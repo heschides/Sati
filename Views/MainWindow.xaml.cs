@@ -1,0 +1,48 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+
+namespace Proofer
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow(MainWindowViewModel vm)
+        {
+            InitializeComponent();
+            DataContext = vm;
+            Activated += MainPage_Activated;
+        }
+        private async void MainPage_Activated(object? sender, EventArgs e)
+        {
+            if (DataContext is MainWindowViewModel vm)
+            {
+                await vm.LoadPeopleAsync();
+            }
+        }
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+        }
+
+
+        private void DataGrid_MouseDoubleClick(object? sender, MouseEventArgs e)
+        {
+            if (DataContext is MainWindowViewModel vm && vm.SelectedNote is not null)
+            {
+                vm.EnterEditMode();
+            }
+        }
+  
+    }
+}

@@ -1,0 +1,54 @@
+﻿<Window x:Class="Proofer.Views.NewUserWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Proofer.Views"
+        mc:Ignorable="d"
+        Title="NewUserWindow" Height="170" Width="320">
+    <Grid Margin="5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="10" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="20" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="Username"
+                   Grid.Row="0"
+                   Grid.Column="0" />
+        <TextBox Grid.Row="0"
+                 Grid.Column="2" Margin="0,0,12,4" Text="{Binding Username}"/>
+        <TextBlock Text="Display Name"
+                   Grid.Row="1"
+                   Grid.Column="0" />
+        <TextBox Grid.Row="1"
+                 Grid.Column="2"
+                 Margin="0,0,12,4" Text="{Binding DisplayName}"/>
+        <Separator Grid.ColumnSpan="3"
+                   Grid.Column="0"
+                   Grid.Row="2" />
+        <TextBlock Text="Create Password"
+                   Grid.Column="0"
+                   Grid.Row="3" />
+        <PasswordBox Grid.Row="3"
+                     Grid.Column="2"
+                     Margin="0,0,12,4"
+                     Name="PasswordInit" PasswordChanged="PasswordInit_PasswordChanged"/>
+        <TextBlock Text="Confirm Password"
+                   Grid.Column="0"
+                   Grid.Row="4" />
+        <PasswordBox Grid.Row="4" Grid.Column="2" Margin="0,0,12,4" Name="PasswordConfirm" PasswordChanged="PasswordConfirm_PasswordChanged"/>
+        <Button Grid.Row="5"
+                Grid.Column="2" 
+                Content="Submit"
+                Margin="0,4,12,0"
+                Command="{Binding CreateUserCommand}"/>
+    </Grid>
+</Window>

@@ -1,0 +1,69 @@
+﻿<Window x:Class="Proofer.NewClientWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Proofer"
+        mc:Ignorable="d"
+    Title="Client List" Height="650" Width="800">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" />
+            <ColumnDefinition Width="12px" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Row="0"
+                    Grid.Column="0">
+            <TextBlock Text="First Name"
+                       Margin="0,0,0,4" />
+            <TextBox Text="{Binding FirstName, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,12" />
+            <TextBlock Text="Last Name"
+                       Margin="0,0,0,4" />
+            <TextBox Text="{Binding LastName, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,12" />
+            <TextBlock Text="Birthday"
+                       Margin="0,0,0,4" />
+            <DatePicker SelectedDate="{Binding BirthDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        Margin="0,0,0,12"/>
+            <TextBlock Text="Waiver"
+                       Margin="0,0,0,4" />
+            <ComboBox ItemsSource="{Binding Waivers}" SelectedItem="{Binding Waiver, Mode=TwoWay}" 
+                      Margin="0,0,0,12" />
+            <TextBlock Text="Effective Date"
+                       Margin="0,0,0,4" />
+            <DatePicker SelectedDate="{Binding EffectiveDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        Margin="0,0,0,12" />
+            <TextBlock Text="Bio"
+                       Margin="0,0,0,4" />
+            <TextBox   Text="{Binding Bio, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       VerticalScrollBarVisibility="Auto"
+                       Height="100"
+                       Margin="2,0,2,12" />
+
+            <Button Content="Add Name"
+                    Command="{Binding SubmitCommand}" 
+                    Margin="0,0,0,12"/>
+            
+            <Button Content="Remove Name"
+                    Command="{Binding RemoveSelectedPersonCommand}" />
+        </StackPanel>
+        <StackPanel Grid.Column="2"
+                    Grid.Row="0">
+            <TextBlock Text="People Who Are Awesome"
+                       Margin="12px" />
+            <DataGrid
+                  ItemsSource="{Binding People}"
+                  SelectedItem="{Binding SelectedPerson, Mode=TwoWay}"
+                  AutoGenerateColumns="True"
+                  IsReadOnly="True">
+        </DataGrid>
+            </StackPanel>
+    </Grid>
+</Window>

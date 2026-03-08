@@ -1,0 +1,241 @@
+﻿<Window x:Class="Proofer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Proofer"
+        mc:Ignorable="d"
+        Title="MainWindow"
+        Background="#F5F5F5"
+        Height="800"
+        Width="1000">
+    <Grid Margin="5,5,5,5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="auto" />
+            <ColumnDefinition Width="20" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="150" />
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0"
+              Grid.Row="1"
+              Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Client"
+                       Grid.Column="0"
+                       Grid.Row="0"
+                       VerticalAlignment="Center" />
+            <ComboBox Grid.Column="2"
+                      Grid.Row="0"
+                      VerticalAlignment="Center"
+                      Margin="0,0,0,12"
+                      ItemsSource="{Binding People, Mode=TwoWay}"
+                      SelectedItem="{Binding SelectedPerson}"
+                      DisplayMemberPath="FullName" />
+            <TextBlock Text="Status"
+                       Grid.Column="0"
+                       Grid.Row="1"
+                       VerticalAlignment="Center" />
+            <ComboBox Grid.Column="2"
+                      Grid.Row="1"
+                      VerticalAlignment="Center"
+                      Margin="0,0,0,12"
+                      ItemsSource="{Binding NoteStatusOptions}"
+                      SelectedItem="{Binding Status, Mode=TwoWay}" />
+            <TextBlock Text="Units"
+                       Grid.Column="0"
+                       Grid.Row="2"
+                       VerticalAlignment="Center" />
+            <TextBox Grid.Column="2"
+                     Grid.Row="2"
+                     VerticalAlignment="Center"
+                     Margin="0,0,0,12"
+                     Text="{Binding Units}" />
+            <TextBlock Text="Date"
+                       Grid.Row="3"
+                       Grid.Column="0" />
+            <DatePicker Grid.Row="3"
+                        Grid.Column="2"
+                        Margin="0,0,0,10"
+                        SelectedDate="{Binding EventDate}" />
+            <TextBlock Text="Note"
+                       Grid.Row="4"
+                       Grid.Column="0" />
+            <TextBox Grid.Row="4"
+                     Grid.Column="2"
+                     Width="275"
+                     VerticalAlignment="Stretch"
+                     Margin="0,0,0,12"
+                     TextWrapping="Wrap"
+                     Text="{Binding Narrative}" />
+            <Button Content="Submit Note"
+                    Grid.Row="5"
+                    Command="{Binding SubmitNoteCommand}"
+                    Grid.Column="1"
+                    Margin="19,0,1,0"
+                    Height="30"
+                    Click="Button_Click"
+                    Grid.ColumnSpan="2" />
+        </Grid>
+
+        <StackPanel Grid.Row="0"
+                    Grid.Column="2">
+            <TextBlock Text="Search"
+                       Margin="0,0,12,4" />
+            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,4" />
+        </StackPanel>
+
+        <DataGrid Grid.Column="2"
+                  Grid.Row="1"
+                  ItemsSource="{Binding Notes}"
+                  SelectedItem="{Binding SelectedNote, Mode=TwoWay}"
+                  MouseDoubleClick="DataGrid_MouseDoubleClick"
+                  Margin="0,0,0,12" />
+
+        <StackPanel Grid.Column="3"
+                    Grid.Row="3">
+            <Button Content="Client List"
+                    Command="{Binding OpenClientListCommand}"
+                    Width="80"
+                    Height="20"
+                    FontSize="10" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Vertical">
+            <StackPanel Orientation="Horizontal">
+        
+            <TextBlock Text="Upcoming Tasks"
+                       FontWeight="Bold"
+                       Margin="4,0,12,4" />
+            <RadioButton GroupName="SortEventsBy"
+                         Content="By Date"
+                         Margin="0,0,24,0" />
+            <RadioButton GroupName="SortEventsBy"
+                         Content="By Type" />
+        </StackPanel>
+            <Separator Margin="0,8" Background="Purple"/>
+            <ItemsControl ItemsSource="{Binding UpcomingEvents}"
+                          d:Background="LightYellow"
+                          d:BorderBrush="Orange"
+                          d:BorderThickness="1">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Title}"
+                                       FontWeight="Bold" />
+                            <TextBlock Text=" - " />
+                            <TextBlock Text="{Binding DueDate, StringFormat={}{0:MMM d}}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <Grid Grid.Column="2"
+              Grid.Row="2" Margin="0,50,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="50" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="50" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Row="0"
+                       Grid.Column="0"
+                       Text="90-Day Reviews"
+                       FontWeight="Bold"/>
+            <CheckBox Grid.Row="1"
+                         Grid.Column="0" 
+                         Content="Quarter 1"
+                         Margin="0,0,20,0"/>
+            <CheckBox Grid.Row="2"
+                         Grid.Column="0"
+                      Content="Quarter 2"
+                      Margin="0,0,20,0" />
+            <CheckBox Grid.Row="3"
+                         Grid.Column="0"
+                      Content="Quarter 3"
+                      Margin="0,0,20,0" />
+            <CheckBox Grid.Row="4"
+                         Grid.Column="0"
+                      Content="Quarter 4"
+                      Margin="0,0,20,0" />
+  
+            <TextBlock Grid.Row="0"
+                      Grid.Column="2"
+                      Text="Releases"
+                      FontWeight="Bold"
+                      Margin="0,0,20,0" />
+            <CheckBox Grid.Row="1"
+                      Grid.Column="2"
+                      Content="DHHS" />
+            <CheckBox Grid.Row="2"
+                      Grid.Column="2"
+                      Content="Agency"
+                      Margin="0,0,20,0" />
+            <CheckBox Grid.Row="3"
+                      Grid.Column="2"
+                      Content="Doctor"
+                      Margin="0,0,20,0" />
+            <CheckBox Grid.Row="4"
+                      Grid.Column="2"
+                      Content="Providers"
+                      Margin="0,0,20,0" />
+            <TextBlock Text="Local Documents"
+                       Grid.Row="0"
+                       Grid.Column="4"
+                       FontWeight="Bold"/>
+            <CheckBox Grid.Row="1"
+                      Grid.Column="4"
+                      Content="Safety Plan"
+                      Margin="0,0,20,0" />
+            <CheckBox Grid.Row="2"
+                      Grid.Column="4"
+                      Content="Privacy Practices"
+                      Margin="0,0,20,0" />
+        </Grid>
+        <Grid Grid.Column="4"
+                    Grid.Row="0"
+                    Grid.RowSpan="2" Margin="4,0,4,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Today's Work" FontWeight="Bold" Grid.Row="0" Grid.Column="0"/>
+            <TextBox VerticalAlignment="Stretch"
+                     Grid.Row="1"
+                     Grid.Column="0"
+                     Background="#FFFFFF
+"/>
+        </Grid>
+        
+    </Grid>
+</Window>
