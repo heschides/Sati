@@ -1,5 +1,5 @@
-﻿using Proofer.Models;
-using Proofer.ViewModels;
+﻿using Sati.Models;
+using Sati.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -12,7 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
-namespace Proofer.Views
+namespace Sati.Views
 {
     /// <summary>
     /// Interaction logic for NewUserWindow.xaml

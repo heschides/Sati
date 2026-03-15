@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Proofer.Models
+namespace Sati.Models
 {
     public class Event
     {

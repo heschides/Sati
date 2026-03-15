@@ -1,9 +1,9 @@
-﻿using Proofer.Models;
+﻿using Sati.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Proofer.Data
+namespace Sati.Data
 {
     public interface IUserService
     {

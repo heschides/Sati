@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Proofer
+namespace Sati
 {
     public class Enums
     {

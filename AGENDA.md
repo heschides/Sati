@@ -1,4 +1,4 @@
-﻿# Proofer — Refactor Agenda
+﻿# Sati — Refactor Agenda
 
 A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM, and SQL LocalDB.
 
@@ -13,7 +13,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 - [ ] Make `IUserService` public
 - [ ] Remove hardcoded seed user from `LoginWindowViewModel`; replace with proper first-run or seeded user via hash path
 - [ ] Fix `MainPage_Activated` firing `LoadPeopleAsync()` on every focus — load once only
-- [ ] Add `OnModelCreating` to `ProoferContext` with explicit keys and relationships
+- [ ] Add `OnModelCreating` to `SatiContext` with explicit keys and relationships
 
 ---
 

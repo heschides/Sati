@@ -1,11 +1,11 @@
-﻿using Proofer.Models;
+﻿using Sati.Models;
 using System;
 using System.Collections.Generic;
 using System.Security.Permissions;
 using System.Text;
-using static Proofer.Enums;
+using static Sati.Enums;
 
-namespace Proofer
+namespace Sati
 {
     public class Person
     {

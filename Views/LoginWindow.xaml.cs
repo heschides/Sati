@@ -1,10 +1,10 @@
-﻿using Proofer.Models;
-using Proofer.ViewModels;
+﻿using Sati.Models;
+using Sati.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
 
 
-namespace Proofer.Views
+namespace Sati.Views
 {
 
     public partial class LoginWindow : Window

@@ -1,10 +1,10 @@
-﻿using Proofer.Models;
-using Proofer.ViewModels;
+﻿using Sati.Models;
+using Sati.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
-namespace Proofer
+namespace Sati
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml

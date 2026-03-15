@@ -5,24 +5,24 @@
 namespace Sati.Migrations
 {
     /// <inheritdoc />
-    public partial class UpdateNoteFields2 : Migration
+    public partial class RenameToSati : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.RenameColumn(
-                name: "UnitCount",
-                table: "Notes",
-                newName: "Units");
+                name: "Birthdate",
+                table: "People",
+                newName: "BirthDate");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.RenameColumn(
-                name: "Units",
-                table: "Notes",
-                newName: "UnitCount");
+                name: "BirthDate",
+                table: "People",
+                newName: "Birthdate");
         }
     }
 }

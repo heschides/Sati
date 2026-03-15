@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Proofer.Models;
+using Sati.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
@@ -7,12 +7,12 @@ using System.Security;
 using System.Text;
 using Windows.UI.Notifications;
 
-namespace Proofer.Data
+namespace Sati.Data
 {
     public class AuthService : IAuthService
     {
-        private readonly ProoferContext _context;
-        public AuthService(ProoferContext context)
+        private readonly SatiContext _context;
+        public AuthService(SatiContext context)
         {
             _context = context;
         }

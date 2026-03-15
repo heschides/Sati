@@ -1,0 +1,51 @@
+﻿<Window x:Class="Sati.Views.SplashScreenWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        WindowStartupLocation="CenterScreen"
+        SizeToContent="WidthAndHeight"
+        ShowInTaskbar="False">
+
+    <Border Background="#FDF6EC"
+            CornerRadius="8">
+        <Grid>
+            <Image Source="/Images/satisplash.png"
+                   Width="800"
+                   Height="533"
+                   Stretch="Uniform" />
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,0,40">
+                <Ellipse x:Name="Dot1"
+                         Width="10"
+                         Height="10"
+                         Margin="6,0"
+                         Fill="#C87941" />
+                <Ellipse x:Name="Dot2"
+                         Width="10"
+                         Height="10"
+                         Margin="6,0"
+                         Fill="#D4A882" />
+                <Ellipse x:Name="Dot3"
+                         Width="10"
+                         Height="10"
+                         Margin="6,0"
+                         Fill="#D4A882" />
+                <Ellipse x:Name="Dot4"
+                         Width="10"
+                         Height="10"
+                         Margin="6,0"
+                         Fill="#D4A882" />
+                <Ellipse x:Name="Dot5"
+                         Width="10"
+                         Height="10"
+                         Margin="6,0"
+                         Fill="#D4A882" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

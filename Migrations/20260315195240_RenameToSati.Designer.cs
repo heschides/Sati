@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Proofer.Data;
+using Sati.Data;
 
 #nullable disable
 
-namespace Proofer.Migrations
+namespace Sati.Migrations
 {
-    [DbContext(typeof(ProoferContext))]
-    partial class ProoferContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(SatiContext))]
+    [Migration("20260315195240_RenameToSati")]
+    partial class RenameToSati
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,7 +25,7 @@ namespace Proofer.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Proofer.Models.Form", b =>
+            modelBuilder.Entity("Sati.Models.Form", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -50,7 +53,7 @@ namespace Proofer.Migrations
                     b.ToTable("Forms");
                 });
 
-            modelBuilder.Entity("Proofer.Models.Note", b =>
+            modelBuilder.Entity("Sati.Models.Note", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -81,7 +84,7 @@ namespace Proofer.Migrations
                     b.ToTable("Notes");
                 });
 
-            modelBuilder.Entity("Proofer.Models.User", b =>
+            modelBuilder.Entity("Sati.Models.User", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -114,7 +117,7 @@ namespace Proofer.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("Proofer.Person", b =>
+            modelBuilder.Entity("Sati.Person", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -125,7 +128,7 @@ namespace Proofer.Migrations
                     b.Property<string>("Bio")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("Birthdate")
+                    b.Property<DateTime>("BirthDate")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("EffectiveDate")
@@ -149,9 +152,9 @@ namespace Proofer.Migrations
                     b.ToTable("People");
                 });
 
-            modelBuilder.Entity("Proofer.Models.Form", b =>
+            modelBuilder.Entity("Sati.Models.Form", b =>
                 {
-                    b.HasOne("Proofer.Person", "Person")
+                    b.HasOne("Sati.Person", "Person")
                         .WithMany("Forms")
                         .HasForeignKey("PersonId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -160,9 +163,9 @@ namespace Proofer.Migrations
                     b.Navigation("Person");
                 });
 
-            modelBuilder.Entity("Proofer.Models.Note", b =>
+            modelBuilder.Entity("Sati.Models.Note", b =>
                 {
-                    b.HasOne("Proofer.Person", "Person")
+                    b.HasOne("Sati.Person", "Person")
                         .WithMany("Notes")
                         .HasForeignKey("PersonId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -171,7 +174,7 @@ namespace Proofer.Migrations
                     b.Navigation("Person");
                 });
 
-            modelBuilder.Entity("Proofer.Person", b =>
+            modelBuilder.Entity("Sati.Person", b =>
                 {
                     b.Navigation("Forms");
 

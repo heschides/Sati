@@ -1,8 +1,8 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
-using Proofer.Data;
-using Proofer.Models;
+using Sati.Data;
+using Sati.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,9 +11,9 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows.Data;
-using static Proofer.Enums;
+using static Sati.Enums;
 
-namespace Proofer
+namespace Sati
 {
     public partial class MainWindowViewModel : ObservableObject
     {

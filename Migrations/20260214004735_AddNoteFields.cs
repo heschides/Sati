@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Proofer.Migrations
+namespace Sati.Migrations
 {
     /// <inheritdoc />
     public partial class AddNoteFields : Migration

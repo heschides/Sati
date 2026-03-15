@@ -5,7 +5,7 @@ using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Proofer.Data
+namespace Sati.Data
 {
     public class PasswordHasher : IPasswordHasher
     {

@@ -2,12 +2,12 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using static Proofer.Enums;
+using static Sati.Enums;
 using System.ComponentModel.DataAnnotations;
-using Proofer.Data;
+using Sati.Data;
 
 
-namespace Proofer
+namespace Sati
 {
 
     public partial class NewClientViewModel : ObservableValidator

@@ -1,14 +1,14 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Proofer.Models;
+using Sati.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Proofer.Data
+namespace Sati.Data
 {
     public partial class UserService : IUserService
     {
-        private readonly ProoferContext _context;
+        private readonly SatiContext _context;
         public async Task<User> CreateAsync(User user)
         {
             _context.Users.Add(user);
@@ -21,7 +21,7 @@ namespace Proofer.Data
             return await _context.Users.ToListAsync();
         }
 
-        public UserService(ProoferContext context)
+        public UserService(SatiContext context)
         {
             _context = context;
         }

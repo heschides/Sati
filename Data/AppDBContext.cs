@@ -1,4 +1,4 @@
-﻿namespace Proofer.Data
+﻿namespace Sati.Data
 {
     internal class AppDBContext
     {

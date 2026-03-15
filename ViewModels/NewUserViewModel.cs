@@ -2,16 +2,16 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Proofer.Data;
+using Sati.Data;
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 using System.Security;
-using Proofer.Models;
+using Sati.Models;
 using System.Windows.Media;
 using Windows.UI.WindowManagement;
 
-namespace Proofer.ViewModels
+namespace Sati.ViewModels
 {
     public partial class NewUserViewModel : ObservableObject
     {

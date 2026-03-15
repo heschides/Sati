@@ -1,9 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
-using Proofer.Data;
-using Proofer.Models;
-using Proofer.Views;
+using Sati.Data;
+using Sati.Models;
+using Sati.Views;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -15,7 +15,7 @@ using System.Text;
 
 
 
-namespace Proofer.ViewModels 
+namespace Sati.ViewModels 
 {
     public partial class LoginWindowViewModel : ObservableObject
     {

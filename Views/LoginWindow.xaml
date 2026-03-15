@@ -1,11 +1,11 @@
-﻿<Window x:Class="Proofer.Views.LoginWindow"
+﻿<Window x:Class="Sati.Views.LoginWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:Proofer.Views"
+        xmlns:local="clr-namespace:Sati.Views"
         mc:Ignorable="d"
-        Title="Proofer"
+        Title="Sati"
         Height="520"
         Width="360"
         WindowStartupLocation="CenterScreen"
@@ -143,6 +143,7 @@
             <ComboBox Style="{StaticResource InputStyle}"
                       ItemsSource="{Binding Users, Mode=OneWay}"
                       SelectedItem="{Binding SelectedUser, Mode=TwoWay}"
+                      VerticalContentAlignment="Center"
                       DisplayMemberPath="DisplayName" />
 
             <!-- Password -->
@@ -150,7 +151,8 @@
                        Style="{StaticResource LabelStyle}" />
             <PasswordBox x:Name="PasswordInput"
                          Style="{StaticResource InputStyle}"
-                         PasswordChanged="PasswordInput_PasswordChanged" />
+                         PasswordChanged="PasswordInput_PasswordChanged" 
+                         VerticalContentAlignment="Center"/>
 
             <!-- Sign In -->
             <Button Content="Sign In"
@@ -164,7 +166,7 @@
             <!-- Create account -->
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Center">
-                <TextBlock Text="New to Proofer?   "
+                <TextBlock Text="New to Sati?   "
                            FontSize="13"
                            Foreground="#9C7A5C"
                            VerticalAlignment="Center" />

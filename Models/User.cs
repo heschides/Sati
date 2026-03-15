@@ -4,7 +4,7 @@ using System.Linq.Expressions;
 using System.Text;
 using Windows.Media.Audio;
 
-namespace Proofer.Models
+namespace Sati.Models
 {
     public class User
     {

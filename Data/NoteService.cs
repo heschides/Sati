@@ -1,18 +1,18 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Proofer.Models;
+using Sati.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Proofer.Data
+namespace Sati.Data
 {
     public class NoteService : INoteService
     {
        
-        private readonly ProoferContext _context;
+        private readonly SatiContext _context;
 
         //constructor
-        public NoteService(ProoferContext context) {  _context = context; }
+        public NoteService(SatiContext context) {  _context = context; }
 
         public async Task<Note> AddNoteAsync(Note note)
         {

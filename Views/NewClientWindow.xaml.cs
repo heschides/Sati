@@ -9,7 +9,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace Proofer
+namespace Sati
 {
     /// <summary>
     /// Interaction logic for NewClientWindow.xaml

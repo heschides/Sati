@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization.Formatters;
 using System.Text;
-using static Proofer.Enums;
+using static Sati.Enums;
 
-namespace Proofer.Models
+namespace Sati.Models
 {
     public class Form
     {

@@ -3,14 +3,14 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Proofer.Data
+namespace Sati.Data
 {
     public class PersonService : IPersonService
     {
-        private readonly ProoferContext _context;
+        private readonly SatiContext _context;
 
         //consstructor
-        public PersonService(ProoferContext context)
+        public PersonService(SatiContext context)
         {
             _context = context;
         }

@@ -1,17 +1,17 @@
 ﻿using System.Configuration;
 using System.Data;
-using Proofer.Views;
+using Sati.Views;
 using System.Windows;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Proofer.Data;
-using Proofer.ViewModels;
+using Sati.Data;
+using Sati.ViewModels;
 using Microsoft.Identity.Client;
 using Windows.Media.ClosedCaptioning;
 
-namespace Proofer
+namespace Sati
 {
     /// <summary>
     /// Interaction logic for App.xaml
@@ -21,8 +21,12 @@ namespace Proofer
         private IHost? _host;
         public IServiceProvider Services => _host!.Services;
 
-        protected override void OnStartup(StartupEventArgs e)
+
+        protected override async void OnStartup(StartupEventArgs e)
         {
+            var splash = new SplashScreenWindow();
+            splash.Show();
+
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
@@ -49,7 +53,7 @@ namespace Proofer
                     services.AddTransient<Func<NewClientWindow>>(sp => () => sp.GetRequiredService<NewClientWindow>());
 
                     //EF Core
-                    services.AddDbContext<ProoferContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("ProoferDb")), ServiceLifetime.Transient);
+                    services.AddDbContext<SatiContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")), ServiceLifetime.Transient);
 
 
 
@@ -65,9 +69,9 @@ namespace Proofer
             var mainVm = _host.Services.GetRequiredService<MainWindowViewModel>();
             var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
             var loginVM = _host.Services.GetRequiredService<LoginWindowViewModel>();
+            await Task.Delay(3000);
+            splash.Close();
             bool? result = loginWindow.ShowDialog();
-
-        
 
             if (result == true)
             {
@@ -76,11 +80,11 @@ namespace Proofer
                 if (user == null)
                     return;
                 mainVm.Initialize(user);
-
                 mainWindow.Show();
             }
             else
             {
+                splash.Close();
                 Shutdown();
             }
 

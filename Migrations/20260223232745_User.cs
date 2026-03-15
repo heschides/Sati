@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace Proofer.Migrations
+namespace Sati.Migrations
 {
     /// <inheritdoc />
     public partial class User : Migration
