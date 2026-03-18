@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows.Data;
+using System.Windows.Threading;
 using static Sati.Enums;
 
 namespace Sati
@@ -104,6 +105,7 @@ namespace Sati
                 var note = Note.Create(Narrative, EventDate, Status, Units, SelectedPerson.Id);
                 var savedNote = await _noteService.AddNoteAsync(note);
                 Notes.Insert(0, savedNote);
+                _= LoadMonthlyNotesAsync();
                 NotesView.Refresh();
 
                 //SelectedPerson = null;
@@ -124,6 +126,7 @@ namespace Sati
                 note.Units = Units ?? 0;
                 note.Status = Status;
                 await _noteService.UpdateNoteAsync(note);
+                _ = LoadMonthlyNotesAsync();
                 NotesView.Refresh();
 
 
@@ -143,6 +146,7 @@ namespace Sati
             {
                 await _noteService.DeleteNoteAsync(SelectedNote);
                 Notes.Remove(SelectedNote);
+                _= LoadMonthlyNotesAsync();
                 SelectedNote = null;
             }
         }
@@ -199,7 +203,9 @@ namespace Sati
         public void Initialize(User user)
         {
             LoggedInUser = user;
-            _ = LoadPeopleAsync();
+            _= LoadPeopleAsync();
+            _= _noteService.UpdateAbandonedNotesAsync(7);
+             StartAbandonmentTimer();
         }
 
         public void EnterEditMode()
@@ -216,5 +222,41 @@ namespace Sati
             SelectedPerson = People.First(p => p.Id == SelectedNote.PersonId);
         }
 
+        private DateTime _lastAbandonmentCheck = DateTime.Now;
+        private void StartAbandonmentTimer()
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromHours(1) };
+            timer.Tick += async (s, e) =>
+            {
+                if ((DateTime.Now - _lastAbandonmentCheck).TotalHours >= 24)
+                {
+                    await _noteService.UpdateAbandonedNotesAsync(7);
+                    _lastAbandonmentCheck = DateTime.Now;
+                }
+            };
+            timer.Start();
+        }
+
+        //COMPUTED PROPERTIES AND METHOD FOR UNIT LOGIC
+        private List<Note> _monthlyNotes = [];
+        public int? PendingUnits => _monthlyNotes
+      .Where(n => n.Status == NoteStatus.Pending)
+      .Sum(n => n.Units);
+
+        public int? LoggedUnits => _monthlyNotes
+            .Where(n => n.Status == NoteStatus.Logged)
+            .Sum(n => n.Units);
+
+        public int? AbandonedUnits => _monthlyNotes
+            .Where(n => n.Status == NoteStatus.Abandoned)
+            .Sum(n => n.Units);
+
+        private async Task LoadMonthlyNotesAsync()
+        {
+            _monthlyNotes = await _noteService.GetMonthlyNotesAsync();
+            OnPropertyChanged(nameof(PendingUnits));
+            OnPropertyChanged(nameof(LoggedUnits));
+            OnPropertyChanged(nameof(AbandonedUnits));
+        }
     }
 }

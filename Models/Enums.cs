@@ -31,11 +31,12 @@ namespace Sati
 
         public enum NoteStatus
         {
-            Schdeduled,
-            NotePending,
+            Scheduled,
+            Pending,
             Logged,
             Cancelled,
-            Delayed
+            Delayed,
+            Abandoned
         }
     }
 }

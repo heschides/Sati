@@ -11,5 +11,8 @@ namespace Sati.Data
         Task DeleteNoteAsync(Note note);
         Task UpdateNoteAsync(Note note);
         Task<List<Note>> GetAllByPersonAsync(int personId);
+        Task UpdateAbandonedNotesAsync(int abandonedAfterDays);
+        Task<List<Note>> GetMonthlyNotesAsync();
+
     }
 }
