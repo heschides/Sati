@@ -19,7 +19,7 @@ namespace Sati
             Q2R,
             Q3R,
             Q4R,
-            
+
             PCP,
             ComprehensiveAssessment,
             Reclassification,
@@ -38,5 +38,13 @@ namespace Sati
             Delayed,
             Abandoned
         }
+
+        public enum NoteType
+        {
+            Visit,
+            Contact,
+            Documentation
+        }
     }
 }
+

@@ -22,9 +22,12 @@ namespace Sati
         //FIELDS
         private readonly IPersonService _personService;
         private readonly INoteService _noteService;
+        private readonly ISettingsService _settingsService;
+        private Settings? _settings;
 
         //EVENTS
         public event EventHandler<bool>? OpenClientsWindowRequested;
+        public event EventHandler<bool>? OpenSettingsWindowRequested;
 
         //PROPERTIES
         public ICollectionView NotesView { get; }
@@ -36,50 +39,30 @@ namespace Sati
             LoadNotesForPersonAsync(value);
         }
 
-        [ObservableProperty]
-        private int? units;
-
-        [ObservableProperty]
-        private DateTime? eventDate;
-
-        [ObservableProperty]
-        private int? duration;
-
-        [ObservableProperty]
-        private string? narrative;
-
-        [ObservableProperty]
-        private NoteStatus? status;
-
-        [ObservableProperty]
-        private bool isEditing = false;
-
-        [ObservableProperty]
-        private Note? selectedNote = null;
-
-        [ObservableProperty]
-        private string? searchText;
-
-        [ObservableProperty]
-        private NoteStatus? filterStatus;
+        [ObservableProperty] private int? units;
+        [ObservableProperty] private DateTime? eventDate;
+        [ObservableProperty] private int? duration;
+        [ObservableProperty] private string? narrative;
+        [ObservableProperty] private NoteStatus? status;
+        [ObservableProperty] private bool isEditing = false;
+        [ObservableProperty] private Note? selectedNote = null;
+        [ObservableProperty] private string? searchText;
+        [ObservableProperty] private NoteStatus? filterStatus;
+        [ObservableProperty] private NoteType? noteType;
+        [ObservableProperty] private User? loggedInUser;
         partial  void OnFilterStatusChanged(NoteStatus? value) => NotesView.Refresh();
-
-        [ObservableProperty]
-        private User? loggedInUser;
-
         public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
-
-
         public ObservableCollection<Note> Notes { get; } = [];
         public ObservableCollection<Person> People { get; set; } = [];
         public ObservableCollection<Event> UpcomingEvents { get; set; } = [];
 
 
         //Constructor
-        public MainWindowViewModel(IServiceProvider services, IPersonService personService, INoteService noteService)
+        public MainWindowViewModel(IServiceProvider services, IPersonService personService, INoteService noteService, ISettingsService settingsService)
         {
             _personService = personService;
             _noteService = noteService;
+            _settingsService = settingsService;
             NotesView = CollectionViewSource.GetDefaultView(Notes);
             NotesView.Filter = FilterNotes;
         }
@@ -89,6 +72,12 @@ namespace Sati
         public void OpenClientList()
         {
             OpenClientsWindowRequested?.Invoke(this, true);
+        }
+
+        [RelayCommand]
+        public void OpenSettingsWindow()
+        {
+            OpenSettingsWindowRequested?.Invoke(this, true);
         }
 
         [RelayCommand]
@@ -202,10 +191,23 @@ namespace Sati
 
         public void Initialize(User user)
         {
+            
             LoggedInUser = user;
+            _ = LoadAsync();
             _= LoadPeopleAsync();
             _= _noteService.UpdateAbandonedNotesAsync(7);
              StartAbandonmentTimer();
+        }
+
+        private async Task LoadAsync()
+        {
+            _settings = await _settingsService.LoadAsync();
+            await LoadPeopleAsync();
+            await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
+            await LoadMonthlyNotesAsync();
+            StartAbandonmentTimer();
+
+
         }
 
         public void EnterEditMode()
@@ -223,17 +225,11 @@ namespace Sati
         }
 
         private DateTime _lastAbandonmentCheck = DateTime.Now;
-        private void StartAbandonmentTimer()
+        private async void StartAbandonmentTimer()
         {
             var timer = new DispatcherTimer { Interval = TimeSpan.FromHours(1) };
-            timer.Tick += async (s, e) =>
-            {
-                if ((DateTime.Now - _lastAbandonmentCheck).TotalHours >= 24)
-                {
-                    await _noteService.UpdateAbandonedNotesAsync(7);
-                    _lastAbandonmentCheck = DateTime.Now;
-                }
-            };
+            await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 7);
+
             timer.Start();
         }
 

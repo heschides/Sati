@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Runtime.Serialization.Formatters;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Abstractions;
 using Sati.Models;
 using static Sati.Enums;
 
@@ -15,6 +16,8 @@ namespace Sati.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Form> Forms { get; set; }
         public DbSet<Note> Notes { get; set; }
+        public DbSet<Settings> Settings { get; set;  }
+
 
         public SatiContext(DbContextOptions<SatiContext> options) : base(options)
         { 
@@ -65,6 +68,13 @@ namespace Sati.Data
                       .WithMany(p => p.Forms)
                       .HasForeignKey(f => f.PersonId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<Settings>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.BaseIncentive).HasColumnType("decimal(18,2)");
+                entity.Property(s => s.PerUnitIncentive).HasColumnType("decimal(18,2)");
             });
         }
     }

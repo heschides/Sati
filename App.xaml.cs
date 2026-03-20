@@ -49,13 +49,16 @@ namespace Sati
                     services.AddTransient<NewUserWindow>();
                     services.AddTransient<NewUserViewModel>();
 
+                    services.AddTransient<ISettingsService, SettingsService>();
+                    services.AddTransient<SettingsViewModel>();
+                    services.AddTransient<SettingsWindow>();
+
+                    services.AddTransient<Func<SettingsWindow>>(sp => () => sp.GetRequiredService<SettingsWindow>());
                     services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
                     services.AddTransient<Func<NewClientWindow>>(sp => () => sp.GetRequiredService<NewClientWindow>());
 
                     //EF Core
                     services.AddDbContext<SatiContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")), ServiceLifetime.Transient);
-
-
 
                 })
                 .Build();

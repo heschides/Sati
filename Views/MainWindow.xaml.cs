@@ -1,5 +1,6 @@
 ﻿using Sati.Models;
 using Sati.ViewModels;
+using Sati.Views;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -11,9 +12,10 @@ namespace Sati
     /// </summary>
     public partial class MainWindow : Window
     {
-        private readonly Func<NewClientWindow> _newClientWindowFactory;
+        private readonly Func<NewClientWindow> _newClientWindow;
+        private readonly Func<SettingsWindow> _newSettingsWindow;
 
-        public MainWindow(MainWindowViewModel vm, Func<NewClientWindow> newClientWindowFactory)
+        public MainWindow(MainWindowViewModel vm, Func<NewClientWindow> newClientWindowFactory, Func<SettingsWindow> newSettingsWindowFactory)
         {
             InitializeComponent();
             var screenHeight = SystemParameters.PrimaryScreenHeight;
@@ -23,14 +25,21 @@ namespace Sati
             Width = Math.Min(1100, screenWidth * 0.9);
 
             DataContext = vm;
-            _newClientWindowFactory = newClientWindowFactory;
+            _newClientWindow = newClientWindowFactory;
 
             vm.OpenClientsWindowRequested += (s, success) =>
             {
-                var win = _newClientWindowFactory();
+                var win = _newClientWindow();
                 var result = win.ShowDialog();
 
                 _= vm.LoadPeopleAsync();
+            };
+
+            _newSettingsWindow = newSettingsWindowFactory;
+            vm.OpenSettingsWindowRequested += (s, success) =>
+            {
+                var win = _newSettingsWindow();
+                var result = win.ShowDialog();
             };
         }
 
