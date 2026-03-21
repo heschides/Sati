@@ -24,6 +24,8 @@ namespace Sati
         private readonly INoteService _noteService;
         private readonly ISettingsService _settingsService;
         private Settings? _settings;
+        private readonly IScratchpadService _scratchpadService;
+        private Scratchpad? _scratchpad;
 
         //EVENTS
         public event EventHandler<bool>? OpenClientsWindowRequested;
@@ -48,8 +50,9 @@ namespace Sati
         [ObservableProperty] private Note? selectedNote = null;
         [ObservableProperty] private string? searchText;
         [ObservableProperty] private NoteStatus? filterStatus;
-        [ObservableProperty] private NoteType? noteType;
         [ObservableProperty] private User? loggedInUser;
+        [ObservableProperty] private string scratchpadContent = string.Empty;
+        [ObservableProperty] private NoteType? selectedNoteType;
         partial  void OnFilterStatusChanged(NoteStatus? value) => NotesView.Refresh();
         public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
         public ObservableCollection<Note> Notes { get; } = [];
@@ -58,11 +61,12 @@ namespace Sati
 
 
         //Constructor
-        public MainWindowViewModel(IServiceProvider services, IPersonService personService, INoteService noteService, ISettingsService settingsService)
+        public MainWindowViewModel(IServiceProvider services, IPersonService personService, INoteService noteService, ISettingsService settingsService, IScratchpadService scratchpadService)
         {
             _personService = personService;
             _noteService = noteService;
             _settingsService = settingsService;
+            _scratchpadService = scratchpadService;
             NotesView = CollectionViewSource.GetDefaultView(Notes);
             NotesView.Filter = FilterNotes;
         }
@@ -194,9 +198,6 @@ namespace Sati
             
             LoggedInUser = user;
             _ = LoadAsync();
-            _= LoadPeopleAsync();
-            _= _noteService.UpdateAbandonedNotesAsync(7);
-             StartAbandonmentTimer();
         }
 
         private async Task LoadAsync()
@@ -205,9 +206,31 @@ namespace Sati
             await LoadPeopleAsync();
             await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
             await LoadMonthlyNotesAsync();
+
+            _scratchpad = await _scratchpadService.LoadTodayAsync(LoggedInUser!.Id);
+            ScratchpadContent = _scratchpad!.Content;
+
             StartAbandonmentTimer();
+            StartScratchpadTimer();
+        }
 
+        private void StartScratchpadTimer()
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
+            timer.Tick += async (s, e) =>
+            {
+                if (_scratchpad is null) return;
+                _scratchpad.Content = ScratchpadContent;
+                await _scratchpadService.SaveAsync(_scratchpad);
+            };
+            timer.Start();
+        }
 
+        public async Task SaveScratchpadAsync()
+        {
+            if (_scratchpad is null) return;
+            _scratchpad.Content = ScratchpadContent;
+            await _scratchpadService.SaveAsync(_scratchpad);
         }
 
         public void EnterEditMode()
@@ -225,12 +248,33 @@ namespace Sati
         }
 
         private DateTime _lastAbandonmentCheck = DateTime.Now;
-        private async void StartAbandonmentTimer()
+        private void StartAbandonmentTimer()
         {
             var timer = new DispatcherTimer { Interval = TimeSpan.FromHours(1) };
-            await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 7);
-
+            timer.Tick += async (s, e) =>
+            {
+                if ((DateTime.Now - _lastAbandonmentCheck).TotalHours >= 24)
+                {
+                    await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 7);
+                    _lastAbandonmentCheck = DateTime.Now;
+                }
+            };
             timer.Start();
+        }
+
+        partial void OnSelectedNoteTypeChanged(NoteType? value)
+        {
+            if (value is null) return;
+            if (!string.IsNullOrWhiteSpace(Narrative)) return;
+
+            var noteType = value.Value;
+            Narrative = noteType switch
+            {
+                Sati.Enums.NoteType.Visit => _settings?.VisitTemplate ?? string.Empty,
+                Sati.Enums.NoteType.Contact => _settings?.ContactTemplate ?? string.Empty,
+                Sati.Enums.NoteType.Documentation => _settings?.DocumentationTemplate ?? string.Empty,
+                _ => string.Empty
+            };
         }
 
         //COMPUTED PROPERTIES AND METHOD FOR UNIT LOGIC

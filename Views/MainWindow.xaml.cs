@@ -41,6 +41,12 @@ namespace Sati
                 var win = _newSettingsWindow();
                 var result = win.ShowDialog();
             };
+
+            Closing += async (s, e) =>
+            {
+                if (DataContext is MainWindowViewModel vm)
+                    await vm.SaveScratchpadAsync();
+            };
         }
 
         private void DataGrid_MouseDoubleClick(object? sender, MouseEventArgs e)

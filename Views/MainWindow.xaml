@@ -534,7 +534,7 @@
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
                          VerticalAlignment="Stretch"
-                         Text="TodaysWork"
+                         Text="{Binding ScratchpadContent, UpdateSourceTrigger=PropertyChanged}"
                          BorderThickness="0"
                          Background="Transparent"
                          Margin="0" />

@@ -17,6 +17,7 @@ namespace Sati.Data
         public DbSet<Form> Forms { get; set; }
         public DbSet<Note> Notes { get; set; }
         public DbSet<Settings> Settings { get; set;  }
+        public DbSet<Scratchpad> Scratchpad {  get; set; }
 
 
         public SatiContext(DbContextOptions<SatiContext> options) : base(options)
@@ -75,6 +76,13 @@ namespace Sati.Data
                 entity.HasKey(s => s.Id);
                 entity.Property(s => s.BaseIncentive).HasColumnType("decimal(18,2)");
                 entity.Property(s => s.PerUnitIncentive).HasColumnType("decimal(18,2)");
+            });
+
+            modelBuilder.Entity<Scratchpad>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.HasIndex(s => new {s.UserId, s.Date})
+                .IsUnique();
             });
         }
     }

@@ -35,6 +35,7 @@ namespace Sati
                     services.AddTransient<INoteService, NoteService>();
                     services.AddTransient<IAuthService, AuthService>();
                     services.AddTransient<IUserService, UserService>();
+                    services.AddTransient<IScratchpadService, ScratchpadService>();
                     services.AddTransient<IPasswordHasher, PasswordHasher>();
 
                     services.AddSingleton<MainWindowViewModel>();
