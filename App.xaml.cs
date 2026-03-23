@@ -30,7 +30,8 @@ namespace Sati
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    //registrations
+                    //REGISTRATIONS
+                    //services
                     services.AddTransient<IPersonService, PersonService>();
                     services.AddTransient<INoteService, NoteService>();
                     services.AddTransient<IAuthService, AuthService>();
@@ -38,7 +39,11 @@ namespace Sati
                     services.AddTransient<IScratchpadService, ScratchpadService>();
                     services.AddTransient<IPasswordHasher, PasswordHasher>();
                     services.AddTransient<IIncentiveService, IncentiveService>();
+                    services.AddSingleton<ISessionService, SessionService>();
+                    services.AddTransient<ISettingsService, SettingsService>();
 
+
+                    //windows and viewmodels
                     services.AddSingleton<MainWindowViewModel>();
                     services.AddSingleton<MainWindow>();
 
@@ -51,15 +56,18 @@ namespace Sati
                     services.AddTransient<NewUserWindow>();
                     services.AddTransient<NewUserViewModel>();
 
-                    services.AddTransient<ISettingsService, SettingsService>();
                     services.AddTransient<SettingsViewModel>();
                     services.AddTransient<SettingsWindow>();
+
+                    services.AddTransient<SchedulerViewModel>();
 
                     services.AddTransient<Func<SettingsWindow>>(sp => () => sp.GetRequiredService<SettingsWindow>());
                     services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
                     services.AddTransient<Func<NewClientWindow>>(sp => () => sp.GetRequiredService<NewClientWindow>());
 
-                    //EF Core
+
+
+                    //ef core
                     services.AddDbContext<SatiContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")), ServiceLifetime.Transient);
 
                 })
@@ -68,6 +76,8 @@ namespace Sati
             _host.Start();
 
 
+
+            //LOGIN SEQUENCE
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
             var mainVm = _host.Services.GetRequiredService<MainWindowViewModel>();
             var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
@@ -79,10 +89,13 @@ namespace Sati
             if (result == true)
             {
                 var user = loginWindow.LoggedInUser;
-
                 if (user == null)
                     return;
-                mainVm.Initialize(user);
+
+                var session = _host.Services.GetRequiredService<ISessionService>();
+                session.SetUser(user);
+
+                mainVm.Initialize();
                 mainWindow.Show();
             }
             else
@@ -92,7 +105,6 @@ namespace Sati
             }
 
             base.OnStartup(e);
-
 
         }
 

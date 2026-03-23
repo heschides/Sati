@@ -1,6 +1,7 @@
 ﻿using Sati.Models;
 using Sati.ViewModels;
 using Sati.Views;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,8 +15,9 @@ namespace Sati
     {
         private readonly Func<NewClientWindow> _newClientWindow;
         private readonly Func<SettingsWindow> _newSettingsWindow;
+        private SchedulerViewModel _schedulerVm;
 
-        public MainWindow(MainWindowViewModel vm, Func<NewClientWindow> newClientWindowFactory, Func<SettingsWindow> newSettingsWindowFactory)
+        public MainWindow(MainWindowViewModel vm, Func<NewClientWindow> newClientWindowFactory, Func<SettingsWindow> newSettingsWindowFactory, SchedulerViewModel schedulerVm)
         {
             InitializeComponent();
             var screenHeight = SystemParameters.PrimaryScreenHeight;
@@ -32,7 +34,7 @@ namespace Sati
                 var win = _newClientWindow();
                 var result = win.ShowDialog();
 
-                _= vm.LoadPeopleAsync();
+                _ = vm.LoadPeopleAsync();
             };
 
             _newSettingsWindow = newSettingsWindowFactory;
@@ -46,6 +48,13 @@ namespace Sati
             {
                 if (DataContext is MainWindowViewModel vm)
                     await vm.SaveScratchpadAsync();
+            };
+            _schedulerVm = schedulerVm;
+            SchedulerPopup.DataContext = schedulerVm;
+            SchedulerPopup.Opened += (s, e) =>
+            {
+                Debug.WriteLine("Popup opened");
+                _schedulerVm.Initialize();
             };
         }
 

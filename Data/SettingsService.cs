@@ -1,20 +1,35 @@
-﻿using Sati.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Microsoft.EntityFrameworkCore;
+using Sati.Models;
 
 namespace Sati.Data
 {
-    class SettingsService : ISettingsService
+    public class SettingsService : ISettingsService
     {
-        public Task<Settings> LoadAsync()
+        private readonly SatiContext _context;
+
+        public SettingsService(SatiContext context)
         {
-            throw new NotImplementedException();
+            _context = context;
         }
 
-        public Task SaveAsync(Settings settings)
+        public async Task<Settings> LoadAsync()
         {
-            throw new NotImplementedException();
+            var settings = await _context.Settings.FirstOrDefaultAsync();
+
+            if (settings is null)
+            {
+                settings = new Settings();
+                _context.Settings.Add(settings);
+                await _context.SaveChangesAsync();
+            }
+
+            return settings;
+        }
+
+        public async Task SaveAsync(Settings settings)
+        {
+            _context.Settings.Update(settings);
+            await _context.SaveChangesAsync();
         }
     }
 }

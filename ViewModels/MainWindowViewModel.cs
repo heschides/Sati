@@ -28,6 +28,8 @@ namespace Sati
         private Scratchpad? _scratchpad;
         private readonly IIncentiveService _incentiveService;
         private Incentive? _incentive;
+        private readonly ISessionService _sessionService;
+
 
         //EVENTS
         public event EventHandler<bool>? OpenClientsWindowRequested;
@@ -55,6 +57,7 @@ namespace Sati
         [ObservableProperty] private string scratchpadContent = string.Empty;
         [ObservableProperty] private NoteType? selectedNoteType; 
         [ObservableProperty] private int daysScheduled;
+        [ObservableProperty] private bool isSchedulerOpen = false;
         partial  void OnFilterStatusChanged(NoteStatus? value) => NotesView.Refresh();
         public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
         public ObservableCollection<Note> Notes { get; } = [];
@@ -64,7 +67,7 @@ namespace Sati
 
 
         //Constructor
-        public MainWindowViewModel(IServiceProvider services, IPersonService personService, INoteService noteService, ISettingsService settingsService, IScratchpadService scratchpadService, IIncentiveService incentiveService)
+        public MainWindowViewModel(IServiceProvider services, IPersonService personService, INoteService noteService, ISettingsService settingsService, IScratchpadService scratchpadService, IIncentiveService incentiveService, ISessionService sessionService)
         {
             _personService = personService;
             _noteService = noteService;
@@ -73,24 +76,19 @@ namespace Sati
             _incentiveService = incentiveService;
             NotesView = CollectionViewSource.GetDefaultView(Notes);
             NotesView.Filter = FilterNotes;
-
+            _sessionService = sessionService;
         }
 
         //Commands
-        [RelayCommand]
-        public void OpenClientList()
+        [RelayCommand] public void OpenClientList()
         {
             OpenClientsWindowRequested?.Invoke(this, true);
         }
-
-        [RelayCommand]
-        public void OpenSettingsWindow()
+        [RelayCommand] public void OpenSettingsWindow()
         {
             OpenSettingsWindowRequested?.Invoke(this, true);
         }
-
-        [RelayCommand]
-        public async Task SubmitNote()
+        [RelayCommand] public async Task SubmitNote()
         {
             if (string.IsNullOrWhiteSpace(Narrative) ||
                     SelectedPerson == null)
@@ -136,9 +134,7 @@ namespace Sati
                 Duration = null;
             }
         }
-
-        [RelayCommand]
-        private async Task DeleteNote()
+        [RelayCommand] private async Task DeleteNote()
         {
             if (SelectedNote != null)
             {
@@ -148,13 +144,15 @@ namespace Sati
                 SelectedNote = null;
             }
         }
+        [RelayCommand] private void OpenScheduler() 
+        {IsSchedulerOpen = !IsSchedulerOpen; 
+        }
 
         //Methods
         partial void OnSearchTextChanged(string? value)
         {
             NotesView.Refresh();
         }
-
         private async void LoadNotesForPersonAsync(Person? person)
         {
             if (person is null)
@@ -167,7 +165,6 @@ namespace Sati
             foreach (var note in notes)
                 Notes.Add(note);
         }
-
         public bool FilterNotes(object obj)
         {
             if (obj is not Note note)
@@ -180,7 +177,6 @@ namespace Sati
 
             return matchesText && matchesStatus;
         }
-
         public async Task LoadPeopleAsync()
         {
             try
@@ -195,14 +191,11 @@ namespace Sati
                     Debug.WriteLine($"Failed to load people: {ex.Message}");
                 }
             }     
-
-        public void Initialize(User user)
+        public void Initialize()
         {
-            
-            LoggedInUser = user;
+            LoggedInUser = _sessionService.CurrentUser;
             _ = LoadAsync();
         }
-
         private async Task LoadAsync()
         {
             _settings = await _settingsService.LoadAsync();
@@ -223,7 +216,6 @@ namespace Sati
             StartAbandonmentTimer();
             StartScratchpadTimer();
         }
-
         private void StartScratchpadTimer()
         {
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };

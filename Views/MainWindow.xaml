@@ -168,7 +168,7 @@
             </Setter>
         </Style>
         <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
-
+        <converters:BoolToTileColorConverter x:Key="BoolToTileColorConverter" />
     </Window.Resources>
 
     <!--
@@ -210,6 +210,8 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -227,12 +229,169 @@
                            HorizontalAlignment="Center" />
             </Button>
 
-            <Button Grid.Column="2"
+            <Button x:Name="SchedulerButton"
+                    Grid.Column="2"
+                    Style="{StaticResource SmallButton}"
+                    ToolTip="Scheduler"
+                    Width="28"
+                    Command="{Binding OpenSchedulerCommand}"
+                    Background="Transparent"
+                    Padding="0">
+                <TextBlock FontFamily="Segoe MDL2 Assets"
+                           Text="&#xE787;"
+                           FontSize="14"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center" />
+            </Button>
+
+            <Button Grid.Column="4"
                     Content="Client List"
                     Style="{StaticResource SmallButton}"
                     Command="{Binding OpenClientListCommand}"
                     HorizontalAlignment="Stretch" />
         </Grid>
+
+        <Popup x:Name="SchedulerPopup"
+               PlacementTarget="{Binding ElementName=SchedulerButton}"
+               Placement="Bottom"
+               IsOpen="{Binding DataContext.IsSchedulerOpen, 
+    RelativeSource={RelativeSource AncestorType=Window}}"
+               StaysOpen="False"
+               AllowsTransparency="True"
+               PopupAnimation="Slide">
+
+            <Border Background="White"
+                    BorderBrush="#E8D0B8"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="16" >
+
+                <StackPanel Width="320">
+
+                    <!-- Header with navigation -->
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0"
+                                Content="◀"
+                                Style="{StaticResource SmallButton}"
+                                Command="{Binding PreviousMonthCommand}"
+                                Width="28" />
+
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding MonthLabel}"
+                                   FontSize="13"
+                                   FontWeight="Bold"
+                                   Foreground="#3D2B1F"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+
+                        <Button Grid.Column="2"
+                                Content="▶"
+                                Style="{StaticResource SmallButton}"
+                                Command="{Binding NextMonthCommand}"
+                                Width="28" />
+                    </Grid>
+
+                    <!-- Day header row -->
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Mon"
+                                   Style="{StaticResource LabelStyle}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="Tue"
+                                   Style="{StaticResource LabelStyle}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="2"
+                                   Text="Wed"
+                                   Style="{StaticResource LabelStyle}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="3"
+                                   Text="Thu"
+                                   Style="{StaticResource LabelStyle}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="4"
+                                   Text="Fri"
+                                   Style="{StaticResource LabelStyle}"
+                                   HorizontalAlignment="Center" />
+                    </Grid>
+
+                    <!-- Tile grid -->
+                    <ItemsControl ItemsSource="{Binding Tiles}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="5" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Margin="2"
+                                        Command="{Binding DataContext.ToggleTileCommand, 
+                                    RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        IsEnabled="{Binding IsInteractable}"
+                                        Background="{Binding IsExcluded, Converter={StaticResource BoolToTileColorConverter}}"
+                                        BorderThickness="0"
+                                        Cursor="Hand"
+                                        Height="44">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="4">
+                                                <Grid>
+                                                    <TextBlock Text="{Binding Letter}"
+                                                               FontSize="16"
+                                                               FontWeight="Bold"
+                                                               Foreground="#3D2B1F"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Date, StringFormat={}{0:d}}"
+                                                               FontSize="8"
+                                                               Foreground="#9C7A5C"
+                                                               HorizontalAlignment="Right"
+                                                               VerticalAlignment="Bottom"
+                                                               Margin="0,0,3,2" />
+                                                </Grid>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Days scheduled footer -->
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="DAYS SCHEDULED"
+                                   Style="{StaticResource LabelStyle}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding DaysScheduled}"
+                                   FontSize="20"
+                                   FontWeight="Bold"
+                                   Foreground="#3D2B1F" />
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+        </Popup>
 
         <!-- ═══ COL 0 ROWS 1-2: NOTE ENTRY FORM ═══ -->
         <Border Grid.Column="0"

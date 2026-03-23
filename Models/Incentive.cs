@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace Sati.Models
 {
@@ -13,16 +15,21 @@ namespace Sati.Models
         public int DaysScheduled { get; set; }
         public decimal BaseIncentive { get; set; }
         public decimal PerUnitIncentive { get; set; }
-
         public User User { get; set; } = null!;
-
         public int Threshold => DaysScheduled * 19;
-
+        public string ExcludedDatesJson { get; set; } = "[]";
         public decimal Calculate(int loggedUnits)
         {
             if (loggedUnits < Threshold) return 0;
             if (loggedUnits == Threshold) return BaseIncentive;
             return BaseIncentive + ((loggedUnits - Threshold) * PerUnitIncentive);
+        }
+
+        [NotMapped]
+        public List<DateTime> ExcludedDates
+        {
+            get => JsonSerializer.Deserialize<List<DateTime>>(ExcludedDatesJson) ?? [];
+            set => ExcludedDatesJson = JsonSerializer.Serialize(value);
         }
     }
 }
