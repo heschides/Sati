@@ -22,6 +22,12 @@ namespace Sati.Views
         {
             InitializeComponent();
             DataContext = vm;
+
+            Closing += async (s, e) =>
+            {
+                if (DataContext is SettingsViewModel vm)
+                    await vm.SaveSettingsAsync();
+            };
         }
     }
 

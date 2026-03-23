@@ -131,6 +131,88 @@
                            Style="{StaticResource LabelStyle}" />
                 <TextBox Text="{Binding PerUnitIncentive, UpdateSourceTrigger=PropertyChanged}" />
 
+                <!-- SCHEDULE EXCLUSIONS -->
+                <TextBlock Text="EXCLUDED WEEKDAYS"
+                           Style="{StaticResource SectionHeader}"
+                           Margin="0,8,0,8" />
+                <Separator />
+
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,12">
+                    <CheckBox Content="Monday"
+                              IsChecked="{Binding ExcludeMonday}"
+                              Margin="0,0,16,0"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Tuesday"
+                              IsChecked="{Binding ExcludeTuesday}"
+                              Margin="0,0,16,0"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Wednesday"
+                              IsChecked="{Binding ExcludeWednesday}"
+                              Margin="0,0,16,0"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Thursday"
+                              IsChecked="{Binding ExcludeThursday}"
+                              Margin="0,0,16,0"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Friday"
+                              IsChecked="{Binding ExcludeFriday}"
+                              Foreground="#3D2B1F" />
+                </StackPanel>
+
+                <!-- FEDERAL HOLIDAYS -->
+                <TextBlock Text="FEDERAL HOLIDAYS"
+                           Style="{StaticResource SectionHeader}"
+                           Margin="0,8,0,8" />
+                <Separator />
+
+                <WrapPanel Margin="0,0,0,12">
+                    <CheckBox Content="New Year's Day"
+                              IsChecked="{Binding ExcludeNewYearsDay}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="MLK Day"
+                              IsChecked="{Binding ExcludeMLKDay}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Presidents Day"
+                              IsChecked="{Binding ExcludePresidentsDay}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Memorial Day"
+                              IsChecked="{Binding ExcludeMemorialDay}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Juneteenth"
+                              IsChecked="{Binding ExcludeJuneteenth}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Independence Day"
+                              IsChecked="{Binding ExcludeIndependenceDay}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Labor Day"
+                              IsChecked="{Binding ExcludeLaborDay}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Indigenous Peoples Day"
+                              IsChecked="{Binding ExcludeIndigenousPeoplesDay}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Veterans Day"
+                              IsChecked="{Binding ExcludeVeteransDay}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Thanksgiving"
+                              IsChecked="{Binding ExcludeThanksgiving}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                    <CheckBox Content="Christmas"
+                              IsChecked="{Binding ExcludeChristmas}"
+                              Margin="0,0,16,8"
+                              Foreground="#3D2B1F" />
+                </WrapPanel>
+
                 <!-- NOTE TEMPLATES -->
                 <TextBlock Text="NOTE TEMPLATES"
                            Style="{StaticResource SectionHeader}"
