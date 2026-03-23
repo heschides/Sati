@@ -144,6 +144,8 @@ namespace Sati
                 SelectedNote = null;
             }
         }
+        
+
         [RelayCommand] private void OpenScheduler() 
         {IsSchedulerOpen = !IsSchedulerOpen; 
         }

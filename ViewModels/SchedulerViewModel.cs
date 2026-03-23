@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
 using Sati.Models;
 using System;
@@ -26,6 +27,7 @@ namespace Sati.ViewModels
         [ObservableProperty] private int currentMonth;
         [ObservableProperty] private int currentYear;
         [ObservableProperty] private string monthLabel = string.Empty;
+        public int DaysScheduled => _incentive?.DaysScheduled ?? 0;
 
         public ObservableCollection<WorkdayTile> Tiles { get; } = [];
 
@@ -41,6 +43,54 @@ namespace Sati.ViewModels
         }
 
         //RELAY METHODS
+        [RelayCommand]
+        private async Task ToggleTile(WorkdayTile tile)
+        {
+            if (!tile.IsInteractable) return;
+
+            tile.IsExcluded = !tile.IsExcluded;
+
+            var dates = _incentive!.ExcludedDates;
+            if (tile.IsExcluded)
+                dates.Add(tile.Date);
+            else
+                dates.Remove(tile.Date);
+
+            _incentive.ExcludedDates = dates;
+            _incentive.DaysScheduled = Tiles.Count(t => t.IsInteractable && !t.IsExcluded);
+            await _incentiveService.SaveAsync(_incentive);
+            OnPropertyChanged(nameof(DaysScheduled));
+        }
+
+        [RelayCommand]
+        private void PreviousMonth()
+        {
+            if (CurrentMonth == 1)
+            {
+                CurrentMonth = 12;
+                CurrentYear--;
+            }
+            else
+            {
+                CurrentMonth--;
+            }
+            _ = LoadMonthAsync();
+        }
+
+        [RelayCommand]
+        private void NextMonth()
+        {
+            if (CurrentMonth == 12)
+            {
+                CurrentMonth = 1;
+                CurrentYear++;
+            }
+            else
+            {
+                CurrentMonth++;
+            }
+            _ = LoadMonthAsync();
+        }
 
         //FUNCTIONS
         private async Task LoadMonthAsync()

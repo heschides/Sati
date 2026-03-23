@@ -256,7 +256,7 @@
                Placement="Bottom"
                IsOpen="{Binding DataContext.IsSchedulerOpen, 
     RelativeSource={RelativeSource AncestorType=Window}}"
-               StaysOpen="False"
+               StaysOpen="True"
                AllowsTransparency="True"
                PopupAnimation="Slide">
 

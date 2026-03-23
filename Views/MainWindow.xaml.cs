@@ -56,7 +56,15 @@ namespace Sati
                 Debug.WriteLine("Popup opened");
                 _schedulerVm.Initialize();
             };
+
+            Mouse.AddPreviewMouseDownOutsideCapturedElementHandler(SchedulerPopup, (s, e) =>
+            {
+                if (DataContext is MainWindowViewModel vm)
+                    vm.IsSchedulerOpen = false;
+            });
+
         }
+
 
         private void DataGrid_MouseDoubleClick(object? sender, MouseEventArgs e)
         {
