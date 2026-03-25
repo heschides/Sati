@@ -65,6 +65,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 - [ ] UI polish — consistent spacing, styles, color scheme
 - [ ] README with purpose, setup instructions, screenshots
 - [ ] Seed data script for reviewers
+- [ ] Settings — add confirmation dialog on close summarizing changed values before saving.
 
 ---
 
