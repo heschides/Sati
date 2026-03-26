@@ -59,6 +59,8 @@ namespace Sati
             list.Add(new Form { DueDate = effective.AddDays(365), Type = FormType.Release_Agency });
             list.Add(new Form { DueDate = effective.AddDays(365), Type = FormType.Release_DHHS });
             list.Add(new Form { DueDate = effective.AddDays(365), Type = FormType.Release_Medical });
+            list.Add(new Form { DueDate = effective.AddDays(365), Type = FormType.SafetyPlan });
+            list.Add(new Form { DueDate = effective.AddDays(365), Type = FormType.PrivacyPractices });
 
             return list;
         }

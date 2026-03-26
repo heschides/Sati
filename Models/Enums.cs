@@ -24,6 +24,9 @@ namespace Sati
             ComprehensiveAssessment,
             Reclassification,
 
+            SafetyPlan,
+            PrivacyPractices,
+
             Release_Agency,
             Release_DHHS,
             Release_Medical

@@ -249,6 +249,150 @@
                          Height="294"
                          VerticalScrollBarVisibility="Auto"
                          Width="351" />
+                
+                <!-- Form Deadline Windows -->
+<TextBlock Text="FORM DEADLINE WINDOWS"
+           Style="{StaticResource SectionHeader}"
+           Margin="0,16,0,8"/>
+
+<Grid>
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="180"/>
+        <ColumnDefinition Width="120"/>
+        <ColumnDefinition Width="120"/>
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+
+                    </Grid.RowDefinitions>
+
+    <!-- Column headers -->
+    <TextBlock Grid.Row="0" Grid.Column="1"
+               Text="Open Days Before"
+               Style="{StaticResource LabelStyle}"
+               HorizontalAlignment="Center"/>
+    <TextBlock Grid.Row="0" Grid.Column="2"
+               Text="Days After Due"
+               Style="{StaticResource LabelStyle}"
+               HorizontalAlignment="Center"/>
+
+    <!-- Reviews -->
+    <TextBlock Grid.Row="1" Grid.Column="0"
+               Text="Reviews"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="1" Grid.Column="1"
+             Text="{Binding ReviewOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="1" Grid.Column="2"
+             Text="{Binding ReviewDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+
+    <!-- PCP -->
+    <TextBlock Grid.Row="2" Grid.Column="0"
+               Text="PCP"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="2" Grid.Column="1"
+             Text="{Binding PcpOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="2" Grid.Column="2"
+             Text="{Binding PcpDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+
+    <!-- Comprehensive Assessment -->
+    <TextBlock Grid.Row="3" Grid.Column="0"
+               Text="Comp. Assessment"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="3" Grid.Column="1"
+             Text="{Binding CompAssessmentOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="3" Grid.Column="2"
+             Text="{Binding CompAssessmentDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+
+    <!-- Reclassification -->
+    <TextBlock Grid.Row="4" Grid.Column="0"
+               Text="Reclassification"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="4" Grid.Column="1"
+             Text="{Binding ReclassificationOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="4" Grid.Column="2"
+             Text="{Binding ReclassificationDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+
+    <!-- Safety Plan -->
+    <TextBlock Grid.Row="5" Grid.Column="0"
+               Text="Safety Plan"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="5" Grid.Column="1"
+             Text="{Binding SafetyPlanOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="5" Grid.Column="2"
+             Text="{Binding SafetyPlanDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+
+    <!-- Privacy Practices -->
+    <TextBlock Grid.Row="6" Grid.Column="0"
+               Text="Privacy Practices"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="6" Grid.Column="1"
+             Text="{Binding PrivacyPracticesOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="6" Grid.Column="2"
+             Text="{Binding PrivacyPracticesDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+
+    <!-- Release Agency -->
+    <TextBlock Grid.Row="7" Grid.Column="0"
+               Text="Release — Agency"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="7" Grid.Column="1"
+             Text="{Binding ReleaseAgencyOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="7" Grid.Column="2"
+             Text="{Binding ReleaseAgencyDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+
+    <!-- Release DHHS -->
+    <TextBlock Grid.Row="8" Grid.Column="0"
+               Text="Release — DHHS"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="8" Grid.Column="1"
+             Text="{Binding ReleaseDhhsOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="8" Grid.Column="2"
+             Text="{Binding ReleaseDhhsDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+
+    <!-- Release Medical -->
+    <TextBlock Grid.Row="9" Grid.Column="0"
+               Text="Release — Medical"
+               Style="{StaticResource LabelStyle}"
+               VerticalAlignment="Center"/>
+    <TextBox Grid.Row="9" Grid.Column="1"
+             Text="{Binding ReleaseMedicalOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,4,8"/>
+    <TextBox Grid.Row="10" Grid.Column="2"
+             Text="{Binding ReleaseMedicalDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
+             Margin="4,0,0,8"/>
+</Grid>
 
                 <!-- SAVE -->
                 <Button Content="Save Settings"

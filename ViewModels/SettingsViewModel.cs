@@ -45,6 +45,31 @@ namespace Sati.ViewModels
         [ObservableProperty] private bool excludeThanksgiving;
         [ObservableProperty] private bool excludeDayAfterThanksgiving;
         [ObservableProperty] private bool excludeChristmas;
+        
+        [ObservableProperty] private int reviewOpenDaysBefore;
+        [ObservableProperty] private int reviewDaysAfterDue;
+
+        [ObservableProperty] private int pcpOpenDaysBefore;
+        [ObservableProperty] private int pcpDaysAfterDue;
+
+        [ObservableProperty] private int compAssessmentOpenDaysBefore;
+        [ObservableProperty] private int compAssessmentDaysAfterDue;
+
+        [ObservableProperty] private int reclassificationOpenDaysBefore;
+        [ObservableProperty] private int reclassificationDaysAfterDue;
+
+        [ObservableProperty] private int safetyPlanOpenDaysBefore;
+        [ObservableProperty] private int safetyPlanDaysAfterDue;
+
+        [ObservableProperty] private int privacyPracticesOpenDaysBefore;
+        [ObservableProperty] private int privacyPracticesDaysAfterDue;
+
+        [ObservableProperty] private int releaseAgencyOpenDaysBefore;
+        [ObservableProperty] private int releaseAgencyDaysAfterDue;
+        [ObservableProperty] private int releaseDhhsOpenDaysBefore;
+        [ObservableProperty] private int releaseDhhsDaysAfterDue;
+        [ObservableProperty] private int releaseMedicalOpenDaysBefore;
+        [ObservableProperty] private int releaseMedicalDaysAfterDue;
 
         private async Task LoadAsync()
         {
@@ -76,6 +101,25 @@ namespace Sati.ViewModels
             ExcludeThanksgiving = _settings.ExcludeThanksgiving;
             ExcludeDayAfterThanksgiving = _settings.ExcludeDayAfterThanksgiving;
             ExcludeChristmas = _settings.ExcludeChristmas;
+           
+            ReviewOpenDaysBefore = _settings.ReviewOpenDaysBefore;
+            ReviewDaysAfterDue = _settings.ReviewDaysAfterDue;
+            PcpOpenDaysBefore = _settings.PcpOpenDaysBefore;
+            PcpDaysAfterDue = _settings.PcpDaysAfterDue;
+            CompAssessmentOpenDaysBefore = _settings.CompAssessmentOpenDaysBefore;
+            CompAssessmentDaysAfterDue = _settings.CompAssessmentDaysAfterDue;
+            ReclassificationOpenDaysBefore = _settings.ReclassificationOpenDaysBefore;
+            ReclassificationDaysAfterDue = _settings.ReclassificationDaysAfterDue;
+            SafetyPlanOpenDaysBefore = _settings.SafetyPlanOpenDaysBefore;
+            SafetyPlanDaysAfterDue = _settings.SafetyPlanDaysAfterDue;
+            PrivacyPracticesOpenDaysBefore = _settings.PrivacyPracticesOpenDaysBefore;
+            PrivacyPracticesDaysAfterDue = _settings.PrivacyPracticesDaysAfterDue;
+            ReleaseAgencyOpenDaysBefore = _settings.ReleaseAgencyOpenDaysBefore;
+            ReleaseAgencyDaysAfterDue = _settings.ReleaseAgencyDaysAfterDue;
+            ReleaseDhhsOpenDaysBefore = _settings.ReleaseDhhsOpenDaysBefore;
+            ReleaseDhhsDaysAfterDue = _settings.ReleaseDhhsDaysAfterDue;
+            ReleaseMedicalOpenDaysBefore = _settings.ReleaseMedicalOpenDaysBefore;
+            ReleaseMedicalDaysAfterDue = _settings.ReleaseMedicalDaysAfterDue;
         }
 
         [RelayCommand]
@@ -111,6 +155,25 @@ namespace Sati.ViewModels
             _settings.ExcludeDayAfterThanksgiving = ExcludeDayAfterThanksgiving;
 
             _settings.ExcludeChristmas = ExcludeChristmas;
+
+            _settings.ReviewOpenDaysBefore = ReviewOpenDaysBefore;
+            _settings.ReviewDaysAfterDue = ReviewDaysAfterDue;
+            _settings.PcpOpenDaysBefore = PcpOpenDaysBefore;
+            _settings.PcpDaysAfterDue = PcpDaysAfterDue;
+            _settings.CompAssessmentOpenDaysBefore = CompAssessmentOpenDaysBefore;
+            _settings.CompAssessmentDaysAfterDue = CompAssessmentDaysAfterDue;
+            _settings.ReclassificationOpenDaysBefore = ReclassificationOpenDaysBefore;
+            _settings.ReclassificationDaysAfterDue = ReclassificationDaysAfterDue;
+            _settings.SafetyPlanOpenDaysBefore = SafetyPlanOpenDaysBefore;
+            _settings.SafetyPlanDaysAfterDue = SafetyPlanDaysAfterDue;
+            _settings.PrivacyPracticesOpenDaysBefore = PrivacyPracticesOpenDaysBefore;
+            _settings.PrivacyPracticesDaysAfterDue = PrivacyPracticesDaysAfterDue;
+            _settings.ReleaseAgencyOpenDaysBefore = ReleaseAgencyOpenDaysBefore;
+            _settings.ReleaseAgencyDaysAfterDue = ReleaseAgencyDaysAfterDue;
+            _settings.ReleaseDhhsOpenDaysBefore = ReleaseDhhsOpenDaysBefore;
+            _settings.ReleaseDhhsDaysAfterDue = ReleaseDhhsDaysAfterDue;
+            _settings.ReleaseMedicalOpenDaysBefore = ReleaseMedicalOpenDaysBefore;
+            _settings.ReleaseMedicalDaysAfterDue = ReleaseMedicalDaysAfterDue;
 
             await _settingsService.SaveAsync(_settings);
         }

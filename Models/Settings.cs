@@ -21,6 +21,8 @@ namespace Sati.Models
         public string ContactTemplate { get; set; } = string.Empty;
         public string DocumentationTemplate { get; set; } = string.Empty;
 
+
+
         // Weekday exclusions
         public bool ExcludeMonday { get; set; } = false;
         public bool ExcludeTuesday { get; set; } = false;
@@ -38,8 +40,44 @@ namespace Sati.Models
         public bool ExcludeLaborDay { get; set; } = true;
         public bool ExcludeIndigenousPeoplesDay { get; set; } = false;
         public bool ExcludeVeteransDay { get; set; } = false;
-        public bool ExcludeThanksgiving { get; set; } = true; 
+        public bool ExcludeThanksgiving { get; set; } = true;
         public bool ExcludeDayAfterThanksgiving { get; set; } = true;
         public bool ExcludeChristmas { get; set; } = true;
+
+        // EVENT DATE SETTINGS
+
+        // Reviews (shared across Q1R–Q4R)
+        public int ReviewOpenDaysBefore { get; set; }
+        public int ReviewDaysAfterDue { get; set; }
+
+        // PCP
+        public int PcpOpenDaysBefore { get; set; }
+        public int PcpDaysAfterDue { get; set; }
+
+        // Comprehensive Assessment
+        public int CompAssessmentOpenDaysBefore { get; set; }
+        public int CompAssessmentDaysAfterDue { get; set; }
+
+        // Reclassification
+        public int ReclassificationOpenDaysBefore { get; set; }
+        public int ReclassificationDaysAfterDue { get; set; }
+
+        // Safety Plan
+        public int SafetyPlanOpenDaysBefore { get; set; }
+        public int SafetyPlanDaysAfterDue { get; set; }
+
+        // Privacy Practices
+        public int PrivacyPracticesOpenDaysBefore { get; set; }
+        public int PrivacyPracticesDaysAfterDue { get; set; }
+
+        // Releases
+        public int ReleaseAgencyOpenDaysBefore { get; set; }
+        public int ReleaseAgencyDaysAfterDue { get; set; }
+
+        public int ReleaseDhhsOpenDaysBefore { get; set; }
+        public int ReleaseDhhsDaysAfterDue { get; set; }
+
+        public int ReleaseMedicalOpenDaysBefore { get; set; }
+        public int ReleaseMedicalDaysAfterDue { get; set; }
     }
 }
