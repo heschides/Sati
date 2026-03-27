@@ -30,7 +30,34 @@ namespace Sati
         private Incentive? _incentive;
         private readonly ISessionService _sessionService;
         private readonly IUpcomingEventService _upcomingEventService;
+        private readonly IFormService _formService;
 
+        //compliance flags
+        // Reviews
+        public bool Q1RCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.Q1R)?.IsCompliant ?? false;
+        public bool Q2RCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.Q2R)?.IsCompliant ?? false;
+        public bool Q3RCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.Q3R)?.IsCompliant ?? false;
+        public bool Q4RCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.Q4R)?.IsCompliant ?? false;
+
+        // PCP
+        public bool PcpCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.PCP)?.IsCompliant ?? false;
+
+        // Comp Assessment
+        public bool CompAssessmentCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.ComprehensiveAssessment)?.IsCompliant ?? false;
+
+        // Reclassification
+        public bool ReclassificationCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.Reclassification)?.IsCompliant ?? false;
+
+        // Safety Plan
+        public bool SafetyPlanCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.SafetyPlan)?.IsCompliant ?? false;
+
+        // Privacy Practices
+        public bool PrivacyPracticesCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.PrivacyPractices)?.IsCompliant ?? false;
+
+        // Releases
+        public bool ReleaseAgencyCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.Release_Agency)?.IsCompliant ?? false;
+        public bool ReleaseDhhsCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.Release_DHHS)?.IsCompliant ?? false;
+        public bool ReleaseMedicalCompliant => SelectedPerson?.Forms.FirstOrDefault(f => f.Type == FormType.Release_Medical)?.IsCompliant ?? false;
 
 
         //EVENTS
@@ -70,7 +97,7 @@ namespace Sati
 
 
         //Constructor
-        public MainWindowViewModel(IServiceProvider services, IPersonService personService, INoteService noteService, ISettingsService settingsService, IScratchpadService scratchpadService, IIncentiveService incentiveService, ISessionService sessionService, IUpcomingEventService upcomingEventService)
+        public MainWindowViewModel(IServiceProvider services, IPersonService personService, INoteService noteService, ISettingsService settingsService, IScratchpadService scratchpadService, IIncentiveService incentiveService, ISessionService sessionService, IUpcomingEventService upcomingEventService, IFormService formService)
         {
             _personService = personService;
             _noteService = noteService;
@@ -81,6 +108,7 @@ namespace Sati
             NotesView.Filter = FilterNotes;
             _sessionService = sessionService;
             _upcomingEventService = upcomingEventService;
+            _formService = formService;
         }
 
         //Commands
@@ -148,7 +176,32 @@ namespace Sati
                 SelectedNote = null;
             }
         }
-        
+        [RelayCommand]
+        private async Task ToggleForm(FormType type)
+        {
+            if (SelectedPerson is null)
+                return;
+
+            var form = SelectedPerson.Forms.FirstOrDefault(f => f.Type == type);
+            if (form is null)
+                return;
+
+            form.IsCompliant = !form.IsCompliant;
+            await _formService.UpdateFormAsync(form);
+
+            OnPropertyChanged(nameof(Q1RCompliant));
+            OnPropertyChanged(nameof(Q2RCompliant));
+            OnPropertyChanged(nameof(Q3RCompliant));
+            OnPropertyChanged(nameof(Q4RCompliant));
+            OnPropertyChanged(nameof(PcpCompliant));
+            OnPropertyChanged(nameof(CompAssessmentCompliant));
+            OnPropertyChanged(nameof(ReclassificationCompliant));
+            OnPropertyChanged(nameof(SafetyPlanCompliant));
+            OnPropertyChanged(nameof(PrivacyPracticesCompliant));
+            OnPropertyChanged(nameof(ReleaseAgencyCompliant));
+            OnPropertyChanged(nameof(ReleaseDhhsCompliant));
+            OnPropertyChanged(nameof(ReleaseMedicalCompliant));
+        }
 
         [RelayCommand] private void OpenScheduler() 
         {IsSchedulerOpen = !IsSchedulerOpen; 
@@ -212,6 +265,7 @@ namespace Sati
                 await LoadPeopleAsync();
                 await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
                 await LoadMonthlyNotesAsync();
+                await LoadUpcomingEventsAsync();
 
                 var (incentive, wasCreated) = await _incentiveService.GetOrCreateAsync(
                     LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);

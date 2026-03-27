@@ -7,6 +7,7 @@ using Sati.Views;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Drawing.Text;
 using System.Security;
@@ -69,12 +70,15 @@ namespace Sati.ViewModels
         //METHODS
         private async void InitializeUsers()
         {
-            if (_userService == null)
-                return;
-            var users = await _userService.GetAllAsync();
-            foreach (var user in users)
+            try
             {
-                Users.Add(user);
+                var users = await _userService.GetAllAsync();
+                foreach (var user in users)
+                    Users.Add(user);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"InitializeUsers failed: {ex.Message}");
             }
         }
     }

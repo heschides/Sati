@@ -1,15 +1,15 @@
-﻿using System.Configuration;
-using System.Data;
-using Sati.Views;
-using System.Windows;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sati.Data;
 using Sati.ViewModels;
-using Microsoft.Identity.Client;
+using Sati.Views;
+using System.Configuration;
+using System.Data;
+using System.Windows;
 using Windows.Media.ClosedCaptioning;
+using static Sati.Enums;
 
 namespace Sati
 {
@@ -24,8 +24,8 @@ namespace Sati
 
         protected override async void OnStartup(StartupEventArgs e)
         {
-            var splash = new SplashScreenWindow();
-            splash.Show();
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
 
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
@@ -42,6 +42,7 @@ namespace Sati
                     services.AddSingleton<ISessionService, SessionService>();
                     services.AddTransient<ISettingsService, SettingsService>();
                     services.AddTransient<IUpcomingEventService, UpcomingEventService>();
+                    services.AddTransient<IFormService, FormService>();
 
 
                     //windows and viewmodels
@@ -66,8 +67,6 @@ namespace Sati
                     services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
                     services.AddTransient<Func<NewClientWindow>>(sp => () => sp.GetRequiredService<NewClientWindow>());
 
-
-
                     //ef core
                     services.AddDbContext<SatiContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")), ServiceLifetime.Transient);
 
@@ -76,37 +75,33 @@ namespace Sati
 
             _host.Start();
 
-
-
             //LOGIN SEQUENCE
+            var splash = new SplashScreenWindow();
+            splash.Show();
+            await Task.Delay(3000);
+            splash.Close();
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
             var mainVm = _host.Services.GetRequiredService<MainWindowViewModel>();
             var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
-            var loginVM = _host.Services.GetRequiredService<LoginWindowViewModel>();
-            await Task.Delay(3000);
-            splash.Close();
+           
             bool? result = loginWindow.ShowDialog();
 
             if (result == true)
             {
                 var user = loginWindow.LoggedInUser;
                 if (user == null)
-                    return;
-
+                    Shutdown();
                 var session = _host.Services.GetRequiredService<ISessionService>();
-                session.SetUser(user);
-
+                session.SetUser(user!);
                 mainVm.Initialize();
                 mainWindow.Show();
             }
             else
             {
-                splash.Close();
                 Shutdown();
             }
 
             base.OnStartup(e);
-
         }
 
         protected override async void OnExit(ExitEventArgs e)
@@ -120,5 +115,4 @@ namespace Sati
             base.OnExit(e);
         }
     }
-
 }

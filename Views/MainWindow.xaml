@@ -591,11 +591,13 @@ Converter={StaticResource EnumToBoolConverter}}" />
                 <!-- Forms Checklist -->
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="24" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />  <!-- Col 0: Reviews -->
+                        <ColumnDefinition Width="24" /> <!-- Col 1: spacer -->
+                        <ColumnDefinition Width="*" />  <!-- Col 2: Releases -->
+                        <ColumnDefinition Width="24" /> <!-- Col 3: spacer -->
+                        <ColumnDefinition Width="*" />  <!-- Col 4: Local Documents -->
+                        <ColumnDefinition Width="24" /> <!-- Col 5: spacer -->
+                        <ColumnDefinition Width="*" />  <!-- Col 6: Clinical -->
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -609,27 +611,41 @@ Converter={StaticResource EnumToBoolConverter}}" />
                                Grid.Column="0"
                                Text="90-Day Reviews"
                                Style="{StaticResource SectionHeader}" />
+                    <!-- 90-Day Reviews -->
                     <CheckBox Grid.Row="1"
                               Grid.Column="0"
                               Content="Quarter 1"
+                              IsChecked="{Binding Q1RCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.Q1R}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
                     <CheckBox Grid.Row="2"
                               Grid.Column="0"
                               Content="Quarter 2"
+                              IsChecked="{Binding Q2RCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.Q2R}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
                     <CheckBox Grid.Row="3"
                               Grid.Column="0"
                               Content="Quarter 3"
+                              IsChecked="{Binding Q3RCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.Q3R}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
                     <CheckBox Grid.Row="4"
                               Grid.Column="0"
                               Content="Quarter 4"
+                              IsChecked="{Binding Q4RCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.Q4R}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
 
+                    <!-- Releases -->
                     <TextBlock Grid.Row="0"
                                Grid.Column="2"
                                Text="Releases"
@@ -637,38 +653,79 @@ Converter={StaticResource EnumToBoolConverter}}" />
                     <CheckBox Grid.Row="1"
                               Grid.Column="2"
                               Content="DHHS"
+                              IsChecked="{Binding ReleaseDhhsCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.Release_DHHS}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
                     <CheckBox Grid.Row="2"
                               Grid.Column="2"
                               Content="Agency"
+                              IsChecked="{Binding ReleaseAgencyCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.Release_Agency}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
                     <CheckBox Grid.Row="3"
                               Grid.Column="2"
-                              Content="Doctor"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="4"
-                              Grid.Column="2"
-                              Content="Providers"
+                              Content="Medical"
+                              IsChecked="{Binding ReleaseMedicalCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.Release_Medical}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
 
+                    <!-- Local Documents -->
+
                     <TextBlock Grid.Row="0"
                                Grid.Column="4"
-                               Text="Local Documents"
+                               Text="Local Docs"
+                               Style="{StaticResource SectionHeader}" />
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="6"
+                               Text="Clinical"
                                Style="{StaticResource SectionHeader}" />
                     <CheckBox Grid.Row="1"
                               Grid.Column="4"
-                              Content="Safety Plan"
+                              Content="Safety"
+                              IsChecked="{Binding SafetyPlanCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.SafetyPlan}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
                     <CheckBox Grid.Row="2"
                               Grid.Column="4"
-                              Content="Privacy Practices"
+                              Content="Privacy"
+                              IsChecked="{Binding PrivacyPracticesCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.PrivacyPractices}"
                               Foreground="#3D2B1F"
                               Margin="0,0,0,6" />
+                    <CheckBox Grid.Row="1"
+                              Grid.Column="6"
+                              Content="PCP"
+                              IsChecked="{Binding PcpCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.PCP}"
+                              Foreground="#3D2B1F"
+                              Margin="0,0,0,6" />
+                    <CheckBox Grid.Row="2"
+                              Grid.Column="6"
+                              Content="Comp"
+                              IsChecked="{Binding CompAssessmentCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.ComprehensiveAssessment}"
+                              Foreground="#3D2B1F"
+                              Margin="0,0,0,6" />
+                    <CheckBox Grid.Row="3"
+                              Grid.Column="6"
+                              Content="Reclass"
+                              IsChecked="{Binding ReclassificationCompliant, Mode=OneWay}"
+                              Command="{Binding ToggleFormCommand}"
+                              CommandParameter="{x:Static local:Enums+FormType.Reclassification}"
+                              Foreground="#3D2B1F"
+                              Margin="0,0,0,6" />
+
                 </Grid>
 
                 <Separator Margin="0,12,0,12" />
@@ -803,8 +860,15 @@ Converter={StaticResource EnumToBoolConverter}}" />
                                 <TextBlock Text=" — "
                                            Foreground="#9C7A5C"
                                            FontSize="12" />
-                                <TextBlock Text="{Binding DueDate, StringFormat={}{0:MMM d}}"
+                                <TextBlock Text="{Binding Date, StringFormat={}{0:MMM d}}"
                                            Foreground="#9C7A5C"
+                                           FontSize="12" />
+                                <TextBlock Text=" — "
+                                           Foreground="#9C7A5C"
+                                           FontSize="12" />
+                                <TextBlock Text="{Binding ClientName}"
+                                           FontWeight="SemiBold"
+                                           Foreground="#C87941"
                                            FontSize="12" />
                             </StackPanel>
                         </DataTemplate>
