@@ -6,7 +6,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Abstractions;
 using Sati.Models;
-using static Sati.Enums;
+
 
 namespace Sati.Data
 {

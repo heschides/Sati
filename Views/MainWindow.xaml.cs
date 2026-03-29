@@ -25,8 +25,22 @@ namespace Sati
 
             Height = Math.Min(900, screenHeight * 0.9);
             Width = Math.Min(1100, screenWidth * 0.9);
+            MinWidth = 900;
 
             DataContext = vm;
+
+            vm.MarkFormCompleteRequested += (s, formType) =>
+            {
+                var result = MessageBox.Show(
+                    $"Would you like to mark the {formType} requirement complete?",
+                    "Mark Form Complete",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                    _ = vm.MarkFormCompleteAsync(formType);
+            };
+
             _newClientWindow = newClientWindowFactory;
 
             vm.OpenClientsWindowRequested += (s, success) =>

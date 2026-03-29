@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization.Formatters;
 using System.Text;
-using static Sati.Enums;
+
 
 namespace Sati.Models
 {

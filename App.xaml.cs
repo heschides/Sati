@@ -9,7 +9,6 @@ using System.Configuration;
 using System.Data;
 using System.Windows;
 using Windows.Media.ClosedCaptioning;
-using static Sati.Enums;
 
 namespace Sati
 {
@@ -20,7 +19,6 @@ namespace Sati
     {
         private IHost? _host;
         public IServiceProvider Services => _host!.Services;
-
 
         protected override async void OnStartup(StartupEventArgs e)
         {
@@ -60,6 +58,9 @@ namespace Sati
 
                     services.AddTransient<SettingsViewModel>();
                     services.AddTransient<SettingsWindow>();
+
+                    services.AddTransient<ComplianceReviewViewModel>();
+                    services.AddTransient<ComplianceReviewWindow>();
 
                     services.AddTransient<SchedulerViewModel>();
 

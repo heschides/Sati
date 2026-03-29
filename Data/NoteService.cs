@@ -3,7 +3,6 @@ using Sati.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using static Sati.Enums;
 
 namespace Sati.Data
 {

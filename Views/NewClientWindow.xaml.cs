@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using Sati.ViewModels;
+using Sati.Views;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -20,6 +22,18 @@ namespace Sati
         {
             DataContext = vm;
             InitializeComponent();
+
+            vm.ComplianceReviewRequested += (forms) =>
+            {
+                var reviewVm = new ComplianceReviewViewModel
+                {
+                    ClientName = $"{vm.FirstName} {vm.LastName}",
+                    Forms = forms
+                };
+
+                var dialog = new ComplianceReviewWindow(reviewVm);
+                return dialog.ShowDialog() == true;
+            };
 
         }
 

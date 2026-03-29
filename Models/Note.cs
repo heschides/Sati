@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using static Sati.Enums;
+
 
 namespace Sati.Models
 {
@@ -13,11 +13,12 @@ namespace Sati.Models
         public NoteStatus? Status { get; set; } 
         public int? Units {  get; set; }
         public int PersonId { get; set; }
-        public Person Person { get; set; } = null!; 
+        public Person Person { get; set; } = null!;
+        public FormType? FormType { get; set; } 
 
         private protected Note() { }
 
-        public static Note Create( string narrative, DateTime? eventDate, NoteStatus? status, int? unitCount, int personId)
+        public static Note Create( string narrative, DateTime? eventDate, NoteStatus? status, int? unitCount, int personId, FormType? formType=null)
         {
             var _note = new Note()
             {
@@ -25,7 +26,8 @@ namespace Sati.Models
                 EventDate = eventDate,
                 Status = status,
                 Units = unitCount,
-                PersonId = personId
+                PersonId = personId,
+                FormType = formType
             };
             return _note;
         }

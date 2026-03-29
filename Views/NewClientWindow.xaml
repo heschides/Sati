@@ -190,10 +190,31 @@
                            Style="{StaticResource LabelStyle}" />
                 <ComboBox ItemsSource="{Binding Waivers}"
                           SelectedItem="{Binding Waiver, Mode=TwoWay}" />
-
                 <TextBlock Text="EFFECTIVE DATE"
                            Style="{StaticResource LabelStyle}" />
-                <DatePicker SelectedDate="{Binding EffectiveDate, Mode=TwoWay}" />
+                <Grid Margin="0,0,0,10"
+                      IsEnabled="{Binding HasWaiver}">
+                    <TextBox Text="{Binding EffectiveDateText, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="MM/DD"
+                               Foreground="#C0A898"
+                               FontSize="13"
+                               Margin="9,4"
+                               IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility"
+                                        Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding EffectiveDateText}"
+                                                 Value="">
+                                        <Setter Property="Visibility"
+                                                Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
 
                 <TextBlock Text="BIO"
                            Style="{StaticResource LabelStyle}" />

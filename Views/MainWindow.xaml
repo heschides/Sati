@@ -10,7 +10,6 @@
         Background="#FDF6EC">
 
     <Window.Resources>
-
         <Style x:Key="LabelStyle"
                TargetType="TextBlock">
             <Setter Property="FontSize"
@@ -169,6 +168,10 @@
         </Style>
         <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
         <converters:BoolToTileColorConverter x:Key="BoolToTileColorConverter" />
+        <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter" />
+
     </Window.Resources>
 
     <!--
@@ -435,40 +438,77 @@
                           ItemsSource="{Binding NoteStatusOptions}"
                           SelectedItem="{Binding Status, Mode=TwoWay}" />
 
-                <TextBlock Text="NOTE TYPE"
-                           Grid.Row="5"
-                           Style="{StaticResource LabelStyle}" />
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,0,0,10"
-                            Grid.Row="6">
-                    <RadioButton Content="Visit"
-                                 GroupName="NoteType"
+
+                <Grid Margin="0,0,0,10" Grid.Row="5">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="3*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="NOTE TYPE"
+                               Style="{StaticResource LabelStyle}" 
+                               Grid.Row="0"
+                               Grid.ColumnSpan="2" />
+                    <RadioButton Grid.Row="1"
+                                 Grid.Column="1"
+                                 Content="Visit"
+                                 Margin="0,0,12,4"
                                  Foreground="#3D2B1F"
-                                 Margin="0,0,12,0"
+                                 GroupName="NoteType"
                                  IsChecked="{Binding SelectedNoteType, 
-                     Converter={StaticResource EnumToBoolConverter},
-                     ConverterParameter=Visit}" />
-                    <RadioButton Content="Contact"
-                                 GroupName="NoteType"
+      Converter={StaticResource EnumToBoolConverter}, 
+      ConverterParameter=Visit}" />
+
+                    <RadioButton Grid.Row="1"
+                                 Grid.Column="3"
+                                 Content="Contact"
+                                 Margin="0,0,12,4"
                                  Foreground="#3D2B1F"
-                                 Margin="0,0,12,0"
-                                 IsChecked="{Binding SelectedNoteType,
-                     Converter={StaticResource EnumToBoolConverter},
-                     ConverterParameter=Contact}" />
-                    <RadioButton Content="Documentation"
                                  GroupName="NoteType"
+                                 IsChecked="{Binding SelectedNoteType, 
+      Converter={StaticResource EnumToBoolConverter}, 
+      ConverterParameter=Contact}" />
+
+                    <RadioButton Grid.Row="2"
+                                 Grid.Column="1"
+                                 Content="Other"
+                                 Margin="0,0,12,4"
                                  Foreground="#3D2B1F"
-                                 Margin="0,0,12,0"
-                                 IsChecked="{Binding SelectedNoteType,
-                     Converter={StaticResource EnumToBoolConverter},
-                     ConverterParameter=Documentation}" />
-                    <RadioButton Content="Other"
                                  GroupName="NoteType"
+                                 IsChecked="{Binding SelectedNoteType, 
+      Converter={StaticResource EnumToBoolConverter}, 
+      ConverterParameter=Other}" />
+
+                    <RadioButton Grid.Row="2"
+                                 Grid.Column="3"
+                                 Content="Form"
+                                 Margin="0,0,8,4"
                                  Foreground="#3D2B1F"
-                                 Margin="0,0,12,0"
-                                 IsChecked="{Binding SelectedNoteType,
-Converter={StaticResource EnumToBoolConverter}}" />
-                </StackPanel>
+                                 GroupName="NoteType"
+                                 IsChecked="{Binding SelectedNoteType, 
+      Converter={StaticResource EnumToBoolConverter}, 
+      ConverterParameter=Form}" />
+
+                    <ComboBox Grid.Row="3"
+                              Grid.ColumnSpan="4"
+                              ItemsSource="{Binding FormTypes}"
+                              SelectedItem="{Binding SelectedFormType, Mode=TwoWay}"
+                              Visibility="{Binding IsFormNote, 
+   Converter={StaticResource BoolToVisibilityConverter}}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </Grid>
 
                 <!-- Units, Date, Narrative -->
                 <Grid Grid.Row="7">
@@ -589,145 +629,143 @@ Converter={StaticResource EnumToBoolConverter}}" />
             <StackPanel>
 
                 <!-- Forms Checklist -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />  <!-- Col 0: Reviews -->
-                        <ColumnDefinition Width="24" /> <!-- Col 1: spacer -->
-                        <ColumnDefinition Width="*" />  <!-- Col 2: Releases -->
-                        <ColumnDefinition Width="24" /> <!-- Col 3: spacer -->
-                        <ColumnDefinition Width="*" />  <!-- Col 4: Local Documents -->
-                        <ColumnDefinition Width="24" /> <!-- Col 5: spacer -->
-                        <ColumnDefinition Width="*" />  <!-- Col 6: Clinical -->
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <Border Grid.Column="2"
+                        Grid.Row="2"
+                        Background="White"
+                        BorderBrush="#E8D0B8"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="14"
+                        Margin="0,0,0,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0"
-                               Grid.Column="0"
-                               Text="90-Day Reviews"
-                               Style="{StaticResource SectionHeader}" />
-                    <!-- 90-Day Reviews -->
-                    <CheckBox Grid.Row="1"
-                              Grid.Column="0"
-                              Content="Quarter 1"
-                              IsChecked="{Binding Q1RCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.Q1R}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="2"
-                              Grid.Column="0"
-                              Content="Quarter 2"
-                              IsChecked="{Binding Q2RCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.Q2R}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="3"
-                              Grid.Column="0"
-                              Content="Quarter 3"
-                              IsChecked="{Binding Q3RCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.Q3R}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="4"
-                              Grid.Column="0"
-                              Content="Quarter 4"
-                              IsChecked="{Binding Q4RCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.Q4R}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="0"
+                                   Text="90-Day Reviews"
+                                   Style="{StaticResource SectionHeader}" />
+                        <CheckBox Grid.Row="1"
+                                  Grid.Column="0"
+                                  Content="Quarter 1"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding Q1RCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.Q1R}" />
+                        <CheckBox Grid.Row="2"
+                                  Grid.Column="0"
+                                  Content="Quarter 2"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding Q2RCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.Q2R}" />
+                        <CheckBox Grid.Row="3"
+                                  Grid.Column="0"
+                                  Content="Quarter 3"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding Q3RCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.Q3R}" />
+                        <CheckBox Grid.Row="4"
+                                  Grid.Column="0"
+                                  Content="Quarter 4"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding Q4RCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.Q4R}" />
 
-                    <!-- Releases -->
-                    <TextBlock Grid.Row="0"
-                               Grid.Column="2"
-                               Text="Releases"
-                               Style="{StaticResource SectionHeader}" />
-                    <CheckBox Grid.Row="1"
-                              Grid.Column="2"
-                              Content="DHHS"
-                              IsChecked="{Binding ReleaseDhhsCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.Release_DHHS}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="2"
-                              Grid.Column="2"
-                              Content="Agency"
-                              IsChecked="{Binding ReleaseAgencyCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.Release_Agency}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="3"
-                              Grid.Column="2"
-                              Content="Medical"
-                              IsChecked="{Binding ReleaseMedicalCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.Release_Medical}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="2"
+                                   Text="Annual Forms"
+                                   Style="{StaticResource SectionHeader}" />
+                        <CheckBox Grid.Row="1"
+                                  Grid.Column="2"
+                                  Content="PCP"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding PcpCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.PCP}" />
+                        <CheckBox Grid.Row="2"
+                                  Grid.Column="2"
+                                  Content="Comp Assessment"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding CompAssessmentCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.ComprehensiveAssessment}" />
+                        <CheckBox Grid.Row="3"
+                                  Grid.Column="2"
+                                  Content="Reclassification"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding ReclassificationCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.Reclassification}" />
+                        <CheckBox Grid.Row="4"
+                                  Grid.Column="2"
+                                  Content="Safety Plan"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding SafetyPlanCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.SafetyPlan}" />
+                        <CheckBox Grid.Row="5"
+                                  Grid.Column="2"
+                                  Content="Privacy Practices"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding PrivacyPracticesCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.PrivacyPractices}" />
 
-                    <!-- Local Documents -->
-
-                    <TextBlock Grid.Row="0"
-                               Grid.Column="4"
-                               Text="Local Docs"
-                               Style="{StaticResource SectionHeader}" />
-                    <TextBlock Grid.Row="0"
-                               Grid.Column="6"
-                               Text="Clinical"
-                               Style="{StaticResource SectionHeader}" />
-                    <CheckBox Grid.Row="1"
-                              Grid.Column="4"
-                              Content="Safety"
-                              IsChecked="{Binding SafetyPlanCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.SafetyPlan}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="2"
-                              Grid.Column="4"
-                              Content="Privacy"
-                              IsChecked="{Binding PrivacyPracticesCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.PrivacyPractices}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="1"
-                              Grid.Column="6"
-                              Content="PCP"
-                              IsChecked="{Binding PcpCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.PCP}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="2"
-                              Grid.Column="6"
-                              Content="Comp"
-                              IsChecked="{Binding CompAssessmentCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.ComprehensiveAssessment}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-                    <CheckBox Grid.Row="3"
-                              Grid.Column="6"
-                              Content="Reclass"
-                              IsChecked="{Binding ReclassificationCompliant, Mode=OneWay}"
-                              Command="{Binding ToggleFormCommand}"
-                              CommandParameter="{x:Static local:Enums+FormType.Reclassification}"
-                              Foreground="#3D2B1F"
-                              Margin="0,0,0,6" />
-
-                </Grid>
-
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="4"
+                                   Text="Releases"
+                                   Style="{StaticResource SectionHeader}" />
+                        <CheckBox Grid.Row="1"
+                                  Grid.Column="4"
+                                  Content="DHHS"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding ReleaseDhhsCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.Release_DHHS}" />
+                        <CheckBox Grid.Row="2"
+                                  Grid.Column="4"
+                                  Content="Agency"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding ReleaseAgencyCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.Release_Agency}" />
+                        <CheckBox Grid.Row="3"
+                                  Grid.Column="4"
+                                  Content="Medical"
+                                  Foreground="#3D2B1F"
+                                  Margin="0,0,0,6"
+                                  IsChecked="{Binding ReleaseMedicalCompliant, Mode=OneWay}"
+                                  Command="{Binding ToggleFormCommand}"
+                                  CommandParameter="{x:Static local:FormType.Release_Medical}" />
+                    </Grid>
+                </Border>
                 <Separator Margin="0,12,0,12" />
 
                 <!-- Monthly Productivity -->
@@ -829,55 +867,104 @@ Converter={StaticResource EnumToBoolConverter}}" />
                 CornerRadius="6"
                 Padding="14"
                 Margin="0,0,0,12">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal"
-                            Margin="18,16,18,18">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,4">
                     <TextBlock Text="UPCOMING TASKS"
                                Style="{StaticResource SectionHeader}"
                                Margin="0,0,12,0" />
                     <RadioButton GroupName="SortEventsBy"
                                  Content="By Date"
+                                 IsChecked="{Binding SortByDate, Mode=TwoWay}"
                                  Foreground="#9C7A5C"
                                  FontSize="11"
                                  Margin="0,0,12,0"
                                  VerticalAlignment="Center" />
                     <RadioButton GroupName="SortEventsBy"
                                  Content="By Type"
+                                 IsChecked="{Binding SortByDate, 
+                             Converter={StaticResource InverseBoolConverter}, 
+                             Mode=TwoWay}"
                                  Foreground="#9C7A5C"
                                  FontSize="11"
                                  VerticalAlignment="Center" />
                 </StackPanel>
-                <Separator />
-                <ItemsControl ItemsSource="{Binding UpcomingEvents}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal"
-                                        Margin="0,2">
-                                <TextBlock Text="{Binding Title}"
-                                           FontWeight="SemiBold"
-                                           Foreground="#3D2B1F"
-                                           FontSize="12" />
-                                <TextBlock Text=" — "
-                                           Foreground="#9C7A5C"
-                                           FontSize="12" />
-                                <TextBlock Text="{Binding Date, StringFormat={}{0:MMM d}}"
-                                           Foreground="#9C7A5C"
-                                           FontSize="12" />
-                                <TextBlock Text=" — "
-                                           Foreground="#9C7A5C"
-                                           FontSize="12" />
-                                <TextBlock Text="{Binding ClientName}"
-                                           FontWeight="SemiBold"
-                                           Foreground="#C87941"
-                                           FontSize="12" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </Border>
 
-       
+                <Separator Grid.Row="1" />
+
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="FORMS"
+                                   Style="{StaticResource LabelStyle}"
+                                   Margin="0,0,0,6" />
+                        <ItemsControl ItemsSource="{Binding FormEvents}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,3">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#3D2B1F"
+                                                   FontSize="11"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Date, StringFormat={}{0:MMM d}}"
+                                                   FontSize="11">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground"
+                                                            Value="#9C7A5C" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Kind}"
+                                                                     Value="{x:Static local:UpcomingEventKind.LateReview}">
+                                                            <Setter Property="Foreground"
+                                                                    Value="#C0392B" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="VISITS"
+                                   Style="{StaticResource LabelStyle}"
+                                   Margin="0,0,0,6" />
+                        <ItemsControl ItemsSource="{Binding VisitEvents}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,3">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#3D2B1F"
+                                                   FontSize="11"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Date, StringFormat={}{0:MMM d}}"
+                                                   Foreground="#9C7A5C"
+                                                   FontSize="11" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
 
     </Grid>
 </Window>

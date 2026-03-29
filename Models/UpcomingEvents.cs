@@ -4,12 +4,7 @@ using System.Text;
 
 namespace Sati.Models
 {
-    public enum UpcomingEventKind
-    {
-        OpenReview,
-        LateReview,
-        ScheduledVisit
-    }
+
     public record UpcomingEvent
     {
         public string ClientName { get; init; } = string.Empty;

@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Text;
 using System.Windows.Controls;
 using System.Windows.Data;
-using static Sati.Enums;
 
 namespace Sati.Converters
 {
