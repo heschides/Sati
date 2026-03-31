@@ -59,9 +59,8 @@ factory delegate pattern throughout.
 
 ## Screenshots
 
-![Main window](images/screenshots/mainwindow.png)
-
-![Client List](images/screenshots/client_list.png)
+![Main window](images/Screenshots/mainwindow.png)
+![Client List](images/Screenshots/client_list.png)
 
 
 ---
