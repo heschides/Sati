@@ -59,7 +59,7 @@ factory delegate pattern throughout.
 
 ## Screenshots
 
-*[Main window — note entry, notes grid, compliance checklist, productivity panel]*
+![Main window](Images/screenshots/main-window.png)
 
 *[Scratchpad history window]*
 
