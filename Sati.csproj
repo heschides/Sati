@@ -10,9 +10,15 @@
 	
 	<PropertyGroup>
 		<NoWarn>CA1416</NoWarn>
-	</PropertyGroup>
+	</PropertyGroup>	
+	
+	<ItemGroup>
+	  <None Remove="images\icon.ico" />
+	  <None Remove="images\leaf.png" />
+	</ItemGroup>
 
   <ItemGroup>
+    <Resource Include="images\leaf.png" />
     <Resource Include="Images\satisplash.png" />
   </ItemGroup>
 

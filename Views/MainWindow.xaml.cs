@@ -17,10 +17,12 @@ namespace Sati
         private readonly Func<SettingsWindow> _newSettingsWindow;
         private SchedulerViewModel _schedulerVm;
         private readonly Func<ScratchpadHistoryWindow> _scratchpadHistoryWindowFactory = null!;
+        private readonly Func<NotesWindow> _notesWindowFactory;
+
         private bool _isSavingOnClose = false;
 
 
-        public MainWindow(MainWindowViewModel vm, Func<NewClientWindow> newClientWindowFactory, Func<SettingsWindow> newSettingsWindowFactory, SchedulerViewModel schedulerVm, Func<ScratchpadHistoryWindow> scratchpadHistoryWindowFactory)
+        public MainWindow(MainWindowViewModel vm, Func<NewClientWindow> newClientWindowFactory, Func<SettingsWindow> newSettingsWindowFactory, SchedulerViewModel schedulerVm, Func<ScratchpadHistoryWindow> scratchpadHistoryWindowFactory, Func<NotesWindow> notesWindowFactory)
         {
             InitializeComponent();
             var screenHeight = SystemParameters.PrimaryScreenHeight;
@@ -50,12 +52,28 @@ namespace Sati
                 _ = vm.LoadPeopleAsync();
             };
 
+
             vm.PromptSchedulerRequested += (s, e) =>
             {
                 var prompt = new PromptWindow(vm.LoggedInUser?.DisplayName ?? "there");
                 var result = prompt.ShowDialog();
                 if (result == true)
                     vm.IsSchedulerOpen = true;
+            };
+
+            _notesWindowFactory = notesWindowFactory;
+
+            vm.OpenNotesWindowRequested += (s, _) =>
+            {
+                var win = _notesWindowFactory!();
+                win.Owner = this;
+                win.Show();
+            };
+
+            SchedulerPopup.Closed += async (s, e) =>
+            {
+                if (DataContext is MainWindowViewModel vm)
+                    await vm.RefreshIncentiveAsync();
             };
 
             _scratchpadHistoryWindowFactory = scratchpadHistoryWindowFactory;
@@ -106,7 +124,22 @@ namespace Sati
 
         }
 
+        private void TodaysWorkBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter &&
+                (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                var timestamp = DateTime.Now.ToString("h:mm tt");
+                var divider = $"\n\n ─── {timestamp} ───────────────────\n\n";
 
+                var box = (TextBox)sender;
+                var caretIndex = box.CaretIndex;
+                box.Text = box.Text.Insert(caretIndex, divider);
+                box.CaretIndex = caretIndex + divider.Length;
+
+                e.Handled = true;  // prevents the Enter from also adding a newline
+            }
+        }
         private void DataGrid_MouseDoubleClick(object? sender, MouseEventArgs e)
         {
             if (DataContext is MainWindowViewModel vm && vm.SelectedNote is not null)

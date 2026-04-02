@@ -8,9 +8,11 @@
         mc:Ignorable="d"
         Title="Sati"
         Background="#FDF6EC"
+        Icon="/Images/leaf.png"
         WindowState="Maximized"
         MinWidth="900"
-        MinHeight="700">
+        MinHeight="700"
+        TextElement.FontFamily="{StaticResource AppFont}">
 
     <Window.Resources>
         <Style x:Key="LabelStyle"
@@ -199,7 +201,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="2*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
@@ -214,6 +216,8 @@
               Grid.Row="0"
               Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="Auto" />
@@ -234,7 +238,19 @@
                            VerticalAlignment="Center"
                            HorizontalAlignment="Center" />
             </Button>
-
+            <Button Command="{Binding OpenNotesWindowCommand}"
+                    Grid.Column="4"
+                    Width="32"
+                    Height="32"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Cursor="Hand"
+                    ToolTip="Notes">
+                <TextBlock Text="&#xE8F1;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="16"
+                           Foreground="#9C7A5C" />
+            </Button>
             <Button x:Name="SchedulerButton"
                     Grid.Column="2"
                     Style="{StaticResource SmallButton}"
@@ -250,7 +266,7 @@
                            HorizontalAlignment="Center" />
             </Button>
 
-            <Button Grid.Column="4"
+            <Button Grid.Column="6"
                     Content="Client List"
                     Style="{StaticResource SmallButton}"
                     Command="{Binding OpenClientListCommand}"
@@ -536,13 +552,46 @@
                     <DatePicker Grid.Row="3"
                                 SelectedDate="{Binding EventDate}" />
 
-                    <TextBlock Text="NARRATIVE"
-                               Grid.Row="4"
-                               Style="{StaticResource LabelStyle}" />
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="NARRATIVE"
+                                   Style="{StaticResource LabelStyle}" />
+
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal">
+                            <Button Command="{Binding DecreaseNarrativeFontCommand}"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Padding="4,0">
+                                <TextBlock Text="A"
+                                           FontSize="11"
+                                           Foreground="#9C7A5C" />
+                            </Button>
+                            <Button Command="{Binding IncreaseNarrativeFontCommand}"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Padding="4,0">
+                                <TextBlock Text="A"
+                                           FontSize="16"
+                                           Foreground="#9C7A5C"
+                                           FontWeight="SemiBold" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
                     <TextBox Grid.Row="5"
                              TextWrapping="Wrap"
                              AcceptsReturn="True"
                              VerticalScrollBarVisibility="Auto"
+                             SpellCheck.IsEnabled="True"
+                             FontFamily="{StaticResource NarrativeFont}"
+                             FontSize="{Binding NarrativeFontSize}"
                              Text="{Binding Narrative}" />
                 </Grid>
 
@@ -882,14 +931,18 @@
                 </StackPanel>
                 <TextBox x:Name="TodaysWorkBox"
                          Grid.Row="1"
+                         FontFamily="{StaticResource NarrativeFont}"
+                         FontSize="{Binding NarrativeFontSize}"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
+                         SpellCheck.IsEnabled="True"
                          VerticalScrollBarVisibility="Auto"
                          VerticalAlignment="Stretch"
                          Text="{Binding ScratchpadContent, UpdateSourceTrigger=PropertyChanged}"
                          BorderThickness="0"
                          Background="Transparent"
-                         Margin="0" />
+                         Margin="0"
+                         KeyDown="TodaysWorkBox_KeyDown" />
             </Grid>
         </Border>
 

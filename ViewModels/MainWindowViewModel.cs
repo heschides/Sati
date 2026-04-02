@@ -20,7 +20,7 @@ namespace Sati
 {
     public partial class MainWindowViewModel : ObservableObject
     {
-        
+
         //SERVICES
         private readonly IPersonService _personService;
         private readonly INoteService _noteService;
@@ -33,7 +33,7 @@ namespace Sati
         private readonly ISessionService _sessionService;
         private readonly IUpcomingEventService _upcomingEventService;
         private readonly IFormService _formService;
-        
+
 
         //compliance flags
         public bool Q1RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q1R)?.IsCompliant ?? false;
@@ -56,6 +56,7 @@ namespace Sati
         public event EventHandler<bool>? PromptSchedulerRequested;
         public event EventHandler<FormType>? MarkFormCompleteRequested;
         public event EventHandler? OpenScratchpadHistoryRequested;
+        public event EventHandler<bool>? OpenNotesWindowRequested;
 
         //PROPERTIES
 
@@ -89,6 +90,8 @@ namespace Sati
         [ObservableProperty] private bool isSchedulerOpen = false;
         [ObservableProperty] private bool sortByDate = true;
         [ObservableProperty] private FormType? selectedFormType;
+        [ObservableProperty] private double narrativeFontSize = 14;
+        [ObservableProperty] private double scratchpadFontSize = 14;
         partial void OnSelectedFormTypeChanged(FormType? value)
         {
             if (value is null) return;
@@ -159,15 +162,18 @@ namespace Sati
         }
 
         //Commands
-        [RelayCommand] public void OpenClientList()
+        [RelayCommand]
+        public void OpenClientList()
         {
             OpenClientsWindowRequested?.Invoke(this, true);
         }
-        [RelayCommand] public void OpenSettingsWindow()
+        [RelayCommand]
+        public void OpenSettingsWindow()
         {
             OpenSettingsWindowRequested?.Invoke(this, true);
         }
-        [RelayCommand] public async Task SubmitNote()
+        [RelayCommand]
+        public async Task SubmitNote()
         {
             try
             {
@@ -235,10 +241,10 @@ namespace Sati
                     SelectedNoteType = null;
                     await LoadUpcomingEventsAsync();
                 }
-                }
+            }
 
 
-             catch (Exception ex)
+            catch (Exception ex)
             {
                 Debug.WriteLine($"SubmitNote failed: {ex.Message}");
                 MessageBox.Show(
@@ -249,8 +255,14 @@ namespace Sati
             }
         }
 
+        [RelayCommand]
+        public void OpenNotesWindow()
+        {
+            OpenNotesWindowRequested?.Invoke(this, true);
+        }
 
-        [RelayCommand] private async Task DeleteNote()
+        [RelayCommand]
+        private async Task DeleteNote()
         {
             if (SelectedNote != null)
             {
@@ -293,9 +305,27 @@ namespace Sati
         private void OpenScratchpadHistory() =>
     OpenScratchpadHistoryRequested?.Invoke(this, EventArgs.Empty);
 
-        [RelayCommand] private void OpenScheduler() 
-        {IsSchedulerOpen = !IsSchedulerOpen; 
+        [RelayCommand]
+        private void OpenScheduler()
+        {
+            IsSchedulerOpen = !IsSchedulerOpen;
         }
+
+        [RelayCommand]
+        private void IncreaseNarrativeFont() =>
+    NarrativeFontSize = Math.Min(NarrativeFontSize + 2, 28);
+
+        [RelayCommand]
+        private void DecreaseNarrativeFont() =>
+            NarrativeFontSize = Math.Max(NarrativeFontSize - 2, 10);
+
+        [RelayCommand]
+        private void IncreaseScratchpadFont() =>
+            ScratchpadFontSize = Math.Min(ScratchpadFontSize + 2, 28);
+
+        [RelayCommand]
+        private void DecreaseScratchpadFont() =>
+            ScratchpadFontSize = Math.Max(ScratchpadFontSize - 2, 10);
 
         //Methods
 
@@ -327,7 +357,7 @@ namespace Sati
                 ScratchpadContent = _scratchpad!.Content;
 
                 StartAbandonmentTimer();
-               // StartScratchpadTimer();
+                // StartScratchpadTimer();
             }
             catch (Exception ex)
             {
@@ -375,10 +405,10 @@ namespace Sati
                     People.Add(person);
             }
             catch (Exception ex)
-                {
-                    Debug.WriteLine($"Failed to load people: {ex.Message}");
-                }
-            }     
+            {
+                Debug.WriteLine($"Failed to load people: {ex.Message}");
+            }
+        }
 
         private void StartScratchpadTimer()
         {
@@ -434,7 +464,7 @@ namespace Sati
             {
                 if ((DateTime.Now - _lastAbandonmentCheck).TotalHours >= 24)
                 {
-                    await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 7);
+                    await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 8);
                     _lastAbandonmentCheck = DateTime.Now;
                 }
             };
@@ -525,6 +555,16 @@ namespace Sati
 
         public decimal EstimatedIncentive => _incentive?.Calculate(LoggedUnits ?? 0) ?? 0;
         public int Threshold => _incentive?.Threshold ?? 0;
+
+        public async Task RefreshIncentiveAsync()
+        {
+            var (incentive, _) = await _incentiveService.GetOrCreateAsync(
+                LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
+            _incentive = incentive;
+            OnPropertyChanged(nameof(Threshold));
+            OnPropertyChanged(nameof(SafeThreshold));
+            OnPropertyChanged(nameof(EstimatedIncentive));
+        }
 
 
     }

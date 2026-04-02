@@ -58,6 +58,9 @@ namespace Sati
                     services.AddTransient<SettingsViewModel>();
                     services.AddTransient<SettingsWindow>();
 
+                    services.AddTransient<NotesWindowViewModel>();
+                    services.AddTransient<NotesWindow>();
+
                     services.AddTransient<ComplianceReviewViewModel>();
                     services.AddTransient<ComplianceReviewWindow>();
 
@@ -70,6 +73,7 @@ namespace Sati
                     services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
                     services.AddTransient<Func<NewClientWindow>>(sp => () => sp.GetRequiredService<NewClientWindow>());
                     services.AddTransient<Func<ScratchpadHistoryWindow>>(sp => () => sp.GetRequiredService<ScratchpadHistoryWindow>());
+                    services.AddTransient<Func<NotesWindow>>(sp => () => sp.GetRequiredService<NotesWindow>());
 
                     //ef core
                     services.AddDbContext<SatiContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")), ServiceLifetime.Transient);

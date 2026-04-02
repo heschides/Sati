@@ -134,7 +134,7 @@ namespace Sati.ViewModels
 
                 var isInteractable = !IsAlwaysExcluded(dow, _settings!);
                 var isExcluded = !isInteractable ||
-                                 (_incentive?.ExcludedDates.Contains(date) ?? false);
+                 (isInteractable && (_incentive?.ExcludedDates.Contains(date) ?? false));
 
                 Tiles.Add(new WorkdayTile
                 {

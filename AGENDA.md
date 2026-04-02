@@ -99,7 +99,9 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 - [ ] UI polish — consistent spacing, styles, color scheme
 - [ ] README with purpose, setup instructions, screenshots
 - [ ] Seed data script for reviewers
-
+- [ ] Settings: add UserId foreign key so settings are per-user
+- [ ] Scheduler: clear stale ExcludedDates when weekday exclusion is removed from Settings
+- [ ] Scheduler: fix day-of-week column alignment across months
 ---
 
 ## Phase 9 — Azure / HIPAA Readiness

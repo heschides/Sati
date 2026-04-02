@@ -2,6 +2,7 @@
 using Sati.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 
 namespace Sati.Views
@@ -45,6 +46,21 @@ namespace Sati.Views
             {
                 vm.SecurePassword = box.SecurePassword;
             }
+        }
+
+        private void ForgotPassword_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show(
+                "Contact your administrator to reset your password.",
+                "Forgot Password",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        private void PasswordInput_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Return && DataContext is LoginWindowViewModel vm)
+                _ = vm.LoginAsync();
         }
     }
 }
