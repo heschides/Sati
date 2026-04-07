@@ -128,8 +128,8 @@ namespace Sati
 
         public ICollectionView NotesView { get; }
         public IEnumerable<UpcomingEvent> FormEvents => SortByDate
-     ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.OpenReview || e.Kind == UpcomingEventKind.LateReview).OrderBy(e => e.Date)
-     : UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.OpenReview || e.Kind == UpcomingEventKind.LateReview).OrderBy(e => e.Kind);
+    ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.OpenReview || e.Kind == UpcomingEventKind.LateReview || e.Kind == UpcomingEventKind.ScheduledForm).OrderBy(e => e.Date)
+    : UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.OpenReview || e.Kind == UpcomingEventKind.LateReview || e.Kind == UpcomingEventKind.ScheduledForm).OrderBy(e => e.Kind);
 
         public IEnumerable<UpcomingEvent> VisitEvents => SortByDate
             ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.ScheduledVisit).OrderBy(e => e.Date)

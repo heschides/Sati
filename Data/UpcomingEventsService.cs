@@ -76,13 +76,19 @@ namespace Sati.Data
 
             foreach (var note in scheduledNotes)
             {
-                var kind = note.NoteType == NoteType.Contact
-                    ? UpcomingEventKind.ScheduledContact
-                    : UpcomingEventKind.ScheduledVisit;
+                var kind = note.NoteType switch
+                {
+                    NoteType.Contact => UpcomingEventKind.ScheduledContact,
+                    NoteType.Form => UpcomingEventKind.ScheduledForm,
+                    _ => UpcomingEventKind.ScheduledVisit
+                };
 
-                var label = note.NoteType == NoteType.Contact
-                    ? $"Contact — {person.FullName}"
-                    : $"Visit — {person.FullName}";
+                var label = note.NoteType switch
+                {
+                    NoteType.Contact => $"Contact — {person.FullName}",
+                    NoteType.Form => $"Form — {person.FullName}",
+                    _ => $"Visit — {person.FullName}"
+                };
 
                 events.Add(new UpcomingEvent
                 {
