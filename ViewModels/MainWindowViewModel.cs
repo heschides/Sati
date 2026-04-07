@@ -57,6 +57,7 @@ namespace Sati
         public event EventHandler<FormType>? MarkFormCompleteRequested;
         public event EventHandler? OpenScratchpadHistoryRequested;
         public event EventHandler<bool>? OpenNotesWindowRequested;
+        public event EventHandler? NoteChanged;
 
         //PROPERTIES
 
@@ -154,6 +155,7 @@ namespace Sati
             _noteService = noteService;
             _settingsService = settingsService;
             _scratchpadService = scratchpadService;
+            
             _incentiveService = incentiveService;
             NotesView = CollectionViewSource.GetDefaultView(Notes);
             NotesView.Filter = FilterNotes;
@@ -212,7 +214,9 @@ namespace Sati
                     Duration = null;
                     SelectedFormType = null;
                     SelectedNoteType = null;
+                    await LoadPeopleAsync();
                     await LoadUpcomingEventsAsync();
+                    NoteChanged?.Invoke(this, EventArgs.Empty);
 
                 }
                 else
@@ -225,6 +229,8 @@ namespace Sati
                     note.EventDate = EventDate;
                     note.Units = Units ?? 0;
                     note.Status = Status;
+                    note.NoteType = SelectedNoteType;   
+                    note.FormType = SelectedFormType;   
                     await _noteService.UpdateNoteAsync(note);
                     await LoadMonthlyNotesAsync();
                     NotesView.Refresh();
@@ -241,6 +247,7 @@ namespace Sati
                     SelectedFormType = null;
                     SelectedNoteType = null;
                     await LoadUpcomingEventsAsync();
+                    NoteChanged?.Invoke(this, EventArgs.Empty);
                 }
             }
 
@@ -272,6 +279,7 @@ namespace Sati
                 SelectedPerson?.Notes.Remove(SelectedNote);
                 await LoadMonthlyNotesAsync();
                 await LoadUpcomingEventsAsync();
+                NoteChanged?.Invoke(this, EventArgs.Empty);
                 SelectedNote = null;
             }
         }
@@ -367,7 +375,6 @@ namespace Sati
                                 "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
         partial void OnSearchTextChanged(string? value)
         {
             NotesView.Refresh();
@@ -410,7 +417,6 @@ namespace Sati
                 Debug.WriteLine($"Failed to load people: {ex.Message}");
             }
         }
-
         private void StartScratchpadTimer()
         {
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
@@ -422,7 +428,6 @@ namespace Sati
             };
             timer.Start();
         }
-
         public async Task SaveScratchpadAsync(string content)
         {
             try
@@ -442,7 +447,6 @@ namespace Sati
                     MessageBoxImage.Error);
             }
         }
-
         public void EnterEditMode()
         {
             if (SelectedNote is null)
@@ -454,6 +458,8 @@ namespace Sati
             EventDate = SelectedNote.EventDate;
             Units = SelectedNote.Units;
             Status = SelectedNote.Status;
+            SelectedNoteType = SelectedNote.NoteType;  
+            SelectedFormType = SelectedNote.FormType;  
             SelectedPerson = People.First(p => p.Id == SelectedNote.PersonId);
         }
 
@@ -471,7 +477,6 @@ namespace Sati
             };
             timer.Start();
         }
-
         partial void OnSelectedNoteTypeChanged(NoteType? value)
         {
             OnPropertyChanged(nameof(IsFormNote));
@@ -498,7 +503,6 @@ namespace Sati
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
         }
-
         private async Task LoadUpcomingEventsAsync()
         {
             if (LoggedInUser is null) return;
@@ -511,7 +515,6 @@ namespace Sati
             OnPropertyChanged(nameof(VisitEvents));
             OnPropertyChanged(nameof(ContactEvents));
         }
-
         public async Task MarkFormCompleteAsync(FormType formType)
         {
             if (SelectedPerson is null) return;
@@ -523,7 +526,6 @@ namespace Sati
             await _formService.UpdateFormAsync(form);
             RefreshComplianceFlags();
         }
-
         private void RefreshComplianceFlags()
         {
             OnPropertyChanged(nameof(Q1RCompliant));

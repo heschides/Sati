@@ -86,6 +86,7 @@ namespace Sati
 
             Closing += async (s, e) =>
             {
+                if (!IsVisible) return; 
                 if (_isSavingOnClose) return;
                 e.Cancel = true;
                 _isSavingOnClose = true;
@@ -137,7 +138,7 @@ namespace Sati
                 box.Text = box.Text.Insert(caretIndex, divider);
                 box.CaretIndex = caretIndex + divider.Length;
 
-                e.Handled = true;  // prevents the Enter from also adding a newline
+                e.Handled = true; 
             }
         }
         private void DataGrid_MouseDoubleClick(object? sender, MouseEventArgs e)

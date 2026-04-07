@@ -72,15 +72,18 @@
         </Grid.RowDefinitions>
 
         <!-- ═══ FILTER BAR ═══ -->
+        <!-- ═══ FILTER BAR ═══ -->
         <Grid Grid.Row="0"
               Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="200" />
                 <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Client dropdown — null item displays as "All Clients" via FallbackValue -->
+            <!-- Client dropdown -->
             <ComboBox Grid.Column="0"
                       ItemsSource="{Binding FilterPeople}"
                       SelectedItem="{Binding SelectedFilterPerson, Mode=TwoWay}">
@@ -91,7 +94,15 @@
                 </ComboBox.ItemTemplate>
             </ComboBox>
 
-            <TextBox Grid.Column="2"
+            <!-- Status dropdown -->
+            <ComboBox Grid.Column="2"
+                      ItemsSource="{Binding FilterStatusOptions}"
+                      SelectedItem="{Binding FilterStatus, Mode=TwoWay}"
+                      DisplayMemberPath="Label">
+            </ComboBox>
+
+            <!-- Search box -->
+            <TextBox Grid.Column="4"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                      Padding="8,4">
                 <TextBox.Style>
@@ -106,33 +117,6 @@
                     </Style>
                 </TextBox.Style>
             </TextBox>
-            <!-- Search placeholder overlay -->
-            <TextBlock Grid.Column="2"
-                       Text="Search notes..."
-                       Foreground="#C0A080"
-                       FontSize="13"
-                       IsHitTestVisible="False"
-                       VerticalAlignment="Center"
-                       Margin="10,0,0,0">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Visibility"
-                                Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding SearchText}"
-                                         Value="">
-                                <Setter Property="Visibility"
-                                        Value="Visible" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding SearchText}"
-                                         Value="{x:Null}">
-                                <Setter Property="Visibility"
-                                        Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
         </Grid>
 
         <!-- ═══ CONTENT: DATAGRID + DETAIL ═══ -->
@@ -161,6 +145,12 @@
                           HorizontalGridLinesBrush="#F0E0D0"
                           HeadersVisibility="Column"
                           SelectionMode="Single">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Mark Note Logged"
+                                      Command="{Binding MarkNoteLoggedCommand}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Client"
                                             Binding="{Binding Person.FullName}"
@@ -170,6 +160,9 @@
                                             Width="60" />
                         <DataGridTextColumn Header="Status"
                                             Binding="{Binding Status}"
+                                            Width="80" />
+                        <DataGridTextColumn Header="Type"
+                                            Binding="{Binding NoteType}"
                                             Width="80" />
                         <DataGridTextColumn Header="Units"
                                             Binding="{Binding Units}"
@@ -234,7 +227,12 @@
                                    FontSize="13"
                                    Foreground="#3D2B1F"
                                    Margin="0,0,0,10" />
-
+                        <TextBlock Text="TYPE"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding SelectedNote.NoteType}"
+                                   FontSize="13"
+                                   Foreground="#3D2B1F"
+                                   Margin="0,0,0,10" />
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

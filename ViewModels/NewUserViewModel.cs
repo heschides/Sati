@@ -29,7 +29,6 @@ namespace Sati.ViewModels
         }
 
         //events
-        public event EventHandler<bool>? CloseRequested;
         public event EventHandler<bool>? CloseWindowRequested;
 
         //properies
