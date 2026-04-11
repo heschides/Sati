@@ -1,33 +1,31 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sati.Models;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
 
 namespace Sati.Data
 {
     public class ScratchpadService : IScratchpadService
     {
-        private readonly SatiContext _context;
+        private readonly IDbContextFactory<SatiContext> _contextFactory;
 
-        public ScratchpadService(SatiContext context)
+        public ScratchpadService(IDbContextFactory<SatiContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<Scratchpad> LoadTodayAsync(int userId)
         {
+            await using var context = _contextFactory.CreateDbContext();
             var today = DateTime.Today;
-            var scratchpad = await _context.Scratchpad
+            var scratchpad = await context.Scratchpad
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.Date == today);
 
             if (scratchpad is null)
             {
                 scratchpad = new Scratchpad { UserId = userId, Date = today };
                 Debug.WriteLine($"SERVICE SaveAsync called with: '{scratchpad.Content}'");
-                _context.Scratchpad.Add(scratchpad);
-                await _context.SaveChangesAsync();
+                context.Scratchpad.Add(scratchpad);
+                await context.SaveChangesAsync();
             }
 
             return scratchpad;
@@ -35,8 +33,9 @@ namespace Sati.Data
 
         public async Task<List<Scratchpad>> GetHistoryAsync(int userId)
         {
+            await using var context = _contextFactory.CreateDbContext();
             var today = DateTime.Today;
-            return await _context.Scratchpad
+            return await context.Scratchpad
                 .Where(s => s.UserId == userId && s.Date < today)
                 .OrderByDescending(s => s.Date)
                 .ToListAsync();
@@ -44,8 +43,9 @@ namespace Sati.Data
 
         public async Task SaveAsync(Scratchpad scratchpad)
         {
-            _context.Scratchpad.Update(scratchpad);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            context.Scratchpad.Update(scratchpad);
+            await context.SaveChangesAsync();
         }
     }
 }

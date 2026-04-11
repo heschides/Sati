@@ -5,27 +5,30 @@ namespace Sati.Data
 {
     public class IncentiveService : IIncentiveService
     {
-        private readonly SatiContext _context;
+        private readonly IDbContextFactory<SatiContext> _contextFactory;
         private readonly ISettingsService _settingsService;
 
-        public IncentiveService(SatiContext context, ISettingsService settingsService)
+        public IncentiveService(IDbContextFactory<SatiContext> context, ISettingsService settingsService)
         {
-            _context = context;
+            _contextFactory = context;
             _settingsService = settingsService;
         }
 
         public async Task<(Incentive incentive, bool wasCreated)> GetOrCreateAsync(int userId, int month, int year)
         {
-            var incentive = await _context.Incentives
+
+            await using var context = _contextFactory.CreateDbContext();
+            var settings = await _settingsService.LoadAsync();
+
+            var incentive = await context.Incentives
+                .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.UserId == userId &&
-                                         i.Month == month &&
-                                         i.Year == year);
+                                          i.Month == month &&
+                                          i.Year == year);
 
             if (incentive is null)
             {
-                var settings = await _settingsService.LoadAsync();
                 var daysScheduled = CalculateDaysScheduled(month, year, settings);
-
                 incentive = new Incentive
                 {
                     UserId = userId,
@@ -33,13 +36,19 @@ namespace Sati.Data
                     Year = year,
                     DaysScheduled = daysScheduled,
                     BaseIncentive = settings.BaseIncentive,
-                    PerUnitIncentive = settings.PerUnitIncentive
+                    PerUnitIncentive = settings.PerUnitIncentive,
+                    UnitsPerDay = settings.ProductivityThreshold
                 };
+                context.Incentives.Add(incentive);
+                await context.SaveChangesAsync();
+                return (incentive, true);
+            }
 
-                _context.Incentives.Add(incentive);
-                await _context.SaveChangesAsync();
-                return (incentive, false);
-            
+            if (incentive.UnitsPerDay == 0)
+            {
+                incentive.UnitsPerDay = settings.ProductivityThreshold;
+               context.Incentives.Update(incentive);
+                await context.SaveChangesAsync();
             }
 
             return (incentive, false);
@@ -47,8 +56,10 @@ namespace Sati.Data
 
         public async Task SaveAsync(Incentive incentive)
         {
-            _context.Incentives.Update(incentive);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+
+            context.Incentives.Update(incentive);
+            await context.SaveChangesAsync();
         }
 
         private int CalculateDaysScheduled(int month, int year, Settings settings)

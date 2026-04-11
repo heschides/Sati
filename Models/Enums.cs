@@ -20,6 +20,13 @@ namespace Sati
         [Description("DHHS Release")] Release_DHHS,
         [Description("Medical Release")] Release_Medical
     }
+    public enum UserRole
+    {
+        CaseManager,
+        Supervisor,
+        Director,
+        Admin
+    }
     public enum UpcomingEventKind
     {
         OpenReview,

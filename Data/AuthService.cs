@@ -1,49 +1,45 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sati.Models;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
 using System.Security;
-using System.Text;
-using Windows.UI.Notifications;
 
 namespace Sati.Data
 {
     public class AuthService : IAuthService
     {
-        private readonly SatiContext _context;
-        public AuthService(SatiContext context)
+        private readonly IDbContextFactory<SatiContext> _contextFactory;
+
+        public AuthService(IDbContextFactory<SatiContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<User?> AuthenticateAsync(string username, SecureString password)
         {
-            var userEntity = await _context.Users.SingleOrDefaultAsync(u => u.Username == username);
+            await using var context = _contextFactory.CreateDbContext();
+
+            var userEntity = await context.Users
+                .SingleOrDefaultAsync(u => u.Username == username);
+
             if (userEntity == null)
-            {
                 return null;
-            }
-                var passwordHasher = new PasswordHasher();
+
+            var passwordHasher = new PasswordHasher();
             var isValid = passwordHasher.Verify(
-                  password,
-                  userEntity.PasswordHash,
-                  userEntity.Salt
-                 );
+                password,
+                userEntity.PasswordHash,
+                userEntity.Salt);
 
-                if (!isValid)
-                    return null; 
-                
-                return User.Create(
-                    userEntity.Id,
-                    userEntity.Username,
-                    userEntity.DisplayName,
-                    userEntity.PasswordHash,
-                    userEntity.Salt
-                );
+            if (!isValid)
+                return null;
 
-                
-            }
+            return User.Create(
+                userEntity.Id,
+                userEntity.Username,
+                userEntity.DisplayName,
+                userEntity.PasswordHash,
+                userEntity.Salt,
+                userEntity.Role,
+                userEntity.SupervisorId);
         }
     }
-
+}

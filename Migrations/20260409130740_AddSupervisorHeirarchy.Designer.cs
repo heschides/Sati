@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sati.Data;
 
@@ -11,9 +12,11 @@ using Sati.Data;
 namespace Sati.Migrations
 {
     [DbContext(typeof(SatiContext))]
-    partial class SatiContextModelSnapshot : ModelSnapshot
+    [Migration("20260409130740_AddSupervisorHeirarchy")]
+    partial class AddSupervisorHeirarchy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -312,9 +315,8 @@ namespace Sati.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
 
                     b.Property<string>("Salt")
                         .IsRequired()
@@ -415,8 +417,7 @@ namespace Sati.Migrations
                 {
                     b.HasOne("Sati.Models.User", "Supervisor")
                         .WithMany("Supervisees")
-                        .HasForeignKey("SupervisorId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("SupervisorId");
 
                     b.Navigation("Supervisor");
                 });

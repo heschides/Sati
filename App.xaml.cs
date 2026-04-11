@@ -5,10 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Sati.Data;
 using Sati.ViewModels;
 using Sati.Views;
-using System.Configuration;
-using System.Data;
 using System.Windows;
-using Windows.Media.ClosedCaptioning;
 
 namespace Sati
 {
@@ -69,6 +66,8 @@ namespace Sati
 
                     services.AddTransient<SchedulerViewModel>();
 
+                    services.AddTransient<Func<string, UserMessageDialog>>(sp => message => new UserMessageDialog(message));
+
                     services.AddTransient<Func<SettingsWindow>>(sp => () => sp.GetRequiredService<SettingsWindow>());
                     services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
                     services.AddTransient<Func<NewClientWindow>>(sp => () => sp.GetRequiredService<NewClientWindow>());
@@ -76,7 +75,7 @@ namespace Sati
                     services.AddTransient<Func<NotesWindow>>(sp => () => sp.GetRequiredService<NotesWindow>());
 
                     //ef core
-                    services.AddDbContext<SatiContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")), ServiceLifetime.Transient);
+                    services.AddDbContextFactory<SatiContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")), ServiceLifetime.Transient);
 
                 })
                 .Build();

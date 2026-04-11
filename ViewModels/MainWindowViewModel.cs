@@ -1,56 +1,73 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Sati.Data;
 using Sati.Models;
-using System;
-using System.Collections.Generic;
+using Sati.Views;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Threading;
-using Windows.Devices.I2c.Provider;
 
-
-namespace Sati
+namespace Sati.ViewModels
 {
     public partial class MainWindowViewModel : ObservableObject
     {
+        // -------------------------------------------------------------------------
+        // Services & private state
+        // -------------------------------------------------------------------------
 
-        //SERVICES
         private readonly IPersonService _personService;
         private readonly INoteService _noteService;
         private readonly ISettingsService _settingsService;
-        private Settings? _settings;
         private readonly IScratchpadService _scratchpadService;
-        private Scratchpad? _scratchpad;
         private readonly IIncentiveService _incentiveService;
-        private Incentive? _incentive;
         private readonly ISessionService _sessionService;
         private readonly IUpcomingEventService _upcomingEventService;
         private readonly IFormService _formService;
+        private readonly Func<string, UserMessageDialog> _validationDialog;
 
+        private Settings? _settings;
+        private Scratchpad? _scratchpad;
+        private Incentive? _incentive;
+        private List<Note> _monthlyNotes = [];
+        private DateTime _lastAbandonmentCheck = DateTime.Now;
 
-        //compliance flags
-        public bool Q1RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q1R)?.IsCompliant ?? false;
-        public bool Q2RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q2R)?.IsCompliant ?? false;
-        public bool Q3RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q3R)?.IsCompliant ?? false;
-        public bool Q4RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q4R)?.IsCompliant ?? false;
-        public bool PcpCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PCP)?.IsCompliant ?? false;
-        public bool CompAssessmentCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.ComprehensiveAssessment)?.IsCompliant ?? false;
-        public bool ReclassificationCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.IsCompliant ?? false;
-        public bool SafetyPlanCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.IsCompliant ?? false;
-        public bool PrivacyPracticesCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.IsCompliant ?? false;
-        public bool ReleaseAgencyCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Agency)?.IsCompliant ?? false;
-        public bool ReleaseDhhsCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_DHHS)?.IsCompliant ?? false;
-        public bool ReleaseMedicalCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Medical)?.IsCompliant ?? false;
+        // -------------------------------------------------------------------------
+        // Constructor
+        // -------------------------------------------------------------------------
 
+        public MainWindowViewModel(
+            IPersonService personService,
+            INoteService noteService,
+            ISettingsService settingsService,
+            IScratchpadService scratchpadService,
+            IIncentiveService incentiveService,
+            ISessionService sessionService,
+            IUpcomingEventService upcomingEventService,
+            IFormService formService,
+            Func<string, UserMessageDialog> validationDialog)
+        {
+            _personService = personService;
+            _noteService = noteService;
+            _settingsService = settingsService;
+            _scratchpadService = scratchpadService;
+            _incentiveService = incentiveService;
+            _sessionService = sessionService;
+            _upcomingEventService = upcomingEventService;
+            _formService = formService;
+            _validationDialog = validationDialog;
 
-        //EVENTS
+            NotesView = CollectionViewSource.GetDefaultView(Notes);
+            NotesView.Filter = FilterNotes;
+        }
+
+        // -------------------------------------------------------------------------
+        // Events
+        // -------------------------------------------------------------------------
+
         public event EventHandler<bool>? OpenClientsWindowRequested;
         public event EventHandler<bool>? OpenSettingsWindowRequested;
         public event EventHandler<bool>? PromptSchedulerRequested;
@@ -59,9 +76,34 @@ namespace Sati
         public event EventHandler<bool>? OpenNotesWindowRequested;
         public event EventHandler? NoteChanged;
 
-        //PROPERTIES
+        // -------------------------------------------------------------------------
+        // Observable properties
+        // -------------------------------------------------------------------------
 
+        [ObservableProperty] private User? loggedInUser;
         [ObservableProperty] private Person? selectedPerson;
+        [ObservableProperty] private Note? selectedNote;
+        [ObservableProperty] private string? searchText;
+        [ObservableProperty] private NoteStatus? filterStatus;
+        [ObservableProperty] private NoteStatus? status;
+        [ObservableProperty] private NoteType? selectedNoteType;
+        [ObservableProperty] private FormType? selectedFormType;
+        [ObservableProperty] private string? narrative;
+        [ObservableProperty] private DateTime? eventDate;
+        [ObservableProperty] private int? units;
+        [ObservableProperty] private int? duration;
+        [ObservableProperty] private bool isEditing;
+        [ObservableProperty] private bool isSchedulerOpen;
+        [ObservableProperty] private bool sortByDate = true;
+        [ObservableProperty] private int daysScheduled;
+        [ObservableProperty] private string scratchpadContent = string.Empty;
+        [ObservableProperty] private double narrativeFontSize = 14;
+        [ObservableProperty] private double scratchpadFontSize = 14;
+
+        // -------------------------------------------------------------------------
+        // Property change callbacks
+        // -------------------------------------------------------------------------
+
         partial void OnSelectedPersonChanged(Person? value)
         {
             LoadNotesForPersonAsync(value);
@@ -75,29 +117,44 @@ namespace Sati
             SelectedFormType = null;
         }
 
-        [ObservableProperty] private int? units;
-        [ObservableProperty] private DateTime? eventDate;
-        [ObservableProperty] private int? duration;
-        [ObservableProperty] private string? narrative;
-        [ObservableProperty] private NoteStatus? status;
-        [ObservableProperty] private bool isEditing = false;
-        [ObservableProperty] private Note? selectedNote = null;
-        [ObservableProperty] private string? searchText;
-        [ObservableProperty] private NoteStatus? filterStatus;
-        [ObservableProperty] private User? loggedInUser;
-        [ObservableProperty] private string scratchpadContent = string.Empty;
-        [ObservableProperty] private NoteType? selectedNoteType;
-        [ObservableProperty] private int daysScheduled;
-        [ObservableProperty] private bool isSchedulerOpen = false;
-        [ObservableProperty] private bool sortByDate = true;
-        [ObservableProperty] private FormType? selectedFormType;
-        [ObservableProperty] private double narrativeFontSize = 14;
-        [ObservableProperty] private double scratchpadFontSize = 14;
+        partial void OnIsSchedulerOpenChanged(bool value)
+        {
+            if (!value)
+                _ = RefreshIncentiveAsync();
+        }
+
+        partial void OnSortByDateChanged(bool value)
+        {
+            OnPropertyChanged(nameof(FormEvents));
+            OnPropertyChanged(nameof(VisitEvents));
+            OnPropertyChanged(nameof(ContactEvents));
+        }
+
+        partial void OnSearchTextChanged(string? value) => NotesView.Refresh();
+        partial void OnFilterStatusChanged(NoteStatus? value) => NotesView.Refresh();
+
+        partial void OnSelectedNoteTypeChanged(NoteType? value)
+        {
+            OnPropertyChanged(nameof(IsFormNote));
+
+            if (value != NoteType.Form)
+                SelectedFormType = null;
+
+            if (value is null || !string.IsNullOrWhiteSpace(Narrative))
+                return;
+
+            Narrative = value.Value switch
+            {
+                NoteType.Visit => _settings?.VisitTemplate ?? string.Empty,
+                NoteType.Contact => _settings?.ContactTemplate ?? string.Empty,
+                _ => string.Empty
+            };
+        }
+
         partial void OnSelectedFormTypeChanged(FormType? value)
         {
-            if (value is null) return;
-            if (SelectedPerson is null) return;
-            if (!string.IsNullOrWhiteSpace(Narrative)) return;
+            if (value is null || SelectedPerson is null || !string.IsNullOrWhiteSpace(Narrative))
+                return;
 
             var user = _sessionService.CurrentUser?.DisplayName ?? "Case Manager";
             var client = SelectedPerson.FullName;
@@ -119,17 +176,22 @@ namespace Sati
                 _ => string.Empty
             };
         }
-        partial void OnSortByDateChanged(bool value)
-        {
-            OnPropertyChanged(nameof(FormEvents));
-            OnPropertyChanged(nameof(VisitEvents));
-            OnPropertyChanged(nameof(ContactEvents));
-        }
 
+        // -------------------------------------------------------------------------
+        // Collections & computed properties
+        // -------------------------------------------------------------------------
+
+        public ObservableCollection<Note> Notes { get; } = [];
+        public ObservableCollection<Person> People { get; } = [];
+        public ObservableCollection<UpcomingEvent> UpcomingEvents { get; } = [];
         public ICollectionView NotesView { get; }
+
+        public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
+        public Array FormTypes => Enum.GetValues(typeof(FormType));
+
         public IEnumerable<UpcomingEvent> FormEvents => SortByDate
-    ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.OpenReview || e.Kind == UpcomingEventKind.LateReview || e.Kind == UpcomingEventKind.ScheduledForm).OrderBy(e => e.Date)
-    : UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.OpenReview || e.Kind == UpcomingEventKind.LateReview || e.Kind == UpcomingEventKind.ScheduledForm).OrderBy(e => e.Kind);
+            ? UpcomingEvents.Where(e => e.Kind is UpcomingEventKind.OpenReview or UpcomingEventKind.LateReview or UpcomingEventKind.ScheduledForm).OrderBy(e => e.Date)
+            : UpcomingEvents.Where(e => e.Kind is UpcomingEventKind.OpenReview or UpcomingEventKind.LateReview or UpcomingEventKind.ScheduledForm).OrderBy(e => e.Kind);
 
         public IEnumerable<UpcomingEvent> VisitEvents => SortByDate
             ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.ScheduledVisit).OrderBy(e => e.Date)
@@ -138,151 +200,65 @@ namespace Sati
         public IEnumerable<UpcomingEvent> ContactEvents => SortByDate
             ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.ScheduledContact).OrderBy(e => e.Date)
             : UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.ScheduledContact).OrderBy(e => e.Kind);
-        partial void OnFilterStatusChanged(NoteStatus? value) => NotesView.Refresh();
-        public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
-        public ObservableCollection<Note> Notes { get; } = [];
-        public ObservableCollection<Person> People { get; set; } = [];
-        public ObservableCollection<UpcomingEvent> UpcomingEvents { get; set; } = [];
-        public Array FormTypes => Enum.GetValues(typeof(FormType));
 
-        public int SafeThreshold => Threshold > 0 ? Threshold : 1;
         public bool IsFormNote => SelectedNoteType == NoteType.Form;
+        public int Threshold => _incentive?.Threshold ?? 0;
+        public int SafeThreshold => Threshold > 0 ? Threshold : 1;
 
-        //Constructor
-        public MainWindowViewModel(IPersonService personService, INoteService noteService, ISettingsService settingsService, IScratchpadService scratchpadService, IIncentiveService incentiveService, ISessionService sessionService, IUpcomingEventService upcomingEventService, IFormService formService)
-        {
-            _personService = personService;
-            _noteService = noteService;
-            _settingsService = settingsService;
-            _scratchpadService = scratchpadService;
-            
-            _incentiveService = incentiveService;
-            NotesView = CollectionViewSource.GetDefaultView(Notes);
-            NotesView.Filter = FilterNotes;
-            _sessionService = sessionService;
-            _upcomingEventService = upcomingEventService;
-            _formService = formService;
-        }
+        public int? PendingUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Pending).Sum(n => n.Units);
+        public int? LoggedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Logged).Sum(n => n.Units);
+        public int? AbandonedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Abandoned).Sum(n => n.Units);
 
-        //Commands
-        [RelayCommand]
-        public void OpenClientList()
-        {
-            OpenClientsWindowRequested?.Invoke(this, true);
-        }
-        [RelayCommand]
-        public void OpenSettingsWindow()
-        {
-            OpenSettingsWindowRequested?.Invoke(this, true);
-        }
-        [RelayCommand]
-        public async Task SubmitNote()
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(Narrative) || SelectedPerson == null)
-                    return;
+        public decimal EstimatedIncentive => _incentive?.Calculate(LoggedUnits ?? 0) ?? 0;
 
+        // -------------------------------------------------------------------------
+        // Compliance flags
+        // -------------------------------------------------------------------------
 
-                if (!IsEditing)
-                {
-                    var note = Note.Create(Narrative, EventDate, Status, Units, SelectedPerson.Id, SelectedFormType, SelectedNoteType);
-                    var savedNote = await _noteService.AddNoteAsync(note);
+        public bool Q1RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q1R)?.IsCompliant ?? false;
+        public bool Q2RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q2R)?.IsCompliant ?? false;
+        public bool Q3RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q3R)?.IsCompliant ?? false;
+        public bool Q4RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q4R)?.IsCompliant ?? false;
+        public bool PcpCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PCP)?.IsCompliant ?? false;
+        public bool CompAssessmentCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.ComprehensiveAssessment)?.IsCompliant ?? false;
+        public bool ReclassificationCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.IsCompliant ?? false;
+        public bool SafetyPlanCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.IsCompliant ?? false;
+        public bool PrivacyPracticesCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.IsCompliant ?? false;
+        public bool ReleaseAgencyCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Agency)?.IsCompliant ?? false;
+        public bool ReleaseDhhsCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_DHHS)?.IsCompliant ?? false;
+        public bool ReleaseMedicalCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Medical)?.IsCompliant ?? false;
 
-                    Notes.Insert(0, savedNote);
-                    SelectedPerson?.Notes.Add(savedNote);
-                    await LoadMonthlyNotesAsync();
-                    if (EventDate.HasValue &&
-        (EventDate.Value.Month != DateTime.Now.Month ||
-         EventDate.Value.Year != DateTime.Now.Year))
-                    {
-                        MessageBox.Show(
-                            $"This note's date ({EventDate.Value:MMM d, yyyy}) is outside the current month and will not appear in this month's productivity totals.",
-                            "Note Outside Current Month",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                    }
-                    NotesView.Refresh();
-                    var formType = SelectedFormType;
-                    if (formType.HasValue && (Status == NoteStatus.Pending || Status == NoteStatus.Logged))
-                        MarkFormCompleteRequested?.Invoke(this, formType.Value);
-                    //SelectedPerson = null;
-                    Status = null;
-                    Narrative = string.Empty;
-                    EventDate = null;
-                    Units = null;
-                    Duration = null;
-                    SelectedFormType = null;
-                    SelectedNoteType = null;
-                    await LoadPeopleAsync();
-                    await LoadUpcomingEventsAsync();
-                    NoteChanged?.Invoke(this, EventArgs.Empty);
+        // -------------------------------------------------------------------------
+        // Commands
+        // -------------------------------------------------------------------------
 
-                }
-                else
-                {
-                    if (SelectedNote == null)
-                        return;
+        [RelayCommand] public void OpenClientList() => OpenClientsWindowRequested?.Invoke(this, true);
+        [RelayCommand] public void OpenSettingsWindow() => OpenSettingsWindowRequested?.Invoke(this, true);
+        [RelayCommand] public void OpenNotesWindow() => OpenNotesWindowRequested?.Invoke(this, true);
+        [RelayCommand] private void OpenScratchpadHistory() => OpenScratchpadHistoryRequested?.Invoke(this, EventArgs.Empty);
+        [RelayCommand] private void OpenScheduler() => IsSchedulerOpen = !IsSchedulerOpen;
 
-                    var note = SelectedNote!;
-                    note.Narrative = Narrative;
-                    note.EventDate = EventDate;
-                    note.Units = Units ?? 0;
-                    note.Status = Status;
-                    note.NoteType = SelectedNoteType;   
-                    note.FormType = SelectedFormType;   
-                    await _noteService.UpdateNoteAsync(note);
-                    await LoadMonthlyNotesAsync();
-                    NotesView.Refresh();
-
-                    var formType = SelectedNote.FormType;
-                    if (formType.HasValue && (Status == NoteStatus.Pending || Status == NoteStatus.Logged))
-                        MarkFormCompleteRequested?.Invoke(this, formType.Value);
-                    IsEditing = false;
-                    Status = null;
-                    Narrative = string.Empty;
-                    EventDate = null;
-                    Units = null;
-                    Duration = null;
-                    SelectedFormType = null;
-                    SelectedNoteType = null;
-                    await LoadUpcomingEventsAsync();
-                    NoteChanged?.Invoke(this, EventArgs.Empty);
-                }
-            }
-
-
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"SubmitNote failed: {ex.Message}");
-                MessageBox.Show(
-                    "Sati encountered an error saving your note. Please try again.  Tell Josh.",
-                    "Save Error",
-                     MessageBoxButton.OK,
-            MessageBoxImage.Error);
-            }
-        }
-
-        [RelayCommand]
-        public void OpenNotesWindow()
-        {
-            OpenNotesWindowRequested?.Invoke(this, true);
-        }
+        [RelayCommand] private void IncreaseNarrativeFont() => NarrativeFontSize = Math.Min(NarrativeFontSize + 2, 28);
+        [RelayCommand] private void DecreaseNarrativeFont() => NarrativeFontSize = Math.Max(NarrativeFontSize - 2, 10);
+        [RelayCommand] private void IncreaseScratchpadFont() => ScratchpadFontSize = Math.Min(ScratchpadFontSize + 2, 28);
+        [RelayCommand] private void DecreaseScratchpadFont() => ScratchpadFontSize = Math.Max(ScratchpadFontSize - 2, 10);
 
         [RelayCommand]
         private async Task DeleteNote()
         {
-            if (SelectedNote != null)
-            {
-                await _noteService.DeleteNoteAsync(SelectedNote);
-                Notes.Remove(SelectedNote);
-                SelectedPerson?.Notes.Remove(SelectedNote);
-                await LoadMonthlyNotesAsync();
-                await LoadUpcomingEventsAsync();
-                NoteChanged?.Invoke(this, EventArgs.Empty);
-                SelectedNote = null;
-            }
+            if (SelectedNote is null)
+                return;
+
+            await _noteService.DeleteNoteAsync(SelectedNote);
+            Notes.Remove(SelectedNote);
+            SelectedPerson?.Notes.Remove(SelectedNote);
+            await LoadMonthlyNotesAsync();
+            await LoadUpcomingEventsAsync();
+            NoteChanged?.Invoke(this, EventArgs.Empty);
+            SelectedNote = null;
+            ResetForm();
         }
+
         [RelayCommand]
         private async Task ToggleForm(FormType type)
         {
@@ -295,60 +271,64 @@ namespace Sati
 
             form.IsCompliant = !form.IsCompliant;
             await _formService.UpdateFormAsync(form);
-
-            OnPropertyChanged(nameof(Q1RCompliant));
-            OnPropertyChanged(nameof(Q2RCompliant));
-            OnPropertyChanged(nameof(Q3RCompliant));
-            OnPropertyChanged(nameof(Q4RCompliant));
-            OnPropertyChanged(nameof(PcpCompliant));
-            OnPropertyChanged(nameof(CompAssessmentCompliant));
-            OnPropertyChanged(nameof(ReclassificationCompliant));
-            OnPropertyChanged(nameof(SafetyPlanCompliant));
-            OnPropertyChanged(nameof(PrivacyPracticesCompliant));
-            OnPropertyChanged(nameof(ReleaseAgencyCompliant));
-            OnPropertyChanged(nameof(ReleaseDhhsCompliant));
-            OnPropertyChanged(nameof(ReleaseMedicalCompliant));
+            RefreshComplianceFlags();
         }
 
         [RelayCommand]
-        private void OpenScratchpadHistory() =>
-    OpenScratchpadHistoryRequested?.Invoke(this, EventArgs.Empty);
-
-        [RelayCommand]
-        private void OpenScheduler()
+        public async Task SubmitNote()
         {
-            IsSchedulerOpen = !IsSchedulerOpen;
+            var errors = new List<string>();
+
+            if (SelectedPerson is null) errors.Add("• Please select a client.");
+            if (Status is null) errors.Add("• Please select a status.");
+            if (EventDate is null) errors.Add("• Please enter a date.");
+            if (string.IsNullOrWhiteSpace(Narrative)) errors.Add("• Please enter a narrative.");
+            if (SelectedNoteType is null) errors.Add("• Please select a note type.");
+
+            if (errors.Count > 0)
+            {
+                var dialog = new UserMessageDialog(string.Join("\n", errors)) { Owner = Application.Current.MainWindow };
+                dialog.ShowDialog();
+                return;
+            }
+
+            try
+            {
+                if (!IsEditing)
+                    await SubmitNewNoteAsync();
+                else
+                    await SubmitEditedNoteAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SubmitNote failed: {ex.Message}");
+                MessageBox.Show(
+                    "Sati encountered an error saving your note. Please try again.",
+                    "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
-        [RelayCommand]
-        private void IncreaseNarrativeFont() =>
-    NarrativeFontSize = Math.Min(NarrativeFontSize + 2, 28);
-
-        [RelayCommand]
-        private void DecreaseNarrativeFont() =>
-            NarrativeFontSize = Math.Max(NarrativeFontSize - 2, 10);
-
-        [RelayCommand]
-        private void IncreaseScratchpadFont() =>
-            ScratchpadFontSize = Math.Min(ScratchpadFontSize + 2, 28);
-
-        [RelayCommand]
-        private void DecreaseScratchpadFont() =>
-            ScratchpadFontSize = Math.Max(ScratchpadFontSize - 2, 10);
-
-        //Methods
+        // -------------------------------------------------------------------------
+        // Initialization
+        // -------------------------------------------------------------------------
 
         public void Initialize()
         {
             LoggedInUser = _sessionService.CurrentUser;
             _ = LoadAsync();
         }
+
+        // -------------------------------------------------------------------------
+        // Private methods
+        // -------------------------------------------------------------------------
+
         private async Task LoadAsync()
         {
             try
             {
                 if (LoggedInUser is null)
                     return;
+
                 _settings = await _settingsService.LoadAsync();
                 await LoadPeopleAsync();
                 await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
@@ -356,29 +336,79 @@ namespace Sati
                 await LoadUpcomingEventsAsync();
 
                 var (incentive, wasCreated) = await _incentiveService.GetOrCreateAsync(
-                    LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
+                    LoggedInUser.Id, DateTime.Now.Month, DateTime.Now.Year);
                 _incentive = incentive;
 
                 if (wasCreated)
                     PromptSchedulerRequested?.Invoke(this, true);
 
-                _scratchpad = await _scratchpadService.LoadTodayAsync(LoggedInUser!.Id);
+                _scratchpad = await _scratchpadService.LoadTodayAsync(LoggedInUser.Id);
                 ScratchpadContent = _scratchpad!.Content;
 
                 StartAbandonmentTimer();
-                // StartScratchpadTimer();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"LoadAsync failed: {ex.Message}");
-                MessageBox.Show("Sati encountered an error loading your data. Please restart the application.  Tell Josh.",
-                                "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(
+                    "Sati encountered an error loading your data. Please restart the application.",
+                    "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        partial void OnSearchTextChanged(string? value)
+
+        private async Task SubmitNewNoteAsync()
         {
+            var note = Note.Create(Narrative!, EventDate, Status, Units, SelectedPerson!.Id, SelectedFormType, SelectedNoteType);
+            var savedNote = await _noteService.AddNoteAsync(note);
+            Notes.Insert(0, savedNote);
+
+            if (EventDate.HasValue &&
+                (EventDate.Value.Month != DateTime.Now.Month || EventDate.Value.Year != DateTime.Now.Year))
+            {
+                MessageBox.Show(
+                    $"This note's date ({EventDate.Value:MMM d, yyyy}) is outside the current month and will not appear in this month's productivity totals.",
+                    "Note Outside Current Month", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+
             NotesView.Refresh();
+            var formType = SelectedFormType;
+            if (formType.HasValue && Status is NoteStatus.Pending or NoteStatus.Logged)
+                MarkFormCompleteRequested?.Invoke(this, formType.Value);
+
+            ResetForm();
+            await LoadPeopleAsync();
+            await LoadMonthlyNotesAsync();
+            await LoadUpcomingEventsAsync();
+            NoteChanged?.Invoke(this, EventArgs.Empty);
         }
+
+        private async Task SubmitEditedNoteAsync()
+        {
+            if (SelectedNote is null)
+                return;
+
+            SelectedNote.Narrative = Narrative!;
+            SelectedNote.EventDate = EventDate;
+            SelectedNote.Units = Units ?? 0;
+            SelectedNote.Status = Status;
+            SelectedNote.NoteType = SelectedNoteType;
+            SelectedNote.FormType = SelectedFormType;
+
+            await _noteService.UpdateNoteAsync(SelectedNote);
+            NotesView.Refresh();
+
+            var formType = SelectedNote.FormType;
+            if (formType.HasValue && Status is NoteStatus.Pending or NoteStatus.Logged)
+                MarkFormCompleteRequested?.Invoke(this, formType.Value);
+
+            IsEditing = false;
+            ResetForm();
+            await LoadPeopleAsync();
+            await LoadMonthlyNotesAsync();
+            await LoadUpcomingEventsAsync();
+            NoteChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         private async void LoadNotesForPersonAsync(Person? person)
         {
             if (person is null)
@@ -386,11 +416,13 @@ namespace Sati
                 Notes.Clear();
                 return;
             }
+
             var notes = await _noteService.GetAllByPersonAsync(person.Id);
             Notes.Clear();
             foreach (var note in notes)
                 Notes.Add(note);
         }
+
         public bool FilterNotes(object obj)
         {
             if (obj is not Note note)
@@ -398,11 +430,11 @@ namespace Sati
 
             var matchesText = string.IsNullOrWhiteSpace(SearchText) ||
                               note.Narrative.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
-
-            var matchesStatus = FilterStatus == null || note.Status == FilterStatus;
+            var matchesStatus = FilterStatus is null || note.Status == FilterStatus;
 
             return matchesText && matchesStatus;
         }
+
         public async Task LoadPeopleAsync()
         {
             try
@@ -417,85 +449,10 @@ namespace Sati
                 Debug.WriteLine($"Failed to load people: {ex.Message}");
             }
         }
-        private void StartScratchpadTimer()
-        {
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
-            timer.Tick += async (s, e) =>
-            {
-                if (_scratchpad is null) return;
-                _scratchpad.Content = ScratchpadContent;
-                await _scratchpadService.SaveAsync(_scratchpad);
-            };
-            timer.Start();
-        }
-        public async Task SaveScratchpadAsync(string content)
-        {
-            try
-            {
-                if (_scratchpad is null) return;
-                _scratchpad.Content = content;
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] SAVING SCRATCHPAD: '{content}'");
-                await _scratchpadService.SaveAsync(_scratchpad);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"SaveScratchpadAsync failed: {ex.Message}");
-                MessageBox.Show(
-                    "Sati encountered an error saving your scratchpad. Your work may not have been saved.  Tell Josh.",
-                    "Save Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-        public void EnterEditMode()
-        {
-            if (SelectedNote is null)
-                return;
 
-            IsEditing = true;
-
-            Narrative = SelectedNote.Narrative;
-            EventDate = SelectedNote.EventDate;
-            Units = SelectedNote.Units;
-            Status = SelectedNote.Status;
-            SelectedNoteType = SelectedNote.NoteType;  
-            SelectedFormType = SelectedNote.FormType;  
-            SelectedPerson = People.First(p => p.Id == SelectedNote.PersonId);
-        }
-
-        private DateTime _lastAbandonmentCheck = DateTime.Now;
-        private void StartAbandonmentTimer()
-        {
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromHours(1) };
-            timer.Tick += async (s, e) =>
-            {
-                if ((DateTime.Now - _lastAbandonmentCheck).TotalHours >= 24)
-                {
-                    await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 8);
-                    _lastAbandonmentCheck = DateTime.Now;
-                }
-            };
-            timer.Start();
-        }
-        partial void OnSelectedNoteTypeChanged(NoteType? value)
-        {
-            OnPropertyChanged(nameof(IsFormNote));
-            if (value != NoteType.Form)
-                SelectedFormType = null;
-
-            if (value is null) return;
-            if (!string.IsNullOrWhiteSpace(Narrative)) return;
-
-            Narrative = value.Value switch
-            {
-                NoteType.Visit => _settings?.VisitTemplate ?? string.Empty,
-                NoteType.Contact => _settings?.ContactTemplate ?? string.Empty,
-                _ => string.Empty
-            };
-        }
         private async Task LoadMonthlyNotesAsync()
         {
-            _monthlyNotes = await _noteService.GetMonthlyNotesAsync();
+            _monthlyNotes = await _noteService.GetMonthlyNotesAsync(LoggedInUser!.Id);
             OnPropertyChanged(nameof(PendingUnits));
             OnPropertyChanged(nameof(LoggedUnits));
             OnPropertyChanged(nameof(AbandonedUnits));
@@ -503,29 +460,37 @@ namespace Sati
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
         }
+
         private async Task LoadUpcomingEventsAsync()
         {
-            if (LoggedInUser is null) return;
+            if (LoggedInUser is null)
+                return;
+
             var settings = await _settingsService.LoadAsync();
             var events = _upcomingEventService.GenerateEvents(People, settings);
             UpcomingEvents.Clear();
             foreach (var e in events)
                 UpcomingEvents.Add(e);
+
             OnPropertyChanged(nameof(FormEvents));
             OnPropertyChanged(nameof(VisitEvents));
             OnPropertyChanged(nameof(ContactEvents));
         }
+
         public async Task MarkFormCompleteAsync(FormType formType)
         {
-            if (SelectedPerson is null) return;
+            if (SelectedPerson is null)
+                return;
 
             var form = SelectedPerson.GetCurrentCycleForm(formType);
-            if (form is null) return;
+            if (form is null)
+                return;
 
             form.IsCompliant = true;
             await _formService.UpdateFormAsync(form);
             RefreshComplianceFlags();
         }
+
         private void RefreshComplianceFlags()
         {
             OnPropertyChanged(nameof(Q1RCompliant));
@@ -542,22 +507,52 @@ namespace Sati
             OnPropertyChanged(nameof(ReleaseMedicalCompliant));
         }
 
-        //COMPUTED PROPERTIES AND METHOD FOR UNIT LOGIC
-        private List<Note> _monthlyNotes = [];
-        public int? PendingUnits => _monthlyNotes
-      .Where(n => n.Status == NoteStatus.Pending)
-      .Sum(n => n.Units);
+        private void ResetForm()
+        {
+            SelectedPerson = null;
+            Status = null;
+            Narrative = string.Empty;
+            EventDate = null;
+            Units = null;
+            Duration = null;
+            SelectedFormType = null;
+            SelectedNoteType = null;
+        }
 
-        public int? LoggedUnits => _monthlyNotes
-            .Where(n => n.Status == NoteStatus.Logged)
-            .Sum(n => n.Units);
+        public void EnterEditMode()
+        {
+            if (SelectedNote is null)
+                return;
 
-        public int? AbandonedUnits => _monthlyNotes
-            .Where(n => n.Status == NoteStatus.Abandoned)
-            .Sum(n => n.Units);
+            IsEditing = true;
+            Narrative = SelectedNote.Narrative;
+            EventDate = SelectedNote.EventDate;
+            Units = SelectedNote.Units;
+            Status = SelectedNote.Status;
+            SelectedNoteType = SelectedNote.NoteType;
+            SelectedFormType = SelectedNote.FormType;
+            SelectedPerson = People.First(p => p.Id == SelectedNote.PersonId);
+        }
 
-        public decimal EstimatedIncentive => _incentive?.Calculate(LoggedUnits ?? 0) ?? 0;
-        public int Threshold => _incentive?.Threshold ?? 0;
+        public async Task SaveScratchpadAsync(string content)
+        {
+            try
+            {
+                if (_scratchpad is null)
+                    return;
+
+                _scratchpad.Content = content;
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] SAVING SCRATCHPAD: '{content}'");
+                await _scratchpadService.SaveAsync(_scratchpad);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"SaveScratchpadAsync failed: {ex.Message}");
+                MessageBox.Show(
+                    "Sati encountered an error saving your scratchpad. Your work may not have been saved.",
+                    "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
         public async Task RefreshIncentiveAsync()
         {
@@ -569,6 +564,30 @@ namespace Sati
             OnPropertyChanged(nameof(EstimatedIncentive));
         }
 
+        private void StartAbandonmentTimer()
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromHours(1) };
+            timer.Tick += async (s, e) =>
+            {
+                if ((DateTime.Now - _lastAbandonmentCheck).TotalHours >= 24)
+                {
+                    await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 8);
+                    _lastAbandonmentCheck = DateTime.Now;
+                }
+            };
+            timer.Start();
+        }
 
+        private void StartScratchpadTimer()
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
+            timer.Tick += async (s, e) =>
+            {
+                if (_scratchpad is null) return;
+                _scratchpad.Content = ScratchpadContent;
+                await _scratchpadService.SaveAsync(_scratchpad);
+            };
+            timer.Start();
+        }
     }
 }

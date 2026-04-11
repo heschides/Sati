@@ -1,47 +1,52 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sati.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Sati.Data
 {
     public class NoteService : INoteService
     {
-       
-        private readonly SatiContext _context;
+        private readonly IDbContextFactory<SatiContext> _contextFactory;
 
-        //constructor
-        public NoteService(SatiContext context) {  _context = context; }
+        public NoteService(IDbContextFactory<SatiContext> contextFactory)
+        {
+            _contextFactory = contextFactory;
+        }
 
         public async Task<Note> AddNoteAsync(Note note)
         {
-            _context.Notes.Add(note);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            context.Notes.Add(note);
+            await context.SaveChangesAsync();
             return note;
         }
 
         public async Task DeleteNoteAsync(Note note)
         {
-            _context.Notes.Remove(note);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            context.Notes.Remove(note);
+            await context.SaveChangesAsync();
         }
 
         public async Task UpdateNoteAsync(Note note)
         {
-            _context.Notes.Update(note);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            context.Notes.Update(note);
+            await context.SaveChangesAsync();
         }
 
-        public Task<List<Note>> GetAllByPersonAsync(int personId)
+        public async Task<List<Note>> GetAllByPersonAsync(int personId)
         {
-            return _context.Notes.Where(n => n.PersonId == personId).ToListAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            return await context.Notes
+                .Where(n => n.PersonId == personId)
+                .ToListAsync();
         }
 
         public async Task UpdateAbandonedNotesAsync(int abandonedAfterDays)
         {
+            await using var context = _contextFactory.CreateDbContext();
             var threshold = DateTime.Now.AddDays(-abandonedAfterDays);
-            var abandonedNotes = await _context.Notes
+            var abandonedNotes = await context.Notes
                 .Where(n => n.Status == NoteStatus.Pending &&
                             n.EventDate.HasValue &&
                             n.EventDate.Value < threshold)
@@ -50,16 +55,19 @@ namespace Sati.Data
             foreach (var note in abandonedNotes)
                 note.Status = NoteStatus.Abandoned;
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
-        public async Task<List<Note>> GetMonthlyNotesAsync()
+        public async Task<List<Note>> GetMonthlyNotesAsync(int userId)
         {
+            await using var context = _contextFactory.CreateDbContext();
             var firstDay = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             var lastDay = firstDay.AddMonths(1).AddDays(-1);
-            var currentMonthNotes = await _context.Notes
-                .Where(n => n.EventDate >= firstDay && n.EventDate <= lastDay).ToListAsync();
-            return currentMonthNotes;
+            return await context.Notes
+                .Where(n => n.EventDate >= firstDay &&
+                            n.EventDate <= lastDay &&
+                            n.Person.UserId == userId)
+                .ToListAsync();
         }
     }
 }

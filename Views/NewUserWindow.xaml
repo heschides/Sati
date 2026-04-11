@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Sati.Views"
         mc:Ignorable="d"
         Title="Create Account"
-        Height="520"
+        Height="640"
         Width="360"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -105,28 +105,36 @@
             <TextBlock Text="USERNAME"
                        Style="{StaticResource LabelStyle}" />
             <TextBox Style="{StaticResource InputStyle}"
-                     Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" 
-                     VerticalContentAlignment ="Center"/>
+                     Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                     VerticalContentAlignment="Center" />
 
             <TextBlock Text="DISPLAY NAME"
                        Style="{StaticResource LabelStyle}" />
             <TextBox Style="{StaticResource InputStyle}"
-                     Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" 
-                     VerticalContentAlignment="Center"/>
+                     Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
+                     VerticalContentAlignment="Center" />
 
             <TextBlock Text="PASSWORD"
                        Style="{StaticResource LabelStyle}" />
             <PasswordBox x:Name="PasswordInit"
                          Style="{StaticResource InputStyle}"
-                         PasswordChanged="PasswordInit_PasswordChanged" 
-                         VerticalContentAlignment="Center"/>
+                         PasswordChanged="PasswordInit_PasswordChanged"
+                         VerticalContentAlignment="Center" />
 
             <TextBlock Text="CONFIRM PASSWORD"
                        Style="{StaticResource LabelStyle}" />
             <PasswordBox x:Name="PasswordConfirm"
                          Style="{StaticResource InputStyle}"
-                         VerticalContentAlignment="Center"
-                         PasswordChanged="PasswordConfirm_PasswordChanged" />
+                         PasswordChanged="PasswordConfirm_PasswordChanged"
+                         VerticalContentAlignment="Center" />
+
+            <TextBlock Text="SUPERVISOR"
+                       Style="{StaticResource LabelStyle}" />
+            <ComboBox Style="{StaticResource InputStyle}"
+                      ItemsSource="{Binding Supervisors}"
+                      SelectedItem="{Binding SelectedSupervisor}"
+                      DisplayMemberPath="DisplayName"
+                      VerticalContentAlignment="Center" />
 
             <Button Content="Create Account"
                     Style="{StaticResource PrimaryButton}"

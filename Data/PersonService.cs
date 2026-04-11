@@ -1,51 +1,48 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Sati.Models;
 
 namespace Sati.Data
 {
     public class PersonService : IPersonService
     {
-        private readonly SatiContext _context;
+        private readonly IDbContextFactory<SatiContext> _contextFactory;
 
-        //consstructor
-        public PersonService(SatiContext context)
+        public PersonService(IDbContextFactory<SatiContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
-        // methods
         public async Task<Person> AddPersonAsync(Person person)
         {
-            _context.People.Add(person);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            context.People.Add(person);
+            await context.SaveChangesAsync();
             return person;
- 
         }
 
         public async Task DeletePersonAsync(Person person)
         {
-            _context.People.Remove(person);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            context.People.Remove(person);
+            await context.SaveChangesAsync();
         }
 
         public async Task<Person> EditPersonAsync(Person person)
         {
-            _context.People.Update(person);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            context.People.Update(person);
+            await context.SaveChangesAsync();
             return person;
         }
 
         public async Task<List<Person>> GetAllPeopleAsync(int userId)
         {
-            return await _context.People
+            await using var context = _contextFactory.CreateDbContext();
+            return await context.People
                 .Where(p => p.UserId == userId)
                 .Include(p => p.Notes)
                 .Include(p => p.Forms)
                 .ToListAsync();
-            ;
-
         }
     }
 }

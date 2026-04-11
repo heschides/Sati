@@ -5,40 +5,34 @@ namespace Sati.Data
 {
     public class SettingsService : ISettingsService
     {
-        private readonly SatiContext _context;
+        private readonly IDbContextFactory<SatiContext> _contextFactory;
 
-        public SettingsService(SatiContext context)
+        public SettingsService(IDbContextFactory<SatiContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<Settings> LoadAsync()
         {
-            var settings = await _context.Settings.FirstOrDefaultAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            var settings = await context.Settings.FirstOrDefaultAsync();
 
             if (settings is null)
             {
                 settings = new Settings
                 {
-                    // Reviews
                     ReviewOpenDaysBefore = 10,
                     ReviewDaysAfterDue = 10,
-                    // PCP
                     PcpOpenDaysBefore = 30,
                     PcpDaysAfterDue = 30,
-                    // Comprehensive Assessment
                     CompAssessmentOpenDaysBefore = 30,
                     CompAssessmentDaysAfterDue = 30,
-                    // Reclassification
                     ReclassificationOpenDaysBefore = 15,
                     ReclassificationDaysAfterDue = 0,
-                    // Safety Plan
                     SafetyPlanOpenDaysBefore = 60,
                     SafetyPlanDaysAfterDue = 30,
-                    // Privacy Practices
                     PrivacyPracticesOpenDaysBefore = 30,
                     PrivacyPracticesDaysAfterDue = 30,
-                    // Releases
                     ReleaseAgencyOpenDaysBefore = 30,
                     ReleaseAgencyDaysAfterDue = 30,
                     ReleaseDhhsOpenDaysBefore = 30,
@@ -47,8 +41,8 @@ namespace Sati.Data
                     ReleaseMedicalDaysAfterDue = 30,
                 };
 
-                _context.Settings.Add(settings);
-                await _context.SaveChangesAsync();
+                context.Settings.Add(settings);
+                await context.SaveChangesAsync();
             }
 
             return settings;
@@ -56,8 +50,9 @@ namespace Sati.Data
 
         public async Task SaveAsync(Settings settings)
         {
-            _context.Settings.Update(settings);
-            await _context.SaveChangesAsync();
+            await using var context = _contextFactory.CreateDbContext();
+            context.Settings.Update(settings);
+            await context.SaveChangesAsync();
         }
     }
 }

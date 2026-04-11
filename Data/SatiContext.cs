@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Runtime.Serialization.Formatters;
-using System.Text;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Abstractions;
+﻿using Microsoft.EntityFrameworkCore;
 using Sati.Models;
-
 
 namespace Sati.Data
 {
@@ -16,12 +9,12 @@ namespace Sati.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Form> Forms { get; set; }
         public DbSet<Note> Notes { get; set; }
-        public DbSet<Settings> Settings { get; set;  }
-        public DbSet<Scratchpad> Scratchpad {  get; set; }
+        public DbSet<Settings> Settings { get; set; }
+        public DbSet<Scratchpad> Scratchpad { get; set; }
         public DbSet<Incentive> Incentives { get; set; }
 
         public SatiContext(DbContextOptions<SatiContext> options) : base(options)
-        { 
+        {
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -36,6 +29,14 @@ namespace Sati.Data
                       .HasMaxLength(50);
                 entity.HasIndex(u => u.Username)
                       .IsUnique();
+                entity.Property(u => u.Role)
+                      .HasConversion<string>();
+
+                // Self-referential supervisor hierarchy
+                entity.HasOne(u => u.Supervisor)
+                      .WithMany(u => u.Supervisees)
+                      .HasForeignKey(u => u.SupervisorId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Person>(entity =>
@@ -48,9 +49,9 @@ namespace Sati.Data
                       .IsRequired()
                       .HasMaxLength(50);
                 entity.HasOne<User>()
-                .WithMany()
-                .HasForeignKey(p => p.UserId)
-                .OnDelete(DeleteBehavior.Restrict);
+                      .WithMany()
+                      .HasForeignKey(p => p.UserId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Note>(entity =>
@@ -97,9 +98,11 @@ namespace Sati.Data
             modelBuilder.Entity<Scratchpad>(entity =>
             {
                 entity.HasKey(s => s.Id);
-                entity.HasIndex(s => new {s.UserId, s.Date})
-                .IsUnique();
+                entity.HasIndex(s => new { s.UserId, s.Date })
+                      .IsUnique();
             });
+
+ 
         }
     }
 }

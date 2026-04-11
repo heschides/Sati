@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sati.Data;
 
@@ -11,9 +12,11 @@ using Sati.Data;
 namespace Sati.Migrations
 {
     [DbContext(typeof(SatiContext))]
-    partial class SatiContextModelSnapshot : ModelSnapshot
+    [Migration("20260408231437_AddUnitsPerDayToIncentive")]
+    partial class AddUnitsPerDayToIncentive
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -312,16 +315,9 @@ namespace Sati.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Salt")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("SupervisorId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -329,8 +325,6 @@ namespace Sati.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("SupervisorId");
 
                     b.HasIndex("Username")
                         .IsUnique();
@@ -411,16 +405,6 @@ namespace Sati.Migrations
                     b.Navigation("Person");
                 });
 
-            modelBuilder.Entity("Sati.Models.User", b =>
-                {
-                    b.HasOne("Sati.Models.User", "Supervisor")
-                        .WithMany("Supervisees")
-                        .HasForeignKey("SupervisorId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Supervisor");
-                });
-
             modelBuilder.Entity("Sati.Person", b =>
                 {
                     b.HasOne("Sati.Models.User", null)
@@ -428,11 +412,6 @@ namespace Sati.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Sati.Models.User", b =>
-                {
-                    b.Navigation("Supervisees");
                 });
 
             modelBuilder.Entity("Sati.Person", b =>

@@ -1,4 +1,6 @@
-﻿# Sati — Refactor Agenda
+﻿
+
+# Sati — Refactor Agenda
 
 A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM, and SQL LocalDB.
 
@@ -11,7 +13,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 - [x] Implement `MainWindowViewModel.Initialize(user)` — store logged-in user, trigger initial load
 - [x] Fix `NewUserViewModel` missing null-conditional on `CloseWindowRequested` event
 - [x] Make `IUserService` public
-- [x] Remove hardcoded seed user from `LoginWindowViewModel`; replace with proper first-run or seeded user via hash path
+- [x] Remove hardcoded seed user from `LoginWindowViewModel`
 - [x] Fix `MainPage_Activated` firing `LoadPeopleAsync()` on every focus — load once only
 - [x] Add `OnModelCreating` to `SatiContext` with explicit keys and relationships
 
@@ -21,7 +23,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 *Goal: No more `((App)Application.Current).Services`*
 
 - [x] Remove service locator from `LoginWindow.xaml.cs`
-- [x] Use `Func<T>` factory injection or similar pattern for window creation
+- [x] Use `Func<T>` factory injection for window creation throughout
 - [x] Audit all remaining `GetRequiredService` calls in view code-behind
 
 ---
@@ -31,7 +33,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 
 - [x] Add edit support to `NewClientViewModel`
 - [x] Add input validation using `[NotifyDataErrorInfo]`
-- [x] Fix `RemoveSelectedPerson` — currently not awaiting `DeletePersonAsync`
+- [x] Fix `RemoveSelectedPerson` — was not awaiting `DeletePersonAsync`
 - [x] Eager-load `Forms` and `Notes` in `PersonService.GetAllPeopleAsync`
 - [x] Add compliance review dialog on client creation
 - [x] EffectiveDate replaced with MM/DD TextBox with CustomValidation and waiver-gating
@@ -69,86 +71,151 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 *Goal: Core business logic — deadline tracking per client*
 
 - [x] UpcomingEvent record and UpcomingEventService with full computation logic
-- [x] Upcoming Tasks panel split into two columns (forms left, visits right)
+- [x] Upcoming Tasks panel split into two columns (forms left, visits/contacts right)
 - [x] Sort radio buttons wired via SortByDate computed property
 - [x] Forms checklist bound to real Form entities via ToggleFormCommand
 - [x] Compliance flags computed per FormType using GetCurrentCycleForm
 - [x] GetCurrentCycleForm on Person model replaces FirstOrDefault throughout
 - [x] EnumDescriptionConverter, BoolToVisibilityConverter, InverseBoolConverter
 - [x] Description attributes on FormType enum for human-readable display
-- [x] Enums moved to top-level namespace — Enums wrapper class removed
+- [x] Enums moved to top-level namespace
 - [x] UserId foreign key on Person, GetAllPeopleAsync filtered by userId
 
 ---
 
-## Phase 7 — Client Detail View and User Management
-*Goal: Per-client deep view, user administration, soft-delete*
+## Phase 7 — Note Polish and Client Detail ✅
+*Goal: Note workflow reliability, scheduled events in upcoming panel*
 
-- [ ] Per-client detail view — all notes, forms, compliance status, upcoming events scoped to one client
-- [ ] User management / admin panel — add, edit, deactivate users
-- [ ] Soft-delete recycle bin for notes
-- [ ] DataGrid column cleanup — replace AutoGenerateColumns with explicit column definitions
+- [x] IsEditing reset on client switch
+- [x] Form clears on client selection
+- [x] In-memory Person.Notes sync for upcoming events
+- [x] NoteType persisted to database with migration
+- [x] Scheduled visits and contacts appearing in Upcoming Tasks panel
+- [x] ContactEvents column added
 
 ---
 
-## Phase 8 — Polish and Portfolio Packaging
-*Goal: Looks good, handles errors gracefully, README exists*
+## Phase 8 — Polish and Portfolio Packaging ✅
+*Goal: Looks good, handles errors gracefully, ships cleanly*
 
-- [ ] Global error handling and user-friendly error dialogs
-- [ ] Loading states / busy indicators
-- [ ] UI polish — consistent spacing, styles, color scheme
-- [ ] README with purpose, setup instructions, screenshots
-- [ ] Seed data script for reviewers
-- [ ] Settings: add UserId foreign key so settings are per-user
-- [ ] Scheduler: clear stale ExcludedDates when weekday exclusion is removed from Settings
-- [ ] Scheduler: fix day-of-week column alignment across months
+- [x] Global exception handling in App.xaml.cs with flat-file error log
+- [x] User-facing error dialogs
+- [x] ScratchpadHistoryWindow with ICollectionView search and full-content preview
+- [x] Scratchpad save bug resolved via cancel/reclose pattern on Closing event
+- [x] Out-of-month warning for EventDate
+- [x] Font configuration — Inter globally, Cambria for narrative/scratchpad fields
+- [x] Font size A/A buttons for narrative and scratchpad
+- [x] Ctrl+Enter timestamp insertion in scratchpad
+- [x] WPF native spell check on narrative and scratchpad fields
+- [x] README.md written and pushed
+- [x] Self-contained single-file executable published
+- [x] SmartScreen blocking resolved
+
 ---
 
-## Phase 9 — Azure / HIPAA Readiness
-*Goal: Production-ready deployment with audit logging and cloud hosting*
+## Active Bugs — In Progress
+*Fix before next feature work*
 
-- [ ] Migrate from LocalDB to Azure SQL (EF Core provider swap)
-- [ ] Audit logging — AuditLog table with SaveChanges override
-- [ ] Microsoft Entra ID evaluation for authentication
-- [ ] MSIX packaging for deployment
-- [ ] Per-agency database isolation strategy
-- [ ] Connection string secret management (no plaintext in appsettings.json)
+- [ ] **Productivity threshold ignores scheduler** — `Incentive.Threshold` hardcodes `* 19`
+  instead of using `Settings.ProductivityThreshold`; panel doesn't refresh after scheduler closes
+  - Fix 1: Add `UnitsPerDay` snapshot field to `Incentive` model + migration
+  - Fix 2: Set `UnitsPerDay = settings.ProductivityThreshold` in `GetOrCreateAsync`
+  - Fix 3: `OnIsSchedulerOpenChanged(false)` calls `RefreshIncentiveAsync()` in MainWindowViewModel
+
+- [ ] **Refactor all services to use IDbContextFactory<SatiContext>** — current pattern holds
+  a DbContext open for the entire session, causing change tracker collisions and memory bloat.
+  Replace constructor-injected SatiContext with IDbContextFactory<SatiContext> across all
+  services. Swap AddDbContext for AddDbContextFactory in App.xaml.cs. Each method creates
+  and disposes its own context via `await using var context = _contextFactory.CreateDbContext()`.
+  Do before adding any new features.
+- [ ] **`GetOrCreateAsync` always returns `wasCreated = false`** — new month records never
+  trigger the scheduler prompt correctly; newly-created branch should return `true`
+- [ ] **NoteType edit not persisting** — suspected EF Core tracking issue; NoteType changes
+  on existing notes not being written to DB on save
+- [ ] **Edit form not populating NoteType** — reopening an existing note doesn't restore
+  the current NoteType value; initialization/binding bug
+- [ ] **Stale data in Upcoming Tasks after failed note edit** — downstream of NoteType
+  persistence failure
+- [x] **Missing "Scheduled" filter in AllNotes combobox** — straightforward omission
+
+---
+
+## Deferred Bugs
+*Known issues, not blocking daily use*
+
+- [ ] Scheduler day-of-week column alignment shifts month to month — tiles render
+  sequentially rather than snapping to fixed Mon–Fri grid positions
+- [ ] Stale ExcludedDates entries persist on Incentive after weekday exclusion is removed
+  from Settings
+- [ ] Note abandonment threshold hardcoded to 8 days — needs wiring to
+  `SettingsService.AbandonedAfterDays`
+- [ ] Settings are global rather than per-user — needs per-user isolation before
+  multi-user deployment
 
 ---
 
 ## Pre-Release Fixes
 *Must address before shipping to team or OADS*
 
-- [ ] Form compliance query — replace remaining FirstOrDefault usage with GetCurrentCycleForm everywhere
-- [ ] Annual form regeneration — when anniversary rolls over, generate new Form records for the new cycle
-- [ ] First login condition for scheduler prompt — currently `if (wasCreated)` which is correct; verify behavior across month boundaries
+- [ ] Annual form regeneration — when a client's anniversary rolls over, generate new
+  Form records for the new compliance cycle
+- [ ] First login / scheduler prompt — verify `wasCreated` behavior across month boundaries
+  once `GetOrCreateAsync` bug is fixed
+- [ ] Accessibility audit — icon-only buttons missing `AutomationProperties.Name`;
+  compliance checkboxes unassociated from labels; color-only overdue indicators
 
 ---
 
-## Future Roadmap (Post-OADS)
-*Ideas parked for v2.0 and beyond*
+## Phase 9 — Azure / HIPAA Readiness
+*Goal: Production-ready deployment with audit logging and cloud hosting*
 
-- [ ] Sati.Core extraction — move models, services, EF context into shared class library
-- [ ] Sati.Api — ASP.NET Core Web API exposing note creation and client read endpoints
-- [ ] Sati.Mobile — MAUI app for field note entry and upcoming task visibility (Android/iOS)
-- [ ] Azure Cognitive Services Speech-to-Text integration for field note dictation
-- [ ] reMarkable integration — push visit PDFs to device, pull annotated docs post-visit
-- [ ] Scratchpad search window — read-only historical entry viewer
+- [ ] Migrate from LocalDB to Azure SQL (EF Core provider swap)
+- [ ] Audit logging — AuditLog table (user, action, entity type, entity ID, timestamp);
+  explicitly excludes note narrative content to avoid PHI in the log;
+  six-year HIPAA retention requirement
+- [ ] Microsoft Entra ID evaluation for authentication
+- [ ] MSIX packaging for deployment
+- [ ] Per-agency database isolation strategy
+- [ ] Connection string secret management (no plaintext in appsettings.json)
+- [ ] Settings per-user (currently global)
+
+---
+
+## Future Roadmap
+*Parked for post-OADS or v2.0+*
+
+- [ ] **Historical productivity viewer** — query past Incentive rows paired with monthly
+  note data to display a full productivity history per user; infrastructure already exists
+- [ ] Per-client detail view — all notes, forms, compliance status, and upcoming events
+  scoped to one client
+- [ ] User management / admin panel — add, edit, deactivate users
+- [ ] Soft-delete recycle bin for notes
+- [ ] DataGrid column cleanup — replace AutoGenerateColumns with explicit column definitions
+- [ ] Sati.Core extraction — shared class library for models, services, EF context
+- [ ] Sati.Api — ASP.NET Core Web API (GET /clients, POST /notes)
+- [ ] Sati.Mobile — MAUI app for field note entry and upcoming task visibility
+- [ ] Azure Cognitive Services Speech-to-Text for field note dictation
+- [ ] reMarkable integration — push visit PDFs, pull annotated docs
+
+---
 
 ## Session Log
-*Update this after each working session*
 
 | Date | Phase | What was done |
 |------|-------|---------------|
-| 3/19 | Ph5 | Settings model, migration, ISettingsService/SettingsService, SettingsViewModel, wired into MainWindowViewModel — settings now load on startup, AbandonedAfterDays no longer hardcoded |
-| 3/20 | Ph5 | Scratchpad model/service/migration, auto-save timer, shutdown save, NoteType enum, template insertion on type selection |
-| 3/21 | Ph5 | NoteType radio buttons, EnumToBoolConverter, Incentive model/service/migration, productivity dashboard with progress bar, Settings weekday/holiday exclusion flags |
-| 3/23 | Ph5 | Day after Thanksgiving flag, tuple return from GetOrCreateAsync, custom new month prompt dialog with personalized greeting |
-| 3/22 | Ph5 | SchedulerViewModel, WorkdayTile, Incentive ExcludedDates, ISessionService singleton, scheduler popup XAML — popup not yet displaying, debug tomorrow |
-| 3/23 | Ph5 | Scheduler popup fully working — tile toggling, month navigation, DaysScheduled persistence, popup open/close behavior fixed |
+| 3/19 | Ph5 | Settings model, migration, ISettingsService/SettingsService, SettingsViewModel, wired into MainWindowViewModel |
+| 3/20 | Ph5 | Scratchpad model/service/migration, auto-save timer, NoteType enum, template insertion |
+| 3/21 | Ph5 | NoteType radio buttons, EnumToBoolConverter, Incentive model/service/migration, productivity dashboard, weekday/holiday exclusion flags |
+| 3/22 | Ph5 | SchedulerViewModel, WorkdayTile, Incentive ExcludedDates, ISessionService singleton, scheduler popup XAML |
+| 3/23 | Ph5 | Scheduler popup fully working — tile toggling, month navigation, DaysScheduled persistence |
 | 3/23 | Ph5 | SettingsWindow fully wired — billing, templates, weekday/holiday flags, auto-save on close |
-| 3/25 | Ph6 | Added SafetyPlan + PrivacyPractices to FormType enum and GenerateFormList. Added 18 form deadline offset properties to Settings model, service, and ViewModel. Added Form Deadline Windows section to SettingsWindow XAML. Created UpcomingEvent record and UpcomingEventService with full computation logic for annual forms, 90-day reviews, and scheduled notes. |
-| 3/26 | Ph6 | Wired UpcomingEventService into MainWindowViewModel, added UserId foreign key to Person, filtered GetAllPeopleAsync by userId, added ISessionService to NewClientViewModel, fixed UpcomingEvents collection type |
-| 3/28 | Ph6 | Upcoming Tasks split into two columns (forms/visits), sort radio buttons wired, EffectiveDate replaced with MM/DD TextBox with CustomValidation and waiver-gating, form note type with per-form narrative templates, FormType added to Note model with migration, EnumDescriptionConverter and BoolToVisibilityConverter added |
-| 3/29 | Ph6 | MarkFormCompleteRequested event wired end to end, Forms checklist bound to real compliance data via ToggleFormCommand, GetCurrentCycleForm added to Person replacing FirstOrDefault, ComplianceReviewWindow on client creation, IsCompliant=true default in GenerateFormList, RefreshComplianceFlags on person selection, enums moved to top-level namespace, scheduler prompt condition restored |
-| 3/29 | Ph7 | Note workflow fixes — IsEditing reset on client switch, form clears on selection, in-memory Person.Notes sync for upcoming events, NoteType persisted to database with migration, scheduled visits and contacts appearing in Upcoming Tasks panel, ContactEvents column added, client detail view fully operational |
+| 3/23 | Ph5 | Day after Thanksgiving flag, tuple return from GetOrCreateAsync, custom new month prompt |
+| 3/25 | Ph6 | SafetyPlan + PrivacyPractices added to FormType. 18 form deadline offset properties in Settings. UpcomingEventService created. |
+| 3/26 | Ph6 | UpcomingEventService wired into MainWindowViewModel, UserId FK on Person, GetAllPeopleAsync filtered by userId |
+| 3/28 | Ph6 | Upcoming Tasks split into two columns, sort radio buttons, EffectiveDate refactor, form note templates, FormType on Note with migration |
+| 3/29 | Ph6 | MarkFormCompleteRequested wired end to end, compliance checklist bound to real data, GetCurrentCycleForm added, ComplianceReviewWindow on client creation |
+| 3/29 | Ph7 | Note workflow fixes — IsEditing reset, form clears, NoteType persistence, scheduled visits/contacts in Upcoming Tasks |
+| 4/8  | Bug | Diagnosed productivity threshold bug — hardcoded * 19, stale _incentive after scheduler closes. Fix plan: UnitsPerDay snapshot field, OnIsSchedulerOpenChanged refresh, GetOrCreateAsync wasCreated fix. Historical productivity viewer scoped as future feature. |
+
+
+

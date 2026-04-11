@@ -31,7 +31,6 @@ namespace Sati.ViewModels
 
 ];
 
-        // null = "All Clients" sentinel; the ItemTemplate uses FallbackValue to display it
         public ObservableCollection<Person?> FilterPeople { get; } = [null];
 
         [ObservableProperty] private Person? selectedFilterPerson;

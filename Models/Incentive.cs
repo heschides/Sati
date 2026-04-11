@@ -16,7 +16,10 @@ namespace Sati.Models
         public decimal BaseIncentive { get; set; }
         public decimal PerUnitIncentive { get; set; }
         public User User { get; set; } = null!;
-        public int Threshold => DaysScheduled * 19;
+        public int UnitsPerDay { get; set; } = 19;
+
+        public int Threshold => DaysScheduled * UnitsPerDay;
+
         public string ExcludedDatesJson { get; set; } = "[]";
         public decimal Calculate(int loggedUnits)
         {

@@ -1,23 +1,24 @@
-﻿using Sati.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Microsoft.EntityFrameworkCore;
+using Sati.Models;
+
 
 namespace Sati.Data
 {
     public class FormService : IFormService
     {
-        private readonly SatiContext _context;
+        private readonly IDbContextFactory<SatiContext> _contextFactory;
 
-        public FormService(SatiContext context)
+        public FormService(IDbContextFactory<SatiContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task UpdateFormAsync(Form form)
         {
-            _context.Forms.Update(form);
-            await _context.SaveChangesAsync();
+
+            await using var context = _contextFactory.CreateDbContext();
+            context.Forms.Update(form);
+            await context.SaveChangesAsync();
         }
     }
 }
