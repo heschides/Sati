@@ -15,10 +15,11 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
 
         private readonly MainWindowViewModel _notesViewModel;
-        private readonly SupervisorDashboardViewModel _supervisorViewModel;
+        private readonly SupervisorDashboardViewModel _supervisorDashboardViewModel;
         private readonly GuidanceViewModel _guidanceViewModel;
         private readonly HelpersViewModel _helpersViewModel;
         private readonly ISessionService _sessionService;
+     
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -33,7 +34,7 @@ namespace Sati.ViewModels
             ISessionService sessionService)
         {
             _notesViewModel = notesViewModel;
-            _supervisorViewModel = supervisorViewModel;
+            _supervisorDashboardViewModel = supervisorViewModel;
             _guidanceViewModel = guidanceViewModel;
             _helpersViewModel = helpersViewModel;
             _sessionService = sessionService;
@@ -112,14 +113,17 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(IsSupervisorActive));
             OnPropertyChanged(nameof(IsGuidanceActive));
             OnPropertyChanged(nameof(IsHelpersActive));
+            if (value is not SupervisorDashboardViewModel)
+                _supervisorDashboardViewModel?.ClearCharts();
         }
+
 
         // -------------------------------------------------------------------------
         // Navigation commands
         // -------------------------------------------------------------------------
 
         [RelayCommand] private void NavigateToNotes() => CurrentViewModel = _notesViewModel;
-        [RelayCommand] private void NavigateToSupervisorDashboard() => CurrentViewModel = _supervisorViewModel;
+        [RelayCommand] private void NavigateToSupervisorDashboard() => CurrentViewModel = _supervisorDashboardViewModel;
         [RelayCommand] private void NavigateToGuidance() => CurrentViewModel = _guidanceViewModel;
         [RelayCommand] private void NavigateToHelpers() => CurrentViewModel = _helpersViewModel;
         [RelayCommand] private void RequestSwitchUser() => SwitchUserRequested?.Invoke(this, EventArgs.Empty);
@@ -169,8 +173,8 @@ namespace Sati.ViewModels
 
         private async Task InitializeSupervisorAsync()
         {
-            await _supervisorViewModel.InitializeAsync();
-            CurrentViewModel = _supervisorViewModel;
+            await _supervisorDashboardViewModel.InitializeAsync();
+            CurrentViewModel = _supervisorDashboardViewModel;
         }
     }
 }

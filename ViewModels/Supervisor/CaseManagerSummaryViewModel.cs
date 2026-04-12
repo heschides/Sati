@@ -5,21 +5,14 @@ namespace Sati.ViewModels.Supervisor
 {
     public partial class CaseManagerSummaryViewModel : ObservableObject
     {
-        // -------------------------------------------------------------------------
-        // Private state
-        // -------------------------------------------------------------------------
-
         private readonly User _user;
-
-        // -------------------------------------------------------------------------
-        // Constructor
-        // -------------------------------------------------------------------------
 
         public CaseManagerSummaryViewModel(User user, List<Person> people,
             List<Note> monthlyNotes, List<UpcomingEvent> upcomingEvents)
         {
             _user = user;
 
+            People = people;
             DisplayName = user.DisplayName;
             Initials = GetInitials(user.DisplayName);
             ClientCount = people.Count;
@@ -28,17 +21,19 @@ namespace Sati.ViewModels.Supervisor
             UnitsThisMonth = monthlyNotes.Sum(n => n.Units ?? 0);
             UpcomingEvents = upcomingEvents;
 
-            OverdueCount = upcomingEvents.Count(e =>
-                e.Kind == UpcomingEventKind.LateReview);
+            OverdueCount = upcomingEvents.Count(e => e.Kind == UpcomingEventKind.LateReview);
             HasOverdue = OverdueCount > 0;
-
             DetailHeading = $"{DisplayName} — upcoming items";
+
+            LoggedCount = monthlyNotes.Count(n => n.Status == NoteStatus.Logged);
+            PendingCount = monthlyNotes.Count(n => n.Status == NoteStatus.Pending);
+            AbandonedCount = monthlyNotes.Count(n => n.Status == NoteStatus.Abandoned);
+            ScheduledCount = monthlyNotes.Count(n => n.Status == NoteStatus.Scheduled);
+            CancelledCount = monthlyNotes.Count(n => n.Status == NoteStatus.Cancelled);
+            DelayedCount = monthlyNotes.Count(n => n.Status == NoteStatus.Delayed);
         }
 
-        // -------------------------------------------------------------------------
-        // Properties
-        // -------------------------------------------------------------------------
-
+        public List<Person> People { get; }
         public string DisplayName { get; }
         public string Initials { get; }
         public int ClientCount { get; }
@@ -50,19 +45,14 @@ namespace Sati.ViewModels.Supervisor
         public string DetailHeading { get; }
         public List<UpcomingEvent> UpcomingEvents { get; }
 
-        // -------------------------------------------------------------------------
-        // Selection state — mutable, bound by the DataGrid
-        // -------------------------------------------------------------------------
+        public int LoggedCount { get; }
+        public int PendingCount { get; }
+        public int AbandonedCount { get; }
+        public int ScheduledCount { get; }
+        public int CancelledCount { get; }
+        public int DelayedCount { get; }
 
         [ObservableProperty] private bool isSelected;
-
-        // -------------------------------------------------------------------------
-        // Progress and status
-        // -------------------------------------------------------------------------
-
-        // ProgressPercent and StatusLevel require the incentive threshold, which
-        // varies per user. SupervisorDashboardViewModel passes it in via
-        // SetThreshold() after construction once incentive data is loaded.
 
         public double ProgressPercent { get; private set; }
         public string StatusLevel { get; private set; } = "Warning";
@@ -92,14 +82,9 @@ namespace Sati.ViewModels.Supervisor
             OnPropertyChanged(nameof(StatusLabel));
         }
 
-        // -------------------------------------------------------------------------
-        // Private helpers
-        // -------------------------------------------------------------------------
-
         private static string GetInitials(string displayName)
         {
-            var parts = displayName.Split(' ',
-                StringSplitOptions.RemoveEmptyEntries);
+            var parts = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             return parts.Length >= 2
                 ? $"{parts[0][0]}{parts[^1][0]}"
                 : displayName.Length > 0 ? displayName[0].ToString() : "?";

@@ -1,9 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
-using Sati.Models;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Windows.Threading;
 
 namespace Sati.ViewModels.Supervisor
 {
@@ -119,23 +119,50 @@ namespace Sati.ViewModels.Supervisor
         // -------------------------------------------------------------------------
         // Navigation commands
         // -------------------------------------------------------------------------
+        [RelayCommand]
+        private async Task NavigateToTeamOverview()
+        {
+            CurrentSubView = null;
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            _teamOverviewViewModel.Refresh(CaseManagers);
+            CurrentSubView = _teamOverviewViewModel;
+        }
 
         [RelayCommand]
-        private void NavigateToTeamOverview() => CurrentSubView = _teamOverviewViewModel;
+        private async Task NavigateToOverdueItems()
+        {
+            CurrentSubView = null;
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            _overdueItemsViewModel.Refresh(CaseManagers);
+            CurrentSubView = _overdueItemsViewModel;
+        }
 
         [RelayCommand]
-        private void NavigateToOverdueItems() => CurrentSubView = _overdueItemsViewModel;
-
-        [RelayCommand]
-        private void NavigateToMonthlyProductivity() => CurrentSubView = _monthlyProductivityViewModel;
+        private async Task NavigateToMonthlyProductivity()
+        {
+            CurrentSubView = null;
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            _monthlyProductivityViewModel.Refresh(CaseManagers);
+            CurrentSubView = _monthlyProductivityViewModel;
+        }
 
         [RelayCommand]
         private async Task NavigateToUserManagement()
         {
+            if (CurrentSubView is UserManagementViewModel)
+            {
+                CurrentSubView = null;
+                return;
+            }
+
+            CurrentSubView = null;
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
             await _userManagementViewModel.InitializeAsync();
             CurrentSubView = _userManagementViewModel;
         }
 
+
+   
         // -------------------------------------------------------------------------
         // Initialization
         // -------------------------------------------------------------------------
@@ -175,11 +202,24 @@ namespace Sati.ViewModels.Supervisor
                 OnPropertyChanged(nameof(TotalOverdue));
                 OnPropertyChanged(nameof(TotalNotesThisMonth));
                 OnPropertyChanged(nameof(AvgComplianceLabel));
+
+                _teamOverviewViewModel.Refresh(CaseManagers);
+                _overdueItemsViewModel.Refresh(CaseManagers);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"SupervisorDashboardViewModel.InitializeAsync failed: {ex.Message}");
             }
         }
+
+        // -------------------------------------------------------------------------
+        // Local Methods
+        // -------------------------------------------------------------------------
+        public void ClearCharts()
+        {
+            _teamOverviewViewModel.ComplianceChartModel = null;
+            _monthlyProductivityViewModel.StatusChartModel = null;
+        }
+
     }
 }

@@ -21,6 +21,8 @@ namespace Sati.Views
         public MonthlyProductivityView()
         {
             InitializeComponent();
+            Unloaded += (_, _) => StatusChart.Model = null;
+
         }
     }
 }

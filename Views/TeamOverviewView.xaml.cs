@@ -21,6 +21,9 @@ namespace Sati.Views
         public TeamOverviewView()
         {
             InitializeComponent();
+            Unloaded += (_, _) => ComplianceChart.Model = null;
         }
+
+
     }
 }
