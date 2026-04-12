@@ -1,0 +1,121 @@
+﻿<Window x:Class="Sati.Views.SwitchUserWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Switch User"
+        Height="380"
+        Width="340"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#FDF6EC"
+        FontFamily="{StaticResource AppFont}">
+
+    <Border Padding="32">
+        <StackPanel>
+
+            <TextBlock Text="Switch User"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Foreground="#3D2B1F"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,4" />
+
+            <TextBlock Text="Select your name and enter your password to continue."
+                       FontSize="12"
+                       Foreground="#9C7A5C"
+                       HorizontalAlignment="Center"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Margin="0,0,0,24" />
+
+            <TextBlock Text="USERNAME"
+                       FontSize="11"
+                       FontWeight="SemiBold"
+                       Foreground="#9C7A5C"
+                       Margin="0,0,0,5" />
+            <ComboBox ItemsSource="{Binding Users}"
+                      SelectedItem="{Binding SelectedUser}"
+                      DisplayMemberPath="DisplayName"
+                      Height="36"
+                      Padding="10,0"
+                      FontSize="14"
+                      VerticalContentAlignment="Center"
+                      Background="White"
+                      BorderBrush="#D4A882"
+                      BorderThickness="1"
+                      Foreground="#3D2B1F"
+                      Margin="0,0,0,16" />
+
+            <TextBlock Text="PASSWORD"
+                       FontSize="11"
+                       FontWeight="SemiBold"
+                       Foreground="#9C7A5C"
+                       Margin="0,0,0,5" />
+            <PasswordBox x:Name="PasswordBox"
+                         Height="36"
+                         Padding="10,0"
+                         FontSize="14"
+                         VerticalContentAlignment="Center"
+                         Background="White"
+                         BorderBrush="#D4A882"
+                         BorderThickness="1"
+                         Foreground="#3D2B1F"
+                         Margin="0,0,0,16"
+                         PasswordChanged="PasswordBox_PasswordChanged" />
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       FontSize="12"
+                       Foreground="#A83220"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,12"
+                       Visibility="{Binding ErrorMessage,
+                           Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility"
+                                Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ErrorMessage}"
+                                         Value="">
+                                <Setter Property="Visibility"
+                                        Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <Button Content="Switch User"
+                    Height="40"
+                    Background="#C87941"
+                    Foreground="White"
+                    FontSize="14"
+                    FontWeight="SemiBold"
+                    BorderThickness="0"
+                    Cursor="Hand"
+                    Command="{Binding SwitchUserCommand}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#A85E28" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#8A4D20" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+
+        </StackPanel>
+    </Border>
+</Window>

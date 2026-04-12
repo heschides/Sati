@@ -20,205 +20,229 @@
                               MinWidth="250" />
         </Grid.ColumnDefinitions>
 
-        <!-- Navigation bar -->
+        <!-- ================================================================ -->
+        <!-- NAVIGATION BAR                                                   -->
+        <!-- ================================================================ -->
         <Border Grid.Row="0"
                 Grid.ColumnSpan="3"
                 Background="#F5E6D0"
                 BorderBrush="#E8D0B8"
                 BorderThickness="0,0,0,1"
-                Padding="12,6">
-            <StackPanel Orientation="Horizontal">
+                Padding="12,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                <Button Command="{Binding NavigateToNotesCommand}"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Cursor="Hand"
-                        Margin="0,0,4,0"
-                        Padding="10,4">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Foreground"
-                                    Value="#9C7A5C" />
-                            <Setter Property="FontSize"
-                                    Value="13" />
-                            <Setter Property="Background"
-                                    Value="Transparent" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                CornerRadius="4"
-                                                Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center" />
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsNotesActive}"
+                <!-- Tab navigation — left side -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal">
+
+                    <Border Cursor="Hand"
+                            CornerRadius="4"
+                            Padding="10,4"
+                            Margin="0,0,4,0"
+                            Visibility="{Binding IsSupervisionAvailable,
+                                Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding NavigateToSupervisorDashboardCommand}" />
+                        </Border.InputBindings>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background"
+                                        Value="Transparent" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSupervisorActive}"
+                                                 Value="True">
+                                        <Setter Property="Background"
+                                                Value="#3D2B1F" />
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver"
                                              Value="True">
-                                    <Setter Property="Background"
-                                            Value="#C87941" />
+                                        <Setter Property="Background"
+                                                Value="#EDD9C0" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="Supervisor"
+                                   FontSize="13">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
                                     <Setter Property="Foreground"
-                                            Value="#FDF6EC" />
-                                </DataTrigger>
-                                <Trigger Property="IsMouseOver"
-                                         Value="True">
-                                    <Setter Property="Background"
-                                            Value="#EDD9C0" />
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <TextBlock Text="Notes"
-                               FontSize="13" />
-                </Button>
+                                            Value="#9C7A5C" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSupervisorActive}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="#FDF6EC" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
 
-                <Button Command="{Binding NavigateToSupervisorDashboardCommand}"
-                        Visibility="{Binding IsSupervisionAvailable,
-                    Converter={StaticResource BoolToVisibilityConverter}}"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Cursor="Hand"
-                        Margin="0,0,4,0"
-                        Padding="10,4">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Foreground"
-                                    Value="#9C7A5C" />
-                            <Setter Property="FontSize"
-                                    Value="13" />
-                            <Setter Property="Background"
-                                    Value="Transparent" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                CornerRadius="4"
-                                                Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center" />
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSupervisorActive}"
+                    <Border Cursor="Hand"
+                            CornerRadius="4"
+                            Padding="10,4"
+                            Margin="0,0,4,0">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding NavigateToNotesCommand}" />
+                        </Border.InputBindings>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background"
+                                        Value="Transparent" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsNotesActive}"
+                                                 Value="True">
+                                        <Setter Property="Background"
+                                                Value="#3D2B1F" />
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver"
                                              Value="True">
-                                    <Setter Property="Background"
-                                            Value="#C87941" />
+                                        <Setter Property="Background"
+                                                Value="#EDD9C0" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="Notes"
+                                   FontSize="13">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
                                     <Setter Property="Foreground"
-                                            Value="#FDF6EC" />
-                                </DataTrigger>
-                                <Trigger Property="IsMouseOver"
-                                         Value="True">
-                                    <Setter Property="Background"
-                                            Value="#EDD9C0" />
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <TextBlock Text="Supervisor"
-                               FontSize="13" />
-                </Button>
+                                            Value="#9C7A5C" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsNotesActive}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="#FDF6EC" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
 
-                <Button Command="{Binding NavigateToGuidanceCommand}"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Cursor="Hand"
-                        Margin="0,0,4,0"
-                        Padding="10,4">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Foreground"
-                                    Value="#9C7A5C" />
-                            <Setter Property="FontSize"
-                                    Value="13" />
-                            <Setter Property="Background"
-                                    Value="Transparent" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                CornerRadius="4"
-                                                Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center" />
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsGuidanceActive}"
+                    <Border Cursor="Hand"
+                            CornerRadius="4"
+                            Padding="10,4"
+                            Margin="0,0,4,0">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding NavigateToGuidanceCommand}" />
+                        </Border.InputBindings>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background"
+                                        Value="Transparent" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsGuidanceActive}"
+                                                 Value="True">
+                                        <Setter Property="Background"
+                                                Value="#3D2B1F" />
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver"
                                              Value="True">
-                                    <Setter Property="Background"
-                                            Value="#C87941" />
+                                        <Setter Property="Background"
+                                                Value="#EDD9C0" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="Guidance"
+                                   FontSize="13">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
                                     <Setter Property="Foreground"
-                                            Value="#FDF6EC" />
-                                </DataTrigger>
-                                <Trigger Property="IsMouseOver"
-                                         Value="True">
-                                    <Setter Property="Background"
-                                            Value="#EDD9C0" />
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <TextBlock Text="Guidance"
-                               FontSize="13" />
-                </Button>
+                                            Value="#9C7A5C" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsGuidanceActive}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="#FDF6EC" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
 
-                <Button Command="{Binding NavigateToHelpersCommand}"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Cursor="Hand"
-                        Margin="0,0,4,0"
-                        Padding="10,4">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Foreground"
-                                    Value="#9C7A5C" />
-                            <Setter Property="FontSize"
-                                    Value="13" />
-                            <Setter Property="Background"
-                                    Value="Transparent" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                CornerRadius="4"
-                                                Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center" />
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsHelpersActive}"
+                    <Border Cursor="Hand"
+                            CornerRadius="4"
+                            Padding="10,4"
+                            Margin="0,0,4,0">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding NavigateToHelpersCommand}" />
+                        </Border.InputBindings>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background"
+                                        Value="Transparent" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsHelpersActive}"
+                                                 Value="True">
+                                        <Setter Property="Background"
+                                                Value="#3D2B1F" />
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver"
                                              Value="True">
-                                    <Setter Property="Background"
-                                            Value="#C87941" />
+                                        <Setter Property="Background"
+                                                Value="#EDD9C0" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="Helpers"
+                                   FontSize="13">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
                                     <Setter Property="Foreground"
-                                            Value="#FDF6EC" />
-                                </DataTrigger>
-                                <Trigger Property="IsMouseOver"
-                                         Value="True">
-                                    <Setter Property="Background"
-                                            Value="#EDD9C0" />
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <TextBlock Text="Helpers"
-                               FontSize="13" />
-                </Button>
+                                            Value="#9C7A5C" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsHelpersActive}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="#FDF6EC" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
 
-            </StackPanel>
+                </StackPanel>
+
+                <!-- User info — right side -->
+                <Border Grid.Column="1"
+                        Cursor="Hand"
+                        CornerRadius="4"
+                        Padding="8,4"
+                        Margin="0,0,4,0"
+                        VerticalAlignment="Center"
+                        Background="{Binding AvatarBrush}">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding RequestSwitchUserCommand}" />
+                    </Border.InputBindings>
+                    <TextBlock Text="{Binding UserGreeting}"
+                               FontSize="12"
+                               Foreground="#FDF6EC"
+                               VerticalAlignment="Center" />
+                </Border>
+
+            </Grid>
         </Border>
 
-        <!-- Main content area -->
+        <!-- ================================================================ -->
+        <!-- MAIN CONTENT AREA                                                -->
+        <!-- ================================================================ -->
         <ContentControl Grid.Row="1"
                         Grid.Column="0"
                         Content="{Binding CurrentViewModel}" />
@@ -241,5 +265,6 @@
                              Converter={StaticResource BoolToVisibilityConverter}}">
             <views:ScratchpadView DataContext="{Binding Scratchpad}" />
         </Border>
+
     </Grid>
 </Window>

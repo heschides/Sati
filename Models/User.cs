@@ -11,8 +11,8 @@ namespace Sati.Models
         public int Id { get; private set; } 
         public string Username { get; private set; } = string.Empty;
         public string DisplayName { get; private set; } = string.Empty;
-        public string PasswordHash { get; private set; } = string.Empty;
-        public string Salt { get; private set; } = string.Empty;
+        public string PasswordHash { get; set; } = string.Empty;
+        public string Salt { get; set; } = string.Empty;
         public UserRole Role { get; set; }
         public int? SupervisorId { get; set; }
         public User? Supervisor { get; set; }
@@ -35,6 +35,12 @@ namespace Sati.Models
         public static User Create(int id, string username, string displayName, string passwordHash, string salt, UserRole role, int? supervisorId)
         {
             return new User(id, username, displayName, passwordHash, salt, role, supervisorId);
+        }
+
+        public void SetPassword(string hash, string salt)
+        {
+            PasswordHash = hash;
+            Salt = salt;
         }
     }
 }

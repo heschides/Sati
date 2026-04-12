@@ -1,0 +1,35 @@
+﻿using Sati.Models;
+using Sati.ViewModels;
+using System.Windows;
+using System.Windows.Controls;
+
+namespace Sati.Views
+{
+    public partial class SwitchUserWindow : Window
+    {
+        private readonly SwitchUserViewModel _viewModel;
+        public User? NewUser { get; private set; }
+
+        public SwitchUserWindow(SwitchUserViewModel viewModel)
+        {
+            InitializeComponent();
+            _viewModel = viewModel;
+            DataContext = viewModel;
+
+            viewModel.SwitchSucceeded += (s, user) =>
+            {
+                NewUser = user;
+                DialogResult = true;
+                Close();
+            };
+
+            Loaded += async (s, e) => await viewModel.InitializeAsync();
+        }
+
+        private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is PasswordBox box)
+                _viewModel.Password = box.SecurePassword;
+        }
+    }
+}

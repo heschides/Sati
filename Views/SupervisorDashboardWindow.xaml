@@ -69,18 +69,6 @@
                     Value="Hand" />
         </Style>
 
-        <Style x:Key="TabButton"
-               TargetType="Border">
-            <Setter Property="CornerRadius"
-                    Value="4" />
-            <Setter Property="Padding"
-                    Value="12,4" />
-            <Setter Property="Margin"
-                    Value="0,0,4,0" />
-            <Setter Property="Cursor"
-                    Value="Hand" />
-        </Style>
-
         <Style x:Key="TeamProgressBar"
                TargetType="ProgressBar">
             <Setter Property="Height"
@@ -173,6 +161,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -187,22 +176,124 @@
             <StackPanel Orientation="Horizontal"
                         VerticalAlignment="Center">
 
-                <Border Style="{StaticResource TabButton}"
-                        Background="#C87941">
+                <!-- Team overview -->
+                <Border Cursor="Hand"
+                        CornerRadius="4"
+                        Padding="12,4"
+                        Margin="0,0,4,0">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NavigateToTeamOverviewCommand}" />
+                    </Border.InputBindings>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background"
+                                    Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTeamOverviewActive}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#C87941" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <TextBlock Text="Team overview"
-                               FontSize="12"
-                               Foreground="#FDF6EC" />
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="#9C7A5C" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTeamOverviewActive}"
+                                                 Value="True">
+                                        <Setter Property="Foreground"
+                                                Value="#FDF6EC" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Border>
-                <Border Style="{StaticResource TabButton}">
+
+                <!-- Overdue items -->
+                <Border Cursor="Hand"
+                        CornerRadius="4"
+                        Padding="12,4"
+                        Margin="0,0,4,0">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NavigateToOverdueItemsCommand}" />
+                    </Border.InputBindings>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background"
+                                    Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsOverdueItemsActive}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#C87941" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <TextBlock Text="Overdue items"
-                               FontSize="12"
-                               Foreground="#9C7A5C" />
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="#9C7A5C" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsOverdueItemsActive}"
+                                                 Value="True">
+                                        <Setter Property="Foreground"
+                                                Value="#FDF6EC" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Border>
-                <Border Style="{StaticResource TabButton}"
+
+                <!-- Monthly productivity -->
+                <Border Cursor="Hand"
+                        CornerRadius="4"
+                        Padding="12,4"
                         Margin="0,0,16,0">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NavigateToMonthlyProductivityCommand}" />
+                    </Border.InputBindings>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background"
+                                    Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMonthlyProductivityActive}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#C87941" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <TextBlock Text="Monthly productivity"
-                               FontSize="12"
-                               Foreground="#9C7A5C" />
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="#9C7A5C" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMonthlyProductivityActive}"
+                                                 Value="True">
+                                        <Setter Property="Foreground"
+                                                Value="#FDF6EC" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Border>
 
                 <Border Width="1"
@@ -214,7 +305,7 @@
                            Foreground="#9C7A5C"
                            VerticalAlignment="Center"
                            Margin="0,0,6,0" />
-                <TextBlock Text="{Binding CurrentMonth}"
+                <TextBlock Text="{Binding CurrentMonth, Mode=OneWay}"
                            FontSize="11"
                            FontWeight="SemiBold"
                            Foreground="#3D2B1F"
@@ -240,9 +331,65 @@
         </Border>
 
         <!-- ================================================================ -->
+        <!-- SUMMARY METRICS                                                   -->
+        <!-- ================================================================ -->
+        <UniformGrid Grid.Row="1"
+                     Rows="1"
+                     Columns="4"
+                     Margin="16,12,16,0">
+
+            <Border Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <TextBlock Text="TOTAL CLIENTS"
+                               Style="{StaticResource MetricLabel}" />
+                    <TextBlock Text="{Binding TotalClients}"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="#3D2B1F" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <TextBlock Text="OVERDUE ITEMS"
+                               Style="{StaticResource MetricLabel}" />
+                    <TextBlock Text="{Binding TotalOverdue}"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="#A83220" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource MetricCard}">
+                <StackPanel>
+                    <TextBlock Text="NOTES THIS MONTH"
+                               Style="{StaticResource MetricLabel}" />
+                    <TextBlock Text="{Binding TotalNotesThisMonth}"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="#3D2B1F" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource MetricCard}"
+                    Margin="0">
+                <StackPanel>
+                    <TextBlock Text="AVG COMPLIANCE"
+                               Style="{StaticResource MetricLabel}" />
+                    <TextBlock Text="{Binding AvgComplianceLabel}"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="#3A6B35" />
+                </StackPanel>
+            </Border>
+
+        </UniformGrid>
+
+        <!-- ================================================================ -->
         <!-- BODY                                                              -->
         <!-- ================================================================ -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2"
+              Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="200" />
                 <ColumnDefinition Width="*" />
@@ -257,8 +404,43 @@
                     BorderThickness="0,0,1,0">
                 <StackPanel>
 
-                    <TextBlock Text="CASE MANAGERS"
-                               Style="{StaticResource SidebarHeading}" />
+                    <!-- Case managers header — clickable, navigates to user management -->
+                    <Border Cursor="Hand"
+                            Padding="0">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding NavigateToUserManagementCommand}" />
+                        </Border.InputBindings>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background"
+                                        Value="Transparent" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsUserManagementActive}"
+                                                 Value="True">
+                                        <Setter Property="Background"
+                                                Value="#EDD9C0" />
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver"
+                                             Value="True">
+                                        <Setter Property="Background"
+                                                Value="#EDD9C0" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="12,12,12,4">
+                            <TextBlock Text="CASE MANAGERS"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="#9C7A5C" />
+                            <TextBlock Text=" ›"
+                                       FontSize="10"
+                                       Foreground="#C87941"
+                                       Margin="4,0,0,0" />
+                        </StackPanel>
+                    </Border>
 
                     <ItemsControl ItemsSource="{Binding CaseManagers}">
                         <ItemsControl.ItemTemplate>
@@ -353,299 +535,11 @@
             </Border>
 
             <!-- ============================================================ -->
-            <!-- MAIN CONTENT                                                  -->
+            <!-- MAIN CONTENT — sub-view ContentControl                        -->
             <!-- ============================================================ -->
-            <ScrollViewer Grid.Column="1"
-                          VerticalScrollBarVisibility="Auto"
-                          Padding="16">
-                <StackPanel>
+            <ContentControl Grid.Column="1"
+                            Content="{Binding CurrentSubView}" />
 
-                    <!-- SUMMARY METRICS -->
-                    <UniformGrid Rows="1"
-                                 Columns="4"
-                                 Margin="0,0,0,14">
-
-                        <Border Style="{StaticResource MetricCard}">
-                            <StackPanel>
-                                <TextBlock Text="TOTAL CLIENTS"
-                                           Style="{StaticResource MetricLabel}" />
-                                <TextBlock Text="{Binding TotalClients}"
-                                           FontSize="22"
-                                           FontWeight="SemiBold"
-                                           Foreground="#3D2B1F" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource MetricCard}">
-                            <StackPanel>
-                                <TextBlock Text="OVERDUE ITEMS"
-                                           Style="{StaticResource MetricLabel}" />
-                                <TextBlock Text="{Binding TotalOverdue}"
-                                           FontSize="22"
-                                           FontWeight="SemiBold"
-                                           Foreground="#A83220" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource MetricCard}">
-                            <StackPanel>
-                                <TextBlock Text="NOTES THIS MONTH"
-                                           Style="{StaticResource MetricLabel}" />
-                                <TextBlock Text="{Binding TotalNotesThisMonth}"
-                                           FontSize="22"
-                                           FontWeight="SemiBold"
-                                           Foreground="#3D2B1F" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource MetricCard}"
-                                Margin="0">
-                            <StackPanel>
-                                <TextBlock Text="AVG COMPLIANCE"
-                                           Style="{StaticResource MetricLabel}" />
-                                <TextBlock Text="{Binding AvgComplianceLabel}"
-                                           FontSize="22"
-                                           FontWeight="SemiBold"
-                                           Foreground="#3A6B35" />
-                            </StackPanel>
-                        </Border>
-
-                    </UniformGrid>
-
-                    <!-- TEAM PRODUCTIVITY TABLE -->
-                    <TextBlock Style="{StaticResource SectionHeading}">
-                        <Run Text="TEAM PRODUCTIVITY — " />
-                        <Run Text="{Binding CurrentMonth, Mode=OneWay}" />
-                    </TextBlock>
-                    <Border BorderBrush="#E8D0B8"
-                            BorderThickness="0,1,0,0"
-                            Margin="0,0,0,2" />
-
-                    <DataGrid ItemsSource="{Binding CaseManagers}"
-                              SelectedItem="{Binding SelectedCaseManager}"
-                              Background="Transparent"
-                              BorderThickness="0"
-                              GridLinesVisibility="Horizontal"
-                              HorizontalGridLinesBrush="#F0E4D0"
-                              RowBackground="Transparent"
-                              AlternatingRowBackground="Transparent"
-                              HeadersVisibility="Column"
-                              IsReadOnly="True"
-                              SelectionMode="Single"
-                              CanUserResizeColumns="False"
-                              CanUserReorderColumns="False"
-                              AutoGenerateColumns="False"
-                              RowHeight="36"
-                              Margin="0,0,0,14">
-                        <DataGrid.Columns>
-
-                            <DataGridTextColumn Header="Case manager"
-                                                Binding="{Binding DisplayName}"
-                                                Width="*" />
-                            <DataGridTextColumn Header="Clients"
-                                                Binding="{Binding ClientCount}"
-                                                Width="60" />
-                            <DataGridTextColumn Header="Notes logged"
-                                                Binding="{Binding NotesThisMonth}"
-                                                Width="90" />
-                            <DataGridTextColumn Header="Units"
-                                                Binding="{Binding UnitsThisMonth}"
-                                                Width="60" />
-
-                            <DataGridTemplateColumn Header="Progress"
-                                                    Width="100">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <ProgressBar Value="{Binding ProgressPercent}"
-                                                     Maximum="100">
-                                            <ProgressBar.Style>
-                                                <Style TargetType="ProgressBar"
-                                                       BasedOn="{StaticResource TeamProgressBar}">
-                                                    <Setter Property="Foreground"
-                                                            Value="#C87941" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding StatusLevel}"
-                                                                     Value="Ok">
-                                                            <Setter Property="Foreground"
-                                                                    Value="#5A9A50" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding StatusLevel}"
-                                                                     Value="Danger">
-                                                            <Setter Property="Foreground"
-                                                                    Value="#A83220" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </ProgressBar.Style>
-                                        </ProgressBar>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-
-                            <DataGridTemplateColumn Header="Overdue"
-                                                    Width="70">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding OverdueCount}"
-                                                   VerticalAlignment="Center">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground"
-                                                            Value="#3A6B35" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasOverdue}"
-                                                                     Value="True">
-                                                            <Setter Property="Foreground"
-                                                                    Value="#A83220" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-
-                            <DataGridTemplateColumn Header="Status"
-                                                    Width="120">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Border CornerRadius="10"
-                                                Padding="8,2"
-                                                HorizontalAlignment="Left"
-                                                VerticalAlignment="Center">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Background"
-                                                            Value="#F5DEB3" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding StatusLevel}"
-                                                                     Value="Ok">
-                                                            <Setter Property="Background"
-                                                                    Value="#D4EBC8" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding StatusLevel}"
-                                                                     Value="Danger">
-                                                            <Setter Property="Background"
-                                                                    Value="#F5CECA" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <TextBlock Text="{Binding StatusLabel}"
-                                                       FontSize="10">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Foreground"
-                                                                Value="#7A4D10" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding StatusLevel}"
-                                                                         Value="Ok">
-                                                                <Setter Property="Foreground"
-                                                                        Value="#2A5025" />
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding StatusLevel}"
-                                                                         Value="Danger">
-                                                                <Setter Property="Foreground"
-                                                                        Value="#7A1F1A" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
-                                        </Border>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <!-- DETAIL PANEL -->
-                    <Border Background="#F0E4D0"
-                            BorderBrush="#E8D0B8"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="12">
-                        <StackPanel>
-
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding SelectedCaseManager.DetailHeading}"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"
-                                           Foreground="#3D2B1F" />
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding SelectedCaseManager.ClientCountLabel}"
-                                           FontSize="10"
-                                           Foreground="#9C7A5C"
-                                           VerticalAlignment="Center" />
-                            </Grid>
-
-                            <ItemsControl ItemsSource="{Binding SelectedCaseManager.UpcomingEvents}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border BorderBrush="#E8D0B8"
-                                                BorderThickness="0,0,0,1"
-                                                Padding="0,5">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-
-                                                <Ellipse Grid.Column="0"
-                                                         Width="8"
-                                                         Height="8"
-                                                         Margin="0,0,8,0"
-                                                         VerticalAlignment="Center">
-                                                    <Ellipse.Style>
-                                                        <Style TargetType="Ellipse">
-                                                            <Setter Property="Fill"
-                                                                    Value="#C87941" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Kind}"
-                                                                             Value="{x:Static sati:UpcomingEventKind.LateReview}">
-                                                                    <Setter Property="Fill"
-                                                                            Value="#A83220" />
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding Kind}"
-                                                                             Value="{x:Static sati:UpcomingEventKind.ScheduledForm}">
-                                                                    <Setter Property="Fill"
-                                                                            Value="#5A9A50" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Ellipse.Style>
-                                                </Ellipse>
-
-                                                <TextBlock Grid.Column="1"
-                                                           Text="{Binding Title}"
-                                                           FontSize="11"
-                                                           Foreground="#3D2B1F"
-                                                           VerticalAlignment="Center" />
-
-                                                <TextBlock Grid.Column="2"
-                                                           Text="{Binding Date, StringFormat={}{0:MMM d}}"
-                                                           FontSize="10"
-                                                           Foreground="#9C7A5C"
-                                                           VerticalAlignment="Center" />
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                        </StackPanel>
-                    </Border>
-
-                </StackPanel>
-            </ScrollViewer>
         </Grid>
     </Grid>
 </UserControl>

@@ -35,6 +35,18 @@
         <DataTemplate DataType="{x:Type children:HelpersViewModel}">
             <views:HelpersView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type supervisor:TeamOverviewViewModel}">
+            <views:TeamOverviewView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type supervisor:OverdueItemsViewModel}">
+            <views:OverdueItemsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type supervisor:MonthlyProductivityViewModel}">
+            <views:MonthlyProductivityView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type supervisor:UserManagementViewModel}">
+            <views:UserManagementView />
+        </DataTemplate>
 
         <!-- Global styles -->
         <Style x:Key="LabelStyle"

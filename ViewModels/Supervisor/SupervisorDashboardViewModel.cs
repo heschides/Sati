@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
 using Sati.Models;
 using System.Collections.ObjectModel;
@@ -18,6 +19,16 @@ namespace Sati.ViewModels.Supervisor
         private readonly IIncentiveService _incentiveService;
         private readonly ISettingsService _settingsService;
         private readonly IUpcomingEventService _upcomingEventService;
+        private readonly IUserService _userService;
+
+        // -------------------------------------------------------------------------
+        // Sub-view ViewModels
+        // -------------------------------------------------------------------------
+
+        private readonly TeamOverviewViewModel _teamOverviewViewModel;
+        private readonly OverdueItemsViewModel _overdueItemsViewModel;
+        private readonly MonthlyProductivityViewModel _monthlyProductivityViewModel;
+        private readonly UserManagementViewModel _userManagementViewModel;
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -29,7 +40,9 @@ namespace Sati.ViewModels.Supervisor
             INoteService noteService,
             IIncentiveService incentiveService,
             ISettingsService settingsService,
-            IUpcomingEventService upcomingEventService)
+            IUpcomingEventService upcomingEventService,
+            IUserService userService,
+            UserManagementViewModel userManagementViewModel)
         {
             _sessionService = sessionService;
             _personService = personService;
@@ -37,12 +50,22 @@ namespace Sati.ViewModels.Supervisor
             _incentiveService = incentiveService;
             _settingsService = settingsService;
             _upcomingEventService = upcomingEventService;
+            _userService = userService;
+            _userManagementViewModel = userManagementViewModel;
+
+            _teamOverviewViewModel = new TeamOverviewViewModel();
+            _overdueItemsViewModel = new OverdueItemsViewModel();
+            _monthlyProductivityViewModel = new MonthlyProductivityViewModel();
+
+            // Start on team overview
+            CurrentSubView = _teamOverviewViewModel;
         }
 
         // -------------------------------------------------------------------------
         // Observable properties
         // -------------------------------------------------------------------------
 
+        [ObservableProperty] private object? currentSubView;
         [ObservableProperty] private CaseManagerSummaryViewModel? selectedCaseManager;
 
         // -------------------------------------------------------------------------
@@ -73,6 +96,44 @@ namespace Sati.ViewModels.Supervisor
                 var avg = CaseManagers.Average(cm => cm.ProgressPercent);
                 return $"{avg:0}%";
             }
+        }
+
+        // Active sub-view indicators for toolbar highlighting
+        public bool IsTeamOverviewActive => CurrentSubView is TeamOverviewViewModel;
+        public bool IsOverdueItemsActive => CurrentSubView is OverdueItemsViewModel;
+        public bool IsMonthlyProductivityActive => CurrentSubView is MonthlyProductivityViewModel;
+        public bool IsUserManagementActive => CurrentSubView is UserManagementViewModel;
+
+        // -------------------------------------------------------------------------
+        // Property change callbacks
+        // -------------------------------------------------------------------------
+
+        partial void OnCurrentSubViewChanged(object? value)
+        {
+            OnPropertyChanged(nameof(IsTeamOverviewActive));
+            OnPropertyChanged(nameof(IsOverdueItemsActive));
+            OnPropertyChanged(nameof(IsMonthlyProductivityActive));
+            OnPropertyChanged(nameof(IsUserManagementActive));
+        }
+
+        // -------------------------------------------------------------------------
+        // Navigation commands
+        // -------------------------------------------------------------------------
+
+        [RelayCommand]
+        private void NavigateToTeamOverview() => CurrentSubView = _teamOverviewViewModel;
+
+        [RelayCommand]
+        private void NavigateToOverdueItems() => CurrentSubView = _overdueItemsViewModel;
+
+        [RelayCommand]
+        private void NavigateToMonthlyProductivity() => CurrentSubView = _monthlyProductivityViewModel;
+
+        [RelayCommand]
+        private async Task NavigateToUserManagement()
+        {
+            await _userManagementViewModel.InitializeAsync();
+            CurrentSubView = _userManagementViewModel;
         }
 
         // -------------------------------------------------------------------------
@@ -107,7 +168,6 @@ namespace Sati.ViewModels.Supervisor
                     CaseManagers.Add(summary);
                 }
 
-                // Select first by default
                 SelectedCaseManager = CaseManagers.FirstOrDefault();
 
                 OnPropertyChanged(nameof(TeamSizeLabel));

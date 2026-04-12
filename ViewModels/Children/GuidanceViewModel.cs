@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 
 namespace Sati.ViewModels.Children
@@ -40,6 +41,8 @@ namespace Sati.ViewModels.Children
                 IsExpanded = false;
             }
         }
+        [RelayCommand]
+        private void Toggle() => IsExpanded = !IsExpanded;
     }
 
     public partial class GuidanceViewModel : ObservableObject
@@ -70,6 +73,7 @@ namespace Sati.ViewModels.Children
         // Commands
         // -------------------------------------------------------------------------
 
+        [RelayCommand]
         public void CollapseAll()
         {
             foreach (var block in Blocks)

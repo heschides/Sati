@@ -1,4 +1,6 @@
-﻿using Sati.ViewModels;
+﻿using Sati.Data;
+using Sati.Models;
+using Sati.ViewModels;
 using System.Windows;
 
 namespace Sati.Views
@@ -6,16 +8,22 @@ namespace Sati.Views
     public partial class ShellWindow : Window
     {
         private readonly ShellViewModel _viewModel;
+        private readonly Func<SwitchUserWindow> _switchUserWindowFactory;
+        private readonly ISessionService _sessionService;
         private bool _isSavingOnClose = false;
 
         public ShellWindow(ShellViewModel viewModel,
+            ISessionService sessionService,
             Func<SettingsWindow> settingsWindowFactory,
             Func<ScratchpadHistoryWindow> scratchpadHistoryWindowFactory,
             Func<NotesWindow> notesWindowFactory,
-            Func<NewClientWindow> newClientWindowFactory)
+            Func<NewClientWindow> newClientWindowFactory,
+            Func<SwitchUserWindow> switchUserWindowFactory)
         {
             InitializeComponent();
             _viewModel = viewModel;
+            _sessionService = sessionService;
+            _switchUserWindowFactory = switchUserWindowFactory;
             DataContext = viewModel;
 
             var notesVm = viewModel.NotesViewModel;
@@ -68,6 +76,23 @@ namespace Sati.Views
                 win.Owner = this;
                 await win.InitializeAsync();
                 win.ShowDialog();
+            };
+
+            viewModel.SwitchUserRequested += async (s, e) =>
+            {
+                // Save scratchpad before switching users
+                var content = _viewModel.Scratchpad.ScratchpadContent;
+                await _viewModel.Scratchpad.SaveScratchpadAsync(content);
+
+                var win = _switchUserWindowFactory();
+                win.Owner = this;
+                bool? result = win.ShowDialog();
+
+                if (result == true && win.NewUser is not null)
+                {
+                    _sessionService.SetUser(win.NewUser);
+                    await _viewModel.ReinitializeAsync();
+                }
             };
 
             Closing += async (s, e) =>

@@ -42,6 +42,14 @@
     <Folder Include="Images\Screenshots\" />
   </ItemGroup>
 
+
+	
+  <ItemGroup>
+    <Compile Update="ViewModels\SwitchUserViewModel.cs">
+      <Generator>MSBuild:Compile</Generator>
+    </Compile>
+  </ItemGroup>
+
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

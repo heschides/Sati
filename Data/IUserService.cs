@@ -1,13 +1,13 @@
 ﻿using Sati.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Security;
 
 namespace Sati.Data
 {
     public interface IUserService
     {
-        Task <List<User>> GetAllAsync();
         Task<User> CreateAsync(User user);
+        Task<List<User>> GetAllAsync();
+        Task UpdateAsync(User user);
+        Task ResetPasswordAsync(User user, string newPassword);
     }
 }

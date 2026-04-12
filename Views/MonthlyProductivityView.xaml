@@ -1,0 +1,9 @@
+﻿<UserControl x:Class="Sati.Views.MonthlyProductivityView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#FDF6EC">
+    <TextBlock Text="Monthly productivity — coming soon"
+               FontSize="14"
+               Foreground="#9C7A5C"
+               Margin="24,20" />
+</UserControl>

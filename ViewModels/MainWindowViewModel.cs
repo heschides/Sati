@@ -540,6 +540,20 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(EstimatedIncentive));
         }
 
+        public void Reset()
+        {
+            LoggedInUser = null;
+            People.Clear();
+            Notes.Clear();
+            UpcomingEvents.Clear();
+            _monthlyNotes = [];
+            _incentive = null;
+            _settings = null;
+            SelectedPerson = null;
+            SelectedNote = null;
+            IsEditing = false;
+        }
+
         public IEnumerable<EffectiveDateGroup> EffectiveDateGroups => BuildEffectiveDateGroups();
 
         private IEnumerable<EffectiveDateGroup> BuildEffectiveDateGroups()
