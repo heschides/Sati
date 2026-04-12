@@ -7,6 +7,6 @@ namespace Sati.Data
 {
     public interface IUpcomingEventService
     {
-        List<UpcomingEvent> GenerateEvents(IEnumerable<Person> people, Settings settings);
+        List<UpcomingEvent> GenerateEvents(IEnumerable<Person> people, Settings settings, DateTime? asOf = null);
     }
 }

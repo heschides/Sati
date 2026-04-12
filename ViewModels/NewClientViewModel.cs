@@ -1,5 +1,4 @@
-﻿
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
 using Sati.Models;
@@ -7,32 +6,70 @@ using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 
-
-
 namespace Sati
 {
-
     public partial class NewClientViewModel : ObservableValidator
     {
+        // -------------------------------------------------------------------------
+        // Services
+        // -------------------------------------------------------------------------
 
-        //FIELDS
         private readonly ISessionService _sessionService;
         private readonly IPersonService _personService;
         private readonly INoteService _noteService;
         private readonly IFormService _formService;
 
+        // -------------------------------------------------------------------------
+        // Events
+        // -------------------------------------------------------------------------
 
-        //EVENTS
         public event Func<List<Form>, bool>? ComplianceReviewRequested;
 
-        //PROPERTIES
-        [ObservableProperty][NotifyDataErrorInfo][Required(ErrorMessage = "First name is required.")] private string? firstName;
-        [ObservableProperty][NotifyDataErrorInfo][Required(ErrorMessage = "Last name is required.")] private string? lastName;
-        [ObservableProperty][NotifyDataErrorInfo][Required(ErrorMessage = "Birthdate is required.")] private DateTime? birthDate;
-        [ObservableProperty][NotifyDataErrorInfo][Required(ErrorMessage = "A short biographical description is required.")] private string? bio;
-        [ObservableProperty] private WaiverType waiver;
-        [ObservableProperty][NotifyDataErrorInfo][CustomValidation(typeof(NewClientViewModel), nameof(ValidateEffectiveDate))] private string effectiveDateText = string.Empty;
-        [ObservableProperty] private Person? selectedPerson;
+        // -------------------------------------------------------------------------
+        // Observable properties
+        // -------------------------------------------------------------------------
+
+        [ObservableProperty]
+        [NotifyDataErrorInfo]
+        [Required(ErrorMessage = "First name is required.")]
+        private string? firstName;
+
+        [ObservableProperty]
+        [NotifyDataErrorInfo]
+        [Required(ErrorMessage = "Last name is required.")]
+        private string? lastName;
+
+        [ObservableProperty]
+        [NotifyDataErrorInfo]
+        [Required(ErrorMessage = "Birthdate is required.")]
+        private DateTime? birthDate;
+
+        [ObservableProperty]
+        [NotifyDataErrorInfo]
+        [Required(ErrorMessage = "A short biographical description is required.")]
+        private string? bio;
+
+        [ObservableProperty]
+        private WaiverType waiver;
+
+        [ObservableProperty]
+        [NotifyDataErrorInfo]
+        [CustomValidation(typeof(NewClientViewModel), nameof(ValidateEffectiveDate))]
+        private string effectiveDateText = string.Empty;
+
+        [ObservableProperty]
+        private Person? selectedPerson;
+
+        [ObservableProperty]
+        private bool isEntryPanelOpen = false;
+
+        [ObservableProperty]
+        private bool isEditMode;
+
+        // -------------------------------------------------------------------------
+        // Property change callbacks
+        // -------------------------------------------------------------------------
+
         partial void OnSelectedPersonChanged(Person? value)
         {
             OnPropertyChanged(nameof(HasSelectedPerson));
@@ -50,18 +87,29 @@ namespace Sati
             RefreshComplianceFlags();
             _ = LoadSelectedPersonNotesAsync(value);
             IsEntryPanelOpen = false;
-
         }
-        [ObservableProperty] private bool isEntryPanelOpen = false;
 
-       
+        partial void OnWaiverChanged(WaiverType value)
+        {
+            OnPropertyChanged(nameof(HasWaiver));
+            if (value == WaiverType.None)
+                EffectiveDateText = string.Empty;
+        }
 
-        [ObservableProperty] private bool isEditMode;
+        // -------------------------------------------------------------------------
+        // Computed properties
+        // -------------------------------------------------------------------------
+
         public bool HasSelectedPerson => SelectedPerson is not null;
         public bool AllowComplianceOverride => _sessionService.AllowComplianceOverride;
+        public bool HasWaiver => Waiver != WaiverType.None;
+        public string SubmitButtonLabel => IsEditMode ? "Save Changes" : "Add Client";
+        public Array Waivers => Enum.GetValues(typeof(WaiverType));
 
         public ObservableCollection<Note> SelectedPersonNotes { get; } = [];
+        public ObservableCollection<Person> People { get; } = [];
 
+        // Due dates
         public DateTime? Q1RDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Q1R)?.DueDate;
         public DateTime? Q2RDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Q2R)?.DueDate;
         public DateTime? Q3RDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Q3R)?.DueDate;
@@ -74,6 +122,163 @@ namespace Sati
         public DateTime? ReleaseAgencyDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Agency)?.DueDate;
         public DateTime? ReleaseDhhsDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Release_DHHS)?.DueDate;
         public DateTime? ReleaseMedicalDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Medical)?.DueDate;
+
+        // Compliance flags
+        public bool Q1RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q1R)?.IsCompliant ?? false;
+        public bool Q2RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q2R)?.IsCompliant ?? false;
+        public bool Q3RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q3R)?.IsCompliant ?? false;
+        public bool Q4RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q4R)?.IsCompliant ?? false;
+        public bool PcpCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PCP)?.IsCompliant ?? false;
+        public bool CompAssessmentCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.ComprehensiveAssessment)?.IsCompliant ?? false;
+        public bool ReclassificationCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.IsCompliant ?? false;
+        public bool SafetyPlanCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.IsCompliant ?? false;
+        public bool PrivacyPracticesCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.IsCompliant ?? false;
+        public bool ReleaseAgencyCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Agency)?.IsCompliant ?? false;
+        public bool ReleaseDhhsCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_DHHS)?.IsCompliant ?? false;
+        public bool ReleaseMedicalCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Medical)?.IsCompliant ?? false;
+
+        // -------------------------------------------------------------------------
+        // Constructor
+        // -------------------------------------------------------------------------
+
+        public NewClientViewModel(IPersonService personService, ISessionService session,
+            INoteService noteService, IFormService formService)
+        {
+            _personService = personService;
+            _sessionService = session;
+            _noteService = noteService;
+            _formService = formService;
+            _ = LoadPeopleAsync();
+        }
+
+        // -------------------------------------------------------------------------
+        // Commands
+        // -------------------------------------------------------------------------
+
+        [RelayCommand]
+        private void OpenEntryPanel()
+        {
+            ClearFields();
+            IsEditMode = false;
+            OnPropertyChanged(nameof(SubmitButtonLabel));
+            IsEntryPanelOpen = true;
+        }
+
+        [RelayCommand]
+        private async Task Submit()
+        {
+            ValidateAllProperties();
+            if (HasErrors)
+                return;
+
+            var effectiveDate = TryGetEffectiveDate(EffectiveDateText);
+
+            if (IsEditMode && SelectedPerson is Person existing)
+            {
+                var wasNoWaiver = existing.Waiver == WaiverType.None;
+                var isAddingWaiver = Waiver != WaiverType.None;
+
+                existing.FirstName = FirstName!;
+                existing.LastName = LastName!;
+                existing.BirthDate = BirthDate!.Value;
+                existing.EffectiveDate = effectiveDate;
+                existing.Waiver = Waiver;
+                existing.Bio = Bio!;
+
+                if (wasNoWaiver && isAddingWaiver && effectiveDate is not null)
+                {
+                    var forms = Person.GenerateFormList(effectiveDate.Value);
+                    existing.Forms = forms;
+                    var confirmed = ComplianceReviewRequested?.Invoke(existing.Forms) ?? true;
+                    if (!confirmed)
+                        return;
+                }
+
+                await _personService.EditPersonAsync(existing);
+
+                var index = People.IndexOf(existing);
+                if (index >= 0)
+                {
+                    People.RemoveAt(index);
+                    People.Insert(index, existing);
+                }
+
+                IsEditMode = false;
+                SelectedPerson = null;
+                ClearFields();
+                OnPropertyChanged(nameof(SubmitButtonLabel));
+                IsEntryPanelOpen = false;
+            }
+            else
+            {
+                var person = Person.CreatePerson(_sessionService.CurrentUser!.Id,
+                    FirstName!, LastName!, Bio!, BirthDate!.Value, effectiveDate, Waiver);
+                var confirmed = ComplianceReviewRequested?.Invoke(person.Forms) ?? true;
+                if (!confirmed)
+                    return;
+                await _personService.AddPersonAsync(person);
+                People.Add(person);
+                IsEntryPanelOpen = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task RemoveSelectedPerson()
+        {
+            if (SelectedPerson is null)
+                return;
+            await _personService.DeletePersonAsync(SelectedPerson);
+            People.Remove(SelectedPerson);
+            SelectedPerson = null;
+        }
+
+        [RelayCommand]
+        private void ToggleComplianceOverride()
+        {
+            _sessionService.AllowComplianceOverride = !_sessionService.AllowComplianceOverride;
+            OnPropertyChanged(nameof(AllowComplianceOverride));
+        }
+
+        [RelayCommand]
+        private async Task ToggleForm(FormType type)
+        {
+            if (SelectedPerson is null) return;
+            var form = SelectedPerson.GetCurrentCycleForm(type);
+            if (form is null) return;
+            form.IsCompliant = !form.IsCompliant;
+            await _formService.UpdateFormAsync(form);
+            RefreshComplianceFlags();
+        }
+
+        // -------------------------------------------------------------------------
+        // Public methods
+        // -------------------------------------------------------------------------
+
+        public void LoadPersonForEdit(Person person)
+        {
+            IsEditMode = true;
+            IsEntryPanelOpen = true;
+            OnPropertyChanged(nameof(SubmitButtonLabel));
+            FirstName = person.FirstName;
+            LastName = person.LastName;
+            Bio = person.Bio;
+            BirthDate = person.BirthDate;
+            EffectiveDateText = person.EffectiveDate?.ToString("MM/dd") ?? string.Empty;
+            Waiver = person.Waiver;
+        }
+
+        // -------------------------------------------------------------------------
+        // Private methods
+        // -------------------------------------------------------------------------
+
+        private async Task LoadPeopleAsync()
+        {
+            if (_sessionService.CurrentUser is null)
+                return;
+            var people = await _personService.GetAllPeopleAsync(_sessionService.CurrentUser.Id);
+            foreach (var person in people)
+                People.Add(person);
+        }
 
         private async Task LoadSelectedPersonNotesAsync(Person? person)
         {
@@ -100,156 +305,6 @@ namespace Sati
             OnPropertyChanged(nameof(ReleaseMedicalCompliant));
         }
 
-        //COMPUTED PROPERTIES
-        public bool HasWaiver => Waiver != WaiverType.None;
-        public string SubmitButtonLabel => IsEditMode ? "Save Changes" : "Add Client";
-        public ObservableCollection<Person> People { get; } = [];
-        public Array Waivers => Enum.GetValues(typeof(WaiverType));
-
-        //compliance flags
-        public bool Q1RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q1R)?.IsCompliant ?? false;
-        public bool Q2RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q2R)?.IsCompliant ?? false;
-        public bool Q3RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q3R)?.IsCompliant ?? false;
-        public bool Q4RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q4R)?.IsCompliant ?? false;
-        public bool PcpCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PCP)?.IsCompliant ?? false;
-        public bool CompAssessmentCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.ComprehensiveAssessment)?.IsCompliant ?? false;
-        public bool ReclassificationCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.IsCompliant ?? false;
-        public bool SafetyPlanCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.IsCompliant ?? false;
-        public bool PrivacyPracticesCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.IsCompliant ?? false;
-        public bool ReleaseAgencyCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Agency)?.IsCompliant ?? false;
-        public bool ReleaseDhhsCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_DHHS)?.IsCompliant ?? false;
-        public bool ReleaseMedicalCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Medical)?.IsCompliant ?? false;
-
-        //PROPERTY CALLBACKS
-        partial void OnWaiverChanged(WaiverType value)
-        {
-            OnPropertyChanged(nameof(HasWaiver));
-            if (value == WaiverType.None)
-                EffectiveDateText = string.Empty;
-        }
-        //constructor
-        public NewClientViewModel(IPersonService personService, ISessionService session, INoteService noteService, IFormService formService)
-        {
-            _personService = personService;
-            _sessionService = session;
-            _ = LoadPeopleAsync();
-            _noteService = noteService;
-            _formService = formService;
-        }
-
-        [RelayCommand]
-        private void OpenEntryPanel()
-        {
-            ClearFields();
-            IsEditMode = false;
-            OnPropertyChanged(nameof(SubmitButtonLabel));
-            IsEntryPanelOpen = true;
-        }
-
-        [RelayCommand]
-        private async Task Submit()
-        {
-            ValidateAllProperties();
-            if (HasErrors)
-                return;
-
-            var effectiveDate = TryGetEffectiveDate(EffectiveDateText)!;
-            if (IsEditMode && SelectedPerson is Person existing)
-            {
-                var wasNoWaiver = existing.Waiver == WaiverType.None;
-                var isAddingWaiver = Waiver != WaiverType.None;
-                existing.FirstName = FirstName!;
-                existing.LastName = LastName!;
-                existing.BirthDate = BirthDate!.Value;
-                existing.EffectiveDate = TryGetEffectiveDate(EffectiveDateText);
-                existing.Waiver = Waiver;
-                existing.Bio = Bio!;
-                if (wasNoWaiver && isAddingWaiver)
-                {
-                    var forms = Person.GenerateFormList(existing.EffectiveDate);
-                    existing.Forms = forms;
-                    var confirmed = ComplianceReviewRequested?.Invoke(existing.Forms) ?? true;
-                    if (!confirmed)
-                        return;
-                }
-                await _personService.EditPersonAsync(existing);
-
-                var index = People.IndexOf(existing);
-                if (index >= 0)
-                {
-                    People.RemoveAt(index);
-                    People.Insert(index, existing);
-                }
-                IsEditMode = false;
-                SelectedPerson = null;
-                ClearFields();
-                OnPropertyChanged(nameof(SubmitButtonLabel));
-                IsEntryPanelOpen = false;
-
-            }
-            else
-            {
-                var person = Person.CreatePerson(_sessionService.CurrentUser!.Id, FirstName!, LastName!, Bio!, BirthDate!.Value, effectiveDate, Waiver);
-                var confirmed = ComplianceReviewRequested?.Invoke(person.Forms) ?? true;
-                if (!confirmed)
-                    return;
-                await _personService.AddPersonAsync(person);
-                People.Add(person);
-                IsEntryPanelOpen = false;
-
-            }
-        }
-
-        [RelayCommand]
-        private async Task RemoveSelectedPerson()
-        {
-            if (SelectedPerson is null)
-                return;
-            await _personService.DeletePersonAsync(SelectedPerson);
-            People.Remove(SelectedPerson);
-            SelectedPerson = null;
-        }
-
-        [RelayCommand]
-        private void ToggleComplianceOverride()
-        {
-            _sessionService.AllowComplianceOverride = !_sessionService.AllowComplianceOverride;
-            OnPropertyChanged(nameof(AllowComplianceOverride));
-        }
-
-        private async Task LoadPeopleAsync()
-        {
-            if (_sessionService.CurrentUser is null)
-                return;
-            var people = await _personService.GetAllPeopleAsync(_sessionService.CurrentUser.Id);
-            foreach (var person in people)
-                People.Add(person);
-        }
-
-        public void LoadPersonForEdit(Person person)
-        {
-            IsEditMode = true;
-            IsEntryPanelOpen = true;
-            OnPropertyChanged(nameof(SubmitButtonLabel));
-            FirstName = person.FirstName;
-            LastName = person.LastName;
-            Bio = person.Bio;
-            BirthDate = person.BirthDate;
-            EffectiveDateText = person.EffectiveDate.ToString("MM/dd");
-            Waiver = person.Waiver;
-        }
-
-        [RelayCommand]
-        private async Task ToggleForm(FormType type)
-        {
-            if (SelectedPerson is null) return;
-            var form = SelectedPerson.GetCurrentCycleForm(type);
-            if (form is null) return;
-            form.IsCompliant = !form.IsCompliant;
-            await _formService.UpdateFormAsync(form);
-            RefreshComplianceFlags();
-        }
-
         private void ClearFields()
         {
             FirstName = string.Empty;
@@ -261,13 +316,16 @@ namespace Sati
             ClearErrors();
         }
 
-        //METHODS
+        // -------------------------------------------------------------------------
+        // Validation
+        // -------------------------------------------------------------------------
 
-        //validation
+        // Effective date is optional — empty string is valid.
+        // If provided, must be in MM/DD format.
         public static ValidationResult? ValidateEffectiveDate(string value, ValidationContext context)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return new ValidationResult("Effective date is required.");
+                return ValidationResult.Success;
 
             if (!DateTime.TryParseExact(value.Trim(), "MM/dd",
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
@@ -276,15 +334,19 @@ namespace Sati
             return ValidationResult.Success;
         }
 
-        private static DateTime TryGetEffectiveDate(string input)
+        // Returns null if empty or unparseable — caller decides what to do with a
+        // missing effective date rather than receiving a sentinel like DateTime.MinValue.
+        private static DateTime? TryGetEffectiveDate(string input)
         {
+            if (string.IsNullOrWhiteSpace(input))
+                return null;
+
             if (!DateTime.TryParseExact(input.Trim(), "MM/dd",
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-                return DateTime.MinValue;
+                return null;
 
             var candidate = new DateTime(DateTime.Today.Year, parsed.Month, parsed.Day);
             return candidate > DateTime.Today ? candidate.AddYears(-1) : candidate;
         }
-
     }
 }

@@ -1,9 +1,198 @@
 ﻿<Application x:Class="Sati.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Sati">
+             xmlns:converters="clr-namespace:Sati.Converters"
+             xmlns:children="clr-namespace:Sati.ViewModels.Children"
+             xmlns:viewmodels="clr-namespace:Sati.ViewModels"
+             xmlns:supervisor="clr-namespace:Sati.ViewModels.Supervisor"
+             xmlns:views="clr-namespace:Sati.Views">
     <Application.Resources>
+
+        <!-- Fonts -->
         <FontFamily x:Key="AppFont">Inter</FontFamily>
         <FontFamily x:Key="NarrativeFont">Cambria</FontFamily>
+
+        <!-- Converters -->
+        <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
+        <converters:BoolToTileColorConverter x:Key="BoolToTileColorConverter" />
+        <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter" />
+
+        <!-- DataTemplates: map ViewModel types to View UserControls -->
+        <DataTemplate DataType="{x:Type viewmodels:MainWindowViewModel}">
+            <views:NotesView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type children:ScratchpadViewModel}">
+            <views:ScratchpadView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type supervisor:SupervisorDashboardViewModel}">
+            <views:SupervisorDashboardWindow />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type children:GuidanceViewModel}">
+            <views:GuidanceView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type children:HelpersViewModel}">
+            <views:HelpersView />
+        </DataTemplate>
+
+        <!-- Global styles -->
+        <Style x:Key="LabelStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="11" />
+            <Setter Property="FontWeight"
+                    Value="SemiBold" />
+            <Setter Property="Foreground"
+                    Value="#9C7A5C" />
+            <Setter Property="Margin"
+                    Value="0,0,0,4" />
+        </Style>
+
+        <Style x:Key="SectionHeader"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="13" />
+            <Setter Property="FontWeight"
+                    Value="Bold" />
+            <Setter Property="Foreground"
+                    Value="#3D2B1F" />
+            <Setter Property="Margin"
+                    Value="0,0,0,8" />
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Padding"
+                    Value="8,4" />
+            <Setter Property="FontSize"
+                    Value="13" />
+            <Setter Property="Background"
+                    Value="White" />
+            <Setter Property="BorderBrush"
+                    Value="#D4A882" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="Foreground"
+                    Value="#3D2B1F" />
+            <Setter Property="Margin"
+                    Value="0,0,0,10" />
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Padding"
+                    Value="6,4" />
+            <Setter Property="FontSize"
+                    Value="13" />
+            <Setter Property="Background"
+                    Value="White" />
+            <Setter Property="BorderBrush"
+                    Value="#D4A882" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="Foreground"
+                    Value="#3D2B1F" />
+            <Setter Property="Margin"
+                    Value="0,0,0,10" />
+        </Style>
+
+        <Style TargetType="DatePicker">
+            <Setter Property="FontSize"
+                    Value="13" />
+            <Setter Property="Background"
+                    Value="White" />
+            <Setter Property="BorderBrush"
+                    Value="#D4A882" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="Foreground"
+                    Value="#3D2B1F" />
+            <Setter Property="Margin"
+                    Value="0,0,0,10" />
+        </Style>
+
+        <Style TargetType="Separator">
+            <Setter Property="Background"
+                    Value="#E8D0B8" />
+            <Setter Property="Margin"
+                    Value="0,4,0,12" />
+        </Style>
+
+        <Style x:Key="PrimaryButton"
+               TargetType="Button">
+            <Setter Property="Height"
+                    Value="36" />
+            <Setter Property="Background"
+                    Value="#C87941" />
+            <Setter Property="Foreground"
+                    Value="White" />
+            <Setter Property="FontSize"
+                    Value="13" />
+            <Setter Property="FontWeight"
+                    Value="SemiBold" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#A85E28" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#8A4D20" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SmallButton"
+               TargetType="Button">
+            <Setter Property="Height"
+                    Value="28" />
+            <Setter Property="Padding"
+                    Value="12,0" />
+            <Setter Property="Background"
+                    Value="#EDD9C0" />
+            <Setter Property="Foreground"
+                    Value="#3D2B1F" />
+            <Setter Property="FontSize"
+                    Value="12" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#D4A882" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Application.Resources>
 </Application>

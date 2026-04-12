@@ -1,19 +1,11 @@
-﻿<Window x:Class="Sati.Views.SupervisorDashboardWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d"
-        Title="Sati — Supervisor Dashboard"
-        Height="660"
-        Width="1020"
-        WindowStartupLocation="CenterScreen"
-        Background="#FDF6EC"
-        FontFamily="Segoe UI">
+﻿<UserControl x:Class="Sati.Views.SupervisorDashboardWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sati="clr-namespace:Sati"
+             Background="#FDF6EC"
+             TextElement.FontFamily="{StaticResource AppFont}">
 
-    <Window.Resources>
-
-        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    <UserControl.Resources>
 
         <Style x:Key="MetricCard"
                TargetType="Border">
@@ -89,34 +81,30 @@
                     Value="Hand" />
         </Style>
 
-        <!-- DataGrid -->
-        <Style TargetType="DataGrid">
+        <Style x:Key="TeamProgressBar"
+               TargetType="ProgressBar">
+            <Setter Property="Height"
+                    Value="6" />
+            <Setter Property="Width"
+                    Value="80" />
             <Setter Property="Background"
-                    Value="Transparent" />
+                    Value="#E8D0B8" />
             <Setter Property="BorderThickness"
                     Value="0" />
-            <Setter Property="GridLinesVisibility"
-                    Value="Horizontal" />
-            <Setter Property="HorizontalGridLinesBrush"
-                    Value="#F0E4D0" />
-            <Setter Property="RowBackground"
-                    Value="Transparent" />
-            <Setter Property="AlternatingRowBackground"
-                    Value="Transparent" />
-            <Setter Property="HeadersVisibility"
-                    Value="Column" />
-            <Setter Property="IsReadOnly"
-                    Value="True" />
-            <Setter Property="SelectionMode"
-                    Value="Single" />
-            <Setter Property="CanUserResizeColumns"
-                    Value="False" />
-            <Setter Property="CanUserReorderColumns"
-                    Value="False" />
-            <Setter Property="AutoGenerateColumns"
-                    Value="False" />
-            <Setter Property="RowHeight"
-                    Value="36" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                Height="6">
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    CornerRadius="3"
+                                    Background="{TemplateBinding Foreground}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
@@ -180,34 +168,7 @@
             </Style.Triggers>
         </Style>
 
-        <!-- Progress bar -->
-        <Style x:Key="TeamProgressBar"
-               TargetType="ProgressBar">
-            <Setter Property="Height"
-                    Value="6" />
-            <Setter Property="Width"
-                    Value="80" />
-            <Setter Property="Background"
-                    Value="#E8D0B8" />
-            <Setter Property="BorderThickness"
-                    Value="0" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ProgressBar">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="3"
-                                Height="6">
-                            <Border x:Name="PART_Indicator"
-                                    HorizontalAlignment="Left"
-                                    CornerRadius="3"
-                                    Background="{TemplateBinding Foreground}" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-    </Window.Resources>
+    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -303,17 +264,22 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border Cursor="Hand"
-                                        Padding="0"
-                                        BorderBrush="#C87941"
-                                        BorderThickness="{Binding IsSelected,
-                                            Converter={StaticResource BoolToLeftBorder}}">
+                                        Padding="0">
                                     <Border.Style>
                                         <Style TargetType="Border">
+                                            <Setter Property="Background"
+                                                    Value="Transparent" />
+                                            <Setter Property="BorderThickness"
+                                                    Value="0" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsSelected}"
                                                              Value="True">
                                                     <Setter Property="Background"
                                                             Value="#EDD9C0" />
+                                                    <Setter Property="BorderThickness"
+                                                            Value="3,0,0,0" />
+                                                    <Setter Property="BorderBrush"
+                                                            Value="#C87941" />
                                                 </DataTrigger>
                                                 <Trigger Property="IsMouseOver"
                                                          Value="True">
@@ -359,7 +325,7 @@
                                                 Padding="6,1"
                                                 VerticalAlignment="Center"
                                                 Visibility="{Binding HasOverdue,
-                                                    Converter={StaticResource BoolToVis}}">
+                                                    Converter={StaticResource BoolToVisibilityConverter}}">
                                             <TextBlock Text="{Binding OverdueCount}"
                                                        FontSize="10"
                                                        Foreground="#FDF6EC" />
@@ -375,11 +341,11 @@
                                Margin="12,16,12,4" />
 
                     <StackPanel Margin="12,0">
-                        <TextBlock Text="&#9656; Has overdue items"
+                        <TextBlock Text="▶ Has overdue items"
                                    Style="{StaticResource QuickFilter}" />
-                        <TextBlock Text="&#9656; Below threshold"
+                        <TextBlock Text="▶ Below threshold"
                                    Style="{StaticResource QuickFilter}" />
-                        <TextBlock Text="&#9656; Missing this month"
+                        <TextBlock Text="▶ Missing this month"
                                    Style="{StaticResource QuickFilter}" />
                     </StackPanel>
 
@@ -449,7 +415,7 @@
                     <!-- TEAM PRODUCTIVITY TABLE -->
                     <TextBlock Style="{StaticResource SectionHeading}">
                         <Run Text="TEAM PRODUCTIVITY — " />
-                        <Run Text="{Binding CurrentMonth}" />
+                        <Run Text="{Binding CurrentMonth, Mode=OneWay}" />
                     </TextBlock>
                     <Border BorderBrush="#E8D0B8"
                             BorderThickness="0,1,0,0"
@@ -457,21 +423,31 @@
 
                     <DataGrid ItemsSource="{Binding CaseManagers}"
                               SelectedItem="{Binding SelectedCaseManager}"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="#F0E4D0"
+                              RowBackground="Transparent"
+                              AlternatingRowBackground="Transparent"
+                              HeadersVisibility="Column"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              CanUserResizeColumns="False"
+                              CanUserReorderColumns="False"
+                              AutoGenerateColumns="False"
+                              RowHeight="36"
                               Margin="0,0,0,14">
                         <DataGrid.Columns>
 
                             <DataGridTextColumn Header="Case manager"
                                                 Binding="{Binding DisplayName}"
                                                 Width="*" />
-
                             <DataGridTextColumn Header="Clients"
                                                 Binding="{Binding ClientCount}"
                                                 Width="60" />
-
                             <DataGridTextColumn Header="Notes logged"
                                                 Binding="{Binding NotesThisMonth}"
                                                 Width="90" />
-
                             <DataGridTextColumn Header="Units"
                                                 Binding="{Binding UnitsThisMonth}"
                                                 Width="60" />
@@ -634,12 +610,12 @@
                                                                     Value="#C87941" />
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Kind}"
-                                                                             Value="LateReview">
+                                                                             Value="{x:Static sati:UpcomingEventKind.LateReview}">
                                                                     <Setter Property="Fill"
                                                                             Value="#A83220" />
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding Kind}"
-                                                                             Value="ScheduledForm">
+                                                                             Value="{x:Static sati:UpcomingEventKind.ScheduledForm}">
                                                                     <Setter Property="Fill"
                                                                             Value="#5A9A50" />
                                                                 </DataTrigger>
@@ -655,7 +631,7 @@
                                                            VerticalAlignment="Center" />
 
                                                 <TextBlock Grid.Column="2"
-                                                           Text="{Binding DateLabel}"
+                                                           Text="{Binding Date, StringFormat={}{0:MMM d}}"
                                                            FontSize="10"
                                                            Foreground="#9C7A5C"
                                                            VerticalAlignment="Center" />
@@ -672,4 +648,4 @@
             </ScrollViewer>
         </Grid>
     </Grid>
-</Window>
+</UserControl>

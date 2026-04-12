@@ -4,14 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sati.Data;
 using Sati.ViewModels;
+using Sati.ViewModels.Children;
+using Sati.ViewModels.Supervisor;
 using Sati.Views;
 using System.Windows;
 
 namespace Sati
 {
-    /// <summary>
-    /// Interaction logic for App.xaml
-    /// </summary>
     public partial class App : Application
     {
         private IHost? _host;
@@ -20,12 +19,11 @@ namespace Sati
         protected override async void OnStartup(StartupEventArgs e)
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            
+
             _host = Host.CreateDefaultBuilder()
                 .ConfigureServices((context, services) =>
                 {
-                    //REGISTRATIONS
-                    //services
+                    // Services
                     services.AddTransient<IPersonService, PersonService>();
                     services.AddTransient<INoteService, NoteService>();
                     services.AddTransient<IAuthService, AuthService>();
@@ -38,14 +36,15 @@ namespace Sati
                     services.AddTransient<IUpcomingEventService, UpcomingEventService>();
                     services.AddTransient<IFormService, FormService>();
 
+                    // Shell
+                    services.AddSingleton<ShellViewModel>();
+                    services.AddSingleton<ShellWindow>();
 
-                    //windows and viewmodels
+                    // Child ViewModels
                     services.AddSingleton<MainWindowViewModel>();
-                    services.AddSingleton<MainWindow>();
+                    services.AddTransient<ScratchpadViewModel>();
 
-                    services.AddTransient<NewClientViewModel>();
-                    services.AddTransient<NewClientWindow>();
-
+                    // Modal windows and their ViewModels
                     services.AddTransient<LoginWindow>();
                     services.AddTransient<LoginWindowViewModel>();
 
@@ -64,58 +63,62 @@ namespace Sati
                     services.AddTransient<ScratchpadHistoryViewModel>();
                     services.AddTransient<ScratchpadHistoryWindow>();
 
+                    services.AddSingleton<GuidanceViewModel>();
+                    services.AddSingleton<HelpersViewModel>();
+
                     services.AddTransient<SchedulerViewModel>();
+                    services.AddTransient<NewClientWindow>();
 
+                    services.AddSingleton<SupervisorDashboardViewModel>();
+
+                    // Factories
                     services.AddTransient<Func<string, UserMessageDialog>>(sp => message => new UserMessageDialog(message));
-
                     services.AddTransient<Func<SettingsWindow>>(sp => () => sp.GetRequiredService<SettingsWindow>());
                     services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
                     services.AddTransient<Func<NewClientWindow>>(sp => () => sp.GetRequiredService<NewClientWindow>());
                     services.AddTransient<Func<ScratchpadHistoryWindow>>(sp => () => sp.GetRequiredService<ScratchpadHistoryWindow>());
                     services.AddTransient<Func<NotesWindow>>(sp => () => sp.GetRequiredService<NotesWindow>());
 
-                    //ef core
-                    services.AddDbContextFactory<SatiContext>(options => options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")), ServiceLifetime.Transient);
-
+                    // EF Core
+                    services.AddDbContextFactory<SatiContext>(options =>
+                        options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")),
+                        ServiceLifetime.Transient);
                 })
                 .Build();
 
             _host.Start();
-            
-            //CREATE DATABASE
+
+            // Migrate database
             using var scope = _host.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<SatiContext>();
             db.Database.Migrate();
-            
 
-            //LOGIN SEQUENCE
+            // Login sequence
             var splash = new SplashScreenWindow();
             splash.Show();
             await Task.Delay(3000);
             splash.Close();
-            var mainWindow = _host.Services.GetRequiredService<MainWindow>();
-            var mainVm = _host.Services.GetRequiredService<MainWindowViewModel>();
+
             var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
-           
             bool? result = loginWindow.ShowDialog();
 
             if (result == true)
             {
                 var user = loginWindow.LoggedInUser;
-                if (user == null)
-                {
-                    Shutdown();
-                    return;
-                }
+                if (user == null) { Shutdown(); return; }
+
                 var session = _host.Services.GetRequiredService<ISessionService>();
-                session.SetUser(user!);
-                mainVm.Initialize();
-                mainWindow.Show();
+                session.SetUser(user);
+
+                var shellVm = _host.Services.GetRequiredService<ShellViewModel>();
+                await shellVm.InitializeAsync();
+
+                var shellWindow = _host.Services.GetRequiredService<ShellWindow>();
+                shellWindow.Show();
             }
             else
             {
                 Shutdown();
-
             }
 
             base.OnStartup(e);

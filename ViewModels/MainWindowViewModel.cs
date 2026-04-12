@@ -1,6 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Sati.Data;
 using Sati.Models;
 using Sati.Views;
@@ -15,6 +14,7 @@ namespace Sati.ViewModels
 {
     public partial class MainWindowViewModel : ObservableObject
     {
+
         // -------------------------------------------------------------------------
         // Services & private state
         // -------------------------------------------------------------------------
@@ -22,18 +22,17 @@ namespace Sati.ViewModels
         private readonly IPersonService _personService;
         private readonly INoteService _noteService;
         private readonly ISettingsService _settingsService;
-        private readonly IScratchpadService _scratchpadService;
         private readonly IIncentiveService _incentiveService;
         private readonly ISessionService _sessionService;
         private readonly IUpcomingEventService _upcomingEventService;
         private readonly IFormService _formService;
         private readonly Func<string, UserMessageDialog> _validationDialog;
-
+         
         private Settings? _settings;
-        private Scratchpad? _scratchpad;
         private Incentive? _incentive;
         private List<Note> _monthlyNotes = [];
         private DateTime _lastAbandonmentCheck = DateTime.Now;
+        private SchedulerViewModel _schedulerViewModel;
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -43,17 +42,16 @@ namespace Sati.ViewModels
             IPersonService personService,
             INoteService noteService,
             ISettingsService settingsService,
-            IScratchpadService scratchpadService,
             IIncentiveService incentiveService,
             ISessionService sessionService,
             IUpcomingEventService upcomingEventService,
             IFormService formService,
-            Func<string, UserMessageDialog> validationDialog)
+            Func<string, UserMessageDialog> validationDialog,
+            SchedulerViewModel schedulerViewModel)
         {
             _personService = personService;
             _noteService = noteService;
             _settingsService = settingsService;
-            _scratchpadService = scratchpadService;
             _incentiveService = incentiveService;
             _sessionService = sessionService;
             _upcomingEventService = upcomingEventService;
@@ -62,6 +60,7 @@ namespace Sati.ViewModels
 
             NotesView = CollectionViewSource.GetDefaultView(Notes);
             NotesView.Filter = FilterNotes;
+            _schedulerViewModel = schedulerViewModel;
         }
 
         // -------------------------------------------------------------------------
@@ -72,7 +71,6 @@ namespace Sati.ViewModels
         public event EventHandler<bool>? OpenSettingsWindowRequested;
         public event EventHandler<bool>? PromptSchedulerRequested;
         public event EventHandler<FormType>? MarkFormCompleteRequested;
-        public event EventHandler? OpenScratchpadHistoryRequested;
         public event EventHandler<bool>? OpenNotesWindowRequested;
         public event EventHandler? NoteChanged;
 
@@ -96,9 +94,7 @@ namespace Sati.ViewModels
         [ObservableProperty] private bool isSchedulerOpen;
         [ObservableProperty] private bool sortByDate = true;
         [ObservableProperty] private int daysScheduled;
-        [ObservableProperty] private string scratchpadContent = string.Empty;
         [ObservableProperty] private double narrativeFontSize = 14;
-        [ObservableProperty] private double scratchpadFontSize = 14;
 
         // -------------------------------------------------------------------------
         // Property change callbacks
@@ -119,7 +115,9 @@ namespace Sati.ViewModels
 
         partial void OnIsSchedulerOpenChanged(bool value)
         {
-            if (!value)
+            if (value)
+                _schedulerViewModel.Initialize();
+            else
                 _ = RefreshIncentiveAsync();
         }
 
@@ -184,6 +182,9 @@ namespace Sati.ViewModels
         public ObservableCollection<Note> Notes { get; } = [];
         public ObservableCollection<Person> People { get; } = [];
         public ObservableCollection<UpcomingEvent> UpcomingEvents { get; } = [];
+        public SchedulerViewModel Scheduler => _schedulerViewModel;
+        public record EffectiveDateGroup(string Label, bool IsCurrent, List<string> ClientNames);
+
         public ICollectionView NotesView { get; }
 
         public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
@@ -235,13 +236,10 @@ namespace Sati.ViewModels
         [RelayCommand] public void OpenClientList() => OpenClientsWindowRequested?.Invoke(this, true);
         [RelayCommand] public void OpenSettingsWindow() => OpenSettingsWindowRequested?.Invoke(this, true);
         [RelayCommand] public void OpenNotesWindow() => OpenNotesWindowRequested?.Invoke(this, true);
-        [RelayCommand] private void OpenScratchpadHistory() => OpenScratchpadHistoryRequested?.Invoke(this, EventArgs.Empty);
         [RelayCommand] private void OpenScheduler() => IsSchedulerOpen = !IsSchedulerOpen;
 
         [RelayCommand] private void IncreaseNarrativeFont() => NarrativeFontSize = Math.Min(NarrativeFontSize + 2, 28);
         [RelayCommand] private void DecreaseNarrativeFont() => NarrativeFontSize = Math.Max(NarrativeFontSize - 2, 10);
-        [RelayCommand] private void IncreaseScratchpadFont() => ScratchpadFontSize = Math.Min(ScratchpadFontSize + 2, 28);
-        [RelayCommand] private void DecreaseScratchpadFont() => ScratchpadFontSize = Math.Max(ScratchpadFontSize - 2, 10);
 
         [RelayCommand]
         private async Task DeleteNote()
@@ -331,6 +329,7 @@ namespace Sati.ViewModels
 
                 _settings = await _settingsService.LoadAsync();
                 await LoadPeopleAsync();
+                OnPropertyChanged(nameof(EffectiveDateGroups));
                 await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
                 await LoadMonthlyNotesAsync();
                 await LoadUpcomingEventsAsync();
@@ -341,9 +340,6 @@ namespace Sati.ViewModels
 
                 if (wasCreated)
                     PromptSchedulerRequested?.Invoke(this, true);
-
-                _scratchpad = await _scratchpadService.LoadTodayAsync(LoggedInUser.Id);
-                ScratchpadContent = _scratchpad!.Content;
 
                 StartAbandonmentTimer();
             }
@@ -534,26 +530,6 @@ namespace Sati.ViewModels
             SelectedPerson = People.First(p => p.Id == SelectedNote.PersonId);
         }
 
-        public async Task SaveScratchpadAsync(string content)
-        {
-            try
-            {
-                if (_scratchpad is null)
-                    return;
-
-                _scratchpad.Content = content;
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] SAVING SCRATCHPAD: '{content}'");
-                await _scratchpadService.SaveAsync(_scratchpad);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"SaveScratchpadAsync failed: {ex.Message}");
-                MessageBox.Show(
-                    "Sati encountered an error saving your scratchpad. Your work may not have been saved.",
-                    "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
         public async Task RefreshIncentiveAsync()
         {
             var (incentive, _) = await _incentiveService.GetOrCreateAsync(
@@ -562,6 +538,28 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
             OnPropertyChanged(nameof(EstimatedIncentive));
+        }
+
+        public IEnumerable<EffectiveDateGroup> EffectiveDateGroups => BuildEffectiveDateGroups();
+
+        private IEnumerable<EffectiveDateGroup> BuildEffectiveDateGroups()
+        {
+            var today = DateTime.Today;
+            var currentMonth = new DateTime(today.Year, today.Month, 1);
+
+            return Enumerable.Range(0, 7)
+                .Select(i => currentMonth.AddMonths(i))
+                .Select(month => new EffectiveDateGroup(
+                    Label: month.ToString("MMMM yyyy"),
+                    IsCurrent: month.Year == today.Year && month.Month == today.Month,
+                    ClientNames: People
+                        .Where(p => p.EffectiveDate.HasValue &&
+                                    p.EffectiveDate.Value.Month == month.Month)
+                        .OrderBy(p => p.EffectiveDate!.Value.Day)
+                        .Select(p => $"{p.FullName} ({p.EffectiveDate!.Value:MMM d})")
+                        .ToList()))
+                .Where(g => g.ClientNames.Count > 0)
+                .ToList();
         }
 
         private void StartAbandonmentTimer()
@@ -574,18 +572,6 @@ namespace Sati.ViewModels
                     await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 8);
                     _lastAbandonmentCheck = DateTime.Now;
                 }
-            };
-            timer.Start();
-        }
-
-        private void StartScratchpadTimer()
-        {
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(10) };
-            timer.Tick += async (s, e) =>
-            {
-                if (_scratchpad is null) return;
-                _scratchpad.Content = ScratchpadContent;
-                await _scratchpadService.SaveAsync(_scratchpad);
             };
             timer.Start();
         }
