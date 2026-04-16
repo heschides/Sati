@@ -42,6 +42,7 @@ namespace Sati.Data
                 .Where(p => p.UserId == userId)
                 .Include(p => p.Notes)
                 .Include(p => p.Forms)
+                .OrderBy(p => p.LastName)
                 .ToListAsync();
         }
     }

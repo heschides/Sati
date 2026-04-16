@@ -75,7 +75,7 @@ namespace Sati.Views
                 var win = scratchpadHistoryWindowFactory();
                 win.Owner = this;
                 await win.InitializeAsync();
-                win.ShowDialog();
+                win.Show();
             };
 
             viewModel.SwitchUserRequested += async (s, e) =>

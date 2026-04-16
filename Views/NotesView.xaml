@@ -647,6 +647,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="PENDING"
@@ -666,6 +667,13 @@
                         <TextBlock Text="ABANDONED"
                                    Style="{StaticResource LabelStyle}" />
                         <TextBlock Text="{Binding AbandonedUnits}"
+                                   FontSize="20"
+                                   Foreground="#3D2B1F" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="DAILY AVG"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding DailyAverageUnits, StringFormat={}{0:F1}}"
                                    FontSize="20"
                                    Foreground="#3D2B1F" />
                     </StackPanel>

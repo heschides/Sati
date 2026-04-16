@@ -17,11 +17,13 @@ namespace Sati.Models
         public int? SupervisorId { get; set; }
         public User? Supervisor { get; set; }
         public ICollection<User> Supervisees { get; set; } = [];
+        public int AgencyId { get; set; }
+        public Agency Agency { get; set; } = null!;
 
 
 
         private User() { }
-        private User(int id, string username, string displayName, string passwordHash, string salt, UserRole role, int? supervisorId)
+        private User(int id, string username, string displayName, string passwordHash, string salt, UserRole role, int? supervisorId, int agencyId)
         {
             Id = id;
             Username = username;
@@ -30,11 +32,13 @@ namespace Sati.Models
             Salt = salt;
             Role = role;
             SupervisorId = supervisorId;
+            AgencyId = agencyId;
         }
 
-        public static User Create(int id, string username, string displayName, string passwordHash, string salt, UserRole role, int? supervisorId)
+        public static User Create(int id, string username, string displayName,
+          string passwordHash, string salt, UserRole role, int? supervisorId, int agencyId)
         {
-            return new User(id, username, displayName, passwordHash, salt, role, supervisorId);
+            return new User(id, username, displayName, passwordHash, salt, role, supervisorId, agencyId);
         }
 
         public void SetPassword(string hash, string salt)

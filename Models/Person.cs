@@ -17,6 +17,8 @@ namespace Sati
         public string? Bio { get; set; }
         public WaiverType Waiver { get; set; } = WaiverType.None;
         public string FullName => $"{FirstName} {LastName}".Trim();
+        public int? AgencyId { get; set; }
+        public Agency? Agency { get; set; } = null!;
 
         // -------------------------------------------------------------------------
         // Collections

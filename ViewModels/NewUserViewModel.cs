@@ -25,6 +25,7 @@ namespace Sati.ViewModels
         [ObservableProperty] private SecureString? passwordInit;
         [ObservableProperty] private SecureString? passwordConfirm;
         [ObservableProperty] private User? selectedSupervisor;
+        [ObservableProperty] private Agency? assignedAgency;
 
         public ObservableCollection<User> Supervisors { get; } = [];
         public User? CreatedUser { get; private set; }
@@ -65,7 +66,8 @@ namespace Sati.ViewModels
                 hash,
                 salt,
                 UserRole.CaseManager,
-                SelectedSupervisor?.Id);
+                SelectedSupervisor?.Id,
+                AssignedAgency.Id);
 
             CreatedUser = await _userService.CreateAsync(user);
 

@@ -5,6 +5,7 @@ namespace Sati.Data
 {
     public class SatiContext : DbContext
     {
+        public DbSet<Agency> Agencies { get; set; }
         public DbSet<Person> People { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Form> Forms { get; set; }
@@ -21,6 +22,17 @@ namespace Sati.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<Agency>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+                entity.Property(a => a.Name)
+                      .IsRequired()
+                      .HasMaxLength(100);
+                entity.HasData(
+                    new Agency { Id = 1, Name = "Internal" },
+                    new Agency { Id = 2, Name = "Sandbox Mode" });
+            });
+
             modelBuilder.Entity<User>(entity =>
             {
                 entity.HasKey(u => u.Id);
@@ -31,11 +43,13 @@ namespace Sati.Data
                       .IsUnique();
                 entity.Property(u => u.Role)
                       .HasConversion<string>();
-
-                // Self-referential supervisor hierarchy
                 entity.HasOne(u => u.Supervisor)
                       .WithMany(u => u.Supervisees)
                       .HasForeignKey(u => u.SupervisorId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(u => u.Agency)
+                      .WithMany()
+                      .HasForeignKey(u => u.AgencyId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
@@ -52,6 +66,10 @@ namespace Sati.Data
                       .WithMany()
                       .HasForeignKey(p => p.UserId)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(p => p.Agency)
+                      .WithMany()
+                      .HasForeignKey(p => p.AgencyId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Note>(entity =>
@@ -63,6 +81,10 @@ namespace Sati.Data
                       .WithMany(p => p.Notes)
                       .HasForeignKey(n => n.PersonId)
                       .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(n => n.Agency)
+                      .WithMany()
+                      .HasForeignKey(n => n.AgencyId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Form>(entity =>
@@ -101,8 +123,6 @@ namespace Sati.Data
                 entity.HasIndex(s => new { s.UserId, s.Date })
                       .IsUnique();
             });
-
- 
         }
     }
 }

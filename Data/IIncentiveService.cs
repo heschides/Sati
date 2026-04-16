@@ -9,5 +9,7 @@ namespace Sati.Data
     {
         Task<(Incentive incentive, bool wasCreated)> GetOrCreateAsync(int userId, int month, int year);
         Task SaveAsync(Incentive incentive);
+
+        Task<int> GetDaysWorkedToDateAsync(int month, int year, DateTime? asOf = null);
     }
 }

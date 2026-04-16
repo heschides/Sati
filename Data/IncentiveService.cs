@@ -62,7 +62,7 @@ namespace Sati.Data
             await context.SaveChangesAsync();
         }
 
-        private int CalculateDaysScheduled(int month, int year, Settings settings)
+        private int CalculateDaysScheduled(int month, int year, Settings settings, DateTime? cap = null)
         {
             var daysInMonth = DateTime.DaysInMonth(year, month);
             var count = 0;
@@ -70,6 +70,7 @@ namespace Sati.Data
             for (int day = 1; day <= daysInMonth; day++)
             {
                 var date = new DateTime(year, month, day);
+                if (cap.HasValue && date > cap.Value) break;  
                 var dow = date.DayOfWeek;
 
                 if (dow == DayOfWeek.Saturday || dow == DayOfWeek.Sunday) continue;
@@ -115,6 +116,12 @@ namespace Sati.Data
         private bool IsLastMonday(DateTime date)
         {
             return date.AddDays(7).Month != date.Month;
+        }
+
+        public async Task<int> GetDaysWorkedToDateAsync(int month, int year, DateTime? asOf = null)
+        {
+            var settings = await _settingsService.LoadAsync();
+            return CalculateDaysScheduled(month, year, settings, cap: asOf ??DateTime.Today);
         }
     }
 }

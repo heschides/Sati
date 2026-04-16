@@ -33,6 +33,7 @@ namespace Sati.ViewModels
         private List<Note> _monthlyNotes = [];
         private DateTime _lastAbandonmentCheck = DateTime.Now;
         private SchedulerViewModel _schedulerViewModel;
+        private int _daysWorkedToDate;
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -184,7 +185,15 @@ namespace Sati.ViewModels
         public ObservableCollection<UpcomingEvent> UpcomingEvents { get; } = [];
         public SchedulerViewModel Scheduler => _schedulerViewModel;
         public record EffectiveDateGroup(string Label, bool IsCurrent, List<string> ClientNames);
-
+        public double DailyAverageUnits
+        {
+            get
+            {
+                if (_daysWorkedToDate <= 0) return 0;
+                var total = (PendingUnits ?? 0) + (LoggedUnits ?? 0);
+                return Math.Round((double)total / _daysWorkedToDate, 1);
+            }
+        }
         public ICollectionView NotesView { get; }
 
         public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
@@ -337,7 +346,7 @@ namespace Sati.ViewModels
                 var (incentive, wasCreated) = await _incentiveService.GetOrCreateAsync(
                     LoggedInUser.Id, DateTime.Now.Month, DateTime.Now.Year);
                 _incentive = incentive;
-
+                _daysWorkedToDate = await _incentiveService.GetDaysWorkedToDateAsync(DateTime.Now.Month, DateTime.Now.Year);
                 if (wasCreated)
                     PromptSchedulerRequested?.Invoke(this, true);
 
@@ -455,6 +464,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(EstimatedIncentive));
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
+            OnPropertyChanged(nameof(DailyAverageUnits));
         }
 
         private async Task LoadUpcomingEventsAsync()
@@ -538,6 +548,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
             OnPropertyChanged(nameof(EstimatedIncentive));
+            OnPropertyChanged(nameof(DailyAverageUnits));
         }
 
         public void Reset()
