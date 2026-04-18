@@ -179,7 +179,30 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 - [ ] Per-agency database isolation strategy
 - [ ] Connection string secret management (no plaintext in appsettings.json)
 - [ ] Settings per-user (currently global)
+## Billing Pipeline (Next Dedicated Session)
 
+### Data model changes needed
+- [ ] Add `CompletedDate DateTime?` to `Form` + migration
+- [ ] Add `IsBillable bool` to `Note` + migration (default true, computed at creation)
+- [ ] Add `BillingStatus` enum: `Pending | Approved | Rejected | Queued`
+- [ ] Add `SupervisorApprovedById int?` and `SupervisorApprovedAt DateTime?` to `Note`
+
+### Logic
+- [ ] Add `FormComplianceStatus` enum: `NotYetDue | InWindow | CompliantOnTime | CompliantLate | Overdue | NoForm`
+- [ ] Add `GetComplianceStatus(FormType, DateTime, Settings)` to `Person`
+- [ ] Wire `IsBillable` computation into `SubmitNewNoteAsync` — check all required forms at `EventDate`
+- [ ] `IsBillable == false` notes route to supervisor review queue, not billing queue
+
+### Supervisor dashboard
+- [ ] Add billing review queue sub-view — shows all `IsBillable == false` notes
+- [ ] Supervisor approve → `IsBillable = true`, set `SupervisorApprovedById` and `SupervisorApprovedAt`
+- [ ] Supervisor reject → note stays non-billable, logged in audit trail
+
+### Rules
+- Compliant on time + in window = billable
+- Compliant late = compliant on paper, gap period unbillable
+- Overdue = not billable until resolved and supervisor-approved
+- Notes persist regardless of billability — always a valid service record
 ---
 
 ## Future Roadmap

@@ -135,6 +135,72 @@
             </Setter>
         </Style>
 
+        <Style x:Key="DangerButton"
+               TargetType="Button">
+            <Setter Property="Height"
+                    Value="36" />
+            <Setter Property="Background"
+                    Value="#E8D0B8" />
+            <Setter Property="Foreground"
+                    Value="#8A4D20" />
+            <Setter Property="FontSize"
+                    Value="13" />
+            <Setter Property="FontWeight"
+                    Value="SemiBold" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#D4A882" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="IconButton"
+               TargetType="Button">
+            <Setter Property="Width"
+                    Value="32" />
+            <Setter Property="Height"
+                    Value="32" />
+            <Setter Property="Background"
+                    Value="Transparent" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#E8D0B8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="SmallButton"
                TargetType="Button">
             <Setter Property="Height"
@@ -177,6 +243,10 @@
         <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
         <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter" />
         <converters:BoolToTileColorConverter x:Key="BoolToTileColorConverter" />
+        <converters:BoolToWidthConverter x:Key="BoolToWidthConverter" />
+        <converters:BoolToWidthConverter x:Key="SpacerWidthConverter"
+                                         TrueWidth="16"
+                                         FalseWidth="0" />
         <!-- View → ViewModel DataTemplates -->
         <DataTemplate DataType="{x:Type viewmodels:CaseManagerDashboardViewModel}">
             <views:CaseManagerDashboardView />

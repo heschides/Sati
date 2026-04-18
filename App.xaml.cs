@@ -57,7 +57,6 @@ namespace Sati
                     services.AddTransient<SettingsViewModel>();
                     services.AddTransient<SettingsWindow>();
                     services.AddTransient<NotesWindowViewModel>();
-                    services.AddTransient<NotesWindow>();
                     services.AddTransient<ComplianceReviewViewModel>();
                     services.AddTransient<ComplianceReviewWindow>();
                     services.AddTransient<ScratchpadHistoryViewModel>();
@@ -65,7 +64,6 @@ namespace Sati
                     services.AddTransient<SwitchUserViewModel>();
                     services.AddTransient<SwitchUserWindow>();
                     services.AddTransient<SchedulerViewModel>();
-                    services.AddTransient<NewClientWindow>();
                     services.AddTransient<NewClientViewModel>();
                     services.AddTransient<CaseManagerDashboardViewModel>();
 
@@ -73,9 +71,7 @@ namespace Sati
                     services.AddTransient<Func<string, UserMessageDialog>>(sp => message => new UserMessageDialog(message));
                     services.AddTransient<Func<SettingsWindow>>(sp => () => sp.GetRequiredService<SettingsWindow>());
                     services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
-                    services.AddTransient<Func<NewClientWindow>>(sp => () => sp.GetRequiredService<NewClientWindow>());
                     services.AddTransient<Func<ScratchpadHistoryWindow>>(sp => () => sp.GetRequiredService<ScratchpadHistoryWindow>());
-                    services.AddTransient<Func<NotesWindow>>(sp => () => sp.GetRequiredService<NotesWindow>());
                     services.AddTransient<Func<SwitchUserWindow>>(sp => () => sp.GetRequiredService<SwitchUserWindow>());
                     // EF Core
                     services.AddDbContextFactory<SatiContext>(options =>

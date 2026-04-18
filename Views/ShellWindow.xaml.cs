@@ -17,8 +17,6 @@ namespace Sati.Views
             ISessionService sessionService,
             Func<SettingsWindow> settingsWindowFactory,
             Func<ScratchpadHistoryWindow> scratchpadHistoryWindowFactory,
-            Func<NotesWindow> notesWindowFactory,
-            Func<NewClientWindow> newClientWindowFactory,
             Func<SwitchUserWindow> switchUserWindowFactory)
         {
             InitializeComponent();
