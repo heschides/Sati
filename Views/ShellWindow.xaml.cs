@@ -1,5 +1,4 @@
 ﻿using Sati.Data;
-using Sati.Models;
 using Sati.ViewModels;
 using System.Windows;
 
@@ -7,12 +6,14 @@ namespace Sati.Views
 {
     public partial class ShellWindow : Window
     {
-        private readonly ShellViewModel _viewModel;
+        private readonly ShellViewModel _shellViewModel;
+        private readonly CaseManagerDashboardViewModel _caseManagerDashboardViewModel;
         private readonly Func<SwitchUserWindow> _switchUserWindowFactory;
         private readonly ISessionService _sessionService;
         private bool _isSavingOnClose = false;
 
-        public ShellWindow(ShellViewModel viewModel,
+        public ShellWindow(ShellViewModel shellViewModel,
+            CaseManagerDashboardViewModel caseManagerDashboardViewModel,
             ISessionService sessionService,
             Func<SettingsWindow> settingsWindowFactory,
             Func<ScratchpadHistoryWindow> scratchpadHistoryWindowFactory,
@@ -21,36 +22,35 @@ namespace Sati.Views
             Func<SwitchUserWindow> switchUserWindowFactory)
         {
             InitializeComponent();
-            _viewModel = viewModel;
+            _shellViewModel = shellViewModel;
+            _caseManagerDashboardViewModel = caseManagerDashboardViewModel;
             _sessionService = sessionService;
             _switchUserWindowFactory = switchUserWindowFactory;
-            DataContext = viewModel;
+            DataContext = shellViewModel;
 
-            var notesVm = viewModel.NotesViewModel;
-
-            notesVm.OpenSettingsWindowRequested += (s, e) =>
+            _shellViewModel.OpenSettingsWindowRequested += (s, e) =>
             {
                 var win = settingsWindowFactory();
                 win.Owner = this;
                 win.ShowDialog();
             };
 
-            notesVm.OpenClientsWindowRequested += async (s, e) =>
-            {
-                var win = newClientWindowFactory();
-                win.Owner = this;
-                win.ShowDialog();
-                await notesVm.LoadPeopleAsync();
-            };
+            //_caseManagerDashboardViewModel.OpenClientsWindowRequested += async (s, e) =>
+            //{
+            //    var win = newClientWindowFactory();
+            //    win.Owner = this;
+            //    win.ShowDialog();
+            //    await _caseManagerDashboardViewModel.LoadPeopleAsync();
+            //};
 
-            notesVm.OpenNotesWindowRequested += (s, e) =>
-            {
-                var win = notesWindowFactory();
-                win.Owner = this;
-                win.Show();
-            };
+            //_caseManagerDashboardViewModel.OpenNotesWindowRequested += (s, e) =>
+            //{
+            //    var win = notesWindowFactory();
+            //    win.Owner = this;
+            //    win.Show();
+            //};
 
-            notesVm.MarkFormCompleteRequested += (s, formType) =>
+            _caseManagerDashboardViewModel.MarkFormCompleteRequested += (s, formType) =>
             {
                 var result = MessageBox.Show(
                     $"Would you like to mark the {formType} requirement complete?",
@@ -59,18 +59,18 @@ namespace Sati.Views
                     MessageBoxImage.Question);
 
                 if (result == MessageBoxResult.Yes)
-                    _ = notesVm.MarkFormCompleteAsync(formType);
+                    _ = _caseManagerDashboardViewModel.MarkFormCompleteAsync(formType);
             };
 
-            notesVm.PromptSchedulerRequested += (s, e) =>
+            _caseManagerDashboardViewModel.PromptSchedulerRequested += (s, e) =>
             {
-                var prompt = new PromptWindow(notesVm.LoggedInUser?.DisplayName ?? "there");
+                var prompt = new PromptWindow(_caseManagerDashboardViewModel.LoggedInUser?.DisplayName ?? "there");
                 var result = prompt.ShowDialog();
                 if (result == true)
-                    notesVm.IsSchedulerOpen = true;
+                    _caseManagerDashboardViewModel.IsSchedulerOpen = true;
             };
 
-            viewModel.Scratchpad.OpenScratchpadHistoryRequested += async (s, e) =>
+            shellViewModel.Scratchpad.OpenScratchpadHistoryRequested += async (s, e) =>
             {
                 var win = scratchpadHistoryWindowFactory();
                 win.Owner = this;
@@ -78,11 +78,11 @@ namespace Sati.Views
                 win.Show();
             };
 
-            viewModel.SwitchUserRequested += async (s, e) =>
+            shellViewModel.SwitchUserRequested += async (s, e) =>
             {
                 // Save scratchpad before switching users
-                var content = _viewModel.Scratchpad.ScratchpadContent;
-                await _viewModel.Scratchpad.SaveScratchpadAsync(content);
+                var content = _shellViewModel.Scratchpad.ScratchpadContent;
+                await _shellViewModel.Scratchpad.SaveScratchpadAsync(content);
 
                 var win = _switchUserWindowFactory();
                 win.Owner = this;
@@ -91,7 +91,7 @@ namespace Sati.Views
                 if (result == true && win.NewUser is not null)
                 {
                     _sessionService.SetUser(win.NewUser);
-                    await _viewModel.ReinitializeAsync();
+                    await _shellViewModel.ReinitializeAsync();
                 }
             };
 
@@ -102,8 +102,8 @@ namespace Sati.Views
                 e.Cancel = true;
                 _isSavingOnClose = true;
 
-                var content = _viewModel.Scratchpad.ScratchpadContent;
-                await _viewModel.Scratchpad.SaveScratchpadAsync(content);
+                var content = _shellViewModel.Scratchpad.ScratchpadContent;
+                await _shellViewModel.Scratchpad.SaveScratchpadAsync(content);
 
                 Close();
             };

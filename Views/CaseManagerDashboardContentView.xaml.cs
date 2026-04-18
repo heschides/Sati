@@ -4,16 +4,15 @@ using System.Windows.Input;
 
 namespace Sati.Views
 {
-    public partial class NotesView : UserControl
+    public partial class CaseManagerDashboardContentView : UserControl
     {
-        public NotesView()
+        public CaseManagerDashboardContentView()
         {
             InitializeComponent();
         }
-
         private void DataGrid_MouseDoubleClick(object sender, MouseEventArgs e)
         {
-            if (DataContext is MainWindowViewModel vm && vm.SelectedNote is not null)
+            if (DataContext is CaseManagerDashboardViewModel vm && vm.SelectedNote is not null)
                 vm.EnterEditMode();
         }
     }

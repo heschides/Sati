@@ -18,22 +18,27 @@ namespace Sati.Data
             await using var context = _contextFactory.CreateDbContext();
 
             var userEntity = await context.Users
-                .Include(u => u.Supervisees)
                 .SingleOrDefaultAsync(u => u.Username == username);
 
             if (userEntity is null)
                 return null;
 
             var passwordHasher = new PasswordHasher();
-            var isValid = passwordHasher.Verify(
-                password,
-                userEntity.PasswordHash,
-                userEntity.Salt);
+            var isValid = passwordHasher.Verify(password, userEntity.PasswordHash, userEntity.Salt);
 
             if (!isValid)
                 return null;
 
-            return userEntity;
+            return User.Create(
+                userEntity.Id,
+                userEntity.Username,
+                userEntity.DisplayName,
+                userEntity.PasswordHash,
+                userEntity.Salt,
+                userEntity.Role,
+                userEntity.SupervisorId,
+                userEntity.AgencyId
+            );
         }
     }
 }

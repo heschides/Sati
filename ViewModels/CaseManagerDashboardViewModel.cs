@@ -12,7 +12,7 @@ using System.Windows.Threading;
 
 namespace Sati.ViewModels
 {
-    public partial class MainWindowViewModel : ObservableObject
+    public partial class CaseManagerDashboardViewModel : ObservableObject
     {
 
         // -------------------------------------------------------------------------
@@ -39,7 +39,7 @@ namespace Sati.ViewModels
         // Constructor
         // -------------------------------------------------------------------------
 
-        public MainWindowViewModel(
+        public CaseManagerDashboardViewModel(
             IPersonService personService,
             INoteService noteService,
             ISettingsService settingsService,
@@ -48,7 +48,10 @@ namespace Sati.ViewModels
             IUpcomingEventService upcomingEventService,
             IFormService formService,
             Func<string, UserMessageDialog> validationDialog,
-            SchedulerViewModel schedulerViewModel)
+            SchedulerViewModel schedulerViewModel,
+            NotesWindowViewModel notesWindowViewModel,
+            NewClientViewModel newClientViewModel
+            )
         {
             _personService = personService;
             _noteService = noteService;
@@ -62,23 +65,33 @@ namespace Sati.ViewModels
             NotesView = CollectionViewSource.GetDefaultView(Notes);
             NotesView.Filter = FilterNotes;
             _schedulerViewModel = schedulerViewModel;
+            NotesLog = notesWindowViewModel;
+            Clients = newClientViewModel;
+            Matrix = new CaseloadMatrixViewModel(People);
         }
 
         // -------------------------------------------------------------------------
         // Events
         // -------------------------------------------------------------------------
 
-        public event EventHandler<bool>? OpenClientsWindowRequested;
-        public event EventHandler<bool>? OpenSettingsWindowRequested;
         public event EventHandler<bool>? PromptSchedulerRequested;
         public event EventHandler<FormType>? MarkFormCompleteRequested;
-        public event EventHandler<bool>? OpenNotesWindowRequested;
-        public event EventHandler? NoteChanged;
 
         // -------------------------------------------------------------------------
-        // Observable properties
+        // Properties
         // -------------------------------------------------------------------------
 
+        public NotesWindowViewModel NotesLog { get; }
+        public NewClientViewModel Clients { get; }
+        public CaseloadMatrixViewModel Matrix { get; }
+
+        public bool IsDashboardSubActive => CurrentSubViewModel is null;
+        public bool IsClientsSubActive => CurrentSubViewModel is NewClientViewModel;
+        public bool IsNotesLogSubActive => CurrentSubViewModel is NotesWindowViewModel;
+        public bool IsMatrixSubActive => CurrentSubViewModel is CaseloadMatrixViewModel;
+        public bool IsSubViewActive => CurrentSubViewModel is not null;
+
+        [ObservableProperty] private object? currentSubViewModel;
         [ObservableProperty] private User? loggedInUser;
         [ObservableProperty] private Person? selectedPerson;
         [ObservableProperty] private Note? selectedNote;
@@ -100,6 +113,17 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
         // Property change callbacks
         // -------------------------------------------------------------------------
+
+        partial void OnCurrentSubViewModelChanged(object? value)
+        {
+            OnPropertyChanged(nameof(IsDashboardSubActive));
+            OnPropertyChanged(nameof(IsClientsSubActive));
+            OnPropertyChanged(nameof(IsNotesLogSubActive));
+            OnPropertyChanged(nameof(IsMatrixSubActive));
+            OnPropertyChanged(nameof(IsSubViewActive));
+        }
+
+
 
         partial void OnSelectedPersonChanged(Person? value)
         {
@@ -241,10 +265,10 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
         // Commands
         // -------------------------------------------------------------------------
-
-        [RelayCommand] public void OpenClientList() => OpenClientsWindowRequested?.Invoke(this, true);
-        [RelayCommand] public void OpenSettingsWindow() => OpenSettingsWindowRequested?.Invoke(this, true);
-        [RelayCommand] public void OpenNotesWindow() => OpenNotesWindowRequested?.Invoke(this, true);
+        [RelayCommand] private void NavigateToOverview() => CurrentSubViewModel = null;
+        [RelayCommand] private void NavigateToClients() => CurrentSubViewModel = Clients;
+        [RelayCommand] private void NavigateToNotesLog() => CurrentSubViewModel = NotesLog;
+        [RelayCommand] private void NavigateToMatrix() => CurrentSubViewModel = Matrix;
         [RelayCommand] private void OpenScheduler() => IsSchedulerOpen = !IsSchedulerOpen;
 
         [RelayCommand] private void IncreaseNarrativeFont() => NarrativeFontSize = Math.Min(NarrativeFontSize + 2, 28);
@@ -261,7 +285,8 @@ namespace Sati.ViewModels
             SelectedPerson?.Notes.Remove(SelectedNote);
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
-            NoteChanged?.Invoke(this, EventArgs.Empty);
+            await NotesLog.ReloadAsync();
+            await Clients.ReloadAsync();
             SelectedNote = null;
             ResetForm();
         }
@@ -343,9 +368,9 @@ namespace Sati.ViewModels
                 await LoadMonthlyNotesAsync();
                 await LoadUpcomingEventsAsync();
 
-                var (incentive, wasCreated) = await _incentiveService.GetOrCreateAsync(
-                    LoggedInUser.Id, DateTime.Now.Month, DateTime.Now.Year);
-                _incentive = incentive;
+                var (_, wasCreated) = await _incentiveService.GetOrCreateAsync(
+    LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
+                await RefreshIncentiveAsync();
                 _daysWorkedToDate = await _incentiveService.GetDaysWorkedToDateAsync(DateTime.Now.Month, DateTime.Now.Year);
                 if (wasCreated)
                     PromptSchedulerRequested?.Invoke(this, true);
@@ -384,7 +409,8 @@ namespace Sati.ViewModels
             await LoadPeopleAsync();
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
-            NoteChanged?.Invoke(this, EventArgs.Empty);
+            await NotesLog.ReloadAsync();
+            await Clients.ReloadAsync();
         }
 
         private async Task SubmitEditedNoteAsync()
@@ -411,7 +437,8 @@ namespace Sati.ViewModels
             await LoadPeopleAsync();
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
-            NoteChanged?.Invoke(this, EventArgs.Empty);
+            await NotesLog.ReloadAsync();
+            await Clients.ReloadAsync();
         }
 
         private async void LoadNotesForPersonAsync(Person? person)

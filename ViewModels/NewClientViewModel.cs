@@ -6,7 +6,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 
-namespace Sati
+namespace Sati.ViewModels
 {
     public partial class NewClientViewModel : ObservableValidator
     {
@@ -265,6 +265,13 @@ namespace Sati
             BirthDate = person.BirthDate;
             EffectiveDateText = person.EffectiveDate?.ToString("MM/dd") ?? string.Empty;
             Waiver = person.Waiver;
+        }
+        public async Task ReloadAsync()
+        {
+            People.Clear();
+            var people = await _personService.GetAllPeopleAsync(_sessionService.CurrentUser!.Id);
+            foreach (var person in people)
+                People.Add(person);
         }
 
         // -------------------------------------------------------------------------

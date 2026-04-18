@@ -10,7 +10,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 *Goal: App starts, login works, no crashes*
 
 - [x] Fix double `mainWindow.Show()` in `App.xaml.cs`
-- [x] Implement `MainWindowViewModel.Initialize(user)` — store logged-in user, trigger initial load
+- [x] Implement `CaseManagerDashboardViewModel.Initialize(user)` — store logged-in user, trigger initial load
 - [x] Fix `NewUserViewModel` missing null-conditional on `CloseWindowRequested` event
 - [x] Make `IUserService` public
 - [x] Remove hardcoded seed user from `LoginWindowViewModel`
@@ -43,7 +43,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 ## Phase 4 — Complete Notes Workflow ✅
 *Goal: Notes are fully usable — create, edit, delete, filter*
 
-- [x] Add delete note command to `MainWindowViewModel`
+- [x] Add delete note command to `CaseManagerDashboardViewModel`
 - [x] Confirm edit flow works end to end
 - [x] Add status filtering (not just text search)
 - [x] Unit count / duration display
@@ -120,9 +120,9 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
   instead of using `Settings.ProductivityThreshold`; panel doesn't refresh after scheduler closes
   - Fix 1: Add `UnitsPerDay` snapshot field to `Incentive` model + migration
   - Fix 2: Set `UnitsPerDay = settings.ProductivityThreshold` in `GetOrCreateAsync`
-  - Fix 3: `OnIsSchedulerOpenChanged(false)` calls `RefreshIncentiveAsync()` in MainWindowViewModel
+  - Fix 3: `OnIsSchedulerOpenChanged(false)` calls `RefreshIncentiveAsync()` in CaseManagerDashboardViewModel
 
-- [ ] **Refactor all services to use IDbContextFactory<SatiContext>** — current pattern holds
+- [x] **Refactor all services to use IDbContextFactory<SatiContext>** — current pattern holds
   a DbContext open for the entire session, causing change tracker collisions and memory bloat.
   Replace constructor-injected SatiContext with IDbContextFactory<SatiContext> across all
   services. Swap AddDbContext for AddDbContextFactory in App.xaml.cs. Each method creates
@@ -170,6 +170,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 *Goal: Production-ready deployment with audit logging and cloud hosting*
 
 - [ ] Migrate from LocalDB to Azure SQL (EF Core provider swap)
+- [ ] Implement a lightweight IQueryScopeService or similar — injected into services alongside the factory  
 - [ ] Audit logging — AuditLog table (user, action, entity type, entity ID, timestamp);
   explicitly excludes note narrative content to avoid PHI in the log;
   six-year HIPAA retention requirement
@@ -203,7 +204,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 
 | Date | Phase | What was done |
 |------|-------|---------------|
-| 3/19 | Ph5 | Settings model, migration, ISettingsService/SettingsService, SettingsViewModel, wired into MainWindowViewModel |
+| 3/19 | Ph5 | Settings model, migration, ISettingsService/SettingsService, SettingsViewModel, wired into CaseManagerDashboardViewModel |
 | 3/20 | Ph5 | Scratchpad model/service/migration, auto-save timer, NoteType enum, template insertion |
 | 3/21 | Ph5 | NoteType radio buttons, EnumToBoolConverter, Incentive model/service/migration, productivity dashboard, weekday/holiday exclusion flags |
 | 3/22 | Ph5 | SchedulerViewModel, WorkdayTile, Incentive ExcludedDates, ISessionService singleton, scheduler popup XAML |
@@ -211,7 +212,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 | 3/23 | Ph5 | SettingsWindow fully wired — billing, templates, weekday/holiday flags, auto-save on close |
 | 3/23 | Ph5 | Day after Thanksgiving flag, tuple return from GetOrCreateAsync, custom new month prompt |
 | 3/25 | Ph6 | SafetyPlan + PrivacyPractices added to FormType. 18 form deadline offset properties in Settings. UpcomingEventService created. |
-| 3/26 | Ph6 | UpcomingEventService wired into MainWindowViewModel, UserId FK on Person, GetAllPeopleAsync filtered by userId |
+| 3/26 | Ph6 | UpcomingEventService wired into CaseManagerDashboardViewModel, UserId FK on Person, GetAllPeopleAsync filtered by userId |
 | 3/28 | Ph6 | Upcoming Tasks split into two columns, sort radio buttons, EffectiveDate refactor, form note templates, FormType on Note with migration |
 | 3/29 | Ph6 | MarkFormCompleteRequested wired end to end, compliance checklist bound to real data, GetCurrentCycleForm added, ComplianceReviewWindow on client creation |
 | 3/29 | Ph7 | Note workflow fixes — IsEditing reset, form clears, NoteType persistence, scheduled visits/contacts in Upcoming Tasks |

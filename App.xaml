@@ -12,42 +12,7 @@
         <FontFamily x:Key="AppFont">Inter</FontFamily>
         <FontFamily x:Key="NarrativeFont">Cambria</FontFamily>
 
-        <!-- Converters -->
-        <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
-        <converters:BoolToTileColorConverter x:Key="BoolToTileColorConverter" />
-        <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter" />
-
-        <!-- DataTemplates: map ViewModel types to View UserControls -->
-        <DataTemplate DataType="{x:Type viewmodels:MainWindowViewModel}">
-            <views:NotesView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type children:ScratchpadViewModel}">
-            <views:ScratchpadView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type supervisor:SupervisorDashboardViewModel}">
-            <views:SupervisorDashboardWindow />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type children:GuidanceViewModel}">
-            <views:GuidanceView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type children:HelpersViewModel}">
-            <views:HelpersView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type supervisor:TeamOverviewViewModel}">
-            <views:TeamOverviewView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type supervisor:OverdueItemsViewModel}">
-            <views:OverdueItemsView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type supervisor:MonthlyProductivityViewModel}">
-            <views:MonthlyProductivityView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type supervisor:UserManagementViewModel}">
-            <views:UserManagementView />
-        </DataTemplate>
-
+      
         <!-- Global styles -->
         <Style x:Key="LabelStyle"
                TargetType="TextBlock">
@@ -206,5 +171,35 @@
             </Setter>
         </Style>
 
+        <!-- Converters -->
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter" />
+        <converters:BoolToTileColorConverter x:Key="BoolToTileColorConverter" />
+        <!-- View → ViewModel DataTemplates -->
+        <DataTemplate DataType="{x:Type viewmodels:CaseManagerDashboardViewModel}">
+            <views:CaseManagerDashboardView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type viewmodels:NotesWindowViewModel}">
+            <views:NotesLogView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type viewmodels:NewClientViewModel}">
+            <views:ClientsView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type viewmodels:CaseloadMatrixViewModel}">
+            <views:CaseloadMatrixView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type children:GuidanceViewModel}">
+            <views:GuidanceView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type children:HelpersViewModel}">
+            <views:HelpersView />
+        </DataTemplate>
     </Application.Resources>
 </Application>

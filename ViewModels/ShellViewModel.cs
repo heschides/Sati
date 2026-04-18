@@ -14,19 +14,20 @@ namespace Sati.ViewModels
         // Services & private state
         // -------------------------------------------------------------------------
 
-        private readonly MainWindowViewModel _notesViewModel;
+        private readonly CaseManagerDashboardViewModel _notesViewModel;
         private readonly SupervisorDashboardViewModel _supervisorDashboardViewModel;
         private readonly GuidanceViewModel _guidanceViewModel;
         private readonly HelpersViewModel _helpersViewModel;
         private readonly ISessionService _sessionService;
-     
+
+
 
         // -------------------------------------------------------------------------
         // Constructor
         // -------------------------------------------------------------------------
 
         public ShellViewModel(
-            MainWindowViewModel notesViewModel,
+            CaseManagerDashboardViewModel notesViewModel,
             ScratchpadViewModel scratchpadViewModel,
             SupervisorDashboardViewModel supervisorViewModel,
             GuidanceViewModel guidanceViewModel,
@@ -46,6 +47,7 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
 
         public event EventHandler? SwitchUserRequested;
+        public event EventHandler<bool>? OpenSettingsWindowRequested;
 
         // -------------------------------------------------------------------------
         // Observable properties
@@ -58,7 +60,7 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
 
         public ScratchpadViewModel Scratchpad { get; }
-        public MainWindowViewModel NotesViewModel => _notesViewModel;
+        public CaseManagerDashboardViewModel NotesViewModel => _notesViewModel;
 
         // -------------------------------------------------------------------------
         // Computed properties
@@ -72,7 +74,7 @@ namespace Sati.ViewModels
                 or UserRole.Director;
 
         // Active tab indicators
-        public bool IsNotesActive => CurrentViewModel is MainWindowViewModel;
+        public bool IsNotesActive => CurrentViewModel is CaseManagerDashboardViewModel;
         public bool IsSupervisorActive => CurrentViewModel is SupervisorDashboardViewModel;
         public bool IsGuidanceActive => CurrentViewModel is GuidanceViewModel;
         public bool IsHelpersActive => CurrentViewModel is HelpersViewModel;
@@ -122,11 +124,13 @@ namespace Sati.ViewModels
         // Navigation commands
         // -------------------------------------------------------------------------
 
-        [RelayCommand] private void NavigateToNotes() => CurrentViewModel = _notesViewModel;
+        [RelayCommand] private void NavigateToCaseManagement() => CurrentViewModel = _notesViewModel;
         [RelayCommand] private void NavigateToSupervisorDashboard() => CurrentViewModel = _supervisorDashboardViewModel;
         [RelayCommand] private void NavigateToGuidance() => CurrentViewModel = _guidanceViewModel;
         [RelayCommand] private void NavigateToHelpers() => CurrentViewModel = _helpersViewModel;
         [RelayCommand] private void RequestSwitchUser() => SwitchUserRequested?.Invoke(this, EventArgs.Empty);
+        [RelayCommand] public void OpenSettingsWindow() => OpenSettingsWindowRequested?.Invoke(this, true);
+
 
         // -------------------------------------------------------------------------
         // Initialization
@@ -167,7 +171,7 @@ namespace Sati.ViewModels
             }
             else
             {
-                NavigateToNotes();
+                NavigateToCaseManagement();
             }
         }
 

@@ -26,8 +26,7 @@ namespace Sati.Views
                 
                 if(result == true && win.CreatedUser is User newUser)
                 {
-                    vm.Users.Add(newUser);
-                    vm.SelectedUser = newUser;
+                    vm.Username = newUser.Username;
                 }
             };
 

@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Sati.Views.NotesView"
+﻿<UserControl x:Class="Sati.Views.CaseManagerDashboardContentView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sati="clr-namespace:Sati"
@@ -44,24 +44,7 @@
                 <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-
-            <Button Grid.Column="0"
-                    Style="{StaticResource SmallButton}"
-                    ToolTip="Settings"
-                    Width="28"
-                    Command="{Binding OpenSettingsWindowCommand}"
-                    Background="Transparent"
-                    Padding="0">
-                <TextBlock FontFamily="Segoe MDL2 Assets"
-                           Text="&#xE713;"
-                           FontSize="14"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center" />
-            </Button>
 
             <Button x:Name="SchedulerButton"
                     Grid.Column="2"
@@ -77,26 +60,6 @@
                            VerticalAlignment="Center"
                            HorizontalAlignment="Center" />
             </Button>
-
-            <Button Command="{Binding OpenNotesWindowCommand}"
-                    Grid.Column="4"
-                    Width="32"
-                    Height="32"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    Cursor="Hand"
-                    ToolTip="Notes">
-                <TextBlock Text="&#xE8F1;"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="16"
-                           Foreground="#9C7A5C" />
-            </Button>
-
-            <Button Grid.Column="6"
-                    Content="Client List"
-                    Style="{StaticResource SmallButton}"
-                    Command="{Binding OpenClientListCommand}"
-                    HorizontalAlignment="Stretch" />
         </Grid>
 
         <!-- Scheduler popup — anchored to SchedulerButton by name, IsOpen binds directly -->

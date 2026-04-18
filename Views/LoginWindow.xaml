@@ -145,13 +145,11 @@
                        Margin="0,0,0,32" />
 
             <!-- User selector -->
-            <TextBlock Text="SELECT USER"
+            <TextBlock Text="USERNAME"
                        Style="{StaticResource LabelStyle}" />
-            <ComboBox Style="{StaticResource InputStyle}"
-                      ItemsSource="{Binding Users, Mode=OneWay}"
-                      SelectedItem="{Binding SelectedUser, Mode=TwoWay}"
-                      VerticalContentAlignment="Center"
-                      DisplayMemberPath="DisplayName" />
+            <TextBox Style="{StaticResource InputStyle}"
+                     Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                     VerticalContentAlignment="Center" />
 
             <!-- Password -->
             <TextBlock Text="PASSWORD"

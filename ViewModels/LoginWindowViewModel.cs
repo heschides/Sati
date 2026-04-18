@@ -1,18 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Extensions.DependencyInjection;
 using Sati.Data;
 using Sati.Models;
-using Sati.Views;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
-using System.Drawing.Text;
 using System.Security;
-using System.Security.RightsManagement;
-using System.Text;
+
 
 
 
@@ -23,23 +16,20 @@ namespace Sati.ViewModels
 
         //FIELDS
         private readonly IAuthService _authService;
-        private readonly IUserService _userService;
 
         //EVENTS
         public event EventHandler<bool>? OpenNewUserRequested;
         public event EventHandler<bool>? LoginSucceeded;
 
         //PROPERTIES
+        [ObservableProperty] private string username = string.Empty;
         public User? SelectedUser { get; set; }
         public SecureString? SecurePassword { get; set; }
-        public ObservableCollection<User> Users { get; set; } = new ObservableCollection<User>();
 
         //CONSTRUCTOR
-        public LoginWindowViewModel(IAuthService authService, IUserService userService)
+        public LoginWindowViewModel(IAuthService authService)
         {
-            _userService = userService;
             _authService = authService;
-            InitializeUsers();
             
         }
 
@@ -47,13 +37,10 @@ namespace Sati.ViewModels
         [RelayCommand]
         public async Task LoginAsync()
         {
-            var selectedUser = SelectedUser;
-            var password = SecurePassword;
-            if (selectedUser == null ||string.IsNullOrWhiteSpace(selectedUser.Username) || password == null)
-            {
+            if (string.IsNullOrWhiteSpace(Username) || SecurePassword == null)
                 return;
-            }
-            var user = await _authService.AuthenticateAsync(selectedUser.Username, password);
+
+            var user = await _authService.AuthenticateAsync(Username, SecurePassword);
             if (user == null)
                 return;
 
@@ -65,21 +52,6 @@ namespace Sati.ViewModels
         public void OpenNewUserWindow()
         {
             OpenNewUserRequested?.Invoke(this, true);
-        }
-
-        //METHODS
-        private async void InitializeUsers()
-        {
-            try
-            {
-                var users = await _userService.GetAllAsync();
-                foreach (var user in users)
-                    Users.Add(user);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"InitializeUsers failed: {ex.Message}");
-            }
         }
     }
 }

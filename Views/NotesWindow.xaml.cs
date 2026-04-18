@@ -18,15 +18,15 @@ namespace Sati.Views
     /// </summary>
     public partial class NotesWindow : Window
     {
-        public NotesWindow(NotesWindowViewModel vm, MainWindowViewModel mainVm)
+        public NotesWindow(NotesWindowViewModel vm, CaseManagerDashboardViewModel mainVm)
         {
             DataContext = vm;
             InitializeComponent();
 
             EventHandler handler = async (s, e) => await vm.ReloadAsync();
-            mainVm.NoteChanged += handler;
+       //     mainVm.NoteChanged += handler;
 
-            Closing += (s, e) => mainVm.NoteChanged -= handler;
+        //    Closing += (s, e) => mainVm.NoteChanged -= handler;
         }
     }
 }

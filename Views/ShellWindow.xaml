@@ -91,7 +91,7 @@
                             Margin="0,0,4,0">
                         <Border.InputBindings>
                             <MouseBinding MouseAction="LeftClick"
-                                          Command="{Binding NavigateToNotesCommand}" />
+                                          Command="{Binding NavigateToCaseManagementCommand}" />
                         </Border.InputBindings>
                         <Border.Style>
                             <Style TargetType="Border">
@@ -111,7 +111,7 @@
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
-                        <TextBlock Text="Notes"
+                        <TextBlock Text="Case Management"
                                    FontSize="13">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -220,22 +220,42 @@
                 </StackPanel>
 
                 <!-- User info — right side -->
-                <Border Grid.Column="1"
-                        Cursor="Hand"
-                        CornerRadius="4"
-                        Padding="8,4"
-                        Margin="0,0,4,0"
-                        VerticalAlignment="Center"
-                        Background="{Binding AvatarBrush}">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding RequestSwitchUserCommand}" />
-                    </Border.InputBindings>
-                    <TextBlock Text="{Binding UserGreeting}"
-                               FontSize="12"
-                               Foreground="#FDF6EC"
-                               VerticalAlignment="Center" />
-                </Border>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+
+                    <!-- Settings -->
+                    <Button Grid.Column="0"
+                            Style="{StaticResource SmallButton}"
+                            ToolTip="Settings"
+                            Width="28"
+                            Command="{Binding OpenSettingsWindowCommand}"
+                            Background="Transparent"
+                            Padding="0">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   Text="&#xE713;"
+                                   FontSize="14"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" />
+                    </Button>
+
+                    <!-- User greeting -->
+                    <Border Cursor="Hand"
+                            CornerRadius="4"
+                            Padding="8,4"
+                            VerticalAlignment="Center"
+                            Background="{Binding AvatarBrush}">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding RequestSwitchUserCommand}" />
+                        </Border.InputBindings>
+                        <TextBlock Text="{Binding UserGreeting}"
+                                   FontSize="12"
+                                   Foreground="#FDF6EC"
+                                   VerticalAlignment="Center" />
+                    </Border>
+
+                </StackPanel>
 
             </Grid>
         </Border>

@@ -82,7 +82,7 @@ Sati/
       Biller/           — billing VMs (new, currently empty)
       Children/         — children's case management VMs
       Supervisor/       — supervisor dashboard VMs
-      MainWindowViewModel.cs   — singleton, the primary VM
+      CaseManagerDashboardViewModel.cs   — singleton, the primary VM
       NotesWindowViewModel.cs
       SchedulerViewModel.cs
       SettingsViewModel.cs
@@ -172,7 +172,7 @@ with stacked bar chart).
 ## Architecture and Key Patterns
 
 **Registration:**
-- MainWindow and MainWindowViewModel are SINGLETON. This was a resolved bug.
+- MainWindow and CaseManagerDashboardViewModel are SINGLETON. This was a resolved bug.
   Never register them as transient.
 - All services are registered in App.xaml.cs via Microsoft.Extensions.DependencyInjection.
 
@@ -193,7 +193,7 @@ with stacked bar chart).
 - This is intentional. Do not "fix" it.
 
 **Cross-window communication:**
-- Events on the singleton MainWindowViewModel.
+- Events on the singleton CaseManagerDashboardViewModel.
 - Handlers unsubscribed on window close to prevent memory leaks.
 - NoteChanged event exists for cross-window refresh.
 

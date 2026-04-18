@@ -42,7 +42,7 @@ namespace Sati
                     services.AddSingleton<ShellWindow>();
 
                     // Child ViewModels
-                    services.AddSingleton<MainWindowViewModel>();
+                    services.AddSingleton<CaseManagerDashboardViewModel>();
                     services.AddTransient<ScratchpadViewModel>();
                     services.AddSingleton<GuidanceViewModel>();
                     services.AddSingleton<HelpersViewModel>();
@@ -67,6 +67,7 @@ namespace Sati
                     services.AddTransient<SchedulerViewModel>();
                     services.AddTransient<NewClientWindow>();
                     services.AddTransient<NewClientViewModel>();
+                    services.AddTransient<CaseManagerDashboardViewModel>();
 
                     // Factories
                     services.AddTransient<Func<string, UserMessageDialog>>(sp => message => new UserMessageDialog(message));
@@ -79,7 +80,7 @@ namespace Sati
                     // EF Core
                     services.AddDbContextFactory<SatiContext>(options =>
                         options.UseSqlServer(context.Configuration.GetConnectionString("SatiDb")),
-                        ServiceLifetime.Transient);
+                        ServiceLifetime.Singleton);
                 })
                 .Build();
 
