@@ -56,7 +56,7 @@ namespace Sati
                     services.AddTransient<NewUserViewModel>();
                     services.AddTransient<SettingsViewModel>();
                     services.AddTransient<SettingsWindow>();
-                    services.AddTransient<NotesWindowViewModel>();
+                    services.AddSingleton<NotesWindowViewModel>();
                     services.AddTransient<ComplianceReviewViewModel>();
                     services.AddTransient<ComplianceReviewWindow>();
                     services.AddTransient<ScratchpadHistoryViewModel>();
@@ -65,7 +65,6 @@ namespace Sati
                     services.AddTransient<SwitchUserWindow>();
                     services.AddTransient<SchedulerViewModel>();
                     services.AddTransient<NewClientViewModel>();
-                    services.AddTransient<CaseManagerDashboardViewModel>();
 
                     // Factories
                     services.AddTransient<Func<string, UserMessageDialog>>(sp => message => new UserMessageDialog(message));

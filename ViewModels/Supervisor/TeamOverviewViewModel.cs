@@ -68,7 +68,7 @@ namespace Sati.ViewModels.Supervisor
             foreach (var cm in managers)
             {
                 categoryAxis.Labels.Add(cm.DisplayName);
-                series.Items.Add(new BarItem { Value = cm.ProgressPercent });
+                series.Items.Add(new BarItem { Value = (double)cm.ProgressPercent });
             }
 
             // Color code bars by status
@@ -76,7 +76,7 @@ namespace Sati.ViewModels.Supervisor
             {
                 series.Items[i] = new BarItem
                 {
-                    Value = managers[i].ProgressPercent,
+                    Value = (double)managers[i].ProgressPercent,
                     Color = managers[i].StatusLevel switch
                     {
                         "Ok" => OxyColor.FromRgb(0x5A, 0x8A, 0x5A),

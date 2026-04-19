@@ -39,7 +39,7 @@ namespace Sati.ViewModels.Supervisor
         public int ClientCount { get; }
         public string ClientCountLabel { get; }
         public int NotesThisMonth { get; }
-        public int UnitsThisMonth { get; }
+        public decimal UnitsThisMonth { get; }
         public int OverdueCount { get; }
         public bool HasOverdue { get; }
         public string DetailHeading { get; }
@@ -54,7 +54,7 @@ namespace Sati.ViewModels.Supervisor
 
         [ObservableProperty] private bool isSelected;
 
-        public double ProgressPercent { get; private set; }
+        public decimal ProgressPercent { get; private set; }
         public string StatusLevel { get; private set; } = "Warning";
         public string StatusLabel { get; private set; } = "No data";
 
@@ -68,7 +68,7 @@ namespace Sati.ViewModels.Supervisor
                 return;
             }
 
-            ProgressPercent = Math.Min(100.0 * UnitsThisMonth / threshold, 100);
+            ProgressPercent = Math.Min(100.0m * UnitsThisMonth / threshold, 100);
 
             (StatusLevel, StatusLabel) = ProgressPercent switch
             {

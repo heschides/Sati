@@ -9,5 +9,7 @@ namespace Sati.Data
         Task<List<User>> GetAllAsync();
         Task UpdateAsync(User user);
         Task ResetPasswordAsync(User user, string newPassword);
+        Task<List<User>> GetSuperviseesAsync(int supervisorId);
+
     }
 }

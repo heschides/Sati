@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sati.Models;
+using Sati.Models.Billing;
 
 namespace Sati.Data
 {
@@ -13,6 +14,8 @@ namespace Sati.Data
         public DbSet<Settings> Settings { get; set; }
         public DbSet<Scratchpad> Scratchpad { get; set; }
         public DbSet<Incentive> Incentives { get; set; }
+        public DbSet<BillingPeriod> BillingPeriods { get; set; }
+        public DbSet<ClaimLine> ClaimLines { get; set; }
 
         public SatiContext(DbContextOptions<SatiContext> options) : base(options)
         {
@@ -70,6 +73,10 @@ namespace Sati.Data
                       .WithMany()
                       .HasForeignKey(p => p.AgencyId)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<User>(p => p.User)
+                      .WithMany()
+                      .HasForeignKey(p => p.UserId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Note>(entity =>
@@ -122,6 +129,31 @@ namespace Sati.Data
                 entity.HasKey(s => s.Id);
                 entity.HasIndex(s => new { s.UserId, s.Date })
                       .IsUnique();
+            });
+
+            modelBuilder.Entity<BillingPeriod>(entity =>
+            {
+                entity.HasKey(b => b.Id);
+                entity.HasOne(b => b.User)
+                      .WithMany()
+                      .HasForeignKey(b => b.UserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(b => new { b.UserId, b.Month, b.Year })
+                      .IsUnique();
+            });
+
+            modelBuilder.Entity<ClaimLine>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Units).HasColumnType("decimal(18,2)");
+                entity.HasOne(c => c.BillingPeriod)
+                      .WithMany(b => b.Lines)
+                      .HasForeignKey(c => c.BillingPeriodId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(c => c.Note)
+                      .WithMany()
+                      .HasForeignKey(c => c.NoteId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

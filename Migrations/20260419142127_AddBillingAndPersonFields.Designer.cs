@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sati.Data;
 
@@ -11,9 +12,11 @@ using Sati.Data;
 namespace Sati.Migrations
 {
     [DbContext(typeof(SatiContext))]
-    partial class SatiContextModelSnapshot : ModelSnapshot
+    [Migration("20260419142127_AddBillingAndPersonFields")]
+    partial class AddBillingAndPersonFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,9 +37,6 @@ namespace Sati.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Npi")
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -122,7 +122,7 @@ namespace Sati.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<decimal?>("Units")
+                    b.Property<decimal>("Units")
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
@@ -217,12 +217,6 @@ namespace Sati.Migrations
                     b.Property<int?>("AgencyId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ApprovedById")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("EventDate")
                         .HasColumnType("datetime2");
 
@@ -239,20 +233,11 @@ namespace Sati.Migrations
                     b.Property<int>("PersonId")
                         .HasColumnType("int");
 
-                    b.Property<string>("ReturnReason")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ReturnedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ReturnedById")
-                        .HasColumnType("int");
-
                     b.Property<int?>("Status")
                         .HasColumnType("int");
 
-                    b.Property<decimal?>("Units")
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<int?>("Units")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -627,15 +612,13 @@ namespace Sati.Migrations
                         .HasForeignKey("AgencyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Sati.Models.User", "User")
+                    b.HasOne("Sati.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Agency");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Sati.Models.Billing.BillingPeriod", b =>

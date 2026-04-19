@@ -172,9 +172,8 @@ namespace Sati.ViewModels.Supervisor
             try
             {
                 var supervisor = _sessionService.CurrentUser!;
-                var supervisees = supervisor.Supervisees
-                    .Where(u => u.Role == UserRole.CaseManager)
-                    .ToList();
+                var supervisees = await _userService.GetSuperviseesAsync(supervisor.Id);
+
 
                 var settings = await _settingsService.LoadAsync();
                 var now = DateTime.Now;
@@ -208,6 +207,7 @@ namespace Sati.ViewModels.Supervisor
             }
             catch (Exception ex)
             {
+                System.Windows.MessageBox.Show($"Init failed: {ex.Message}\n{ex.StackTrace}");
                 Debug.WriteLine($"SupervisorDashboardViewModel.InitializeAsync failed: {ex.Message}");
             }
         }

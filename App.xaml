@@ -5,6 +5,7 @@
              xmlns:children="clr-namespace:Sati.ViewModels.Children"
              xmlns:viewmodels="clr-namespace:Sati.ViewModels"
              xmlns:supervisor="clr-namespace:Sati.ViewModels.Supervisor"
+             xmlns:supervisorVms="clr-namespace:Sati.ViewModels.Supervisor"
              xmlns:views="clr-namespace:Sati.Views">
     <Application.Resources>
 
@@ -251,7 +252,9 @@
         <DataTemplate DataType="{x:Type viewmodels:CaseManagerDashboardViewModel}">
             <views:CaseManagerDashboardView />
         </DataTemplate>
-
+        <DataTemplate DataType="{x:Type supervisorVms:SupervisorDashboardViewModel}">
+            <views:SupervisorDashboardWindow />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:NotesWindowViewModel}">
             <views:NotesLogView />
         </DataTemplate>
@@ -270,6 +273,20 @@
 
         <DataTemplate DataType="{x:Type children:HelpersViewModel}">
             <views:HelpersView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type supervisorVms:TeamOverviewViewModel}">
+            <views:TeamOverviewView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type supervisorVms:OverdueItemsViewModel}">
+            <views:OverdueItemsView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type supervisorVms:MonthlyProductivityViewModel}">
+            <views:MonthlyProductivityView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type supervisorVms:UserManagementViewModel}">
+            <views:UserManagementView />
         </DataTemplate>
     </Application.Resources>
 </Application>

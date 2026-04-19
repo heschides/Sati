@@ -67,7 +67,6 @@ namespace Sati.ViewModels
             _schedulerViewModel = schedulerViewModel;
             NotesLog = notesWindowViewModel;
             Clients = newClientViewModel;
-            Matrix = new CaseloadMatrixViewModel(People);
         }
 
         // -------------------------------------------------------------------------
@@ -83,7 +82,7 @@ namespace Sati.ViewModels
 
         public NotesWindowViewModel NotesLog { get; }
         public NewClientViewModel Clients { get; }
-        public CaseloadMatrixViewModel Matrix { get; }
+        public CaseloadMatrixViewModel? Matrix { get; private set; }
 
         public bool IsDashboardSubActive => CurrentSubViewModel is null;
         public bool IsClientsSubActive => CurrentSubViewModel is NewClientViewModel;
@@ -102,7 +101,7 @@ namespace Sati.ViewModels
         [ObservableProperty] private FormType? selectedFormType;
         [ObservableProperty] private string? narrative;
         [ObservableProperty] private DateTime? eventDate;
-        [ObservableProperty] private int? units;
+        [ObservableProperty] private decimal? units;
         [ObservableProperty] private int? duration;
         [ObservableProperty] private bool isEditing;
         [ObservableProperty] private bool isSchedulerOpen;
@@ -239,9 +238,9 @@ namespace Sati.ViewModels
         public int Threshold => _incentive?.Threshold ?? 0;
         public int SafeThreshold => Threshold > 0 ? Threshold : 1;
 
-        public int? PendingUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Pending).Sum(n => n.Units);
-        public int? LoggedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Logged).Sum(n => n.Units);
-        public int? AbandonedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Abandoned).Sum(n => n.Units);
+        public decimal? PendingUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Pending).Sum(n => n.Units);
+        public decimal? LoggedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Logged).Sum(n => n.Units);
+        public decimal? AbandonedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Abandoned).Sum(n => n.Units);
 
         public decimal EstimatedIncentive => _incentive?.Calculate(LoggedUnits ?? 0) ?? 0;
 
@@ -302,6 +301,7 @@ namespace Sati.ViewModels
                 return;
 
             form.IsCompliant = !form.IsCompliant;
+            form.CompletedDate = form.IsCompliant ? DateTime.Today : null;
             await _formService.UpdateFormAsync(form);
             RefreshComplianceFlags();
         }
@@ -363,6 +363,8 @@ namespace Sati.ViewModels
 
                 _settings = await _settingsService.LoadAsync();
                 await LoadPeopleAsync();
+                Matrix = new CaseloadMatrixViewModel(People, _settings);
+                OnPropertyChanged(nameof(Matrix));
                 OnPropertyChanged(nameof(EffectiveDateGroups));
                 await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
                 await LoadMonthlyNotesAsync();

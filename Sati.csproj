@@ -42,7 +42,8 @@
   <ItemGroup>
     <Folder Include="Images\Screenshots\" />
     <Folder Include="Edi\" />
-    <Folder Include="ViewModels\Biller\" />
+    <Folder Include="ViewModels\Billing\" />
+    <Folder Include="Views\Billing\" />
   </ItemGroup>
 
 

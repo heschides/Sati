@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sati.Data;
 
@@ -11,9 +12,11 @@ using Sati.Data;
 namespace Sati.Migrations
 {
     [DbContext(typeof(SatiContext))]
-    partial class SatiContextModelSnapshot : ModelSnapshot
+    [Migration("20260418231143_AddCompletedDateToForm")]
+    partial class AddCompletedDateToForm
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -35,9 +38,6 @@ namespace Sati.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("Npi")
-                        .HasColumnType("nvarchar(max)");
-
                     b.HasKey("Id");
 
                     b.ToTable("Agencies");
@@ -53,85 +53,6 @@ namespace Sati.Migrations
                             Id = 2,
                             Name = "Sandbox Mode"
                         });
-                });
-
-            modelBuilder.Entity("Sati.Models.Billing.BillingPeriod", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("Month")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("SubmittedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Year")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "Month", "Year")
-                        .IsUnique();
-
-                    b.ToTable("BillingPeriods");
-                });
-
-            modelBuilder.Entity("Sati.Models.Billing.ClaimLine", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BillingPeriodId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ClientMaineCareId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("DateOfService")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DiagnosisCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("NoteId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PlaceOfService")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ProcedureCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RenderingProviderNpi")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal?>("Units")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BillingPeriodId");
-
-                    b.HasIndex("NoteId");
-
-                    b.ToTable("ClaimLines");
                 });
 
             modelBuilder.Entity("Sati.Models.Form", b =>
@@ -217,12 +138,6 @@ namespace Sati.Migrations
                     b.Property<int?>("AgencyId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ApprovedById")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("EventDate")
                         .HasColumnType("datetime2");
 
@@ -239,20 +154,11 @@ namespace Sati.Migrations
                     b.Property<int>("PersonId")
                         .HasColumnType("int");
 
-                    b.Property<string>("ReturnReason")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ReturnedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ReturnedById")
-                        .HasColumnType("int");
-
                     b.Property<int?>("Status")
                         .HasColumnType("int");
 
-                    b.Property<decimal?>("Units")
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<int?>("Units")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -495,9 +401,6 @@ namespace Sati.Migrations
                     b.Property<DateTime>("BirthDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("DiagnosisCode")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime?>("EffectiveDate")
                         .HasColumnType("datetime2");
 
@@ -510,12 +413,6 @@ namespace Sati.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("MaineCareId")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("PlaceOfService")
-                        .HasColumnType("int");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
@@ -530,36 +427,6 @@ namespace Sati.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("People");
-                });
-
-            modelBuilder.Entity("Sati.Models.Billing.BillingPeriod", b =>
-                {
-                    b.HasOne("Sati.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Sati.Models.Billing.ClaimLine", b =>
-                {
-                    b.HasOne("Sati.Models.Billing.BillingPeriod", "BillingPeriod")
-                        .WithMany("Lines")
-                        .HasForeignKey("BillingPeriodId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Sati.Models.Note", "Note")
-                        .WithMany()
-                        .HasForeignKey("NoteId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("BillingPeriod");
-
-                    b.Navigation("Note");
                 });
 
             modelBuilder.Entity("Sati.Models.Form", b =>
@@ -627,20 +494,13 @@ namespace Sati.Migrations
                         .HasForeignKey("AgencyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Sati.Models.User", "User")
+                    b.HasOne("Sati.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Agency");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Sati.Models.Billing.BillingPeriod", b =>
-                {
-                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Sati.Models.User", b =>

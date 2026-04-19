@@ -47,6 +47,8 @@ namespace Sati
         Logged,
         Cancelled,
         Delayed,
+        Approved,
+        Returned,
         Abandoned
     }
 
@@ -56,6 +58,38 @@ namespace Sati
         Contact,
         Form,
         Other
+    }
+
+        public enum FormComplianceStatus
+        {
+            NotYetDue,
+            InWindow,
+            CompliantOnTime,
+            CompliantLate,
+            Overdue,
+            NoForm
+        }
+
+    //Billing
+
+    public enum BillingStatus
+    {
+        Draft,
+        Submitted,
+        Accepted,
+        Rejected
+    }
+
+    public enum PlaceOfService
+    {
+        [Description("Office")]
+        Office = 11,
+        [Description("Home")]
+        Home = 12,
+        [Description("Group Home")]
+        GroupHome = 14,
+        [Description("Other")]
+        Other = 99
     }
 }
 

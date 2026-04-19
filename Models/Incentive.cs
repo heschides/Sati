@@ -21,7 +21,7 @@ namespace Sati.Models
         public int Threshold => DaysScheduled * UnitsPerDay;
 
         public string ExcludedDatesJson { get; set; } = "[]";
-        public decimal Calculate(int loggedUnits)
+        public decimal Calculate(decimal loggedUnits)
         {
             if (loggedUnits < Threshold) return 0;
             if (loggedUnits == Threshold) return BaseIncentive;

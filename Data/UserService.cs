@@ -45,5 +45,13 @@ namespace Sati.Data
             context.Users.Update(user);
             await context.SaveChangesAsync();
         }
+
+        public async Task<List<User>> GetSuperviseesAsync(int supervisorId)
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            return await context.Users
+                .Where(u => u.SupervisorId == supervisorId && u.Role == UserRole.CaseManager)
+                .ToListAsync();
+        }
     }
 }

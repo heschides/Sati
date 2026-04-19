@@ -1,12 +1,520 @@
 ﻿<UserControl x:Class="Sati.Views.CaseloadMatrixView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:Sati.Views"
-             mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             xmlns:sati="clr-namespace:Sati"
+             xmlns:vm="clr-namespace:Sati.ViewModels"
+             Background="#FDF6EC"
+             TextElement.FontFamily="{StaticResource AppFont}">
+
+    <UserControl.Resources>
+
+        <!-- Status colors -->
+        <SolidColorBrush x:Key="CompliantOnTimeBrush"
+                         Color="#C2DFB3" />
+        <SolidColorBrush x:Key="CompliantLateBrush"
+                         Color="#F5DFB0" />
+        <SolidColorBrush x:Key="InWindowBrush"
+                         Color="#F5DFB0" />
+        <SolidColorBrush x:Key="OverdueBrush"
+                         Color="#EEB09A" />
+        <SolidColorBrush x:Key="NotYetDueBrush"
+                         Color="#E8E0D3" />
+        <SolidColorBrush x:Key="NoFormBrush"
+                         Color="#C8A882" />
+
+        <Style x:Key="MatrixHeader"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="10" />
+            <Setter Property="FontWeight"
+                    Value="SemiBold" />
+            <Setter Property="Foreground"
+                    Value="#9C7A5C" />
+            <Setter Property="TextAlignment"
+                    Value="Center" />
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
+        </Style>
+
+        <Style x:Key="MatrixCell"
+               TargetType="Border">
+            <Setter Property="BorderBrush"
+                    Value="Tan" />
+            <Setter Property="BorderThickness"
+                    Value="0.5" />
+            <Setter Property="MinWidth"
+                    Value="78" />
+            <Setter Property="Height"
+                    Value="48" />
+            <Setter Property="Padding"
+                    Value="4,6" />
+        </Style>
+
+        <Style x:Key="ClientNameCell"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="12" />
+            <Setter Property="Foreground"
+                    Value="#3D2B1F" />
+            <Setter Property="FontWeight"
+                    Value="Medium" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Setter Property="Padding"
+                    Value="10,0" />
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis" />
+        </Style>
+
+    </UserControl.Resources>
+
     <Grid>
-            
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ═══ HEADER ═══ -->
+        <Border Grid.Row="0"
+                Background="#3D2B1F"
+                Padding="12,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal">
+                    <Path Data="M2 14 C4 10 6 6 14 2 C14 2 14 10 8 12 C6 13 4 13 2 14Z"
+                          Fill="#C87941"
+                          Width="14"
+                          Height="14"
+                          Stretch="Uniform"
+                          Margin="0,0,10,0"
+                          VerticalAlignment="Center" />
+                    <TextBlock Text="Caseload Matrix"
+                               FontSize="15"
+                               FontWeight="Medium"
+                               Foreground="#F5ECD8"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <Border Grid.Column="1"
+                        Background="#C87941"
+                        CornerRadius="4"
+                        Padding="9,2">
+                    <TextBlock Text="READ ONLY"
+                               FontSize="11"
+                               FontWeight="Medium"
+                               Foreground="#FDF6EC"  />
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ═══ LEGEND ═══ -->
+        <Border Grid.Row="1"
+                Background="#F5EBD8"
+                BorderBrush="#C8B8A4"
+                BorderThickness="0,0,0,0.5"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,16,0">
+                    <Border Width="13"
+                            Height="13"
+                            CornerRadius="3"
+                            Background="#C2DFB3"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Margin="0,0,6,0" />
+                    <TextBlock Text="Compliant"
+                               FontSize="12"
+                               Foreground="#3D2B1F"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,16,0">
+                    <Border Width="13"
+                            Height="13"
+                            CornerRadius="3"
+                            Background="#F5DFB0"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Margin="0,0,6,0" />
+                    <TextBlock Text="Window open"
+                               FontSize="12"
+                               Foreground="#3D2B1F"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,16,0">
+                    <Border Width="13"
+                            Height="13"
+                            CornerRadius="3"
+                            Background="#EEB09A"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Margin="0,0,6,0" />
+                    <TextBlock Text="Overdue"
+                               FontSize="12"
+                               Foreground="#3D2B1F"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,16,0">
+                    <Border Width="13"
+                            Height="13"
+                            CornerRadius="3"
+                            Background="#E8E0D3"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Margin="0,0,6,0" />
+                    <TextBlock Text="Not yet due"
+                               FontSize="12"
+                               Foreground="#3D2B1F"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="13"
+                            Height="13"
+                            CornerRadius="3"
+                            Background="#C8A882"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Margin="0,0,6,0" />
+                    <TextBlock Text="No form"
+                               FontSize="12"
+                               Foreground="#3D2B1F"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══ MATRIX ═══ -->
+        <ScrollViewer Grid.Row="2"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- Column headers -->
+                <Grid Background="#E8D9C4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="148" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="90" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="10,7">
+                        <TextBlock Text="Client"
+                                   Style="{StaticResource MatrixHeader}"
+                                   TextAlignment="Left" />
+                    </Border>
+                    <Border Grid.Column="1"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Comp.&#x0a;Assess."
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="2"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="PCP"
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="3"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Q1&#x0a;Review"
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="4"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Q2&#x0a;Review"
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="5"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Q3&#x0a;Review"
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="6"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Q4&#x0a;Review"
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="7"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Reclass."
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="8"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Safety&#x0a;Plan"
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="9"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Privacy&#x0a;Pract."
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="10"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Agency&#x0a;Rel."
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="11"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="DHHS&#x0a;Rel."
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                    <Border Grid.Column="12"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Padding="4,7">
+                        <TextBlock Text="Med.&#x0a;Rel."
+                                   Style="{StaticResource MatrixHeader}" />
+                    </Border>
+                </Grid>
+
+                <!-- Data rows -->
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="148" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="90" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        BorderBrush="#C8B8A4"
+                                        BorderThickness="0.5"
+                                        Height="48"
+                                        Background="#FDF6EC">
+                                    <TextBlock Text="{Binding FullName}"
+                                               Style="{StaticResource ClientNameCell}" />
+                                </Border>
+
+                                <Border Grid.Column="1"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding CompAssessmentBrush}">
+                                    <TextBlock Text="{Binding CompAssessmentLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="2"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding PcpBrush}">
+                                    <TextBlock Text="{Binding PcpLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="3"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding Q1RBrush}">
+                                    <TextBlock Text="{Binding Q1RLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="4"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding Q2RBrush}">
+                                    <TextBlock Text="{Binding Q2RLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="5"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding Q3RBrush}">
+                                    <TextBlock Text="{Binding Q3RLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="6"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding Q4RBrush}">
+                                    <TextBlock Text="{Binding Q4RLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="7"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding ReclassBrush}">
+                                    <TextBlock Text="{Binding ReclassLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="8"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding SafetyPlanBrush}">
+                                    <TextBlock Text="{Binding SafetyPlanLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="9"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding PrivacyBrush}">
+                                    <TextBlock Text="{Binding PrivacyLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="10"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding ReleaseAgencyBrush}">
+                                    <TextBlock Text="{Binding ReleaseAgencyLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="11"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding ReleaseDhhsBrush}">
+                                    <TextBlock Text="{Binding ReleaseDhhsLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                                <Border Grid.Column="12"
+                                        Style="{StaticResource MatrixCell}"
+                                        Background="{Binding ReleaseMedicalBrush}">
+                                    <TextBlock Text="{Binding ReleaseMedicalLabel}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Border>
+
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ═══ FOOTER ═══ -->
+        <Border Grid.Row="3"
+                Background="#F5EBD8"
+                BorderBrush="#C8B8A4"
+                BorderThickness="0,0.5,0,0"
+                Padding="12,7">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           FontSize="11"
+                           Foreground="#8C7060">
+                    <Run Text="{Binding PeopleCount, Mode=OneWay}" />
+                    <Run Text=" clients · 12 form types" />
+                </TextBlock>
+                <TextBlock Grid.Column="1"
+                           Text="read only"
+                           FontSize="11"
+                           Foreground="#8C7060" />
+                
+            </Grid>
+        </Border>
+
     </Grid>
 </UserControl>

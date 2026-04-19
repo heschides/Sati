@@ -10,6 +10,7 @@ namespace Sati
 
         public int Id { get; private set; }
         public int UserId { get; private set; }
+        public User? User { get; set; }
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public DateTime BirthDate { get; set; }
@@ -19,6 +20,9 @@ namespace Sati
         public string FullName => $"{FirstName} {LastName}".Trim();
         public int? AgencyId { get; set; }
         public Agency? Agency { get; set; } = null!;
+        public string? MaineCareId { get; set; }
+        public string? DiagnosisCode { get; set; }
+        public int? PlaceOfService { get; set; }
 
         // -------------------------------------------------------------------------
         // Collections
@@ -110,5 +114,54 @@ namespace Sati
                 .OrderByDescending(f => f.DueDate)
                 .FirstOrDefault();
         }
+
+        public FormComplianceStatus GetComplianceStatus(FormType type, DateTime referenceDate, Settings settings)
+        {
+            var form = GetCurrentCycleForm(type);
+
+            if (form is null)
+                return FormComplianceStatus.NoForm;
+
+            if (form.IsCompliant)
+            {
+                return form.CompletedDate.HasValue && form.CompletedDate.Value > form.DueDate
+                    ? FormComplianceStatus.CompliantLate
+                    : FormComplianceStatus.CompliantOnTime;
+            }
+
+            var openDaysBefore = GetOpenDaysBefore(type, settings);
+            var openDate = form.DueDate.AddDays(-openDaysBefore);
+
+            if (referenceDate < openDate)
+                return FormComplianceStatus.NotYetDue;
+
+            if (referenceDate <= form.DueDate)
+                return FormComplianceStatus.InWindow;
+
+            return FormComplianceStatus.Overdue;
+        }
+
+        private static int GetOpenDaysBefore(FormType type, Settings settings) => type switch
+        {
+            FormType.Q1R or FormType.Q2R or FormType.Q3R or FormType.Q4R
+                => settings.ReviewOpenDaysBefore,
+            FormType.PCP
+                => settings.PcpOpenDaysBefore,
+            FormType.ComprehensiveAssessment
+                => settings.CompAssessmentOpenDaysBefore,
+            FormType.Reclassification
+                => settings.ReclassificationOpenDaysBefore,
+            FormType.SafetyPlan
+                => settings.SafetyPlanOpenDaysBefore,
+            FormType.PrivacyPractices
+                => settings.PrivacyPracticesOpenDaysBefore,
+            FormType.Release_Agency
+                => settings.ReleaseAgencyOpenDaysBefore,
+            FormType.Release_DHHS
+                => settings.ReleaseDhhsOpenDaysBefore,
+            FormType.Release_Medical
+                => settings.ReleaseMedicalOpenDaysBefore,
+            _ => 30
+        };
     }
 }
