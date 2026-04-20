@@ -6,6 +6,7 @@ namespace Sati.ViewModels.Supervisor
     public partial class CaseManagerSummaryViewModel : ObservableObject
     {
         private readonly User _user;
+        public int UserId => _user.Id;
 
         public CaseManagerSummaryViewModel(User user, List<Person> people,
             List<Note> monthlyNotes, List<UpcomingEvent> upcomingEvents)

@@ -3,6 +3,8 @@ using Sati;
 using Sati.Data;
 using Sati.Data.Billing;
 using Sati.Models;
+using System.Diagnostics;
+using static Azure.Core.HttpHeader;
 
 public class SupervisorService : ISupervisorService
 {

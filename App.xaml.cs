@@ -3,7 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sati.Data;
+using Sati.Data.Billing;
 using Sati.Models;
+using Sati.Services.Billing;
 using Sati.ViewModels;
 using Sati.ViewModels.Children;
 using Sati.ViewModels.Supervisor;
@@ -36,6 +38,8 @@ namespace Sati
                     services.AddTransient<ISettingsService, SettingsService>();
                     services.AddTransient<IUpcomingEventService, UpcomingEventService>();
                     services.AddTransient<IFormService, FormService>();
+                    services.AddTransient<ISupervisorService, SupervisorService>();
+                    services.AddTransient<IBillingService, BillingService>();
 
                     // Shell
                     services.AddSingleton<ShellViewModel>();
@@ -48,6 +52,8 @@ namespace Sati
                     services.AddSingleton<HelpersViewModel>();
                     services.AddSingleton<SupervisorDashboardViewModel>();
                     services.AddTransient<UserManagementViewModel>();
+                    services.AddTransient<PendingApprovalsViewModel>();
+
 
                     // Modal windows and their ViewModels
                     services.AddTransient<LoginWindow>();

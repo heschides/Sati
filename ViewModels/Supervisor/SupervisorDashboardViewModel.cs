@@ -29,6 +29,7 @@ namespace Sati.ViewModels.Supervisor
         private readonly OverdueItemsViewModel _overdueItemsViewModel;
         private readonly MonthlyProductivityViewModel _monthlyProductivityViewModel;
         private readonly UserManagementViewModel _userManagementViewModel;
+        private readonly PendingApprovalsViewModel _pendingApprovalsViewModel;
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -42,7 +43,8 @@ namespace Sati.ViewModels.Supervisor
             ISettingsService settingsService,
             IUpcomingEventService upcomingEventService,
             IUserService userService,
-            UserManagementViewModel userManagementViewModel)
+            UserManagementViewModel userManagementViewModel,
+            PendingApprovalsViewModel pendingApprovalsViewModel)
         {
             _sessionService = sessionService;
             _personService = personService;
@@ -59,6 +61,7 @@ namespace Sati.ViewModels.Supervisor
 
             // Start on team overview
             CurrentSubView = _teamOverviewViewModel;
+            _pendingApprovalsViewModel = pendingApprovalsViewModel;
         }
 
         // -------------------------------------------------------------------------
@@ -87,6 +90,7 @@ namespace Sati.ViewModels.Supervisor
         public int TotalClients => CaseManagers.Sum(cm => cm.ClientCount);
         public int TotalOverdue => CaseManagers.Sum(cm => cm.OverdueCount);
         public int TotalNotesThisMonth => CaseManagers.Sum(cm => cm.NotesThisMonth);
+        public bool IsPendingApprovalsActive => CurrentSubView is PendingApprovalsViewModel;
 
         public string AvgComplianceLabel
         {
@@ -114,6 +118,7 @@ namespace Sati.ViewModels.Supervisor
             OnPropertyChanged(nameof(IsOverdueItemsActive));
             OnPropertyChanged(nameof(IsMonthlyProductivityActive));
             OnPropertyChanged(nameof(IsUserManagementActive));
+            OnPropertyChanged(nameof(IsPendingApprovalsActive));
         }
 
         // -------------------------------------------------------------------------
@@ -161,7 +166,17 @@ namespace Sati.ViewModels.Supervisor
             CurrentSubView = _userManagementViewModel;
         }
 
+        [RelayCommand]
+        private async Task NavigateToPendingApprovals()
+        {
+            CurrentSubView = null;
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
+            var filterUserId = SelectedCaseManager?.UserId;
+            await _pendingApprovalsViewModel.LoadAsync(filterUserId);
+    
+            CurrentSubView = _pendingApprovalsViewModel;
+}
    
         // -------------------------------------------------------------------------
         // Initialization
@@ -194,7 +209,7 @@ namespace Sati.ViewModels.Supervisor
                     CaseManagers.Add(summary);
                 }
 
-                SelectedCaseManager = CaseManagers.FirstOrDefault();
+               // SelectedCaseManager = CaseManagers.FirstOrDefault();
 
                 OnPropertyChanged(nameof(TeamSizeLabel));
                 OnPropertyChanged(nameof(TotalClients));

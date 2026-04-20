@@ -240,6 +240,7 @@
 
         <!-- Converters -->
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
         <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
         <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
         <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter" />
@@ -287,6 +288,9 @@
 
         <DataTemplate DataType="{x:Type supervisorVms:UserManagementViewModel}">
             <views:UserManagementView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type supervisorVms:PendingApprovalsViewModel}">
+            <views:PendingApprovalsView />
         </DataTemplate>
     </Application.Resources>
 </Application>
