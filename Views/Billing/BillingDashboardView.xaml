@@ -1,0 +1,244 @@
+﻿<UserControl x:Class="Sati.Views.Billing.BillingDashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#FDF6EC"
+             TextElement.FontFamily="{StaticResource AppFont}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ================================================================ -->
+        <!-- TOOLBAR                                                           -->
+        <!-- ================================================================ -->
+        <Border Grid.Row="0"
+                Background="#F0E4D0"
+                BorderBrush="#E8D0B8"
+                BorderThickness="0,0,0,1"
+                Padding="16,8">
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
+
+                <!-- Overview -->
+                <Border Cursor="Hand"
+                        CornerRadius="4"
+                        Padding="12,4"
+                        Margin="0,0,4,0">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NavigateToOverviewCommand}" />
+                    </Border.InputBindings>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background"
+                                    Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsOverviewActive}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#C87941" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Overview"
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="#9C7A5C" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsOverviewActive}"
+                                                 Value="True">
+                                        <Setter Property="Foreground"
+                                                Value="#FDF6EC" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+
+                <!-- Submissions -->
+                <Border Cursor="Hand"
+                        CornerRadius="4"
+                        Padding="12,4"
+                        Margin="0,0,4,0">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NavigateToSubmissionsCommand}" />
+                    </Border.InputBindings>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background"
+                                    Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSubmissionsActive}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#C87941" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Submissions"
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="#9C7A5C" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSubmissionsActive}"
+                                                 Value="True">
+                                        <Setter Property="Foreground"
+                                                Value="#FDF6EC" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+
+                <!-- Remittances -->
+                <Border Cursor="Hand"
+                        CornerRadius="4"
+                        Padding="12,4"
+                        Margin="0,0,4,0">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NavigateToRemittancesCommand}" />
+                    </Border.InputBindings>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background"
+                                    Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRemittancesActive}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#C87941" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Remittances"
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="#9C7A5C" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsRemittancesActive}"
+                                                 Value="True">
+                                        <Setter Property="Foreground"
+                                                Value="#FDF6EC" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+
+                <!-- Alerts -->
+                <Border Cursor="Hand"
+                        CornerRadius="4"
+                        Padding="12,4"
+                        Margin="0,0,4,0">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NavigateToAlertsCommand}" />
+                    </Border.InputBindings>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background"
+                                    Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsAlertsActive}"
+                                             Value="True">
+                                    <Setter Property="Background"
+                                            Value="#C87941" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Alerts"
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground"
+                                        Value="#9C7A5C" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAlertsActive}"
+                                                 Value="True">
+                                        <Setter Property="Foreground"
+                                                Value="#FDF6EC" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+
+            </StackPanel>
+        </Border>
+
+        <!-- ================================================================ -->
+        <!-- BODY: sidebar + sub-view                                          -->
+        <!-- ================================================================ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Sidebar filters -->
+            <Border Grid.Column="0"
+                    Background="#F5EAD8"
+                    BorderBrush="#E8D0B8"
+                    BorderThickness="0,0,1,0"
+                    Padding="12">
+                <StackPanel>
+                    <TextBlock Text="FILTERS"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               Foreground="#9C7A5C"
+                               Margin="0,4,0,10" />
+
+                    <TextBlock Text="Department"
+                               FontSize="10"
+                               Foreground="#9C7A5C"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="(available when departments are configured)"
+                               FontSize="10"
+                               Foreground="#C8A882"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12" />
+
+                    <TextBlock Text="Supervisor"
+                               FontSize="10"
+                               Foreground="#9C7A5C"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="(filter coming soon)"
+                               FontSize="10"
+                               Foreground="#C8A882"
+                               Margin="0,0,0,12" />
+
+                    <TextBlock Text="Case Manager"
+                               FontSize="10"
+                               Foreground="#9C7A5C"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="(filter coming soon)"
+                               FontSize="10"
+                               Foreground="#C8A882"
+                               Margin="0,0,0,12" />
+                </StackPanel>
+            </Border>
+
+            <!-- Sub-view -->
+            <ContentControl Grid.Column="1"
+                            Content="{Binding CurrentSubView}" />
+        </Grid>
+    </Grid>
+</UserControl>

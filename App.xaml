@@ -6,7 +6,9 @@
              xmlns:viewmodels="clr-namespace:Sati.ViewModels"
              xmlns:supervisor="clr-namespace:Sati.ViewModels.Supervisor"
              xmlns:supervisorVms="clr-namespace:Sati.ViewModels.Supervisor"
-             xmlns:views="clr-namespace:Sati.Views">
+             xmlns:billingVms="clr-namespace:Sati.ViewModels.Billing"
+             xmlns:views="clr-namespace:Sati.Views"
+             xmlns:billingViews="clr-namespace:Sati.Views.Billing">
     <Application.Resources>
 
         <!-- Fonts -->
@@ -292,5 +294,25 @@
         <DataTemplate DataType="{x:Type supervisorVms:PendingApprovalsViewModel}">
             <views:PendingApprovalsView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type billingVms:BillingDashboardViewModel}">
+            <billingViews:BillingDashboardView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type billingVms:BillingOverviewViewModel}">
+            <billingViews:BillingOverviewView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type billingVms:BillingSubmissionsViewModel}">
+            <billingViews:BillingSubmissionsView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type billingVms:BillingRemittancesViewModel}">
+            <billingViews:BillingRemittancesView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type billingVms:BillingAlertsViewModel}">
+            <billingViews:BillingAlertsView />
+        </DataTemplate>
+
     </Application.Resources>
 </Application>

@@ -62,6 +62,19 @@ namespace Sati
             return person;
         }
 
+        // Sentinel factory for filter dropdowns that need an "All Persons" row.
+        // Bypasses GenerateFormList deliberately — this object never enters the DB
+        // and has no forms, notes, or real identity. Id = -1 is a marker, not a key.
+        public static Person CreateSentinel(string label)
+        {
+            return new Person
+            {
+                Id = -1,
+                FirstName = label,
+                LastName = string.Empty
+            };
+        }
+
         // -------------------------------------------------------------------------
         // Methods
         // -------------------------------------------------------------------------

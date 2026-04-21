@@ -1,10 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
+using Sati.ViewModels.Billing;
 using Sati.ViewModels.Children;
 using Sati.ViewModels.Supervisor;
-using System.Windows.Media;
 using System.Windows;
+using System.Windows.Media;
 
 namespace Sati.ViewModels
 {
@@ -19,7 +20,7 @@ namespace Sati.ViewModels
         private readonly GuidanceViewModel _guidanceViewModel;
         private readonly HelpersViewModel _helpersViewModel;
         private readonly ISessionService _sessionService;
-
+        private readonly BillingDashboardViewModel _billingDashboardViewModel;
 
 
         // -------------------------------------------------------------------------
@@ -32,7 +33,8 @@ namespace Sati.ViewModels
             SupervisorDashboardViewModel supervisorViewModel,
             GuidanceViewModel guidanceViewModel,
             HelpersViewModel helpersViewModel,
-            ISessionService sessionService)
+            ISessionService sessionService,
+            BillingDashboardViewModel billingDashboardViewModel)
         {
             _notesViewModel = notesViewModel;
             _supervisorDashboardViewModel = supervisorViewModel;
@@ -40,6 +42,7 @@ namespace Sati.ViewModels
             _helpersViewModel = helpersViewModel;
             _sessionService = sessionService;
             Scratchpad = scratchpadViewModel;
+            _billingDashboardViewModel = billingDashboardViewModel;
         }
 
         // -------------------------------------------------------------------------
@@ -65,7 +68,10 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
         // Computed properties
         // -------------------------------------------------------------------------
+        public bool IsBillingAvailable =>
+    _sessionService.CurrentUser?.Role is UserRole.Admin;
 
+        public bool IsBillingActive => CurrentViewModel is BillingDashboardViewModel;
         public bool IsScratchpadVisible => true;
 
         public bool IsSupervisionAvailable =>
@@ -115,10 +121,10 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(IsSupervisorActive));
             OnPropertyChanged(nameof(IsGuidanceActive));
             OnPropertyChanged(nameof(IsHelpersActive));
+            OnPropertyChanged(nameof(IsBillingActive));
             if (value is not SupervisorDashboardViewModel)
                 _supervisorDashboardViewModel?.ClearCharts();
         }
-
 
         // -------------------------------------------------------------------------
         // Navigation commands
@@ -130,7 +136,7 @@ namespace Sati.ViewModels
         [RelayCommand] private void NavigateToHelpers() => CurrentViewModel = _helpersViewModel;
         [RelayCommand] private void RequestSwitchUser() => SwitchUserRequested?.Invoke(this, EventArgs.Empty);
         [RelayCommand] public void OpenSettingsWindow() => OpenSettingsWindowRequested?.Invoke(this, true);
-
+        [RelayCommand] private void NavigateToBilling() => CurrentViewModel = _billingDashboardViewModel;
 
         // -------------------------------------------------------------------------
         // Initialization
@@ -145,7 +151,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(UserInitials));
             OnPropertyChanged(nameof(AvatarBrush));
             OnPropertyChanged(nameof(IsSupervisionAvailable));
-
+            OnPropertyChanged(nameof(IsBillingAvailable));
             NavigateByRole();
         }
 
@@ -159,6 +165,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(UserInitials));
             OnPropertyChanged(nameof(AvatarBrush));
             OnPropertyChanged(nameof(IsSupervisionAvailable));
+            OnPropertyChanged(nameof(IsBillingAvailable));
             NavigateByRole();
         }
 

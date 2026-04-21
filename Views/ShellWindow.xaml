@@ -84,7 +84,51 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </Border>
-
+                    <Border Cursor="Hand"
+                            CornerRadius="4"
+                            Padding="10,4"
+                            Margin="0,0,4,0"
+                            Visibility="{Binding IsBillingAvailable,
+            Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding NavigateToBillingCommand}" />
+                        </Border.InputBindings>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background"
+                                        Value="Transparent" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsBillingActive}"
+                                                 Value="True">
+                                        <Setter Property="Background"
+                                                Value="#3D2B1F" />
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver"
+                                             Value="True">
+                                        <Setter Property="Background"
+                                                Value="#EDD9C0" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="Billing"
+                                   FontSize="13">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground"
+                                            Value="#9C7A5C" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsBillingActive}"
+                                                     Value="True">
+                                            <Setter Property="Foreground"
+                                                    Value="#FDF6EC" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
                     <Border Cursor="Hand"
                             CornerRadius="4"
                             Padding="10,4"

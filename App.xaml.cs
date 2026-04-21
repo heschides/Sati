@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sati.Data;
 using Sati.Data.Billing;
+using Sati.ViewModels.Billing;
 using Sati.Models;
 using Sati.Services.Billing;
 using Sati.ViewModels;
@@ -71,6 +72,12 @@ namespace Sati
                     services.AddTransient<SwitchUserWindow>();
                     services.AddTransient<SchedulerViewModel>();
                     services.AddTransient<NewClientViewModel>();
+
+                    services.AddSingleton<BillingDashboardViewModel>();
+                    services.AddSingleton<BillingOverviewViewModel>();
+                    services.AddSingleton<BillingSubmissionsViewModel>();
+                    services.AddSingleton<BillingRemittancesViewModel>();
+                    services.AddSingleton<BillingAlertsViewModel>();
 
                     // Factories
                     services.AddTransient<Func<string, UserMessageDialog>>(sp => message => new UserMessageDialog(message));

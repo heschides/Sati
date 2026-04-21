@@ -31,29 +31,33 @@ namespace Sati.ViewModels.Supervisor
 
         public async Task LoadAsync(int? filterByUserId = null)
         {
+            var sw = Stopwatch.StartNew();
             try
             {
                 PendingNotes.Clear();
+                Debug.WriteLine($"[{sw.ElapsedMilliseconds}ms] Cleared");
 
                 var supervisor = _sessionService.CurrentUser!;
                 var notes = await _supervisorService.GetPendingNotesAsync(
                     supervisor.Id,
                     allSupervisees: filterByUserId is null);
+                Debug.WriteLine($"[{sw.ElapsedMilliseconds}ms] Fetched {notes.Count()} notes");
 
                 var filtered = filterByUserId is null
                     ? notes
                     : notes.Where(n => n.Person.UserId == filterByUserId);
-                Debug.WriteLine($"notes.Count={notes.Count()}, filtered.Count={filtered.Count()}, filterByUserId={filterByUserId}");
+                Debug.WriteLine($"[{sw.ElapsedMilliseconds}ms] Filtered");
 
                 foreach (var note in filtered)
                     PendingNotes.Add(new PendingNoteViewModel(note));
-                Debug.WriteLine($"After foreach: PendingNotes.Count={PendingNotes.Count}");
+                Debug.WriteLine($"[{sw.ElapsedMilliseconds}ms] Added {PendingNotes.Count} to collection");
 
                 OnPropertyChanged(nameof(HasPending));
+                Debug.WriteLine($"[{sw.ElapsedMilliseconds}ms] Notified");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"PendingApprovalsViewModel.LoadAsync failed: {ex.Message}");
+                Debug.WriteLine($"LoadAsync failed: {ex.Message}");
             }
         }
 

@@ -373,7 +373,6 @@ namespace Sati.ViewModels
                 var (_, wasCreated) = await _incentiveService.GetOrCreateAsync(
     LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
                 await RefreshIncentiveAsync();
-                _daysWorkedToDate = await _incentiveService.GetDaysWorkedToDateAsync(DateTime.Now.Month, DateTime.Now.Year);
                 if (wasCreated)
                     PromptSchedulerRequested?.Invoke(this, true);
 
@@ -574,6 +573,9 @@ namespace Sati.ViewModels
             var (incentive, _) = await _incentiveService.GetOrCreateAsync(
                 LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
             _incentive = incentive;
+            _daysWorkedToDate = await _incentiveService.GetDaysWorkedToDateAsync(
+                DateTime.Now.Month, DateTime.Now.Year);
+
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
             OnPropertyChanged(nameof(EstimatedIncentive));

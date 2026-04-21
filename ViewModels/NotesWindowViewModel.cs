@@ -31,7 +31,10 @@ namespace Sati.ViewModels
 
 ];
 
-        public ObservableCollection<Person?> FilterPeople { get; } = [null];
+        private static readonly Person AllPersonsSentinel = Person.CreateSentinel("All Persons");
+
+        public ObservableCollection<Person?> FilterPeople { get; } = [AllPersonsSentinel];
+
 
         [ObservableProperty] private Person? selectedFilterPerson;
         [ObservableProperty] private Note? selectedNote;
@@ -81,16 +84,17 @@ namespace Sati.ViewModels
             if (obj is not Note note) return false;
 
             var matchesPerson = SelectedFilterPerson is null
+                || ReferenceEquals(SelectedFilterPerson, AllPersonsSentinel)
                 || note.PersonId == SelectedFilterPerson.Id;
 
             var matchesSearch = string.IsNullOrWhiteSpace(SearchText)
                 || note.Narrative.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
 
-            var matchesStatus = FilterStatus?.Value is null
-    || note.Status == FilterStatus.Value;
+            var matchesStatus = FilterStatus is null || note.Status == FilterStatus.Value;
 
             return matchesPerson && matchesSearch && matchesStatus;
         }
+
         public async Task ReloadAsync()
         {
             _allNotes.Clear();
