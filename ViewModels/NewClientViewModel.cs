@@ -18,6 +18,7 @@ namespace Sati.ViewModels
         private readonly IPersonService _personService;
         private readonly INoteService _noteService;
         private readonly IFormService _formService;
+        private readonly ISettingsService _settingsService;
 
         // -------------------------------------------------------------------------
         // Events
@@ -142,12 +143,13 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
 
         public NewClientViewModel(IPersonService personService, ISessionService session,
-            INoteService noteService, IFormService formService)
+                   INoteService noteService, IFormService formService, ISettingsService settingsService)
         {
             _personService = personService;
             _sessionService = session;
             _noteService = noteService;
             _formService = formService;
+            _settingsService = settingsService;
             _ = LoadPeopleAsync();
         }
 
@@ -172,6 +174,7 @@ namespace Sati.ViewModels
                 return;
 
             var effectiveDate = TryGetEffectiveDate(EffectiveDateText);
+            var settings = await _settingsService.LoadAsync();
 
             if (IsEditMode && SelectedPerson is Person existing)
             {
@@ -187,7 +190,7 @@ namespace Sati.ViewModels
 
                 if (wasNoWaiver && isAddingWaiver && effectiveDate is not null)
                 {
-                    var forms = Person.GenerateFormList(effectiveDate.Value);
+                    var forms = Person.GenerateFormList(effectiveDate.Value, settings);
                     existing.Forms = forms;
                     var confirmed = ComplianceReviewRequested?.Invoke(existing.Forms) ?? true;
                     if (!confirmed)
@@ -212,7 +215,7 @@ namespace Sati.ViewModels
             else
             {
                 var person = Person.CreatePerson(_sessionService.CurrentUser!.Id,
-                    FirstName!, LastName!, Bio!, BirthDate!.Value, effectiveDate, Waiver);
+                    FirstName!, LastName!, Bio!, BirthDate!.Value, effectiveDate, Waiver, settings);
                 var confirmed = ComplianceReviewRequested?.Invoke(person.Forms) ?? true;
                 if (!confirmed)
                     return;

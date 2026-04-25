@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sati.Data;
 
@@ -11,9 +12,11 @@ using Sati.Data;
 namespace Sati.Migrations
 {
     [DbContext(typeof(SatiContext))]
-    partial class SatiContextModelSnapshot : ModelSnapshot
+    [Migration("20260425184458_AddOpenedDateAndAnniversaryOffsets")]
+    partial class AddOpenedDateAndAnniversaryOffsets
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -101,18 +104,12 @@ namespace Sati.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ComplianceExceptionReason")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime>("DateOfService")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("DiagnosisCode")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsComplianceException")
-                        .HasColumnType("bit");
 
                     b.Property<int>("NoteId")
                         .HasColumnType("int");
@@ -232,9 +229,6 @@ namespace Sati.Migrations
                     b.Property<int?>("ApprovedById")
                         .HasColumnType("int");
 
-                    b.Property<bool>("ComplianceOverride")
-                        .HasColumnType("bit");
-
                     b.Property<DateTime?>("EventDate")
                         .HasColumnType("datetime2");
 
@@ -247,15 +241,6 @@ namespace Sati.Migrations
 
                     b.Property<int?>("NoteType")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("OverrideApprovedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("OverrideApprovedById")
-                        .HasColumnType("int");
-
-                    b.Property<string>("OverrideReason")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("PersonId")
                         .HasColumnType("int");

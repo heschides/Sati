@@ -49,7 +49,7 @@ namespace Sati.Services.Billing
                 .ToListAsync();
         }
 
-        public async Task<ClaimLine> CreateClaimLineAsync(int noteId)
+        public async Task<ClaimLine> CreateClaimLineAsync(int noteId, bool isComplianceException = false, string? complianceExceptionReason = null)
         {
             await using var context = _contextFactory.CreateDbContext();
 
@@ -70,12 +70,12 @@ namespace Sati.Services.Billing
                 note.EventDate.Value.Month,
                 note.EventDate.Value.Year);
 
-            var procedureCode = note.Person.Waiver switch
-            {
-                WaiverType.Section21 => "T2041",
-                WaiverType.Section29 => "T2042",
-                _ => throw new InvalidOperationException($"Unknown waiver type for person {note.PersonId}.")
-            };
+            // T1016 — Targeted Case Management (Maine Section 17).
+            // Procedure code is fixed for the case management department.
+            // Future departments (residential, day program) will have their
+            // own codes; at that point this becomes a department-driven lookup
+            // rather than a constant. For now, one department, one code.
+            const string procedureCode = "T1016";
 
             var claimLine = new ClaimLine
             {
@@ -87,8 +87,9 @@ namespace Sati.Services.Billing
                 ClientMaineCareId = note.Person.MaineCareId ?? string.Empty,
                 RenderingProviderNpi = note.Person.Agency?.Npi ?? string.Empty,
                 DiagnosisCode = note.Person.DiagnosisCode ?? string.Empty,
-                PlaceOfService = (int?)note.Person.PlaceOfService ?? (int)PlaceOfService.Other
-
+                PlaceOfService = (int?)note.Person.PlaceOfService ?? (int)PlaceOfService.Other,
+                IsComplianceException = isComplianceException,
+                ComplianceExceptionReason = complianceExceptionReason
             };
 
             context.ClaimLines.Add(claimLine);

@@ -60,15 +60,24 @@ namespace Sati
         Other
     }
 
-        public enum FormComplianceStatus
-        {
-            NotYetDue,
-            InWindow,
-            CompliantOnTime,
-            CompliantLate,
-            Overdue,
-            NoForm
-        }
+    public enum FormComplianceStatus
+    {
+        NotYetDue,
+        InWindow,
+        CompliantOnTime,
+        CompliantLate,
+        Overdue,
+        NoForm
+    }
+
+    public enum FormCellStatus
+    {
+        Complete,
+        DueThisMonth,
+        DueNextMonth,
+        NotYetOpen,
+        Overdue
+    }
 
     //Billing
 

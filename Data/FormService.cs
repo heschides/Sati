@@ -20,5 +20,15 @@ namespace Sati.Data
             context.Forms.Update(form);
             await context.SaveChangesAsync();
         }
+
+        public async Task OpenFormAsync(Form form)
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            form.OpenedDate = DateTime.Today;
+            context.Forms.Update(form);
+            await context.SaveChangesAsync();
+        }
+    
     }
 }
+

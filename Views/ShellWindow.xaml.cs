@@ -51,13 +51,19 @@ namespace Sati.Views
             _caseManagerDashboardViewModel.MarkFormCompleteRequested += (s, formType) =>
             {
                 var result = MessageBox.Show(
-                    $"Would you like to mark the {formType} requirement complete?",
-                    "Mark Form Complete",
+                    $"Did you complete the {formType} today?",
+                    "Form Status",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
+                // Yes: form is done — mark compliant, set CompletedDate.
+                // No: form was worked on but not finished — set OpenedDate so
+                //     the matrix can show the open-form indicator.
+                // Anything else (X-button → MessageBoxResult.None): no change.
                 if (result == MessageBoxResult.Yes)
                     _ = _caseManagerDashboardViewModel.MarkFormCompleteAsync(formType);
+                else if (result == MessageBoxResult.No)
+                    _ = _caseManagerDashboardViewModel.OpenFormAsync(formType);
             };
 
             _caseManagerDashboardViewModel.PromptSchedulerRequested += (s, e) =>

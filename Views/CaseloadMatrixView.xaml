@@ -39,7 +39,7 @@
         <Style x:Key="MatrixCell"
                TargetType="Border">
             <Setter Property="BorderBrush"
-                    Value="Tan" />
+                    Value="#C8A882" />
             <Setter Property="BorderThickness"
                     Value="0.5" />
             <Setter Property="MinWidth"
@@ -128,7 +128,21 @@
                             BorderBrush="#C8B8A4"
                             BorderThickness="0.5"
                             Margin="0,0,6,0" />
-                    <TextBlock Text="Compliant"
+                    <TextBlock Text="Complete"
+                               FontSize="12"
+                               Foreground="#3D2B1F"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,16,0">
+                    <Border Width="13"
+                            Height="13"
+                            CornerRadius="3"
+                            Background="#F2B17A"
+                            BorderBrush="#C8B8A4"
+                            BorderThickness="0.5"
+                            Margin="0,0,6,0" />
+                    <TextBlock Text="Due this month"
                                FontSize="12"
                                Foreground="#3D2B1F"
                                VerticalAlignment="Center" />
@@ -142,7 +156,7 @@
                             BorderBrush="#C8B8A4"
                             BorderThickness="0.5"
                             Margin="0,0,6,0" />
-                    <TextBlock Text="Window open"
+                    <TextBlock Text="Due next month"
                                FontSize="12"
                                Foreground="#3D2B1F"
                                VerticalAlignment="Center" />
@@ -161,29 +175,15 @@
                                Foreground="#3D2B1F"
                                VerticalAlignment="Center" />
                 </StackPanel>
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,0,16,0">
-                    <Border Width="13"
-                            Height="13"
-                            CornerRadius="3"
-                            Background="#E8E0D3"
-                            BorderBrush="#C8B8A4"
-                            BorderThickness="0.5"
-                            Margin="0,0,6,0" />
-                    <TextBlock Text="Not yet due"
-                               FontSize="12"
-                               Foreground="#3D2B1F"
-                               VerticalAlignment="Center" />
-                </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <Border Width="13"
                             Height="13"
                             CornerRadius="3"
-                            Background="#C8A882"
-                            BorderBrush="#C8B8A4"
-                            BorderThickness="0.5"
+                            Background="Transparent"
+                            BorderBrush="#C87941"
+                            BorderThickness="2"
                             Margin="0,0,6,0" />
-                    <TextBlock Text="No form"
+                    <TextBlock Text="Open (in progress)"
                                FontSize="12"
                                Foreground="#3D2B1F"
                                VerticalAlignment="Center" />
@@ -311,6 +311,48 @@
 
                 <!-- Data rows -->
                 <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.Resources>
+                 
+                        <DataTemplate x:Key="MatrixCellTemplate">
+                            <Border BorderBrush="#C8B8A4"
+                                    BorderThickness="0.5"
+                                    MinWidth="78"
+                                    Height="48"
+                                    Padding="4,6"
+                                    Background="{Binding Status,
+                                                 Converter={StaticResource FormCellStatusToBrushConverter}}">
+                                <Grid>
+                              
+                                    <Border BorderBrush="#3D2B1F "
+                                            BorderThickness="2"
+                                            Margin="-4,-6">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility"
+                                                        Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsOpen}"
+                                                                 Value="True">
+                                                        <Setter Property="Visibility"
+                                                                Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
+
+                                    <TextBlock Text="{Binding CellText}"
+                                               FontSize="9"
+                                               Foreground="#3D2B1F"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               LineHeight="13" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.Resources>
+
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Grid>
@@ -339,150 +381,42 @@
                                                Style="{StaticResource ClientNameCell}" />
                                 </Border>
 
-                                <Border Grid.Column="1"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding CompAssessmentBrush}">
-                                    <TextBlock Text="{Binding CompAssessmentLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="2"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding PcpBrush}">
-                                    <TextBlock Text="{Binding PcpLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="3"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding Q1RBrush}">
-                                    <TextBlock Text="{Binding Q1RLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="4"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding Q2RBrush}">
-                                    <TextBlock Text="{Binding Q2RLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="5"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding Q3RBrush}">
-                                    <TextBlock Text="{Binding Q3RLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="6"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding Q4RBrush}">
-                                    <TextBlock Text="{Binding Q4RLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="7"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding ReclassBrush}">
-                                    <TextBlock Text="{Binding ReclassLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="8"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding SafetyPlanBrush}">
-                                    <TextBlock Text="{Binding SafetyPlanLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="9"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding PrivacyBrush}">
-                                    <TextBlock Text="{Binding PrivacyLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="10"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding ReleaseAgencyBrush}">
-                                    <TextBlock Text="{Binding ReleaseAgencyLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="11"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding ReleaseDhhsBrush}">
-                                    <TextBlock Text="{Binding ReleaseDhhsLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
-                                <Border Grid.Column="12"
-                                        Style="{StaticResource MatrixCell}"
-                                        Background="{Binding ReleaseMedicalBrush}">
-                                    <TextBlock Text="{Binding ReleaseMedicalLabel}"
-                                               FontSize="9"
-                                               Foreground="#3D2B1F"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               TextAlignment="Center"
-                                               LineHeight="13" />
-                                </Border>
-
+                                <ContentControl Grid.Column="1"
+                                                Content="{Binding CompAssessment}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="2"
+                                                Content="{Binding Pcp}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="3"
+                                                Content="{Binding Q1R}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="4"
+                                                Content="{Binding Q2R}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="5"
+                                                Content="{Binding Q3R}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="6"
+                                                Content="{Binding Q4R}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="7"
+                                                Content="{Binding Reclassification}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="8"
+                                                Content="{Binding SafetyPlan}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="9"
+                                                Content="{Binding PrivacyPractices}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="10"
+                                                Content="{Binding ReleaseAgency}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="11"
+                                                Content="{Binding ReleaseDhhs}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
+                                <ContentControl Grid.Column="12"
+                                                Content="{Binding ReleaseMedical}"
+                                                ContentTemplate="{StaticResource MatrixCellTemplate}" />
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

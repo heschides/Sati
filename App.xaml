@@ -251,6 +251,7 @@
         <converters:BoolToWidthConverter x:Key="SpacerWidthConverter"
                                          TrueWidth="16"
                                          FalseWidth="0" />
+        <converters:FormCellStatusToBrushConverter x:Key="FormCellStatusToBrushConverter" />
         <!-- View → ViewModel DataTemplates -->
         <DataTemplate DataType="{x:Type viewmodels:CaseManagerDashboardViewModel}">
             <views:CaseManagerDashboardView />

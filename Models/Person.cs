@@ -1,4 +1,5 @@
-﻿using Sati.Models;
+﻿using Sati.Data;
+using Sati.Models;
 
 namespace Sati
 {
@@ -42,7 +43,7 @@ namespace Sati
         // -------------------------------------------------------------------------
 
         public static Person CreatePerson(int userId, string firstName, string lastName,
-            string bio, DateTime birthdate, DateTime? effective, WaiverType waiver)
+                   string bio, DateTime birthdate, DateTime? effective, WaiverType waiver, Settings settings)
         {
             var person = new Person
             {
@@ -58,7 +59,7 @@ namespace Sati
             if (effective is null)
                 return person;
 
-            person.Forms = GenerateFormList(effective.Value);
+            person.Forms = GenerateFormList(effective.Value, settings);
             return person;
         }
 
@@ -79,43 +80,59 @@ namespace Sati
         // Methods
         // -------------------------------------------------------------------------
 
-        public static List<Form> GenerateFormList(DateTime effective)
+        public static List<Form> GenerateFormList(DateTime effective, Settings settings)
         {
-            return
-            [
-                new Form { DueDate = effective.AddDays(90),  Type = FormType.Q1R,                   IsCompliant = true },
-                new Form { DueDate = effective.AddDays(180), Type = FormType.Q2R,                   IsCompliant = true },
-                new Form { DueDate = effective.AddDays(270), Type = FormType.Q3R,                   IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1), Type = FormType.Q4R,                   IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1), Type = FormType.PCP,                   IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1), Type = FormType.Reclassification,      IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1), Type = FormType.ComprehensiveAssessment, IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1), Type = FormType.Release_Agency,        IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1).AddDays(365), Type = FormType.Release_DHHS,          IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1).AddDays(365), Type = FormType.Release_Medical,       IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1).AddDays(365), Type = FormType.SafetyPlan,            IsCompliant = true },
-                new Form { DueDate = effective.AddYears(1).AddDays(365), Type = FormType.PrivacyPractices,      IsCompliant = true },
-            ];
+            // First-cycle generation: cycleStart is the effective date itself,
+            // cycleEnd is one year later. All due dates flow through the
+            // calculator so this method never carries shadow math.
+            var cycleStart = effective;
+            var cycleEnd = effective.AddYears(1);
+
+            return Enum.GetValues<FormType>()
+                .Select(type => new Form
+                {
+                    Type = type,
+                    DueDate = FormDueDateCalculator.Compute(type, cycleStart, cycleEnd, settings),
+                    IsCompliant = true
+                })
+                .ToList();
         }
 
-        public Form? GetCurrentCycleForm(FormType type)
+
+
+        // Returns (cycleStart, cycleEnd) bracketing the cycle that contains `today`.
+        // cycleStart is the most recent anniversary on or before today; cycleEnd
+        // is the next anniversary. Returns null if EffectiveDate is unset.
+        //
+        // Why a helper instead of duplicating the math: GetCurrentCycleForm and
+        // EnsureCurrentCycleForms both need it, and shadow copies drift.
+        public (DateTime cycleStart, DateTime cycleEnd)? GetCurrentCycleBoundaries(DateTime today)
         {
             if (EffectiveDate is null)
                 return null;
 
             var effective = EffectiveDate.Value;
-            var today = DateTime.Today;
             var yearsElapsed = today.Year - effective.Year;
             if (today < effective.AddYears(yearsElapsed))
                 yearsElapsed--;
 
             var cycleStart = effective.AddYears(yearsElapsed);
             var cycleEnd = effective.AddYears(yearsElapsed + 1);
+            return (cycleStart, cycleEnd);
+        }
+
+        public Form? GetCurrentCycleForm(FormType type)
+        {
+            var boundaries = GetCurrentCycleBoundaries(DateTime.Today);
+            if (boundaries is null)
+                return null;
+
+            var (cycleStart, cycleEnd) = boundaries.Value;
 
             var currentCycle = Forms
                 .Where(f => f.Type == type &&
                             f.DueDate >= cycleStart &&
-                            f.DueDate < cycleEnd)
+                            f.DueDate <= cycleEnd)
                 .OrderByDescending(f => f.DueDate)
                 .FirstOrDefault();
 
@@ -176,5 +193,47 @@ namespace Sati
                 => settings.ReleaseMedicalOpenDaysBefore,
             _ => 30
         };
+
+        // Generates form records for the current cycle if they don't already exist.
+        // Called by PersonService.GetAllPeopleAsync on every load — idempotent, so
+        // calling it when forms already exist is a no-op.
+        //
+        // Returns true if any forms were added (caller should save). Returns false
+        // if nothing changed.
+        //
+        // Why this exists: without it, a client past their first anniversary keeps
+        // showing only first-cycle forms. The matrix would show those forms as
+        // "complete" indefinitely — the false-green problem.
+        public bool EnsureCurrentCycleForms(DateTime today, Settings settings)
+        {
+            var boundaries = GetCurrentCycleBoundaries(today);
+            if (boundaries is null)
+                return false;
+
+            var (cycleStart, cycleEnd) = boundaries.Value;
+            var added = false;
+
+            foreach (var type in Enum.GetValues<FormType>())
+            {
+                var existsForCycle = Forms.Any(f =>
+                    f.Type == type &&
+                    f.DueDate >= cycleStart &&
+                    f.DueDate <= cycleEnd);
+
+                if (existsForCycle)
+                    continue;
+
+                Forms.Add(new Form
+                {
+                    Type = type,
+                    DueDate = FormDueDateCalculator.Compute(type, cycleStart, cycleEnd, settings),
+                    IsCompliant = false,    // see comment in GenerateFormList re: opposite default
+                    PersonId = Id
+                });
+                added = true;
+            }
+
+            return added;
+        }
     }
 }

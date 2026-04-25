@@ -51,7 +51,7 @@ namespace Sati.Models
         public int ReviewDaysAfterDue { get; set; }
 
         // PCP
-        public int PcpOpenDaysBefore { get; set; }
+        public int PcpOpenDaysBefore { get; set; } = 90;
         public int PcpDaysAfterDue { get; set; }
 
         // Comprehensive Assessment
@@ -79,5 +79,18 @@ namespace Sati.Models
 
         public int ReleaseMedicalOpenDaysBefore { get; set; }
         public int ReleaseMedicalDaysAfterDue { get; set; }
+
+        // EVENT DATE OFFSETS (anniversary − N days = due date)
+        // These set when each annual form is *due*, distinct from when it
+        // opens in the upcoming-events dashboard (*OpenDaysBefore above).
+
+        public int PcpDaysBeforeAnniversary { get; set; }
+        public int CompAssessmentDaysBeforeAnniversary { get; set; }
+        public int ReclassificationDaysBeforeAnniversary { get; set; }
+        public int SafetyPlanDaysBeforeAnniversary { get; set; }
+        public int PrivacyPracticesDaysBeforeAnniversary { get; set; }
+        public int ReleaseAgencyDaysBeforeAnniversary { get; set; }
+        public int ReleaseDhhsDaysBeforeAnniversary { get; set; }
+        public int ReleaseMedicalDaysBeforeAnniversary { get; set; }
     }
 }

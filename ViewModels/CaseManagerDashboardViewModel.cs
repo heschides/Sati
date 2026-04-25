@@ -267,7 +267,12 @@ namespace Sati.ViewModels
         [RelayCommand] private void NavigateToOverview() => CurrentSubViewModel = null;
         [RelayCommand] private void NavigateToClients() => CurrentSubViewModel = Clients;
         [RelayCommand] private void NavigateToNotesLog() => CurrentSubViewModel = NotesLog;
-        [RelayCommand] private void NavigateToMatrix() => CurrentSubViewModel = Matrix;
+        [RelayCommand]
+        private void NavigateToMatrix() 
+        {
+            Matrix?.Rebuild(People, DateTime.Today);
+            CurrentSubViewModel = Matrix;
+        }
         [RelayCommand] private void OpenScheduler() => IsSchedulerOpen = !IsSchedulerOpen;
 
         [RelayCommand] private void IncreaseNarrativeFont() => NarrativeFontSize = Math.Min(NarrativeFontSize + 2, 28);
@@ -360,10 +365,10 @@ namespace Sati.ViewModels
             {
                 if (LoggedInUser is null)
                     return;
-
                 _settings = await _settingsService.LoadAsync();
                 await LoadPeopleAsync();
-                Matrix = new CaseloadMatrixViewModel(People, _settings);
+                Matrix = new CaseloadMatrixViewModel();
+                Matrix.Rebuild(People, DateTime.Today);
                 OnPropertyChanged(nameof(Matrix));
                 OnPropertyChanged(nameof(EffectiveDateGroups));
                 await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
@@ -521,8 +526,23 @@ namespace Sati.ViewModels
                 return;
 
             form.IsCompliant = true;
+            form.CompletedDate = DateTime.Today;
             await _formService.UpdateFormAsync(form);
             RefreshComplianceFlags();
+            Matrix?.Rebuild(People, DateTime.Today);
+        }
+
+        public async Task OpenFormAsync(FormType formType)
+        {
+            if (SelectedPerson is null)
+                return;
+
+            var form = SelectedPerson.GetCurrentCycleForm(formType);
+            if (form is null)
+                return;
+
+            await _formService.OpenFormAsync(form);
+            Matrix?.Rebuild(People, DateTime.Today);
         }
 
         private void RefreshComplianceFlags()

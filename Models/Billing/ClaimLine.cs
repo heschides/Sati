@@ -14,6 +14,9 @@
         public string DiagnosisCode { get; set; } = string.Empty;
         public int PlaceOfService { get; set; }
 
+        public bool IsComplianceException { get; set; }
+        public string? ComplianceExceptionReason { get; set; }
+
         public BillingPeriod BillingPeriod { get; set; } = null!;
         public Note Note { get; set; } = null!;
     }

@@ -14,11 +14,16 @@
 	
 	<ItemGroup>
 	  <None Remove="images\icon.ico" />
-	  <None Remove="images\leaf.png" />
+	  <None Remove="images\sati.ico" />
+	</ItemGroup>	
+	
+	<ItemGroup>
+	  <Content Include="images\sati.ico">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
 	</ItemGroup>
 
   <ItemGroup>
-    <Resource Include="images\leaf.png" />
     <Resource Include="Images\satisplash.png" />
   </ItemGroup>
 

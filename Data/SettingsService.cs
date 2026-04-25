@@ -23,7 +23,7 @@ namespace Sati.Data
                 {
                     ReviewOpenDaysBefore = 10,
                     ReviewDaysAfterDue = 10,
-                    PcpOpenDaysBefore = 30,
+                    PcpOpenDaysBefore = 90,
                     PcpDaysAfterDue = 30,
                     CompAssessmentOpenDaysBefore = 30,
                     CompAssessmentDaysAfterDue = 30,
@@ -39,6 +39,19 @@ namespace Sati.Data
                     ReleaseDhhsDaysAfterDue = 30,
                     ReleaseMedicalOpenDaysBefore = 30,
                     ReleaseMedicalDaysAfterDue = 30,
+                    // Anniversary offsets (anniversary − N days = due date).
+                    // PCP, Safety Plan, Privacy Practices, and Releases are due
+                    // on the anniversary itself. Comp Assessment is due 120 days
+                    // earlier so the next year's PCP can be informed by it.
+                    // Reclassification is due 30 days earlier (Evergreen workflow).
+                    PcpDaysBeforeAnniversary = 0,
+                    CompAssessmentDaysBeforeAnniversary = 120,
+                    ReclassificationDaysBeforeAnniversary = 30,
+                    SafetyPlanDaysBeforeAnniversary = 0,
+                    PrivacyPracticesDaysBeforeAnniversary = 0,
+                    ReleaseAgencyDaysBeforeAnniversary = 0,
+                    ReleaseDhhsDaysBeforeAnniversary = 0,
+                    ReleaseMedicalDaysBeforeAnniversary = 0,
                 };
 
                 context.Settings.Add(settings);

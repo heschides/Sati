@@ -38,9 +38,9 @@
 
             <!-- Status dropdown -->
             <ComboBox Grid.Column="2"
-                      ItemsSource="{Binding FilterStatusOptions}"
-                      SelectedItem="{Binding FilterStatus, Mode=TwoWay}"
-                      DisplayMemberPath="Label">
+                      ItemsSource="{Binding StatusOptions}"
+                      SelectedItem="{Binding SelectedStatusOption, Mode=TwoWay}"
+                      DisplayMemberPath="Display">
             </ComboBox>
 
             <!-- Search box -->

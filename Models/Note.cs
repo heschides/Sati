@@ -24,6 +24,11 @@ namespace Sati.Models
         public DateTime? ApprovedAt { get; set; }
         public DateTime? ReturnedAt { get; set; }
 
+        public bool ComplianceOverride { get; set; }
+        public string? OverrideReason { get; set; }
+        public int? OverrideApprovedById { get; set; }
+        public DateTime? OverrideApprovedAt { get; set; }
+
         private protected Note() { }
 
         public static Note Create( string narrative, DateTime? eventDate, NoteStatus? status, decimal? unitCount, int personId, FormType? formType=null, NoteType? noteType = null)

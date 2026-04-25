@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.Serialization.Formatters;
-using System.Text;
-
-
-namespace Sati.Models
+﻿namespace Sati.Models
 {
     public class Form
     {
@@ -15,5 +9,6 @@ namespace Sati.Models
         public Person Person { get; set; } = null!; 
         public int PersonId { get; set; }
         public DateTime? CompletedDate { get; set; }
+        public DateTime? OpenedDate { get; set; }
     }
 }
