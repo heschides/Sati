@@ -1,0 +1,432 @@
+﻿<UserControl x:Class="Sati.Views.Billing.BillingQueueView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:billing="clr-namespace:Sati.ViewModels.Billing"
+             Background="#FDF6EC"
+             TextElement.FontFamily="{StaticResource AppFont}">
+
+    <Grid Margin="24,24,24,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ================================================================ -->
+        <!-- HEADER                                                            -->
+        <!-- ================================================================ -->
+        <TextBlock Grid.Row="0"
+                   Text="BILLING QUEUE"
+                   FontSize="13"
+                   FontWeight="Bold"
+                   Foreground="#3D2B1F"
+                   Margin="0,0,0,4" />
+
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    Margin="0,0,0,16">
+            <TextBlock FontSize="12"
+                       Foreground="#9C7A5C">
+                <Run Text="{Binding ValidCount, Mode=OneWay}" />
+                <Run Text="ready" />
+            </TextBlock>
+            <TextBlock Text="  ·  "
+                       FontSize="12"
+                       Foreground="#C8A882" />
+            <TextBlock FontSize="12"
+                       Foreground="#9C7A5C">
+                <Run Text="{Binding InvalidCount, Mode=OneWay}" />
+                <Run Text="need attention" />
+            </TextBlock>
+            <TextBlock Text="  ·  "
+                       FontSize="12"
+                       Foreground="#C8A882"
+                       Visibility="{Binding SelectedValidCount,
+                                    Converter={StaticResource BoolToVisibilityConverter}}" />
+            <TextBlock FontSize="12"
+                       Foreground="#C87941"
+                       Visibility="{Binding SelectedValidCount,
+                                    Converter={StaticResource BoolToVisibilityConverter}}">
+                <Run Text="{Binding SelectedValidCount, Mode=OneWay}" />
+                <Run Text="selected" />
+            </TextBlock>
+        </StackPanel>
+
+        <!-- ================================================================ -->
+        <!-- COLUMN HEADERS                                                    -->
+        <!-- ================================================================ -->
+        <Grid Grid.Row="2"
+              Margin="8,0,8,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="32" />
+                <ColumnDefinition Width="160" />
+                <ColumnDefinition Width="110" />
+                <ColumnDefinition Width="60" />
+                <ColumnDefinition Width="50" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="90" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="1"
+                       Text="CLIENT"
+                       Style="{StaticResource LabelStyle}" />
+            <TextBlock Grid.Column="2"
+                       Text="SERVICE DATE"
+                       Style="{StaticResource LabelStyle}" />
+            <TextBlock Grid.Column="3"
+                       Text="UNITS"
+                       Style="{StaticResource LabelStyle}" />
+            <TextBlock Grid.Column="4"
+                       Text="CODE"
+                       Style="{StaticResource LabelStyle}" />
+            <TextBlock Grid.Column="5"
+                       Text="ISSUES"
+                       Style="{StaticResource LabelStyle}" />
+        </Grid>
+
+        <Separator Grid.Row="2"
+                   VerticalAlignment="Bottom"
+                   Margin="8,0,8,0" />
+
+        <!-- ================================================================ -->
+        <!-- BUSY INDICATOR                                                    -->
+        <!-- ================================================================ -->
+        <TextBlock Grid.Row="3"
+                   Text="Loading..."
+                   FontSize="12"
+                   Foreground="#9C7A5C"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Visibility="{Binding IsBusy,
+                                Converter={StaticResource BoolToVisibilityConverter}}" />
+
+        <!-- ================================================================ -->
+        <!-- EMPTY STATE                                                       -->
+        <!-- ================================================================ -->
+        <TextBlock Grid.Row="3"
+                   Text="No approved notes are waiting for billing."
+                   FontSize="12"
+                   Foreground="#9C7A5C"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility"
+                            Value="Collapsed" />
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsBusy}"
+                                           Value="False" />
+                                <Condition Binding="{Binding ValidCount}"
+                                           Value="0" />
+                                <Condition Binding="{Binding InvalidCount}"
+                                           Value="0" />
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility"
+                                    Value="Visible" />
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <!-- ================================================================ -->
+        <!-- QUEUE LIST                                                        -->
+        <!-- ================================================================ -->
+        <ListView Grid.Row="3"
+                  ItemsSource="{Binding QueueItems}"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  HorizontalContentAlignment="Stretch"
+                  VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling"
+                  Visibility="{Binding IsBusy,
+                               Converter={StaticResource InverseBoolToVisibilityConverter}}">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding"
+                            Value="0,6" />
+                    <Setter Property="Background"
+                            Value="Transparent" />
+                    <Setter Property="BorderThickness"
+                            Value="0,0,0,1" />
+                    <Setter Property="BorderBrush"
+                            Value="#F0E4D0" />
+                    <Setter Property="HorizontalContentAlignment"
+                            Value="Stretch" />
+                    <Setter Property="Focusable"
+                            Value="False" />
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter Property="Background"
+                                    Value="#FAF2E8" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </ListView.ItemContainerStyle>
+
+            <ListView.ItemTemplate>
+                <DataTemplate DataType="{x:Type billing:BillingQueueItemViewModel}">
+                    <Grid Margin="8,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="32" />
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="60" />
+                            <ColumnDefinition Width="50" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="90" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Checkbox -->
+                        <CheckBox Grid.Column="0"
+                                  IsChecked="{Binding IsSelected}"
+                                  IsEnabled="{Binding IsValid}"
+                                  VerticalAlignment="Center" />
+
+                        <!-- Client name -->
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Result.Note.Person.FullName}"
+                                   FontSize="13"
+                                   Foreground="#3D2B1F"
+                                   VerticalAlignment="Center" />
+
+                        <!-- Service date -->
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding Result.Note.EventDate, StringFormat='MMM d, yyyy'}"
+                                   FontSize="13"
+                                   Foreground="#3D2B1F"
+                                   VerticalAlignment="Center" />
+
+                        <!-- Units -->
+                        <TextBlock Grid.Column="3"
+                                   Text="{Binding Result.Note.Units}"
+                                   FontSize="13"
+                                   Foreground="#3D2B1F"
+                                   VerticalAlignment="Center" />
+
+                        <!-- Procedure code -->
+                        <TextBlock Grid.Column="4"
+                                   Text="T1016"
+                                   FontSize="13"
+                                   Foreground="#9C7A5C"
+                                   VerticalAlignment="Center" />
+
+                        <!-- Issues -->
+                        <StackPanel Grid.Column="5"
+                                    VerticalAlignment="Center">
+
+                            <Border Background="#FFF3CD"
+                                    BorderBrush="#F0C040"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Padding="6,2"
+                                    Margin="0,0,0,2"
+                                    HorizontalAlignment="Left"
+                                    Visibility="{Binding IsComplianceOverride,
+                                                 Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="Compliance override"
+                                           FontSize="11"
+                                           Foreground="#7A5800" />
+                            </Border>
+
+                            <ItemsControl ItemsSource="{Binding Result.Errors}"
+                                          Visibility="{Binding IsValid,
+                                                       Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}"
+                                                   FontSize="11"
+                                                   Foreground="#A85E28"
+                                                   Margin="0,1" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="Ready"
+                                       FontSize="11"
+                                       Foreground="#5A7A3A"
+                                       Visibility="{Binding IsValid,
+                                                    Converter={StaticResource BoolToVisibilityConverter}}" />
+                        </StackPanel>
+
+                        <!-- Per-row promote button -->
+                        <Button Grid.Column="6"
+                                Content="Promote"
+                                Command="{Binding DataContext.PromoteCommand,
+                                          RelativeSource={RelativeSource AncestorType=ListView}}"
+                                CommandParameter="{Binding}"
+                                IsEnabled="{Binding IsValid}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Padding="12,6"
+                                FontSize="12"
+                                BorderThickness="0"
+                                Cursor="Hand">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Background"
+                                            Value="#A8C48A" />
+                                    <Setter Property="Foreground"
+                                            Value="#2A4A10" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}"
+                                                        CornerRadius="4">
+                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"
+                                                                      Margin="{TemplateBinding Padding}" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver"
+                                                             Value="True">
+                                                        <Setter Property="Background"
+                                                                Value="#8AAE6A" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsEnabled"
+                                                             Value="False">
+                                                        <Setter Property="Opacity"
+                                                                Value="0.4" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- ================================================================ -->
+        <!-- FOOTER                                                            -->
+        <!-- ================================================================ -->
+        <Border Grid.Row="4"
+                HorizontalAlignment="Right"
+                Margin="0,12,0,0">
+            <StackPanel Orientation="Horizontal">
+
+                <Button Content="Select all ready"
+                        Command="{Binding SelectAllReadyCommand}"
+                        Margin="0,0,8,0"
+                        Padding="12,6"
+                        FontSize="12"
+                        BorderThickness="0"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background"
+                                    Value="#C8DDB0" />
+                            <Setter Property="Foreground"
+                                    Value="#2A4A10" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="4">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Margin="{TemplateBinding Padding}" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver"
+                                                     Value="True">
+                                                <Setter Property="Background"
+                                                        Value="#A8C48A" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <Button Content="Promote selected"
+                        Command="{Binding PromoteSelectedCommand}"
+                        Margin="0,0,8,0"
+                        Padding="12,6"
+                        FontSize="12"
+                        BorderThickness="0"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background"
+                                    Value="#A8C48A" />
+                            <Setter Property="Foreground"
+                                    Value="#2A4A10" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="4">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Margin="{TemplateBinding Padding}" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver"
+                                                     Value="True">
+                                                <Setter Property="Background"
+                                                        Value="#8AAE6A" />
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled"
+                                                     Value="False">
+                                                <Setter Property="Opacity"
+                                                        Value="0.4" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <Button Content="Refresh"
+                        Command="{Binding RefreshCommand}"
+                        Padding="12,6"
+                        FontSize="12"
+                        BorderThickness="0"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background"
+                                    Value="#C4B8D8" />
+                            <Setter Property="Foreground"
+                                    Value="#3A2A5A" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="4">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Margin="{TemplateBinding Padding}" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver"
+                                                     Value="True">
+                                                <Setter Property="Background"
+                                                        Value="#A89CC0" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</UserControl>

@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sati.Data;
 using Sati.Data.Billing;
+using Sati.Models;
 using Sati.Models.Billing;
 
 namespace Sati.Services.Billing
@@ -80,11 +81,6 @@ namespace Sati.Services.Billing
                 note.EventDate.Value.Month,
                 note.EventDate.Value.Year);
 
-            // T1016 — Targeted Case Management (Maine Section 17).
-            // Procedure code is fixed for the case management department.
-            // Future departments (residential, day program) will have their
-            // own codes; at that point this becomes a department-driven lookup
-            // rather than a constant. For now, one department, one code.
             const string procedureCode = "T1016";
 
             var claimLine = new ClaimLine
@@ -130,6 +126,55 @@ namespace Sati.Services.Billing
             period.Status = BillingStatus.Submitted;
             period.SubmittedAt = DateTime.UtcNow;
             await context.SaveChangesAsync();
+        }
+
+        public async Task<IEnumerable<Note>> GetApprovedUnbilledNotesAsync()
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            return await context.Notes
+                .Include(n => n.Person)
+                    .ThenInclude(p => p.Agency)
+                .Include(n => n.Person)
+                    .ThenInclude(p => p.Forms)
+                .Where(n => n.Status == NoteStatus.Approved
+                         && !context.ClaimLines.Any(c => c.NoteId == n.Id))
+                .OrderBy(n => n.EventDate)
+                .ToListAsync();
+        }
+
+        public BillingValidationResult ValidateNoteForBilling(Note note)
+        {
+            var errors = new List<string>();
+
+            if (note.EventDate is null)
+                errors.Add("No service date.");
+
+            if (note.Units is null || note.Units < 1)
+                errors.Add("Units must be at least 1 (minimum billable unit for Section 13 TCM).");
+
+            if (note.Units is not null)
+            {
+                var rounded = Math.Round(note.Units.Value, 2);
+                if (rounded != note.Units.Value)
+                    errors.Add("Units may not exceed two decimal places.");
+            }
+
+            if (string.IsNullOrWhiteSpace(note.Person?.MaineCareId))
+                errors.Add("Consumer has no MaineCare ID.");
+
+            if (string.IsNullOrWhiteSpace(note.Person?.DiagnosisCode))
+                errors.Add("Consumer has no diagnosis code.");
+
+            if (note.Person?.PlaceOfService is null)
+                errors.Add("Consumer has no place of service.");
+
+            if (string.IsNullOrWhiteSpace(note.Person?.Agency?.Npi))
+                errors.Add("Agency has no NPI.");
+
+            return new BillingValidationResult(
+                IsValid: errors.Count == 0,
+                Note: note,
+                Errors: errors);
         }
     }
 }

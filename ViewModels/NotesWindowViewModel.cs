@@ -51,7 +51,6 @@ namespace Sati.ViewModels
             _noteService = noteService;
             NotesView = CollectionViewSource.GetDefaultView(_allNotes);
             NotesView.Filter = FilterNotes;
-            _ = LoadAsync();
         }
 
         // COMMANDS

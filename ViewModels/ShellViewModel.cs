@@ -146,6 +146,8 @@ namespace Sati.ViewModels
         {
             await Scratchpad.InitializeAsync();
             _notesViewModel.Initialize();
+            await _notesViewModel.NotesLog.ReloadAsync();
+            await _notesViewModel.Clients.ReloadAsync();
 
             OnPropertyChanged(nameof(UserGreeting));
             OnPropertyChanged(nameof(UserInitials));
@@ -161,6 +163,8 @@ namespace Sati.ViewModels
             await Scratchpad.InitializeAsync();
             _notesViewModel.Reset();
             _notesViewModel.Initialize();
+            await _notesViewModel.NotesLog.ReloadAsync();
+            await _notesViewModel.Clients.ReloadAsync();
             OnPropertyChanged(nameof(UserGreeting));
             OnPropertyChanged(nameof(UserInitials));
             OnPropertyChanged(nameof(AvatarBrush));

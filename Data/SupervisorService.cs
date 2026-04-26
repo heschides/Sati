@@ -1,7 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Sati;
-using Sati.Data;
-using Sati.Data.Billing;
 using Sati.Models;
 
 namespace Sati.Data
@@ -9,13 +6,11 @@ namespace Sati.Data
     public class SupervisorService : ISupervisorService
     {
         private readonly IDbContextFactory<SatiContext> _contextFactory;
-        private readonly IBillingService _billingService;
         private readonly IUserService _userService;
 
-        public SupervisorService(IDbContextFactory<SatiContext> contextFactory, IBillingService billingService, IUserService userService)
+        public SupervisorService(IDbContextFactory<SatiContext> contextFactory, IUserService userService)
         {
             _contextFactory = contextFactory;
-            _billingService = billingService;
             _userService = userService;
         }
 
@@ -73,7 +68,6 @@ namespace Sati.Data
             note.ApprovedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
-            await _billingService.CreateClaimLineAsync(noteId);
         }
 
         // Override path — for notes in the non-compliant queue where the
@@ -104,11 +98,6 @@ namespace Sati.Data
             note.OverrideApprovedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
-
-            await _billingService.CreateClaimLineAsync(
-                noteId,
-                isComplianceException: true,
-                complianceExceptionReason: overrideReason);
         }
 
         public async Task ReturnNoteAsync(int noteId, int supervisorId, string reason)

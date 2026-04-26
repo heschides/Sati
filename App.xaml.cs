@@ -76,6 +76,7 @@ namespace Sati
 
                     services.AddSingleton<BillingDashboardViewModel>();
                     services.AddSingleton<BillingOverviewViewModel>();
+                    services.AddSingleton<BillingQueueViewModel>();
                     services.AddSingleton<BillingSubmissionsViewModel>();
                     services.AddSingleton<BillingRemittancesViewModel>();
                     services.AddSingleton<BillingAlertsViewModel>();

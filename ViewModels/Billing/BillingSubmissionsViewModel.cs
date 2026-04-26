@@ -32,6 +32,7 @@ namespace Sati.ViewModels.Billing
         [ObservableProperty] private string? statusMessage;
         [ObservableProperty] private bool isGenerating;
         [ObservableProperty] private bool isTestMode = true;
+        public bool HasLoaded { get; private set; }
 
         public bool HasSelectedPeriod => SelectedPeriod is not null;
         public bool HasGeneratedFile => !string.IsNullOrWhiteSpace(LastGeneratedPath);
@@ -54,6 +55,8 @@ namespace Sati.ViewModels.Billing
 
                 foreach (var period in periods)
                     BillingPeriods.Add(period);
+
+                HasLoaded = true;
             }
             catch (Exception ex)
             {

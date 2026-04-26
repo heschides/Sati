@@ -1,23 +1,25 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Windows.Threading;
 
 namespace Sati.ViewModels.Billing
 {
     public partial class BillingDashboardViewModel : ObservableObject
     {
         private readonly BillingOverviewViewModel _overviewViewModel;
+        private readonly BillingQueueViewModel _queueViewModel;
         private readonly BillingSubmissionsViewModel _submissionsViewModel;
         private readonly BillingRemittancesViewModel _remittancesViewModel;
         private readonly BillingAlertsViewModel _alertsViewModel;
 
         public BillingDashboardViewModel(
             BillingOverviewViewModel overviewViewModel,
+            BillingQueueViewModel queueViewModel,
             BillingSubmissionsViewModel submissionsViewModel,
             BillingRemittancesViewModel remittancesViewModel,
             BillingAlertsViewModel alertsViewModel)
         {
             _overviewViewModel = overviewViewModel;
+            _queueViewModel = queueViewModel;
             _submissionsViewModel = submissionsViewModel;
             _remittancesViewModel = remittancesViewModel;
             _alertsViewModel = alertsViewModel;
@@ -28,6 +30,7 @@ namespace Sati.ViewModels.Billing
         [ObservableProperty] private object? currentSubView;
 
         public bool IsOverviewActive => CurrentSubView is BillingOverviewViewModel;
+        public bool IsQueueActive => CurrentSubView is BillingQueueViewModel;
         public bool IsSubmissionsActive => CurrentSubView is BillingSubmissionsViewModel;
         public bool IsRemittancesActive => CurrentSubView is BillingRemittancesViewModel;
         public bool IsAlertsActive => CurrentSubView is BillingAlertsViewModel;
@@ -35,43 +38,39 @@ namespace Sati.ViewModels.Billing
         partial void OnCurrentSubViewChanged(object? value)
         {
             OnPropertyChanged(nameof(IsOverviewActive));
+            OnPropertyChanged(nameof(IsQueueActive));
             OnPropertyChanged(nameof(IsSubmissionsActive));
             OnPropertyChanged(nameof(IsRemittancesActive));
             OnPropertyChanged(nameof(IsAlertsActive));
         }
 
         [RelayCommand]
-        private async Task NavigateToOverview()
-        {
-            CurrentSubView = null;
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        private void NavigateToOverview() =>
             CurrentSubView = _overviewViewModel;
+
+        [RelayCommand]
+        private void NavigateToQueue()
+        {
+            CurrentSubView = _queueViewModel;
+            if (!_queueViewModel.HasLoaded)
+                _ = _queueViewModel.LoadAsync();
         }
 
         [RelayCommand]
-        private async Task NavigateToSubmissions()
+        private void NavigateToSubmissions()
         {
-            CurrentSubView = null;
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-            await _submissionsViewModel.LoadAsync();
             CurrentSubView = _submissionsViewModel;
+            if (!_submissionsViewModel.HasLoaded)
+                _ = _submissionsViewModel.LoadAsync();
         }
 
         [RelayCommand]
-        private async Task NavigateToRemittances()
-        {
-            CurrentSubView = null;
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        private void NavigateToRemittances() =>
             CurrentSubView = _remittancesViewModel;
-        }
 
         [RelayCommand]
-        private async Task NavigateToAlerts()
-        {
-            CurrentSubView = null;
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        private void NavigateToAlerts() =>
             CurrentSubView = _alertsViewModel;
-        }
 
         public Task InitializeAsync() => Task.CompletedTask;
     }

@@ -303,6 +303,10 @@
             <billingViews:BillingOverviewView />
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type billingVms:BillingQueueViewModel}">
+            <billingViews:BillingQueueView />
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type billingVms:BillingSubmissionsViewModel}">
             <billingViews:BillingSubmissionsView />
         </DataTemplate>
