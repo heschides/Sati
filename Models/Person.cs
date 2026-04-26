@@ -15,6 +15,7 @@ namespace Sati
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public DateTime BirthDate { get; set; }
+        public Gender Gender { get; set; } = Gender.Unknown;
         public DateTime? EffectiveDate { get; set; }
         public string? Bio { get; set; }
         public WaiverType Waiver { get; set; } = WaiverType.None;

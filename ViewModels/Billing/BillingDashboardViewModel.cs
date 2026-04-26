@@ -53,6 +53,7 @@ namespace Sati.ViewModels.Billing
         {
             CurrentSubView = null;
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            await _submissionsViewModel.LoadAsync();
             CurrentSubView = _submissionsViewModel;
         }
 

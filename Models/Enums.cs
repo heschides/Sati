@@ -33,6 +33,13 @@ namespace Sati
         ScheduledForm
     }
 
+    public enum Gender
+    {
+        Unknown,
+        Male,
+        Female
+    }
+
     public enum WaiverType
     {
         None,

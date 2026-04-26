@@ -49,6 +49,16 @@ namespace Sati.Services.Billing
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<BillingPeriod>> GetAllBillingPeriodsAsync()
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            return await context.BillingPeriods
+                .Include(b => b.Lines)
+                .OrderByDescending(b => b.Year)
+                .ThenByDescending(b => b.Month)
+                .ToListAsync();
+        }
+
         public async Task<ClaimLine> CreateClaimLineAsync(int noteId, bool isComplianceException = false, string? complianceExceptionReason = null)
         {
             await using var context = _contextFactory.CreateDbContext();

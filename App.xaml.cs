@@ -4,11 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sati.Data;
 using Sati.Data.Billing;
-using Sati.ViewModels.Billing;
-
-using Sati.Models;
+using Sati.Edi;
 using Sati.Services.Billing;
 using Sati.ViewModels;
+using Sati.ViewModels.Billing;
 using Sati.ViewModels.Children;
 using Sati.ViewModels.Supervisor;
 using Sati.Views;
@@ -42,6 +41,7 @@ namespace Sati
                     services.AddTransient<IFormService, FormService>();
                     services.AddTransient<ISupervisorService, SupervisorService>();
                     services.AddTransient<IBillingService, BillingService>();
+                    services.AddTransient<IEdiService, EdiService>();
 
                     // Shell
                     services.AddSingleton<ShellViewModel>();

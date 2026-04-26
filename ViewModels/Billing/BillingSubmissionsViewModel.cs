@@ -1,9 +1,109 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Sati.Data;
+using Sati.Data.Billing;
+using Sati.Edi;
+using Sati.Models.Billing;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace Sati.ViewModels.Billing
 {
-    public class BillingSubmissionsViewModel : ObservableObject
+    public partial class BillingSubmissionsViewModel : ObservableObject
     {
-        public string StubMessage => "Submissions: 837P claim files pending submission, recently sent, and filterable by date range.";
+        private readonly IBillingService _billingService;
+        private readonly IEdiService _ediService;
+        private readonly ISessionService _sessionService;
+
+        public BillingSubmissionsViewModel(
+            IBillingService billingService,
+            IEdiService ediService,
+            ISessionService sessionService)
+        {
+            _billingService = billingService;
+            _ediService = ediService;
+            _sessionService = sessionService;
+        }
+
+        public ObservableCollection<BillingPeriod> BillingPeriods { get; } = [];
+
+        [ObservableProperty] private BillingPeriod? selectedPeriod;
+        [ObservableProperty] private string? lastGeneratedPath;
+        [ObservableProperty] private string? statusMessage;
+        [ObservableProperty] private bool isGenerating;
+        [ObservableProperty] private bool isTestMode = true;
+
+        public bool HasSelectedPeriod => SelectedPeriod is not null;
+        public bool HasGeneratedFile => !string.IsNullOrWhiteSpace(LastGeneratedPath);
+
+        partial void OnSelectedPeriodChanged(BillingPeriod? value)
+            => OnPropertyChanged(nameof(HasSelectedPeriod));
+
+        partial void OnLastGeneratedPathChanged(string? value)
+            => OnPropertyChanged(nameof(HasGeneratedFile));
+
+        public async Task LoadAsync()
+        {
+            try
+            {
+                BillingPeriods.Clear();
+                var user = _sessionService.CurrentUser!;
+                var periods = user.Role is UserRole.Admin or UserRole.Supervisor
+                    ? await _billingService.GetAllBillingPeriodsAsync()
+                    : await _billingService.GetBillingPeriodsAsync(user.Id);
+
+                foreach (var period in periods)
+                    BillingPeriods.Add(period);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"BillingSubmissionsViewModel.LoadAsync failed: {ex.Message}");
+                StatusMessage = "Failed to load billing periods.";
+            }
+        }
+
+        [RelayCommand]
+        private async Task GenerateEdi()
+        {
+            if (SelectedPeriod is null)
+                return;
+
+            try
+            {
+                IsGenerating = true;
+                StatusMessage = "Generating 837P file...";
+
+                var path = await _ediService.GenerateAndSaveAsync(
+                    SelectedPeriod.Id,
+                    isTest: IsTestMode);
+
+                LastGeneratedPath = path;
+                StatusMessage = $"File saved: {path}";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"GenerateEdi failed: {ex.Message}");
+                StatusMessage = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                IsGenerating = false;
+            }
+        }
+
+        [RelayCommand]
+        private void OpenOutputFolder()
+        {
+            try
+            {
+                var folder = System.IO.Path.GetDirectoryName(LastGeneratedPath);
+                if (folder is not null && System.IO.Directory.Exists(folder))
+                    Process.Start("explorer.exe", folder);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"OpenOutputFolder failed: {ex.Message}");
+            }
+        }
     }
 }
