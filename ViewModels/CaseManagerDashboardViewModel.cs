@@ -1,7 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Identity.Client;
 using Sati.Data;
 using Sati.Models;
+using Sati.ViewModels.Children;
 using Sati.Views;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -33,7 +35,6 @@ namespace Sati.ViewModels
         private List<Note> _monthlyNotes = [];
         private DateTime _lastAbandonmentCheck = DateTime.Now;
         private SchedulerViewModel _schedulerViewModel;
-        private int _daysWorkedToDate;
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -50,7 +51,8 @@ namespace Sati.ViewModels
             Func<string, UserMessageDialog> validationDialog,
             SchedulerViewModel schedulerViewModel,
             NotesWindowViewModel notesWindowViewModel,
-            NewClientViewModel newClientViewModel
+            NewClientViewModel newClientViewModel,
+            CalendarViewModel calendarViewModel
             )
         {
             _personService = personService;
@@ -66,6 +68,7 @@ namespace Sati.ViewModels
             NotesView.Filter = FilterNotes;
             _schedulerViewModel = schedulerViewModel;
             NotesLog = notesWindowViewModel;
+            Calendar = calendarViewModel;
             Clients = newClientViewModel;
         }
 
@@ -89,7 +92,9 @@ namespace Sati.ViewModels
         public bool IsNotesLogSubActive => CurrentSubViewModel is NotesWindowViewModel;
         public bool IsMatrixSubActive => CurrentSubViewModel is CaseloadMatrixViewModel;
         public bool IsSubViewActive => CurrentSubViewModel is not null;
+        public bool IsCalendarSubActive => CurrentSubViewModel is CalendarViewModel;
 
+        public CalendarViewModel Calendar { get; }
         [ObservableProperty] private object? currentSubViewModel;
         [ObservableProperty] private User? loggedInUser;
         [ObservableProperty] private Person? selectedPerson;
@@ -100,14 +105,17 @@ namespace Sati.ViewModels
         [ObservableProperty] private NoteType? selectedNoteType;
         [ObservableProperty] private FormType? selectedFormType;
         [ObservableProperty] private string? narrative;
+        [ObservableProperty] private int? minutes;
         [ObservableProperty] private DateTime? eventDate;
-        [ObservableProperty] private decimal? units;
-        [ObservableProperty] private int? duration;
         [ObservableProperty] private bool isEditing;
         [ObservableProperty] private bool isSchedulerOpen;
         [ObservableProperty] private bool sortByDate = true;
+        [ObservableProperty] private bool showOverdue;
         [ObservableProperty] private int daysScheduled;
         [ObservableProperty] private double narrativeFontSize = 14;
+        [ObservableProperty] private bool isComplianceDialogVisible;
+        [ObservableProperty] private string pendingJustification = string.Empty;
+        [ObservableProperty] private IReadOnlyList<string> complianceFailureReasons = [];
 
         // -------------------------------------------------------------------------
         // Property change callbacks
@@ -119,6 +127,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(IsClientsSubActive));
             OnPropertyChanged(nameof(IsNotesLogSubActive));
             OnPropertyChanged(nameof(IsMatrixSubActive));
+            OnPropertyChanged(nameof(IsCalendarSubActive));
             OnPropertyChanged(nameof(IsSubViewActive));
         }
 
@@ -132,7 +141,6 @@ namespace Sati.ViewModels
             Status = null;
             Narrative = string.Empty;
             EventDate = null;
-            Units = null;
             SelectedNoteType = null;
             SelectedFormType = null;
         }
@@ -147,9 +155,12 @@ namespace Sati.ViewModels
 
         partial void OnSortByDateChanged(bool value)
         {
-            OnPropertyChanged(nameof(FormEvents));
-            OnPropertyChanged(nameof(VisitEvents));
-            OnPropertyChanged(nameof(ContactEvents));
+            OnPropertyChanged(nameof(AllEvents));
+        }
+
+        partial void OnShowOverdueChanged(bool value)
+        {
+            OnPropertyChanged(nameof(AllEvents));
         }
 
         partial void OnSearchTextChanged(string? value) => NotesView.Refresh();
@@ -212,9 +223,10 @@ namespace Sati.ViewModels
         {
             get
             {
-                if (_daysWorkedToDate <= 0) return 0;
+                var days = BilledDaysCount;
+                if (days <= 0) return 0;
                 var total = (PendingUnits ?? 0) + (LoggedUnits ?? 0);
-                return Math.Round((double)total / _daysWorkedToDate, 1);
+                return Math.Round((double)total / days, 1);
             }
         }
         public ICollectionView NotesView { get; }
@@ -222,17 +234,21 @@ namespace Sati.ViewModels
         public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
         public Array FormTypes => Enum.GetValues(typeof(FormType));
 
-        public IEnumerable<UpcomingEvent> FormEvents => SortByDate
-            ? UpcomingEvents.Where(e => e.Kind is UpcomingEventKind.OpenReview or UpcomingEventKind.LateReview or UpcomingEventKind.ScheduledForm).OrderBy(e => e.Date)
-            : UpcomingEvents.Where(e => e.Kind is UpcomingEventKind.OpenReview or UpcomingEventKind.LateReview or UpcomingEventKind.ScheduledForm).OrderBy(e => e.Kind);
+        public IEnumerable<UpcomingEvent> AllEvents
+        {
+            get
+            {
+                var source = ShowOverdue
+                    ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.LateReview)
+                    : UpcomingEvents.Where(e => e.Kind != UpcomingEventKind.LateReview);
+                return SortByDate
+                    ? source.OrderBy(e => e.Date)
+                    : source.OrderBy(e => e.Kind).ThenBy(e => e.Date);
+            }
+        }
 
-        public IEnumerable<UpcomingEvent> VisitEvents => SortByDate
-            ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.ScheduledVisit).OrderBy(e => e.Date)
-            : UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.ScheduledVisit).OrderBy(e => e.Kind);
-
-        public IEnumerable<UpcomingEvent> ContactEvents => SortByDate
-            ? UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.ScheduledContact).OrderBy(e => e.Date)
-            : UpcomingEvents.Where(e => e.Kind == UpcomingEventKind.ScheduledContact).OrderBy(e => e.Kind);
+        public int OverdueCount => UpcomingEvents.Count(e => e.Kind == UpcomingEventKind.LateReview);
+        public bool HasOverdueEvents => OverdueCount > 0;
 
         public bool IsFormNote => SelectedNoteType == NoteType.Form;
         public int Threshold => _incentive?.Threshold ?? 0;
@@ -241,6 +257,16 @@ namespace Sati.ViewModels
         public decimal? PendingUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Pending).Sum(n => n.Units);
         public decimal? LoggedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Logged).Sum(n => n.Units);
         public decimal? AbandonedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Abandoned).Sum(n => n.Units);
+
+        // Distinct calendar dates on which at least one Pending or Logged note
+        // has an EventDate this month. This is the correct denominator for
+        // DailyAverageUnits — only days you actually recorded notes count,
+        // not days you were scheduled to work.
+        private int BilledDaysCount => _monthlyNotes
+            .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged && n.EventDate.HasValue)
+            .Select(n => n.EventDate!.Value.Date)
+            .Distinct()
+            .Count();
 
         public decimal EstimatedIncentive => _incentive?.Calculate(LoggedUnits ?? 0) ?? 0;
 
@@ -264,8 +290,9 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
         // Commands
         // -------------------------------------------------------------------------
-        [RelayCommand] private void NavigateToOverview() => CurrentSubViewModel = null;
-        [RelayCommand] private void NavigateToClients() => CurrentSubViewModel = Clients;
+        [RelayCommand] private void SelectUpcomingTab() => ShowOverdue = false;
+        [RelayCommand] private void SelectOverdueTab() => ShowOverdue = true;
+        [RelayCommand] private void NavigateToOverview() => CurrentSubViewModel = null; [RelayCommand] private void NavigateToClients() => CurrentSubViewModel = Clients;
         [RelayCommand] private void NavigateToNotesLog() => CurrentSubViewModel = NotesLog;
         [RelayCommand]
         private void NavigateToMatrix() 
@@ -273,6 +300,8 @@ namespace Sati.ViewModels
             Matrix?.Rebuild(People, DateTime.Today);
             CurrentSubViewModel = Matrix;
         }
+        [RelayCommand] private void NavigateToCalendar() => CurrentSubViewModel = Calendar;
+        
         [RelayCommand] private void OpenScheduler() => IsSchedulerOpen = !IsSchedulerOpen;
 
         [RelayCommand] private void IncreaseNarrativeFont() => NarrativeFontSize = Math.Min(NarrativeFontSize + 2, 28);
@@ -289,6 +318,7 @@ namespace Sati.ViewModels
             SelectedPerson?.Notes.Remove(SelectedNote);
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
+            await Calendar.InitializeAsync();
             await NotesLog.ReloadAsync();
             await Clients.ReloadAsync();
             SelectedNote = null;
@@ -331,6 +361,18 @@ namespace Sati.ViewModels
 
             try
             {
+                if (Status == NoteStatus.Logged)
+                {
+                    var (passed, reasons) = SelectedPerson!.EvaluateComplianceGate(DateTime.Today);
+                    if (!passed)
+                    {
+                        ComplianceFailureReasons = reasons;
+                        PendingJustification = string.Empty;
+                        IsComplianceDialogVisible = true;
+                        return;
+                    }
+                }
+
                 if (!IsEditing)
                     await SubmitNewNoteAsync();
                 else
@@ -374,6 +416,7 @@ namespace Sati.ViewModels
                 await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
                 await LoadMonthlyNotesAsync();
                 await LoadUpcomingEventsAsync();
+                await Calendar.InitializeAsync();
 
                 var (_, wasCreated) = await _incentiveService.GetOrCreateAsync(
     LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
@@ -392,25 +435,44 @@ namespace Sati.ViewModels
             }
         }
 
-        private async Task SubmitNewNoteAsync()
+        [RelayCommand]
+        private async Task HoldForCompliance()
         {
-            var note = Note.Create(Narrative!, EventDate, Status, Units, SelectedPerson!.Id, SelectedFormType, SelectedNoteType);
+            Status = NoteStatus.HeldForCompliance;
+            IsComplianceDialogVisible = false;
+            PendingJustification = string.Empty;
+            if (IsEditing)
+                await SubmitEditedNoteAsync();
+            else
+                await SubmitNewNoteAsync();
+        }
+
+        [RelayCommand]
+        private async Task SendToSupervisor()
+        {
+            if (string.IsNullOrWhiteSpace(PendingJustification)) return;
+            var justification = PendingJustification;
+            IsComplianceDialogVisible = false;
+            PendingJustification = string.Empty;
+            if (IsEditing)
+                await SubmitEditedNoteAsync(justification);
+            else
+                await SubmitNewNoteAsync(justification);
+        }
+
+        [RelayCommand]
+        private void CancelComplianceDialog()
+        {
+            IsComplianceDialogVisible = false;
+            PendingJustification = string.Empty;
+        }
+
+        private async Task SubmitNewNoteAsync(string? caseManagerJustification = null)
+        {
+            var note = Note.Create(Narrative!, EventDate, Status, Minutes, SelectedPerson!.Id, SelectedFormType, SelectedNoteType);
+            if (caseManagerJustification is not null)
+                note.CaseManagerJustification = caseManagerJustification;
             var savedNote = await _noteService.AddNoteAsync(note);
-            Notes.Insert(0, savedNote);
-
-            if (EventDate.HasValue &&
-                (EventDate.Value.Month != DateTime.Now.Month || EventDate.Value.Year != DateTime.Now.Year))
-            {
-                MessageBox.Show(
-                    $"This note's date ({EventDate.Value:MMM d, yyyy}) is outside the current month and will not appear in this month's productivity totals.",
-                    "Note Outside Current Month", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-
-            NotesView.Refresh();
-            var formType = SelectedFormType;
-            if (formType.HasValue && Status is NoteStatus.Pending or NoteStatus.Logged)
-                MarkFormCompleteRequested?.Invoke(this, formType.Value);
-
             ResetForm();
             await LoadPeopleAsync();
             await LoadMonthlyNotesAsync();
@@ -419,14 +481,14 @@ namespace Sati.ViewModels
             await Clients.ReloadAsync();
         }
 
-        private async Task SubmitEditedNoteAsync()
+        private async Task SubmitEditedNoteAsync(string? caseManagerJustification = null)
         {
             if (SelectedNote is null)
                 return;
 
             SelectedNote.Narrative = Narrative!;
             SelectedNote.EventDate = EventDate;
-            SelectedNote.Units = Units ?? 0;
+            SelectedNote.Minutes = Minutes ?? 0;
             SelectedNote.Status = Status;
             SelectedNote.NoteType = SelectedNoteType;
             SelectedNote.FormType = SelectedFormType;
@@ -511,9 +573,9 @@ namespace Sati.ViewModels
             foreach (var e in events)
                 UpcomingEvents.Add(e);
 
-            OnPropertyChanged(nameof(FormEvents));
-            OnPropertyChanged(nameof(VisitEvents));
-            OnPropertyChanged(nameof(ContactEvents));
+            OnPropertyChanged(nameof(AllEvents));
+            OnPropertyChanged(nameof(OverdueCount));
+            OnPropertyChanged(nameof(HasOverdueEvents));
         }
 
         public async Task MarkFormCompleteAsync(FormType formType)
@@ -567,8 +629,6 @@ namespace Sati.ViewModels
             Status = null;
             Narrative = string.Empty;
             EventDate = null;
-            Units = null;
-            Duration = null;
             SelectedFormType = null;
             SelectedNoteType = null;
         }
@@ -581,7 +641,7 @@ namespace Sati.ViewModels
             IsEditing = true;
             Narrative = SelectedNote.Narrative;
             EventDate = SelectedNote.EventDate;
-            Units = SelectedNote.Units;
+            Minutes = SelectedNote.Minutes;
             Status = SelectedNote.Status;
             SelectedNoteType = SelectedNote.NoteType;
             SelectedFormType = SelectedNote.FormType;
@@ -593,8 +653,6 @@ namespace Sati.ViewModels
             var (incentive, _) = await _incentiveService.GetOrCreateAsync(
                 LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
             _incentive = incentive;
-            _daysWorkedToDate = await _incentiveService.GetDaysWorkedToDateAsync(
-                DateTime.Now.Month, DateTime.Now.Year);
 
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));

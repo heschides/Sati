@@ -53,9 +53,6 @@ namespace Sati.Data
 
             foreach (var person in people)
             {
-                if (BackfillFirstCycleDueDates(person, settings))
-                    anyChanges = true;
-
                 if (person.EnsureCurrentCycleForms(today, settings))
                     anyChanges = true;
             }
@@ -64,49 +61,6 @@ namespace Sati.Data
                 await context.SaveChangesAsync();
 
             return people;
-        }
-
-        // Option B backfill: recomputes due dates for first-cycle forms only,
-        // against current settings. Scoped to the first cycle because second-cycle
-        // and later forms represent real history — they were generated under the
-        // settings that existed at the time, and rewriting them would lose that.
-        //
-        // Production-safe because production starts with correct settings, so
-        // first-cycle dates will already match the calculator output and this
-        // method will be a no-op. Its only practical effect is keeping Josh's
-        // existing test data in sync as he tunes the *DaysBeforeAnniversary
-        // values during development.
-        //
-        // Returns true if any due dates were changed.
-        private static bool BackfillFirstCycleDueDates(Person person, Settings settings)
-        {
-            if (person.EffectiveDate is null)
-                return false;
-
-            var effective = person.EffectiveDate.Value;
-            var firstCycleStart = effective;
-            var firstCycleEnd = effective.AddYears(1);
-            var changed = false;
-
-            foreach (var form in person.Forms)
-            {
-                // First-cycle filter: form's due date falls within the first
-                // anniversary window. This excludes any second-cycle forms
-                // EnsureCurrentCycleForms may have generated on a prior load.
-                if (form.DueDate < firstCycleStart || form.DueDate > firstCycleEnd)
-                    continue;
-
-                var expected = FormDueDateCalculator.Compute(
-                    form.Type, firstCycleStart, firstCycleEnd, settings);
-
-                if (form.DueDate != expected)
-                {
-                    form.DueDate = expected;
-                    changed = true;
-                }
-            }
-
-            return changed;
         }
     }
 }

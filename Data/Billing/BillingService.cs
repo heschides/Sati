@@ -152,13 +152,6 @@ namespace Sati.Services.Billing
             if (note.Units is null || note.Units < 1)
                 errors.Add("Units must be at least 1 (minimum billable unit for Section 13 TCM).");
 
-            if (note.Units is not null)
-            {
-                var rounded = Math.Round(note.Units.Value, 2);
-                if (rounded != note.Units.Value)
-                    errors.Add("Units may not exceed two decimal places.");
-            }
-
             if (string.IsNullOrWhiteSpace(note.Person?.MaineCareId))
                 errors.Add("Consumer has no MaineCare ID.");
 

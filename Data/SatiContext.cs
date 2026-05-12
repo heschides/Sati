@@ -16,6 +16,8 @@ namespace Sati.Data
         public DbSet<Incentive> Incentives { get; set; }
         public DbSet<BillingPeriod> BillingPeriods { get; set; }
         public DbSet<ClaimLine> ClaimLines { get; set; }
+        public DbSet<ExemptDate> ExemptDates { get; set; }
+
 
         public SatiContext(DbContextOptions<SatiContext> options) : base(options)
         {

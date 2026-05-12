@@ -47,17 +47,15 @@ namespace Sati.ViewModels
         private async Task ToggleTile(WorkdayTile tile)
         {
             if (!tile.IsInteractable) return;
+            if (_incentive is null) return;   
 
             tile.IsExcluded = !tile.IsExcluded;
-
-            var dates = _incentive!.ExcludedDates;
+            var dates = new List<DateTime>();
             if (tile.IsExcluded)
                 dates.Add(tile.Date);
             else
                 dates.Remove(tile.Date);
 
-            _incentive.ExcludedDates = dates;
-            _incentive.DaysScheduled = Tiles.Count(t => t.IsInteractable && !t.IsExcluded);
             await _incentiveService.SaveAsync(_incentive);
             OnPropertyChanged(nameof(DaysScheduled));
         }
@@ -91,6 +89,8 @@ namespace Sati.ViewModels
             }
             await LoadMonthAsync();
         }
+
+
 
         //FUNCTIONS
         private async Task LoadMonthAsync()
@@ -133,8 +133,7 @@ namespace Sati.ViewModels
                 };
 
                 var isInteractable = !IsAlwaysExcluded(dow, _settings!);
-                var isExcluded = !isInteractable ||
-                 (isInteractable && (_incentive?.ExcludedDates.Contains(date) ?? false));
+                var isExcluded = !isInteractable;
 
                 Tiles.Add(new WorkdayTile
                 {

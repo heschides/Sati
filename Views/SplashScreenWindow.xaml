@@ -11,7 +11,7 @@
     <Border Background="#FDF6EC"
             CornerRadius="8">
         <Grid>
-            <Image Source="/Images/satisplash.png"
+            <Image Source="pack://application:,,,/images/satisplash.png"
                    Width="800"
                    Height="533"
                    Stretch="Uniform" />

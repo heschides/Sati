@@ -108,6 +108,43 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="OverrideButton"
+               TargetType="Button">
+            <Setter Property="Background"
+                    Value="#7A3B3B" />
+            <Setter Property="Foreground"
+                    Value="#FDF6EC" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Padding"
+                    Value="14,6" />
+            <Setter Property="FontSize"
+                    Value="12" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Margin"
+                    Value="6,0,0,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver"
+                         Value="True">
+                    <Setter Property="Background"
+                            Value="#5E2D2D" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="CancelButton"
                TargetType="Button"
                BasedOn="{StaticResource ReturnButton}">
@@ -126,146 +163,263 @@
 
     <Grid>
         <!-- Main content -->
-        <Grid Margin="16,12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="16,12">
 
-            <TextBlock Grid.Row="0"
-                       Text="PENDING APPROVALS"
-                       Style="{StaticResource SectionHeading}" />
+                <!-- PENDING APPROVALS SECTION -->
+                <TextBlock Text="PENDING APPROVALS"
+                           Style="{StaticResource SectionHeading}" />
 
-            <!-- Empty state -->
-            <TextBlock Grid.Row="1"
-                       Text="{Binding EmptyStateMessage}"
-                       FontSize="13"
-                       Foreground="#9C7A5C"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Visibility="{Binding HasPending,
-                            Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                <!-- Empty state -->
+                <TextBlock Text="{Binding EmptyStateMessage}"
+                           FontSize="13"
+                           Foreground="#9C7A5C"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,24"
+                           Visibility="{Binding HasPending,
+                               Converter={StaticResource InverseBoolToVisibilityConverter}}" />
 
-            <!-- List of pending notes -->
-            <ItemsControl Grid.Row="1"
-                          ItemsSource="{Binding PendingNotes}"
-                          VirtualizingStackPanel.IsVirtualizing="True"
-                          VirtualizingStackPanel.VirtualizationMode="Recycling"
-                          ScrollViewer.CanContentScroll="True"
-                          Visibility="{Binding HasPending,
-                Converter={StaticResource BoolToVisibilityConverter}}">
-                <ItemsControl.Template>
-                    <ControlTemplate TargetType="ItemsControl">
-                        <ScrollViewer CanContentScroll="True"
-                                      VerticalScrollBarVisibility="Auto">
-                            <ItemsPresenter />
-                        </ScrollViewer>
-                    </ControlTemplate>
-                </ItemsControl.Template>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <VirtualizingStackPanel />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
+                <!-- Pending note cards -->
+                <ItemsControl ItemsSource="{Binding PendingNotes}"
+                              Visibility="{Binding HasPending,
+                                  Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#F0E4D0"
+                                    BorderBrush="#E8D0B8"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="14,12"
+                                    Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                        <Border Background="#F0E4D0"
-                                BorderBrush="#E8D0B8"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="14,12"
-                                Margin="0,0,0,10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                                    <!-- Header row -->
+                                    <Grid Grid.Row="0"
+                                          Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                <!-- Header row: client, date, type, units -->
-                                <Grid Grid.Row="0"
-                                      Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="CLIENT"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <TextBlock Text="{Binding ClientName}"
+                                                       FontSize="13"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#3D2B1F" />
+                                        </StackPanel>
 
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="CLIENT"
-                                                   Style="{StaticResource FieldLabel}" />
-                                        <TextBlock Text="{Binding ClientName}"
-                                                   FontSize="13"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="#3D2B1F" />
-                                    </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                                                    Margin="16,0,0,0">
+                                            <TextBlock Text="DATE"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <TextBlock Text="{Binding EventDate, StringFormat='MM/dd/yy'}"
+                                                       Style="{StaticResource FieldValue}" />
+                                        </StackPanel>
 
-                                    <StackPanel Grid.Column="1"
-                                                Margin="16,0,0,0">
-                                        <TextBlock Text="DATE"
-                                                   Style="{StaticResource FieldLabel}" />
-                                        <TextBlock Text="{Binding EventDate, StringFormat='MM/dd/yy'}"
-                                                   Style="{StaticResource FieldValue}" />
-                                    </StackPanel>
+                                        <StackPanel Grid.Column="2"
+                                                    Margin="16,0,0,0">
+                                            <TextBlock Text="TYPE"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <TextBlock Text="{Binding NoteType}"
+                                                       Style="{StaticResource FieldValue}" />
+                                        </StackPanel>
 
-                                    <StackPanel Grid.Column="2"
-                                                Margin="16,0,0,0">
-                                        <TextBlock Text="TYPE"
-                                                   Style="{StaticResource FieldLabel}" />
-                                        <TextBlock Text="{Binding NoteType}"
-                                                   Style="{StaticResource FieldValue}" />
-                                    </StackPanel>
+                                        <StackPanel Grid.Column="3"
+                                                    Margin="16,0,0,0">
+                                            <TextBlock Text="UNITS"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <TextBlock Text="{Binding Units}"
+                                                       Style="{StaticResource FieldValue}" />
+                                        </StackPanel>
+                                    </Grid>
 
-                                    <StackPanel Grid.Column="3"
-                                                Margin="16,0,0,0">
-                                        <TextBlock Text="UNITS"
-                                                   Style="{StaticResource FieldLabel}" />
-                                        <TextBlock Text="{Binding Units}"
-                                                   Style="{StaticResource FieldValue}" />
+                                    <!-- Narrative -->
+                                    <TextBlock Grid.Row="1"
+                                               Text="NARRATIVE"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,4,0,2" />
+                                    <TextBlock Grid.Row="2"
+                                               Text="{Binding Narrative}"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               Foreground="#3D2B1F"
+                                               Margin="0,0,0,10" />
+
+                                    <!-- Actions -->
+                                    <StackPanel Grid.Row="3"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right">
+                                        <Button Content="Approve"
+                                                Style="{StaticResource ApproveButton}"
+                                                Command="{Binding DataContext.ApproveCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Return"
+                                                Style="{StaticResource ReturnButton}"
+                                                Command="{Binding DataContext.OpenReturnDialogCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
                                     </StackPanel>
                                 </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                                <!-- Narrative -->
-                                <TextBlock Grid.Row="1"
-                                           Text="NARRATIVE"
-                                           Style="{StaticResource FieldLabel}"
-                                           Margin="0,4,0,2" />
-                                <TextBlock Grid.Row="2"
-                                           Text="{Binding Narrative}"
-                                           TextWrapping="Wrap"
-                                           FontSize="12"
-                                           Foreground="#3D2B1F"
-                                           Margin="0,0,0,10" />
+                <!-- DIVIDER -->
+                <Separator Margin="0,8,0,16"
+                           Visibility="{Binding HasNonCompliant,
+                               Converter={StaticResource BoolToVisibilityConverter}}" />
 
-                                <!-- Actions -->
-                                <StackPanel Grid.Row="3"
-                                            Orientation="Horizontal"
-                                            HorizontalAlignment="Right">
-                                    <Button Content="Approve"
-                                            Style="{StaticResource ApproveButton}"
-                                            Command="{Binding DataContext.ApproveCommand,
-                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}" />
-                                    <Button Content="Return"
-                                            Style="{StaticResource ReturnButton}"
-                                            Command="{Binding DataContext.OpenReturnDialogCommand,
-                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </Grid>
+                <!-- NON-COMPLIANT SECTION -->
+                <TextBlock Visibility="{Binding HasNonCompliant,
+                               Converter={StaticResource BoolToVisibilityConverter}}"
+                           Margin="0,0,0,4">
+                    <Run Text="HELD FOR COMPLIANCE"
+                         FontSize="11"
+                         FontWeight="SemiBold"
+                         Foreground="#7A3B3B" />
+                    <Run Text="  ·  supervisor override required"
+                         FontSize="10"
+                         Foreground="#9C7A5C" />
+                </TextBlock>
+
+                <!-- Empty state -->
+                <TextBlock Text="{Binding NonCompliantEmptyMessage}"
+                           FontSize="13"
+                           Foreground="#9C7A5C"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,0"
+                           Visibility="{Binding HasNonCompliant,
+                               Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+
+                <!-- Non-compliant note cards -->
+                <ItemsControl ItemsSource="{Binding NonCompliantNotes}"
+                              Visibility="{Binding HasNonCompliant,
+                                  Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#F5E8E8"
+                                    BorderBrush="#D9AEAE"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="14,12"
+                                    Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Compliance warning banner -->
+                                    <Border Grid.Row="0"
+                                            Background="#EDD0D0"
+                                            CornerRadius="4"
+                                            Padding="8,4"
+                                            Margin="0,0,0,10">
+                                        <TextBlock Text="Client does not meet billing compliance requirements. Override requires written justification."
+                                                   FontSize="11"
+                                                   Foreground="#7A3B3B"
+                                                   TextWrapping="Wrap" />
+                                    </Border>
+
+                                    <!-- Header row -->
+                                    <Grid Grid.Row="1"
+                                          Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="CLIENT"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <TextBlock Text="{Binding ClientName}"
+                                                       FontSize="13"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#3D2B1F" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1"
+                                                    Margin="16,0,0,0">
+                                            <TextBlock Text="DATE"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <TextBlock Text="{Binding EventDate, StringFormat='MM/dd/yy'}"
+                                                       Style="{StaticResource FieldValue}" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2"
+                                                    Margin="16,0,0,0">
+                                            <TextBlock Text="TYPE"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <TextBlock Text="{Binding NoteType}"
+                                                       Style="{StaticResource FieldValue}" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="3"
+                                                    Margin="16,0,0,0">
+                                            <TextBlock Text="UNITS"
+                                                       Style="{StaticResource FieldLabel}" />
+                                            <TextBlock Text="{Binding Units}"
+                                                       Style="{StaticResource FieldValue}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Narrative -->
+                                    <TextBlock Grid.Row="2"
+                                               Text="NARRATIVE"
+                                               Style="{StaticResource FieldLabel}"
+                                               Margin="0,4,0,2" />
+                                    <TextBlock Grid.Row="3"
+                                               Text="{Binding Narrative}"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               Foreground="#3D2B1F"
+                                               Margin="0,0,0,10" />
+
+                                    <!-- Actions -->
+                                    <StackPanel Grid.Row="4"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right">
+                                        <Button Content="Override &amp; Approve"
+                                                Style="{StaticResource OverrideButton}"
+                                                Command="{Binding DataContext.OpenOverrideDialogCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Return"
+                                                Style="{StaticResource ReturnButton}"
+                                                Command="{Binding DataContext.OpenReturnDialogCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+            </StackPanel>
+        </ScrollViewer>
 
         <!-- Return dialog overlay -->
         <Grid Background="#80000000"
               Visibility="{Binding IsReturnDialogVisible,
-                Converter={StaticResource BoolToVisibilityConverter}}">
+                  Converter={StaticResource BoolToVisibilityConverter}}">
             <Border Background="#FDF6EC"
                     BorderBrush="#E8D0B8"
                     BorderThickness="1"
@@ -304,5 +458,54 @@
                 </StackPanel>
             </Border>
         </Grid>
+
+        <!-- Override dialog overlay -->
+        <Grid Background="#80000000"
+              Visibility="{Binding IsOverrideDialogVisible,
+                  Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Background="#FDF6EC"
+                    BorderBrush="#D9AEAE"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Width="420"
+                    Padding="20"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="OVERRIDE COMPLIANCE &amp; APPROVE"
+                               Style="{StaticResource SectionHeading}"
+                               Foreground="#7A3B3B" />
+                    <TextBlock FontSize="12"
+                               Foreground="#3D2B1F"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10">
+                        <Run Text="Approving " />
+                        <Run Text="{Binding OverrideNote.ClientName, FallbackValue='this client'}"
+                             FontWeight="SemiBold" />
+                        <Run Text="'s note despite non-compliant status. Provide written justification — this will be recorded on the claim." />
+                    </TextBlock>
+                    <TextBox Text="{Binding OverrideReason, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Height="100"
+                             Padding="8"
+                             FontSize="12"
+                             Background="White"
+                             BorderBrush="#D9AEAE"
+                             VerticalScrollBarVisibility="Auto"
+                             Margin="0,0,0,12" />
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Content="Cancel"
+                                Style="{StaticResource CancelButton}"
+                                Command="{Binding CancelOverrideCommand}" />
+                        <Button Content="Override &amp; Approve"
+                                Style="{StaticResource OverrideButton}"
+                                Command="{Binding ConfirmOverrideCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
     </Grid>
 </UserControl>

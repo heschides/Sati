@@ -186,6 +186,7 @@ namespace Sati.ViewModels.Supervisor
         {
             try
             {
+                CaseManagers.Clear();
                 var supervisor = _sessionService.CurrentUser!;
                 var supervisees = await _userService.GetSuperviseesAsync(supervisor.Id);
 

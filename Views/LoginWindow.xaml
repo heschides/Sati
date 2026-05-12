@@ -4,7 +4,6 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Sati.Views"
-        Icon="/Images/sati.ico"
         mc:Ignorable="d"
         Title="Sati"
         Height="600"
@@ -124,7 +123,7 @@
         <StackPanel VerticalAlignment="Center">
 
             <!-- Bodhi leaf -->
-            <Image Source="/Images/leaf.png"
+            <Image Source="pack://application:,,,/images/leaf.png"
                    Height="72"
                    Width="48"
                    HorizontalAlignment="Center"

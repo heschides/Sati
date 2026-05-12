@@ -6,220 +6,472 @@
              mc:Ignorable="d">
 
     <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <!-- Filter bar -->
-            <RowDefinition Height="*" />
-            <!-- Content -->
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="180" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <!-- ═══ FILTER BAR ═══ -->
-        <!-- ═══ FILTER BAR ═══ -->
-        <Grid Grid.Row="0"
-              Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="200" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <!-- ═══ SIDEBAR ═══ -->
+        <Border Grid.Column="0"
+                Background="White"
+                BorderBrush="#E8D0B8"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="12">
+            <StackPanel>
 
-            <!-- Client dropdown -->
-            <ComboBox Grid.Column="0"
-                      ItemsSource="{Binding FilterPeople}"
-                      SelectedItem="{Binding SelectedFilterPerson, Mode=TwoWay}">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding FullName, FallbackValue='All Clients'}" />
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
+                <TextBlock Text="FILTERS"
+                           Style="{StaticResource SectionHeader}" />
+                <Separator Background="#E8D0B8"
+                           Margin="0,0,0,10" />
 
-            <!-- Status dropdown -->
-            <ComboBox Grid.Column="2"
-                      ItemsSource="{Binding StatusOptions}"
-                      SelectedItem="{Binding SelectedStatusOption, Mode=TwoWay}"
-                      DisplayMemberPath="Display">
-            </ComboBox>
+                <TextBlock Text="CLIENT"
+                           Style="{StaticResource LabelStyle}" />
+                <ComboBox Margin="0,0,0,10"
+                          ItemsSource="{Binding FilterPeople}"
+                          SelectedItem="{Binding SelectedFilterPerson, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding FullName, FallbackValue='All Clients'}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
 
-            <!-- Search box -->
-            <TextBox Grid.Column="4"
-                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                     Padding="8,4">
-                <TextBox.Style>
-                    <Style TargetType="TextBox"
-                           BasedOn="{StaticResource {x:Type TextBox}}">
-                        <Style.Triggers>
-                            <Trigger Property="Text"
-                                     Value="">
-                                <!-- Placeholder handled by overlay below -->
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBox.Style>
-            </TextBox>
-        </Grid>
+                <TextBlock Text="STATUS"
+                           Style="{StaticResource LabelStyle}" />
+                <ComboBox Margin="0,0,0,10"
+                          ItemsSource="{Binding StatusOptions}"
+                          SelectedItem="{Binding SelectedStatusOption, Mode=TwoWay}"
+                          DisplayMemberPath="Display" />
 
-        <!-- ═══ CONTENT: DATAGRID + DETAIL ═══ -->
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+                <TextBlock Text="SEARCH"
+                           Style="{StaticResource LabelStyle}" />
+                <TextBox Margin="0,0,0,20"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="6,4" />
 
-            <!-- Notes DataGrid -->
-            <Border Grid.Column="0"
-                    Background="White"
-                    BorderBrush="#E8D0B8"
-                    BorderThickness="1"
-                    CornerRadius="6">
-                <DataGrid ItemsSource="{Binding NotesView}"
-                          SelectedItem="{Binding SelectedNote, Mode=TwoWay}"
-                          AutoGenerateColumns="False"
-                          IsReadOnly="True"
-                          Background="Transparent"
-                          BorderThickness="0"
-                          RowBackground="White"
-                          AlternatingRowBackground="#FDF6EC"
-                          GridLinesVisibility="Horizontal"
-                          HorizontalGridLinesBrush="#F0E0D0"
-                          HeadersVisibility="Column"
-                          SelectionMode="Single">
-                    <DataGrid.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Mark Note Logged"
-                                      Command="{Binding MarkNoteLoggedCommand}" />
-                        </ContextMenu>
-                    </DataGrid.ContextMenu>
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Client"
-                                            Binding="{Binding Person.FullName}"
-                                            Width="*" />
-                        <DataGridTextColumn Header="Date"
-                                            Binding="{Binding EventDate, StringFormat={}{0:MM/dd}}"
-                                            Width="60" />
-                        <DataGridTextColumn Header="Status"
-                                            Binding="{Binding Status}"
-                                            Width="80" />
-                        <DataGridTextColumn Header="Type"
-                                            Binding="{Binding NoteType}"
-                                            Width="80" />
-                        <DataGridTextColumn Header="Units"
-                                            Binding="{Binding Units}"
-                                            Width="50" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Border>
+                <!-- Attention section — hidden when nothing needs action -->
+                <StackPanel Visibility="{Binding HasAttentionItems,
+                                Converter={StaticResource BoolToVisibilityConverter}}">
 
-            <!-- Note Detail Panel -->
-            <Border Grid.Column="2"
-                    Background="White"
-                    BorderBrush="#E8D0B8"
+                    <TextBlock Text="ATTENTION NEEDED"
+                               Style="{StaticResource SectionHeader}" />
+                    <Separator Background="#E8D0B8"
+                               Margin="0,0,0,10" />
+
+                    <!-- Returned notes link -->
+                    <Button Margin="0,0,0,8"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Command="{Binding ShowReturnedCommand}"
+                            Visibility="{Binding HasReturned,
+                                Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        CornerRadius="4"
+                                        Padding="4,6">
+                                    <ContentPresenter />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver"
+                                             Value="True">
+                                        <Setter Property="Background"
+                                                Value="#F5EBE0" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="#C87941"
+                                    CornerRadius="10"
+                                    MinWidth="20"
+                                    Height="20"
+                                    Padding="5,0"
+                                    Margin="0,0,8,0"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ReturnedCount}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Returned"
+                                       FontSize="12"
+                                       Foreground="#3D2B1F"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Held for compliance link -->
+                    <Button Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Command="{Binding ShowHeldCommand}"
+                            Visibility="{Binding HasHeld,
+                                Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        CornerRadius="4"
+                                        Padding="4,6">
+                                    <ContentPresenter />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver"
+                                             Value="True">
+                                        <Setter Property="Background"
+                                                Value="#F5EBE0" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="#7A3B3B"
+                                    CornerRadius="10"
+                                    MinWidth="20"
+                                    Height="20"
+                                    Padding="5,0"
+                                    Margin="0,0,8,0"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding HeldCount}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Held for Compliance"
+                                       FontSize="12"
+                                       Foreground="#3D2B1F"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══ NOTES DATAGRID ═══ -->
+        <Border Grid.Column="2"
+                Background="White"
+                BorderBrush="#E8D0B8"
+                BorderThickness="1"
+                CornerRadius="6">
+            <DataGrid ItemsSource="{Binding NotesView}"
+                      SelectedItem="{Binding SelectedNote, Mode=TwoWay}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      RowBackground="White"
+                      AlternatingRowBackground="#FDF6EC"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="#F0E0D0"
+                      HeadersVisibility="Column"
+                      SelectionMode="Single">
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Mark Note Logged"
+                                  Command="{Binding PlacementTarget.DataContext.MarkNoteLoggedCommand,
+                                      RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Client"
+                                        Binding="{Binding Person.FullName}"
+                                        Width="*" />
+                    <DataGridTextColumn Header="Date"
+                                        Binding="{Binding EventDate, StringFormat={}{0:MM/dd}}"
+                                        Width="60" />
+                    <DataGridTextColumn Header="Status"
+                                        Binding="{Binding Status}"
+                                        Width="80" />
+                    <DataGridTextColumn Header="Type"
+                                        Binding="{Binding NoteType}"
+                                        Width="80" />
+                    <DataGridTextColumn Header="Units"
+                                        Binding="{Binding Units}"
+                                        Width="50" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- ═══ NOTE DETAIL PANEL ═══ -->
+        <Border Grid.Column="4"
+                Background="White"
+                BorderBrush="#E8D0B8"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="16">
+            <Grid>
+
+                <!-- Placeholder when nothing selected -->
+                <TextBlock Text="Select a note to view details."
+                           Foreground="#C0A080"
+                           FontSize="13"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedNote}"
+                                             Value="{x:Null}">
+                                    <Setter Property="Visibility"
+                                            Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Detail content -->
+                <StackPanel>
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility"
+                                    Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedNote}"
+                                             Value="{x:Null}">
+                                    <Setter Property="Visibility"
+                                            Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+
+                    <TextBlock Text="NOTE DETAIL"
+                               Style="{StaticResource SectionHeader}" />
+                    <Separator Background="#E8D0B8"
+                               Margin="0,0,0,10" />
+
+                    <TextBlock Text="CLIENT"
+                               Style="{StaticResource LabelStyle}" />
+                    <TextBlock Text="{Binding SelectedNote.Person.FullName}"
+                               FontSize="13"
+                               Foreground="#3D2B1F"
+                               Margin="0,0,0,10" />
+
+                    <TextBlock Text="TYPE"
+                               Style="{StaticResource LabelStyle}" />
+                    <TextBlock Text="{Binding SelectedNote.NoteType}"
+                               FontSize="13"
+                               Foreground="#3D2B1F"
+                               Margin="0,0,0,10" />
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="60" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="DATE"
+                                       Style="{StaticResource LabelStyle}" />
+                            <TextBlock Text="{Binding SelectedNote.EventDate, StringFormat={}{0:MM/dd/yyyy}}"
+                                       FontSize="13"
+                                       Foreground="#3D2B1F" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="STATUS"
+                                       Style="{StaticResource LabelStyle}" />
+                            <TextBlock Text="{Binding SelectedNote.Status}"
+                                       FontSize="13"
+                                       Foreground="#3D2B1F" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="UNITS"
+                                       Style="{StaticResource LabelStyle}" />
+                            <TextBlock Text="{Binding SelectedNote.Units}"
+                                       FontSize="13"
+                                       Foreground="#3D2B1F" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Return reason banner — only for returned notes -->
+                    <Border Background="#FFF0E8"
+                            BorderBrush="#E8C0A0"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="10,8"
+                            Margin="0,0,0,10"
+                            Visibility="{Binding IsSelectedNoteReturned,
+                                Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="RETURNED BY SUPERVISOR"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="#C87941"
+                                       Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding SelectedNote.ReturnReason}"
+                                       FontSize="12"
+                                       Foreground="#3D2B1F"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="NARRATIVE"
+                               Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding SelectedNote.Narrative, Mode=OneWay}"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Height="300"
+                             Background="#FDF6EC"
+                             BorderBrush="#E8D0B8"
+                             Padding="8" />
+
+                </StackPanel>
+            </Grid>
+        </Border>
+        <!-- Compliance dialog overlay -->
+        <Grid Background="#80000000"
+              Grid.ColumnSpan="5"
+              Visibility="{Binding IsComplianceDialogVisible,
+                  Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Background="#FDF6EC"
+                    BorderBrush="#D9AEAE"
                     BorderThickness="1"
                     CornerRadius="6"
-                    Padding="16">
-                <Grid>
-                    <!-- Placeholder when nothing is selected -->
-                    <TextBlock Text="Select a note to view details."
-                               Foreground="#C0A080"
-                               FontSize="13"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Center">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Visibility"
-                                        Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding SelectedNote}"
-                                                 Value="{x:Null}">
-                                        <Setter Property="Visibility"
-                                                Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
+                    Width="460"
+                    Padding="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel>
+
+                    <TextBlock Text="CLIENT NOT BILLING COMPLIANT"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="#7A3B3B"
+                               Margin="0,0,0,8" />
+
+                    <TextBlock TextWrapping="Wrap"
+                               FontSize="12"
+                               Foreground="#3D2B1F"
+                               Margin="0,0,0,12">
+                        <Run Text="{Binding SelectedNote.Person.FullName, FallbackValue='This client', Mode=OneWay}" />
+                        <Run Text="does not currently meet billing compliance requirements. You may hold this note in your queue until compliance is resolved, or send it to your supervisor with a written justification." />
                     </TextBlock>
 
-                    <!-- Detail content -->
-                    <StackPanel>
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Visibility"
-                                        Value="Visible" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding SelectedNote}"
-                                                 Value="{x:Null}">
-                                        <Setter Property="Visibility"
-                                                Value="Collapsed" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
+                    <Border Background="#FFF0E8"
+                            BorderBrush="#D9AEAE"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="10,8"
+                            Margin="0,0,0,12">
+                        <ItemsControl ItemsSource="{Binding ComplianceFailureReasons}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
+                                               FontSize="12"
+                                               Foreground="#7A3B3B"
+                                               Margin="0,2"
+                                               TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
 
-                        <TextBlock Text="NOTE DETAIL"
-                                   Style="{StaticResource SectionHeader}" />
-                        <Separator Background="#E8D0B8"
-                                   Margin="0,0,0,10" />
+                    <TextBlock Text="JUSTIFICATION"
+                               FontSize="10"
+                               Foreground="#9C7A5C"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="Required if sending to supervisor. Ignored if holding."
+                               FontSize="10"
+                               Foreground="#9C7A5C"
+                               Margin="0,0,0,6" />
+                    <TextBox Text="{Binding PendingJustification, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Height="90"
+                             Padding="8"
+                             FontSize="12"
+                             Background="White"
+                             BorderBrush="#D9AEAE"
+                             VerticalScrollBarVisibility="Auto"
+                             Margin="0,0,0,16" />
 
-                        <TextBlock Text="CLIENT"
-                                   Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding SelectedNote.Person.FullName}"
-                                   FontSize="13"
-                                   Foreground="#3D2B1F"
-                                   Margin="0,0,0,10" />
-                        <TextBlock Text="TYPE"
-                                   Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding SelectedNote.NoteType}"
-                                   FontSize="13"
-                                   Foreground="#3D2B1F"
-                                   Margin="0,0,0,10" />
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="60" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="DATE"
-                                           Style="{StaticResource LabelStyle}" />
-                                <TextBlock Text="{Binding SelectedNote.EventDate, StringFormat={}{0:MM/dd/yyyy}}"
-                                           FontSize="13"
-                                           Foreground="#3D2B1F" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="STATUS"
-                                           Style="{StaticResource LabelStyle}" />
-                                <TextBlock Text="{Binding SelectedNote.Status}"
-                                           FontSize="13"
-                                           Foreground="#3D2B1F" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="4">
-                                <TextBlock Text="UNITS"
-                                           Style="{StaticResource LabelStyle}" />
-                                <TextBlock Text="{Binding SelectedNote.Units}"
-                                           FontSize="13"
-                                           Foreground="#3D2B1F" />
-                            </StackPanel>
-                        </Grid>
-
-                        <TextBlock Text="NARRATIVE"
-                                   Style="{StaticResource LabelStyle}" />
-                        <TextBox Text="{Binding SelectedNote.Narrative, Mode=OneWay}"
-                                 IsReadOnly="True"
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 Height="300"
-                                 Background="#FDF6EC"
-                                 BorderBrush="#E8D0B8"
-                                 Padding="8" />
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Content="Cancel"
+                                Padding="14,6"
+                                FontSize="12"
+                                Cursor="Hand"
+                                BorderThickness="0"
+                                Background="#9C7A5C"
+                                Foreground="#FDF6EC"
+                                Margin="0,0,6,0"
+                                Command="{Binding CancelComplianceDialogCommand}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            CornerRadius="4"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Content="Hold for Now"
+                                Padding="14,6"
+                                FontSize="12"
+                                Cursor="Hand"
+                                BorderThickness="0"
+                                Background="#C87941"
+                                Foreground="#FDF6EC"
+                                Margin="0,0,6,0"
+                                Command="{Binding HoldForComplianceCommand}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            CornerRadius="4"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Content="Send to Supervisor"
+                                Padding="14,6"
+                                FontSize="12"
+                                Cursor="Hand"
+                                BorderThickness="0"
+                                Background="#7A3B3B"
+                                Foreground="#FDF6EC"
+                                Command="{Binding SendToSupervisorCommand}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            CornerRadius="4"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
                     </StackPanel>
-                </Grid>
+
+                </StackPanel>
             </Border>
         </Grid>
+
     </Grid>
 </UserControl>

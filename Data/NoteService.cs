@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sati.Models;
+using Windows.UI;
 
 namespace Sati.Data
 {
@@ -67,6 +68,19 @@ namespace Sati.Data
                 .Where(n => n.EventDate >= firstDay &&
                             n.EventDate <= lastDay &&
                             n.Person.UserId == userId)
+                .ToListAsync();
+        }
+        public async Task<List<Note>> GetByYearAsync(int userId, int year)
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            var firstDay = new DateTime(year, 1, 1);
+            var lastDay = new DateTime(year, 12, 31);
+            return await context.Notes
+                .Include(n => n.Person)
+                .Where(n => n.Person.UserId == userId &&
+                            n.EventDate.HasValue &&
+                            n.EventDate.Value >= firstDay &&
+                            n.EventDate.Value <= lastDay)
                 .ToListAsync();
         }
     }

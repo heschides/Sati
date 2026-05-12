@@ -28,11 +28,11 @@
             <RowDefinition Height="2*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width=".55*" />
             <ColumnDefinition Width="10" />
-            <ColumnDefinition Width="1.25*" />
+            <ColumnDefinition Width="1*" />
             <ColumnDefinition Width="10" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width=".65*" />
         </Grid.ColumnDefinitions>
 
         <!-- ═══ COL 0 ROW 0: TOOLBAR ═══ -->
@@ -320,11 +320,11 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="UNITS"
+                    <TextBlock Text="MINUTES"
                                Grid.Row="0"
                                Style="{StaticResource LabelStyle}" />
                     <TextBox Grid.Row="1"
-                             Text="{Binding Units}" />
+                             Text="{Binding Minutes}" />
 
                     <TextBlock Text="DATE"
                                Grid.Row="2"
@@ -665,7 +665,7 @@
             </StackPanel>
         </Border>
 
-        <!-- ═══ COL 4 ROW 0: UPCOMING TASKS (compact) ═══ -->
+        <!-- ═══ COL 4 ROW 0: UPCOMING TASKS ═══ -->
         <Border Grid.Column="4"
                 Grid.Row="0"
                 Grid.RowSpan="2"
@@ -682,48 +682,175 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0"
-                            Orientation="Horizontal"
-                            Margin="0,0,0,4">
-                    <TextBlock Text="UPCOMING"
-                               Style="{StaticResource SectionHeader}"
-                               Margin="0,0,12,0" />
-                    <RadioButton GroupName="SortEventsBy"
-                                 Content="By Date"
-                                 IsChecked="{Binding SortByDate, Mode=TwoWay}"
-                                 Foreground="#9C7A5C"
-                                 FontSize="11"
-                                 Margin="0,0,12,0"
-                                 VerticalAlignment="Center" />
-                    <RadioButton GroupName="SortEventsBy"
-                                 Content="By Type"
-                                 IsChecked="{Binding SortByDate,
-                             Converter={StaticResource InverseBoolConverter},
-                             Mode=TwoWay}"
-                                 Foreground="#9C7A5C"
-                                 FontSize="11"
-                                 VerticalAlignment="Center" />
-                </StackPanel>
+                <Grid Grid.Row="0"
+                      Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Tab buttons: Upcoming | Overdue -->
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal">
+
+                        <Button Command="{Binding SelectUpcomingTabCommand}"
+                                Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border BorderThickness="0,0,0,2"
+                                            Padding="0,0,12,4"
+                                            Background="Transparent">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="BorderBrush"
+                                                        Value="Transparent" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShowOverdue}"
+                                                                 Value="False">
+                                                        <Setter Property="BorderBrush"
+                                                                Value="#C87941" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="UPCOMING"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground"
+                                                            Value="#9C7A5C" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShowOverdue}"
+                                                                     Value="False">
+                                                            <Setter Property="Foreground"
+                                                                    Value="#3D2B1F" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button Command="{Binding SelectOverdueTabCommand}"
+                                Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border BorderThickness="0,0,0,2"
+                                            Padding="0,0,0,4"
+                                            Background="Transparent">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="BorderBrush"
+                                                        Value="Transparent" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShowOverdue}"
+                                                                 Value="True">
+                                                        <Setter Property="BorderBrush"
+                                                                Value="#C0392B" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="OVERDUE"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Margin="0,0,5,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground"
+                                                                Value="#9C7A5C" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ShowOverdue}"
+                                                                         Value="True">
+                                                                <Setter Property="Foreground"
+                                                                        Value="#3D2B1F" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <Border Background="#C0392B"
+                                                    CornerRadius="8"
+                                                    Padding="5,1"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="{Binding HasOverdueEvents,
+                                                        Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="{Binding OverdueCount}"
+                                                           FontSize="10"
+                                                           Foreground="White"
+                                                           FontWeight="SemiBold" />
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                    </StackPanel>
+
+                    <!-- Sort toggles — abbreviated to save space -->
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Bottom">
+                        <RadioButton GroupName="SortEventsBy"
+                                     Content="Date"
+                                     IsChecked="{Binding SortByDate, Mode=TwoWay}"
+                                     Foreground="#9C7A5C"
+                                     FontSize="10"
+                                     Margin="0,0,8,0"
+                                     VerticalAlignment="Center" />
+                        <RadioButton GroupName="SortEventsBy"
+                                     Content="Type"
+                                     IsChecked="{Binding SortByDate,
+                                         Converter={StaticResource InverseBoolConverter},
+                                         Mode=TwoWay}"
+                                     Foreground="#9C7A5C"
+                                     FontSize="10"
+                                     VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
 
                 <Separator Grid.Row="1" />
 
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="FORMS"
-                                   Style="{StaticResource LabelStyle}"
-                                   Margin="0,0,0,6" />
-                        <ItemsControl ItemsSource="{Binding FormEvents}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="0,3">
+                <ScrollViewer Grid.Row="2"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding AllEvents}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,2"
+                                        Padding="6,4"
+                                        CornerRadius="3"
+                                        BorderThickness="3,0,0,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <!-- Default: open form deadline (amber) -->
+                                            <Setter Property="BorderBrush"
+                                                    Value="#C87941" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Kind}"
+                                                             Value="{x:Static sati:UpcomingEventKind.LateReview}">
+                                                    <Setter Property="BorderBrush"
+                                                            Value="#C0392B" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}"
+                                                             Value="{x:Static sati:UpcomingEventKind.ScheduledVisit}">
+                                                    <Setter Property="BorderBrush"
+                                                            Value="#6B8E6B" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}"
+                                                             Value="{x:Static sati:UpcomingEventKind.ScheduledContact}">
+                                                    <Setter Property="BorderBrush"
+                                                            Value="#9C7A5C" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel>
                                         <TextBlock Text="{Binding Title}"
                                                    FontWeight="SemiBold"
                                                    Foreground="#3D2B1F"
@@ -746,55 +873,11 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="VISITS"
-                                   Style="{StaticResource LabelStyle}"
-                                   Margin="0,0,0,6" />
-                        <ItemsControl ItemsSource="{Binding VisitEvents}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="0,3">
-                                        <TextBlock Text="{Binding Title}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="#3D2B1F"
-                                                   FontSize="11"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Date, StringFormat={}{0:MMM d}}"
-                                                   Foreground="#9C7A5C"
-                                                   FontSize="11" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="4">
-                        <TextBlock Text="CONTACTS"
-                                   Style="{StaticResource LabelStyle}"
-                                   Margin="0,0,0,6" />
-                        <ItemsControl ItemsSource="{Binding ContactEvents}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="0,3">
-                                        <TextBlock Text="{Binding Title}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="#3D2B1F"
-                                                   FontSize="11"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding Date, StringFormat={}{0:MMM d}}"
-                                                   Foreground="#9C7A5C"
-                                                   FontSize="11" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
             </Grid>
         </Border>
 
@@ -864,6 +947,141 @@
                 </ScrollViewer>
             </Grid>
         </Border>
+
+        <!-- Compliance dialog overlay -->
+        <Grid Background="#80000000"
+              Grid.RowSpan="3"
+              Grid.ColumnSpan="5"
+              Visibility="{Binding IsComplianceDialogVisible,
+                  Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Background="#FDF6EC"
+                    BorderBrush="#D9AEAE"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Width="460"
+                    Padding="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel>
+
+                    <TextBlock Text="CLIENT NOT BILLING COMPLIANT"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="#7A3B3B"
+                               Margin="0,0,0,8" />
+
+                    <TextBlock TextWrapping="Wrap"
+                               FontSize="12"
+                               Foreground="#3D2B1F"
+                               Margin="0,0,0,12">
+                        <Run Text="{Binding SelectedPerson.FullName, FallbackValue='This client', Mode=OneWay}" />
+                        <Run Text="does not currently meet billing compliance requirements. You may hold this note in your queue until compliance is resolved, or send it to your supervisor with a written justification." />
+                    </TextBlock>
+
+                    <Border Background="#FFF0E8"
+                            BorderBrush="#D9AEAE"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="10,8"
+                            Margin="0,0,0,12">
+                        <ItemsControl ItemsSource="{Binding ComplianceFailureReasons}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
+                                               FontSize="12"
+                                               Foreground="#7A3B3B"
+                                               Margin="0,2"
+                                               TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+
+                    <TextBlock Text="JUSTIFICATION"
+                               FontSize="10"
+                               Foreground="#9C7A5C"
+                               Margin="0,0,0,4" />
+                    <TextBlock Text="Required if sending to supervisor. Ignored if holding."
+                               FontSize="10"
+                               Foreground="#9C7A5C"
+                               Margin="0,0,0,6" />
+                    <TextBox Text="{Binding PendingJustification, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Height="90"
+                             Padding="8"
+                             FontSize="12"
+                             Background="White"
+                             BorderBrush="#D9AEAE"
+                             VerticalScrollBarVisibility="Auto"
+                             Margin="0,0,0,16" />
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Content="Cancel"
+                                Padding="14,6"
+                                FontSize="12"
+                                Cursor="Hand"
+                                BorderThickness="0"
+                                Background="#9C7A5C"
+                                Foreground="#FDF6EC"
+                                Margin="0,0,6,0"
+                                Command="{Binding CancelComplianceDialogCommand}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            CornerRadius="4"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Content="Hold for Now"
+                                Padding="14,6"
+                                FontSize="12"
+                                Cursor="Hand"
+                                BorderThickness="0"
+                                Background="#C87941"
+                                Foreground="#FDF6EC"
+                                Margin="0,0,6,0"
+                                Command="{Binding HoldForComplianceCommand}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            CornerRadius="4"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Content="Send to Supervisor"
+                                Padding="14,6"
+                                FontSize="12"
+                                Cursor="Hand"
+                                BorderThickness="0"
+                                Background="#7A3B3B"
+                                Foreground="#FDF6EC"
+                                Command="{Binding SendToSupervisorCommand}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            CornerRadius="4"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+
+                </StackPanel>
+            </Border>
+        </Grid>
 
     </Grid>
 </UserControl>

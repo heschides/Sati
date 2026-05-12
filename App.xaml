@@ -252,6 +252,7 @@
                                          TrueWidth="16"
                                          FalseWidth="0" />
         <converters:FormCellStatusToBrushConverter x:Key="FormCellStatusToBrushConverter" />
+        <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
         <!-- View → ViewModel DataTemplates -->
         <DataTemplate DataType="{x:Type viewmodels:CaseManagerDashboardViewModel}">
             <views:CaseManagerDashboardView />
@@ -273,6 +274,9 @@
 
         <DataTemplate DataType="{x:Type children:GuidanceViewModel}">
             <views:GuidanceView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type children:CalendarViewModel}">
+            <views:CalendarView />
         </DataTemplate>
 
         <DataTemplate DataType="{x:Type children:HelpersViewModel}">

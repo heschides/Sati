@@ -25,7 +25,7 @@ namespace Sati.Data
         {
             var notes = await GetLoggedNotesAsync(supervisorId, allSupervisees);
             var today = DateTime.Today;
-            return notes.Where(n => IsComplianceGatePassed(n.Person, today));
+            return notes.Where(n => n.Person.EvaluateComplianceGate(today).Passed);
         }
 
         // Returns Logged notes whose consumer fails the compliance gate.
@@ -35,7 +35,7 @@ namespace Sati.Data
         {
             var notes = await GetLoggedNotesAsync(supervisorId, allSupervisees);
             var today = DateTime.Today;
-            return notes.Where(n => !IsComplianceGatePassed(n.Person, today));
+            return notes.Where(n => !n.Person.EvaluateComplianceGate(today).Passed);
         }
 
         // -------------------------------------------------------------------------
@@ -57,11 +57,12 @@ namespace Sati.Data
 
             // Hard compliance guard — service enforces the rule even if UI
             // pre-filters. Cannot be bypassed by calling this method directly.
-            if (!IsComplianceGatePassed(note.Person, DateTime.Today))
+            var (passed, reasons) = note.Person.EvaluateComplianceGate(DateTime.Today);
+            if (!passed)
                 throw new InvalidOperationException(
-                    $"Cannot approve note {noteId}: consumer {note.Person.FullName} " +
-                    $"does not meet compliance requirements. Use ApproveWithOverrideAsync " +
-                    $"if a supervisor exception is warranted.");
+                    $"Cannot approve note {noteId}: {note.Person.FullName} does not meet " +
+                    $"compliance requirements. Failures: {string.Join("; ", reasons)}. " +
+                    $"Use ApproveWithOverrideAsync if a supervisor exception is warranted.");
 
             note.Status = NoteStatus.Approved;
             note.ApprovedById = supervisorId;
@@ -117,90 +118,8 @@ namespace Sati.Data
             await context.SaveChangesAsync();
         }
 
-        // -------------------------------------------------------------------------
-        // Compliance gate
-        // -------------------------------------------------------------------------
-
-        // Returns true if the person meets all billing compliance requirements
-        // as of today. The rule:
-        //
-        //   Annual forms (current cycle):
-        //     PCP, Reclassification, ComprehensiveAssessment — all IsCompliant = true
-        //
-        //   90-day reviews — previous cycle (if not first cycle):
-        //     All four (Q1R–Q4R) must be IsCompliant = true.
-        //     Missing records = fail.
-        //
-        //   90-day reviews — current cycle:
-        //     Any review whose DueDate <= today must be IsCompliant = true.
-        //     Reviews not yet due are not evaluated.
-        //
-        // Missing form record for any required check = fail (can't verify = not compliant).
-        private static bool IsComplianceGatePassed(Person person, DateTime today)
-        {
-            // Annual forms — current cycle
-            var annualTypes = new[]
-            {
-                FormType.PCP,
-                FormType.Reclassification,
-                FormType.ComprehensiveAssessment
-            };
-
-            foreach (var type in annualTypes)
-            {
-                var form = person.GetCurrentCycleForm(type);
-                if (form is null || !form.IsCompliant)
-                    return false;
-            }
-
-            // Get cycle boundaries for review checks
-            var boundaries = person.GetCurrentCycleBoundaries(today);
-            if (boundaries is null)
-                return false;
-
-            var (cycleStart, cycleEnd) = boundaries.Value;
-            var isFirstCycle = cycleStart == person.EffectiveDate;
-
-            // Previous cycle reviews — required if not first cycle
-            if (!isFirstCycle)
-            {
-                var prevCycleStart = cycleStart.AddYears(-1);
-                var prevCycleEnd = cycleStart;
-
-                var reviewTypes = new[] { FormType.Q1R, FormType.Q2R, FormType.Q3R, FormType.Q4R };
-                foreach (var type in reviewTypes)
-                {
-                    var prevForm = person.Forms
-                        .Where(f => f.Type == type &&
-                                    f.DueDate >= prevCycleStart &&
-                                    f.DueDate <= prevCycleEnd)
-                        .OrderByDescending(f => f.DueDate)
-                        .FirstOrDefault();
-
-                    if (prevForm is null || !prevForm.IsCompliant)
-                        return false;
-                }
-            }
-
-            // Current cycle reviews — only those past due
-            var currentReviews = person.Forms
-                .Where(f => (f.Type == FormType.Q1R ||
-                             f.Type == FormType.Q2R ||
-                             f.Type == FormType.Q3R ||
-                             f.Type == FormType.Q4R) &&
-                             f.DueDate >= cycleStart &&
-                             f.DueDate <= cycleEnd &&
-                             f.DueDate.Date <= today.Date);
-
-            foreach (var review in currentReviews)
-            {
-                if (!review.IsCompliant)
-                    return false;
-            }
-
-            return true;
-        }
-
+     
+      
         // -------------------------------------------------------------------------
         // Private helpers
         // -------------------------------------------------------------------------

@@ -37,11 +37,24 @@ namespace Sati.ViewModels
         [ObservableProperty] private StatusOption _selectedStatusOption = StatusOptions[0];
         [ObservableProperty] private Note? _selectedNote;
         [ObservableProperty] private string? _searchText;
+        [ObservableProperty] private bool _isComplianceDialogVisible;
+        [ObservableProperty] private string _pendingJustification = string.Empty;
+        [ObservableProperty] private IReadOnlyList<string> _complianceFailureReasons = [];
 
         // CALLBACKS
         partial void OnSelectedFilterPersonChanged(Person? value) => NotesView.Refresh();
         partial void OnSelectedStatusOptionChanged(StatusOption value) => NotesView.Refresh();
         partial void OnSearchTextChanged(string? value) => NotesView.Refresh();
+        partial void OnSelectedNoteChanged(Note? value) =>
+            OnPropertyChanged(nameof(IsSelectedNoteReturned));
+     
+        // COMPUTED
+        public int ReturnedCount => _allNotes.Count(n => n.Status == NoteStatus.Returned);
+        public int HeldCount => _allNotes.Count(n => n.Status == NoteStatus.HeldForCompliance);
+        public bool HasReturned => ReturnedCount > 0;
+        public bool HasHeld => HeldCount > 0;
+        public bool HasAttentionItems => HasReturned || HasHeld;
+        public bool IsSelectedNoteReturned => SelectedNote?.Status == NoteStatus.Returned;
 
         // CONSTRUCTOR
         public NotesWindowViewModel(IPersonService personService, ISessionService sessionService, INoteService noteService)
@@ -55,12 +68,69 @@ namespace Sati.ViewModels
 
         // COMMANDS
         [RelayCommand]
-        private async Task MarkNoteLogged()
+        private void ShowReturned() =>
+                   SelectedStatusOption = StatusOptions.First(s => s.Value == NoteStatus.Returned);
+
+        [RelayCommand]
+        private void ShowHeld() =>
+            SelectedStatusOption = StatusOptions.First(s => s.Value == NoteStatus.HeldForCompliance);
+
+
+        [RelayCommand]
+        private void MarkNoteLogged()
+        {
+            if (SelectedNote is null) return;
+
+            var (passed, reasons) = SelectedNote.Person.EvaluateComplianceGate(DateTime.Today);
+            if (!passed)
+            {
+                ComplianceFailureReasons = reasons;
+                PendingJustification = string.Empty;
+                IsComplianceDialogVisible = true;
+                return;
+            }
+
+            _ = LogNoteDirectlyAsync();
+        }
+
+        private async Task LogNoteDirectlyAsync()
         {
             if (SelectedNote is null) return;
             SelectedNote.Status = NoteStatus.Logged;
             await _noteService.UpdateNoteAsync(SelectedNote);
             NotesView.Refresh();
+        }
+
+        [RelayCommand]
+        private async Task HoldForCompliance()
+        {
+            if (SelectedNote is null) return;
+            SelectedNote.Status = NoteStatus.HeldForCompliance;
+            await _noteService.UpdateNoteAsync(SelectedNote);
+            IsComplianceDialogVisible = false;
+            PendingJustification = string.Empty;
+            NotesView.Refresh();
+        }
+
+        [RelayCommand]
+        private async Task SendToSupervisor()
+        {
+            if (SelectedNote is null) return;
+            if (string.IsNullOrWhiteSpace(PendingJustification)) return;
+
+            SelectedNote.Status = NoteStatus.Logged;
+            SelectedNote.CaseManagerJustification = PendingJustification;
+            await _noteService.UpdateNoteAsync(SelectedNote);
+            IsComplianceDialogVisible = false;
+            PendingJustification = string.Empty;
+            NotesView.Refresh();
+        }
+
+        [RelayCommand]
+        private void CancelComplianceDialog()
+        {
+            IsComplianceDialogVisible = false;
+            PendingJustification = string.Empty;
         }
 
         // METHODS
@@ -94,6 +164,11 @@ namespace Sati.ViewModels
             }
 
             NotesView.Refresh();
+            OnPropertyChanged(nameof(ReturnedCount));
+            OnPropertyChanged(nameof(HeldCount));
+            OnPropertyChanged(nameof(HasReturned));
+            OnPropertyChanged(nameof(HasHeld));
+            OnPropertyChanged(nameof(HasAttentionItems));
         }
 
         private bool FilterNotes(object obj)

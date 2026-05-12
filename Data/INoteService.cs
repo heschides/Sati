@@ -13,5 +13,6 @@ namespace Sati.Data
         Task<List<Note>> GetAllByPersonAsync(int personId);
         Task UpdateAbandonedNotesAsync(int abandonedAfterDays);
         Task<List<Note>> GetMonthlyNotesAsync(int userId);
+        Task<List<Note>> GetByYearAsync(int userId, int year);
     }
 }

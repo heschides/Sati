@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sati.Data;
 
@@ -11,9 +12,11 @@ using Sati.Data;
 namespace Sati.Migrations
 {
     [DbContext(typeof(SatiContext))]
-    partial class SatiContextModelSnapshot : ModelSnapshot
+    [Migration("20260503122020_AddSupervisorFieldsToNote")]
+    partial class AddSupervisorFieldsToNote
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -155,30 +158,6 @@ namespace Sati.Migrations
                     b.ToTable("ClaimLines");
                 });
 
-            modelBuilder.Entity("Sati.Models.ExemptDate", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("ExemptDates");
-                });
-
             modelBuilder.Entity("Sati.Models.Form", b =>
                 {
                     b.Property<int>("Id")
@@ -227,6 +206,10 @@ namespace Sati.Migrations
                     b.Property<int>("DaysScheduled")
                         .HasColumnType("int");
 
+                    b.Property<string>("ExcludedDatesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("Month")
                         .HasColumnType("int");
 
@@ -266,9 +249,6 @@ namespace Sati.Migrations
 
                     b.Property<int?>("ApprovedById")
                         .HasColumnType("int");
-
-                    b.Property<string>("CaseManagerJustification")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("ComplianceOverride")
                         .HasColumnType("bit");
@@ -649,17 +629,6 @@ namespace Sati.Migrations
                     b.Navigation("BillingPeriod");
 
                     b.Navigation("Note");
-                });
-
-            modelBuilder.Entity("Sati.Models.ExemptDate", b =>
-                {
-                    b.HasOne("Sati.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Sati.Models.Form", b =>

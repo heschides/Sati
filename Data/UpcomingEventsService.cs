@@ -7,7 +7,6 @@ namespace Sati.Data
         public List<UpcomingEvent> GenerateEvents(IEnumerable<Person> people, Settings settings, DateTime? asOf = null)
         {
             var today = asOf ?? DateTime.Today;
-            var lookahead = today.AddDays(30);
             var events = new List<UpcomingEvent>();
 
             foreach (var person in people)
@@ -15,59 +14,65 @@ namespace Sati.Data
                 if (person.EffectiveDate is null)
                     continue;
 
-                var effective = person.EffectiveDate.Value;
-                var anniversary = GetNextAnniversary(effective, today);
-                var prevAnniversary = anniversary.AddYears(-1);
-
-                GenerateFormEvents(person, anniversary, prevAnniversary, today, lookahead, settings, events);
-                GenerateScheduledNoteEvents(person, today, lookahead, events);
+                GenerateFormEvents(person, today, settings, events);
+                GenerateScheduledNoteEvents(person, today, events);
             }
 
             return events.OrderBy(e => e.Date).ToList();
         }
 
-        private static DateTime GetNextAnniversary(DateTime effectiveDate, DateTime today)
-        {
-            var anniversary = new DateTime(today.Year, effectiveDate.Month, effectiveDate.Day);
-            if (anniversary <= today)
-                anniversary = anniversary.AddYears(1);
-            return anniversary;
-        }
-
-        private static void GenerateFormEvents(Person person, DateTime anniversary,
-            DateTime prevAnniversary, DateTime today, DateTime lookahead,
+        private static void GenerateFormEvents(Person person, DateTime today,
             Settings settings, List<UpcomingEvent> events)
         {
-            var minus30Forms = new[]
+            // All 12 form types in one table. Due dates come from the stored
+            // form record via GetCurrentCycleForm — never recomputed here.
+            // That keeps FormDueDateCalculator as the single source of truth
+            // and means settings changes propagate automatically.
+            var formMeta = new[]
             {
-                (FormType.PCP,              settings.PcpOpenDaysBefore,              settings.PcpDaysAfterDue,              "PCP"),
-                (FormType.SafetyPlan,       settings.SafetyPlanOpenDaysBefore,       settings.SafetyPlanDaysAfterDue,       "Safety Plan"),
-                (FormType.PrivacyPractices, settings.PrivacyPracticesOpenDaysBefore, settings.PrivacyPracticesDaysAfterDue, "Privacy Practices"),
-                (FormType.Release_Agency,   settings.ReleaseAgencyOpenDaysBefore,    settings.ReleaseAgencyDaysAfterDue,    "Release — Agency"),
-                (FormType.Release_DHHS,     settings.ReleaseDhhsOpenDaysBefore,      settings.ReleaseDhhsDaysAfterDue,      "Release — DHHS"),
-                (FormType.Release_Medical,  settings.ReleaseMedicalOpenDaysBefore,   settings.ReleaseMedicalDaysAfterDue,   "Release — Medical"),
-            };
-
-            foreach (var (type, openBefore, daysAfter, label) in minus30Forms)
-                AddAnnualFormEvent(person, type, anniversary.AddDays(-30), openBefore, daysAfter,
-                    label, prevAnniversary, anniversary, today, lookahead, events);
-
-            var minus60Forms = new[]
-            {
+                (FormType.PCP,                     settings.PcpOpenDaysBefore,              settings.PcpDaysAfterDue,              "PCP"),
                 (FormType.ComprehensiveAssessment, settings.CompAssessmentOpenDaysBefore,   settings.CompAssessmentDaysAfterDue,   "Comp. Assessment"),
                 (FormType.Reclassification,        settings.ReclassificationOpenDaysBefore, settings.ReclassificationDaysAfterDue, "Reclassification"),
+                (FormType.SafetyPlan,              settings.SafetyPlanOpenDaysBefore,       settings.SafetyPlanDaysAfterDue,       "Safety Plan"),
+                (FormType.PrivacyPractices,        settings.PrivacyPracticesOpenDaysBefore, settings.PrivacyPracticesDaysAfterDue, "Privacy Practices"),
+                (FormType.Release_Agency,          settings.ReleaseAgencyOpenDaysBefore,    settings.ReleaseAgencyDaysAfterDue,    "Release — Agency"),
+                (FormType.Release_DHHS,            settings.ReleaseDhhsOpenDaysBefore,      settings.ReleaseDhhsDaysAfterDue,      "Release — DHHS"),
+                (FormType.Release_Medical,         settings.ReleaseMedicalOpenDaysBefore,   settings.ReleaseMedicalDaysAfterDue,   "Release — Medical"),
+                (FormType.Q1R,                     settings.ReviewOpenDaysBefore,           settings.ReviewDaysAfterDue,           "Q1 Review"),
+                (FormType.Q2R,                     settings.ReviewOpenDaysBefore,           settings.ReviewDaysAfterDue,           "Q2 Review"),
+                (FormType.Q3R,                     settings.ReviewOpenDaysBefore,           settings.ReviewDaysAfterDue,           "Q3 Review"),
+                (FormType.Q4R,                     settings.ReviewOpenDaysBefore,           settings.ReviewDaysAfterDue,           "Q4 Review"),
             };
 
-            foreach (var (type, openBefore, daysAfter, label) in minus60Forms)
-                AddAnnualFormEvent(person, type, anniversary.AddDays(-60), openBefore, daysAfter,
-                    label, prevAnniversary, anniversary, today, lookahead, events);
+            foreach (var (type, openBefore, daysAfter, label) in formMeta)
+            {
+                var form = person.GetCurrentCycleForm(type, today);
+                if (form is null || form.IsCompliant)
+                    continue;
 
-            GenerateReviewEvents(person, prevAnniversary, anniversary, today, lookahead, settings, events);
+                var dueDate = form.DueDate.Date;
+                var openDate = dueDate.AddDays(-openBefore);
+                var lateDate = dueDate.AddDays(daysAfter);
+
+                if (today < openDate || today > lateDate)
+                    continue;
+
+                var kind = today > dueDate ? UpcomingEventKind.LateReview : UpcomingEventKind.OpenReview;
+                events.Add(new UpcomingEvent
+                {
+                    ClientName = person.FullName,
+                    Title = $"{label} — {person.FullName}",
+                    Date = dueDate,
+                    Kind = kind
+                });
+            }
         }
 
         private static void GenerateScheduledNoteEvents(Person person, DateTime today,
-            DateTime lookahead, List<UpcomingEvent> events)
+            List<UpcomingEvent> events)
         {
+            var lookahead = today.AddDays(30);
+
             var scheduledNotes = person.Notes
                 .Where(n => n.Status == NoteStatus.Scheduled &&
                             n.EventDate.HasValue &&
@@ -96,75 +101,6 @@ namespace Sati.Data
                     ClientName = person.FullName,
                     Title = label,
                     Date = note.EventDate!.Value,
-                    Kind = kind
-                });
-            }
-        }
-
-        private static void AddAnnualFormEvent(Person person, FormType type, DateTime dueDate,
-            int openBefore, int daysAfter, string label, DateTime prevAnniversary,
-            DateTime anniversary, DateTime today, DateTime lookahead, List<UpcomingEvent> events)
-        {
-            var isCompliant = person.Forms.Any(f => f.Type == type &&
-                                                    f.IsCompliant &&
-                                                    f.DueDate >= prevAnniversary &&
-                                                    f.DueDate <= anniversary);
-            if (isCompliant)
-                return;
-
-            var openDate = dueDate.AddDays(-openBefore);
-            var lateDate = dueDate.AddDays(daysAfter);
-
-            if (today > lateDate)
-                return;
-
-            if (today < openDate)
-                return;
-
-            var kind = today > dueDate ? UpcomingEventKind.LateReview : UpcomingEventKind.OpenReview;
-            events.Add(new UpcomingEvent
-            {
-                ClientName = person.FullName,
-                Title = label,
-                Date = dueDate,
-                Kind = kind
-            });
-        }
-
-        private static void GenerateReviewEvents(Person person, DateTime prevAnniversary,
-            DateTime anniversary, DateTime today, DateTime lookahead,
-            Settings settings, List<UpcomingEvent> events)
-        {
-            var reviewTypes = new[] { FormType.Q1R, FormType.Q2R, FormType.Q3R, FormType.Q4R };
-            var intervals = new[] { 90, 180, 270, 365 };
-
-            for (int i = 0; i < 4; i++)
-            {
-                var dueDate = prevAnniversary.AddDays(intervals[i]);
-                var type = reviewTypes[i];
-
-                var isCompliant = person.Forms.Any(f => f.Type == type &&
-                                                        f.IsCompliant &&
-                                                        f.DueDate >= prevAnniversary &&
-                                                        f.DueDate <= anniversary);
-                if (isCompliant)
-                    continue;
-
-                var openDate = dueDate.AddDays(-settings.ReviewOpenDaysBefore);
-                var lateDate = dueDate.AddDays(settings.ReviewDaysAfterDue);
-
-                if (today > lateDate)
-                    continue;
-
-                if (today < openDate)
-                    continue;
-
-                var kind = today > dueDate ? UpcomingEventKind.LateReview : UpcomingEventKind.OpenReview;
-                events.Add(new UpcomingEvent
-                {
-                    ClientName = person.FullName,
-                    Title = $"Q{i + 1} Review",
-                    Date = dueDate,
                     Kind = kind
                 });
             }

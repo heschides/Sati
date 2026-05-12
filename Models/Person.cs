@@ -43,6 +43,8 @@ namespace Sati
         // Factory
         // -------------------------------------------------------------------------
 
+        // Settings is no longer used in the body but kept on the signature so
+        // existing callers (NewClientViewModel) don't break. Remove in cleanup.
         public static Person CreatePerson(int userId, string firstName, string lastName,
                    string bio, DateTime birthdate, DateTime? effective, WaiverType waiver, Settings settings)
         {
@@ -60,7 +62,7 @@ namespace Sati
             if (effective is null)
                 return person;
 
-            person.Forms = GenerateFormList(effective.Value, settings);
+            person.Forms = GenerateFormList(effective.Value);
             return person;
         }
 
@@ -81,11 +83,14 @@ namespace Sati
         // Methods
         // -------------------------------------------------------------------------
 
-        public static List<Form> GenerateFormList(DateTime effective, Settings settings)
+        // First-cycle generation. Annual non-review documents default to compliant
+        // because cycle 1 begins with the consumer's initial signed PCP, comp
+        // assessment, and so on already in place at admission. Reviews default to
+        // non-compliant — they're tasks to complete during the cycle. The
+        // creation-time compliance dialog lets the user override these defaults
+        // for backdated admissions where some forms are already overdue.
+        public static List<Form> GenerateFormList(DateTime effective)
         {
-            // First-cycle generation: cycleStart is the effective date itself,
-            // cycleEnd is one year later. All due dates flow through the
-            // calculator so this method never carries shadow math.
             var cycleStart = effective;
             var cycleEnd = effective.AddYears(1);
 
@@ -93,20 +98,16 @@ namespace Sati
                 .Select(type => new Form
                 {
                     Type = type,
-                    DueDate = FormDueDateCalculator.Compute(type, cycleStart, cycleEnd, settings),
-                    IsCompliant = true
+                    DueDate = FormDueDateCalculator.Compute(type, cycleStart, cycleEnd),
+                    IsCompliant = !IsReviewType(type)
                 })
                 .ToList();
         }
 
-
-
-        // Returns (cycleStart, cycleEnd) bracketing the cycle that contains `today`.
-        // cycleStart is the most recent anniversary on or before today; cycleEnd
-        // is the next anniversary. Returns null if EffectiveDate is unset.
-        //
-        // Why a helper instead of duplicating the math: GetCurrentCycleForm and
-        // EnsureCurrentCycleForms both need it, and shadow copies drift.
+        // Returns (cycleStart, cycleEnd) bracketing the cycle that contains today,
+        // using the half-open convention: today belongs to a cycle if cycleStart
+        // <= today < cycleEnd. The anniversary date itself belongs to the next
+        // cycle. Returns null if EffectiveDate is unset.
         public (DateTime cycleStart, DateTime cycleEnd)? GetCurrentCycleBoundaries(DateTime today)
         {
             if (EffectiveDate is null)
@@ -122,33 +123,31 @@ namespace Sati
             return (cycleStart, cycleEnd);
         }
 
-        public Form? GetCurrentCycleForm(FormType type)
+        // Returns the form of the given type that belongs to the consumer's
+        // current cycle. Cycle membership is half-open [cycleStart, cycleEnd) —
+        // forms whose DueDate equals cycleEnd belong to the next cycle, not
+        // this one. Returns null if no current-cycle form exists; the caller
+        // surfaces that as NoForm rather than borrowing a stale form.
+        public Form? GetCurrentCycleForm(FormType type, DateTime? asOf = null)
         {
-            var boundaries = GetCurrentCycleBoundaries(DateTime.Today);
+            var today = asOf ?? DateTime.Today;
+            var boundaries = GetCurrentCycleBoundaries(today);
             if (boundaries is null)
                 return null;
 
             var (cycleStart, cycleEnd) = boundaries.Value;
 
-            var currentCycle = Forms
+            return Forms
                 .Where(f => f.Type == type &&
                             f.DueDate >= cycleStart &&
-                            f.DueDate <= cycleEnd)
-                .OrderByDescending(f => f.DueDate)
-                .FirstOrDefault();
-
-            if (currentCycle is not null)
-                return currentCycle;
-
-            return Forms
-                .Where(f => f.Type == type)
+                            f.DueDate < cycleEnd)
                 .OrderByDescending(f => f.DueDate)
                 .FirstOrDefault();
         }
 
         public FormComplianceStatus GetComplianceStatus(FormType type, DateTime referenceDate, Settings settings)
         {
-            var form = GetCurrentCycleForm(type);
+            var form = GetCurrentCycleForm(type, referenceDate);
 
             if (form is null)
                 return FormComplianceStatus.NoForm;
@@ -195,16 +194,23 @@ namespace Sati
             _ => 30
         };
 
-        // Generates form records for the current cycle if they don't already exist.
-        // Called by PersonService.GetAllPeopleAsync on every load — idempotent, so
-        // calling it when forms already exist is a no-op.
+        // Ensures forms exist for both the consumer's current cycle and their
+        // next cycle. Defaults differ by cycle:
         //
-        // Returns true if any forms were added (caller should save). Returns false
-        // if nothing changed.
+        //   - Current cycle: annual non-reviews default to IsCompliant = true,
+        //     because the cycle started because those documents were signed.
+        //     Reviews default to false — tasks to complete during the cycle.
         //
-        // Why this exists: without it, a client past their first anniversary keeps
-        // showing only first-cycle forms. The matrix would show those forms as
-        // "complete" indefinitely — the false-green problem.
+        //   - Next cycle: annual non-reviews default to IsCompliant = false.
+        //     The user marks them true during the prep window as each
+        //     renewal is signed. If the cycle rolls over with these still
+        //     false, the consumer is correctly flagged as having missed
+        //     prep — the renewal didn't happen in time. Reviews default
+        //     to false same as current.
+        //
+        // The Settings parameter is unused after the form-model refactor but
+        // kept on the signature so PersonService doesn't need to change in
+        // lockstep. Safe to remove in a follow-up sweep.
         public bool EnsureCurrentCycleForms(DateTime today, Settings settings)
         {
             var boundaries = GetCurrentCycleBoundaries(today);
@@ -214,21 +220,43 @@ namespace Sati
             var (cycleStart, cycleEnd) = boundaries.Value;
             var added = false;
 
+            // Current cycle: documents in force, reviews to do
+            added |= AddMissingFormsForCycle(cycleStart, cycleEnd, defaultAnnualCompliant: true);
+
+            // Next cycle: prep not yet done; user marks true as renewals are signed
+            var nextStart = cycleEnd;
+            var nextEnd = cycleEnd.AddYears(1);
+            added |= AddMissingFormsForCycle(nextStart, nextEnd, defaultAnnualCompliant: false);
+
+            return added;
+        }
+
+        // Idempotent: only adds forms that don't already exist for the cycle.
+        // Cycle membership uses the half-open [cycleStart, cycleEnd) convention,
+        // matching GetCurrentCycleForm so a form created here is visible there.
+        private bool AddMissingFormsForCycle(DateTime cycleStart, DateTime cycleEnd, bool defaultAnnualCompliant)
+        {
+            var added = false;
+
             foreach (var type in Enum.GetValues<FormType>())
             {
                 var existsForCycle = Forms.Any(f =>
                     f.Type == type &&
                     f.DueDate >= cycleStart &&
-                    f.DueDate <= cycleEnd);
+                    f.DueDate < cycleEnd);
 
                 if (existsForCycle)
                     continue;
 
+                // Reviews never default to compliant; annual non-reviews follow
+                // the caller's instruction (true for current cycle, false for next).
+                var defaultCompliant = !IsReviewType(type) && defaultAnnualCompliant;
+
                 Forms.Add(new Form
                 {
                     Type = type,
-                    DueDate = FormDueDateCalculator.Compute(type, cycleStart, cycleEnd, settings),
-                    IsCompliant = false,    // see comment in GenerateFormList re: opposite default
+                    DueDate = FormDueDateCalculator.Compute(type, cycleStart, cycleEnd),
+                    IsCompliant = defaultCompliant,
                     PersonId = Id
                 });
                 added = true;
@@ -236,5 +264,72 @@ namespace Sati
 
             return added;
         }
+
+        // Returns whether the billing compliance gate is satisfied, and if not,
+        // a human-readable list of every reason it failed. Callers that only
+        // need a bool use .Passed; callers that need to explain the failure to
+        // the user destructure .Reasons. Both pieces come from one pass through
+        // the same logic, so they can never drift apart.
+        public (bool Passed, IReadOnlyList<string> Reasons) EvaluateComplianceGate(DateTime today)
+        {
+            var reasons = new List<string>();
+
+            var requiredAnnual = new[]
+            {
+                FormType.PCP,
+                FormType.ComprehensiveAssessment,
+                FormType.Reclassification,
+                FormType.SafetyPlan
+            };
+
+            foreach (var type in requiredAnnual)
+            {
+                var form = GetCurrentCycleForm(type, today);
+                if (form is null || !form.IsCompliant)
+                    reasons.Add($"{FormDisplayName(type)} is not marked compliant for the current cycle.");
+            }
+
+            var boundaries = GetCurrentCycleBoundaries(today);
+            if (boundaries is null)
+            {
+                reasons.Add("No active compliance cycle found. This client may be missing an effective date.");
+                return (false, reasons);
+            }
+
+            var (cycleStart, cycleEnd) = boundaries.Value;
+
+            var pastDueReviews = Forms.Where(f =>
+                IsReviewType(f.Type) &&
+                f.DueDate >= cycleStart &&
+                f.DueDate < cycleEnd &&
+                f.DueDate.Date <= today.Date);
+
+            foreach (var review in pastDueReviews)
+            {
+                if (!review.IsCompliant)
+                    reasons.Add($"{FormDisplayName(review.Type)} was due {review.DueDate:MMM d, yyyy} and is not marked compliant.");
+            }
+
+            return (reasons.Count == 0, reasons);
+        }
+        
+        private static string FormDisplayName(FormType type) => type switch
+        {
+            FormType.PCP => "PCP",
+            FormType.ComprehensiveAssessment => "Comprehensive Assessment",
+            FormType.Reclassification => "Reclassification",
+            FormType.SafetyPlan => "Safety Plan",
+            FormType.PrivacyPractices => "Privacy Practices",
+            FormType.Release_Agency => "Agency Release",
+            FormType.Release_DHHS => "DHHS Release",
+            FormType.Release_Medical => "Medical Release",
+            FormType.Q1R => "Q1 Review",
+            FormType.Q2R => "Q2 Review",
+            FormType.Q3R => "Q3 Review",
+            FormType.Q4R => "Q4 Review",
+            _ => type.ToString()
+        };
+        private static bool IsReviewType(FormType type) => type is
+                FormType.Q1R or FormType.Q2R or FormType.Q3R or FormType.Q4R;
     }
 }

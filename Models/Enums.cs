@@ -52,6 +52,7 @@ namespace Sati
         Scheduled,
         Pending,
         Logged,
+        HeldForCompliance,
         Cancelled,
         Delayed,
         Approved,
