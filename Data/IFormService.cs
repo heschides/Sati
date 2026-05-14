@@ -7,5 +7,6 @@ namespace Sati.Data
     {
         Task UpdateFormAsync(Form form);
         Task OpenFormAsync(Form form);
+        Task DeleteFormsAsync(IEnumerable<Form> forms);
     }
 }

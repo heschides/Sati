@@ -190,7 +190,9 @@ namespace Sati.ViewModels
 
                 if (wasNoWaiver && isAddingWaiver && effectiveDate is not null)
                 {
-                    var forms = Person.GenerateFormList(effectiveDate.Value); existing.Forms = forms;
+                    await _formService.DeleteFormsAsync(existing.Forms);
+                    var forms = Person.GenerateFormList(effectiveDate.Value);
+                    existing.Forms = forms;
                     var confirmed = ComplianceReviewRequested?.Invoke(existing.Forms) ?? true;
                     if (!confirmed)
                         return;

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sati.Models;
+using Windows.UI;
 
 
 namespace Sati.Data
@@ -28,7 +29,14 @@ namespace Sati.Data
             context.Forms.Update(form);
             await context.SaveChangesAsync();
         }
-    
+
+        public async Task DeleteFormsAsync(IEnumerable<Form> forms)
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            context.Forms.RemoveRange(forms);
+            await context.SaveChangesAsync();
+        }
+
     }
 }
 
