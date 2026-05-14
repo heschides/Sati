@@ -41,6 +41,8 @@ namespace Sati.ViewModels
         [ObservableProperty] private string _pendingJustification = string.Empty;
         [ObservableProperty] private IReadOnlyList<string> _complianceFailureReasons = [];
 
+        public event EventHandler? NoteStatusChanged;
+
         // CALLBACKS
         partial void OnSelectedFilterPersonChanged(Person? value) => NotesView.Refresh();
         partial void OnSelectedStatusOptionChanged(StatusOption value) => NotesView.Refresh();
@@ -81,8 +83,8 @@ namespace Sati.ViewModels
         {
             if (SelectedNote is null) return;
 
-            var (passed, reasons) = SelectedNote.Person.EvaluateComplianceGate(DateTime.Today);
-            if (!passed)
+            var (passed, reasons) = SelectedNote.Person.EvaluateComplianceGate(DateTime.Today,
+                            SelectedNote.NoteType == NoteType.Form ? SelectedNote.FormType : null); if (!passed)
             {
                 ComplianceFailureReasons = reasons;
                 PendingJustification = string.Empty;
@@ -99,6 +101,7 @@ namespace Sati.ViewModels
             SelectedNote.Status = NoteStatus.Logged;
             await _noteService.UpdateNoteAsync(SelectedNote);
             NotesView.Refresh();
+            NoteStatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
         [RelayCommand]
@@ -110,6 +113,7 @@ namespace Sati.ViewModels
             IsComplianceDialogVisible = false;
             PendingJustification = string.Empty;
             NotesView.Refresh();
+            NoteStatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
         [RelayCommand]
@@ -131,6 +135,8 @@ namespace Sati.ViewModels
         {
             IsComplianceDialogVisible = false;
             PendingJustification = string.Empty;
+            NotesView.Refresh();
+            NoteStatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
         // METHODS

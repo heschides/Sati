@@ -36,7 +36,6 @@ namespace Sati.Data
             context.Forms.RemoveRange(forms);
             await context.SaveChangesAsync();
         }
-
     }
 }
 

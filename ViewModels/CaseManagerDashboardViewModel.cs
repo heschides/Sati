@@ -70,6 +70,19 @@ namespace Sati.ViewModels
             NotesLog = notesWindowViewModel;
             Calendar = calendarViewModel;
             Clients = newClientViewModel;
+
+            newClientViewModel.FormComplianceChanged += async (s, e) =>
+            {
+                await LoadPeopleAsync();
+                if (SelectedPerson is not null)
+                    SelectedPerson = People.FirstOrDefault(p => p.Id == SelectedPerson.Id);
+                await NotesLog.ReloadAsync();
+            };
+
+            notesWindowViewModel.NoteStatusChanged += async (s, e) =>
+            {
+                await LoadMonthlyNotesAsync();
+            };
         }
 
         // -------------------------------------------------------------------------
@@ -93,7 +106,7 @@ namespace Sati.ViewModels
         public bool IsMatrixSubActive => CurrentSubViewModel is CaseloadMatrixViewModel;
         public bool IsSubViewActive => CurrentSubViewModel is not null;
         public bool IsCalendarSubActive => CurrentSubViewModel is CalendarViewModel;
-
+        public Func<FormType, Task>? FormStatusRequested { get; set; }
         public CalendarViewModel Calendar { get; }
         [ObservableProperty] private object? currentSubViewModel;
         [ObservableProperty] private User? loggedInUser;
@@ -363,7 +376,8 @@ namespace Sati.ViewModels
             {
                 if (Status == NoteStatus.Logged)
                 {
-                    var (passed, reasons) = SelectedPerson!.EvaluateComplianceGate(DateTime.Today);
+                    var (passed, reasons) = SelectedPerson!.EvaluateComplianceGate(DateTime.Today,
+                        SelectedNoteType == NoteType.Form ? SelectedFormType : null);
                     if (!passed)
                     {
                         ComplianceFailureReasons = reasons;
@@ -473,7 +487,14 @@ namespace Sati.ViewModels
             if (caseManagerJustification is not null)
                 note.CaseManagerJustification = caseManagerJustification;
             var savedNote = await _noteService.AddNoteAsync(note);
+
+            if (note.NoteType == NoteType.Form && note.FormType.HasValue &&
+                            Status is NoteStatus.Pending or NoteStatus.Logged &&
+                            FormStatusRequested is not null)
+                await FormStatusRequested(note.FormType.Value);
+
             ResetForm();
+
             await LoadPeopleAsync();
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();

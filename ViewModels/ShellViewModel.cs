@@ -175,21 +175,17 @@ namespace Sati.ViewModels
 
         private void NavigateByRole()
         {
-            var role = _sessionService.CurrentUser?.Role;
-            if (role is UserRole.Supervisor or UserRole.Admin or UserRole.Director)
-            {
+            if (_sessionService.CurrentUser?.Role is UserRole.Supervisor or UserRole.Admin or UserRole.Director)
                 _ = InitializeSupervisorAsync();
-            }
-            else
-            {
-                NavigateToCaseManagement();
-            }
+
+            NavigateToCaseManagement();
         }
 
         private async Task InitializeSupervisorAsync()
         {
             await _supervisorDashboardViewModel.InitializeAsync();
-            CurrentViewModel = _supervisorDashboardViewModel;
         }
+
+
     }
 }

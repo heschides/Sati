@@ -25,6 +25,7 @@ namespace Sati.ViewModels
         // -------------------------------------------------------------------------
 
         public event Func<List<Form>, bool>? ComplianceReviewRequested;
+        public event EventHandler? FormComplianceChanged;
 
         // -------------------------------------------------------------------------
         // Observable properties
@@ -252,6 +253,7 @@ namespace Sati.ViewModels
             form.IsCompliant = !form.IsCompliant;
             await _formService.UpdateFormAsync(form);
             RefreshComplianceFlags();
+            FormComplianceChanged?.Invoke(this, EventArgs.Empty);
         }
 
         // -------------------------------------------------------------------------

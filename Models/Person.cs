@@ -270,47 +270,51 @@ namespace Sati
         // need a bool use .Passed; callers that need to explain the failure to
         // the user destructure .Reasons. Both pieces come from one pass through
         // the same logic, so they can never drift apart.
-        public (bool Passed, IReadOnlyList<string> Reasons) EvaluateComplianceGate(DateTime today)
+        public (bool Passed, IReadOnlyList<string> Reasons) EvaluateComplianceGate(DateTime today, FormType? beingCompleted = null)
         {
-            var reasons = new List<string>();
-
-            var requiredAnnual = new[]
             {
+                var reasons = new List<string>();
+
+                var requiredAnnual = new[]
+                {
                 FormType.PCP,
                 FormType.ComprehensiveAssessment,
                 FormType.Reclassification,
                 FormType.SafetyPlan
             };
 
-            foreach (var type in requiredAnnual)
-            {
-                var form = GetCurrentCycleForm(type, today);
-                if (form is null || !form.IsCompliant)
-                    reasons.Add($"{FormDisplayName(type)} is not marked compliant for the current cycle.");
+                foreach (var type in requiredAnnual)
+                {
+                    if (type == beingCompleted) continue;
+                    var form = GetCurrentCycleForm(type, today);
+                    if (form is null || !form.IsCompliant)
+                        reasons.Add($"{FormDisplayName(type)} is not marked compliant for the current cycle.");
+                }
+
+                var boundaries = GetCurrentCycleBoundaries(today);
+                if (boundaries is null)
+                {
+                    reasons.Add("No active compliance cycle found. This client may be missing an effective date.");
+                    return (false, reasons);
+                }
+
+                var (cycleStart, cycleEnd) = boundaries.Value;
+
+                var pastDueReviews = Forms.Where(f =>
+                    IsReviewType(f.Type) &&
+                    f.DueDate >= cycleStart &&
+                    f.DueDate < cycleEnd &&
+                    f.DueDate.Date <= today.Date);
+
+                foreach (var review in pastDueReviews)
+                {
+                    if (review.Type == beingCompleted) continue;
+                    if (!review.IsCompliant)
+                        reasons.Add($"{FormDisplayName(review.Type)} was due {review.DueDate:MMM d, yyyy} and is not marked compliant.");
+                }
+
+                return (reasons.Count == 0, reasons);
             }
-
-            var boundaries = GetCurrentCycleBoundaries(today);
-            if (boundaries is null)
-            {
-                reasons.Add("No active compliance cycle found. This client may be missing an effective date.");
-                return (false, reasons);
-            }
-
-            var (cycleStart, cycleEnd) = boundaries.Value;
-
-            var pastDueReviews = Forms.Where(f =>
-                IsReviewType(f.Type) &&
-                f.DueDate >= cycleStart &&
-                f.DueDate < cycleEnd &&
-                f.DueDate.Date <= today.Date);
-
-            foreach (var review in pastDueReviews)
-            {
-                if (!review.IsCompliant)
-                    reasons.Add($"{FormDisplayName(review.Type)} was due {review.DueDate:MMM d, yyyy} and is not marked compliant.");
-            }
-
-            return (reasons.Count == 0, reasons);
         }
         
         private static string FormDisplayName(FormType type) => type switch
