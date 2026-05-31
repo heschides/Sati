@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace Sati.Models
 {
@@ -13,7 +14,14 @@ namespace Sati.Models
         public decimal PerUnitIncentive { get; set; }
         public User User { get; set; } = null!;
         public int UnitsPerDay { get; set; }
+        public string ExcludedDatesJson { get; set; } = "[]";
 
+        [NotMapped]
+        public List<DateTime> ExcludedDates
+        {
+            get => JsonSerializer.Deserialize<List<DateTime>>(ExcludedDatesJson) ?? [];
+            set => ExcludedDatesJson = JsonSerializer.Serialize(value);
+        }
         public int Threshold => DaysScheduled * UnitsPerDay;
 
         public decimal Calculate(decimal loggedUnits)

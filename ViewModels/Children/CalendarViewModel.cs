@@ -17,6 +17,8 @@ namespace Sati.ViewModels.Children
         private readonly INoteService _noteService;
         private readonly ISessionService _sessionService;
 
+        public event EventHandler? ExemptDateChanged;
+
         // -------------------------------------------------------------------------
         // Private state
         // -------------------------------------------------------------------------
@@ -111,6 +113,7 @@ namespace Sati.ViewModels.Children
             // Rebuild so the calendar grid reflects the change
             BuildMonths();
             OnPropertyChanged(nameof(ExemptDaysForSelectedMonth));
+            ExemptDateChanged?.Invoke(this, EventArgs.Empty);
         }
 
         [RelayCommand]

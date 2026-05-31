@@ -1,10 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
+using Sati.Helpers;
 using Sati.Models;
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using System.Linq;
+using System.Net;
 
 namespace Sati.ViewModels
 {
@@ -67,6 +70,25 @@ namespace Sati.ViewModels
 
         [ObservableProperty]
         private bool isEditMode;
+        [ObservableProperty]
+        private bool openWithVR;
+
+        [ObservableProperty]
+        private bool hasGuardian;
+        [ObservableProperty]
+        private string? guardianName;
+
+        [ObservableProperty]
+        private string? phoneNumber;
+
+        [ObservableProperty]
+        private string? address;
+
+        [ObservableProperty]
+        private string? primaryCareProvider;
+
+        [ObservableProperty]
+        private string? healthcareSystemName;
 
         // -------------------------------------------------------------------------
         // Property change callbacks
@@ -110,6 +132,17 @@ namespace Sati.ViewModels
 
         public ObservableCollection<Note> SelectedPersonNotes { get; } = [];
         public ObservableCollection<Person> People { get; } = [];
+        public ObservableCollection<HealthcareSystemOption> HealthcareSystems { get; } = [];
+
+        // Derived, read-only: the most recent Contact-type note's date for the selected
+        // client. A window over the already-loaded notes, not a stored field. Selecting
+        // into DateTime? before Max means an empty sequence yields null rather than
+        // throwing, and the detail panel renders null as a dash.
+        public DateTime? LastContact =>
+            SelectedPersonNotes
+                .Where(n => n.NoteType == NoteType.Contact)
+                .Select(n => (DateTime?)n.EventDate)
+                .Max();
 
         // Due dates
         public DateTime? Q1RDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Q1R)?.DueDate;
@@ -152,6 +185,7 @@ namespace Sati.ViewModels
             _formService = formService;
             _settingsService = settingsService;
             _ = LoadPeopleAsync();
+            _ = LoadHealthcareOptionsAsync();
         }
 
         // -------------------------------------------------------------------------
@@ -188,6 +222,13 @@ namespace Sati.ViewModels
                 existing.EffectiveDate = effectiveDate;
                 existing.Waiver = Waiver;
                 existing.Bio = Bio!;
+                existing.OpenWithVR = OpenWithVR;
+                existing.HasGuardian = HasGuardian;
+                existing.GuardianName = GuardianName;
+                existing.PhoneNumber = PhoneNumber;
+                existing.Address = Address;
+                existing.PrimaryCareProvider = PrimaryCareProvider;
+                existing.HealthcareSystemName = HealthcareSystemName;
 
                 if (wasNoWaiver && isAddingWaiver && effectiveDate is not null)
                 {
@@ -217,7 +258,14 @@ namespace Sati.ViewModels
             else
             {
                 var person = Person.CreatePerson(_sessionService.CurrentUser!.Id,
-                    FirstName!, LastName!, Bio!, BirthDate!.Value, effectiveDate, Waiver, settings);
+                                    FirstName!, LastName!, Bio!, BirthDate!.Value, effectiveDate, Waiver, settings);
+                person.OpenWithVR = OpenWithVR;
+                person.HasGuardian = HasGuardian;
+                person.GuardianName = GuardianName;
+                person.PhoneNumber = PhoneNumber;
+                person.Address = Address;
+                person.PrimaryCareProvider = PrimaryCareProvider;
+                person.HealthcareSystemName = HealthcareSystemName;
                 var confirmed = ComplianceReviewRequested?.Invoke(person.Forms) ?? true;
                 if (!confirmed)
                     return;
@@ -271,6 +319,13 @@ namespace Sati.ViewModels
             BirthDate = person.BirthDate;
             EffectiveDateText = person.EffectiveDate?.ToString("MM/dd") ?? string.Empty;
             Waiver = person.Waiver;
+            OpenWithVR = person.OpenWithVR;
+            HasGuardian = person.HasGuardian;
+            GuardianName = person.GuardianName;
+            PhoneNumber = person.PhoneNumber;
+            Address = person.Address;
+            PrimaryCareProvider = person.PrimaryCareProvider;
+            HealthcareSystemName = person.HealthcareSystemName;
         }
         public async Task ReloadAsync()
         {
@@ -296,10 +351,30 @@ namespace Sati.ViewModels
         private async Task LoadSelectedPersonNotesAsync(Person? person)
         {
             SelectedPersonNotes.Clear();
-            if (person is null) return;
+            if (person is null)
+            {
+                OnPropertyChanged(nameof(LastContact));
+                return;
+            }
             var notes = await _noteService.GetAllByPersonAsync(person.Id);
             foreach (var note in notes)
                 SelectedPersonNotes.Add(note);
+
+            // LastContact is computed from the notes just loaded, so it can't refresh
+            // until they're here. (The notes arrive async after the selection changes,
+            // which is why this can't live in OnSelectedPersonChanged.)
+            OnPropertyChanged(nameof(LastContact));
+        }
+
+        // Loads the configurable system names from Settings and projects each into a
+        // HealthcareSystemOption for the combobox. Normalize re-applies the "Other"
+        // floor and ordering in case the stored list was hand-edited.
+        private async Task LoadHealthcareOptionsAsync()
+        {
+            var settings = await _settingsService.LoadAsync();
+            HealthcareSystems.Clear();
+            foreach (var name in HealthcareSystemOptions.Normalize(settings.HealthcareSystems))
+                HealthcareSystems.Add(new HealthcareSystemOption(name));
         }
 
         private void RefreshComplianceFlags()
@@ -326,6 +401,13 @@ namespace Sati.ViewModels
             EffectiveDateText = string.Empty;
             Waiver = default;
             Bio = string.Empty;
+            OpenWithVR = false;
+            HasGuardian = false;
+            GuardianName = string.Empty;
+            PhoneNumber = string.Empty;
+            Address = string.Empty;
+            PrimaryCareProvider = string.Empty;
+            HealthcareSystemName = null;
             ClearErrors();
         }
 

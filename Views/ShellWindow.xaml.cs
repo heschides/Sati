@@ -76,14 +76,6 @@ namespace Sati.Views
                     await _caseManagerDashboardViewModel.OpenFormAsync(formType);
             };
 
-            _caseManagerDashboardViewModel.PromptSchedulerRequested += (s, e) =>
-            {
-                var prompt = new PromptWindow(_caseManagerDashboardViewModel.LoggedInUser?.DisplayName ?? "there");
-                var result = prompt.ShowDialog();
-                if (result == true)
-                    _caseManagerDashboardViewModel.IsSchedulerOpen = true;
-            };
-
             shellViewModel.Scratchpad.OpenScratchpadHistoryRequested += async (s, e) =>
             {
                 var win = scratchpadHistoryWindowFactory();

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text;
+using System.Text.Json;
 
 namespace Sati.Models
 {
@@ -20,6 +22,36 @@ namespace Sati.Models
         public string VisitTemplate { get; set; } = string.Empty;
         public string ContactTemplate { get; set; } = string.Empty;
         public string DocumentationTemplate { get; set; } = string.Empty;
+
+        // Healthcare systems
+        //
+        // The selectable healthcare systems are configured per install and persisted
+        // as JSON in this single column, mirroring the ExcludedDatesJson pattern.
+        // Today the payload is a list of names; because it's JSON, the serialized
+        // shape can later hold objects (with ids / foreign keys) without a schema
+        // change to this table — the third leg of the future-proofing described on
+        // Person.HealthcareSystemName.
+        //
+        // Defaults to ["Other"] via a raw string literal — the C# 11 """ ... """
+        // form, which lets the embedded double-quotes sit unescaped — so a fresh
+        // install always has one selectable option rather than an empty dropdown.
+        public string HealthcareSystemsJson { get; set; } = """["Other"]""";
+
+        // A serialization view over HealthcareSystemsJson. [NotMapped] means EF
+        // ignores it for the schema — only the JSON string above is a real column.
+        //
+        // Gotcha worth stating plainly: the getter deserializes a fresh list on every
+        // access, so mutating the returned list in place — HealthcareSystems.Add(x) —
+        // writes into a throwaway and persists nothing. To save a change, reassign the
+        // whole list:  settings.HealthcareSystems = updated;
+        [NotMapped]
+        public List<string> HealthcareSystems
+        {
+            get => string.IsNullOrWhiteSpace(HealthcareSystemsJson)
+                ? new List<string>()
+                : JsonSerializer.Deserialize<List<string>>(HealthcareSystemsJson) ?? new List<string>();
+            set => HealthcareSystemsJson = JsonSerializer.Serialize(value);
+        }
 
 
 

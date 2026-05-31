@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sati.Data;
 
@@ -11,9 +12,11 @@ using Sati.Data;
 namespace Sati.Migrations
 {
     [DbContext(typeof(SatiContext))]
-    partial class SatiContextModelSnapshot : ModelSnapshot
+    [Migration("20260530134142_AddIncentiveExcludedDates")]
+    partial class AddIncentiveExcludedDates
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -437,12 +440,6 @@ namespace Sati.Migrations
                     b.Property<bool>("ExcludeWednesday")
                         .HasColumnType("bit");
 
-                    b.Property<string>("HealthcareSystemsJson")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("nvarchar(max)")
-                        .HasDefaultValue("[\"Other\"]");
-
                     b.Property<int>("PcpDaysAfterDue")
                         .HasColumnType("int");
 
@@ -582,10 +579,6 @@ namespace Sati.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Address")
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)");
-
                     b.Property<int?>("AgencyId")
                         .HasColumnType("int");
 
@@ -609,17 +602,6 @@ namespace Sati.Migrations
                     b.Property<int>("Gender")
                         .HasColumnType("int");
 
-                    b.Property<string>("GuardianName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<bool>("HasGuardian")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("HealthcareSystemName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -628,19 +610,8 @@ namespace Sati.Migrations
                     b.Property<string>("MaineCareId")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("OpenWithVR")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
                     b.Property<int?>("PlaceOfService")
                         .HasColumnType("int");
-
-                    b.Property<string>("PrimaryCareProvider")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");

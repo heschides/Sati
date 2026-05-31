@@ -394,6 +394,52 @@
              Margin="4,0,0,8"/>
 </Grid>
 
+                <!-- HEALTHCARE SYSTEMS -->
+                <TextBlock Text="HEALTHCARE SYSTEMS"
+                           Style="{StaticResource SectionHeader}"
+                           Margin="0,16,0,8" />
+                <Separator />
+
+                <ListBox ItemsSource="{Binding HealthcareSystems}"
+                         SelectedItem="{Binding SelectedHealthcareSystem, Mode=TwoWay}"
+                         Height="140"
+                         Width="361"
+                         HorizontalAlignment="Left"
+                         Margin="0,0,0,8"
+                         Background="White"
+                         BorderBrush="#D4A882"
+                         BorderThickness="1"
+                         Foreground="#3D2B1F" />
+
+                <!-- Add row. Width is set locally to override the implicit TextBox
+                     style's 100px default; everything else (padding, border, colors)
+                     is inherited from that style. -->
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,8">
+                    <TextBox Text="{Binding NewHealthcareSystem, UpdateSourceTrigger=PropertyChanged}"
+                             Width="250"
+                             Margin="0,0,8,0"
+                             VerticalAlignment="Center" />
+                    <Button Content="Add"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding AddHealthcareSystemCommand}"
+                            Width="100" />
+                </StackPanel>
+
+                <!-- Action row -->
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,8">
+                    <Button Content="Remove Selected"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding RemoveHealthcareSystemCommand}"
+                            Width="140"
+                            Margin="0,0,8,0" />
+                    <Button Content="Default Maine Options"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding ApplyMaineDefaultsCommand}"
+                            Width="200" />
+                </StackPanel>
+
                 <!-- SAVE -->
                 <Button Content="Save Settings"
                         Style="{StaticResource PrimaryButton}"

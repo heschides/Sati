@@ -1,12 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
+using Sati.Helpers;
 using Sati.Models;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Text;
 
 namespace Sati.ViewModels
 {
@@ -47,15 +45,20 @@ namespace Sati.ViewModels
         private async Task ToggleTile(WorkdayTile tile)
         {
             if (!tile.IsInteractable) return;
-            if (_incentive is null) return;   
+            if (_incentive is null) return;
 
             tile.IsExcluded = !tile.IsExcluded;
-            var dates = new List<DateTime>();
-            if (tile.IsExcluded)
-                dates.Add(tile.Date);
-            else
-                dates.Remove(tile.Date);
 
+            // ExcludedDates getter deserializes; setter re-serializes.
+            // We must read, mutate, then write back to trigger serialization.
+            var excluded = _incentive.ExcludedDates;
+            if (tile.IsExcluded)
+                excluded.Add(tile.Date);
+            else
+                excluded.Remove(tile.Date);
+            _incentive.ExcludedDates = excluded;
+
+            _incentive.DaysScheduled = Tiles.Count(t => !t.IsExcluded);
             await _incentiveService.SaveAsync(_incentive);
             OnPropertyChanged(nameof(DaysScheduled));
         }
@@ -115,6 +118,11 @@ namespace Sati.ViewModels
             Tiles.Clear();
             var daysInMonth = DateTime.DaysInMonth(CurrentYear, CurrentMonth);
 
+            // Normalize stored excluded dates to midnight for reliable comparison.
+            var manuallyExcluded = (_incentive?.ExcludedDates ?? [])
+                .Select(d => d.Date)
+                .ToHashSet();
+
             for (int day = 1; day <= daysInMonth; day++)
             {
                 var date = new DateTime(CurrentYear, CurrentMonth, day);
@@ -132,30 +140,31 @@ namespace Sati.ViewModels
                     _ => "F"
                 };
 
-                var isInteractable = !IsAlwaysExcluded(dow, _settings!);
-                var isExcluded = !isInteractable;
+                // Always-excluded: weekday flags or federal holidays from Settings.
+                // Non-interactable so the user cannot toggle them.
+                var alwaysExcluded = WorkdayHelper.IsAlwaysExcludedWorkday(date, _settings!);
 
                 Tiles.Add(new WorkdayTile
                 {
                     Date = date,
                     Letter = letter,
-                    IsInteractable = isInteractable,
-                    IsExcluded = isExcluded
+                    IsInteractable = !alwaysExcluded,
+                    IsExcluded = alwaysExcluded || manuallyExcluded.Contains(date)
                 });
             }
-        }
 
-        private bool IsAlwaysExcluded(DayOfWeek dow, Settings settings)
-        {
-            return dow switch
+            // Auto-correct a stale DaysScheduled (e.g. existing records created before
+            // this fix). Only saves when the count has actually drifted.
+            if (_incentive is not null)
             {
-                DayOfWeek.Monday => settings.ExcludeMonday,
-                DayOfWeek.Tuesday => settings.ExcludeTuesday,
-                DayOfWeek.Wednesday => settings.ExcludeWednesday,
-                DayOfWeek.Thursday => settings.ExcludeThursday,
-                DayOfWeek.Friday => settings.ExcludeFriday,
-                _ => false
-            };
+                var computed = Tiles.Count(t => !t.IsExcluded);
+                if (computed != _incentive.DaysScheduled)
+                {
+                    _incentive.DaysScheduled = computed;
+                    _ = _incentiveService.SaveAsync(_incentive);
+                }
+                OnPropertyChanged(nameof(DaysScheduled));
+            }
         }
 
         public void Initialize()

@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Sati"
         xmlns:converters="clr-namespace:Sati.Converters"
+        xmlns:helpers="clr-namespace:Sati.Helpers"
         Background="#FDF6EC">
 
     <UserControl.Resources>
@@ -12,7 +13,24 @@
         <converters:BoolToWidthConverter x:Key="SpacerWidthConverter"
                                          TrueWidth="16"
                                          FalseWidth="0" />
+        <helpers:BindingProxy x:Key="LayoutProxy"
+                              Data="{Binding}" />
 
+        <converters:BoolToGridLengthConverter x:Key="RosterRowHeight"
+                                              TrueLength="260"
+                                              TrueUnit="Pixel"
+                                              FalseLength="1"
+                                              FalseUnit="Star" />
+        <converters:BoolToGridLengthConverter x:Key="SpacerRowHeight"
+                                              TrueLength="12"
+                                              TrueUnit="Pixel"
+                                              FalseLength="0"
+                                              FalseUnit="Pixel" />
+        <converters:BoolToGridLengthConverter x:Key="DetailRowHeight"
+                                              TrueLength="1"
+                                              TrueUnit="Star"
+                                              FalseLength="0"
+                                              FalseUnit="Pixel" />
         <Style x:Key="LabelStyle"
                TargetType="TextBlock">
             <Setter Property="FontSize"
@@ -93,10 +111,11 @@
                 CornerRadius="6"
                 Padding="16"
                 Visibility="{Binding IsEntryPanelOpen, 
-            Converter={StaticResource BoolToVisibilityConverter}}">
-            <StackPanel>
-                <TextBlock Text="ADD CLIENT"
-                           FontSize="13"
+  Converter={StaticResource BoolToVisibilityConverter}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="ADD CLIENT"
+                               FontSize="13"
                            FontWeight="Bold"
                            Foreground="#3D2B1F"
                            Margin="0,0,0,16" />
@@ -142,15 +161,43 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
-                </Grid>
+                    </Grid>
 
-                <TextBlock Text="BIO"
-                           Style="{StaticResource LabelStyle}" />
-                <TextBox Text="{Binding Bio, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         AcceptsReturn="True"
+                    <TextBlock Text="BIO"
+                               Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding Bio, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
                          Height="100" />
+
+                <TextBlock Text="PHONE"
+                           Style="{StaticResource LabelStyle}" />
+                <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="ADDRESS"
+                           Style="{StaticResource LabelStyle}" />
+                <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="PRIMARY CARE PROVIDER"
+                           Style="{StaticResource LabelStyle}" />
+                <TextBox Text="{Binding PrimaryCareProvider, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Text="HEALTHCARE SYSTEM"
+                           Style="{StaticResource LabelStyle}" />
+                <ComboBox ItemsSource="{Binding HealthcareSystems}"
+                          DisplayMemberPath="Name"
+                          SelectedValuePath="Name"
+                          SelectedValue="{Binding HealthcareSystemName, Mode=TwoWay}" />
+
+                <CheckBox Content="Open with VR"
+                          IsChecked="{Binding OpenWithVR}"
+                          Margin="0,12,0,6" />
+
+                <CheckBox Content="Has guardian"
+                          IsChecked="{Binding HasGuardian}" />
+                <TextBox Text="{Binding GuardianName, UpdateSourceTrigger=PropertyChanged}"
+                         Visibility="{Binding HasGuardian, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                 <Button Content="{Binding SubmitButtonLabel}"
                         Style="{StaticResource PrimaryButton}"
@@ -160,14 +207,15 @@
                         Style="{StaticResource DangerButton}"
                         Command="{Binding RemoveSelectedPersonCommand}" />
             </StackPanel>
+            </ScrollViewer>
         </Border>
 
         <!-- ═══ RIGHT PANEL ═══ -->
         <Grid Grid.Column="2">
             <Grid.RowDefinitions>
-                <RowDefinition Height="260" />
-                <RowDefinition Height="12" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="{Binding Data.HasSelectedPerson, Source={StaticResource LayoutProxy}, Converter={StaticResource RosterRowHeight}}" />
+                <RowDefinition Height="{Binding Data.HasSelectedPerson, Source={StaticResource LayoutProxy}, Converter={StaticResource SpacerRowHeight}}" />
+                <RowDefinition Height="{Binding Data.HasSelectedPerson, Source={StaticResource LayoutProxy}, Converter={StaticResource DetailRowHeight}}" />
             </Grid.RowDefinitions>
 
             <!-- ═══ CLIENT ROSTER ═══ -->
@@ -284,6 +332,58 @@
                                    Foreground="#3D2B1F"
                                    FontSize="13"
                                    Margin="0,0,0,10" />
+
+                        <TextBlock Text="LAST CONTACT"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding LastContact, StringFormat={}{0:MM/dd/yyyy}, TargetNullValue=—}"
+                                   Foreground="#3D2B1F"
+                                   FontSize="13"
+                                   Margin="0,0,0,10" />
+
+                        <TextBlock Text="PHONE"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding SelectedPerson.PhoneNumber}"
+                                   Foreground="#3D2B1F"
+                                   FontSize="13"
+                                   Margin="0,0,0,10" />
+
+                        <TextBlock Text="ADDRESS"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding SelectedPerson.Address}"
+                                   Foreground="#3D2B1F"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+
+                        <TextBlock Text="PRIMARY CARE PROVIDER"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding SelectedPerson.PrimaryCareProvider}"
+                                   Foreground="#3D2B1F"
+                                   FontSize="13"
+                                   Margin="0,0,0,10" />
+
+                        <TextBlock Text="HEALTHCARE SYSTEM"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding SelectedPerson.HealthcareSystemName}"
+                                   Foreground="#3D2B1F"
+                                   FontSize="13"
+                                   Margin="0,0,0,10" />
+
+                        <TextBlock Text="GUARDIAN"
+                                   Style="{StaticResource LabelStyle}"
+                                   Visibility="{Binding SelectedPerson.HasGuardian, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <TextBlock Text="{Binding SelectedPerson.GuardianName}"
+                                   Foreground="#3D2B1F"
+                                   FontSize="13"
+                                   Margin="0,0,0,10"
+                                   Visibility="{Binding SelectedPerson.HasGuardian, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <TextBlock Text="Open with VR"
+                                   Foreground="#3D2B1F"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10"
+                                   Visibility="{Binding SelectedPerson.OpenWithVR, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                         <TextBlock Text="BIO"
                                    Style="{StaticResource LabelStyle}" />

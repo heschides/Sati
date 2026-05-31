@@ -65,9 +65,13 @@ namespace Sati.Data
                       .IsRequired()
                       .HasMaxLength(50);
                 entity.Property(p => p.LastName)
-                      .IsRequired()
-                      .HasMaxLength(50);
-                entity.HasOne<User>()
+                                      .IsRequired()
+                                      .HasMaxLength(50);
+                entity.Property(p => p.GuardianName).HasMaxLength(100);
+                entity.Property(p => p.PhoneNumber).HasMaxLength(20);
+                entity.Property(p => p.Address).HasMaxLength(250);
+                entity.Property(p => p.PrimaryCareProvider).HasMaxLength(100);
+                entity.Property(p => p.HealthcareSystemName).HasMaxLength(100); entity.HasOne<User>()
                       .WithMany()
                       .HasForeignKey(p => p.UserId)
                       .OnDelete(DeleteBehavior.Restrict);
@@ -112,6 +116,14 @@ namespace Sati.Data
                 entity.HasKey(s => s.Id);
                 entity.Property(s => s.BaseIncentive).HasColumnType("decimal(18,2)");
                 entity.Property(s => s.PerUnitIncentive).HasColumnType("decimal(18,2)");
+
+                // SQL-level default. When this non-nullable column is added by the
+                // migration, EF needs a value for the rows already in your database;
+                // HasDefaultValue supplies ["Other"] for that backfill AND writes a
+                // DEFAULT constraint going forward. Without it, existing rows get ""
+                // and the [NotMapped] wrapper reads that as an empty dropdown.
+                entity.Property(s => s.HealthcareSystemsJson)
+                      .HasDefaultValue("""["Other"]""");
             });
 
             modelBuilder.Entity<Incentive>(entity =>

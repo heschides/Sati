@@ -35,169 +35,6 @@
             <ColumnDefinition Width=".65*" />
         </Grid.ColumnDefinitions>
 
-        <!-- ═══ COL 0 ROW 0: TOOLBAR ═══ -->
-        <Grid Grid.Column="0"
-              Grid.Row="0"
-              Margin="0,0,0,8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="8" />
-            </Grid.ColumnDefinitions>
-
-            <Button x:Name="SchedulerButton"
-                    Grid.Column="2"
-                    Style="{StaticResource SmallButton}"
-                    ToolTip="Scheduler"
-                    Width="28"
-                    Command="{Binding OpenSchedulerCommand}"
-                    Background="Transparent"
-                    Padding="0">
-                <TextBlock FontFamily="Segoe MDL2 Assets"
-                           Text="&#xE787;"
-                           FontSize="14"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center" />
-            </Button>
-        </Grid>
-
-        <!-- Scheduler popup — anchored to SchedulerButton by name, IsOpen binds directly -->
-        <Popup x:Name="SchedulerPopup"
-               PlacementTarget="{Binding ElementName=SchedulerButton}"
-               Placement="Bottom"
-               IsOpen="{Binding DataContext.IsSchedulerOpen,
-                RelativeSource={RelativeSource AncestorType=UserControl}}"
-               DataContext="{Binding Scheduler}"
-               StaysOpen="True"
-               AllowsTransparency="True"
-               PopupAnimation="Slide">
-            <Border Background="White"
-                    BorderBrush="#E8D0B8"
-                    BorderThickness="1"
-                    CornerRadius="6"
-                    Padding="16">
-                <StackPanel Width="320">
-
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0"
-                                Content="◀"
-                                Style="{StaticResource SmallButton}"
-                                Command="{Binding PreviousMonthCommand}"
-                                Width="28" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding MonthLabel}"
-                                   FontSize="13"
-                                   FontWeight="Bold"
-                                   Foreground="#3D2B1F"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                        <Button Grid.Column="2"
-                                Content="▶"
-                                Style="{StaticResource SmallButton}"
-                                Command="{Binding NextMonthCommand}"
-                                Width="28" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="Mon"
-                                   Style="{StaticResource LabelStyle}"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Grid.Column="1"
-                                   Text="Tue"
-                                   Style="{StaticResource LabelStyle}"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Grid.Column="2"
-                                   Text="Wed"
-                                   Style="{StaticResource LabelStyle}"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Grid.Column="3"
-                                   Text="Thu"
-                                   Style="{StaticResource LabelStyle}"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Grid.Column="4"
-                                   Text="Fri"
-                                   Style="{StaticResource LabelStyle}"
-                                   HorizontalAlignment="Center" />
-                    </Grid>
-
-                    <ItemsControl ItemsSource="{Binding Tiles}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Columns="5" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Margin="2"
-                                        Command="{Binding DataContext.ToggleTileCommand,
-                                            RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                        CommandParameter="{Binding}"
-                                        IsEnabled="{Binding IsInteractable}"
-                                        Background="{Binding IsExcluded,
-                                            Converter={StaticResource BoolToTileColorConverter}}"
-                                        BorderThickness="0"
-                                        Cursor="Hand"
-                                        Height="44">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}"
-                                                    CornerRadius="4">
-                                                <Grid>
-                                                    <TextBlock Text="{Binding Letter}"
-                                                               FontSize="16"
-                                                               FontWeight="Bold"
-                                                               Foreground="#3D2B1F"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding Date, StringFormat={}{0:d}}"
-                                                               FontSize="8"
-                                                               Foreground="#9C7A5C"
-                                                               HorizontalAlignment="Right"
-                                                               VerticalAlignment="Bottom"
-                                                               Margin="0,0,3,2" />
-                                                </Grid>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="DAYS SCHEDULED"
-                                   Style="{StaticResource LabelStyle}"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding DaysScheduled}"
-                                   FontSize="20"
-                                   FontWeight="Bold"
-                                   Foreground="#3D2B1F" />
-                    </Grid>
-
-                </StackPanel>
-            </Border>
-        </Popup>
-
         <!-- ═══ COL 0 ROWS 1-2: NOTE ENTRY FORM ═══ -->
         <Border Grid.Column="0"
                 Grid.Row="1"
@@ -634,8 +471,29 @@
                                    Foreground="#3D2B1F" />
                     </StackPanel>
                     <StackPanel Grid.Column="3">
-                        <TextBlock Text="DAILY AVG"
-                                   Style="{StaticResource LabelStyle}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="DAILY AVG"
+                                       Style="{StaticResource LabelStyle}" />
+                            <TextBlock Text="ⓘ"
+                                       FontSize="12"
+                                       Foreground="DarkSlateBlue"
+                                       Margin="4,0,0,0"
+                                       VerticalAlignment="Top"
+                                       Cursor="Help">
+                                <TextBlock.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock MaxWidth="220"
+                                                   TextWrapping="Wrap">
+                                            <Run Text="Average units per day on days where notes have been logged.  When you enter your first note for a new day, this number will decrease significantly; it will continue to rise as you enter notes for that day."/>
+                                            <LineBreak />
+                                            <LineBreak />
+                                            <Run Text="Days without logged notes are not included — they don't drag your average down. Use the calendar to mark non-working days as exempt, which removes them from your monthly target." />
+                                             <LineBreak />
+                                        </TextBlock>
+                                    </ToolTip>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </StackPanel>
                         <TextBlock Text="{Binding DailyAverageUnits, StringFormat={}{0:F1}}"
                                    FontSize="20"
                                    Foreground="#3D2B1F" />
@@ -656,6 +514,47 @@
                              Foreground="#C87941"
                              Background="#E8D0B8"
                              BorderThickness="0" />
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="NEEDED / DAY"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding UnitsPerRemainingDay, StringFormat={}{0:F1}, TargetNullValue='—'}"
+                                   FontSize="20"
+                                   Foreground="#3D2B1F" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="DAYS LEFT"
+                                       Style="{StaticResource LabelStyle}" />
+                            <TextBlock Text="ⓘ"
+                                       FontSize="12"
+                                       Foreground="#9C7A5C"
+                                       Margin="4,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Cursor="Help">
+                                <TextBlock.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock MaxWidth="220"
+                                                   TextWrapping="Wrap">
+                                            <Run Text="Eligible workdays remaining in the month with no notes logged yet." />
+                                            <LineBreak />
+                                            <LineBreak />
+                                            <Run Text="Excludes weekends, holidays, and days marked exempt in the calendar. Past days without notes are included — you can still log notes for them." />
+                                        </TextBlock>
+                                    </ToolTip>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </StackPanel>
+                        <TextBlock Text="{Binding RemainingEligibleDays}"
+                                   FontSize="20"
+                                   Foreground="#3D2B1F" />
+                    </StackPanel>
+                </Grid>
 
                 <TextBlock Text="ESTIMATED INCENTIVE"
                            Style="{StaticResource LabelStyle}" />

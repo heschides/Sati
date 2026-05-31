@@ -27,6 +27,46 @@ namespace Sati
         public int? PlaceOfService { get; set; }
 
         // -------------------------------------------------------------------------
+        // Contact & support details
+        // -------------------------------------------------------------------------
+
+        // Active Vocational Rehabilitation case running alongside Section 17 services.
+        public bool OpenWithVR { get; set; }
+
+        // HasGuardian drives the reveal of the guardian-name field in the edit form.
+        // GuardianName is kept independent of the flag — unchecking HasGuardian does
+        // not null out GuardianName — so a name typed in error-and-recovery, or a
+        // guardianship that lapses and resumes, doesn't silently destroy the stored
+        // value. The flag governs visibility; the user governs the data.
+        public bool HasGuardian { get; set; }
+        public string? GuardianName { get; set; }
+
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+        public string? PrimaryCareProvider { get; set; }
+
+        // Healthcare system, stored denormalized as a plain name string. This is a
+        // deliberate design choice, not a shortcut, and the seam for a future
+        // relational model is pre-cut in three places so that migration is additive
+        // rather than a rewrite:
+        //
+        //   1. The property is named *Name* on purpose. It leaves the bare name
+        //      `HealthcareSystem` free for a future navigation property and
+        //      `HealthcareSystemId` free for a future foreign key. When records get
+        //      relational, you add those columns and backfill by matching on this
+        //      string — this column is never renamed.
+        //
+        //   2. In the UI, the ComboBox binds through SelectedValuePath against a
+        //      HealthcareSystemOption type rather than binding directly to a string.
+        //      When the option type later carries an Id, you flip SelectedValuePath
+        //      from "Name" to "Id" and the ItemsSource and item template are unchanged.
+        //
+        //   3. The configurable option list is serialized as JSON on Settings (see
+        //      HealthcareSystemsJson), so its stored shape can gain fields later
+        //      without breaking rows written today.
+        public string? HealthcareSystemName { get; set; }
+
+        // -------------------------------------------------------------------------
         // Collections
         // -------------------------------------------------------------------------
 

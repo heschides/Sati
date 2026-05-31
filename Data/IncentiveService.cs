@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Sati.Models;
+using Sati.Helpers;
 
 namespace Sati.Data
 {
@@ -44,10 +45,26 @@ namespace Sati.Data
                 return (incentive, true);
             }
 
+            // Sync DaysScheduled and UnitsPerDay on every load so stale values
+            // (e.g. written by the old scheduler code) self-correct at startup.
+            var correctDays = CalculateDaysScheduled(month, year, settings);
+            var needsUpdate = false;
+
             if (incentive.UnitsPerDay == 0)
             {
                 incentive.UnitsPerDay = settings.ProductivityThreshold;
-               context.Incentives.Update(incentive);
+                needsUpdate = true;
+            }
+
+            if (incentive.DaysScheduled != correctDays)
+            {
+                incentive.DaysScheduled = correctDays;
+                needsUpdate = true;
+            }
+
+            if (needsUpdate)
+            {
+                context.Incentives.Update(incentive);
                 await context.SaveChangesAsync();
             }
 
@@ -70,16 +87,11 @@ namespace Sati.Data
             for (int day = 1; day <= daysInMonth; day++)
             {
                 var date = new DateTime(year, month, day);
-                if (cap.HasValue && date > cap.Value) break;  
+                if (cap.HasValue && date > cap.Value) break;
                 var dow = date.DayOfWeek;
 
                 if (dow == DayOfWeek.Saturday || dow == DayOfWeek.Sunday) continue;
-                if (settings.ExcludeMonday && dow == DayOfWeek.Monday) continue;
-                if (settings.ExcludeTuesday && dow == DayOfWeek.Tuesday) continue;
-                if (settings.ExcludeWednesday && dow == DayOfWeek.Wednesday) continue;
-                if (settings.ExcludeThursday && dow == DayOfWeek.Thursday) continue;
-                if (settings.ExcludeFriday && dow == DayOfWeek.Friday) continue;
-                if (IsExcludedHoliday(date, settings)) continue;
+                if (WorkdayHelper.IsAlwaysExcludedWorkday(date, settings)) continue;
 
                 count++;
             }
@@ -87,41 +99,32 @@ namespace Sati.Data
             return count;
         }
 
-        private bool IsExcludedHoliday(DateTime date, Settings settings)
-        {
-            var m = date.Month;
-            var d = date.Day;
-            var dow = date.DayOfWeek;
-
-            if (settings.ExcludeNewYearsDay && m == 1 && d == 1) return true;
-            if (settings.ExcludeMLKDay && m == 1 && dow == DayOfWeek.Monday && IsNthWeekday(date, 3)) return true;
-            if (settings.ExcludePresidentsDay && m == 2 && dow == DayOfWeek.Monday && IsNthWeekday(date, 3)) return true;
-            if (settings.ExcludeMemorialDay && m == 5 && dow == DayOfWeek.Monday && IsLastMonday(date)) return true;
-            if (settings.ExcludeJuneteenth && m == 6 && d == 19) return true;
-            if (settings.ExcludeIndependenceDay && m == 7 && d == 4) return true;
-            if (settings.ExcludeLaborDay && m == 9 && dow == DayOfWeek.Monday && IsNthWeekday(date, 1)) return true;
-            if (settings.ExcludeIndigenousPeoplesDay && m == 10 && dow == DayOfWeek.Monday && IsNthWeekday(date, 2)) return true;
-            if (settings.ExcludeVeteransDay && m == 11 && d == 11) return true;
-            if (settings.ExcludeThanksgiving && m == 11 && dow == DayOfWeek.Thursday && IsNthWeekday(date, 4)) return true;
-            if (settings.ExcludeChristmas && m == 12 && d == 25) return true;
-
-            return false;
-        }
-
-        private bool IsNthWeekday(DateTime date, int n)
-        {
-            return (date.Day - 1) / 7 + 1 == n;
-        }
-
-        private bool IsLastMonday(DateTime date)
-        {
-            return date.AddDays(7).Month != date.Month;
-        }
-
         public async Task<int> GetDaysWorkedToDateAsync(int month, int year, DateTime? asOf = null)
         {
             var settings = await _settingsService.LoadAsync();
-            return CalculateDaysScheduled(month, year, settings, cap: asOf ??DateTime.Today);
+            return CalculateDaysScheduled(month, year, settings, cap: asOf ?? DateTime.Today);
+        }
+
+        public async Task<int> GetRemainingEligibleDaysAsync(int month, int year, HashSet<DateTime> daysAlreadyWorked, HashSet<DateTime> exemptDates)
+        {
+            var settings = await _settingsService.LoadAsync();
+            var daysInMonth = DateTime.DaysInMonth(year, month);
+            var count = 0;
+
+            for (int day = 1; day <= daysInMonth; day++)
+            {
+                var date = new DateTime(year, month, day);
+                var dow = date.DayOfWeek;
+
+                if (dow == DayOfWeek.Saturday || dow == DayOfWeek.Sunday) continue;
+                if (WorkdayHelper.IsAlwaysExcludedWorkday(date, settings)) continue;
+                if (exemptDates.Contains(date)) continue;
+                if (daysAlreadyWorked.Contains(date)) continue;
+
+                count++;
+            }
+
+            return count;
         }
     }
 }

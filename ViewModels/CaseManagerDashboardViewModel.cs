@@ -29,13 +29,14 @@ namespace Sati.ViewModels
         private readonly IUpcomingEventService _upcomingEventService;
         private readonly IFormService _formService;
         private readonly Func<string, UserMessageDialog> _validationDialog;
-         
+        private readonly IExemptDateService _exemptDateService;
+
         private Settings? _settings;
         private Incentive? _incentive;
         private List<Note> _monthlyNotes = [];
         private DateTime _lastAbandonmentCheck = DateTime.Now;
-        private SchedulerViewModel _schedulerViewModel;
-
+        private int _remainingEligibleDays;
+        private List<ExemptDate> _exemptDatesForMonth = [];
         // -------------------------------------------------------------------------
         // Constructor
         // -------------------------------------------------------------------------
@@ -49,10 +50,10 @@ namespace Sati.ViewModels
             IUpcomingEventService upcomingEventService,
             IFormService formService,
             Func<string, UserMessageDialog> validationDialog,
-            SchedulerViewModel schedulerViewModel,
             NotesWindowViewModel notesWindowViewModel,
             NewClientViewModel newClientViewModel,
-            CalendarViewModel calendarViewModel
+      CalendarViewModel calendarViewModel,
+            IExemptDateService exemptDateService
             )
         {
             _personService = personService;
@@ -63,10 +64,9 @@ namespace Sati.ViewModels
             _upcomingEventService = upcomingEventService;
             _formService = formService;
             _validationDialog = validationDialog;
-
+            _exemptDateService = exemptDateService;
             NotesView = CollectionViewSource.GetDefaultView(Notes);
             NotesView.Filter = FilterNotes;
-            _schedulerViewModel = schedulerViewModel;
             NotesLog = notesWindowViewModel;
             Calendar = calendarViewModel;
             Clients = newClientViewModel;
@@ -83,13 +83,18 @@ namespace Sati.ViewModels
             {
                 await LoadMonthlyNotesAsync();
             };
+
+            calendarViewModel.ExemptDateChanged += async (s, e) =>
+            {
+                await LoadExemptDatesAsync();
+                await LoadMonthlyNotesAsync();
+            };
         }
 
         // -------------------------------------------------------------------------
         // Events
         // -------------------------------------------------------------------------
 
-        public event EventHandler<bool>? PromptSchedulerRequested;
         public event EventHandler<FormType>? MarkFormCompleteRequested;
 
         // -------------------------------------------------------------------------
@@ -121,10 +126,8 @@ namespace Sati.ViewModels
         [ObservableProperty] private int? minutes;
         [ObservableProperty] private DateTime? eventDate;
         [ObservableProperty] private bool isEditing;
-        [ObservableProperty] private bool isSchedulerOpen;
         [ObservableProperty] private bool sortByDate = true;
         [ObservableProperty] private bool showOverdue;
-        [ObservableProperty] private int daysScheduled;
         [ObservableProperty] private double narrativeFontSize = 14;
         [ObservableProperty] private bool isComplianceDialogVisible;
         [ObservableProperty] private string pendingJustification = string.Empty;
@@ -156,14 +159,6 @@ namespace Sati.ViewModels
             EventDate = null;
             SelectedNoteType = null;
             SelectedFormType = null;
-        }
-
-        partial void OnIsSchedulerOpenChanged(bool value)
-        {
-            if (value)
-                _schedulerViewModel.Initialize();
-            else
-                _ = RefreshIncentiveAsync();
         }
 
         partial void OnSortByDateChanged(bool value)
@@ -230,16 +225,20 @@ namespace Sati.ViewModels
         public ObservableCollection<Note> Notes { get; } = [];
         public ObservableCollection<Person> People { get; } = [];
         public ObservableCollection<UpcomingEvent> UpcomingEvents { get; } = [];
-        public SchedulerViewModel Scheduler => _schedulerViewModel;
         public record EffectiveDateGroup(string Label, bool IsCurrent, List<string> ClientNames);
         public double DailyAverageUnits
         {
             get
             {
-                var days = BilledDaysCount;
-                if (days <= 0) return 0;
+                var billedDays = _monthlyNotes
+                    .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged
+                             && n.EventDate.HasValue)
+                    .Select(n => n.EventDate!.Value.Date)
+                    .Distinct()
+                    .Count();
+                if (billedDays <= 0) return 0;
                 var total = (PendingUnits ?? 0) + (LoggedUnits ?? 0);
-                return Math.Round((double)total / days, 1);
+                return Math.Round((double)total / billedDays, 1);
             }
         }
         public ICollectionView NotesView { get; }
@@ -264,24 +263,34 @@ namespace Sati.ViewModels
         public bool HasOverdueEvents => OverdueCount > 0;
 
         public bool IsFormNote => SelectedNoteType == NoteType.Form;
-        public int Threshold => _incentive?.Threshold ?? 0;
+        public int Threshold
+        {
+            get
+            {
+                if (_incentive is null) return 0;
+                var effectiveDays = _incentive.DaysScheduled - _exemptDatesForMonth.Count;
+                return Math.Max(0, effectiveDays) * _incentive.UnitsPerDay;
+            }
+        }
         public int SafeThreshold => Threshold > 0 ? Threshold : 1;
 
         public decimal? PendingUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Pending).Sum(n => n.Units);
         public decimal? LoggedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Logged).Sum(n => n.Units);
         public decimal? AbandonedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Abandoned).Sum(n => n.Units);
 
-        // Distinct calendar dates on which at least one Pending or Logged note
-        // has an EventDate this month. This is the correct denominator for
-        // DailyAverageUnits — only days you actually recorded notes count,
-        // not days you were scheduled to work.
-        private int BilledDaysCount => _monthlyNotes
-            .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged && n.EventDate.HasValue)
-            .Select(n => n.EventDate!.Value.Date)
-            .Distinct()
-            .Count();
-
         public decimal EstimatedIncentive => _incentive?.Calculate(LoggedUnits ?? 0) ?? 0;
+        public int RemainingEligibleDays => _remainingEligibleDays;
+
+        public decimal? UnitsPerRemainingDay
+        {
+            get
+            {
+                if (_remainingEligibleDays <= 0) return null;
+                var unitsNeeded = Threshold - ((LoggedUnits ?? 0) + (PendingUnits ?? 0));
+                if (unitsNeeded <= 0) return 0m;
+                return Math.Round(unitsNeeded / _remainingEligibleDays, 1);
+            }
+        }
 
         // -------------------------------------------------------------------------
         // Compliance flags
@@ -314,9 +323,6 @@ namespace Sati.ViewModels
             CurrentSubViewModel = Matrix;
         }
         [RelayCommand] private void NavigateToCalendar() => CurrentSubViewModel = Calendar;
-        
-        [RelayCommand] private void OpenScheduler() => IsSchedulerOpen = !IsSchedulerOpen;
-
         [RelayCommand] private void IncreaseNarrativeFont() => NarrativeFontSize = Math.Min(NarrativeFontSize + 2, 28);
         [RelayCommand] private void DecreaseNarrativeFont() => NarrativeFontSize = Math.Max(NarrativeFontSize - 2, 10);
 
@@ -329,6 +335,7 @@ namespace Sati.ViewModels
             await _noteService.DeleteNoteAsync(SelectedNote);
             Notes.Remove(SelectedNote);
             SelectedPerson?.Notes.Remove(SelectedNote);
+            await LoadExemptDatesAsync();
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
             await Calendar.InitializeAsync();
@@ -435,9 +442,6 @@ namespace Sati.ViewModels
                 var (_, wasCreated) = await _incentiveService.GetOrCreateAsync(
     LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
                 await RefreshIncentiveAsync();
-                if (wasCreated)
-                    PromptSchedulerRequested?.Invoke(this, true);
-
                 StartAbandonmentTimer();
             }
             catch (Exception ex)
@@ -574,6 +578,17 @@ namespace Sati.ViewModels
         private async Task LoadMonthlyNotesAsync()
         {
             _monthlyNotes = await _noteService.GetMonthlyNotesAsync(LoggedInUser!.Id);
+
+            var workedDays = _monthlyNotes
+                            .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged && n.EventDate.HasValue)
+                            .Select(n => n.EventDate!.Value.Date)
+                            .ToHashSet();
+            var exemptDays = _exemptDatesForMonth
+                .Select(e => e.Date.Date)
+                .ToHashSet();
+            _remainingEligibleDays = await _incentiveService.GetRemainingEligibleDaysAsync(
+                DateTime.Now.Month, DateTime.Now.Year, workedDays, exemptDays);
+
             OnPropertyChanged(nameof(PendingUnits));
             OnPropertyChanged(nameof(LoggedUnits));
             OnPropertyChanged(nameof(AbandonedUnits));
@@ -581,6 +596,8 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
             OnPropertyChanged(nameof(DailyAverageUnits));
+            OnPropertyChanged(nameof(RemainingEligibleDays));
+            OnPropertyChanged(nameof(UnitsPerRemainingDay));
         }
 
         private async Task LoadUpcomingEventsAsync()
@@ -669,16 +686,42 @@ namespace Sati.ViewModels
             SelectedPerson = People.First(p => p.Id == SelectedNote.PersonId);
         }
 
+        private async Task LoadExemptDatesAsync()
+        {
+            if (LoggedInUser is null) return;
+            var allExempt = await _exemptDateService.GetByYearAsync(
+                LoggedInUser.Id, DateTime.Now.Year);
+            _exemptDatesForMonth = allExempt
+                .Where(e => e.Date.Month == DateTime.Now.Month)
+                .ToList();
+        }
+
         public async Task RefreshIncentiveAsync()
         {
             var (incentive, _) = await _incentiveService.GetOrCreateAsync(
                 LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
             _incentive = incentive;
+            await LoadExemptDatesAsync();
+
+            // Recompute remaining days now that exempt dates are fresh.
+            // Reuses _monthlyNotes already in memory — no extra DB query.
+            var workedDays = _monthlyNotes
+                .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged
+                         && n.EventDate.HasValue)
+                .Select(n => n.EventDate!.Value.Date)
+                .ToHashSet();
+            var exemptDays = _exemptDatesForMonth
+                .Select(e => e.Date.Date)
+                .ToHashSet();
+            _remainingEligibleDays = await _incentiveService.GetRemainingEligibleDaysAsync(
+                DateTime.Now.Month, DateTime.Now.Year, workedDays, exemptDays);
 
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
             OnPropertyChanged(nameof(EstimatedIncentive));
             OnPropertyChanged(nameof(DailyAverageUnits));
+            OnPropertyChanged(nameof(RemainingEligibleDays));
+            OnPropertyChanged(nameof(UnitsPerRemainingDay));
         }
 
         public void Reset()
@@ -690,6 +733,7 @@ namespace Sati.ViewModels
             _monthlyNotes = [];
             _incentive = null;
             _settings = null;
+            _exemptDatesForMonth = [];
             SelectedPerson = null;
             SelectedNote = null;
             IsEditing = false;

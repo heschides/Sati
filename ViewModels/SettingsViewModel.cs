@@ -1,9 +1,12 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
+using Sati.Helpers;
 using Sati.Models;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text;
 
 namespace Sati.ViewModels
@@ -66,11 +69,21 @@ namespace Sati.ViewModels
 
         [ObservableProperty] private int releaseAgencyOpenDaysBefore;
         [ObservableProperty] private int releaseAgencyDaysAfterDue;
+
         [ObservableProperty] private int releaseDhhsOpenDaysBefore;
         [ObservableProperty] private int releaseDhhsDaysAfterDue;
         [ObservableProperty] private int releaseMedicalOpenDaysBefore;
         [ObservableProperty] private int releaseMedicalDaysAfterDue;
 
+        // ---- Healthcare systems ----
+        // Bound to a ListBox in the settings window. Held as our own collection,
+        // edited in memory, and written back to Settings on save — the same lifecycle
+        // as every other field here. Mutated in place (Clear/Add) so the ListBox stays
+        // bound to one instance rather than re-binding on each change.
+        public ObservableCollection<string> HealthcareSystems { get; } = new();
+
+        [ObservableProperty] private string newHealthcareSystem = string.Empty;
+        [ObservableProperty] private string? selectedHealthcareSystem;
         private async Task LoadAsync()
         {
             _settings = await _settingsService.LoadAsync();
@@ -120,6 +133,10 @@ namespace Sati.ViewModels
             ReleaseDhhsDaysAfterDue = _settings.ReleaseDhhsDaysAfterDue;
             ReleaseMedicalOpenDaysBefore = _settings.ReleaseMedicalOpenDaysBefore;
             ReleaseMedicalDaysAfterDue = _settings.ReleaseMedicalDaysAfterDue;
+
+            // Normalize on load so a hand-edited or legacy JSON value still arrives
+            // de-duplicated, sorted, and with the "Other" floor present.
+            SetHealthcareSystems(HealthcareSystemOptions.Normalize(_settings.HealthcareSystems));
         }
 
         [RelayCommand]
@@ -175,7 +192,60 @@ namespace Sati.ViewModels
             _settings.ReleaseMedicalOpenDaysBefore = ReleaseMedicalOpenDaysBefore;
             _settings.ReleaseMedicalDaysAfterDue = ReleaseMedicalDaysAfterDue;
 
+            // Reassign the whole list. The Settings.HealthcareSystems wrapper persists
+            // only on assignment, never on in-place mutation — this is the gotcha we
+            // flagged when writing Settings.cs, now honored.
+            _settings.HealthcareSystems = HealthcareSystems.ToList();
+
             await _settingsService.SaveAsync(_settings);
+        }
+
+        // Rebuilds the bound collection in place from a source list. Snapshots the
+        // source first: callers often pass a LINQ query defined *over* HealthcareSystems
+        // itself (the Remove command filters it), and clearing the collection before
+        // enumerating a deferred query would empty the query's own source mid-iteration.
+        // Materializing up front makes this safe regardless of what the caller passes.
+        private void SetHealthcareSystems(IEnumerable<string> names)
+        {
+            var snapshot = names.ToList();
+            HealthcareSystems.Clear();
+            foreach (var name in snapshot)
+                HealthcareSystems.Add(name);
+        }
+
+        [RelayCommand]
+        private void AddHealthcareSystem()
+        {
+            if (string.IsNullOrWhiteSpace(NewHealthcareSystem))
+                return;
+
+            SetHealthcareSystems(
+                HealthcareSystemOptions.Normalize(HealthcareSystems.Append(NewHealthcareSystem)));
+            NewHealthcareSystem = string.Empty;
+        }
+
+        [RelayCommand]
+        private void RemoveHealthcareSystem()
+        {
+            if (SelectedHealthcareSystem is null)
+                return;
+
+            // The "Other" floor is permanent; silently ignore a request to remove it.
+            if (string.Equals(SelectedHealthcareSystem, HealthcareSystemOptions.Other,
+                              StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var remaining = HealthcareSystems.Where(s =>
+                !string.Equals(s, SelectedHealthcareSystem, StringComparison.OrdinalIgnoreCase));
+
+            SetHealthcareSystems(HealthcareSystemOptions.Normalize(remaining));
+        }
+
+        [RelayCommand]
+        private void ApplyMaineDefaults()
+        {
+            SetHealthcareSystems(
+                HealthcareSystemOptions.MergeDefaults(HealthcareSystems, HealthcareSystemOptions.Maine));
         }
     }
 }

@@ -137,6 +137,7 @@ A WPF MVVM case-management desktop app built with EF Core, CommunityToolkit MVVM
 - [ ] **Stale data in Upcoming Tasks after failed note edit** — downstream of NoteType
   persistence failure
 - [x] **Missing "Scheduled" filter in AllNotes combobox** — straightforward omission
+- [ ] **ExcludeDayAfterThanksgiving unhandled by IsExcludedHoliday
 
 ---
 
