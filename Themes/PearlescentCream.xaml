@@ -24,7 +24,7 @@
     <SolidColorBrush x:Key="BorderBrush" Color="#DDD9D2" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="#C9C4BC" />
     <SolidColorBrush x:Key="DividerBrush" Color="#E8E5DF" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#805960" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#7D575E" />
     <SolidColorBrush x:Key="AccentHoverBrush" Color="#67464C" />
     <SolidColorBrush x:Key="AccentPressedBrush" Color="#52373C" />
     <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFDF9" />
@@ -44,15 +44,15 @@
     <SolidColorBrush x:Key="OnAiAccentBrush" Color="#FCFBFF" />
     <SolidColorBrush x:Key="AiPanelTextBrush" Color="#4B4371" />
     <SolidColorBrush x:Key="HoverBrush" Color="#EBE7E4" />
-    <SolidColorBrush x:Key="HoverStrongBrush" Color="#D7D1CE" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#E2DEDB" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#393536" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#60595A" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#696162" />
-    <SolidColorBrush x:Key="TextSubtleBrush" Color="#6D6566" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#5E5758" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#5E5758" />
     <SolidColorBrush x:Key="NarrativeTextBrush" Color="#625658" />
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#FCFBF8" />
     <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#F3F0F1" />
     <Color x:Key="SurfaceAltColor">#FFF1F0EB</Color>
     <Color x:Key="SurfaceRaisedColor">#FFFFFFFF</Color>
-    <Color x:Key="TextSubtleColor">#FF6D6566</Color>
+    <Color x:Key="TextSubtleColor">#FF5E5758</Color>
 </ResourceDictionary>

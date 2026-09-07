@@ -109,7 +109,7 @@
                                        Style="{StaticResource LabelStyle}" />
                             <TextBlock Text="ⓘ"
                                        FontSize="12"
-                                       Foreground="DarkSlateBlue"
+                                       Foreground="{DynamicResource InfoBrush}"
                                        Margin="4,0,0,0"
                                        VerticalAlignment="Top"
                                        Cursor="Help">

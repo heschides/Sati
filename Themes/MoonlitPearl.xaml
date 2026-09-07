@@ -14,9 +14,9 @@
     <SolidColorBrush x:Key="OnAccentButtonBrush" Color="#FAFCFF" />
     <!-- Local AI: misted teal to complement the moonlit indigo. -->
     <Color x:Key="AiGlowColor">#FF75AEB0</Color>
-    <SolidColorBrush x:Key="AiAccentBrush" Color="#3F7F80"/><SolidColorBrush x:Key="AiAccentHoverBrush" Color="#528F90"/><SolidColorBrush x:Key="AiAccentPressedBrush" Color="#2F6667"/><SolidColorBrush x:Key="AiAccentSoftBrush" Color="#E0F0F0"/><SolidColorBrush x:Key="AiAccentBorderBrush" Color="#A6CACA"/><SolidColorBrush x:Key="OnAiAccentBrush" Color="#F8FFFF"/><SolidColorBrush x:Key="AiPanelTextBrush" Color="#28595A"/>
-    <SolidColorBrush x:Key="HoverBrush" Color="#E4EAF1"/><SolidColorBrush x:Key="HoverStrongBrush" Color="#CCD6E2"/>
-<SolidColorBrush x:Key="TextPrimaryBrush" Color="#303640"/><SolidColorBrush x:Key="TextSecondaryBrush" Color="#56626E"/><SolidColorBrush x:Key="TextMutedBrush" Color="#5B6873"/><SolidColorBrush x:Key="TextSubtleBrush" Color="#5D6975"/><SolidColorBrush x:Key="NarrativeTextBrush" Color="#505B68"/>
+    <SolidColorBrush x:Key="AiAccentBrush" Color="#3F7F80"/><SolidColorBrush x:Key="AiAccentHoverBrush" Color="#477C7D"/><SolidColorBrush x:Key="AiAccentPressedBrush" Color="#2F6667"/><SolidColorBrush x:Key="AiAccentSoftBrush" Color="#E0F0F0"/><SolidColorBrush x:Key="AiAccentBorderBrush" Color="#A6CACA"/><SolidColorBrush x:Key="OnAiAccentBrush" Color="#F8FFFF"/><SolidColorBrush x:Key="AiPanelTextBrush" Color="#28595A"/>
+    <SolidColorBrush x:Key="HoverBrush" Color="#E4EAF1"/><SolidColorBrush x:Key="HoverStrongBrush" Color="#D8DFE9"/>
+<SolidColorBrush x:Key="TextPrimaryBrush" Color="#303640"/><SolidColorBrush x:Key="TextSecondaryBrush" Color="#515C67"/><SolidColorBrush x:Key="TextMutedBrush" Color="#515C66"/><SolidColorBrush x:Key="TextSubtleBrush" Color="#525C67"/><SolidColorBrush x:Key="NarrativeTextBrush" Color="#505B68"/>
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#F8FAFC"/><SolidColorBrush x:Key="PersonGroupAltBrush" Color="#EEF3F7"/>
-    <Color x:Key="SurfaceAltColor">#FFEAF0F4</Color><Color x:Key="SurfaceRaisedColor">#FFFFFFFF</Color><Color x:Key="TextSubtleColor">#FF5D6975</Color>
+    <Color x:Key="SurfaceAltColor">#FFEAF0F4</Color><Color x:Key="SurfaceRaisedColor">#FFFFFFFF</Color><Color x:Key="TextSubtleColor">#FF525C67</Color>
 </ResourceDictionary>

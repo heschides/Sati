@@ -92,7 +92,8 @@ namespace Sati.ViewModels
         // Events
         // -------------------------------------------------------------------------
 
-        public event EventHandler? SwitchUserRequested;
+        // Settings is the one window behind the greeting badge. Switching accounts is
+        // asked for from inside it, so the shell no longer raises a request of its own.
         public event EventHandler<bool>? OpenSettingsWindowRequested;
 
         // -------------------------------------------------------------------------
@@ -224,7 +225,6 @@ namespace Sati.ViewModels
         {
             if (IsSupervisionAvailable) CurrentViewModel = _supervisorDashboardViewModel;
         }
-        [RelayCommand] private void RequestSwitchUser() => SwitchUserRequested?.Invoke(this, EventArgs.Empty);
         [RelayCommand] public void OpenSettingsWindow() => OpenSettingsWindowRequested?.Invoke(this, true);
         [RelayCommand]
         private void NavigateToBilling()

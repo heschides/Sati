@@ -1,6 +1,7 @@
 <UserControl x:Class="Sati.Views.GuidanceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:Sati.Helpers"
              Background="{DynamicResource WindowBackgroundBrush}"
              TextElement.FontFamily="{StaticResource AppFont}">
 
@@ -96,11 +97,9 @@
                                 <!-- Accordion header -->
                                 <Border Padding="14,10"
                                         Cursor="Hand"
-                                        Background="Transparent">
-                                    <Border.InputBindings>
-                                        <MouseBinding MouseAction="LeftClick"
-                                                      Command="{Binding ToggleCommand}" />
-                                    </Border.InputBindings>
+                                        Background="Transparent"
+                                        helpers:ClickableSurface.Command="{Binding ToggleCommand}"
+                                        AutomationProperties.Name="{Binding Title}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />

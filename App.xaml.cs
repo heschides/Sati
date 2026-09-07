@@ -213,7 +213,6 @@ namespace Sati
                         services.AddTransient<SwitchUserViewModel>();
                         services.AddTransient<SwitchUserWindow>();
                         services.AddTransient<MyAccountViewModel>();
-                        services.AddTransient<MyAccountWindow>();
                         services.AddTransient<DatabasePatienceWindow>();
                         services.AddTransient<SchedulerViewModel>();
                         services.AddTransient<SsnPanelViewModel>();
@@ -261,8 +260,6 @@ namespace Sati
                         services.AddTransient<Func<ScratchpadHistoryWindow>>(sp => () => sp.GetRequiredService<ScratchpadHistoryWindow>());
                         services.AddTransient<Func<SwitchUserWindow>>(sp => () => sp.GetRequiredService<SwitchUserWindow>());
                         services.AddTransient<Func<LoginWindow>>(sp => () => sp.GetRequiredService<LoginWindow>());
-                        services.AddTransient<Func<MyAccountWindow>>(sp => () => sp.GetRequiredService<MyAccountWindow>());
-                        services.AddTransient<Func<MyAccountViewModel>>(sp => () => sp.GetRequiredService<MyAccountViewModel>());
                         services.AddTransient<Func<DatabasePatienceWindow>>(sp =>
                             () => sp.GetRequiredService<DatabasePatienceWindow>());
                     })

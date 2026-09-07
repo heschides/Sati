@@ -26,7 +26,7 @@
     <SolidColorBrush x:Key="DividerBrush" Color="#E9DCE4" />
 
     <!-- Berry-pink controls anchor the pastel surfaces with accessible contrast. -->
-    <SolidColorBrush x:Key="AccentBrush" Color="#95506F" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#8E4C6A" />
     <SolidColorBrush x:Key="AccentHoverBrush" Color="#7D405C" />
     <SolidColorBrush x:Key="AccentPressedBrush" Color="#653248" />
     <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFAFC" />
@@ -48,16 +48,16 @@
     <SolidColorBrush x:Key="AiPanelTextBrush" Color="#4E3F6B" />
 
     <SolidColorBrush x:Key="HoverBrush" Color="#F1E3EC" />
-    <SolidColorBrush x:Key="HoverStrongBrush" Color="#DEC8D7" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#E9DBE5" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#3D313B" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#625360" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#6B5A68" />
-    <SolidColorBrush x:Key="TextSubtleBrush" Color="#705F6D" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#62525F" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#61525E" />
     <SolidColorBrush x:Key="NarrativeTextBrush" Color="#64515F" />
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#FFF9F6" />
     <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#F5EAF2" />
 
     <Color x:Key="SurfaceAltColor">#FFF7EDF2</Color>
     <Color x:Key="SurfaceRaisedColor">#FFFFFCF8</Color>
-    <Color x:Key="TextSubtleColor">#FF705F6D</Color>
+    <Color x:Key="TextSubtleColor">#FF61525E</Color>
 </ResourceDictionary>

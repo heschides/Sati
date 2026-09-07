@@ -528,6 +528,238 @@
                         Value="0,4,0,12" />
             </Style>
 
+            <!-- Tick boxes carry their label in the control's own Foreground, and the
+                 framework default for that is black. Left alone, every checkbox and
+                 radio label in the application rendered black on a dark theme's
+                 background. The box and dot are retemplated for the same reason: the
+                 framework paints them from system brushes no application dictionary
+                 can reach, which put a stark white square on a dark surface.
+                 Keyboard focus stays visible, and the checked state changes the mark
+                 as well as the fill, so state is never carried by colour alone. -->
+            <Style TargetType="CheckBox">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Padding" Value="6,0,0,0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="CheckBox">
+                            <Grid Background="Transparent" SnapsToDevicePixels="True">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="Box"
+                                        Width="16" Height="16"
+                                        CornerRadius="3"
+                                        VerticalAlignment="Center"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="1">
+                                    <Path x:Name="Tick"
+                                          Visibility="Collapsed"
+                                          Stretch="Uniform"
+                                          Margin="3"
+                                          StrokeThickness="2"
+                                          StrokeEndLineCap="Round"
+                                          StrokeStartLineCap="Round"
+                                          Stroke="{DynamicResource OnAccentBrush}"
+                                          Data="M 0,4 L 3.5,7.5 L 9,1" />
+                                </Border>
+                                <Border x:Name="FocusRing"
+                                        Grid.ColumnSpan="2"
+                                        CornerRadius="3"
+                                        BorderThickness="1"
+                                        BorderBrush="Transparent"
+                                        Margin="-2,-1,-2,-1" />
+                                <ContentPresenter Grid.Column="1"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  RecognizesAccessKey="True"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Box" Property="Background"
+                                            Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="Box" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="{x:Null}">
+                                    <Setter TargetName="Box" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Tick" Property="Data" Value="M 0,4 L 9,4" />
+                                    <Setter TargetName="Tick" Property="Stroke"
+                                            Value="{DynamicResource AccentBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Box" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="FocusRing" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextMutedBrush}" />
+                                    <Setter TargetName="Box" Property="Opacity" Value="0.55" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Padding" Value="6,0,0,0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Grid Background="Transparent" SnapsToDevicePixels="True">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="Ring"
+                                        Width="16" Height="16"
+                                        CornerRadius="8"
+                                        VerticalAlignment="Center"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="1">
+                                    <Ellipse x:Name="Dot"
+                                             Width="8" Height="8"
+                                             Visibility="Collapsed"
+                                             Fill="{DynamicResource AccentBrush}" />
+                                </Border>
+                                <Border x:Name="FocusRing"
+                                        Grid.ColumnSpan="2"
+                                        CornerRadius="3"
+                                        BorderThickness="1"
+                                        BorderBrush="Transparent"
+                                        Margin="-2,-1,-2,-1" />
+                                <ContentPresenter Grid.Column="1"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  RecognizesAccessKey="True"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Ring" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Ring" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="FocusRing" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextMutedBrush}" />
+                                    <Setter TargetName="Ring" Property="Opacity" Value="0.55" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Focus ring for elements made operable by Helpers.ClickableSurface.
+                 The system dotted rectangle is nearly invisible on Sati's darker
+                 palettes, so this draws the theme accent instead. -->
+            <Style x:Key="ClickableSurfaceFocusVisual">
+                <Setter Property="Control.Template">
+                    <Setter.Value>
+                        <ControlTemplate>
+                            <Rectangle StrokeThickness="2"
+                                       RadiusX="4"
+                                       RadiusY="4"
+                                       Margin="-2"
+                                       SnapsToDevicePixels="True"
+                                       Stroke="{DynamicResource AccentBrush}" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- An Expander's header text takes the control's own Foreground, which
+                 the framework leaves black. Screens that group optional detail behind
+                 an expander were unreadable on a dark theme for that reason alone. -->
+            <Style TargetType="Expander">
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+            </Style>
+
+            <!-- Tab strips are the worst of the framework defaults on a dark theme:
+                 the strip and the content panel both paint near-white, so themed
+                 light text on a selected tab all but vanished. Screens with their own
+                 tab styling keep it; everything else gets this. The selected tab is
+                 marked by an accent rule and heavier weight as well as by fill. -->
+            <Style TargetType="TabControl">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0,10,0,0" />
+            </Style>
+
+            <Style TargetType="TabItem">
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border x:Name="TabSurface"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0,0,0,2"
+                                    Padding="14,8"
+                                    Margin="0,0,4,0">
+                                <ContentPresenter ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="TabSurface" Property="Background"
+                                            Value="{DynamicResource HoverBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="TabSurface" Property="Background"
+                                            Value="{DynamicResource SurfaceAltBrush}" />
+                                    <Setter TargetName="TabSurface" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimaryBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="TabSurface" Property="BorderBrush"
+                                            Value="{DynamicResource AccentBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextMutedBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- Context menus must use the same foreground/background contract as
                  the rest of the application. The framework defaults otherwise use
                  system menu colours, which become dark-on-dark in Sati's dark
@@ -668,15 +900,19 @@
                 </Setter>
             </Style>
 
+            <!-- Destructive actions take the danger fill and the ink named for it.
+                 They previously borrowed BorderBrush and AccentPressedBrush, which
+                 are a boundary colour and a pressed-surface fill; on a dark theme
+                 that put a dim accent on a dim grey and the label all but vanished. -->
             <Style x:Key="DangerButton"
                    TargetType="Button"
                    BasedOn="{StaticResource ButtonBaseStyle}">
                 <Setter Property="Height"
                         Value="36" />
                 <Setter Property="Background"
-                        Value="{DynamicResource BorderBrush}" />
+                        Value="{DynamicResource DangerStrongBrush}" />
                 <Setter Property="Foreground"
-                        Value="{DynamicResource AccentPressedBrush}" />
+                        Value="{DynamicResource OnDangerStrongBrush}" />
                 <Setter Property="FontSize"
                         Value="13" />
                 <Setter Property="FontWeight"
@@ -698,7 +934,7 @@
                                 <Trigger Property="IsMouseOver"
                                          Value="True">
                                     <Setter Property="Background"
-                                            Value="{DynamicResource HoverStrongBrush}" />
+                                            Value="{DynamicResource DangerDarkBrush}" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

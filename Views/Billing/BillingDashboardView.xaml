@@ -1,6 +1,7 @@
 <UserControl x:Class="Sati.Views.Billing.BillingDashboardView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:Sati.Helpers"
              Background="{DynamicResource WindowBackgroundBrush}"
              TextElement.FontFamily="{StaticResource AppFont}">
 
@@ -25,11 +26,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,4,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToOverviewCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToOverviewCommand}"
+                        AutomationProperties.Name="Overview">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -65,11 +64,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,4,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToQueueCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToQueueCommand}"
+                        AutomationProperties.Name="Queue">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -105,11 +102,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,4,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToSubmissionsCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToSubmissionsCommand}"
+                        AutomationProperties.Name="Submissions">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -145,11 +140,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,4,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToRemittancesCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToRemittancesCommand}"
+                        AutomationProperties.Name="Remittances">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -185,11 +178,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,4,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToAlertsCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToAlertsCommand}"
+                        AutomationProperties.Name="Alerts">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"

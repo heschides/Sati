@@ -45,16 +45,15 @@
             </Setter>
         </Style>
 
-        <!-- Action button: the consequential one. Background is set in code-behind —
-             deep red when destructive, warm accent otherwise — so one style serves both. -->
+        <!-- Action button: the consequential one. Background AND foreground are both
+             set in code-behind — destructive red or warm accent — so the label always
+             belongs to the fill beneath it instead of borrowing a surface colour. -->
         <Style x:Key="ActionButton"
                TargetType="Button">
             <Setter Property="Height"
                     Value="34" />
             <Setter Property="MinWidth"
                     Value="90" />
-            <Setter Property="Foreground"
-                    Value="{DynamicResource SurfaceBrush}" />
             <Setter Property="FontSize"
                     Value="13" />
             <Setter Property="FontWeight"

@@ -46,6 +46,37 @@ namespace Sati.ViewModels
         // The current user, straight from the session.
         private User? CurrentUser => _sessionService.CurrentUser;
 
+        /// <summary>
+        /// What a user is about to lose if this account view goes away now, or
+        /// <see langword="null"/> when nothing is unsaved. Settings shows it as a
+        /// confirmation before closing to switch accounts.
+        /// </summary>
+        public string? UnsavedWorkWarning()
+        {
+            // A PasswordBox raises PasswordChanged on its way back to empty too, so
+            // these hold an empty SecureString rather than null once a box has been
+            // touched at all. Length is what says whether anything is still typed.
+            static bool HasText(SecureString? secret) => secret is { Length: > 0 };
+
+            var contact = IsEditing;
+            var password = HasText(CurrentPassword) || HasText(NewPassword) || HasText(ConfirmPassword);
+            if (!contact && !password)
+                return null;
+
+            // Naming what is lost is the point. "Are you sure?" tells someone nothing
+            // they did not already know, and Cancel is what protects the work, so the
+            // sentence has to be worth reading before they reach for it.
+            var lost = (contact, password) switch
+            {
+                (true, true) => "your unsaved contact details and the password you were changing",
+                (true, false) => "the contact details you have not saved yet",
+                _ => "the password change you started",
+            };
+
+            return $"Switching accounts closes Settings and discards {lost}. "
+                 + "Nothing has been saved to your account.";
+        }
+
         // ---- Read-only context (never self-editable) ----
         public string DisplayName => CurrentUser?.DisplayName ?? string.Empty;
         public string Username => CurrentUser?.Username ?? string.Empty;

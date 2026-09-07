@@ -56,9 +56,9 @@
             <Setter Property="MinWidth"
                     Value="90" />
             <Setter Property="Background"
-                    Value="#7A3B3B" />
+                    Value="{DynamicResource DangerStrongBrush}" />
             <Setter Property="Foreground"
-                    Value="{DynamicResource SurfaceBrush}" />
+                    Value="{DynamicResource OnDangerStrongBrush}" />
             <Setter Property="FontSize"
                     Value="13" />
             <Setter Property="FontWeight"

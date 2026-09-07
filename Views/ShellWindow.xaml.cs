@@ -17,8 +17,6 @@ namespace Sati.Views
         private readonly CaseManagerDashboardViewModel _caseManagerDashboardViewModel;
         private readonly Func<SwitchUserWindow> _switchUserWindowFactory;
         private readonly Func<LoginWindow> _loginWindowFactory;
-        private readonly Func<MyAccountWindow> _myAccountWindowFactory;
-        private readonly Func<MyAccountViewModel> _myAccountViewModelFactory;
         private readonly ISessionService _sessionService;
         private readonly ISessionLifetime _sessionLifetime;
         private readonly SessionKeepAlive? _sessionKeepAlive;
@@ -55,8 +53,6 @@ namespace Sati.Views
             Func<ScratchpadHistoryWindow> scratchpadHistoryWindowFactory,
             Func<SwitchUserWindow> switchUserWindowFactory,
             Func<LoginWindow> loginWindowFactory,
-            Func<MyAccountWindow> myAccountWindowFactory,
-            Func<MyAccountViewModel> myAccountViewModelFactory,
             Func<DatabasePatienceWindow> databasePatienceWindowFactory,
             TextShortcutService textShortcutService,
             TextShortcutHook textShortcutHook,
@@ -73,8 +69,6 @@ namespace Sati.Views
             _applicationRunState = applicationRunState;
             _switchUserWindowFactory = switchUserWindowFactory;
             _loginWindowFactory = loginWindowFactory;
-            _myAccountWindowFactory = myAccountWindowFactory;
-            _myAccountViewModelFactory = myAccountViewModelFactory;
             _databaseActivity = shellViewModel.DatabaseActivity;
             _databasePatienceWindowFactory = databasePatienceWindowFactory;
             _textShortcutService = textShortcutService;
@@ -127,12 +121,24 @@ namespace Sati.Views
                 }
             };
 
+            // The greeting badge is the only way in. Settings holds this user's own
+            // profile and password as well as the agency tabs, and carries the
+            // switch-user request that used to live in a separate account window.
             _shellViewModel.OpenSettingsWindowRequested += async (s, e) =>
             {
                 var win = settingsWindowFactory();
                 win.Owner = this;
+
+                var switchRequested = false;
+                win.SwitchUserRequested += (_, _) => switchRequested = true;
+
                 win.ShowDialog();
                 await _shellViewModel.NotesViewModel.Clients.ReloadProfileSettingsAsync();
+
+                // Started only after the window is gone: the flow replaces the session
+                // user and rebuilds every view model the window was bound to.
+                if (switchRequested)
+                    await OpenSwitchUserFlowAsync();
             };
 
             shellViewModel.Scratchpad.OpenScratchpadHistoryRequested += async (s, e) =>
@@ -141,27 +147,6 @@ namespace Sati.Views
                 win.Owner = this;
                 await win.InitializeAsync();
                 win.Show();
-            };
-
-            // The greeting opens My Account. Switch-user lives on a button inside it,
-            // which raises SwitchUserRequested on the account VM — handled by the
-            // extracted flow below. VM comes from the injected factory (no service
-            // locator); the window's parameterless ctor takes DataContext externally.
-            shellViewModel.SwitchUserRequested += async (s, e) =>
-            {
-                var vm = _myAccountViewModelFactory();
-                await vm.InitializeAsync();
-                var win = _myAccountWindowFactory();
-                win.Owner = this;
-                win.DataContext = vm;
-
-                vm.SwitchUserRequested += async (s2, e2) =>
-                {
-                    win.Close();
-                    await OpenSwitchUserFlowAsync();
-                };
-
-                win.ShowDialog();
             };
 
             Closing += async (s, e) =>

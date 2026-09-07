@@ -137,6 +137,7 @@
         <!-- QUEUE LIST                                                        -->
         <!-- ================================================================ -->
         <ListView Grid.Row="3"
+                  AutomationProperties.Name="Billing queue"
                   ItemsSource="{Binding QueueItems}"
                   Background="Transparent"
                   BorderThickness="0"

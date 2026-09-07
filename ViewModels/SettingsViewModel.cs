@@ -50,9 +50,12 @@ namespace Sati.ViewModels
             EasyEyesPreferenceService easyEyesPreferences,
             IdleLockPreferenceService idlePreferences,
             ConsumerPickerSortPreferenceService consumerPickerSortPreferences,
+            MyAccountViewModel account,
             FormDueDateBackfill? backfill = null,
             FormBulkCompletion? bulkCompletion = null)
         {
+            Account = account;
+            _ = Account.InitializeAsync();
             _settingsService = settingsService;
             _providerService = providerService;
             _backfill = backfill;
@@ -79,6 +82,20 @@ namespace Sati.ViewModels
             if (CanManageAgencySettings)
                 _ = LoadAsync();
         }
+
+        /// <summary>
+        /// The signed-in user's own profile and password, shown on the first two
+        /// tabs. Settings is now the single window behind the greeting badge, so the
+        /// personal tabs and the agency tabs share one view model tree rather than
+        /// two windows with two ways in.
+        /// </summary>
+        /// <remarks>
+        /// Switching accounts is deliberately not done here. It replaces the session
+        /// user and rebuilds every view model behind this window, so the window must
+        /// close first; <see cref="MyAccountViewModel.SwitchUserRequested"/> is the
+        /// signal the shell listens for, and the shell owns the flow.
+        /// </remarks>
+        public MyAccountViewModel Account { get; }
 
         public DatabaseActivityViewModel DatabaseActivity { get; }
         public IReadOnlyList<ThemeOption> ThemeOptions => _themeService.Themes;

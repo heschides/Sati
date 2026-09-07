@@ -34,6 +34,7 @@
     <SolidColorBrush x:Key="OnDangerStrongBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="DangerDarkBrush" Color="#5E2D2D" />
     <SolidColorBrush x:Key="DangerSoftBrush" Color="#EDD4D4" />
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="#EDDFC0" />
     <SolidColorBrush x:Key="WorkflowPurpleBrush" Color="#3A2A5A" />
     <SolidColorBrush x:Key="WorkflowPurpleFillBrush" Color="#C4B8D8" />
     <SolidColorBrush x:Key="WorkflowPurpleBorderBrush" Color="#A89CC0" />
@@ -61,6 +62,12 @@
     <!-- Form workflow: opened -->
     <SolidColorBrush x:Key="OpenedFormBrush"     Color="#914300" />
     <SolidColorBrush x:Key="OpenedFormFillBrush" Color="#FBEAD7" />
+
+    <!-- Control-dense screens quiet a patterned theme behind their working area.
+         Themes without a pattern leave this transparent, so the overlay costs them
+         nothing; the patterned ones override it with a translucent surface tone.
+         See PATTERNED_THEME_SCRIM in DECISIONS.md. -->
+    <SolidColorBrush x:Key="PatternScrimBrush" Color="Transparent" />
 
     <!-- Modal scrim (dim behind dialogs). Functional, theme-independent. -->
     <SolidColorBrush x:Key="ScrimBrush" Color="#80000000" />

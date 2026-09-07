@@ -543,11 +543,15 @@ public sealed class ReleaseUiStructureTests
         {
             var theme = File.ReadAllText(Path.Combine(Root, "Themes", $"{name}.xaml"));
 
-            // The accent used for type is unchanged; only the button fill moved.
-            Assert.Contains("x:Key=\"AccentBrush\" Color=\"#E25507\"", theme);
-
             var fill = Color(theme, "AccentButtonBrush");
             var accent = Color(theme, "AccentBrush");
+
+            // These two themes previously pinned the type accent to the same bright
+            // orange as the button fill. That orange reads at under 3:1 as text on
+            // their own surfaces, so the type accent is now a deeper rust and only
+            // the button keeps the bright fill. The relationship the split exists to
+            // protect is what is asserted, not the literal colour: measured
+            // legibility of the type accent belongs to ThemeLegibilityTests.
             Assert.True(Luminance(fill) > Luminance(accent) + 0.2,
                 $"{name} button fill {fill} is not clearly lighter than accent {accent}.");
 

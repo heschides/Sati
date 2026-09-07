@@ -1,6 +1,7 @@
 <UserControl x:Class="Sati.Views.SupervisorDashboardWindow"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:Sati.Helpers"
              xmlns:sati="clr-namespace:Sati"
              Background="{DynamicResource WindowBackgroundBrush}"
              TextElement.FontFamily="{StaticResource AppFont}">
@@ -188,11 +189,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,4,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToTeamOverviewCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToTeamOverviewCommand}"
+                        AutomationProperties.Name="Team overview">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -228,11 +227,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,4,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToOverdueItemsCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToOverdueItemsCommand}"
+                        AutomationProperties.Name="Overdue items">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -266,11 +263,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,4,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToPendingApprovalsCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToPendingApprovalsCommand}"
+                        AutomationProperties.Name="Pending approvals">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -305,11 +300,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,16,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToMonthlyProductivityCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,16,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToMonthlyProductivityCommand}"
+                        AutomationProperties.Name="Monthly productivity">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -342,11 +335,9 @@
                 </Border>
 
                 <!-- Import a caseload from Credible -->
-                <Border Cursor="Hand" CornerRadius="4" Padding="12,4" Margin="0,0,16,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToCaseloadImportCommand}" />
-                    </Border.InputBindings>
+                <Border Cursor="Hand" CornerRadius="4" Padding="12,4" Margin="0,0,16,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToCaseloadImportCommand}"
+                        AutomationProperties.Name="Import from Credible">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background" Value="Transparent" />
@@ -376,11 +367,9 @@
                 <Border Cursor="Hand"
                         CornerRadius="4"
                         Padding="12,4"
-                        Margin="0,0,16,0">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding NavigateToCaseloadDistributionCommand}" />
-                    </Border.InputBindings>
+                        Margin="0,0,16,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToCaseloadDistributionCommand}"
+                        AutomationProperties.Name="Distribute caseload">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Background"
@@ -524,11 +513,9 @@
 
                     <!-- Case managers header — clickable, navigates to user management -->
                     <Border Cursor="Hand"
-                            Padding="0">
-                        <Border.InputBindings>
-                            <MouseBinding MouseAction="LeftClick"
-                                          Command="{Binding NavigateToUserManagementCommand}" />
-                        </Border.InputBindings>
+                            Padding="0"
+                            helpers:ClickableSurface.Command="{Binding NavigateToUserManagementCommand}"
+                            AutomationProperties.Name="User management">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Setter Property="Background"

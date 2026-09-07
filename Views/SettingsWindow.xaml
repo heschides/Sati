@@ -66,6 +66,38 @@
                     Value="0,4,0,16" />
         </Style>
 
+        <!-- The account tabs take wider fields than the numeric agency settings
+             above: an email address does not fit in a hundred pixels. -->
+        <Style x:Key="AccountFieldStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Width" Value="360" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HoverStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+
+        <Style x:Key="AccountPasswordStyle" TargetType="PasswordBox">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Width" Value="360" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HoverStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+
         <Style x:Key="PrimaryButton"
                TargetType="Button"
                BasedOn="{StaticResource ButtonBaseStyle}">
@@ -74,7 +106,7 @@
             <Setter Property="Background"
                     Value="{DynamicResource AccentBrush}" />
             <Setter Property="Foreground"
-                    Value="{DynamicResource SurfaceBrush}" />
+                    Value="{DynamicResource OnAccentBrush}" />
             <Setter Property="FontSize"
                     Value="13" />
             <Setter Property="FontWeight"
@@ -144,7 +176,7 @@
                                         Property="Background"
                                         Value="{DynamicResource SurfaceAltBrush}" />
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource AccentPressedBrush}" />
+                                        Value="{DynamicResource AccentBrush}" />
                                 <Setter Property="FontWeight"
                                         Value="SemiBold" />
                             </Trigger>
@@ -172,28 +204,61 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <Border Background="{DynamicResource NavBackgroundBrush}"
-                                    BorderBrush="{DynamicResource BorderBrush}"
-                                    BorderThickness="0,0,1,0"
-                                    Padding="18,24">
-                                <StackPanel>
-                                    <TextBlock Text="SETTINGS"
-                                               FontSize="18"
-                                               FontWeight="Bold"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                               Margin="12,0,0,6" />
-                                    <TextBlock Text="Choose a category"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextMutedBrush}"
-                                               Margin="12,0,0,22" />
-                                    <ItemsPresenter />
-                                </StackPanel>
-                            </Border>
+                            <!-- Settings is the densest screen in the application: two
+                                 columns of labels, checkboxes and helper text. The
+                                 illustrated themes tile a motif behind all of that,
+                                 which competes with the controls. Both columns are
+                                 therefore painted as three layers — the theme's own
+                                 brush, softened; a translucent scrim in the theme's
+                                 surface tone; then the controls. Themes with no
+                                 pattern leave the scrim transparent and the blur has
+                                 nothing to soften, so they look exactly as before.
+                                 The blur is applied to the filled rectangle rather
+                                 than to the tile, so no tile seams appear; the
+                                 negative margin and ClipToBounds keep the blur's soft
+                                 edge from showing at the column boundary. -->
+                            <Grid ClipToBounds="True">
+                                <Rectangle Margin="-16"
+                                           Fill="{DynamicResource NavBackgroundBrush}">
+                                    <Rectangle.Effect>
+                                        <BlurEffect Radius="7" RenderingBias="Performance" />
+                                    </Rectangle.Effect>
+                                </Rectangle>
+                                <Rectangle Fill="{DynamicResource PatternScrimBrush}" />
+                                <Border BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="0,0,1,0"
+                                        Padding="18,24">
+                                    <StackPanel>
+                                        <TextBlock Text="SETTINGS"
+                                                   FontSize="18"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   Margin="12,0,0,2" />
+                                        <TextBlock Text="{Binding Account.DisplayName}"
+                                                   AutomationProperties.Name="Signed in as"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="12,0,0,4" />
+                                        <TextBlock Text="Your account and this agency"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextMutedBrush}"
+                                                   Margin="12,0,0,22" />
+                                        <ItemsPresenter />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
 
-                            <Border Grid.Column="1"
-                                    Background="{DynamicResource WindowBackgroundBrush}">
+                            <Grid Grid.Column="1" ClipToBounds="True">
+                                <Rectangle Margin="-16"
+                                           Fill="{DynamicResource WindowBackgroundBrush}">
+                                    <Rectangle.Effect>
+                                        <BlurEffect Radius="7" RenderingBias="Performance" />
+                                    </Rectangle.Effect>
+                                </Rectangle>
+                                <Rectangle Fill="{DynamicResource PatternScrimBrush}" />
                                 <ContentPresenter ContentSource="SelectedContent" />
-                            </Border>
+                            </Grid>
                         </Grid>
                     </ControlTemplate>
                 </Setter.Value>
@@ -212,6 +277,177 @@
         </Grid.RowDefinitions>
 
         <TabControl Style="{StaticResource SettingsTabControlStyle}">
+
+            <!-- The signed-in user's own account leads, because the greeting badge is
+                 now the only way into this window. Both tabs bind to the Account
+                 child view model; everything after them is agency and application
+                 settings and binds to this window's own view model. -->
+            <TabItem Header="Profile"
+                     Style="{StaticResource SettingsTabItemStyle}"
+                     DataContext="{Binding Account}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="36,30" MaxWidth="620" HorizontalAlignment="Left">
+                        <TextBlock Text="PROFILE" Style="{StaticResource SectionHeader}" />
+                        <Separator />
+
+                        <TextBlock Text="Your identity and access details are managed by your agency."
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,20" />
+
+                        <Grid Margin="0,0,0,18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,28,0">
+                                <TextBlock Text="NAME" Style="{StaticResource LabelStyle}" />
+                                <TextBlock Text="{Binding DisplayName}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="14" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="USERNAME" Style="{StaticResource LabelStyle}" />
+                                <TextBlock Text="{Binding Username}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="14" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,26">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,28,0">
+                                <TextBlock Text="ROLE" Style="{StaticResource LabelStyle}" />
+                                <TextBlock Text="{Binding Role}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="14" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="AGENCY" Style="{StaticResource LabelStyle}" />
+                                <TextBlock Text="{Binding AgencyName}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="14" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="0,0,0,26">
+                            <TextBlock Text="SUPERVISOR" Style="{StaticResource LabelStyle}" />
+                            <TextBlock Text="{Binding SupervisorName}"
+                                       AutomationProperties.Name="Supervisor name"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontSize="14" />
+                        </StackPanel>
+
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="CONTACT INFORMATION"
+                                       Style="{StaticResource SectionHeader}"
+                                       VerticalAlignment="Center" />
+                            <Button Content="Edit Information"
+                                    AutomationProperties.Name="Edit contact information"
+                                    Style="{StaticResource SmallButton}"
+                                    HorizontalAlignment="Right"
+                                    Command="{Binding BeginEditCommand}"
+                                    Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                        </Grid>
+                        <Separator />
+
+                        <TextBlock Text="EMAIL" Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding Email, TargetNullValue=—}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   FontSize="14"
+                                   Margin="0,0,0,16"
+                                   Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                        <TextBox AutomationProperties.Name="Email"
+                                 Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource AccountFieldStyle}"
+                                 Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <TextBlock Text="PHONE" Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding Phone, TargetNullValue=—}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   FontSize="14"
+                                   Margin="0,0,0,16"
+                                   Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                        <TextBox AutomationProperties.Name="Phone"
+                                 Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource AccountFieldStyle}"
+                                 Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Left"
+                                    Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Button Content="Save Changes"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Width="130"
+                                    Command="{Binding SaveProfileCommand}" />
+                            <Button Content="Cancel"
+                                    Style="{StaticResource SmallButton}"
+                                    Margin="10,0,0,0"
+                                    Command="{Binding CancelEditCommand}" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding ProfileMessage}"
+                                   AutomationProperties.LiveSetting="Assertive"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource CompliantBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,10,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Password &amp; Security"
+                     Style="{StaticResource SettingsTabItemStyle}"
+                     DataContext="{Binding Account}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="36,30" MaxWidth="620" HorizontalAlignment="Left">
+                        <TextBlock Text="CHANGE PASSWORD" Style="{StaticResource SectionHeader}" />
+                        <Separator />
+
+                        <TextBlock Text="Use at least 8 characters for your new password."
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,20" />
+
+                        <TextBlock Text="CURRENT PASSWORD" Style="{StaticResource LabelStyle}" />
+                        <PasswordBox AutomationProperties.Name="Current password"
+                                     x:Name="CurrentPasswordBox"
+                                     Style="{StaticResource AccountPasswordStyle}"
+                                     PasswordChanged="CurrentPasswordBox_PasswordChanged" />
+
+                        <TextBlock Text="NEW PASSWORD" Style="{StaticResource LabelStyle}" />
+                        <PasswordBox AutomationProperties.Name="New password"
+                                     x:Name="NewPasswordBox"
+                                     Style="{StaticResource AccountPasswordStyle}"
+                                     PasswordChanged="NewPasswordBox_PasswordChanged" />
+
+                        <TextBlock Text="CONFIRM NEW PASSWORD" Style="{StaticResource LabelStyle}" />
+                        <PasswordBox AutomationProperties.Name="Confirm new password"
+                                     x:Name="ConfirmPasswordBox"
+                                     Style="{StaticResource AccountPasswordStyle}"
+                                     PasswordChanged="ConfirmPasswordBox_PasswordChanged" />
+
+                        <Button Content="Change Password"
+                                Style="{StaticResource PrimaryButton}"
+                                Width="160"
+                                HorizontalAlignment="Left"
+                                Command="{Binding ChangePasswordCommand}" />
+
+                        <TextBlock Text="{Binding PasswordMessage}"
+                                   AutomationProperties.LiveSetting="Assertive"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource CompliantBrush}"
+                                   Margin="0,10,0,0"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <TabItem Header="Appearance"
                      Style="{StaticResource SettingsTabItemStyle}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -1154,13 +1390,33 @@
                 BorderThickness="0,1,0,0"
                 Padding="18,12">
             <Grid>
-                <TextBlock Text="Appearance changes are remembered immediately. Personal text shortcuts are saved from their own tab. Agency settings remain Admin-only."
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Switching accounts closes this window before it starts, so it sits
+                     apart from the save controls rather than beside them. The shell
+                     owns the flow; this only asks for it. -->
+                <Button Grid.Column="0"
+                        Content="Switch User"
+                        AutomationProperties.Name="Switch user"
+                        AutomationProperties.HelpText="Closes settings and asks who is signing in next."
+                        Style="{StaticResource SmallButton}"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Margin="0,0,18,0"
+                        Command="{Binding Account.RequestSwitchUserCommand}" />
+
+                <TextBlock Grid.Column="1"
+                           Text="Appearance changes are remembered immediately. Personal text shortcuts are saved from their own tab. Agency settings remain Admin-only."
                            Visibility="{Binding CanManageAgencySettings, Converter={StaticResource InverseBoolToVisibilityConverter}}"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource TextMutedBrush}"
                            FontSize="11"
                            TextWrapping="Wrap" />
-                <StackPanel Orientation="Horizontal"
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             Visibility="{Binding CanManageAgencySettings, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TextBlock Text="{Binding SaveStatus}"

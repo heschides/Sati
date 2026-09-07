@@ -1,5 +1,72 @@
 # Sati — Refactor Agenda
 
+## Unreleased — measured theme legibility
+
+Release 1.3.4 closed the contrast gaps that were visible to review. This work replaces review with
+measurement: `Helpers/ThemeContrast.cs` owns the WCAG arithmetic and `ThemeLegibilityTests` holds
+all nineteen palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
+
+- [x] Score every text role against every surface role, and every fill against the ink named for
+      it, in all nineteen themes. Correct the palettes by luminance only, never by hue.
+- [x] Render every view under every theme and measure the resolved brushes, finding each run's
+      background by hit test rather than by ancestor walk.
+- [x] Fail on any theme key a view names that no dictionary defines. `WarningSoftBrush` was
+      referenced by two workspaces and defined nowhere, which nothing had ever reported.
+- [x] Give `CheckBox`, `RadioButton`, `TabItem`, `TabControl` and `Expander` application-wide
+      styles. The framework paints their labels black and their chrome from system brushes no
+      theme dictionary can reach, which is what put black labels on dark panels.
+- [x] Stop using surface, border and text tokens outside their role — `SurfaceBrush` as ink,
+      `BorderBrush` and `TextSecondaryBrush` as fills, `AccentPressedBrush` as type.
+- [x] Take the destructive confirmation dialogs off literal light-theme colours; both left their
+      confirm label at about 1.3:1 in every dark theme.
+- [x] Add `PatternScrimBrush` and layer blur, scrim and controls in Settings so an illustrated
+      theme stops competing with the densest screen in the application.
+- [ ] Retire the remaining hard-coded literal colours in `ShellWindow`, `AdminDashboardView` and
+      `PlatformHealthView`. Each is a self-consistent light pair, so it stays legible and the audit
+      does not flag it, but it does not follow the theme and looks wrong on a dark palette.
+- [ ] Extend the rendered pass beyond the views that parse standalone. A handful cannot be built
+      without their code-behind; the coverage floor is asserted so the gap cannot widen silently.
+- [ ] Consider whether the scrim belongs on other control-dense screens. Only Settings was reported
+      and only Settings was changed.
+
+## Unreleased — one door into settings
+
+- [x] Fold Profile and Password & Security into Settings ahead of the agency tabs, delete
+      `MyAccountWindow`, and make the greeting badge the only header entry point. The gear is gone.
+- [x] Keep `MyAccountViewModel` as a constructor-injected child of `SettingsViewModel`.
+- [x] Keep switching accounts outside the window: it closes, then the shell runs the flow. Asserted,
+      because reversing the order leaves a live window bound to the outgoing user over a new session.
+- [x] Give the greeting badge focus, tab stop and Enter/Space bindings. It is a `Border`, so none of
+      that came free once it became the only way in.
+- [ ] Add a rendered test of the merged window. `SettingsViewModel` takes twelve dependencies, so
+      the merge is currently covered by structure tests and by the theme legibility pass.
+- [x] Decide what happens when Switch User is pressed with unsaved profile edits or a half-typed
+      password change. `MyAccountViewModel.UnsavedWorkWarning` names what is lost and Settings
+      confirms before closing.
+
+## Unreleased — measured accessibility
+
+`AccessibilityAuditTests` asks the automation peers what a screen reader would be told, using the
+same view loader as the theme legibility audit. See `DECISIONS.md`.
+
+- [x] Give every control a screen reader stops on a name to announce, and fail when a control is
+      announced only as an icon glyph from the private use area.
+- [x] Add `Helpers.ClickableSurface`, an attached command that supplies focus, the tab stop, Enter
+      and Space, and a themed focus ring together. Convert the twelve navigation tabs and three
+      list rows that were mouse-only.
+- [x] Name the inner entry controls of `PasswordRevealBox`. A name does not travel down a visual
+      tree, so the sign-in password field on three windows announced nothing.
+- [x] Hold `TabIndex` at zero across the application and keep the focus visual switched on.
+- [ ] Hands-on testing with Narrator and JAWS, including browse mode, reading order as a sentence,
+      and whether live regions fire at useful moments. The automated pass is a floor, not a
+      certificate, and none of those can be judged from the automation tree alone.
+- [ ] Decide whether the converted surfaces should report a Button control type to UI Automation.
+      They are operable and named, but a screen reader still announces them by their default type.
+- [ ] Audit `Sati.Portal` separately. It is a web surface, so it needs semantic markup, labels and
+      ARIA rather than UI Automation, and that is where TalkBack and mobile browsers would apply.
+- [ ] Check keyboard operation at the two Easy Eyes scales and under Windows high-contrast themes,
+      neither of which this pass exercises.
+
 ## Release 1.3.4 — 2026-09-07
 
 "A clean slate, clearly seen." This release makes the complete synthetic Demo recoverable on

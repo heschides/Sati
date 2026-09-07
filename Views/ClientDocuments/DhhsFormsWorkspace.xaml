@@ -33,7 +33,7 @@
                     <TextBlock Text="OFFICIAL MAINE DHHS FORM"
                                FontSize="11"
                                FontWeight="Bold"
-                               Foreground="{DynamicResource AccentPressedBrush}" />
+                               Foreground="{DynamicResource AccentBrush}" />
                     <TextBlock Text="{Binding PersonName}"
                                Margin="0,4,0,10"
                                FontSize="20"

@@ -268,34 +268,30 @@
                             </Image>
                         </Border>
 
-                        <!-- Settings -->
-                        <Button Grid.Column="0"
-                                AutomationProperties.Name="Open settings"
-                                Style="{StaticResource SmallButton}"
-                                ToolTip="Settings"
-                                Width="28"
-                                Command="{Binding OpenSettingsWindowCommand}"
-                                Background="Transparent"
-                                Foreground="{DynamicResource TextPrimaryBrush}"
-                                Padding="0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets"
-                                       Text="&#xE713;"
-                                       FontSize="14"
-                                       VerticalAlignment="Center"
-                                       HorizontalAlignment="Center" />
-                        </Button>
-
-                        <!-- User greeting -->
+                        <!-- User greeting. The single way into Settings, which now holds
+                             this user's own profile and password as well as the agency
+                             and application tabs. There was a separate gear beside this
+                             badge; two controls opening two windows of the same kind is
+                             one more thing to learn for no benefit. -->
                         <Border Cursor="Hand"
                                 CornerRadius="4"
                                 Padding="8,4"
                                 VerticalAlignment="Center"
+                                Focusable="True"
+                                KeyboardNavigation.IsTabStop="True"
+                                AutomationProperties.Name="Open settings"
+                                AutomationProperties.HelpText="Opens your account, agency and application settings."
+                                ToolTip="Your account and settings"
                                 Background="{DynamicResource SurfaceRaisedBrush}"
                                 BorderBrush="{DynamicResource AccentBrush}"
                                 BorderThickness="1.5">
                             <Border.InputBindings>
                                 <MouseBinding MouseAction="LeftClick"
-                                              Command="{Binding RequestSwitchUserCommand}" />
+                                              Command="{Binding OpenSettingsWindowCommand}" />
+                                <KeyBinding Key="Enter"
+                                            Command="{Binding OpenSettingsWindowCommand}" />
+                                <KeyBinding Key="Space"
+                                            Command="{Binding OpenSettingsWindowCommand}" />
                             </Border.InputBindings>
                             <TextBlock FontSize="12"
                                        Foreground="{DynamicResource TextPrimaryBrush}"

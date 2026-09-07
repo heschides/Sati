@@ -47,17 +47,17 @@
     <SolidColorBrush x:Key="AiPanelTextBrush" Color="#4C2057" />
 
     <SolidColorBrush x:Key="HoverBrush" Color="#F2E3B8" />
-    <SolidColorBrush x:Key="HoverStrongBrush" Color="#E2C865" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#EEDEA4" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#382C39" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5D4E5F" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#675769" />
-    <SolidColorBrush x:Key="TextSubtleBrush" Color="#6C5B6E" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#5D4F5F" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#5D4F5F" />
     <SolidColorBrush x:Key="NarrativeTextBrush" Color="#5C485E" />
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#FFFAEA" />
     <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#F6ECF6" />
 
     <Color x:Key="SurfaceAltColor">#FFFBF1D7</Color>
     <Color x:Key="SurfaceRaisedColor">#FFFFFEF8</Color>
-    <Color x:Key="TextSubtleColor">#FF6C5B6E</Color>
+    <Color x:Key="TextSubtleColor">#FF5D4F5F</Color>
     <Visibility x:Key="BrandLogoVisibility">Visible</Visibility>
 </ResourceDictionary>

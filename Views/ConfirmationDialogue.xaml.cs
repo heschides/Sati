@@ -1,5 +1,4 @@
 ﻿using System.Windows;
-using System.Windows.Media;
 
 namespace Sati.Views
 {
@@ -17,11 +16,16 @@ namespace Sati.Views
             MessageText.Text = message;
             ConfirmButton.Content = confirmText;
 
-            // One style, two moods: deep red (#7A3B3B) for destructive, warm accent
-            // (#C87941) otherwise. Set in code because the dialog is built in code anyway.
-            ConfirmButton.Background = isDestructive
-                ? new SolidColorBrush(Color.FromRgb(0x7A, 0x3B, 0x3B))
-                : new SolidColorBrush(Color.FromRgb(0xC8, 0x79, 0x41));
+            // One style, two moods: destructive red or the theme's button accent. Set
+            // in code because the dialog is built in code anyway, but taken from the
+            // theme rather than literal colours — the literals were a light-theme red
+            // and amber, and their light ink turned invisible on a dark theme. Fill and
+            // ink are always taken as a pair, and as resource references so a theme
+            // change while the dialog is open re-resolves both.
+            var fill = isDestructive ? "DangerStrongBrush" : "AccentButtonBrush";
+            var ink = isDestructive ? "OnDangerStrongBrush" : "OnAccentButtonBrush";
+            ConfirmButton.SetResourceReference(BackgroundProperty, fill);
+            ConfirmButton.SetResourceReference(ForegroundProperty, ink);
         }
 
         private void Confirm_Click(object sender, RoutedEventArgs e)

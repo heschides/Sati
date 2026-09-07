@@ -24,7 +24,7 @@
     <SolidColorBrush x:Key="BorderBrush" Color="#E2D2D5" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="#CCB8BD" />
     <SolidColorBrush x:Key="DividerBrush" Color="#EBDDE0" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#9D5E6C" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#88525E" />
     <SolidColorBrush x:Key="AccentHoverBrush" Color="#814B58" />
     <SolidColorBrush x:Key="AccentPressedBrush" Color="#693C47" />
     <SolidColorBrush x:Key="OnAccentBrush" Color="#FFF9FA" />
@@ -37,22 +37,22 @@
     <!-- Local AI: soft aubergine, distinct but harmonious with rosewater. -->
     <Color x:Key="AiGlowColor">#FF9B7BA8</Color>
     <SolidColorBrush x:Key="AiAccentBrush" Color="#765886" />
-    <SolidColorBrush x:Key="AiAccentHoverBrush" Color="#896A99" />
+    <SolidColorBrush x:Key="AiAccentHoverBrush" Color="#866795" />
     <SolidColorBrush x:Key="AiAccentPressedBrush" Color="#5B4168" />
     <SolidColorBrush x:Key="AiAccentSoftBrush" Color="#F0E7F3" />
     <SolidColorBrush x:Key="AiAccentBorderBrush" Color="#C8B2CF" />
     <SolidColorBrush x:Key="OnAiAccentBrush" Color="#FFF9FF" />
     <SolidColorBrush x:Key="AiPanelTextBrush" Color="#553E61" />
     <SolidColorBrush x:Key="HoverBrush" Color="#EFE1E3" />
-    <SolidColorBrush x:Key="HoverStrongBrush" Color="#D8C3C8" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#E8DCDF" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#403638" />
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#635459" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#6C5D61" />
-    <SolidColorBrush x:Key="TextSubtleBrush" Color="#706166" />
-    <SolidColorBrush x:Key="NarrativeTextBrush" Color="#625257" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5E4F54" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#5C5053" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#5B4F53" />
+    <SolidColorBrush x:Key="NarrativeTextBrush" Color="#5E4F54" />
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#FFF9F9" />
     <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#F3E9ED" />
     <Color x:Key="SurfaceAltColor">#FFF5E9EA</Color>
     <Color x:Key="SurfaceRaisedColor">#FFFFFBFA</Color>
-    <Color x:Key="TextSubtleColor">#FF706166</Color>
+    <Color x:Key="TextSubtleColor">#FF5B4F53</Color>
 </ResourceDictionary>

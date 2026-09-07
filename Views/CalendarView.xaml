@@ -65,7 +65,7 @@
                     <Setter Property="Background"
                             Value="{DynamicResource AccentBrush}" />
                     <Setter Property="Foreground"
-                            Value="{DynamicResource SurfaceBrush}" />
+                            Value="{DynamicResource OnAccentBrush}" />
                 </DataTrigger>
                 <Trigger Property="IsMouseOver"
                          Value="True">
@@ -475,7 +475,7 @@
                                                                                     <DataTrigger Binding="{Binding IsToday}"
                                                                                                  Value="True">
                                                                                         <Setter Property="Foreground"
-                                                                                                Value="{DynamicResource SurfaceBrush}" />
+                                                                                                Value="{DynamicResource OnAccentBrush}" />
                                                                                     </DataTrigger>
                                                                                 </Style.Triggers>
                                                                             </Style>

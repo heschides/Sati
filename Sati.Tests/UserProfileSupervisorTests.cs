@@ -47,6 +47,63 @@ public sealed class UserProfileSupervisorTests
         Assert.Equal("Taylor Director", viewModel.SupervisorName);
     }
 
+    [Fact]
+    public void SwitchingAccountsIsNotQuestionedWhenNothingOnTheAccountTabsIsUnsaved()
+    {
+        Assert.Null(Account().UnsavedWorkWarning());
+    }
+
+    [Fact]
+    public void ATouchedButEmptyPasswordBoxIsNotTreatedAsUnsavedWork()
+    {
+        var viewModel = Account();
+
+        // A PasswordBox raises PasswordChanged on its way back to empty, so the view
+        // model ends up holding an empty SecureString rather than null. A null check
+        // alone would interrupt every user who typed a character and deleted it.
+        viewModel.CurrentPassword = new SecureString();
+        viewModel.NewPassword = new SecureString();
+        viewModel.ConfirmPassword = new SecureString();
+
+        Assert.Null(viewModel.UnsavedWorkWarning());
+    }
+
+    [Theory]
+    [InlineData(true, false, "contact details you have not saved")]
+    [InlineData(false, true, "password change you started")]
+    [InlineData(true, true, "contact details and the password")]
+    public void TheWarningNamesWhatTheSwitchWillDiscard(
+        bool editingContact, bool typingPassword, string expected)
+    {
+        var viewModel = Account();
+        if (editingContact)
+            viewModel.BeginEditCommand.Execute(null);
+        if (typingPassword)
+        {
+            var typed = new SecureString();
+            typed.AppendChar('x');
+            viewModel.NewPassword = typed;
+        }
+
+        var warning = viewModel.UnsavedWorkWarning();
+
+        Assert.NotNull(warning);
+        Assert.Contains(expected, warning);
+        // Cancel is what protects the work, so the sentence has to say the account is
+        // untouched rather than leaving the reader to guess what "switch" commits.
+        Assert.Contains("Nothing has been saved", warning);
+    }
+
+    private MyAccountViewModel Account()
+    {
+        var session = new SessionService();
+        session.SetUser(_caseManager);
+        return new MyAccountViewModel(
+            session,
+            new ProfileUserService([_caseManager, _director]),
+            new UnusedAuthService());
+    }
+
     private sealed class ProfileUserService(List<User> users) : IUserService
     {
         public Task<List<User>> GetAllAsync() => Task.FromResult(users);

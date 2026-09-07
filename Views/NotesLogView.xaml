@@ -279,7 +279,7 @@
                                         <TextBlock Text="{Binding ReturnedCount}"
                                                    FontSize="11"
                                                    FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource SurfaceBrush}"
+                                                   Foreground="{DynamicResource OnAccentBrush}"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center" />
                                     </Border>
@@ -327,7 +327,7 @@
                                         <TextBlock Text="{Binding HeldCount}"
                                                    FontSize="11"
                                                    FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource SurfaceBrush}"
+                                                   Foreground="{DynamicResource OnDangerStrongBrush}"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center" />
                                     </Border>

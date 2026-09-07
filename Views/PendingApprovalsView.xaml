@@ -145,16 +145,21 @@
             </Style.Triggers>
         </Style>
 
+        <!-- The neutral half of the pair. It fills with a surface tone rather than
+             with a text colour: text tokens are chosen to read against surfaces, not
+             to be read against, and as a fill this one left its label unreadable. -->
         <Style x:Key="CancelButton"
                TargetType="Button"
                BasedOn="{StaticResource ReturnButton}">
             <Setter Property="Background"
-                    Value="{DynamicResource TextSecondaryBrush}" />
+                    Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource TextPrimaryBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver"
                          Value="True">
                     <Setter Property="Background"
-                            Value="{DynamicResource TextMutedBrush}" />
+                            Value="{DynamicResource HoverStrongBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -247,13 +252,13 @@
                            AutomationProperties.LiveSetting="Polite" />
 
                 <WrapPanel Margin="0,0,0,12">
-                    <TextBlock Text="Maximum units per note (1-96):" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Text="Maximum units per note (1-96):" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                     <TextBox Text="{Binding MaximumUnitsText, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="Maximum units per note" Width="55" Margin="0,0,8,0" />
                     <Button Content="Approve all within threshold" Command="{Binding BatchApproveCommand}"
                             Style="{StaticResource PrimaryButton}" />
                 </WrapPanel>
-                <TextBlock Text="Applies to this case-manager filter, including notes not yet loaded. Notes must pass validation and compliance; no overrides."
+                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="Applies to this case-manager filter, including notes not yet loaded. Notes must pass validation and compliance; no overrides."
                            TextWrapping="Wrap" Margin="0,0,0,8" />
                 <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,0,0,8"
                            AutomationProperties.LiveSetting="Polite" />

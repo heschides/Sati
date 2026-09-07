@@ -8,9 +8,9 @@
         <GradientStop Color="#FFF4EBDD" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="NavBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#FFE4D8C5" Offset="0" />
-        <GradientStop Color="#FFD9DDCC" Offset="0.62" />
-        <GradientStop Color="#FFE8DDCC" Offset="1" />
+        <GradientStop Color="#FFE8DECE" Offset="0" />
+        <GradientStop Color="#FFDDE0D1" Offset="0.62" />
+        <GradientStop Color="#FFEAE0D2" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="SurfaceBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#FFFFFEFA" Offset="0" />
@@ -18,17 +18,17 @@
         <GradientStop Color="#FFEAEEE4" Offset="1" />
     </LinearGradientBrush>
     <SolidColorBrush x:Key="SurfaceAltBrush" Color="#E9E1D2" />
-    <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#DCD4C5" />
+    <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#E4DED2" />
     <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FFFDF7" />
     <SolidColorBrush x:Key="SurfaceAlpha70Brush" Color="#B3F7F2E9" />
     <SolidColorBrush x:Key="SurfaceAlpha25Brush" Color="#40F7F2E9" />
     <SolidColorBrush x:Key="BorderBrush" Color="#C9BBA6" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="#A89478" />
     <SolidColorBrush x:Key="DividerBrush" Color="#D8CDBB" />
-    <SolidColorBrush x:Key="AccentBrush" Color="#E25507" />
-    <SolidColorBrush x:Key="AccentHoverBrush" Color="#EF6A24" />
-    <SolidColorBrush x:Key="AccentPressedBrush" Color="#D95B10" />
-    <SolidColorBrush x:Key="OnAccentBrush" Color="#090705" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#A33D05" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#C0551D" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#C4520E" />
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
     <!-- Button fill is its own token so a palette can lighten its buttons
          without lightening the accent used for type. -->
     <SolidColorBrush x:Key="AccentButtonBrush" Color="#FBA76B" />
@@ -44,16 +44,16 @@
     <SolidColorBrush x:Key="AiAccentBorderBrush" Color="#A8BCA2" />
     <SolidColorBrush x:Key="OnAiAccentBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="AiPanelTextBrush" Color="#304D35" />
-    <SolidColorBrush x:Key="HoverBrush" Color="#E4DAC8" />
-    <SolidColorBrush x:Key="HoverStrongBrush" Color="#CDBB9F" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#E7DECD" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#E6DED0" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#38372B" />
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#575745" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#696957" />
-    <SolidColorBrush x:Key="TextSubtleBrush" Color="#747260" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#4C4C3C" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#4C4C3F" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#4E4C40" />
     <SolidColorBrush x:Key="NarrativeTextBrush" Color="#514D38" />
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#F8F3E9" />
     <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#EAE6D8" />
     <Color x:Key="SurfaceAltColor">#FFE9E1D2</Color>
     <Color x:Key="SurfaceRaisedColor">#FFFFFDF7</Color>
-    <Color x:Key="TextSubtleColor">#FF747260</Color>
+    <Color x:Key="TextSubtleColor">#FF4E4C40</Color>
 </ResourceDictionary>

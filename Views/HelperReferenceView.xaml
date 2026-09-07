@@ -1,6 +1,7 @@
 <UserControl x:Class="Sati.Views.HelperReferenceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:Sati.Helpers"
              Background="{DynamicResource WindowBackgroundBrush}"
              TextElement.FontFamily="{StaticResource AppFont}">
 
@@ -38,13 +39,11 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border Cursor="Hand"
-                                                    Padding="0">
-                                                <Border.InputBindings>
-                                                    <MouseBinding MouseAction="LeftClick"
-                                                                  Command="{Binding DataContext.SelectItemCommand,
+                                                    Padding="0"
+                                                    helpers:ClickableSurface.Command="{Binding DataContext.SelectItemCommand,
                                                                       RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                  CommandParameter="{Binding}" />
-                                                </Border.InputBindings>
+                                                                      helpers:ClickableSurface.CommandParameter="{Binding}"
+                                                                      AutomationProperties.Name="{Binding Title}">
                                                 <Border.Style>
                                                     <Style TargetType="Border">
                                                         <Setter Property="Background"

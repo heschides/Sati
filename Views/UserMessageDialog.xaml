@@ -29,7 +29,7 @@
                 Padding="20,6"
                 FontSize="13"
                 Background="{DynamicResource AccentBrush}"
-                Foreground="{DynamicResource SurfaceBrush}"
+                Foreground="{DynamicResource OnAccentBrush}"
                 BorderThickness="0"
                 Cursor="Hand"
                 Click="OkButton_Click" />

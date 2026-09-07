@@ -52,7 +52,7 @@
             <Setter Property="Background"
                     Value="{DynamicResource AccentBrush}" />
             <Setter Property="Foreground"
-                    Value="{DynamicResource SurfaceBrush}" />
+                    Value="{DynamicResource OnAccentBrush}" />
             <Setter Property="FontSize"
                     Value="14" />
             <Setter Property="FontWeight"

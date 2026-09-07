@@ -20,8 +20,8 @@
     <SolidColorBrush x:Key="AccentButtonPressedBrush" Color="#184638" />
     <SolidColorBrush x:Key="OnAccentButtonBrush" Color="#FFFFFF" />
     <Color x:Key="AiGlowColor">#FF568FA2</Color><SolidColorBrush x:Key="AiAccentBrush" Color="#356F82"/><SolidColorBrush x:Key="AiAccentHoverBrush" Color="#2B5D6E"/><SolidColorBrush x:Key="AiAccentPressedBrush" Color="#214956"/><SolidColorBrush x:Key="AiAccentSoftBrush" Color="#DDEEF2"/><SolidColorBrush x:Key="AiAccentBorderBrush" Color="#93BAC4"/><SolidColorBrush x:Key="OnAiAccentBrush" Color="#FFFFFF"/><SolidColorBrush x:Key="AiPanelTextBrush" Color="#244F5A"/>
-    <SolidColorBrush x:Key="HoverBrush" Color="#DDEBE4"/><SolidColorBrush x:Key="HoverStrongBrush" Color="#C5D9CF"/>
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#203C34"/><SolidColorBrush x:Key="TextSecondaryBrush" Color="#3C5A51"/><SolidColorBrush x:Key="TextMutedBrush" Color="#526B63"/><SolidColorBrush x:Key="TextSubtleBrush" Color="#5D746C"/><SolidColorBrush x:Key="NarrativeTextBrush" Color="#34564B"/>
+    <SolidColorBrush x:Key="HoverBrush" Color="#DDEBE4"/><SolidColorBrush x:Key="HoverStrongBrush" Color="#D2E2DA"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#203C34"/><SolidColorBrush x:Key="TextSecondaryBrush" Color="#3C5A51"/><SolidColorBrush x:Key="TextMutedBrush" Color="#495F58"/><SolidColorBrush x:Key="TextSubtleBrush" Color="#4C5F58"/><SolidColorBrush x:Key="NarrativeTextBrush" Color="#34564B"/>
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#EDF7F1"/><SolidColorBrush x:Key="PersonGroupAltBrush" Color="#E2EFE8"/>
-    <Color x:Key="SurfaceAltColor">#FFE5F0EA</Color><Color x:Key="SurfaceRaisedColor">#FFFFFFFF</Color><Color x:Key="TextSubtleColor">#FF5D746C</Color>
+    <Color x:Key="SurfaceAltColor">#FFE5F0EA</Color><Color x:Key="SurfaceRaisedColor">#FFFFFFFF</Color><Color x:Key="TextSubtleColor">#FF4C5F58</Color>
 </ResourceDictionary>

@@ -174,6 +174,55 @@ tree, and hold primary-button contrast to at least 4.5:1. Context menus and shel
 use explicit themed foreground/background pairs instead of Windows system menu colours or the
 window background as a text colour.
 
+## Theme legibility
+
+`Sati.Helpers.ThemeContrast` is the single owner of legibility arithmetic: WCAG 2.1 relative
+luminance, contrast ratio, alpha compositing, and the flattening of a gradient or tiled pattern
+into the colours a reader actually receives. Nothing else may reimplement it.
+
+`ThemeLegibilityTests` holds every one of the nineteen palettes to WCAG AA (4.5:1) two ways. The
+token pass scores each text role against each surface role it can land on, plus each fill that
+carries its own named ink, so a pair fails before any screen ships that uses it. The rendered pass
+loads every view under every theme, reads the brushes WPF resolved, and finds each run's background
+by hit testing the point its glyphs occupy. A third check fails on any theme key a view names that
+no dictionary defines, because `DynamicResource` resolves a missing key to nothing and silently
+leaves the inherited value in place.
+
+Two rules follow from what the audit found. A surface, border, or text token is never used outside
+its role — a fill takes a fill token and the ink named for it, never `SurfaceBrush` as a foreground
+or `BorderBrush`/`TextSecondaryBrush` as a background. And every control whose label colour comes
+from the framework rather than from a theme — `CheckBox`, `RadioButton`, `TabItem`, `Expander`,
+`ContextMenu`, `MenuItem`, `ComboBoxItem` — carries an application-wide style in `App.xaml`;
+framework defaults are black text and system chrome that no theme dictionary can reach.
+
+`PatternScrimBrush` lets a control-dense screen quiet an illustrated theme. It is `Transparent`
+for every theme without a pattern and a translucent surface tone for the four that have one; the
+Settings window paints its columns as blurred theme brush, then scrim, then controls. See
+`DECISIONS.md`.
+
+## Accessibility
+
+`AccessibilityAuditTests` measures what a screen reader is actually told. It loads every view
+through `RenderedViews`, the shared loader the theme legibility audit also uses, and reads each
+control's `AutomationPeer` name rather than inferring one from nearby markup. Narrator, JAWS and
+NVDA all read WPF through UI Automation, so the peer is the ground truth.
+
+`Sati.Helpers.ClickableSurface` is the single owner of making a non-button element operable. An
+element that people click takes `ClickableSurface.Command` rather than a bare `MouseBinding`: the
+attached property supplies focus, the tab stop, Enter and Space activation, and the themed focus
+ring in one place. It cannot supply the name, so the caller sets `AutomationProperties.Name` and
+the audit fails when it is missing. A raw `MouseBinding` on a non-button element is a defect the
+audit reports.
+
+Three rules hold across the application. `TabIndex` is never set by hand, because WPF tabs in
+declaration order and one explicit index sends every unnumbered control in the same scope to the
+end. `FocusVisualStyle` is never set to null. Status that changes without moving focus is announced
+through `AutomationProperties.LiveSetting`, and the audit fails if that channel is dismantled.
+
+An automated pass is a floor. It cannot judge whether a name reads well, whether the reading order
+makes sense, or how the interface behaves in a real screen reader's browse mode; see `AGENDA.md`
+for the hands-on work that remains.
+
 
 ## Easy Eyes presentation mode
 

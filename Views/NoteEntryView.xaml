@@ -196,7 +196,7 @@
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
-                <Style TargetType="RadioButton">
+                <Style TargetType="RadioButton" BasedOn="{StaticResource {x:Type RadioButton}}">
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding DataContext.IsLocked,
                                          RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -205,7 +205,7 @@
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
-                <Style TargetType="CheckBox">
+                <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding DataContext.IsLocked,
                                          RelativeSource={RelativeSource AncestorType=UserControl}}"

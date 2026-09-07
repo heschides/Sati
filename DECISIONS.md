@@ -2,7 +2,7 @@
 
 *Living document. The "why" behind choices that no diagram preserves. ARCHITECTURE.md
 says what owns what; this says why it was built that way and what was rejected. Newest
-sections at the bottom. Last updated: 2026-09-06.*
+sections at the bottom. Last updated: 2026-09-07.*
 
 ---
 
@@ -3358,3 +3358,143 @@ hard billing gate. Every synthetic Demo client now receives one deterministic fi
 from a varied valid set. The former missing-diagnosis profile instead teaches that a present code
 still needs ordinary source-document verification. Post-refresh validation checks every client,
 including teaching cases, and refuses to complete if any diagnosis is absent or outside that set.
+
+## 2026-09-07 — Theme legibility is measured, not reviewed by eye
+
+Sati's palettes are a token system: a view names a role such as `TextMutedBrush` or
+`SurfaceRaisedBrush` and never a colour. Legibility is therefore a property of the token *pairs*,
+not of any one screen, which makes it something a machine can check exhaustively rather than
+something a person notices on the screens they happen to open. `Helpers/ThemeContrast.cs` is the
+single owner of the arithmetic — WCAG 2.1 relative luminance, contrast ratio, and the flattening
+of a gradient or tiled pattern into the colours a reader actually receives. `ThemeLegibilityTests`
+enforces it two ways.
+
+The **token pass** scores every text role against every surface role it can land on, plus every
+fill that carries its own named ink. It is complete: a pair no screen uses today still cannot be
+allowed to fail, because the next screen will use it.
+
+The **rendered pass** loads every view under every theme and reads the brushes WPF actually
+resolved, which is the only way to catch a literal colour written into a view, a surface token used
+as ink, and framework defaults. It finds the background by hit testing the point the glyphs occupy
+rather than by walking ancestors: a `CheckBox` carries a white `Background` that its template spends
+on the small box and not behind the label, so an ancestor walk reports white behind text that in
+fact sits on the panel.
+
+The audit found four classes of defect that eye review had missed for the life of the product.
+Framework defaults were the largest: `CheckBox`, `RadioButton`, `TabItem` and `Expander` take their
+label colour from the control's own `Foreground`, which WPF leaves black, and paint their chrome
+from system brushes no application dictionary can reach. On a dark theme that put black labels on
+dark panels and near-white tab text on near-white tabs. App-wide styles now own all four. Second,
+several buttons used a boundary or text token as a fill — `BorderBrush` behind a label,
+`TextSecondaryBrush` behind "Cancel", `AccentPressedBrush` as type — so the ink no longer belonged
+to the surface beneath it. Third, the destructive confirmation dialogs set a literal light-theme red
+in code and paired it with a surface brush used as ink, leaving the confirm label at 1.3:1 in every
+dark theme. Fourth, `WarningSoftBrush` was referenced by two workspaces and defined by no
+dictionary; `DynamicResource` resolves a missing key to nothing and leaves the inherited value in
+place, so nothing ever reported it.
+
+Correcting the palettes moved luminance only, never hue. The dim end of every text ramp was
+compressed, because a dark theme has far less room below its secondary text than a light theme
+assumes, and hover and pressed states were re-scored — they had never been measured against the
+text that lands on them. Two themes lose a pinned colour: Blue-Gray Pearl and Cedar Grove used the
+same bright orange for the type accent and the button fill, and that orange reads at under 3:1 as
+text on their own surfaces. The type accent is now a deeper rust and the button keeps the bright
+fill, which is exactly the split `AccentButtonBrush` was introduced for.
+
+**Rejected:** an implicit application-wide `TextBlock` foreground, because an implicit style beats
+inheritance and would override the colour a button or badge deliberately passes down to its
+content; and holding the four dark themes to the bar while leaving the fifteen light ones alone,
+since the same audit condemned them and several light themes measured worse than any dark one.
+
+## 2026-09-07 — PATTERNED_THEME_SCRIM: control-dense screens quiet an illustrated theme
+
+Art Nouveau, Paisley, Mid-Century Modern and Ironworks Matte tile a motif behind navigable content.
+That reads well on browsing screens and badly on Settings, which is the densest surface in the
+application: two columns of labels, tick boxes and helper text, where the motif competes with the
+controls for the same attention.
+
+`PatternScrimBrush` is a theme token that is `Transparent` for every theme without a pattern and a
+translucent surface tone for the four that have one. Settings paints each column as three layers —
+the theme's own brush, softened by a blur; the scrim; then the controls. Themes with no pattern
+leave the scrim transparent and the blur has nothing to soften, so they render exactly as before
+and no theme needs a special case in the view.
+
+The blur is applied to the filled rectangle rather than to the tile. Blurring a 128-pixel tile and
+then repeating it produces a visible seam at every tile edge, which is why the existing pattern
+brushes can only afford a radius of about 2.5; blurring the composed fill has no seams to show and
+allows a radius that actually mutes the motif. `ClipToBounds` with a negative margin keeps the
+blur's soft edge from appearing at the column boundary.
+
+**Rejected:** raising the blur radius inside the existing tile brushes, which produces seams;
+replacing the pattern with a solid colour on dense screens, which discards the theme's identity
+rather than quieting it; and a per-screen opacity applied to the whole panel, which would fade the
+controls and the text along with the pattern.
+
+## 2026-09-07 — One door into settings, and switching accounts still closes it
+
+The shell header carried two controls of the same kind: a gear that opened Settings, and the
+greeting badge that opened a separate My Account window whose only unique job was a Switch User
+button. Two windows, two entry points, and a user had to learn which one held what. Settings now
+holds the signed-in user's own Profile and Password & Security tabs ahead of the agency and
+application tabs, `MyAccountWindow` is deleted, and the greeting badge is the only way in. The
+badge is a `Border` rather than a `Button`, so it carries `Focusable`, `IsTabStop` and Enter/Space
+key bindings explicitly; a decorative element that became the sole entry point would otherwise be
+unreachable from the keyboard.
+
+`MyAccountViewModel` survives the window it was built for and is now a constructor-injected child
+of `SettingsViewModel`, exposed as `Account`. The two account tabs set `DataContext="{Binding
+Account}"` and everything after them binds the window's own view model.
+
+Switching accounts is deliberately **not** performed inside the window. `OpenSwitchUserFlowAsync`
+saves scratchpads, flushes the journal, replaces the session user and reinitializes the shell; a
+settings window still bound to the outgoing user would survive that as a live window over a new
+session. So the window closes first and then raises `SwitchUserRequested`, and the shell starts the
+flow only after `ShowDialog` returns. That ordering is asserted rather than left to a comment,
+because it is invisible in the code and silently wrong if reversed. The credential dialog itself,
+`SwitchUserWindow`, is unchanged, as is the platform-operator path that uses neutral sign-in
+instead of an account picker.
+
+**Rejected:** putting the switch-user credential form on a tab in the merged window, which would
+require the window to tear itself down mid-switch; and keeping My Account as a separate window
+reached from inside Settings, which removes the gear without removing the second window.
+
+## 2026-09-07 — Accessibility is measured through the automation tree, not the markup
+
+Narrator, JAWS and NVDA all read a WPF application through UI Automation, and what they announce
+for a control is its `AutomationPeer` name, not the text that happens to sit beside it in the
+markup. `AccessibilityAuditTests` therefore asks the peers, exactly as a screen reader would, after
+loading every view through the same `RenderedViews` loader the theme legibility audit uses. Reading
+the XAML and inferring would have missed all four of the real defects it found. TalkBack is not in
+scope here: it is Android, and this is the desktop client.
+
+The largest finding was that clicking was the only way to use twelve navigation tabs and three list
+rows. They are built from `Border` rather than `Button` because their selected state is carried by
+style triggers a button template would have to reproduce, and a `Border` with a `MouseBinding` is
+mouse-only: it is not focusable, answers no key, and nothing in WPF reports that. Rather than
+repeat four attributes at fifteen sites, `Helpers.ClickableSurface` is an attached command that
+supplies focus, the tab stop, Enter and Space, and a themed focus ring together, so the parts that
+have to be right cannot be remembered three at a time. It cannot invent the name, so the audit
+fails when a surface using it has none.
+
+The second finding was `PasswordRevealBox`. Its hosts set an automation name on the control, but a
+name does not travel down a visual tree and focus lands on the inner box, so the sign-in password
+field on three windows announced nothing at all. The inner entry controls now repeat whatever the
+host set, and the reveal toggle renames itself to "Hide password" once the password is showing,
+because a name should say what the button will do next.
+
+Two rules the audit encodes are worth stating plainly. Explicit `TabIndex` stays at zero across the
+application: WPF tabs in declaration order, which already matches the reading order, and a single
+hand-written index silently sends every unnumbered control in the same scope to the end. And the
+focus visual is never switched off, because removing it leaves a keyboard user with no way to tell
+where they are.
+
+**What this cannot do.** It proves every control has a name, that nothing clickable is mouse-only,
+and that focus stays visible. It cannot judge whether a name is a *good* one, whether the reading
+order makes sense as a sentence, whether a live region fires at a useful moment, or how any of it
+behaves under a real screen reader's browse mode. Hands-on testing with Narrator and JAWS remains
+outstanding and is listed in `AGENDA.md`; an automated pass is a floor, not a certificate.
+
+**Rejected:** converting the fifteen surfaces to `Button` with custom templates, which would have
+rewritten their selected-state triggers and risked the visual regression the audit could not catch;
+and treating framework template parts as failures, since a `DataGrid`'s filler header and a scroll
+bar's arrows are not what a screen reader user navigates between.

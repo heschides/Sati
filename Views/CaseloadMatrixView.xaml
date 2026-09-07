@@ -78,7 +78,7 @@
 
         <!-- ═══ HEADER ═══ -->
         <Border Grid.Row="0"
-                Background="{DynamicResource TextPrimaryBrush}"
+                Background="{DynamicResource AccentBrush}"
                 Padding="12,10">
             <Grid>
                 <Grid.ColumnDefinitions>

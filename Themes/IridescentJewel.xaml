@@ -29,39 +29,39 @@
     <SolidColorBrush x:Key="InputBorderBrush" Color="#8292AA" />
     <SolidColorBrush x:Key="DividerBrush" Color="#52647A" />
 
-    <SolidColorBrush x:Key="AccentBrush" Color="#B58AD5" />
-    <SolidColorBrush x:Key="AccentHoverBrush" Color="#C8A3E2" />
-    <SolidColorBrush x:Key="AccentPressedBrush" Color="#8D68B0" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#CFB3E4" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#DBC6EC" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#9472B5" />
     <SolidColorBrush x:Key="OnAccentBrush" Color="#191222" />
     <!-- Button fill is its own token so a palette can lighten its buttons
          without lightening the accent used for type. -->
     <SolidColorBrush x:Key="AccentButtonBrush" Color="#B58AD5" />
     <SolidColorBrush x:Key="AccentButtonHoverBrush" Color="#C8A3E2" />
-    <SolidColorBrush x:Key="AccentButtonPressedBrush" Color="#8D68B0" />
+    <SolidColorBrush x:Key="AccentButtonPressedBrush" Color="#9472B5" />
     <SolidColorBrush x:Key="OnAccentButtonBrush" Color="#191222" />
 
     <Color x:Key="AiGlowColor">#FF6FD1C7</Color>
-    <SolidColorBrush x:Key="AiAccentBrush" Color="#3D9E98" />
-    <SolidColorBrush x:Key="AiAccentHoverBrush" Color="#58B8B0" />
-    <SolidColorBrush x:Key="AiAccentPressedBrush" Color="#287A76" />
+    <SolidColorBrush x:Key="AiAccentBrush" Color="#58B8B0" />
+    <SolidColorBrush x:Key="AiAccentHoverBrush" Color="#6FC9C1" />
+    <SolidColorBrush x:Key="AiAccentPressedBrush" Color="#3D9E98" />
     <SolidColorBrush x:Key="AiAccentSoftBrush" Color="#264B55" />
     <SolidColorBrush x:Key="AiAccentBorderBrush" Color="#69C3BC" />
     <SolidColorBrush x:Key="OnAiAccentBrush" Color="#102A2A" />
     <SolidColorBrush x:Key="AiPanelTextBrush" Color="#C6F4EF" />
 
-    <SolidColorBrush x:Key="HoverBrush" Color="#3C4961" />
-    <SolidColorBrush x:Key="HoverStrongBrush" Color="#51617A" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#333E52" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#404C60" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F6F2FA" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#D2CADC" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#B9B6CA" />
-    <SolidColorBrush x:Key="TextSubtleBrush" Color="#B5B2C6" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#C0BDCF" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#BEBBCD" />
     <SolidColorBrush x:Key="NarrativeTextBrush" Color="#DDD4E5" />
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#2D3E50" />
     <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#37334F" />
 
     <Color x:Key="SurfaceAltColor">#FF303A50</Color>
     <Color x:Key="SurfaceRaisedColor">#FF3B465B</Color>
-    <Color x:Key="TextSubtleColor">#FFB5B2C6</Color>
+    <Color x:Key="TextSubtleColor">#FFBEBBCD</Color>
 
     <!-- Dark-surface semantic variants. Meaning stays fixed; luminance changes. -->
     <SolidColorBrush x:Key="OverdueBrush" Color="#FFADA3" />
@@ -70,7 +70,7 @@
     <SolidColorBrush x:Key="CompliantBrush" Color="#A8DDA6" />
     <SolidColorBrush x:Key="CompliantFillBrush" Color="#2D493F" />
     <SolidColorBrush x:Key="WarningBrush" Color="#F0D07B" />
-    <SolidColorBrush x:Key="WarningFillBrush" Color="#4B4029" />
+    <SolidColorBrush x:Key="WarningFillBrush" Color="#4B4029" /><SolidColorBrush x:Key="WarningSoftBrush" Color="#52472F" />
     <SolidColorBrush x:Key="InfoBrush" Color="#9BCDF5" />
     <SolidColorBrush x:Key="InfoFillBrush" Color="#29445C" />
     <SolidColorBrush x:Key="SuccessStrongBrush" Color="#A6D69C" />

@@ -42,7 +42,7 @@
                 <StackPanel>
                     <TextBlock Text="{Binding WorkspaceTitle}"
                                FontSize="11" FontWeight="Bold"
-                               Foreground="{DynamicResource AccentPressedBrush}" />
+                               Foreground="{DynamicResource AccentBrush}" />
                     <TextBlock Text="{Binding PersonName}"
                                Margin="0,4,0,4" FontSize="20" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
@@ -229,19 +229,19 @@
                                 <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Text="Include drug/alcohol treatment or diagnosis information?" TextWrapping="Wrap" Margin="0,7,12,8" />
+                            <TextBlock Grid.Row="0" Text="Include drug/alcohol treatment or diagnosis information?" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,7,12,8" />
                             <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding YesNoChoices}" SelectedItem="{Binding DrugAlcoholChoice}"
                                       DisplayMemberPath="DisplayName" Style="{StaticResource ReleaseCombo}"
                                       AutomationProperties.Name="Drug and alcohol information permission" />
-                            <TextBlock Grid.Row="1" Text="Include mental/behavioral health treatment information?" TextWrapping="Wrap" Margin="0,7,12,8" />
+                            <TextBlock Grid.Row="1" Text="Include mental/behavioral health treatment information?" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,7,12,8" />
                             <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding YesNoChoices}" SelectedItem="{Binding MentalHealthChoice}"
                                       DisplayMemberPath="DisplayName" Style="{StaticResource ReleaseCombo}"
                                       AutomationProperties.Name="Mental health information permission" />
-                            <TextBlock Grid.Row="2" Text="Include HIV/AIDS status, testing, or diagnosis information?" TextWrapping="Wrap" Margin="0,7,12,8" />
+                            <TextBlock Grid.Row="2" Text="Include HIV/AIDS status, testing, or diagnosis information?" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,7,12,8" />
                             <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding YesNoChoices}" SelectedItem="{Binding HivAidsChoice}"
                                       DisplayMemberPath="DisplayName" Style="{StaticResource ReleaseCombo}"
                                       AutomationProperties.Name="HIV and AIDS information permission" />
-                            <TextBlock Grid.Row="3" Text="May the agency release authorized information without the consumer's prior review?" TextWrapping="Wrap" Margin="0,7,12,8" />
+                            <TextBlock Grid.Row="3" Text="May the agency release authorized information without the consumer's prior review?" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,7,12,8" />
                             <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding YesNoChoices}" SelectedItem="{Binding ReleaseWithoutReviewChoice}"
                                       DisplayMemberPath="DisplayName" Style="{StaticResource ReleaseCombo}"
                                       AutomationProperties.Name="Release without prior review permission" />

@@ -83,11 +83,11 @@
                         Margin="0,18,0,0"
                         Orientation="Horizontal"
                         HorizontalAlignment="Center">
-                <Ellipse Width="7" Height="7" Fill="#FF3E8F83" Margin="0,0,8,0" />
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentBrush}" Margin="0,0,8,0" />
                 <TextBlock Text="Still working — no action is needed"
                            FontSize="12"
                            FontWeight="SemiBold"
-                           Foreground="#FF28746A" />
+                           Foreground="{DynamicResource AccentBrush}" />
             </StackPanel>
         </Grid>
     </Border>

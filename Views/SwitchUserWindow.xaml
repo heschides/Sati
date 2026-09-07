@@ -90,7 +90,7 @@
                     IsDefault="True"
                     Height="40"
                     Background="{DynamicResource AccentBrush}"
-                    Foreground="{DynamicResource SurfaceBrush}"
+                    Foreground="{DynamicResource OnAccentBrush}"
                     FontSize="14"
                     FontWeight="SemiBold"
                     BorderThickness="0"
