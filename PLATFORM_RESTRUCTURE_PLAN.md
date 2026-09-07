@@ -1,9 +1,9 @@
 # SatiLogica — platform restructure plan
 
 *Status: proposal, nothing implemented. Written 2026-09-07 against branch
-`ui-legibility-and-accessibility` at commit `6e78c6d`. Read `ARCHITECTURE.md` for what owns what
-today and `DECISIONS.md` for why. Three decisions at the end have to be settled before stage 3
-starts; the earlier stages are safe to begin without them.*
+`ui-legibility-and-accessibility` at commit `6e78c6d`, restaged the same day. Read
+`PLATFORM_DOMAIN.md` first: it decides what the platform is, and this document only moves code to
+match. `ARCHITECTURE.md` says what owns what today and `DECISIONS.md` says why.*
 
 ---
 
@@ -75,14 +75,33 @@ SatiLogica.slnx
 │   ├── Sati.Api                  the case-management endpoints
 │   ├── Sati.Persistence          case-management entity configurations
 │   ├── Sati.Desktop              the WPF client (today's Sati.csproj)
-│   └── Carika                    Avalonia client of Sati  ← see decision 1
-├── karuna/                       nothing yet  ← see decision 2
-└── upekkha/                      nothing yet  ← see decision 2
+│   └── Carika                    Avalonia client of Sati  ← still open, see below
+├── karuna/                       designed in PLATFORM_DOMAIN.md, no code yet
+└── upekkha/                      designed in PLATFORM_DOMAIN.md, no code yet
 ```
 
-## Three decisions to settle before stage 3
+## Superseded: the staging changed on 2026-09-07
 
-These are yours, not mine. The staged work below stops at stage 2 without them.
+This document originally put the platform extraction at stage 3 with the Karuna and Upekkha design
+deferred until each shipped. That was backwards. What belongs to the platform cannot be derived from
+one product, so extracting first would have encoded Sati's assumptions as "platform" and called it
+done. The design now comes first and lives in `PLATFORM_DOMAIN.md`; the code boundary in stage 3 is
+derived from it rather than guessed.
+
+Decisions 1 and 3 below are settled, and decision 2 changed answer. Both are recorded in
+`DECISIONS.md`.
+
+- **Tenancy.** One model. Agency is Sati's tenant, provider organization is Karuna's, and OADS is an
+  authority rather than a tenant. Membership and authority are separate concepts.
+- **Person identity.** A platform registry that products link to, mirroring the Organization
+  decision. Reconciliation is a link, never a swap.
+- **Karuna and Upekkha.** Designed now, not deferred. Not as empty projects — as the domain design
+  that decides what the platform is. Projects still wait until there is code to put in them.
+
+## The original three decisions
+
+*Kept for the record. Decision 2's premise was wrong: the reason to design Karuna and Upekkha now is
+that they constrain Sati, which has nothing to do with when they ship.*
 
 **1. Is Carika a product or a Sati client?** Its README calls it "a deliberately limited Avalonia
 client for authenticated client-profile access and case-note entry", it reaches Azure only through
@@ -111,8 +130,20 @@ to be split, cross-product transactions become distributed, and the audit and te
 
 ## Staged sequence
 
-Each stage builds, passes the full suite, and is worth committing alone. Stages 1 and 2 are safe
-before the decisions above are settled.
+Each stage builds, passes the full suite, and is worth committing alone.
+
+### Stage 0 — design the other two programs
+
+Done for the structural decisions, in `PLATFORM_DOMAIN.md`. It settles who the tenant is in each
+program, who reads across tenants and by what authority, and whether a person is one identity or
+three. Those answers are what make the stage 3 split derivable instead of arbitrary.
+
+It also produced three things Sati should do now, none of which waits on the restructure and all of
+which get harder the longer they wait: do not build the OADS Resource Coordinator as an agency user,
+strengthen `MaineCareId` capture before a registry has to match on it, and stop widening the
+`Role != "PlatformOperator"` exclusion pattern.
+
+Four open questions remain in that document. None blocks stages 1 and 2.
 
 ### Stage 1 — guardrail first
 
@@ -205,12 +236,13 @@ reprieve, and an existing install's uninstall entry has to keep working.*
 
 | Stage | Size | Can start now |
 |---|---|---|
+| 0 design | done for the structural decisions | — |
 | 1 guardrail | small | yes |
 | 2 solution shape | small | yes |
-| 3 platform contracts | large | needs decisions 1 and 3 |
-| 4 platform persistence | large | needs decision 3 |
+| 3 platform contracts | large | yes, boundary now derived |
+| 4 platform persistence | large | yes, one chain confirmed |
 | 5 API split | medium, plus a release | after 4 |
 | 6 desktop rename | medium, plus an installer test | any time after 2 |
 
-Stages 1 and 2 are worth doing regardless of how the decisions land, because the guardrail is what
-keeps the boundary honest afterwards and the solution folders cost nothing.
+Stages 1 and 2 remain the place to start. The guardrail is what keeps the boundary honest after the
+extraction, and the solution folders cost nothing.

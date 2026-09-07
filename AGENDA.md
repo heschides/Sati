@@ -1,5 +1,25 @@
 # Sati — Refactor Agenda
 
+## Unreleased — what the platform design changes in Sati
+
+From `PLATFORM_DOMAIN.md` and the two decisions of 2026-09-07. None of these waits on the
+restructure, and all three get harder the longer they wait.
+
+- [ ] **Do not build the OADS Resource Coordinator as an agency user.** It is the first *authority*,
+      not the second excluded role. Membership and authority are separate concepts now; building it
+      the old way and migrating later means rewriting the exclusion filters and the audit records
+      both. Supersedes the wording in "Classification and future OADS access" below.
+- [ ] **Strengthen `MaineCareId` capture before a registry has to match on it.** Format validation,
+      a filtered unique index per agency, and a decision about the rows that already disagree.
+      `Person.BirthDate` is non-nullable while `FirstName` and `LastName` are not, which is the wrong
+      way round for a matching key. This is the `Provider.Npi` lesson: match quality later is
+      entirely a function of capture quality now, and capture cannot be done retroactively.
+- [ ] **Stop widening the `Role != "PlatformOperator"` exclusion pattern.** Five queries carry it
+      today and ten places branch on the role. Containment by subtraction does not survive a second
+      cross-tenant identity; the number should not grow before authority lands.
+- [ ] Answer the four open questions at the end of `PLATFORM_DOMAIN.md`. They need domain knowledge
+      the repository does not contain, and none of them blocks restructure stages 1 and 2.
+
 ## Unreleased — measured theme legibility
 
 Release 1.3.4 closed the contrast gaps that were visible to review. This work replaces review with

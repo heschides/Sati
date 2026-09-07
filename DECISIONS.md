@@ -3498,3 +3498,55 @@ outstanding and is listed in `AGENDA.md`; an automated pass is a floor, not a ce
 rewritten their selected-state triggers and risked the visual regression the audit could not catch;
 and treating framework template parts as failures, since a `DataGrid`'s filler header and a scroll
 bar's arrows are not what a screen reader user navigates between.
+
+## 2026-09-07 — Membership and authority are separate, and OADS is an authority
+
+Sati's tenant is the agency, and `TenantAccess` refuses any caller-supplied scope value. Karuna's
+tenant will be the provider organization on the same terms. Upekkha is **not** a tenant: OADS has no
+consumers of its own, it reviews other tenants' records and records decisions about them. Modelling
+it as a super-tenant above agencies was rejected because it turns today's flat agency check into a
+tree walk on every query in the application, to serve a reader that creates nothing.
+
+So membership and authority are separate concepts. Membership is the one tenant a user belongs to.
+Authority is a named, granted, time-bounded capability to reach beyond it for a stated purpose,
+provisioned outside tenant user-management, confined by a route allowlist, and audited on every use
+with the authority recorded rather than only the user.
+
+`PlatformOperator` already proves most of this and `API_SECURITY_AUDIT.md` calls its containment
+sound. What it does not prove is generality: it is a `UserRole` on an ordinary `User` row with a
+non-nullable `AgencyId`, and it is contained **by subtraction** — five queries carry
+`Role != "PlatformOperator"` so it stays out of agency lists, chat rosters and user management.
+Subtraction works for a role excluded from everything. It is the wrong shape for a reviewer who must
+be *included* in specific records across many tenants, and a second excluded role means every one of
+those filters grows a clause, with the forgotten site being a disclosure. Authority therefore becomes
+its own concept and `PlatformOperator` becomes its first holder, which also retires the non-nullable
+`AgencyId` fiction it carries today.
+
+**Consequence for Sati now.** The OADS Resource Coordinator in `AGENDA.md` must not be built as an
+agency user with a role. Building it that way and migrating later means rewriting both the exclusion
+filters and the audit records.
+
+**Rejected:** OADS as a super-tenant, for the reason above; and per-product tenancy models, which
+would leave the platform unable to own authorization and put the rule that decides access in three
+places, which `CLAUDE.md` calls a defect rather than a convenience.
+
+## 2026-09-07 — One person registry, products link to it
+
+The same human is a consumer in Sati, a service recipient in Karuna and a waiver member in Upekkha.
+This follows the Organization decision exactly: a platform-wide registry holding canonical identity
+and external identifiers only, a local record per product with its own columns and lifecycle, and a
+nullable link from the local record to the registry. Reconciliation is a link, never a swap, so no
+product's rows are repointed and no history is disturbed.
+
+A single shared `Person` row with product satellites was rejected because a Karuna provider would
+then read rows created under an agency's tenancy, and the isolation boundary and the identity
+boundary would stop agreeing. Separate people matched on demand was rejected because the same human
+can drift out of agreement between products with nothing able to detect it.
+
+**Consequence for Sati now.** `Person.MaineCareId` already exists, so the identifier that matters is
+being captured — the `Provider.Npi` lesson applied once already. What is missing is capture quality:
+`MaineCareId` has no validation or uniqueness constraint comparable to the NPI check digit and
+filtered unique index, and `BirthDate` is non-nullable while `FirstName` and `LastName` are not,
+which is the wrong way round for a matching key. Match quality later is entirely a function of
+capture quality now. The registry table itself is deliberately not created yet, on the same
+reasoning that refused to add a column pointing at a table that does not exist.
