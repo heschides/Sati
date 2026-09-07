@@ -432,3 +432,30 @@ claims no certificate-based digital seal, independent identity proof or NIST ass
 Actual deployed permissions, vendor/agency agreements, risk/incident/restore evidence, retention
 and holds, later copies, accessible documents and program approval remain necessary operating
 work. The generated evidence PDF is untagged; automated page checks do not establish accessibility.
+
+## Cross-tenant sharing between programs (design stage, 2026-09-07)
+
+`PLATFORM_DOMAIN.md` designs Karuna documentation flowing to the case manager who authorised the
+service, and OADS reading submitted assessments and plans across agencies. Both cross an
+organizational boundary, and neither is built. Four questions need counsel before either is.
+
+Whether provider-to-case-manager flow is a **disclosure or an internal treatment use** depends on
+how the two organizations relate under HIPAA. The design treats care coordination inside an existing
+treatment relationship as not requiring a consent artefact; that reading has not been reviewed.
+
+Whether **42 CFR Part 2 records reach OADS at all** is a separate question from whether they reach a
+case manager. Regulatory oversight is a different basis from care coordination, and the answer may
+differ. Part 2 governs redisclosure specifically and is stricter than HIPAA.
+
+What a reader is shown when a **category is withheld**. Showing nothing and showing "something exists
+and is withheld" are different, and only the second is honest, but under Part 2 the acknowledgement
+that protected treatment exists can itself be the disclosure.
+
+**Retention of visibility after an authorization closes.** Documentation written under a closed
+authorization still exists. How long the case manager keeps reading it interacts with the retention
+schedule and the hold registry in `OPERATIONS.md`.
+
+The design assumes the conservative answer throughout: ordinary documentation flows within the
+relationship, and the three specially protected categories the agency release form already names —
+substance use, mental and behavioural health, HIV — cross only when a signed release names them.
+That is the reading that is safe to relax later if counsel permits it.

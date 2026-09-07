@@ -25,12 +25,64 @@ building Sati. This document gathers them.
 | | Sati | Karuna | Upekkha |
 |---|---|---|---|
 | Who uses it | Case-management agency staff | Service-provider organization staff | OADS reviewers |
-| Tenant | Agency | Provider organization | Not a tenant; an authority |
-| Owns | Notes, billing, caseload, compliance forms, assessments | Service delivery documentation against an authorization | Nothing; it reviews and decides |
-| Reads across tenants | No | No | Yes, scoped |
+| Tenant | Agency | Provider organization | Not a tenant |
+| Owns | Notes, billing, caseload, compliance forms, assessments | Service delivery documentation against an authorization | Waiver decisions |
+| Reads across tenants | Yes, by relationship | Yes, by relationship | Yes, by authority |
 
-Upekkha being an authority rather than a tenant is the load-bearing distinction. OADS does not have
-its own consumers; it reviews other tenants' records and records decisions about them.
+Upekkha is not a tenant because it has no consumers of its own. It is still a **system of record**:
+it owns the decision rows, which then flow into Sati. Reviewing and deciding are different things,
+and Upekkha does both.
+
+## Two kinds of cross-tenant access
+
+The first draft of this document said no product reads across tenants except OADS. That was wrong,
+and the correction is structural rather than a detail. There are two mechanisms and they must not be
+built as one.
+
+**Authority** is granted, programme-scoped and exceptional. Someone outside a tenant is given a
+named capability to reach in for oversight, for a bounded time, audited on every use.
+`PlatformOperator` and the OADS Resource Coordinator are the two holders.
+
+**Relationship** is derived, record-scoped and ordinary. A case manager authorises a service; a
+provider documents delivering it; the case manager reads that documentation. Nobody grants this and
+nothing about it is exceptional. It is the normal operation of the platform, and it is what makes
+Karuna worth building at all.
+
+Conflating them would be a serious mistake in both directions. Modelling relationship reads as
+authority grants would mean provisioning a grant per case manager per provider per person, which
+collapses under its own weight. Modelling authority as a relationship would give OADS access by
+being adjacent to a record rather than by a decision someone made and can revoke.
+
+### The authorization is the join, not the person
+
+A provider documents against an **authorization**, and the case manager who owns that authorization
+reads that documentation. The join is the authorization, not the person.
+
+That distinction bounds the read precisely. "Any case manager who has ever served this person" is a
+much wider door than "the case manager whose authorization this documentation was written against",
+and the wider door is the one that leaks when caseloads transfer, when a person moves agency, or
+when an old episode closes. `CaseloadTransferRules` already exists in Sati and would have to be
+taught about Karuna if the join were the person; joining on the authorization means transfer moves
+the authorization and the visibility follows it.
+
+## The OADS decision flows as a snapshot, not as a live read
+
+Upekkha owns the decision. Sati receives it and keeps an immutable snapshot of what it was told,
+alongside a link to the owning row.
+
+The reason is billing reproducibility, not tidiness. If billability depends on an authorization and
+Sati reads Upekkha's decision live, then an amendment in Upekkha silently changes the answer to a
+question Sati already answered. A claim generated in March becomes unexplainable in June, and
+`BillingComplianceGate` cannot be asked why it passed. `CLAUDE.md` already requires immutable
+versions and amendments rather than silent overwrites for submitted clinical and financial records,
+and `ProfessionalClaimSnapshot` is the same pattern applied once already.
+
+So: Upekkha never writes into Sati's tables, and Sati never gates a claim on a live cross-product
+read. Sati snapshots the decision at receipt, records when and from which version, and an amendment
+in Upekkha arrives as a new snapshot rather than a mutation of the old one. `AGENDA.md` already
+insists on preserving the distinction between assessment facts, supervisor attestation, plan, OADS
+decision, classification and authorization; separate rows on separate sides of the product boundary
+is what makes that distinction survive contact with an amendment.
 
 ## Decision 1 — one tenancy model, authority-scoped reads
 
@@ -104,6 +156,47 @@ be fixed retroactively:
 The registry table itself is deliberately **not** created yet, on the same reasoning that refused to
 add a column pointing at a table that does not exist.
 
+## Sharing defaults, and the one place the default cannot hold
+
+Provider documentation for a shared person is visible to the case manager and to OADS by default,
+with the ability to disable some sharing. That is right for the ordinary case and it cannot be right
+for all of it, because `DECISIONS.md` already settled the harder half:
+
+> A profile answers who someone is, never what they agreed to. [...] Deriving any of it from stored
+> data would manufacture a consent nobody gave.
+
+The agency release form records three categories separately, and it records them because they are
+separately protected: substance use treatment, mental and behavioural health treatment, and HIV
+status. Substance use records fall under 42 CFR Part 2, which is stricter than HIPAA and governs
+redisclosure specifically. A default that shares them until somebody turns sharing off is a
+disclosure decided by a default rather than by a consent anybody gave, which is the exact thing that
+decision refuses.
+
+So the model has two layers, and the difference between them is who decides.
+
+**Ordinary documentation is default-open across the relationship.** A case manager reading the
+documentation of a service they authorised is care coordination inside an existing treatment
+relationship, not a third-party disclosure. No consent artefact gates it. This is the common case
+and it should stay frictionless.
+
+**Specially protected categories are default-closed and travel only on a recorded release.** Not a
+toggle, and not a setting anybody administers: the signed release that already exists in Sati is the
+evidence, and the categories it names are the categories that travel. If no release covers them,
+they do not cross, and the reader is told that something exists and is withheld rather than being
+shown a gap that looks like an absence.
+
+**Suppression is two different things and must not be one switch.** A provider marking a document
+not-yet-shareable because it is a draft is operational, reversible and needs no evidence. A category
+withheld for want of consent is regulatory, evidenced by the absence of a release, and no user may
+override it. Building both as one "share" flag would let an operational click do a regulatory job.
+
+**This needs legal review before it is built, not after.** Whether Part 2 data reaches OADS at all
+is a question about regulatory oversight authority, and whether provider-to-case-manager flow is a
+disclosure or an internal treatment use depends on how the organizations relate under HIPAA.
+`REGULATORY_CONCERNS.md` already lists cross-agency access and specially protected records as
+counsel questions. This design assumes the conservative answer until someone qualified says
+otherwise, because the conservative answer is the one that is safe to relax later.
+
 ## What changes in Sati now
 
 Three things, all consequences of decisions above rather than new features.
@@ -127,30 +220,56 @@ Derived from the above rather than guessed:
 **Platform.** Identity and authentication. Tenancy and membership. Authority grants and the audit of
 their use. The person and organization registries. Audit events and record versions. Documents,
 signatures and envelope protection. Incidents and health telemetry. Chat. Legal hold and retention.
+**The authorization**, and **the sharing policy that decides what crosses a tenant boundary**.
 
 **Sati.** Notes and the service timeline. Billing, claims and remittance. Caseload and transfer.
 Compliance forms and annual cycles. Comprehensive assessments and person-centred plans. Provider
 directory entries. Everything the `Sati.Contracts` classification put in the case-management column.
 
+The last two platform entries are the ones that could not have been found by looking at Sati alone,
+and they are why this document had to come before the extraction.
+
+**The authorization** looks like a Sati concept right up until Karuna documents against it and
+Upekkha decides it. It is the join for every relationship read, it is what an OADS decision resolves
+into, and it is what a caseload transfer moves. Left in Sati, Karuna would have to reference a
+sibling product to know what it is delivering, which is the exact coupling this restructure exists to
+remove.
+
+**The sharing policy** decides whether a given reader may see a given record across a tenant
+boundary, and it has to have one owner. `CLAUDE.md` calls a rule enforced two different ways a
+defect rather than a convenience, and a disclosure rule enforced two different ways is a defect with
+a regulator attached. It belongs beside `TenantAccess`, not inside any product.
+
 Karuna and Upekkha will each add their own product column. The platform column is the intersection,
 and it stays the intersection only if a test enforces the direction, which is stage one of the
 restructure plan.
 
+## Answered 2026-09-07
+
+1. **Karuna documentation flows back to the case manager.** Answered yes. This is what produced the
+   relationship mechanism above; it is ordinary operation, not an authority grant.
+2. **An OADS decision is a record in Upekkha that flows into Sati.** Answered: Upekkha owns it, Sati
+   snapshots it. Upekkha is a system of record, not only a reviewer.
+3. **Provider documentation for a shared person is visible to case managers and OADS by default,
+   with some sharing disableable.** Answered, with the two-layer qualification above: the default
+   holds for ordinary documentation and cannot hold for the three specially protected categories.
+
 ## Open questions
 
-These need domain knowledge the repository does not contain. None of them blocks the restructure
+These need domain knowledge or counsel the repository does not contain. None blocks the restructure
 stages that can start now.
 
-1. **Does Karuna receive work from Sati, or only publish to it?** A case manager authorises a
-   service; a provider documents delivering it. If documentation flows back for the case manager to
-   read, that is a cross-product read between two tenants and needs its own authority, not just a
-   shared registry.
-2. **Is an OADS decision a record in Upekkha or in Sati?** `AGENDA.md` insists on preserving the
-   distinction between assessment facts, supervisor attestation, plan, OADS decision, classification
-   and authorization. Which side of the product boundary the decision row lives on determines
-   whether Upekkha is a reviewer of Sati's records or a system of record in its own right.
-3. **Do Karuna providers see each other's documentation for a shared person?** Two providers may
-   serve the same waiver member. The registry makes that visible to the platform; whether it is
-   visible to them is a policy question with regulatory weight.
-4. **Which waiver programmes scope an OADS authority?** `WaiverType` exists on `Person` already, and
+1. **Which waiver programmes scope an OADS authority?** `WaiverType` exists on `Person` already and
    Lifespan Waiver support is a roadmap item. Authority scope needs the programme list to be stable.
+2. **Do Karuna providers see each other's documentation for a shared person?** Two providers may
+   serve the same waiver member. Answer 3 covers case managers and OADS but not provider-to-provider,
+   which has no authorization joining the two and so no relationship under the model above. The
+   default should probably be no.
+3. **Does a Part 2 category reach OADS at all?** Regulatory oversight is a different basis from care
+   coordination, and the answer may differ from the case-manager answer. Counsel question.
+4. **What happens to visibility when an authorization ends?** Documentation written under a closed
+   authorization still exists. Whether the case manager keeps reading it, and for how long, is a
+   retention question that `OPERATIONS.md` and legal hold both touch.
+5. **What does a case manager see when a category is withheld?** Being shown nothing and being shown
+   "something exists and is withheld" are different, and only the second is honest. The second may
+   itself disclose the existence of protected treatment, which under Part 2 can be the disclosure.

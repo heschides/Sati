@@ -3550,3 +3550,55 @@ filtered unique index, and `BirthDate` is non-nullable while `FirstName` and `La
 which is the wrong way round for a matching key. Match quality later is entirely a function of
 capture quality now. The registry table itself is deliberately not created yet, on the same
 reasoning that refused to add a column pointing at a table that does not exist.
+
+## 2026-09-07 — Cross-tenant access has two mechanisms, and sharing has two layers
+
+Karuna documentation flows back to the case manager, an OADS decision is a record in Upekkha that
+flows into Sati, and provider documentation for a shared person is visible to case managers and OADS
+by default. Three answers, and together they change the model recorded earlier the same day.
+
+**Authority is not the only way across a tenant boundary.** Authority is granted, programme-scoped
+and exceptional. Relationship is derived, record-scoped and ordinary: a case manager authorises a
+service, a provider documents delivering it, the case manager reads it, and nobody grants anything.
+Building relationship reads as authority grants would mean a grant per case manager per provider per
+person; building authority as a relationship would give OADS access by adjacency rather than by a
+decision someone made and can revoke.
+
+**The join is the authorization, not the person.** "Any case manager who ever served this person" is
+a much wider door than "the case manager whose authorization this was written against", and the
+wider one leaks on caseload transfer, on agency change, and when an old episode closes. Joining on
+the authorization means `CaseloadTransferRules` moves visibility as a side effect of moving the
+authorization, rather than Karuna having to learn what a caseload transfer is.
+
+**The OADS decision arrives as a snapshot.** Upekkha owns the row; Sati keeps an immutable snapshot
+of what it was told plus a link. The reason is reproducibility: if billability depends on an
+authorization and Sati reads Upekkha live, an amendment silently changes the answer to a question
+Sati already answered, and a claim generated in March becomes unexplainable in June.
+`ProfessionalClaimSnapshot` is the same pattern applied once already. An amendment arrives as a new
+snapshot, never as a mutation of the old one.
+
+**Sharing is default-open for ordinary documentation and default-closed for specially protected
+categories.** The default-open half is right: a case manager reading documentation of a service they
+authorised is care coordination inside an existing treatment relationship. The other half cannot
+follow it, because "A profile answers who someone is, never what they agreed to" already settled
+that consent is recorded at signing and never derived — and a default that shares substance use,
+mental health or HIV information until somebody switches it off is a disclosure decided by a default
+rather than by a consent anybody gave. Those three categories travel only when the signed release
+already in Sati names them.
+
+**Operational suppression and regulatory suppression are not one switch.** A provider marking a
+draft not-yet-shareable is reversible and needs no evidence. A category withheld for want of consent
+is evidenced by the absence of a release and no user may override it. One flag serving both lets an
+operational click do a regulatory job.
+
+**Consequence for the platform boundary.** Two things move that would have looked like Sati's if
+Sati were the only product examined. The **authorization** is the join for every relationship read,
+what an OADS decision resolves into, and what a caseload transfer moves, so it is platform. The
+**sharing policy** decides what crosses a tenant boundary and must have one owner, because a
+disclosure rule enforced two different ways is a defect with a regulator attached.
+
+**Not settled.** Whether Part 2 data reaches OADS at all, whether provider-to-case-manager flow is a
+disclosure or an internal treatment use, and what a reader is shown when a category is withheld,
+given that "something exists and is withheld" can itself be the disclosure under Part 2. See
+`REGULATORY_CONCERNS.md`; the conservative reading holds until counsel says otherwise, because it is
+the one that is safe to relax later.
