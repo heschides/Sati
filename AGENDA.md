@@ -142,11 +142,26 @@ before release. Outlook calendar data is an encrypted client-local overlay, not 
       online NuGet advisory audit found no vulnerable direct or transitive packages; the 96-entry
       migration replay found no defects; EF found no model changes after the latest migration; and
       the rendered theme/calendar/accessibility suites exercised the packaged visual behavior.
-- [ ] Source commit and fast-forward reconciliation to `master`, followed by a normal push.
-- [ ] Demo API package, OneDeploy publication, live/ready/version/contract checks, and authenticated
-      readiness evidence.
-- [ ] Demo and Local installer builds, isolated acceptance, checksum verification, and non-overwriting
-      publication to the two approved distribution folders.
+- [x] Source commit `8ee618f7fd28073f4d9d012e5c5036fe89dc6c71` was fast-forwarded onto
+      `master` and pushed normally; local and remote `master` matched afterward. The completed
+      `ui-legibility-and-accessibility` branch was deleted locally only after its tip was fully
+      contained in `master`. Other branches were retained because they have unique commits or are
+      checked out by another worktree.
+- [x] Demo API package `artifacts/SatiApi-1.3.5-fx-x86.zip` was built from the pushed source commit:
+      8,907,368 bytes, SHA-256 `E3290D0B5FF49F4C768F0058B14643525F4E3C97EA3F3EBF2F2E4367377758A7`,
+      file version 1.3.5.0, with no private configuration. OneDeploy deployment
+      `658f05f6a17d442f932659fc3c64e148` succeeded to the existing Demo API only. Live and ready are
+      healthy; `/health/version` reports 1.3.5 and contract revision `CC236B20EF18`; authenticated
+      Admin readiness passed. No SQL, firewall, Function, baseline, or Production operation ran.
+- [x] Both installers passed isolated acceptance and were published with matching checksum files
+      without overwriting earlier artifacts. Demo completed five responsive launches, normal closes,
+      exact version, and cleanup; `SatiDemoSetup-1.3.5.exe` is 101,339,136 bytes with SHA-256
+      `D4852283DD4CF12AC419B88372BA09592152D61E35B76C2D10307447DDD845FB` in
+      `SatiLogica Demo Files`. Local passed exact version, integrated security, the Microsoft-signed
+      LocalDB prerequisite, and cleanup; `SatiLocalSetup-1.3.5.exe` is 203,659,016 bytes with SHA-256
+      `B0D09BED961296644DF08CB0EE7A2543FEEEB10D280B187351AF419C5201B02C` in
+      `Sati Desktop`. Source artifacts, published executables, and checksum contents match, and no
+      temporary distribution file remains.
 - [ ] Final evidence commit, clean-tree check, and equality of local `master` with `origin/master`.
 
 ## Release 1.3.4 — 2026-09-07
