@@ -162,7 +162,9 @@ before release. Outlook calendar data is an encrypted client-local overlay, not 
       `B0D09BED961296644DF08CB0EE7A2543FEEEB10D280B187351AF419C5201B02C` in
       `Sati Desktop`. Source artifacts, published executables, and checksum contents match, and no
       temporary distribution file remains.
-- [ ] Final evidence commit, clean-tree check, and equality of local `master` with `origin/master`.
+- [x] Evidence commit `cac1046da794cb2621c5284262933abe6b1526f5` is pushed; this final ledger
+      entry indexes it. Final verification confirmed a clean tracked worktree and equality of local
+      `master` with `origin/master`.
 
 ## Release 1.3.4 — 2026-09-07
 
