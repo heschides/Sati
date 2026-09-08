@@ -6,11 +6,38 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "A clean slate, clearly seen";
+    public const string ReleaseName = "A clearer calendar, softly framed";
     public const string ReleaseDate = "September 7, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Outlook calendar exports can join the calendar",
+            [
+                "A one-time Outlook .ics import places appointments beside Sati work without turning them into notes, billable activity, exemptions, or compliance records.",
+                "The selected file stays on this computer, and the replaceable calendar copy is separated by Sati user and Demo or Production environment.",
+                "Imported subjects, times, and locations appear in the year, month, selected-day, and focused-day views. Common recurrences, exclusions, all-day events, UTC times, and Windows time zones are supported.",
+                "Because calendar text may contain protected information, the local copy is encrypted for the current Windows account. Sati does not connect to Outlook or store a Microsoft account token."
+            ]),
+        new(
+            "Calendar navigation is easier to read and move through",
+            [
+                "The calendar opens with a useful month view, provides direct previous-month, next-month, month, and year controls, and keeps selected-day details together.",
+                "Outlook entries and Sati notes remain visually and semantically distinct, including non-color labels and screen-reader names."
+            ]),
+        new(
+            "Themes are measured, not only inspected",
+            [
+                "All twenty themes are checked against WCAG AA color contrast across their named text and surface roles and across rendered application views.",
+                "Interactive tiles and navigation surfaces now receive keyboard operation, visible focus, and meaningful screen-reader names through one shared behavior.",
+                "Profile and password settings now live in the main Settings window, and the greeting badge is the single keyboard-accessible way into it."
+            ]),
+        new(
+            "Decorative themes frost every working window",
+            [
+                "Geometric and illustrated patterns remain crisp in genuinely open shell space but soften into frosted glass behind navigation, panels, startup screens, sign-in, account switching, settings, and confirmation dialogs.",
+                "Vanilla Bean joins the theme list, while the larger Paisley and Mid-Century Modern repeats reduce obvious tiling without putting sharp artwork behind text."
+            ]),
         new(
             "Demo administrators can restore the approved baseline",
             [
@@ -29,8 +56,8 @@ public static class ProductReleaseNotes
         new(
             "Decorative patterns step back from working content",
             [
-                "Paisley, Art Nouveau, and Mid-Century Modern softly blur their pattern behind navigable content so labels and field boundaries remain clear.",
-                "Navigation decoration remains crisp, and Sati never blurs the controls, case notes, forms, or tables themselves."
+                "Paisley, Art Nouveau, Mid-Century Modern, and Vanilla Bean softly blur their pattern behind navigable content so labels and field boundaries remain clear.",
+                "Navigation decoration is softly muted beneath its labels, and Sati never blurs the controls, case notes, forms, or tables themselves."
             ]),
         new(
             "Submitted claims now have a visible staging lane",
@@ -61,9 +88,9 @@ public static class ProductReleaseNotes
                 "If Microsoft LocalDB is missing, Windows may still show its normal permission prompt; that security prompt is intentional."
             ]),
         new(
-            "Four new themes",
+            "Five decorative themes",
             [
-                "Settings now includes Ironworks Matte, Paisley, Art Nouveau, and Mid-Century Modern.",
+                "Settings now includes Ironworks Matte, Paisley, Art Nouveau, Mid-Century Modern, and Vanilla Bean.",
                 "Their geometric and decorative patterns stay on the outer shell and navigation, while forms, notes, and tables keep calm readable surfaces."
             ]),
         new(

@@ -7,7 +7,7 @@
         Width="420"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{DynamicResource WindowBackgroundBrush}"
+        Background="{DynamicResource SurfaceBrush}"
         FontFamily="{StaticResource AppFont}">
 
     <Window.Resources>

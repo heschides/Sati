@@ -1,53 +1,118 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!-- MID-CENTURY MODERN: warm paper, atomic geometry, teal, ochre, and coral. -->
-    <DrawingBrush x:Key="NavigableContentPatternSourceBrush" TileMode="Tile"
-                  Viewport="0,0,132,96" ViewportUnits="Absolute"
-                  Viewbox="0,0,132,96" ViewboxUnits="Absolute">
+    <!-- A deliberately roomy repeat keeps the atomic vocabulary without turning it into a grid. -->
+    <DrawingBrush x:Key="WindowBackgroundBrush" TileMode="Tile"
+                  Viewport="0,0,264,192" ViewportUnits="Absolute"
+                  Viewbox="0,0,264,192" ViewboxUnits="Absolute">
         <DrawingBrush.Drawing>
             <DrawingGroup>
-                <GeometryDrawing Brush="#F9F3E9" Geometry="M 0,0 L 132,0 132,96 0,96 Z" />
+                <GeometryDrawing Brush="#F9F3E9" Geometry="M 0,0 L 264,0 264,192 0,192 Z" />
+
+                <!-- Circles and ellipses vary gently in scale and angle. -->
                 <GeometryDrawing Brush="#22608B87">
-                    <GeometryDrawing.Geometry><EllipseGeometry Center="25,24" RadiusX="18" RadiusY="18" /></GeometryDrawing.Geometry>
+                    <GeometryDrawing.Geometry><EllipseGeometry Center="29,28" RadiusX="18" RadiusY="18" /></GeometryDrawing.Geometry>
                 </GeometryDrawing>
-                <GeometryDrawing Brush="#24D29B3D" Geometry="M 67,2 L 91,2 79,31 Z" />
-                <GeometryDrawing Brush="#22B85E4D" Geometry="M 102,50 C 122,50 132,65 132,82 L 102,82 Z" />
-                <GeometryDrawing Geometry="M 5,78 C 22,58 42,58 59,78 M 50,18 L 60,18 M 55,13 L 55,23">
+                <DrawingGroup>
+                    <DrawingGroup.Transform><RotateTransform Angle="-16" CenterX="151" CenterY="139" /></DrawingGroup.Transform>
+                    <GeometryDrawing Brush="#1E608B87">
+                        <GeometryDrawing.Geometry><EllipseGeometry Center="151,139" RadiusX="21" RadiusY="17" /></GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+                <GeometryDrawing Brush="#1C608B87">
+                    <GeometryDrawing.Geometry><EllipseGeometry Center="239,61" RadiusX="15" RadiusY="15" /></GeometryDrawing.Geometry>
+                </GeometryDrawing>
+
+                <!-- Ochre wedges are related, but never line up or point the same way. -->
+                <GeometryDrawing Brush="#24D29B3D" Geometry="M 77,7 L 102,12 85,40 Z" />
+                <GeometryDrawing Brush="#21D29B3D" Geometry="M 207,151 L 237,139 233,173 Z" />
+                <GeometryDrawing Brush="#1FD29B3D" Geometry="M 126,73 L 143,53 154,80 Z" />
+
+                <!-- Coral quarter-rounds alternate corners and sizes. -->
+                <GeometryDrawing Brush="#22B85E4D" Geometry="M 220,0 C 244,0 258,14 258,38 L 220,38 Z" />
+                <GeometryDrawing Brush="#1FB85E4D" Geometry="M 5,127 C 27,127 42,142 42,164 L 5,164 Z" />
+                <DrawingGroup>
+                    <DrawingGroup.Transform><RotateTransform Angle="182" CenterX="111" CenterY="116" /></DrawingGroup.Transform>
+                    <GeometryDrawing Brush="#1DB85E4D" Geometry="M 94,99 C 115,99 128,112 128,133 L 94,133 Z" />
+                </DrawingGroup>
+
+                <!-- Loose arcs, small satellites, and off-axis crosses add the requested irregularity. -->
+                <GeometryDrawing Geometry="M 8,93 C 25,72 46,70 63,91 M 174,41 C 192,23 213,27 224,47 M 177,169 C 190,151 211,151 225,169">
                     <GeometryDrawing.Pen><Pen Brush="#2483564A" Thickness="2" /></GeometryDrawing.Pen>
                 </GeometryDrawing>
+                <DrawingGroup>
+                    <DrawingGroup.Transform><RotateTransform Angle="13" CenterX="57" CenterY="152" /></DrawingGroup.Transform>
+                    <GeometryDrawing Geometry="M 50,152 L 64,152 M 57,145 L 57,159">
+                        <GeometryDrawing.Pen><Pen Brush="#2683564A" Thickness="2" /></GeometryDrawing.Pen>
+                    </GeometryDrawing>
+                </DrawingGroup>
+                <DrawingGroup>
+                    <DrawingGroup.Transform><RotateTransform Angle="-11" CenterX="181" CenterY="99" /></DrawingGroup.Transform>
+                    <GeometryDrawing Geometry="M 175,99 L 187,99 M 181,93 L 181,105">
+                        <GeometryDrawing.Pen><Pen Brush="#2283564A" Thickness="1.8" /></GeometryDrawing.Pen>
+                    </GeometryDrawing>
+                </DrawingGroup>
                 <GeometryDrawing Brush="#2483564A">
-                    <GeometryDrawing.Geometry><EllipseGeometry Center="79,65" RadiusX="3" RadiusY="3" /></GeometryDrawing.Geometry>
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <EllipseGeometry Center="73,63" RadiusX="3" RadiusY="3" />
+                            <EllipseGeometry Center="118,169" RadiusX="2.5" RadiusY="2.5" />
+                            <EllipseGeometry Center="201,91" RadiusX="3.5" RadiusY="3.5" />
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
                 </GeometryDrawing>
             </DrawingGroup>
         </DrawingBrush.Drawing>
     </DrawingBrush>
-    <VisualBrush x:Key="WindowBackgroundBrush" TileMode="Tile"
-                 Viewport="0,0,132,96" ViewportUnits="Absolute"
-                 Viewbox="0,0,132,96" ViewboxUnits="Absolute">
+    <VisualBrush x:Key="SurfaceBrush" TileMode="Tile"
+                 Viewport="0,0,264,192" ViewportUnits="Absolute"
+                 Viewbox="0,0,264,192" ViewboxUnits="Absolute">
         <VisualBrush.Visual>
-            <Border Width="132" Height="96"
-                    Background="{StaticResource NavigableContentPatternSourceBrush}">
-                <Border.Effect>
-                    <BlurEffect Radius="2.5" RenderingBias="Performance" />
-                </Border.Effect>
+            <Border Width="264" Height="192" Background="#F2FFF9EE">
+                <Border Background="{StaticResource WindowBackgroundBrush}" Opacity="0.12">
+                    <Border.Effect>
+                        <BlurEffect Radius="4" RenderingBias="Performance" />
+                    </Border.Effect>
+                </Border>
             </Border>
         </VisualBrush.Visual>
     </VisualBrush>
-    <DrawingBrush x:Key="NavBackgroundBrush" TileMode="Tile"
-                  Viewport="0,0,88,64" ViewportUnits="Absolute"
-                  Viewbox="0,0,88,64" ViewboxUnits="Absolute">
+    <DrawingBrush x:Key="NavPatternSourceBrush" TileMode="Tile"
+                  Viewport="0,0,176,64" ViewportUnits="Absolute"
+                  Viewbox="0,0,176,64" ViewboxUnits="Absolute">
         <DrawingBrush.Drawing>
             <DrawingGroup>
-                <GeometryDrawing Brush="#F8F3EC" Geometry="M 0,0 L 88,0 88,64 0,64 Z" />
+                <GeometryDrawing Brush="#F8F3EC" Geometry="M 0,0 L 176,0 176,64 0,64 Z" />
                 <GeometryDrawing Brush="#28608B87">
                     <GeometryDrawing.Geometry><EllipseGeometry Center="18,18" RadiusX="12" RadiusY="12" /></GeometryDrawing.Geometry>
                 </GeometryDrawing>
                 <GeometryDrawing Brush="#28D29B3D" Geometry="M 52,7 L 76,7 64,34 Z" />
-                <GeometryDrawing Geometry="M 6,51 L 82,51"><GeometryDrawing.Pen><Pen Brush="#2483564A" Thickness="2" /></GeometryDrawing.Pen></GeometryDrawing>
+                <GeometryDrawing Brush="#22B85E4D" Geometry="M 100,8 C 119,8 131,20 131,39 L 100,39 Z" />
+                <DrawingGroup>
+                    <DrawingGroup.Transform><RotateTransform Angle="-14" CenterX="151" CenterY="26" /></DrawingGroup.Transform>
+                    <GeometryDrawing Brush="#24608B87">
+                        <GeometryDrawing.Geometry><EllipseGeometry Center="151,26" RadiusX="14" RadiusY="11" /></GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+                <GeometryDrawing Geometry="M 6,51 C 24,39 40,40 52,51 M 137,51 L 167,51">
+                    <GeometryDrawing.Pen><Pen Brush="#2483564A" Thickness="2" /></GeometryDrawing.Pen>
+                </GeometryDrawing>
             </DrawingGroup>
         </DrawingBrush.Drawing>
     </DrawingBrush>
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFF9EE" />
+    <VisualBrush x:Key="NavBackgroundBrush" TileMode="Tile"
+                 Viewport="0,0,176,64" ViewportUnits="Absolute"
+                 Viewbox="0,0,176,64" ViewboxUnits="Absolute">
+        <VisualBrush.Visual>
+            <Border Width="176" Height="64" Background="#EEF8F3EC">
+                <Border Background="{StaticResource NavPatternSourceBrush}" Opacity="0.18">
+                    <Border.Effect>
+                        <BlurEffect Radius="3.5" RenderingBias="Performance" />
+                    </Border.Effect>
+                </Border>
+            </Border>
+        </VisualBrush.Visual>
+    </VisualBrush>
     <SolidColorBrush x:Key="SurfaceAltBrush" Color="#EDE0CA" />
     <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#E8DDCB" />
     <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FFFFF8" />

@@ -28,6 +28,7 @@ namespace Sati.ViewModels
         private readonly IApiCompatibilityService _apiCompatibility;
         private readonly EasyEyesPreferenceService _easyEyesPreferences;
         private readonly IdleLockPreferenceService _idlePreferences;
+        private bool _isTogglingEasyEyes;
 
 
         // -------------------------------------------------------------------------
@@ -303,6 +304,28 @@ namespace Sati.ViewModels
             IsEasyEyesMode = enabled;
             NotesViewModel.Clients.IsEasyEyesMode = enabled;
             NotesViewModel.NotesLog.IsEasyEyesMode = enabled;
+        }
+
+        [RelayCommand]
+        private async Task ToggleEasyEyes()
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            if (userId is null || _isTogglingEasyEyes)
+                return;
+
+            _isTogglingEasyEyes = true;
+            try
+            {
+                await _easyEyesPreferences.SetEnabledAsync(userId.Value, !IsEasyEyesMode);
+            }
+            catch (EasyEyesPreferenceSaveException exception)
+            {
+                AppErrorLog.Record(exception, "easy-eyes.keyboard-shortcut");
+            }
+            finally
+            {
+                _isTogglingEasyEyes = false;
+            }
         }
 
         /// <summary>

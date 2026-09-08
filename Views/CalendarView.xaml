@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:children="clr-namespace:Sati.ViewModels.Children"
+             xmlns:services="clr-namespace:Sati.Services"
              Background="{DynamicResource WindowBackgroundBrush}"
              TextElement.FontFamily="{StaticResource AppFont}">
 
@@ -37,12 +38,42 @@
             </Border>
         </DataTemplate>
 
+        <DataTemplate x:Key="OutlookEventTemplate"
+                      DataType="{x:Type services:ImportedOutlookEvent}">
+            <Border Background="{DynamicResource SurfaceRaisedBrush}"
+                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="3,1,1,1"
+                    CornerRadius="5"
+                    Padding="10"
+                    Margin="0,0,0,8"
+                    AutomationProperties.Name="{Binding AccessibleLabel}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Title}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <TextBlock Text="{Binding TimeLabel}"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="0,3,0,0" />
+                    <TextBlock Text="{Binding Location}"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="0,2,0,0"
+                               Visibility="{Binding Location,
+                                   Converter={StaticResource NullToVisibilityConverter}}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <Style x:Key="CalendarDayButtonStyle"
                TargetType="Button">
             <Setter Property="Height"
-                    Value="36" />
+                    Value="30" />
             <Setter Property="Margin"
-                    Value="2" />
+                    Value="1" />
             <Setter Property="Padding"
                     Value="0" />
             <Setter Property="Background"
@@ -136,6 +167,81 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="CalendarViewModeButtonStyle" TargetType="Button">
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="3,0,0,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <Style x:Key="CalendarMonthDayButtonStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="96" />
+            <Setter Property="Margin" Value="4" />
+            <Setter Property="Padding" Value="9" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border Background="{TemplateBinding Background}"
+                                    CornerRadius="10"
+                                    SnapsToDevicePixels="True">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#000000"
+                                                      BlurRadius="8"
+                                                      Direction="270"
+                                                      ShadowDepth="1"
+                                                      Opacity="0.14" />
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="Chrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="10"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverStrongBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource HoverStrongBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </DataTrigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -160,7 +266,7 @@
                                    FontSize="16"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Choose a day in the year view. You can also use Tab and press Enter."
+                        <TextBlock Text="Choose a day in the month view. You can also use Tab and press Enter."
                                    FontSize="11"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
@@ -220,6 +326,34 @@
                                                      Value="False">
                                             <Setter Property="Visibility"
                                                     Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Text="OUTLOOK EVENTS"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,7,0,7" />
+
+                        <ItemsControl ItemsSource="{Binding SelectedDayOutlookEvents}"
+                                      ItemTemplate="{StaticResource OutlookEventTemplate}" />
+
+                        <TextBlock Text="No Outlook events are dated this day."
+                                   FontSize="11"
+                                   FontStyle="Italic"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,0,0,12">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedDay.HasOutlookEvents}"
+                                                     Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -302,7 +436,7 @@
             </Border>
 
             <Grid Grid.Row="1">
-                <!-- Year overview. -->
+                <!-- Month view is the default; the year overview is an optional wider scan. -->
                 <Grid x:Name="YearOverviewPanel"
                       Visibility="{Binding IsDayFocused,
                           Converter={StaticResource InverseBoolToVisibilityConverter}}">
@@ -311,79 +445,199 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0"
-                          Margin="18,14,18,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <Border Grid.Row="0"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="14,10"
+                            Margin="18,14,18,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="YEAR OVERVIEW"
-                                       FontSize="10"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextSubtleBrush}" />
-                            <StackPanel Orientation="Horizontal"
-                                        Margin="0,5,0,0">
-                                <Button Style="{StaticResource CalendarYearNavigationButtonStyle}"
-                                        AutomationProperties.Name="Previous year"
-                                        ToolTip="Previous year"
-                                        Command="{Binding PreviousYearCommand}"
-                                        Margin="0,0,2,0">
-                                    <Path Data="M 12,4 L 6,10 L 12,16"
-                                          Width="12"
-                                          Height="20"
-                                          Stretch="Uniform"
-                                          Stroke="{DynamicResource AccentBrush}"
-                                          StrokeThickness="2.2"
-                                          StrokeStartLineCap="Round"
-                                          StrokeEndLineCap="Round"
-                                          StrokeLineJoin="Round" />
-                                </Button>
-                                <TextBlock Text="{Binding CurrentYear}"
-                                           FontSize="20"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           VerticalAlignment="Center"
-                                           Margin="13,0" />
-                                <Button Style="{StaticResource CalendarYearNavigationButtonStyle}"
-                                        AutomationProperties.Name="Next year"
-                                        ToolTip="Next year"
-                                        Command="{Binding NextYearCommand}"
-                                        Margin="2,0,0,0">
-                                    <Path Data="M 6,4 L 12,10 L 6,16"
-                                          Width="12"
-                                          Height="20"
-                                          Stretch="Uniform"
-                                          Stroke="{DynamicResource AccentBrush}"
-                                          StrokeThickness="2.2"
-                                          StrokeStartLineCap="Round"
-                                          StrokeEndLineCap="Round"
-                                          StrokeLineJoin="Round" />
-                                </Button>
-                                <TextBlock Text="Loading calendar…"
-                                           AutomationProperties.LiveSetting="Polite"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                           VerticalAlignment="Center"
-                                           Margin="14,0,0,0"
-                                           Visibility="{Binding IsLoading,
-                                               Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <Grid Grid.Column="0" VerticalAlignment="Center">
+                            <StackPanel Visibility="{Binding IsYearOverview,
+                                Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                <TextBlock Text="MONTH VIEW" FontSize="10" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextSubtleBrush}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                    <Button Style="{StaticResource CalendarYearNavigationButtonStyle}"
+                                            AutomationProperties.Name="Previous month"
+                                            ToolTip="Previous month"
+                                            Command="{Binding PreviousMonthCommand}" Margin="0,0,2,0">
+                                        <Path Data="M 12,4 L 6,10 L 12,16" Width="12" Height="20"
+                                              Stretch="Uniform" Stroke="{DynamicResource AccentBrush}"
+                                              StrokeThickness="2.2" StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                                    </Button>
+                                    <TextBlock FontSize="20" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center" Margin="13,0">
+                                        <Run Text="{Binding SelectedMonthName, Mode=OneWay}" /><Run Text=" " /><Run Text="{Binding CurrentYear, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <Button Style="{StaticResource CalendarYearNavigationButtonStyle}"
+                                            AutomationProperties.Name="Next month"
+                                            ToolTip="Next month"
+                                            Command="{Binding NextMonthCommand}" Margin="2,0,0,0">
+                                        <Path Data="M 6,4 L 12,10 L 6,16" Width="12" Height="20"
+                                              Stretch="Uniform" Stroke="{DynamicResource AccentBrush}"
+                                              StrokeThickness="2.2" StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                                    </Button>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
 
-                        <Button Grid.Column="1"
-                                Content="Refresh"
-                                AutomationProperties.Name="Refresh calendar"
-                                Command="{Binding RefreshCommand}"
-                                Padding="12,6"
-                                VerticalAlignment="Bottom" />
+                            <StackPanel Visibility="{Binding IsYearOverview,
+                                Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="YEAR OVERVIEW" FontSize="10" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextSubtleBrush}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                    <Button Style="{StaticResource CalendarYearNavigationButtonStyle}"
+                                            AutomationProperties.Name="Previous year"
+                                            ToolTip="Previous year"
+                                            Command="{Binding PreviousYearCommand}" Margin="0,0,2,0">
+                                        <Path Data="M 12,4 L 6,10 L 12,16" Width="12" Height="20"
+                                              Stretch="Uniform" Stroke="{DynamicResource AccentBrush}"
+                                              StrokeThickness="2.2" StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                                    </Button>
+                                    <TextBlock Text="{Binding CurrentYear}" FontSize="20" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center" Margin="13,0" />
+                                    <Button Style="{StaticResource CalendarYearNavigationButtonStyle}"
+                                            AutomationProperties.Name="Next year"
+                                            ToolTip="Next year"
+                                            Command="{Binding NextYearCommand}" Margin="2,0,0,0">
+                                        <Path Data="M 6,4 L 12,10 L 6,16" Width="12" Height="20"
+                                              Stretch="Uniform" Stroke="{DynamicResource AccentBrush}"
+                                              StrokeThickness="2.2" StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Content="Month" AutomationProperties.Name="Show month view"
+                                    Command="{Binding ShowMonthCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource CalendarViewModeButtonStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsYearOverview}" Value="False">
+                                                <Setter Property="Background" Value="{DynamicResource HoverStrongBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Content="Year" AutomationProperties.Name="Show year view"
+                                    Command="{Binding ShowYearCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource CalendarViewModeButtonStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsYearOverview}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource HoverStrongBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Content="Import Outlook"
+                                    AutomationProperties.Name="Import an Outlook calendar file"
+                                    ToolTip="Import an Outlook .ics calendar export"
+                                    Command="{Binding ImportOutlookCalendarCommand}"
+                                    Padding="12,6"
+                                    Margin="10,0,0,0"
+                                    IsEnabled="{Binding IsImportingOutlookCalendar,
+                                        Converter={StaticResource InverseBoolConverter}}" />
+                            <Button Content="Refresh" AutomationProperties.Name="Refresh calendar"
+                                    Command="{Binding RefreshCommand}" Padding="12,6" Margin="10,0,0,0" />
+                        </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="18,0,18,12"
+                          Visibility="{Binding IsYearOverview,
+                              Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0" Background="{DynamicResource SurfaceMutedBrush}"
+                                CornerRadius="8" Padding="0,6" Margin="4,0,4,4">
+                            <UniformGrid Columns="7">
+                                <TextBlock Text="Sunday" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="Monday" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="Tuesday" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="Wednesday" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="Thursday" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="Friday" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="Saturday" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                            </UniformGrid>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding SelectedCalendarMonth.Cells}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Columns="7" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Border MinHeight="96" Margin="4"
+                                                    Visibility="{Binding Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=inverse}" />
+                                            <Button Style="{StaticResource CalendarMonthDayButtonStyle}"
+                                                    Visibility="{Binding Converter={StaticResource NullToVisibilityConverter}}"
+                                                    Command="{Binding DataContext.SelectDayCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    AutomationProperties.Name="{Binding AccessibleLabel}"
+                                                    ToolTip="{Binding AccessibleLabel}">
+                                                <Grid>
+                                                    <TextBlock Text="{Binding Date.Day}" FontSize="14" FontWeight="SemiBold"
+                                                               HorizontalAlignment="Left" VerticalAlignment="Top" />
+                                                    <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                                                        <TextBlock Text="{Binding NoteCount, StringFormat={}{0} scheduled}"
+                                                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        <TextBlock Text="{Binding OutlookEventCount, StringFormat={}{0} Outlook}"
+                                                                   FontSize="11" Foreground="{DynamicResource AccentBrush}"
+                                                                   Visibility="{Binding HasOutlookEvents, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                                                VerticalAlignment="Top" Margin="0,4,3,0">
+                                                        <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}"
+                                                                 Margin="0,0,3,0"
+                                                                 Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}"
+                                                                 Stroke="{DynamicResource TextPrimaryBrush}" StrokeThickness="1"
+                                                                 Visibility="{Binding HasOutlookEvents, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </Grid>
 
                     <ScrollViewer Grid.Row="1"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
-                                  Padding="14,0,14,18">
+                                  Padding="18,0,18,22"
+                                  Visibility="{Binding IsYearOverview,
+                                      Converter={StaticResource BoolToVisibilityConverter}}">
                         <ItemsControl x:Name="MonthItemsControl"
                                       ItemsSource="{Binding Months}"
                                       VerticalAlignment="Top">
@@ -395,23 +649,23 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type children:CalendarMonth}">
-                                    <Border Margin="5"
-                                            Background="{DynamicResource SurfaceRaisedBrush}"
+                                    <Border Margin="8"
+                                            Background="{DynamicResource SurfaceBrush}"
                                             BorderBrush="{DynamicResource BorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="9"
-                                            Padding="10,9,10,11"
+                                            CornerRadius="10"
+                                            Padding="12,10,12,14"
                                             VerticalAlignment="Top">
                                         <StackPanel>
                                             <TextBlock Text="{Binding Name}"
                                                        FontSize="14"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       Margin="2,0,0,9" />
+                                                       Margin="2,0,0,7" />
 
-                                            <Border Background="{DynamicResource SurfaceMutedBrush}"
-                                                    CornerRadius="5"
-                                                    Padding="0,5"
+                                            <Border BorderBrush="{DynamicResource BorderBrush}"
+                                                    BorderThickness="0,0,0,1"
+                                                    Padding="0,0,0,5"
                                                     Margin="0,0,0,3">
                                                 <UniformGrid Columns="7">
                                                     <TextBlock Text="S" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextSubtleBrush}" HorizontalAlignment="Center" />
@@ -433,7 +687,7 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Grid>
-                                                            <Border Height="36"
+                                                            <Border Height="30"
                                                                     Visibility="{Binding Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=inverse}" />
 
                                                             <Button Style="{StaticResource CalendarDayButtonStyle}"
@@ -449,11 +703,10 @@
                                                                                       RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                   CommandParameter="{Binding}" />
                                                                 </Button.InputBindings>
-                                                                <Grid>
-                                                                    <TextBlock Text="{Binding Date.Day}"
-                                                                               HorizontalAlignment="Left"
+                                                                    <Grid>
+                                                                        <TextBlock Text="{Binding Date.Day}"
+                                                                               HorizontalAlignment="Center"
                                                                                VerticalAlignment="Center"
-                                                                               Margin="5,0,0,0"
                                                                                FontSize="12">
                                                                         <TextBlock.Style>
                                                                             <Style TargetType="TextBlock">
@@ -482,24 +735,23 @@
                                                                         </TextBlock.Style>
                                                                     </TextBlock>
 
-                                                                    <Border HorizontalAlignment="Right"
-                                                                            VerticalAlignment="Center"
-                                                                            MinWidth="16"
-                                                                            Height="16"
-                                                                            CornerRadius="8"
-                                                                            Background="{DynamicResource AccentBrush}"
-                                                                            Margin="0,0,3,0"
-                                                                            Visibility="{Binding HasNotes,
-                                                                                Converter={StaticResource BoolToVisibilityConverter}}">
-                                                                        <TextBlock Text="{Binding NoteCount}"
-                                                                                   FontSize="9"
-                                                                                   FontWeight="Bold"
-                                                                                   Foreground="{DynamicResource OnAccentBrush}"
-                                                                                   HorizontalAlignment="Center"
-                                                                                   VerticalAlignment="Center"
-                                                                                   Margin="3,0" />
-                                                                    </Border>
-                                                                </Grid>
+                                                                        <Ellipse Width="5" Height="5"
+                                                                                 Fill="{DynamicResource AccentBrush}"
+                                                                                 HorizontalAlignment="Left"
+                                                                                 VerticalAlignment="Bottom"
+                                                                                 Margin="8,0,0,2"
+                                                                                 Visibility="{Binding HasNotes,
+                                                                                     Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                                        <Ellipse Width="5" Height="5"
+                                                                                 Fill="{DynamicResource AccentBrush}"
+                                                                                 Stroke="{DynamicResource TextPrimaryBrush}"
+                                                                                 StrokeThickness="1"
+                                                                                 HorizontalAlignment="Right"
+                                                                                 VerticalAlignment="Bottom"
+                                                                                 Margin="0,0,8,2"
+                                                                                 Visibility="{Binding HasOutlookEvents,
+                                                                                     Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                                    </Grid>
                                                             </Button>
                                                         </Grid>
                                                     </DataTemplate>
@@ -515,6 +767,7 @@
 
                 <!-- Focused single-day surface. -->
                 <Grid x:Name="FocusedDayPanel"
+                      Background="{DynamicResource SurfaceBrush}"
                       Visibility="{Binding IsDayFocused,
                           Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid.RowDefinitions>
@@ -526,8 +779,8 @@
                     <DockPanel Grid.Row="0"
                                Margin="20,16,20,6">
                         <Button DockPanel.Dock="Left"
-                                Content="&#8592; Back to year"
-                                AutomationProperties.Name="Return to calendar year"
+                                Content="&#8592; Back to month"
+                                AutomationProperties.Name="Return to calendar month"
                                 Command="{Binding ReturnToYearCommand}"
                                 Padding="10,5"
                                 Margin="0,0,14,0" />
@@ -536,7 +789,7 @@
                                        FontSize="21"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <TextBlock Text="Service notes are grouped by the date of service recorded on each note."
+                            <TextBlock Text="Service notes and locally imported Outlook events for this date."
                                        FontSize="11"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        Margin="0,3,0,0" />
@@ -570,6 +823,35 @@
                                   VerticalScrollBarVisibility="Auto"
                                   Padding="20,0,20,20">
                         <StackPanel>
+                            <TextBlock Text="OUTLOOK EVENTS"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,0,7" />
+                            <ItemsControl ItemsSource="{Binding SelectedDayOutlookEvents}"
+                                          ItemTemplate="{StaticResource OutlookEventTemplate}" />
+                            <TextBlock Text="No Outlook events are dated this day."
+                                       FontSize="12"
+                                       FontStyle="Italic"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,0,16">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedDay.HasOutlookEvents}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <TextBlock Text="SERVICE NOTES"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,0,7" />
                             <ItemsControl ItemsSource="{Binding SelectedDayNotes}"
                                           ItemTemplate="{StaticResource CalendarNoteTemplate}" />
 

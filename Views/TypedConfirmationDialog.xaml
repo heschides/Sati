@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Background="{DynamicResource WindowBackgroundBrush}"
+        Background="{DynamicResource SurfaceBrush}"
         FocusManager.FocusedElement="{Binding ElementName=CancelButton}">
 
     <Window.Resources>

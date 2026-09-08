@@ -15,6 +15,12 @@
         TextOptions.TextRenderingMode="ClearType"
         TextOptions.TextHintingMode="Fixed">
 
+    <Window.InputBindings>
+        <KeyBinding Key="Oem5"
+                    Modifiers="Control"
+                    Command="{Binding ToggleEasyEyesCommand}" />
+    </Window.InputBindings>
+
     <Window.Resources>
         <!-- Compact mode changes spacing, not text scale or control semantics. The
              same buttons remain available and keep their accessible names. -->

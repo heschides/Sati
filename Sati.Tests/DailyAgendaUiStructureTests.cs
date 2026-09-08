@@ -37,7 +37,7 @@ public sealed class DailyAgendaUiStructureTests
 
         Assert.DoesNotContain("Color=\"#", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Background=\"#", view, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("{DynamicResource WindowBackgroundBrush}", view, StringComparison.Ordinal);
+        Assert.Contains("{DynamicResource SurfaceBrush}", view, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding EnvironmentLabel", view, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", view, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Daily agenda items\"", view, StringComparison.Ordinal);
@@ -65,8 +65,8 @@ public sealed class DailyAgendaUiStructureTests
             {
                 foreach (var theme in new[]
                          {
-                             "PearlescentCream", "MidnightOpal", "IndustrialMatte",
-                             "Paisley", "ArtNouveau", "MidCenturyModern"
+                              "PearlescentCream", "MidnightOpal", "IndustrialMatte",
+                              "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
                          })
                 {
                     dictionaries[themeIndex] = new ResourceDictionary
@@ -77,7 +77,7 @@ public sealed class DailyAgendaUiStructureTests
                     WpfUiHarness.Realize(window, 860, 720);
 
                     var expected = Assert.IsAssignableFrom<Brush>(
-                        Application.Current.FindResource("WindowBackgroundBrush"));
+                        Application.Current.FindResource("SurfaceBrush"));
                     Assert.Same(expected, window.Background);
                 }
             }

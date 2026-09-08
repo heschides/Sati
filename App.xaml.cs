@@ -154,6 +154,8 @@ namespace Sati
                         services.AddSingleton<EasyEyesPreferenceService>();
                         services.AddSingleton<IdleLockPreferenceService>();
                         services.AddSingleton<ConsumerPickerSortPreferenceService>();
+                        services.AddSingleton<IOutlookCalendarService, OutlookCalendarService>();
+                        services.AddSingleton<IOutlookCalendarFilePicker, Sati.Views.OutlookCalendarFilePicker>();
                         services.AddSingleton<TextShortcutHook>();
                         services.AddSingleton<ICaseNoteFormatter, FoundryLocalCaseNoteFormatter>();
 

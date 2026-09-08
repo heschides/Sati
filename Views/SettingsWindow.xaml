@@ -11,7 +11,7 @@
         MinWidth="900"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
-        Background="{DynamicResource WindowBackgroundBrush}">
+        Background="{DynamicResource SurfaceBrush}">
 
     <Window.Resources>
         <Style x:Key="LabelStyle"
@@ -480,7 +480,7 @@
                           AutomationProperties.HelpText="Uses larger text and controls. Sati rearranges panels to keep your work comfortable."
                           IsChecked="{Binding EasyEyesMode, Mode=TwoWay}"
                           Margin="0,0,0,6" />
-                <TextBlock Text="Larger text and controls. Sati rearranges panels to keep your work comfortable."
+                <TextBlock Text="Larger text and controls. Sati rearranges panels to keep your work comfortable. Shortcut: Ctrl+\ (backslash)."
                            FontSize="11"
                            Foreground="{DynamicResource TextMutedBrush}"
                            TextWrapping="Wrap"

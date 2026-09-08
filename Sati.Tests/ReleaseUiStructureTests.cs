@@ -165,6 +165,9 @@ public sealed class ReleaseUiStructureTests
         var clientViewModel = File.ReadAllText(Path.Combine(Root, "ViewModels", "NewClientViewModel.cs"));
 
         Assert.Contains("ScaleX=\"{Binding EasyEyesScale}\"", shell);
+        Assert.Contains("Key=\"Oem5\"", shell);
+        Assert.Contains("Modifiers=\"Control\"", shell);
+        Assert.Contains("Command=\"{Binding ToggleEasyEyesCommand}\"", shell);
         Assert.Contains("AutomationProperties.Name=\"Use Easy Eyes mode\"", settings);
         Assert.Contains("UseHorizontalClientSelector", clients);
         Assert.Contains("IsClientListCompact || IsEasyEyesMode", clientViewModel);
@@ -274,7 +277,7 @@ public sealed class ReleaseUiStructureTests
         foreach (var name in new[]
                  {
                      "PineCoast", "BlueberryMist", "BlueGrayPearl", "CedarGrove", "HarborNight",
-                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern"
+                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
                  })
         {
             var supplied = ResourceKeys(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -291,6 +294,7 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("Paisley", service);
         Assert.Contains("Art Nouveau", service);
         Assert.Contains("Mid-Century Modern", service);
+        Assert.Contains("Vanilla Bean", service);
     }
 
     [Fact]
@@ -298,7 +302,7 @@ public sealed class ReleaseUiStructureTests
     {
         foreach (var name in new[]
                  {
-                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern"
+                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
                  })
         {
             var document = XDocument.Load(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -306,7 +310,7 @@ public sealed class ReleaseUiStructureTests
             var windowBrush = Assert.Single(document.Descendants(), element =>
                 element.Attribute(x + "Key")?.Value == "WindowBackgroundBrush");
             var navBrush = Assert.Single(document.Descendants(), element =>
-                element.Name.LocalName == "DrawingBrush" &&
+                element.Name.LocalName == "VisualBrush" &&
                 element.Attribute(x + "Key")?.Value == "NavBackgroundBrush");
             var surface = Assert.Single(document.Descendants(), element =>
                 element.Attribute(x + "Key")?.Value == "SurfaceBrush");
@@ -318,27 +322,106 @@ public sealed class ReleaseUiStructureTests
     }
 
     [Fact]
-    public void ContentPatternsAreBlurredWithoutBlurringNavigationOrControls()
+    public void OpenAreasKeepCrispPatternsAndContentSurfacesFrostThem()
     {
-        foreach (var name in new[] { "Paisley", "ArtNouveau", "MidCenturyModern" })
+        foreach (var name in new[] { "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean" })
         {
             var document = XDocument.Load(Path.Combine(Root, "Themes", $"{name}.xaml"));
             XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
 
             var windowBrush = Assert.Single(document.Descendants(), element =>
-                element.Name.LocalName == "VisualBrush" &&
+                element.Name.LocalName == "DrawingBrush" &&
                 element.Attribute(x + "Key")?.Value == "WindowBackgroundBrush");
-            Assert.Contains(windowBrush.Descendants(), element =>
+            Assert.DoesNotContain(windowBrush.Descendants(), element =>
+                element.Name.LocalName == "BlurEffect");
+
+            var surfaceBrush = Assert.Single(document.Descendants(), element =>
+                element.Name.LocalName == "VisualBrush" &&
+                element.Attribute(x + "Key")?.Value == "SurfaceBrush");
+            Assert.Contains(surfaceBrush.Descendants(), element =>
                 element.Name.LocalName == "BlurEffect" &&
                 double.Parse(element.Attribute("Radius")!.Value,
                     System.Globalization.CultureInfo.InvariantCulture) > 0);
 
             var navBrush = Assert.Single(document.Descendants(), element =>
-                element.Name.LocalName == "DrawingBrush" &&
+                element.Name.LocalName == "VisualBrush" &&
                 element.Attribute(x + "Key")?.Value == "NavBackgroundBrush");
-            Assert.DoesNotContain(navBrush.Descendants(), element =>
+            Assert.Contains(navBrush.Descendants(), element =>
+                element.Name.LocalName == "BlurEffect" &&
+                double.Parse(element.Attribute("Radius")!.Value,
+                    System.Globalization.CultureInfo.InvariantCulture) > 0);
+
+            var navPattern = Assert.Single(document.Descendants(), element =>
+                element.Name.LocalName == "DrawingBrush" &&
+                element.Attribute(x + "Key")?.Value == "NavPatternSourceBrush");
+            Assert.DoesNotContain(navPattern.Descendants(), element =>
                 element.Name.LocalName == "BlurEffect");
         }
+    }
+
+    [Fact]
+    public void AuxiliaryWindowsUseTheFrostedContentSurface()
+    {
+        foreach (var name in new[]
+                 {
+                     "ComplianceReviewWindow", "ConfirmationDialogue", "DailyAgendaWindow",
+                     "DatabasePatienceWindow", "DataEnvironmentWindow", "FirstRunAdminWindow",
+                     "IncorrectPasswordDialog", "LoginWindow", "NewUserWindow", "PromptWindow",
+                     "ScratchpadHistoryWindow", "SettingsWindow", "SplashScreenWindow",
+                     "SwitchUserWindow", "TypedConfirmationDialog", "UserMessageDialog"
+                 })
+        {
+            var document = XDocument.Load(Path.Combine(Root, "Views", $"{name}.xaml"));
+            var window = document.Root!;
+            var paintedSurface = window.Attribute("Background")?.Value ==
+                                 "{DynamicResource SurfaceBrush}"
+                ? window
+                : window.Elements().FirstOrDefault(element =>
+                    element.Attribute("Background")?.Value == "{DynamicResource SurfaceBrush}");
+
+            Assert.NotNull(paintedSurface);
+        }
+    }
+
+    [Fact]
+    public void MidCenturyAndPaisleyPatternsUseRoomyVariedRepeatTiles()
+    {
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        var midCentury = XDocument.Load(Path.Combine(Root, "Themes", "MidCenturyModern.xaml"));
+        var midCenturyPattern = Assert.Single(midCentury.Descendants(), element =>
+            element.Name.LocalName == "DrawingBrush" &&
+            element.Attribute(x + "Key")?.Value == "WindowBackgroundBrush");
+        Assert.Equal("0,0,264,192", midCenturyPattern.Attribute("Viewport")?.Value);
+        Assert.True(midCenturyPattern.Descendants().Count(element =>
+            element.Name.LocalName == "RotateTransform") >= 3);
+
+        var paisley = XDocument.Load(Path.Combine(Root, "Themes", "Paisley.xaml"));
+        var paisleyPattern = Assert.Single(paisley.Descendants(), element =>
+            element.Name.LocalName == "DrawingBrush" &&
+            element.Attribute(x + "Key")?.Value == "WindowBackgroundBrush");
+        Assert.Equal("0,0,216,216", paisleyPattern.Attribute("Viewport")?.Value);
+        Assert.True(paisleyPattern.Descendants().Count(element =>
+            element.Name.LocalName == "RotateTransform") >= 2);
+        Assert.True(paisleyPattern.Descendants().Count(element =>
+            element.Name.LocalName == "ScaleTransform") >= 2);
+    }
+
+    [Fact]
+    public void VanillaBeanUsesCreamFoldsAndIrregularSeedFlecks()
+    {
+        var document = XDocument.Load(Path.Combine(Root, "Themes", "VanillaBean.xaml"));
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var pattern = Assert.Single(document.Descendants(), element =>
+            element.Name.LocalName == "DrawingBrush" &&
+            element.Attribute(x + "Key")?.Value == "WindowBackgroundBrush");
+
+        Assert.Equal("0,0,300,220", pattern.Attribute("Viewport")?.Value);
+        Assert.True(pattern.Descendants().Count(element =>
+            element.Name.LocalName == "EllipseGeometry") >= 12);
+        Assert.Contains(pattern.Descendants(), element =>
+            element.Name.LocalName == "GeometryDrawing" &&
+            element.Attribute("Brush")?.Value == "#18E8CFA4");
     }
 
     [Fact]
@@ -565,7 +648,7 @@ public sealed class ReleaseUiStructureTests
     {
         foreach (var name in new[]
                  {
-                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern"
+                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
                  })
         {
             var theme = File.ReadAllText(Path.Combine(Root, "Themes", $"{name}.xaml"));

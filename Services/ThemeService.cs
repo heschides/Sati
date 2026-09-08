@@ -37,7 +37,8 @@ namespace Sati.Services
             new("Ironworks Matte", "IndustrialMatte"),
             new("Paisley", "Paisley"),
             new("Art Nouveau", "ArtNouveau"),
-            new("Mid-Century Modern", "MidCenturyModern")
+            new("Mid-Century Modern", "MidCenturyModern"),
+            new("Vanilla Bean", "VanillaBean")
         ];
 
         public ThemeOption CurrentTheme { get; private set; }

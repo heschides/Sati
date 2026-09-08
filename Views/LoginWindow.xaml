@@ -11,7 +11,7 @@
         Width="360"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Background="{DynamicResource WindowBackgroundBrush}">
+        Background="{DynamicResource SurfaceBrush}">
 
     <Window.Resources>
         <Style x:Key="LabelStyle"

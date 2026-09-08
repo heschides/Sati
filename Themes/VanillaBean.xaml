@@ -1,0 +1,127 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- VANILLA BEAN: rich vanilla cream, caramel warmth, and irregular bean flecks. -->
+    <DrawingBrush x:Key="WindowBackgroundBrush" TileMode="Tile"
+                  Viewport="0,0,300,220" ViewportUnits="Absolute"
+                  Viewbox="0,0,300,220" ViewboxUnits="Absolute">
+        <DrawingBrush.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#FFFFF7E4" Geometry="M 0,0 L 300,0 300,220 0,220 Z" />
+
+                <!-- Uneven pools of cream suggest a freshly scooped surface without making stripes. -->
+                <GeometryDrawing Brush="#18E8CFA4"
+                                 Geometry="M -20,25 C 20,5 89,13 106,47 C 123,82 80,103 36,90 C -7,77 -23,51 -20,25 Z M 194,125 C 229,102 289,115 313,151 L 313,220 226,220 C 199,197 175,151 194,125 Z M 91,142 C 112,127 143,132 155,154 C 168,178 143,198 117,191 C 92,184 76,158 91,142 Z" />
+                <GeometryDrawing Brush="#26FFFDF3"
+                                 Geometry="M -9,32 C 24,18 77,22 91,48 C 103,70 70,84 38,76 C 7,69 -7,51 -9,32 Z M 207,139 C 237,120 282,130 302,156 L 302,210 235,210 C 213,190 190,156 207,139 Z M 101,149 C 116,139 138,142 146,157 C 154,173 138,186 120,181 C 104,177 90,160 101,149 Z" />
+
+                <!-- Flecks are short, uneven, and angled like scraped vanilla seeds. -->
+                <GeometryDrawing Geometry="M 19,25 L 21,27 M 52,83 L 55,82 M 91,39 L 92,43 M 127,102 L 130,105 M 169,22 L 172,20 M 208,74 L 209,78 M 253,34 L 257,36 M 280,111 L 283,108 M 35,145 L 38,148 M 75,194 L 79,192 M 112,160 L 113,164 M 153,199 L 157,201 M 194,139 L 198,137 M 233,185 L 235,189 M 270,158 L 274,160">
+                    <GeometryDrawing.Pen><Pen Brush="#22533C2A" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" /></GeometryDrawing.Pen>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#1E533C2A">
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <EllipseGeometry Center="30,68" RadiusX="1.3" RadiusY="0.8" />
+                            <EllipseGeometry Center="68,24" RadiusX="0.8" RadiusY="1.2" />
+                            <EllipseGeometry Center="106,127" RadiusX="1.2" RadiusY="0.9" />
+                            <EllipseGeometry Center="143,61" RadiusX="0.9" RadiusY="1.4" />
+                            <EllipseGeometry Center="184,104" RadiusX="1.4" RadiusY="0.8" />
+                            <EllipseGeometry Center="224,18" RadiusX="1" RadiusY="1.3" />
+                            <EllipseGeometry Center="263,85" RadiusX="1.3" RadiusY="1" />
+                            <EllipseGeometry Center="17,202" RadiusX="1.1" RadiusY="0.8" />
+                            <EllipseGeometry Center="57,119" RadiusX="0.9" RadiusY="1.3" />
+                            <EllipseGeometry Center="96,215" RadiusX="1.3" RadiusY="0.8" />
+                            <EllipseGeometry Center="137,147" RadiusX="1" RadiusY="1" />
+                            <EllipseGeometry Center="177,181" RadiusX="1.3" RadiusY="0.9" />
+                            <EllipseGeometry Center="216,121" RadiusX="0.8" RadiusY="1.2" />
+                            <EllipseGeometry Center="251,214" RadiusX="1.2" RadiusY="0.8" />
+                            <EllipseGeometry Center="292,53" RadiusX="0.9" RadiusY="1.4" />
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingBrush.Drawing>
+    </DrawingBrush>
+
+    <!-- Content reads as a thick scoop of frosted cream with the flecks receding behind it. -->
+    <VisualBrush x:Key="SurfaceBrush" TileMode="Tile"
+                 Viewport="0,0,300,220" ViewportUnits="Absolute"
+                 Viewbox="0,0,300,220" ViewboxUnits="Absolute">
+        <VisualBrush.Visual>
+            <Border Width="300" Height="220" Background="#F4FFF9EC">
+                <Border Background="{StaticResource WindowBackgroundBrush}" Opacity="0.14">
+                    <Border.Effect>
+                        <BlurEffect Radius="3.5" RenderingBias="Performance" />
+                    </Border.Effect>
+                </Border>
+            </Border>
+        </VisualBrush.Visual>
+    </VisualBrush>
+
+    <DrawingBrush x:Key="NavPatternSourceBrush" TileMode="Tile"
+                  Viewport="0,0,180,72" ViewportUnits="Absolute"
+                  Viewbox="0,0,180,72" ViewboxUnits="Absolute">
+        <DrawingBrush.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#FFF8E7CC" Geometry="M 0,0 L 180,0 180,72 0,72 Z" />
+                <GeometryDrawing Geometry="M -8,43 C 35,20 75,23 104,44 C 128,61 155,58 188,35">
+                    <GeometryDrawing.Pen><Pen Brush="#38FFF8E6" Thickness="12" StartLineCap="Round" EndLineCap="Round" /></GeometryDrawing.Pen>
+                </GeometryDrawing>
+                <GeometryDrawing Geometry="M 18,18 L 21,20 M 47,53 L 50,51 M 79,17 L 80,21 M 112,56 L 115,58 M 145,22 L 148,20 M 169,49 L 172,52">
+                    <GeometryDrawing.Pen><Pen Brush="#22533C2A" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" /></GeometryDrawing.Pen>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingBrush.Drawing>
+    </DrawingBrush>
+    <VisualBrush x:Key="NavBackgroundBrush" TileMode="Tile"
+                 Viewport="0,0,180,72" ViewportUnits="Absolute"
+                 Viewbox="0,0,180,72" ViewboxUnits="Absolute">
+        <VisualBrush.Visual>
+            <Border Width="180" Height="72" Background="#F2F8E7CC">
+                <Border Background="{StaticResource NavPatternSourceBrush}" Opacity="0.18">
+                    <Border.Effect>
+                        <BlurEffect Radius="3.5" RenderingBias="Performance" />
+                    </Border.Effect>
+                </Border>
+            </Border>
+        </VisualBrush.Visual>
+    </VisualBrush>
+
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#F5E8CF" />
+    <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#EBDCC0" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FFFDF5" />
+    <SolidColorBrush x:Key="SurfaceAlpha70Brush" Color="#B3FFF9EC" />
+    <SolidColorBrush x:Key="SurfaceAlpha25Brush" Color="#40FFF9EC" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#D8BE98" />
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#B99568" />
+    <SolidColorBrush x:Key="DividerBrush" Color="#E3D2B4" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#68452F" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#583823" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#432A1A" />
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AccentButtonBrush" Color="#76503A" />
+    <SolidColorBrush x:Key="AccentButtonHoverBrush" Color="#5F3E29" />
+    <SolidColorBrush x:Key="AccentButtonPressedBrush" Color="#432A1A" />
+    <SolidColorBrush x:Key="OnAccentButtonBrush" Color="#FFFFFF" />
+    <Color x:Key="AiGlowColor">#FFC7924D</Color>
+    <SolidColorBrush x:Key="AiAccentBrush" Color="#765126" />
+    <SolidColorBrush x:Key="AiAccentHoverBrush" Color="#624018" />
+    <SolidColorBrush x:Key="AiAccentPressedBrush" Color="#4B2F10" />
+    <SolidColorBrush x:Key="AiAccentSoftBrush" Color="#F6E5BF" />
+    <SolidColorBrush x:Key="AiAccentBorderBrush" Color="#D1AA69" />
+    <SolidColorBrush x:Key="OnAiAccentBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AiPanelTextBrush" Color="#5C3C17" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#F0E2C8" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#F2E5CD" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#3D3028" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#59483A" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#5B4A3C" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#59483A" />
+    <SolidColorBrush x:Key="NarrativeTextBrush" Color="#604937" />
+    <SolidColorBrush x:Key="PersonGroupBrush" Color="#FFF9EA" />
+    <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#F4E5CA" />
+    <Color x:Key="SurfaceAltColor">#FFF5E8CF</Color>
+    <Color x:Key="SurfaceRaisedColor">#FFFFFDF5</Color>
+    <Color x:Key="TextSubtleColor">#FF59483A</Color>
+    <SolidColorBrush x:Key="PatternScrimBrush" Color="#EBFFF9EC" />
+</ResourceDictionary>

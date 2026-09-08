@@ -8,7 +8,7 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         ShowInTaskbar="True"
-        Background="{DynamicResource WindowBackgroundBrush}"
+        Background="{DynamicResource SurfaceBrush}"
         FontFamily="{StaticResource AppFont}">
 
     <Window.Resources>

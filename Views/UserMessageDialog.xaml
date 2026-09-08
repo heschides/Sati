@@ -7,7 +7,7 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{DynamicResource WindowBackgroundBrush}"
+        Background="{DynamicResource SurfaceBrush}"
         BorderBrush="{DynamicResource BorderBrush}"
         BorderThickness="1">
 

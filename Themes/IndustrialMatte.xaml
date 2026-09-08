@@ -21,7 +21,7 @@
             </DrawingGroup>
         </DrawingBrush.Drawing>
     </DrawingBrush>
-    <DrawingBrush x:Key="NavBackgroundBrush" TileMode="Tile"
+    <DrawingBrush x:Key="NavPatternSourceBrush" TileMode="Tile"
                   Viewport="0,0,48,48" ViewportUnits="Absolute"
                   Viewbox="0,0,48,48" ViewboxUnits="Absolute">
         <DrawingBrush.Drawing>
@@ -33,7 +33,32 @@
             </DrawingGroup>
         </DrawingBrush.Drawing>
     </DrawingBrush>
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#2C3435" />
+    <VisualBrush x:Key="NavBackgroundBrush" TileMode="Tile"
+                 Viewport="0,0,48,48" ViewportUnits="Absolute"
+                 Viewbox="0,0,48,48" ViewboxUnits="Absolute">
+        <VisualBrush.Visual>
+            <Border Width="48" Height="48" Background="#EE252C2D">
+                <Border Background="{StaticResource NavPatternSourceBrush}" Opacity="0.20">
+                    <Border.Effect>
+                        <BlurEffect Radius="3.5" RenderingBias="Performance" />
+                    </Border.Effect>
+                </Border>
+            </Border>
+        </VisualBrush.Visual>
+    </VisualBrush>
+    <VisualBrush x:Key="SurfaceBrush" TileMode="Tile"
+                 Viewport="0,0,72,72" ViewportUnits="Absolute"
+                 Viewbox="0,0,72,72" ViewboxUnits="Absolute">
+        <VisualBrush.Visual>
+            <Border Width="72" Height="72" Background="#F22C3435">
+                <Border Background="{StaticResource WindowBackgroundBrush}" Opacity="0.14">
+                    <Border.Effect>
+                        <BlurEffect Radius="4" RenderingBias="Performance" />
+                    </Border.Effect>
+                </Border>
+            </Border>
+        </VisualBrush.Visual>
+    </VisualBrush>
     <SolidColorBrush x:Key="SurfaceAltBrush" Color="#343D3E" />
     <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#3A4445" />
     <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#3D4647" />

@@ -5,6 +5,9 @@ using Sati.Models;
 using Sati.Services;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Sati.ViewModels.Children;
 
@@ -16,10 +19,13 @@ public partial class CalendarViewModel : ObservableObject
     private readonly IExemptDateService _exemptDateService;
     private readonly INoteService _noteService;
     private readonly ISessionService _sessionService;
+    private readonly IOutlookCalendarService? _outlookCalendarService;
+    private readonly IOutlookCalendarFilePicker? _outlookCalendarFilePicker;
     private readonly LatestRequestTracker _yearLoadRequests = new();
 
     private List<ExemptDate> _exemptDates = [];
     private List<Note> _yearNotes = [];
+    private List<ImportedOutlookEvent> _yearOutlookEvents = [];
 
     // The dashboard refresh is part of the calendar operation, so it is a Task
     // rather than an async-void EventHandler. Each subscriber is awaited and
@@ -36,6 +42,9 @@ public partial class CalendarViewModel : ObservableObject
     private int selectedMonth = DateTime.Today.Month;
 
     [ObservableProperty]
+    private bool isYearOverview;
+
+    [ObservableProperty]
     private List<CalendarMonth> months = [];
 
     [ObservableProperty]
@@ -48,10 +57,16 @@ public partial class CalendarViewModel : ObservableObject
     private bool isUpdatingExemptDate;
 
     [ObservableProperty]
+    private bool isImportingOutlookCalendar;
+
+    [ObservableProperty]
     private string statusMessage = string.Empty;
 
     public IReadOnlyList<CalendarNoteItem> SelectedDayNotes =>
         SelectedDay?.Notes ?? [];
+
+    public IReadOnlyList<ImportedOutlookEvent> SelectedDayOutlookEvents =>
+        SelectedDay?.OutlookEvents ?? [];
 
     public bool HasSelectedDay => SelectedDay is not null;
 
@@ -91,20 +106,71 @@ public partial class CalendarViewModel : ObservableObject
         ? CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(SelectedMonth)
         : string.Empty;
 
+    public CalendarMonth? SelectedCalendarMonth =>
+        Months.FirstOrDefault(month => month.Month == SelectedMonth);
+
     public CalendarViewModel(
         IExemptDateService exemptDateService,
         INoteService noteService,
-        ISessionService sessionService)
+        ISessionService sessionService,
+        IOutlookCalendarService? outlookCalendarService = null,
+        IOutlookCalendarFilePicker? outlookCalendarFilePicker = null)
     {
         _exemptDateService = exemptDateService;
         _noteService = noteService;
         _sessionService = sessionService;
+        _outlookCalendarService = outlookCalendarService;
+        _outlookCalendarFilePicker = outlookCalendarFilePicker;
     }
 
     public Task InitializeAsync() => LoadYearAsync();
 
     [RelayCommand]
     private Task Refresh() => LoadYearAsync();
+
+    [RelayCommand]
+    private async Task ImportOutlookCalendar()
+    {
+        if (IsImportingOutlookCalendar || _outlookCalendarService is null ||
+            _outlookCalendarFilePicker is null)
+        {
+            return;
+        }
+
+        var user = _sessionService.CurrentUser;
+        if (user is null)
+        {
+            StatusMessage = "Sign in again before importing an Outlook calendar.";
+            return;
+        }
+
+        var filePath = _outlookCalendarFilePicker.PickCalendarFile();
+        if (string.IsNullOrWhiteSpace(filePath))
+            return;
+
+        IsImportingOutlookCalendar = true;
+        try
+        {
+            var result = await _outlookCalendarService.ImportAsync(user.Id, filePath);
+            await LoadYearAsync();
+            var skipped = result.SkippedCount == 0
+                ? string.Empty
+                : $" {result.SkippedCount} cancelled, duplicate, or unsupported items were skipped.";
+            StatusMessage = $"Imported {result.ImportedCount} Outlook events on this computer.{skipped}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
+                                   InvalidDataException or CryptographicException or JsonException)
+        {
+            Debug.WriteLine($"CalendarViewModel.ImportOutlookCalendar failed: {ex.GetType().Name}");
+            StatusMessage = ex is InvalidDataException
+                ? ex.Message
+                : "The Outlook calendar could not be imported. Check the file and try again.";
+        }
+        finally
+        {
+            IsImportingOutlookCalendar = false;
+        }
+    }
 
     [RelayCommand]
     private void SelectDay(CalendarDay? day)
@@ -114,17 +180,61 @@ public partial class CalendarViewModel : ObservableObject
 
         SelectedDay = day;
         SelectedMonth = day.Date.Month;
+        IsYearOverview = false;
     }
 
     [RelayCommand]
     private void OpenSelectedDay()
     {
         if (SelectedDay is not null)
+        {
+            IsYearOverview = false;
             IsDayFocused = true;
+        }
     }
 
     [RelayCommand]
     private void ReturnToYear() => IsDayFocused = false;
+
+    [RelayCommand]
+    private void ShowMonth()
+    {
+        IsDayFocused = false;
+        IsYearOverview = false;
+    }
+
+    [RelayCommand]
+    private void ShowYear()
+    {
+        IsDayFocused = false;
+        IsYearOverview = true;
+    }
+
+    [RelayCommand]
+    private Task PreviousMonth() => MoveMonthAsync(-1);
+
+    [RelayCommand]
+    private Task NextMonth() => MoveMonthAsync(1);
+
+    private async Task MoveMonthAsync(int offset)
+    {
+        if (IsLoading)
+            return;
+
+        var target = new DateTime(CurrentYear, SelectedMonth, 1).AddMonths(offset);
+        if (target.Year is < MinimumYear or > MaximumYear)
+            return;
+
+        var yearChanged = target.Year != CurrentYear;
+        CurrentYear = target.Year;
+        SelectedMonth = target.Month;
+        SelectedDay = null;
+        IsDayFocused = false;
+        IsYearOverview = false;
+
+        if (yearChanged)
+            await LoadYearAsync();
+    }
 
     [RelayCommand]
     private async Task ToggleExempt(CalendarDay? day)
@@ -219,15 +329,18 @@ public partial class CalendarViewModel : ObservableObject
 
             var exemptDatesTask = _exemptDateService.GetByYearAsync(user.Id, year);
             var notesTask = _noteService.GetByYearAsync(user.Id, year);
-            await Task.WhenAll(exemptDatesTask, notesTask);
+            var outlookTask = LoadOutlookEventsAsync(user.Id, year);
+            await Task.WhenAll(exemptDatesTask, notesTask, outlookTask);
 
             if (!_yearLoadRequests.IsCurrent(request) || CurrentYear != year)
                 return;
 
             _exemptDates = await exemptDatesTask;
             _yearNotes = await notesTask;
+            var outlookResult = await outlookTask;
+            _yearOutlookEvents = outlookResult.Events;
             BuildMonths();
-            StatusMessage = string.Empty;
+            StatusMessage = outlookResult.Warning;
         }
         catch (Exception ex)
         {
@@ -261,6 +374,19 @@ public partial class CalendarViewModel : ObservableObject
                     .ThenBy(note => note.ClientName, StringComparer.CurrentCultureIgnoreCase)
                     .ThenBy(note => note.Id)
                     .ToList());
+        var outlookByDate = _yearOutlookEvents
+            .SelectMany(entry => CalendarDates(entry)
+                .Select(date => (Date: date, Event: entry)))
+            .Where(entry => entry.Date.Year == CurrentYear)
+            .GroupBy(entry => entry.Date)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(entry => entry.Event)
+                    .OrderBy(entry => entry.IsAllDay ? 0 : 1)
+                    .ThenBy(entry => entry.Start)
+                    .ThenBy(entry => entry.Title, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList());
         var exemptByDate = _exemptDates
             .Where(entry => entry.Date.Year == CurrentYear)
             .GroupBy(entry => entry.Date.Date)
@@ -281,13 +407,15 @@ public partial class CalendarViewModel : ObservableObject
                 var date = new DateTime(CurrentYear, month, dayNumber);
                 exemptByDate.TryGetValue(date, out var exemptEntry);
                 notesByDate.TryGetValue(date, out var notes);
+                outlookByDate.TryGetValue(date, out var outlookEvents);
                 cells.Add(new CalendarDay
                 {
                     Date = date,
                     IsExempt = exemptEntry is not null,
                     ExemptDateId = exemptEntry?.Id,
                     IsWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday,
-                    Notes = notes ?? []
+                    Notes = notes ?? [],
+                    OutlookEvents = outlookEvents ?? []
                 });
             }
 
@@ -316,10 +444,23 @@ public partial class CalendarViewModel : ObservableObject
             .SelectMany(month => month.Cells)
             .FirstOrDefault(day => day?.Date.Date == date.Date);
 
+    private static IEnumerable<DateTime> CalendarDates(ImportedOutlookEvent entry)
+    {
+        yield return entry.Start.Date;
+        if (!entry.IsAllDay)
+            yield break;
+
+        // iCalendar DTEND is exclusive for all-day events. A three-day event therefore
+        // appears on Start, Start + 1, and the day immediately before End.
+        for (var date = entry.Start.Date.AddDays(1); date < entry.End.Date; date = date.AddDays(1))
+            yield return date;
+    }
+
     private void ClearLoadedYear()
     {
         _exemptDates = [];
         _yearNotes = [];
+        _yearOutlookEvents = [];
         Months = [];
         SelectedDay = null;
         IsDayFocused = false;
@@ -349,15 +490,37 @@ public partial class CalendarViewModel : ObservableObject
         return succeeded;
     }
 
+    private async Task<(List<ImportedOutlookEvent> Events, string Warning)> LoadOutlookEventsAsync(
+        int userId,
+        int year)
+    {
+        if (_outlookCalendarService is null)
+            return ([], string.Empty);
+
+        try
+        {
+            var events = await _outlookCalendarService.GetByYearAsync(userId, year);
+            return (events.ToList(), string.Empty);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
+                                   CryptographicException or JsonException)
+        {
+            Debug.WriteLine($"CalendarViewModel.LoadOutlookEvents failed: {ex.GetType().Name}");
+            return ([], "Sati loaded its calendar, but the saved Outlook import could not be read on this Windows account.");
+        }
+    }
+
     private void NotifyCalendarComputedProperties()
     {
         OnPropertyChanged(nameof(SelectedDayNotes));
+        OnPropertyChanged(nameof(SelectedDayOutlookEvents));
         OnPropertyChanged(nameof(SelectedDayTotalMinutes));
         OnPropertyChanged(nameof(SelectedDayTotalUnits));
         OnPropertyChanged(nameof(SelectedDaySummary));
         OnPropertyChanged(nameof(SelectedDayExemptActionLabel));
         OnPropertyChanged(nameof(ExemptDaysForSelectedMonth));
         OnPropertyChanged(nameof(SelectedMonthName));
+        OnPropertyChanged(nameof(SelectedCalendarMonth));
         OnPropertyChanged(nameof(HasSelectedDay));
     }
 
@@ -368,12 +531,14 @@ public partial class CalendarViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ExemptDaysForSelectedMonth));
         OnPropertyChanged(nameof(SelectedMonthName));
+        OnPropertyChanged(nameof(SelectedCalendarMonth));
     }
 
     partial void OnCurrentYearChanged(int value)
     {
         OnPropertyChanged(nameof(ExemptDaysForSelectedMonth));
         OnPropertyChanged(nameof(SelectedMonthName));
+        OnPropertyChanged(nameof(SelectedCalendarMonth));
     }
 
     partial void OnStatusMessageChanged(string value) =>

@@ -639,9 +639,9 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.4", version);
+        Assert.Equal("1.3.5", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("A clean slate, clearly seen", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("A clearer calendar, softly framed", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Submitted claims now have a visible staging lane" &&
@@ -658,8 +658,9 @@ public sealed class StabilizationTests
             section.Title == "Setup stays out of the command window" &&
             section.Items.Any(item => item.Contains("progress", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Four new themes" &&
-            section.Items.Any(item => item.Contains("Art Nouveau", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Five decorative themes" &&
+            section.Items.Any(item => item.Contains("Art Nouveau", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("Vanilla Bean", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "The Overview now fits the space you have" &&
             section.Items.Any(item => item.Contains("Work Agenda", StringComparison.OrdinalIgnoreCase)) &&

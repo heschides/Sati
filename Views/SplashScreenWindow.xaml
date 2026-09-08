@@ -10,7 +10,7 @@
 
     <Border Width="760"
             Height="480"
-            Background="{DynamicResource WindowBackgroundBrush}"
+            Background="{DynamicResource SurfaceBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
             CornerRadius="18">

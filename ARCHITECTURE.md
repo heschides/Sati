@@ -162,17 +162,29 @@ Every theme dictionary now supplies `AccentButtonBrush`, `AccentButtonHoverBrush
 `AccentButtonPressedBrush`, and `OnAccentButtonBrush` alongside the accent tokens. Only
 `PrimaryButton` binds the button set; selection highlights and accent type still bind
 `AccentBrush`. A theme dictionary is swapped in whole, so a theme missing a key loses the fill
-rather than inheriting one — a structure test asserts all nineteen supply all four.
+rather than inheriting one — a structure test asserts all twenty supply all four.
 
-Decorative themes use tiled vector resources only for the outer window and navigation chrome.
-Paisley, Art Nouveau, and Mid-Century Modern render the outer content pattern through a small
-GPU-backed blur while leaving the navigation pattern and every control untouched; content surfaces
-remain solid or gently graded so artwork cannot compete with case notes, form fields, tables, or
-status text. Industrial Matte keeps its low-contrast crisp texture. Runtime render tests load every
-decorative dictionary, assert the blur is confined to the brush rather than the navigable visual
-tree, and hold primary-button contrast to at least 4.5:1. Context menus and shell identity chrome
-use explicit themed foreground/background pairs instead of Windows system menu colours or the
-window background as a text colour.
+Decorative themes use tiled vector resources for the outer window and navigation chrome. Ironworks
+Matte, Paisley, Art Nouveau, Mid-Century Modern, and Vanilla Bean keep that pattern crisp on
+uncovered canvas.
+Their shared `SurfaceBrush` is a frosted-glass tile: the same motif is blurred inside the brush,
+reduced to 12–14 percent opacity, and laid over a high-opacity theme tint. `NavBackgroundBrush`
+similarly places a softly blurred, faint navigation-specific motif behind menu labels. Content
+panels and navigation therefore retain the theme without asking text to compete with pattern;
+stronger input and control surfaces remain opaque. Auxiliary windows, including startup,
+authentication, confirmation, settings, and account-switch surfaces, use that same frosted content
+brush because their entire canvas carries text or controls. Runtime tests assert that open-area brushes stay
+crisp, text-bearing patterned surfaces own the blur, and text/surface combinations maintain WCAG AA
+contrast. Context menus and shell identity chrome use explicit themed foreground/background pairs
+instead of Windows system menu colours or the window background as a text colour.
+
+Mid-Century Modern uses a 264-by-192 vector repeat with modestly varied circle, ellipse, wedge,
+quarter-round, arc, and satellite sizes and rotations. Paisley uses a 216-by-216 repeat of layered,
+hooked boteh at three scales and orientations, with inner curls, leaves, vines, and seed dots. These
+larger compositions reduce obvious row-and-column repetition while remaining lightweight vectors.
+Vanilla Bean uses a 300-by-220 cream tile with broad pale folds and scattered, irregular short
+strokes and ellipses that read as vanilla-seed flecks. Its brown-and-caramel palette uses the same
+frosted content boundary as the other illustrated themes.
 
 ## Theme legibility
 
@@ -180,7 +192,7 @@ window background as a text colour.
 luminance, contrast ratio, alpha compositing, and the flattening of a gradient or tiled pattern
 into the colours a reader actually receives. Nothing else may reimplement it.
 
-`ThemeLegibilityTests` holds every one of the nineteen palettes to WCAG AA (4.5:1) two ways. The
+`ThemeLegibilityTests` holds every one of the twenty palettes to WCAG AA (4.5:1) two ways. The
 token pass scores each text role against each surface role it can land on, plus each fill that
 carries its own named ink, so a pair fails before any screen ships that uses it. The rendered pass
 loads every view under every theme, reads the brushes WPF resolved, and finds each run's background
@@ -1649,6 +1661,13 @@ isolates a downstream dashboard-refresh failure rather than allowing an `async v
 reach WPF's dispatcher. `CalendarNoteItem` is display-only and delegates service-time labels to the
 shared `ServiceTimeline` rule. The focused-day view groups notes by `Note.EventDate` (date of
 service), because the current note model has no separate logged/created timestamp.
+`OutlookCalendarService` is a separate client-local integration overlay. It parses an exported `.ics`
+file without uploading it, expands common recurrence rules into a bounded seven-year window, and
+stores the replaceable result under `%LOCALAPPDATA%\Sati` encrypted with Windows DPAPI. The cache key
+includes the selected data environment and signed-in Sati user. Imported items are display-only and
+never enter the note, billing, compliance, exemption, or API persistence paths. A future live Graph
+integration is not implemented by this boundary and requires a separate authorization and audit
+design.
 `ScratchpadViewModel`: loads separate Today and next-
 workday drafts, rolls them forward after midnight on window activation or the 10-min timer, and
 explicitly saves both on shutdown/user-switch; diagnostics omit scratchpad content. A conflict is

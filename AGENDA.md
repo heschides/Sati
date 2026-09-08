@@ -20,14 +20,30 @@ restructure, and all three get harder the longer they wait.
 - [ ] Answer the four open questions at the end of `PLATFORM_DOMAIN.md`. They need domain knowledge
       the repository does not contain, and none of them blocks restructure stages 1 and 2.
 
+## Unreleased — Outlook calendar import
+
+- [x] Add a one-time `.ics` import to the existing Calendar workspace and show Outlook subjects,
+      times, and locations on the month, year, selected-day, and focused-day surfaces.
+- [x] Parse the export locally, including basic daily/weekly/monthly/yearly recurrence rules,
+      weekly day lists, exclusions, all-day entries, UTC values, and Windows time-zone identifiers; skip cancelled,
+      duplicate, and unsupported entries with a visible summary.
+- [x] Treat the import as a replaceable integration overlay rather than a Sati clinical record.
+      Keep it separate by Windows profile, Sati user, and Demo/Production, and protect the local
+      cache with the current Windows user's DPAPI key.
+- [x] Cover parsing, recurrence, replacement, user/environment isolation, ViewModel projection,
+      accessible labels, and the rendered UI surfaces with focused tests.
+- [ ] If automatic synchronization is later required, design Microsoft Graph authorization,
+      tenant administration, revocation, audit, retention, and BAA/responsibility boundaries before
+      adding account tokens or server-side calendar data.
+
 ## Unreleased — measured theme legibility
 
 Release 1.3.4 closed the contrast gaps that were visible to review. This work replaces review with
 measurement: `Helpers/ThemeContrast.cs` owns the WCAG arithmetic and `ThemeLegibilityTests` holds
-all nineteen palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
+all twenty palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
 
 - [x] Score every text role against every surface role, and every fill against the ink named for
-      it, in all nineteen themes. Correct the palettes by luminance only, never by hue.
+      it, in all twenty themes. Correct the palettes by luminance only, never by hue.
 - [x] Render every view under every theme and measure the resolved brushes, finding each run's
       background by hit test rather than by ancestor walk.
 - [x] Fail on any theme key a view names that no dictionary defines. `WarningSoftBrush` was
@@ -87,6 +103,52 @@ same view loader as the theme legibility audit. See `DECISIONS.md`.
 - [ ] Check keyboard operation at the two Easy Eyes scales and under Windows high-contrast themes,
       neither of which this pass exercises.
 
+## Release 1.3.5 — 2026-09-07
+
+"A clearer calendar, softly framed." This release brings a protected, one-time Outlook calendar
+export into the existing calendar, makes month/year navigation more direct, measures theme and
+automation accessibility across the application, consolidates account settings, and applies the
+frosted-content rule consistently to auxiliary windows under illustrated themes.
+
+- [x] Add a local-only `.ics` overlay separated by Windows profile, Sati user, and data environment;
+      protect its replaceable cache with DPAPI and keep imported items out of notes, billing,
+      compliance, exemptions, the API, and the database.
+- [x] Present Outlook subjects, times, and locations across year, month, selected-day, and
+      focused-day calendar surfaces with bounded recurrence expansion, visible import results,
+      keyboard controls, and non-color accessible labels.
+- [x] Hold all twenty themes to measured WCAG AA text/surface contrast and use one shared attached
+      behavior for keyboard-accessible, named interactive surfaces.
+- [x] Keep decorative artwork crisp only on open shell canvas; use frosted theme surfaces behind
+      navigation, working panels, splash, sign-in, settings, account switching, confirmations, and
+      the other auxiliary windows.
+- [x] Fold Profile and Password & Security into Settings and preserve the account-switch ordering
+      that closes the outgoing user's window before replacing the session.
+- [x] Add the platform-domain/restructure design records and a synthetic-demo functionality
+      voiceover script without representing planned Karuna, Upekkha, OADS, signature, chat, or
+      compliance capabilities as deployed.
+
+**No EF migration.** The model matches the 96-entry migration chain, the Local Production database
+on this release workstation reports every migration applied, and hosted Demo readiness was healthy
+before release. Outlook calendar data is an encrypted client-local overlay, not a database table.
+
+- [x] Preflight: `origin/master` remained at release 1.3.4; version 1.3.5 and its API, Demo installer,
+      Local installer, checksum, and distribution names were unused. The active branch contains four
+      completed commits ahead of `master`; other branches retain unique or worktree-owned material
+      and are not eligible for deletion. No cloud migration, Production deployment, baseline capture,
+      or firewall change is required or authorized.
+- [x] Release validation: the full Release solution build succeeded with zero errors and nine known
+      warnings; all five test projects passed (2,175 passed, one documented optional local-AI
+      evaluation skipped); eight release/installer PowerShell entry points parsed cleanly; the
+      online NuGet advisory audit found no vulnerable direct or transitive packages; the 96-entry
+      migration replay found no defects; EF found no model changes after the latest migration; and
+      the rendered theme/calendar/accessibility suites exercised the packaged visual behavior.
+- [ ] Source commit and fast-forward reconciliation to `master`, followed by a normal push.
+- [ ] Demo API package, OneDeploy publication, live/ready/version/contract checks, and authenticated
+      readiness evidence.
+- [ ] Demo and Local installer builds, isolated acceptance, checksum verification, and non-overwriting
+      publication to the two approved distribution folders.
+- [ ] Final evidence commit, clean-tree check, and equality of local `master` with `origin/master`.
+
 ## Release 1.3.4 — 2026-09-07
 
 "A clean slate, clearly seen." This release makes the complete synthetic Demo recoverable on
@@ -95,8 +157,13 @@ working content.
 
 - [x] Fix remaining theme-owned text pairs in menus, selected states, action labels, and the shell
       greeting so dark palettes do not render dark-on-dark text.
-- [x] Blur the Paisley, Art Nouveau, and Mid-Century Modern pattern only behind navigable content;
-      keep navigation chrome crisp and controls/content surfaces unblurred.
+- [x] Keep the five decorative themes crisp on open canvas and move their blurred, faint motif into
+      frosted content and navigation surfaces so labels and calendar text never sit directly on the
+      pattern; align the calendar header within a consistently padded glass panel.
+- [x] Enlarge and vary the Mid-Century Modern repeat with modest shape rotation and scale changes;
+      redraw Paisley with layered hooked boteh, inner curls, foliage, and multiple orientations.
+- [x] Add Vanilla Bean as a complete creamy ivory, caramel, and brown theme, with subtle cream folds
+      and irregular vanilla-seed flecks that recede beneath frosted text-bearing surfaces.
 - [x] Add a Demo-only Admin command with an explicit `RESET DEMO` typed confirmation. Route it
       through the Administration-authorized API and a separately authenticated reset Function;
       Local Production has no reset implementation and the API route is absent outside Demo.

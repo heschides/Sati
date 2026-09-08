@@ -3430,6 +3430,50 @@ replacing the pattern with a solid colour on dense screens, which discards the t
 rather than quieting it; and a per-screen opacity applied to the whole panel, which would fade the
 controls and the text along with the pattern.
 
+## 2026-09-07 — Patterned themes use crisp canvas and frosted content glass
+
+Ironworks Matte, Paisley, Art Nouveau, and Mid-Century Modern now reserve the crisp tiled motif for
+uncovered canvas. `WindowBackgroundBrush` owns that crisp tile. `SurfaceBrush` reproduces the same
+motif inside a brush-local radius-4 blur at only 12–14 percent opacity over a high-opacity theme
+tint. Panels can therefore look translucent and remain recognizably part of the illustrated theme,
+while every text-bearing surface has a quiet, predictable field behind it. Raised controls, input
+fields, and calendar date tiles keep their stronger opaque surface tokens.
+
+Navigation bars follow the same readability rule with a separate `NavPatternSourceBrush` and a
+softly blurred, tinted `NavBackgroundBrush`. This preserves each navigation motif while giving menu
+labels a calm field with enough contrast.
+
+The calendar makes the boundary explicit: its open gutters show the crisp canvas, while the header,
+focused-day surface, status feedback, sidebar, and each year-month group use the frosted content
+surface. The month date tiles remain opaque glass above that canvas. The existing Settings-specific
+`PatternScrimBrush` remains useful for its unusually dense, multi-layer layout.
+
+Auxiliary windows have no uncovered decorative canvas: splash, environment selection, sign-in,
+settings, daily agenda, account switching, confirmations, messages, and similar windows are all
+text-or-control surfaces. Their outermost painted layer therefore uses `SurfaceBrush` too. This
+keeps illustrated themes visible as frosted glass instead of placing the crisp motif directly
+behind a whole dialog.
+
+**Rejected:** a pattern directly beneath labels or calendar numbers; blurring the entire window,
+which also softens intentionally open decorative space; and applying opacity or blur to a parent
+containing text, which degrades glyph rendering along with the artwork.
+
+## 2026-09-07 — Illustrated repeats need variation inside the tile
+
+Mid-Century Modern now uses a larger repeat containing related shapes with roughly 20-percent size
+variation, irregular spacing, and several rotations. Paisley replaces the simple paired teardrops
+with layered, hooked boteh at three sizes and angles, plus inner curls, leaves, vines, and seed dots.
+The frosted surface and navigation brushes reuse these source drawings, so this added visual detail
+appears crisply only in open space and stays quiet beneath text.
+
+## 2026-09-07 — Vanilla Bean treats food texture as quiet vector atmosphere
+
+Vanilla Bean is a full theme contract, not a bitmap wallpaper. A large cream-coloured drawing tile
+combines broad pale curves with small, irregular brown strokes and ellipses resembling scraped
+vanilla seeds. Caramel borders and bean-brown accents provide structure. As with the other
+illustrated themes, the crisp pattern is reserved for open canvas while content and navigation use
+frosted, high-opacity versions that protect text clarity.
+
 ## 2026-09-07 — One door into settings, and switching accounts still closes it
 
 The shell header carried two controls of the same kind: a gear that opened Settings, and the
@@ -3602,3 +3646,21 @@ disclosure or an internal treatment use, and what a reader is shown when a categ
 given that "something exists and is withheld" can itself be the disclosure under Part 2. See
 `REGULATORY_CONCERNS.md`; the conservative reading holds until counsel says otherwise, because it is
 the one that is safe to relax later.
+
+## 2026-09-07 — Outlook import is a protected local overlay, not a Sati record
+
+The first Outlook calendar integration is a deliberate one-time `.ics` import. Sati parses the file
+on the workstation and keeps only a replaceable display mirror, separated by Sati user and by
+Demo/Production. Event subjects and locations may contain protected information, so the cache is
+encrypted with the current Windows profile's DPAPI key and diagnostics never include those values or
+the selected path. Reimporting replaces that profile's previous Outlook mirror; it does not create,
+edit, complete, or authorize a Sati service note, appointment, exemption, or compliance record.
+
+This is not presented as synchronization. Automatic Microsoft Graph access would introduce OAuth
+tokens, tenant-consent and revocation behavior, external-vendor responsibility, server-side audit and
+retention questions, and a cross-device data boundary. Those decisions must be made before Sati asks
+for an Outlook account connection.
+
+**Rejected:** writing imported entries into `Notes`, because Outlook events are not clinical service
+documentation; storing them in an unencrypted preference file, because calendar text can contain
+PHI; and adding a desktop-held Microsoft Graph token as a shortcut to two-way synchronization.

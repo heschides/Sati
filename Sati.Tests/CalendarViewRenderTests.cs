@@ -3,8 +3,8 @@ using Sati.Models;
 using Sati.ViewModels.Children;
 using Sati.Views;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using Xunit;
 
@@ -21,21 +21,32 @@ public sealed class CalendarViewRenderTests
             var view = new CalendarView();
 
             WpfUiHarness.Realize(view, 1400, 900);
-            Assert.Equal(4, view.MonthColumnCount);
-            Assert.Equal(4, FindMonthPanel(view).Columns);
+            Assert.Equal(3, view.MonthColumnCount);
 
             WpfUiHarness.Realize(view, 930, 700);
             Assert.Equal(2, view.MonthColumnCount);
-            Assert.Equal(2, FindMonthPanel(view).Columns);
 
             WpfUiHarness.Realize(view, 650, 700);
             Assert.Equal(1, view.MonthColumnCount);
-            Assert.Equal(1, FindMonthPanel(view).Columns);
         });
     }
 
-    private static UniformGrid FindMonthPanel(CalendarView view) =>
-        Assert.Single(WpfUiHarness.Descendants(view).OfType<UniformGrid>());
+    [Fact]
+    public void CalendarStartsInMonthView()
+    {
+        var viewModel = new CalendarViewModel(
+            new EmptyExemptDateService(),
+            new StaticYearNoteService(Note.Create(
+                "Synthetic note.",
+                DateTime.Today,
+                NoteStatus.Logged,
+                15,
+                1,
+                noteType: NoteType.Contact)),
+            new SessionService());
+
+        Assert.False(viewModel.IsYearOverview);
+    }
 
     [Fact]
     public async Task ACalendarDayIsKeyboardReachableAndOpensTheFocusedNoteView()
@@ -63,7 +74,8 @@ public sealed class CalendarViewRenderTests
             new StaticYearNoteService(note),
             session)
         {
-            CurrentYear = date.Year
+            CurrentYear = date.Year,
+            SelectedMonth = date.Month
         };
         await viewModel.InitializeAsync();
         var day = viewModel.Months
@@ -76,10 +88,15 @@ public sealed class CalendarViewRenderTests
             var view = new CalendarView { DataContext = viewModel };
             WpfUiHarness.Realize(view);
 
-            var dayButton = WpfUiHarness.FindByAutomationName<Button>(
-                view, day.AccessibleLabel);
+            var dayButton = Assert.Single(
+                WpfUiHarness.Descendants(view).OfType<Button>(),
+                candidate => ReferenceEquals(candidate.CommandParameter, day) &&
+                             candidate.MinHeight == 96);
+            Assert.Equal(day.AccessibleLabel, AutomationProperties.GetName(dayButton));
             Assert.True(dayButton.IsTabStop);
             Assert.Equal(Visibility.Visible, dayButton.Visibility);
+            Assert.Equal(VerticalAlignment.Stretch, dayButton.VerticalAlignment);
+            Assert.True(double.IsNaN(dayButton.Height));
 
             dayButton.Command.Execute(dayButton.CommandParameter);
             var focusButton = WpfUiHarness.FindByAutomationName<Button>(
@@ -88,7 +105,7 @@ public sealed class CalendarViewRenderTests
             WpfUiHarness.Realize(view);
 
             var backButton = WpfUiHarness.FindByAutomationName<Button>(
-                view, "Return to calendar year");
+                view, "Return to calendar month");
             Assert.Equal(Visibility.Visible, backButton.Visibility);
             Assert.Equal(
                 Visibility.Visible,

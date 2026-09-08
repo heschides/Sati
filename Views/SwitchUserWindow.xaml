@@ -7,7 +7,7 @@
         Width="340"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{DynamicResource WindowBackgroundBrush}"
+        Background="{DynamicResource SurfaceBrush}"
         FontFamily="{StaticResource AppFont}">
 
     <Border Padding="32">

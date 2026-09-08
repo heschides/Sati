@@ -30,13 +30,12 @@ namespace Sati.Views
 
         private void CalendarView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            // The detail rail always uses 220 px. Choose a month count from the
-            // space that remains so dates and note badges never have to overlap.
+            // The detail rail always uses 220 px. The year view intentionally
+            // stops at three columns so each mini-calendar keeps some breathing room.
             var yearOverviewWidth = Math.Max(0, e.NewSize.Width - 220);
             MonthColumnCount = yearOverviewWidth switch
             {
-                >= 1120 => 4,
-                >= 780 => 3,
+                >= 900 => 3,
                 >= 500 => 2,
                 _ => 1
             };
