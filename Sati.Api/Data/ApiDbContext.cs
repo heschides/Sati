@@ -48,6 +48,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerProvider> Providers => Set<ServerProvider>();
     public DbSet<ServerAtRequest> AtRequests => Set<ServerAtRequest>();
     public DbSet<ServerAtRequestItem> AtRequestItems => Set<ServerAtRequestItem>();
+    public DbSet<ServerCheckRequest> CheckRequests => Set<ServerCheckRequest>();
     public DbSet<ServerAuditEvent> AuditEvents => Set<ServerAuditEvent>();
     public DbSet<ServerPersonVersion> PersonVersions => Set<ServerPersonVersion>();
     public DbSet<ServerIncidentGroup> IncidentGroups => Set<ServerIncidentGroup>();
@@ -501,6 +502,25 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.ToTable("ATRequestItems"); entity.HasKey(x => x.Id);
             entity.Property(x => x.ItemCost).HasColumnType("decimal(18,2)");
         });
+        modelBuilder.Entity<ServerCheckRequest>(entity =>
+        {
+            entity.ToTable("CheckRequests");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.ConsumerName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+            entity.Property(x => x.AgencyName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+            entity.Property(x => x.CaseManagerName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+            entity.Property(x => x.SupervisorName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+            entity.Property(x => x.RequestDate).HasColumnType("date");
+            entity.Property(x => x.PayableTo).HasMaxLength(CheckRequestPublication.PayableToMaxLength);
+            entity.Property(x => x.MailingAddress).HasMaxLength(CheckRequestPublication.MailingAddressMaxLength);
+            entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.NeededByDate).HasColumnType("date");
+            entity.Property(x => x.Reason).HasMaxLength(CheckRequestPublication.ReasonMaxLength);
+            entity.Property(x => x.PublishedByName).HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+            entity.HasIndex(x => new { x.PersonId, x.RequestDate });
+            entity.HasOne<ServerPerson>().WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<ServerAuditEvent>(entity =>
         {
             entity.ToTable("AuditEvents");
@@ -600,6 +620,10 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
         SignaturePersistenceModel.ProtectDocumentArtifacts<ServerDocumentArtifact>(ChangeTracker);
         ChatPersistenceModel.ProtectWrites<ServerChatRoom, ServerChatRoomMember, ServerChatMessage, ServerChatChange,
             ServerChatReadMarker>(ChangeTracker);
+        if (ChangeTracker.Entries<ServerCheckRequest>().Any(entry =>
+                (entry.State is EntityState.Modified or EntityState.Deleted) &&
+                entry.Property(request => request.PublishedAtUtc).OriginalValue is not null))
+            throw new InvalidOperationException("Published check requests are immutable.");
         if (ChangeTracker.Entries<ServerAuditEvent>()
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<ServerPersonVersion>()
@@ -1222,6 +1246,27 @@ internal sealed class ServerAtRequestItem
     // Pasted evidence clip. Heavy column; the AT request list projection never
     // touches item rows at all, so it stays out of queue reads by construction.
     public byte[]? ScreenshotPng { get; set; }
+}
+
+internal sealed class ServerCheckRequest
+{
+    public int Id { get; set; }
+    public int Revision { get; set; } = 1;
+    public int PersonId { get; set; }
+    public string ConsumerName { get; set; } = string.Empty;
+    public string AgencyName { get; set; } = string.Empty;
+    public string CaseManagerName { get; set; } = string.Empty;
+    public string SupervisorName { get; set; } = string.Empty;
+    public DateTime? RequestDate { get; set; }
+    public string? PayableTo { get; set; }
+    public string? MailingAddress { get; set; }
+    public decimal Amount { get; set; }
+    public DateTime? NeededByDate { get; set; }
+    public string? Reason { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? PublishedAtUtc { get; set; }
+    public int? PublishedByUserId { get; set; }
+    public string? PublishedByName { get; set; }
 }
 
 internal sealed class ServerAuditEvent

@@ -45,6 +45,7 @@ namespace Sati.Data
         public DbSet<Appointment> Appointments { get; set; }
         public DbSet<ATRequest> ATRequests { get; set; }
         public DbSet<ATRequestItem> ATRequestItems { get; set; }
+        public DbSet<CheckRequest> CheckRequests { get; set; }
         public DbSet<Provider> Providers { get; set; }
         public DbSet<ProviderContact> ProviderContacts { get; set; }
         public DbSet<PersonContact> PersonContacts { get; set; }
@@ -86,6 +87,10 @@ namespace Sati.Data
             SignaturePersistenceModel.ProtectWrites(ChangeTracker);
             SignaturePersistenceModel.ProtectDocumentArtifacts<DocumentArtifact>(ChangeTracker);
             ChatPersistenceModel.ProtectWrites<ChatRoom, ChatRoomMember, ChatMessage, ChatChange, ChatReadMarker>(ChangeTracker);
+            if (ChangeTracker.Entries<CheckRequest>().Any(entry =>
+                    (entry.State is EntityState.Modified or EntityState.Deleted) &&
+                    entry.Property(request => request.PublishedAtUtc).OriginalValue is not null))
+                throw new InvalidOperationException("Published check requests are immutable.");
             if (ChangeTracker.Entries<AuditEvent>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
                 ChangeTracker.Entries<PersonVersion>()
@@ -660,6 +665,28 @@ namespace Sati.Data
                       .WithMany(a => a.Items)
                       .HasForeignKey(i => i.ATRequestId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CheckRequest>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Revision).IsConcurrencyToken();
+                entity.Property(x => x.ConsumerName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+                entity.Property(x => x.AgencyName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+                entity.Property(x => x.CaseManagerName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+                entity.Property(x => x.SupervisorName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+                entity.Property(x => x.RequestDate).HasColumnType("date");
+                entity.Property(x => x.PayableTo).HasMaxLength(CheckRequestPublication.PayableToMaxLength);
+                entity.Property(x => x.MailingAddress).HasMaxLength(CheckRequestPublication.MailingAddressMaxLength);
+                entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(x => x.NeededByDate).HasColumnType("date");
+                entity.Property(x => x.Reason).HasMaxLength(CheckRequestPublication.ReasonMaxLength);
+                entity.Property(x => x.PublishedByName).HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+                entity.HasIndex(x => new { x.PersonId, x.RequestDate });
+                entity.HasOne(x => x.Person)
+                    .WithMany()
+                    .HasForeignKey(x => x.PersonId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Settings>(entity =>

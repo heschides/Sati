@@ -229,6 +229,8 @@ namespace Sati
                         services.AddTransient<ViewModels.ClientDocuments.SafetyPlanViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.AnnualDocumentsViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.SignatureRequestsViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.CheckRequestsViewModel>();
+                        services.AddSingleton<CheckRequestPdfExporter>();
 
                         // Transient by intent: injected into two singleton hosts
                         // (CaseManagerDashboardViewModel, NotesWindowViewModel),
@@ -425,6 +427,7 @@ namespace Sati
             services.AddTransient<IReviewItemService, ReviewItemService>();
             services.AddSingleton<IClientAiContextService, ClientAiContextService>();
             services.AddTransient<IATRequestService, ATRequestService>();
+            services.AddTransient<ICheckRequestService, CheckRequestService>();
             services.AddTransient<IProviderService, ProviderService>();
             services.AddTransient<IDhhsFormService, DhhsFormService>();
             // Local SSN protection: the same envelope the API uses, wrapped by the
@@ -482,6 +485,7 @@ namespace Sati
             services.AddTransient<ISupervisorService, CloudSupervisorService>();
             services.AddTransient<IReviewItemService, CloudReviewItemService>();
             services.AddTransient<IATRequestService, CloudAtRequestService>();
+            services.AddTransient<ICheckRequestService, CloudCheckRequestService>();
             services.AddTransient<IProviderService, CloudProviderService>();
             services.AddTransient<IDhhsFormService, CloudDhhsFormService>();
             services.AddTransient<IApiCompatibilityService, CloudApiCompatibilityService>();

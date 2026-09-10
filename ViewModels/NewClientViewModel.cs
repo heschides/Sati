@@ -58,6 +58,7 @@ namespace Sati.ViewModels
         public AgencyReleaseViewModel AgencyRelease { get; }
         public SafetyPlanViewModel? SafetyPlan { get; }
         public AnnualDocumentsViewModel? AnnualDocuments { get; }
+        public CheckRequestsViewModel? CheckRequests { get; }
         public FormAttestationViewModel Attestation { get; }
 
         // Per-consumer journal state. The timer debounces saves to 2s after the last
@@ -347,6 +348,7 @@ namespace Sati.ViewModels
             ConsumerProviders.SetPerson(value);
             DhhsForms.SetPerson(value);
             AgencyRelease.SetPerson(value);
+            CheckRequests?.SetPerson(value);
             SafetyPlan?.SetPerson(value);
             AnnualDocuments?.SetPerson(value);
             RefreshUpcomingItems(value);
@@ -609,7 +611,8 @@ namespace Sati.ViewModels
                            ConsumerProvidersViewModel consumerProviders,
                            ConsumerImportViewModel consumerImport,
                            SafetyPlanViewModel? safetyPlan = null,
-                           AnnualDocumentsViewModel? annualDocuments = null)
+                           AnnualDocumentsViewModel? annualDocuments = null,
+                           CheckRequestsViewModel? checkRequests = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -626,6 +629,7 @@ namespace Sati.ViewModels
             AgencyRelease = agencyRelease;
             SafetyPlan = safetyPlan;
             AnnualDocuments = annualDocuments;
+            CheckRequests = checkRequests;
             ConsumerProviders = consumerProviders;
             ConsumerImport = consumerImport;
             Attestation = new FormAttestationViewModel(formService)

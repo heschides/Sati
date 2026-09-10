@@ -41,7 +41,7 @@ public static class ApiSurface
         "billing-exchange-history-v3",
         "claim-response-ingestion-v1",
         "schema-drift-report-v1",
-        "admin-test-consumer-deletion-v1",
+        "admin-test-consumer-deletion-v2",
         "person-test-data-v1",
         // SavePersonRequest gained CredibleClientId. A newer client sending it to an older
         // server would have the import dedupe key silently dropped.
@@ -66,7 +66,8 @@ public static class ApiSurface
         // making every session issued against the replaced baseline unusable.
         "demo-full-reset-v1",
         // Prevent same-month periods for different case managers from rendering identically.
-        "billing-period-case-manager-name-v1"
+        "billing-period-case-manager-name-v1",
+        "check-request-v1"
     ];
 
     /// <summary>
@@ -110,6 +111,7 @@ public static class ApiSurface
         "GET /api/v1/chat/rooms/{roomId:int}/members",
         "GET /api/v1/chat/rooms/{roomId:int}/messages",
         "GET /api/v1/chat/stream",
+        "GET /api/v1/check-requests/{id:int}",
         "GET /api/v1/exempt-dates/{year:int}",
         "GET /api/v1/incentives/history",
         "GET /api/v1/incentives/{year:int}/{month:int}",
@@ -122,6 +124,7 @@ public static class ApiSurface
         "GET /api/v1/people/{personId:int}/appointments/latest",
         "GET /api/v1/people/{personId:int}/assessments/latest",
         "GET /api/v1/people/{personId:int}/at-requests",
+        "GET /api/v1/people/{personId:int}/check-requests",
         "GET /api/v1/people/{personId:int}/attestations/pending",
         "GET /api/v1/people/{personId:int}/contacts",
         "GET /api/v1/people/{personId:int}/documents",
@@ -185,6 +188,8 @@ public static class ApiSurface
         "POST /api/v1/chat/rooms/{roomId:int}/members",
         "POST /api/v1/chat/rooms/{roomId:int}/messages",
         "POST /api/v1/chat/rooms/{roomId:int}/read",
+        "POST /api/v1/check-requests",
+        "POST /api/v1/check-requests/{id:int}/publish",
         "POST /api/v1/exempt-dates",
         "POST /api/v1/forms/delete",
         "POST /api/v1/incentives/eligible-days",
@@ -230,6 +235,7 @@ public static class ApiSurface
         "PUT /api/v1/at-requests/{id:int}",
         "PUT /api/v1/billing/configuration",
         "PUT /api/v1/chat/rooms/{roomId:int}",
+        "PUT /api/v1/check-requests/{id:int}",
         "PUT /api/v1/forms/{id:int}",
         "PUT /api/v1/incentives/{id:int}",
         "PUT /api/v1/notes/{id:int}",

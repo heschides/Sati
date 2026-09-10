@@ -3664,3 +3664,57 @@ for an Outlook account connection.
 **Rejected:** writing imported entries into `Notes`, because Outlook events are not clinical service
 documentation; storing them in an unencrypted preference file, because calendar text can contain
 PHI; and adding a desktop-held Microsoft Graph token as a shortcut to two-way synchronization.
+
+## 2026-09-09 — The repository solution is the platform; Sati remains a product
+
+The repository-wide solution is named `SatiLogica.slnx` because it is the container for the
+SatiLogica platform and its present and future products. Solution folders record that intended
+shape without moving code: today's projects remain together under `sati`, while `platform`,
+`karuna`, and `upekkha` are empty until code exists that belongs in them.
+
+This rename is deliberately metadata-only. The Sati application, assemblies, namespaces, project
+paths, installer identity, local-data paths, API resource names, and `SatiDemo`/`SatiProduction`
+database safety identities do not change. Those names have product, upgrade, deployment, or safety
+meaning and must be changed only by their separately planned stages.
+
+**Rejected:** mechanically renaming every `Sati` identifier to `SatiLogica`. That would erase the
+product/platform boundary and combine a harmless solution rename with assembly, installer,
+deployment, and database changes that carry materially different risks.
+
+## 2026-09-09 — Check requests are immutable financial records, not electronic signatures
+
+The client profile now carries a Check Requests workspace and history. A draft snapshots the
+consumer name, agency, assigned case manager, and assigned supervisor from authoritative profile
+and user records. Those snapshots, rather than current profile values, render later. Payee,
+mailing address, amount, needed-by date, and reason are never guessed from representative-payee
+profile context: a recurring need or monthly income describes the consumer but does not authorize
+a particular payment.
+
+Publishing saves the visible draft and locks it in one operation. The authenticated actor becomes
+the recorded publisher and `check-request.published` is audited. The two original rows labeled
+"Adult Case Manager Signature" and "Supervisor Signature" remain in the reproduced paper layout
+because fidelity was requested, but the UI explicitly says the prefilled names are identifiers,
+not electronic signatures or evidence of supervisor approval. Corrections create a new request;
+there is no reopen or silent overwrite path.
+
+Both EF contexts also reject tracked modification or deletion when the stored row was already
+published. That guard is below the UI and service methods, so a future caller cannot bypass the
+lock merely by forgetting to disable a button. The narrowly authorized consumer-deletion workflows
+remain explicit, transactional exceptions and include check requests in their audited counts.
+
+The PDF is regenerated from the frozen row and is not stored as a second canonical copy. Its
+metadata timestamp is pinned to publication so repeated exports of unchanged content remain
+stable. The original document's one-page bordered table, field names, and cut line are preserved;
+the surrounding WPF editor uses the active Sati theme and accessible control names.
+
+Publication and approval are deliberately different facts. During the interim manual process,
+publication is shown to users as “PDF prepared”; the case manager saves that PDF, attaches it to an
+email to Finance, and CCs the supervisor. Sati does not claim that it sent the message, that the
+supervisor approved the request, or that either printed name is a signature. The later workflow
+will transition the frozen request through explicit server-side submission, supervisor decision,
+and Finance delivery events, with the actor and time recorded for each transition.
+
+**Rejected:** auto-filling payee/address from the consumer or regular-needs text, accepting staff
+names from an API payload, letting a supervisor edit another user's request, and treating typed
+names under a signature label as a legally reviewed electronic signature. Also rejected: treating
+PDF publication, an email CC, or the supervisor's printed name as approval.

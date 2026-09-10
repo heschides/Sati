@@ -341,6 +341,61 @@ public sealed class CloudAtRequestService(CloudApiClient api) : IATRequestServic
     }
 }
 
+public sealed class CloudCheckRequestService(CloudApiClient api) : ICheckRequestService
+{
+    public async Task<List<CheckRequestListItem>> GetAllForPersonAsync(int personId) =>
+        (await api.GetAsync<List<CheckRequestListItemDto>>($"/api/v1/people/{personId}/check-requests"))
+        .Select(x => new CheckRequestListItem(
+            x.Id, x.Revision, x.RequestDate, x.PayableTo, x.Amount, x.NeededByDate, x.PublishedAtUtc))
+        .ToList();
+
+    public async Task<CheckRequest?> GetByIdAsync(int id) =>
+        CloudContractMapper.ToCheckRequest(await api.GetAsync<CheckRequestDto>($"/api/v1/check-requests/{id}"));
+
+    public async Task<CheckRequest> CreateDraftAsync(int personId) =>
+        CloudContractMapper.ToCheckRequest(await api.PostAsync<CreateCheckRequestRequest, CheckRequestDto>(
+            "/api/v1/check-requests", new CreateCheckRequestRequest(personId)));
+
+    public Task<CheckRequest> UpdateAsync(CheckRequest request) => SaveAsync(request, publish: false);
+    public Task<CheckRequest> PublishAsync(CheckRequest request) => SaveAsync(request, publish: true);
+
+    private async Task<CheckRequest> SaveAsync(CheckRequest request, bool publish)
+    {
+        try
+        {
+            var payload = CloudContractMapper.ToSaveCheckRequestRequest(request);
+            var dto = publish
+                ? await api.PostAsync<SaveCheckRequestRequest, CheckRequestDto>(
+                    $"/api/v1/check-requests/{request.Id}/publish", payload)
+                : await api.PutAsync<SaveCheckRequestRequest, CheckRequestDto>(
+                    $"/api/v1/check-requests/{request.Id}", payload);
+            var stored = CloudContractMapper.ToCheckRequest(dto);
+            CopyState(stored, request);
+            return request;
+        }
+        catch (CloudApiException ex) when (ex.Code == "stale_check_request")
+        {
+            throw new CheckRequestConcurrencyException(ex);
+        }
+        catch (CloudApiException ex) when (ex.Code == "published_check_request")
+        {
+            throw new CheckRequestLockedException();
+        }
+    }
+
+    private static void CopyState(CheckRequest source, CheckRequest target)
+    {
+        target.RequestDate = source.RequestDate;
+        target.PayableTo = source.PayableTo;
+        target.MailingAddress = source.MailingAddress;
+        target.Amount = source.Amount;
+        target.NeededByDate = source.NeededByDate;
+        target.Reason = source.Reason;
+        target.Revision = source.Revision;
+        target.RehydratePublication(source.PublishedAtUtc, source.PublishedByUserId, source.PublishedByName);
+    }
+}
+
 public sealed class CloudConsumerProviderService(CloudApiClient api) : IConsumerProviderService
 {
     public async Task<List<PersonProvider>> GetByPersonAsync(int personId) =>

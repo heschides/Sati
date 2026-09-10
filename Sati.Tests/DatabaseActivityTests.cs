@@ -266,7 +266,7 @@ public sealed class DatabaseActivityTests
         var testsDirectory = Directory.GetParent(sourceFilePath);
         var repositoryRoot = testsDirectory?.Parent;
         Assert.NotNull(repositoryRoot);
-        Assert.True(File.Exists(Path.Combine(repositoryRoot.FullName, "Sati.slnx")));
+        Assert.True(File.Exists(Path.Combine(repositoryRoot.FullName, "SatiLogica.slnx")));
         return repositoryRoot.FullName;
     }
 

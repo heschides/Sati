@@ -1,0 +1,88 @@
+<UserControl x:Class="Sati.Views.ClientDocuments.CheckRequestDocument"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="White"
+             AutomationProperties.Name="Live check request preview">
+    <Border Width="816" Height="1056" Background="White" Padding="48,44">
+        <StackPanel>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="82" />
+                    <RowDefinition Height="58" />
+                    <RowDefinition Height="54" />
+                    <RowDefinition Height="70" />
+                    <RowDefinition Height="43" />
+                    <RowDefinition Height="43" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="275" />
+                    <ColumnDefinition Width="205" />
+                    <ColumnDefinition Width="240" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Row="0" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding AgencyName}" FontFamily="Times New Roman" FontSize="15" FontWeight="Bold" TextAlignment="Center" />
+                        <TextBlock Text="Rep Payee Account" FontFamily="Times New Roman" FontSize="15" FontWeight="Bold" TextAlignment="Center" />
+                        <TextBlock FontFamily="Times New Roman" FontSize="15" FontWeight="Bold" TextAlignment="Center">
+                            <Run Text="FOR: " /><Run Text="{Binding ConsumerName, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Row="0" Grid.Column="1" BorderBrush="Black" BorderThickness="0,1,1,1">
+                    <TextBlock Text="Check Requisition" FontFamily="Times New Roman" FontSize="20" FontWeight="Bold"
+                               TextAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </Border>
+                <Border Grid.Row="0" Grid.Column="2" BorderBrush="Black" BorderThickness="0,1,1,1" Padding="7">
+                    <TextBlock FontFamily="Times New Roman" FontSize="15" VerticalAlignment="Center">
+                        <Run Text="Date: " FontWeight="Bold" /><Run Text="{Binding RequestDate, Mode=OneWay, StringFormat={}{0:MM/dd/yyyy}}" />
+                    </TextBlock>
+                </Border>
+
+                <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" BorderBrush="Black" BorderThickness="1,0,1,1" Padding="7">
+                    <TextBlock FontFamily="Times New Roman" FontSize="15" VerticalAlignment="Center" TextWrapping="Wrap">
+                        <Run Text="Check payable to: " FontWeight="Bold" /><Run Text="{Binding PayableTo, Mode=OneWay}" />
+                    </TextBlock>
+                </Border>
+                <Border Grid.Row="1" Grid.Column="2" BorderBrush="Black" BorderThickness="0,0,1,1" Padding="7">
+                    <TextBlock FontFamily="Times New Roman" FontSize="15" VerticalAlignment="Center" TextWrapping="Wrap">
+                        <Run Text="Address: " FontWeight="Bold" /><Run Text="{Binding MailingAddress, Mode=OneWay}" />
+                    </TextBlock>
+                </Border>
+
+                <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" BorderBrush="Black" BorderThickness="1,0,1,1" Padding="7">
+                    <TextBlock FontFamily="Times New Roman" FontSize="15" VerticalAlignment="Center">
+                        <Run Text="Amount: " FontWeight="Bold" /><Run Text="{Binding Amount, Mode=OneWay, StringFormat={}{0:C2}}" />
+                    </TextBlock>
+                </Border>
+                <Border Grid.Row="2" Grid.Column="2" BorderBrush="Black" BorderThickness="0,0,1,1" Padding="7">
+                    <TextBlock FontFamily="Times New Roman" FontSize="15" VerticalAlignment="Center">
+                        <Run Text="Date NEEDED by: " FontWeight="Bold" /><Run Text="{Binding NeededByDate, Mode=OneWay, StringFormat={}{0:MM/dd/yyyy}}" />
+                    </TextBlock>
+                </Border>
+
+                <Border Grid.Row="3" Grid.ColumnSpan="3" BorderBrush="Black" BorderThickness="1,0,1,1" Padding="7">
+                    <TextBlock FontFamily="Times New Roman" FontSize="15" TextWrapping="Wrap">
+                        <Run Text="Reason: " FontWeight="Bold" /><Run Text="{Binding Reason, Mode=OneWay}" />
+                    </TextBlock>
+                </Border>
+
+                <Border Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" BorderBrush="Black" BorderThickness="1,0,1,1" Padding="7">
+                    <TextBlock Text="Adult Case Manager Signature:" FontFamily="Times New Roman" FontSize="15" FontWeight="Bold" VerticalAlignment="Center" />
+                </Border>
+                <Border Grid.Row="4" Grid.Column="2" BorderBrush="Black" BorderThickness="0,0,1,1" Padding="7">
+                    <TextBlock Text="{Binding CaseManagerName}" FontFamily="Times New Roman" FontSize="15" FontWeight="Bold" TextAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <Border Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" BorderBrush="Black" BorderThickness="1,0,1,1" Padding="7">
+                    <TextBlock Text="Supervisor Signature:" FontFamily="Times New Roman" FontSize="15" FontWeight="Bold" VerticalAlignment="Center" />
+                </Border>
+                <Border Grid.Row="5" Grid.Column="2" BorderBrush="Black" BorderThickness="0,0,1,1" Padding="7">
+                    <TextBlock Text="{Binding SupervisorName}" FontFamily="Times New Roman" FontSize="15" FontWeight="Bold" TextAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </Grid>
+            <TextBlock Text="-------------------------------------------------------------------------------------------------------------------------------- cut here"
+                       FontFamily="Times New Roman" FontSize="11" Margin="0,5,0,0" />
+        </StackPanel>
+    </Border>
+</UserControl>

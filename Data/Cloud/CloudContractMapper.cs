@@ -464,6 +464,16 @@ internal static class CloudContractMapper
             i.ScreenshotPng is null ? null : Convert.ToBase64String(i.ScreenshotPng))).ToList(),
         a.Revision);
 
+    public static CheckRequest ToCheckRequest(CheckRequestDto dto) => CheckRequest.Rehydrate(
+        dto.Id, dto.PersonId, dto.Revision, dto.ConsumerName, dto.AgencyName,
+        dto.CaseManagerName, dto.SupervisorName, dto.RequestDate, dto.PayableTo,
+        dto.MailingAddress, dto.Amount, dto.NeededByDate, dto.Reason,
+        dto.CreatedAtUtc, dto.PublishedAtUtc, dto.PublishedByUserId, dto.PublishedByName);
+
+    public static SaveCheckRequestRequest ToSaveCheckRequestRequest(CheckRequest request) => new(
+        request.RequestDate, request.PayableTo, request.MailingAddress, request.Amount,
+        request.NeededByDate, request.Reason, request.Revision);
+
     private static Note ToNoteSummary(NoteSummaryDto dto)
     {
         var note = Note.Rehydrate(0);

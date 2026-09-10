@@ -16,9 +16,9 @@ not a production-security or regulatory certification.
 Run these checks before the meeting, not while attendees wait:
 
 ```powershell
-dotnet restore .\Sati.slnx
-dotnet build .\Sati.slnx --configuration Debug --no-restore
-dotnet test .\Sati.slnx --configuration Debug --no-build --no-restore
+dotnet restore .\SatiLogica.slnx
+dotnet build .\SatiLogica.slnx --configuration Debug --no-restore
+dotnet test .\SatiLogica.slnx --configuration Debug --no-build --no-restore
 dotnet build .\Sati.csproj --configuration Demo --no-restore
 ```
 

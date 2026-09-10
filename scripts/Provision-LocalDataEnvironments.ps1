@@ -106,6 +106,10 @@ WHERE PersonId IN (SELECT Id FROM #ExcludedPeople)
 DELETE FROM dbo.ATRequests
 WHERE PersonId IN (SELECT Id FROM #ExcludedPeople);
 
+IF OBJECT_ID(N'dbo.CheckRequests', N'U') IS NOT NULL
+    DELETE FROM dbo.CheckRequests
+    WHERE PersonId IN (SELECT Id FROM #ExcludedPeople);
+
 DELETE FROM dbo.People
 WHERE Id IN (SELECT Id FROM #ExcludedPeople);
 

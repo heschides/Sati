@@ -41,6 +41,7 @@ internal static partial class ApiEndpoints
         MapSignatures(api);
         MapProviders(api);
         MapAtRequests(api);
+        MapCheckRequests(api);
         MapAiContext(api);
         MapNotes(api);
         MapSettings(api);
@@ -568,6 +569,9 @@ internal static partial class ApiEndpoints
                 var atRequestsDeleted = await db.AtRequests
                     .Where(atRequest => atRequest.PersonId == personId)
                     .ExecuteDeleteAsync(cancellationToken);
+                var checkRequestsDeleted = await db.CheckRequests
+                    .Where(request => request.PersonId == personId)
+                    .ExecuteDeleteAsync(cancellationToken);
                 var assessmentsDeleted = await db.ComprehensiveAssessments
                     .Where(assessment => assessment.PersonId == personId)
                     .ExecuteDeleteAsync(cancellationToken);
@@ -604,7 +608,7 @@ internal static partial class ApiEndpoints
                     personVersionsDeleted,
                     personProvidersDeleted,
                     formAttestationsDeleted,
-                    documentArtifactsDeleted, safetyPlansDeleted, documentAcknowledgmentsDeleted);
+                    documentArtifactsDeleted, safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted);
                 auditTrail.Record(
                     actor,
                     AuditActions.TestConsumerDeleted,
@@ -626,6 +630,7 @@ internal static partial class ApiEndpoints
                         appointmentsDeleted = result.AppointmentsDeleted,
                         assessmentsDeleted = result.AssessmentsDeleted,
                         atRequestsDeleted = result.AtRequestsDeleted,
+                        checkRequestsDeleted = result.CheckRequestsDeleted,
                         atRequestItemsDeleted = result.AtRequestItemsDeleted,
                         personVersionsDeleted = result.PersonVersionsDeleted
                     }));
@@ -910,6 +915,11 @@ internal static partial class ApiEndpoints
                 .Select(request => new { request.Id, request.Status, request.SubmittedDate })
                 .ToListAsync(cancellationToken);
 
+            var checkRequestRows = await db.CheckRequests.AsNoTracking()
+                .Where(request => request.PersonId == personId)
+                .Select(request => new { request.Id, request.RequestDate, request.PublishedAtUtc })
+                .ToListAsync(cancellationToken);
+
             var contactRows = await db.PersonContacts.AsNoTracking()
                 .Where(contact => contact.PersonId == personId)
                 .Select(contact => new { contact.Id, contact.Kind })
@@ -957,6 +967,9 @@ internal static partial class ApiEndpoints
             var atRequestsDeleted = await db.AtRequests
                 .Where(request => request.PersonId == personId)
                 .ExecuteDeleteAsync(cancellationToken);
+            var checkRequestsDeleted = await db.CheckRequests
+                .Where(request => request.PersonId == personId)
+                .ExecuteDeleteAsync(cancellationToken);
             var assessmentsDeleted = await db.ComprehensiveAssessments
                 .Where(assessment => assessment.PersonId == personId)
                 .ExecuteDeleteAsync(cancellationToken);
@@ -986,7 +999,7 @@ internal static partial class ApiEndpoints
                 personId, formsDeleted, notesDeleted, contactsDeleted, reviewsDeleted, appointmentsDeleted,
                 assessmentsDeleted, atRequestsDeleted, atRequestItemsDeleted, personVersionsDeleted,
                 personProvidersDeleted, formAttestationsDeleted, documentArtifactsDeleted, claimLinesDeleted,
-                safetyPlansDeleted, documentAcknowledgmentsDeleted);
+                safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted);
 
             auditTrail.Record(
                 actor,
@@ -1007,6 +1020,7 @@ internal static partial class ApiEndpoints
                     reviews = reviewInventory,
                     assessments = assessmentRows,
                     atRequests = atRequestRows,
+                    checkRequests = checkRequestRows,
                     contacts = contactRows,
                     personVersions = personVersionInventory
                 }));
@@ -3718,6 +3732,132 @@ internal static partial class ApiEndpoints
             }
             return Results.NoContent();
         });
+    }
+
+    private static void MapCheckRequests(RouteGroupBuilder api)
+    {
+        api.MapGet("/people/{personId:int}/check-requests", async Task<IResult> (
+            int personId, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == personId, cancellationToken);
+            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                return Results.NotFound();
+
+            var rows = await db.CheckRequests.AsNoTracking()
+                .Where(x => x.PersonId == personId)
+                .OrderByDescending(x => x.RequestDate)
+                .ThenByDescending(x => x.Id)
+                .Select(x => new CheckRequestListItemDto(
+                    x.Id, x.Revision, x.RequestDate, x.PayableTo, x.Amount, x.NeededByDate, x.PublishedAtUtc))
+                .ToListAsync(cancellationToken);
+            return Results.Ok(rows);
+        });
+
+        api.MapGet("/check-requests/{id:int}", async Task<IResult> (
+            int id, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            var request = await db.CheckRequests.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (request is null) return Results.NotFound();
+            var ownerId = await db.People.AsNoTracking().Where(x => x.Id == request.PersonId)
+                .Select(x => (int?)x.UserId).SingleOrDefaultAsync(cancellationToken);
+            if (ownerId is null || !await TenantAccess.CanAccessUserAsync(db, actor, ownerId.Value, cancellationToken))
+                return Results.NotFound();
+            return Results.Ok(ContractMapper.ToCheckRequest(request));
+        });
+
+        api.MapPost("/check-requests", async Task<IResult> (
+            CreateCheckRequestRequest input, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!await TenantAccess.OwnsPersonAsync(db, actor, input.PersonId, cancellationToken))
+                return Results.NotFound();
+
+            var person = await db.People.AsNoTracking().SingleAsync(x => x.Id == input.PersonId, cancellationToken);
+            var owner = await db.Users.AsNoTracking().SingleAsync(x => x.Id == person.UserId, cancellationToken);
+            var supervisorName = owner.SupervisorId is int supervisorId
+                ? await db.Users.AsNoTracking().Where(x => x.Id == supervisorId).Select(x => x.DisplayName)
+                    .SingleOrDefaultAsync(cancellationToken) ?? string.Empty
+                : string.Empty;
+            var agencyName = await db.Agencies.AsNoTracking().Where(x => x.Id == actor.AgencyId)
+                .Select(x => x.Name).SingleOrDefaultAsync(cancellationToken) ?? string.Empty;
+            var now = DateTime.UtcNow;
+            var request = new ServerCheckRequest
+            {
+                PersonId = person.Id,
+                ConsumerName = $"{person.FirstName} {person.LastName}".Trim(),
+                AgencyName = agencyName,
+                CaseManagerName = owner.DisplayName,
+                SupervisorName = supervisorName,
+                RequestDate = now.Date,
+                CreatedAtUtc = now
+            };
+            db.CheckRequests.Add(request);
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(ContractMapper.ToCheckRequest(request));
+        });
+
+        api.MapPut("/check-requests/{id:int}", async Task<IResult> (
+            int id, SaveCheckRequestRequest input, ClaimsPrincipal principal,
+            ApiDbContext db, CancellationToken cancellationToken) =>
+            await SaveCheckRequestAsync(id, input, publish: false, principal, db, null, cancellationToken));
+
+        api.MapPost("/check-requests/{id:int}/publish", async Task<IResult> (
+            int id, SaveCheckRequestRequest input, ClaimsPrincipal principal,
+            ApiDbContext db, AuditTrail audit, CancellationToken cancellationToken) =>
+            await SaveCheckRequestAsync(id, input, publish: true, principal, db, audit, cancellationToken));
+    }
+
+    private static async Task<IResult> SaveCheckRequestAsync(
+        int id,
+        SaveCheckRequestRequest input,
+        bool publish,
+        ClaimsPrincipal principal,
+        ApiDbContext db,
+        AuditTrail? audit,
+        CancellationToken cancellationToken)
+    {
+        var actor = Actor.From(principal);
+        var request = await db.CheckRequests.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (request is null || !await TenantAccess.OwnsPersonAsync(db, actor, request.PersonId, cancellationToken))
+            return Results.NotFound();
+        if (request.Revision != input.ExpectedRevision)
+            return Results.Conflict(new ApiErrorDto("stale_check_request",
+                "This check request changed elsewhere. Reload it before trying again.", string.Empty));
+        if (request.PublishedAtUtc is not null)
+            return Results.Conflict(new ApiErrorDto("published_check_request",
+                "A PDF has already been prepared from this check request, so it is read-only. Create a new request for a correction.", string.Empty));
+
+        var errors = publish
+            ? CheckRequestPublication.FindPublicationBlockers(input.RequestDate, input.PayableTo,
+                input.MailingAddress, input.Amount, input.NeededByDate, input.Reason, false)
+            : CheckRequestPublication.FindDraftErrors(input.RequestDate, input.PayableTo,
+                input.MailingAddress, input.Amount, input.NeededByDate, input.Reason);
+        if (errors.Count > 0)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { [publish ? "publish" : "request"] = [.. errors] });
+
+        request.RequestDate = input.RequestDate?.Date;
+        request.PayableTo = Normalize(input.PayableTo);
+        request.MailingAddress = Normalize(input.MailingAddress);
+        request.Amount = input.Amount;
+        request.NeededByDate = input.NeededByDate?.Date;
+        request.Reason = Normalize(input.Reason);
+        if (publish)
+        {
+            request.PublishedAtUtc = DateTime.UtcNow;
+            request.PublishedByUserId = actor.UserId;
+            request.PublishedByName = actor.DisplayName;
+            audit!.Record(actor, AuditActions.CheckRequestPublished, "CheckRequest", request.Id);
+        }
+        request.Revision++;
+        try { await db.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Results.Conflict(new ApiErrorDto("stale_check_request",
+                "This check request changed elsewhere. Reload it before trying again.", string.Empty));
+        }
+        return Results.Ok(ContractMapper.ToCheckRequest(request));
     }
 
     private static void MapAiContext(RouteGroupBuilder api)

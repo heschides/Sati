@@ -748,6 +748,25 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                     Id = 1001, PersonId = 201, ClientName = "Person Two", CaseManagerName = "case-manager-two",
                     Status = "Development", SnapshotPng = [4, 5, 6]
                 });
+            db.CheckRequests.AddRange(
+                new ServerCheckRequest
+                {
+                    Id = 2001, PersonId = 101, ConsumerName = "Person One", AgencyName = "Agency One",
+                    CaseManagerName = "case-manager-one", SupervisorName = "supervisor-one",
+                    RequestDate = new DateTime(2026, 9, 1), PayableTo = "Original Payee",
+                    MailingAddress = "10 Test Street", Amount = 75m,
+                    NeededByDate = new DateTime(2026, 9, 15), Reason = "Original reason",
+                    CreatedAtUtc = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc)
+                },
+                new ServerCheckRequest
+                {
+                    Id = 2002, PersonId = 201, ConsumerName = "Person Two", AgencyName = "Agency Two",
+                    CaseManagerName = "case-manager-two", SupervisorName = "supervisor-two",
+                    RequestDate = new DateTime(2026, 9, 1), PayableTo = "Other Agency Payee",
+                    MailingAddress = "20 Other Street", Amount = 80m,
+                    NeededByDate = new DateTime(2026, 9, 16), Reason = "Other agency reason",
+                    CreatedAtUtc = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc)
+                });
             db.BillingPeriods.AddRange(
                 new ServerBillingPeriod
                 {

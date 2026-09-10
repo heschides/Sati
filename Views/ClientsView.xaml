@@ -2537,6 +2537,10 @@
                             <clientDocuments:AnnualDocumentsWorkspace DataContext="{Binding AnnualDocuments}" />
                         </TabItem>
 
+                        <TabItem Header="Check Requests" Style="{StaticResource ClientWorkspaceTabItemStyle}">
+                            <clientDocuments:CheckRequestsWorkspace DataContext="{Binding CheckRequests}" />
+                        </TabItem>
+
                         <!-- AT REQUESTS
                              Every assistive technology payment request filed for
                              this client, newest first. The list follows the CLIENT

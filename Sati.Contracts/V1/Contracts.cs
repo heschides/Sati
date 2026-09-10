@@ -535,13 +535,14 @@ public sealed record TestConsumerDeletionResultDto(
     int FormAttestationsDeleted = 0,
     int DocumentArtifactsDeleted = 0,
     int SafetyPlansDeleted = 0,
-    int DocumentAcknowledgmentsDeleted = 0)
+    int DocumentAcknowledgmentsDeleted = 0,
+    int CheckRequestsDeleted = 0)
 {
     public int RelatedRecordsDeleted =>
         FormsDeleted + NotesDeleted + ContactsDeleted + ReviewsDeleted +
         AppointmentsDeleted + AssessmentsDeleted + AtRequestsDeleted +
         AtRequestItemsDeleted + PersonVersionsDeleted + PersonProvidersDeleted +
-        FormAttestationsDeleted + DocumentArtifactsDeleted + SafetyPlansDeleted + DocumentAcknowledgmentsDeleted;
+        FormAttestationsDeleted + DocumentArtifactsDeleted + SafetyPlansDeleted + DocumentAcknowledgmentsDeleted + CheckRequestsDeleted;
 }
 
 /// <summary>Rule-3 deletion: delete a consumer created within the window. See <c>ConsumerDeletionRules</c>.</summary>
@@ -568,13 +569,14 @@ public sealed record ConsumerDeletionResultDto(
     int DocumentArtifactsDeleted,
     int ClaimLinesDeleted,
     int SafetyPlansDeleted = 0,
-    int DocumentAcknowledgmentsDeleted = 0)
+    int DocumentAcknowledgmentsDeleted = 0,
+    int CheckRequestsDeleted = 0)
 {
     public int RelatedRecordsDeleted =>
         FormsDeleted + NotesDeleted + ContactsDeleted + ReviewsDeleted +
         AppointmentsDeleted + AssessmentsDeleted + AtRequestsDeleted +
         AtRequestItemsDeleted + PersonVersionsDeleted + PersonProvidersDeleted +
-        FormAttestationsDeleted + DocumentArtifactsDeleted + ClaimLinesDeleted + SafetyPlansDeleted + DocumentAcknowledgmentsDeleted;
+        FormAttestationsDeleted + DocumentArtifactsDeleted + ClaimLinesDeleted + SafetyPlansDeleted + DocumentAcknowledgmentsDeleted + CheckRequestsDeleted;
 }
 
 public sealed record AdminActivityDto(
@@ -760,6 +762,45 @@ public sealed record SaveAtRequestRequest(
     int ExpectedRevision = 0);
 public sealed record PublishAtRequestRequest(int ExpectedRevision);
 public sealed record ReopenAtRequestRequest(int ExpectedRevision);
+
+public sealed record CheckRequestListItemDto(
+    int Id,
+    int Revision,
+    DateTime? RequestDate,
+    string? PayableTo,
+    decimal Amount,
+    DateTime? NeededByDate,
+    DateTime? PublishedAtUtc);
+
+public sealed record CheckRequestDto(
+    int Id,
+    int PersonId,
+    int Revision,
+    string ConsumerName,
+    string AgencyName,
+    string CaseManagerName,
+    string SupervisorName,
+    DateTime? RequestDate,
+    string? PayableTo,
+    string? MailingAddress,
+    decimal Amount,
+    DateTime? NeededByDate,
+    string? Reason,
+    DateTime CreatedAtUtc,
+    DateTime? PublishedAtUtc,
+    int? PublishedByUserId,
+    string? PublishedByName);
+
+public sealed record CreateCheckRequestRequest(int PersonId);
+
+public sealed record SaveCheckRequestRequest(
+    DateTime? RequestDate,
+    string? PayableTo,
+    string? MailingAddress,
+    decimal Amount,
+    DateTime? NeededByDate,
+    string? Reason,
+    int ExpectedRevision);
 public sealed record BinaryPayloadDto(string? Base64);
 
 public sealed record ClientAiContextSourceDto(string Category, string Description);

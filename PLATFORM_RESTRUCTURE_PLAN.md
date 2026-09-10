@@ -1,7 +1,7 @@
 # SatiLogica — platform restructure plan
 
-*Status: proposal, nothing implemented. Written 2026-09-07 against branch
-`ui-legibility-and-accessibility` at commit `6e78c6d`, restaged the same day. Read
+*Status: stages 0 and 2 implemented; stages 1 and 3–6 remain proposed. Written 2026-09-07 against branch
+`ui-legibility-and-accessibility` at commit `6e78c6d`, restaged the same day and updated 2026-09-09. Read
 `PLATFORM_DOMAIN.md` first: it decides what the platform is, and this document only moves code to
 match. `ARCHITECTURE.md` says what owns what today and `DECISIONS.md` says why.*
 
@@ -161,6 +161,10 @@ product project.** That test is what makes the boundary real rather than aspirat
 Rename `Sati.slnx` to `SatiLogica.slnx` and add solution folders (`platform/`, `sati/`, `karuna/`,
 `upekkha/`). Solution folders are metadata; no file moves, no project renames, no csproj edits.
 
+**Completed 2026-09-09.** All current projects are grouped under `sati`; the other three solution
+folders are intentionally empty until code exists that belongs in them. CI, the Demo runbook,
+release instructions, and source-based repository-root discovery now use `SatiLogica.slnx`.
+
 *Risk: none beyond anyone with the old solution path in muscle memory. `README.md`, the release
 scripts and `RELEASE_PLAYBOOK.md` reference the solution by name and need updating together.*
 
@@ -238,11 +242,11 @@ reprieve, and an existing install's uninstall entry has to keep working.*
 |---|---|---|
 | 0 design | done for the structural decisions | — |
 | 1 guardrail | small | yes |
-| 2 solution shape | small | yes |
+| 2 solution shape | done 2026-09-09 | — |
 | 3 platform contracts | large | yes, boundary now derived |
 | 4 platform persistence | large | yes, one chain confirmed |
 | 5 API split | medium, plus a release | after 4 |
 | 6 desktop rename | medium, plus an installer test | any time after 2 |
 
-Stages 1 and 2 remain the place to start. The guardrail is what keeps the boundary honest after the
-extraction, and the solution folders cost nothing.
+Stage 2 is complete. Stage 1 remains the next structural step: its dependency-graph guardrail is
+what keeps the boundary honest after extraction.

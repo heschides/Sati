@@ -154,6 +154,11 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | AT | `DELETE /at-requests/{id}` | Request person's assigned user and agency | Accessible case manager only; stale or omitted revisions are rejected, and a published request is refused. |
 | AT | `POST /at-requests/{id}/publish` | Request person's assigned user and agency | Accessible case manager only. The attestation signer is taken from the validated actor; no request field can name a different signer. Completeness is decided by `AtRequestPublication`. Refused if already published or if the revision is stale. |
 | AT | `POST /at-requests/{id}/reopen` | Request person's assigned user and agency | Accessible case manager only. Discards the attestation, returns the request to `Development`, and records the discarded signer in the audit event. Refused if the revision is stale. |
+| Check requests | `GET /people/{personId}/check-requests` | Request person's assigned user and agency | The assigned case manager and supervisors already permitted to reach that caseload may read the list. |
+| Check requests | `GET /check-requests/{id}` | Request person's assigned user and agency | The assigned case manager and supervisors already permitted to reach that caseload may read the frozen document data. |
+| Check requests | `POST /check-requests` | Person's assigned user and agency | Own caseload only. Consumer, agency, case-manager, and supervisor snapshots are derived from server-side records; the caller supplies only the person id. |
+| Check requests | `PUT /check-requests/{id}` | Request person's assigned user and agency | Own caseload only; requires the aggregate revision and refuses a published row. Snapshot fields and person id are not accepted from the client. |
+| Check requests | `POST /check-requests/{id}/publish` | Request person's assigned user and agency | Own caseload only; saves the displayed values and prepares the PDF source atomically, derives publisher identity from the validated actor, audits `check-request.published`, and permanently locks the row. Completeness is decided by `CheckRequestPublication`. Publication is not supervisor approval or proof of delivery to Finance. |
 | AI context | `GET /people/{personId}/ai-context` | Person's assigned user and agency | Own caseload only; actor identity is derived from the validated session and the response contains selected-client identity only. |
 | Notes | `POST /notes` | Note person's assigned user and agency | Own caseload only; note agency is assigned server-side. |
 | Notes | `PUT /notes/{id}` | Current and requested note persons' assigned user and agency | Both the stored note and any requested reassignment target must belong to the actor's own caseload and agency; server enforces the `NoteWorkflow` transition table, rejects stale revisions, and audits a successful reassignment. |
@@ -229,7 +234,7 @@ agency counts, switch-user results, selectable agency roles, and agency user edi
 
 `Sati.Api.Tests/TenantAuthorizationTests.cs` exercises the real HTTP and JWT pipeline against two
 isolated agencies. It must retain rejection tests for authentication, users, people, providers,
-reports, billing exports, AT requests and snapshots, assessments, and supervisor actions whenever
+reports, billing exports, AT requests and snapshots, check requests, assessments, and supervisor actions whenever
 these routes are refactored.
 
 It additionally covers two properties that are invisible in the table above and easy to regress:

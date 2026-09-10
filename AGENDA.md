@@ -5,6 +5,11 @@
 From `PLATFORM_DOMAIN.md` and the two decisions of 2026-09-07. None of these waits on the
 restructure, and all three get harder the longer they wait.
 
+- [x] Rename the repository solution to `SatiLogica.slnx`. The current Sati projects are grouped
+      under the `sati` solution folder, with empty `platform`, `karuna`, and `upekkha` folders
+      reserving the agreed platform shape. CI, operational instructions, and source-based repository
+      discovery use the new filename. Product assemblies, namespaces, executable names, database
+      identities, and physical project folders deliberately remain unchanged in this stage.
 - [ ] **Do not build the OADS Resource Coordinator as an agency user.** It is the first *authority*,
       not the second excluded role. Membership and authority are separate concepts now; building it
       the old way and migrating later means rewriting the exclusion filters and the audit records
@@ -102,6 +107,33 @@ same view loader as the theme legibility audit. See `DECISIONS.md`.
       ARIA rather than UI Automation, and that is where TalkBack and mobile browsers would apply.
 - [ ] Check keyboard operation at the two Easy Eyes scales and under Windows high-contrast themes,
       neither of which this pass exercises.
+
+## Release 1.3.6 — 2026-09-09 (Demo API alignment only)
+
+"Check requests, prepared and preserved." This source/API alignment makes the new representative-
+payee check-request workflow reachable from the current debugger build. It is not an installer
+release and does not deploy anything to Production.
+
+- [x] Add the Check Requests workspace, immutable financial snapshot, shared publication rules,
+      narrowly scoped DTOs and routes, tenant/caseload authorization, audit event, optimistic
+      concurrency, deterministic PDF rendering, and focused desktop/API tests.
+- [x] Apply `20260909153255_AddCheckRequests` to identity-validated Azure `SatiDemo` with the
+      existence-guarded `scripts/Apply-CheckRequestMigration.ps1`: rollback-only dry run succeeded,
+      the real run created the table and migration-history row 97, and a second real run made no
+      changes. The user removed the temporary exact-IP firewall rule immediately afterward; a
+      read-only Azure listing confirmed it absent.
+- [x] Release validation: the full Release solution build succeeded with zero errors and nine
+      existing warnings. All five test projects passed: 2,184 passed and one documented optional
+      local-AI evaluation skipped. The first post-version test run caught the intentionally changed
+      release name's stale expected value; after that ledger assertion was corrected, the complete
+      affected desktop suite passed 1,553 with the same one skip.
+- [ ] Commit and push the exact source, build the API package from that pushed commit, deploy it to
+      the existing Demo API only, and verify live, ready, release 1.3.6, and contract revision
+      `F286195242CA`.
+- [ ] No 1.3.6 installer is authorized or produced by this alignment. The published 1.3.5 Demo
+      installer expects the prior contract and will correctly refuse the newer API; use the current
+      debugger build until a separately invoked full release produces and accepts matching 1.3.6
+      installers.
 
 ## Release 1.3.5 — 2026-09-07
 
@@ -5259,3 +5291,28 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
       Signature history is retained and test-consumer deletion is blocked when it exists.
 - [ ] Establish an approved API-mediated Production implementation separately. Current Production
       remains hard-disabled; no real-use switch or legal-clearance setting is provided by this build.
+
+## Check request workflow — implemented 2026-09-09
+
+- [x] Add a Check Requests destination to each consumer profile with a per-consumer history,
+      modern themed editor, accessible field names, and a live preview of the original form.
+- [x] Snapshot consumer, agency, assigned case manager, and supervisor data at draft creation;
+      leave payee, address, amount, needed-by date, and reason as deliberate entries.
+- [x] Use one shared publication rule, revisioned local/API persistence, own-caseload writes,
+      supervisory read access, authenticated publisher identity, an audit event, and a permanent
+      publication lock. Corrections are new requests rather than edits to published financial data.
+- [x] Reproduce the original one-page bordered form and cut line in `CheckRequestPdfExporter`,
+      offer Publish PDF at the bottom of the editor, and allow faithful regeneration from the list.
+- [x] Add the controlled `AddCheckRequests` migration and update API compatibility/authorization
+      inventories. No database migration or deployment was performed.
+- [x] Make the interim routing explicit: publication is presented as “PDF prepared,” after which
+      the case manager manually emails the attachment to Finance and CCs the supervisor. Printed
+      names, PDF preparation, and the CC do not constitute or record supervisor approval.
+- [ ] Before real operational use, have the agency confirm that the preserved “Signature” labels
+      and routing meet its finance procedure. Sati identifies the staff and records the publisher;
+      this feature does not claim electronic-signature or supervisor-approval status.
+- [ ] Add the server-authoritative workflow over a frozen request: submit to the assigned
+      supervisor, approve or return with a reason, deliver to an authorized Finance destination,
+      and record completion or cancellation. Each transition needs role/tenant authorization,
+      revision checks, timestamps, actors, append-only events, idempotency, and notification-failure
+      handling; publication itself must never be treated as approval or proof of delivery.

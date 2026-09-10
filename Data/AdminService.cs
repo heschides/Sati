@@ -403,6 +403,11 @@ public sealed class AdminService(
         var atRequestInventory = atRequestRows.Select(request => new
         { request.Id, status = request.Status.ToString(), submittedDate = request.SubmittedDate }).ToList();
 
+        var checkRequestInventory = await context.CheckRequests.AsNoTracking()
+            .Where(request => request.PersonId == personId)
+            .Select(request => new { request.Id, request.RequestDate, request.PublishedAtUtc })
+            .ToListAsync(cancellationToken);
+
         var contactRows = await context.PersonContacts.AsNoTracking()
             .Where(contact => contact.PersonId == personId)
             .Select(contact => new { contact.Id, contact.Kind })
@@ -452,6 +457,9 @@ public sealed class AdminService(
         var atRequestsDeleted = await context.ATRequests
             .Where(request => request.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
+        var checkRequestsDeleted = await context.CheckRequests
+            .Where(request => request.PersonId == personId)
+            .ExecuteDeleteAsync(cancellationToken);
         var assessmentsDeleted = await context.ComprehensiveAssessments
             .Where(assessment => assessment.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
@@ -484,7 +492,7 @@ public sealed class AdminService(
             personId, formsDeleted, notesDeleted, contactsDeleted, reviewsDeleted, appointmentsDeleted,
             assessmentsDeleted, atRequestsDeleted, atRequestItemsDeleted, personVersionsDeleted,
             personProvidersDeleted, formAttestationsDeleted, documentArtifactsDeleted, claimLinesDeleted,
-            safetyPlansDeleted, documentAcknowledgmentsDeleted);
+            safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted);
 
         LocalAuditTrail.Record(
             context,
@@ -506,6 +514,7 @@ public sealed class AdminService(
                 reviews = reviewInventory,
                 assessments = assessmentInventory,
                 atRequests = atRequestInventory,
+                checkRequests = checkRequestInventory,
                 contacts = contactInventory,
                 personVersions = personVersionInventory
             }));
@@ -688,6 +697,9 @@ public sealed class AdminService(
         var atRequestsDeleted = await context.ATRequests
             .Where(request => request.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
+        var checkRequestsDeleted = await context.CheckRequests
+            .Where(request => request.PersonId == personId)
+            .ExecuteDeleteAsync(cancellationToken);
         var assessmentsDeleted = await context.ComprehensiveAssessments
             .Where(assessment => assessment.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
@@ -724,7 +736,7 @@ public sealed class AdminService(
             personVersionsDeleted,
             personProvidersDeleted,
             formAttestationsDeleted,
-            documentArtifactsDeleted, safetyPlansDeleted, documentAcknowledgmentsDeleted);
+            documentArtifactsDeleted, safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted);
         LocalAuditTrail.Record(
             context,
             actor,
@@ -747,6 +759,7 @@ public sealed class AdminService(
                 appointmentsDeleted = result.AppointmentsDeleted,
                 assessmentsDeleted = result.AssessmentsDeleted,
                 atRequestsDeleted = result.AtRequestsDeleted,
+                checkRequestsDeleted = result.CheckRequestsDeleted,
                 atRequestItemsDeleted = result.AtRequestItemsDeleted,
                 personVersionsDeleted = result.PersonVersionsDeleted
             }));

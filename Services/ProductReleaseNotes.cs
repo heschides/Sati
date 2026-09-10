@@ -6,11 +6,19 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "A clearer calendar, softly framed";
-    public const string ReleaseDate = "September 7, 2026";
+    public const string ReleaseName = "Check requests, prepared and preserved";
+    public const string ReleaseDate = "September 9, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Representative-payee check requests are ready for Finance",
+            [
+                "Each consumer profile now has a Check Requests workspace with history, a draft editor, a paper preview, and PDF preparation.",
+                "Consumer, agency, case-manager, supervisor, and publisher identity come from Sati records rather than editable document fields.",
+                "Preparing the PDF publishes and permanently locks the request. A correction is a new request, preserving the financial record and audit history.",
+                "Only the assigned case manager may create, edit, or publish. Existing authorized supervisors may read and regenerate the frozen document."
+            ]),
         new(
             "Outlook calendar exports can join the calendar",
             [

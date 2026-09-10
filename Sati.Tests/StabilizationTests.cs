@@ -127,7 +127,7 @@ public sealed class StabilizationTests
     public void NoteStatusGuidanceOccupiesItsOwnLayoutRowOnBothHostPages()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -630,7 +630,7 @@ public sealed class StabilizationTests
     public void ReleaseNotesMatchTheDemoAssemblyVersionAndDocumentProductionGaps()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -639,9 +639,9 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.5", version);
+        Assert.Equal("1.3.6", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("A clearer calendar, softly framed", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Check requests, prepared and preserved", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Submitted claims now have a visible staging lane" &&
@@ -718,7 +718,7 @@ public sealed class StabilizationTests
     public void ApplicationIconContainsSmallAndLargeWindowsFrames()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -775,7 +775,7 @@ public sealed class StabilizationTests
     public void ShellSaveOnCloseDefersTheSecondCloseUntilDispatcherIdle()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -808,7 +808,7 @@ public sealed class StabilizationTests
     public void ShellUsesNeutralSignInForPlatformAccountSwitching()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -821,7 +821,7 @@ public sealed class StabilizationTests
     public void DemoResetScriptIsPinnedToTheSyntheticDatabaseAndVerifiesItsBackup()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -843,7 +843,7 @@ public sealed class StabilizationTests
     public void InstallerAcceptanceChecksInstalledVersionPublicConfigAndLiveProcess()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -877,7 +877,7 @@ public sealed class StabilizationTests
     public void InstallerBuildWaitsForCompressionAndRejectsPartialOutput()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -941,7 +941,7 @@ public sealed class StabilizationTests
     public void DemoAcceptanceEvidenceBindsEveryFinalGateToExactArtifacts()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -989,7 +989,7 @@ public sealed class StabilizationTests
     public void DemoRunbookDoesNotClaimAcceptanceBeforeExternalEvidenceExists()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -1007,7 +1007,7 @@ public sealed class StabilizationTests
     public void DisplayOnlyRunBindingsAreExplicitlyOneWay()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
@@ -1031,7 +1031,7 @@ public sealed class StabilizationTests
     public void IconButtonsAndCheckBoxesExposeAccessibleNames()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);

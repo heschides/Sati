@@ -18,16 +18,16 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore Sati.slnx
+        run: dotnet restore SatiLogica.slnx
 
       - name: Build
-        run: dotnet build Sati.slnx --configuration Release --no-restore
+        run: dotnet build SatiLogica.slnx --configuration Release --no-restore
 
       - name: Build Demo client configuration
         run: dotnet build Sati.csproj --configuration Demo --no-restore
 
       - name: Test
-        run: dotnet test Sati.slnx --configuration Release --no-build --no-restore
+        run: dotnet test SatiLogica.slnx --configuration Release --no-build --no-restore
 
       - name: Test signing portal page behavior
         run: node --test Sati.Portal.Tests/portal-ui.test.cjs

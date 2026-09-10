@@ -289,6 +289,12 @@ internal static class ContractMapper
         a.PassthroughRate,
         a.SignedByName, a.SignedByRole, a.SignedByUserId, a.SignedAtUtc, a.AttestationStatement);
 
+    public static CheckRequestDto ToCheckRequest(ServerCheckRequest x) => new(
+        x.Id, x.PersonId, x.Revision, x.ConsumerName, x.AgencyName, x.CaseManagerName,
+        x.SupervisorName, x.RequestDate, x.PayableTo, x.MailingAddress, x.Amount,
+        x.NeededByDate, x.Reason, x.CreatedAtUtc, x.PublishedAtUtc,
+        x.PublishedByUserId, x.PublishedByName);
+
     public static SettingsDto ToSettings(ServerSettings s) => new(
         s.Id, s.AbandonedAfterDays, s.ProductivityThreshold, s.BaseIncentive, s.PerUnitIncentive,
         s.PassthroughRate, s.SalesTaxRate, s.DefaultPassthroughProviderId, s.VisitTemplate,

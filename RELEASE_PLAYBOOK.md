@@ -170,8 +170,8 @@ an existing version number.
 ## 4. Release validation
 
 1. Review the complete diff and run `git diff --check`.
-2. Build the complete solution in Release configuration.
-3. Run every test project in the solution, including Sati desktop/domain tests, API integration
+2. Build the complete `SatiLogica.slnx` solution in Release configuration.
+3. Run every test project in `SatiLogica.slnx`, including Sati desktop/domain tests, API integration
    tests, and Carika tests when present. Run profile-dependent DPAPI, WPF, or Avalonia checks under
    the normal signed-in Windows profile when the sandbox cannot exercise them correctly.
 4. Run additional focused tests required by the changed behavior and inspect relevant packaged UI

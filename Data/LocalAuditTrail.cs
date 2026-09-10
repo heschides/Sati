@@ -27,6 +27,7 @@ internal static class LocalAuditTrail
 
 internal static class LocalAuditActions
 {
+    public const string CheckRequestPublished = "check-request.published";
     public const string AuthenticationSucceeded = "authentication.succeeded";
     public const string PersonCreated = "person.created";
     public const string PersonUpdated = "person.updated";

@@ -122,7 +122,7 @@ public sealed class AccountSwitchTests
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Sati.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
         return directory?.FullName ?? throw new DirectoryNotFoundException("Could not locate the Sati repository root.");
     }

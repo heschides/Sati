@@ -7,6 +7,29 @@ namespace Sati.Tests;
 public sealed class ProjectBoundaryTests
 {
     [Fact]
+    public void RepositorySolutionUsesThePlatformNameAndProductFolders()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var solutionPath = Path.Combine(repositoryRoot, "SatiLogica.slnx");
+
+        Assert.True(File.Exists(solutionPath));
+        Assert.False(File.Exists(Path.Combine(repositoryRoot, "Sati.slnx")));
+
+        var solution = XDocument.Load(solutionPath);
+        var folders = solution.Root!
+            .Elements("Folder")
+            .ToDictionary(folder => (string)folder.Attribute("Name")!);
+
+        Assert.Equal(
+            ["/karuna/", "/platform/", "/sati/", "/upekkha/"],
+            folders.Keys.Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(13, folders["/sati/"].Elements("Project").Count());
+        Assert.Empty(folders["/platform/"].Elements("Project"));
+        Assert.Empty(folders["/karuna/"].Elements("Project"));
+        Assert.Empty(folders["/upekkha/"].Elements("Project"));
+    }
+
+    [Fact]
     public void DesktopProjectExcludesStandaloneToolProjects()
     {
         var projectPath = Path.Combine(FindRepositoryRoot(), "Sati.csproj");

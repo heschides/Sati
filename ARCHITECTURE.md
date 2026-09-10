@@ -1,6 +1,30 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-09-06.*
+*Living document. Updated during structured review sessions. Last updated: 2026-09-09.*
+
+## Representative-payee check requests
+
+The client profile owns a Check Requests workspace with a per-consumer history, draft editor,
+live paper preview, and PDF publication. `CheckRequestsViewModel` uses `LatestRequestTracker` so a
+slow response cannot display one consumer's financial request under another consumer. The local
+and Demo paths share `ICheckRequestService`; Demo uses `CloudCheckRequestService` and the API, while
+local Production keeps the transitional short-lived `SatiContext` implementation.
+
+`CheckRequest` is one revisioned financial aggregate. Creation snapshots the consumer, agency,
+assigned case manager, and assigned supervisor from authoritative records. The payee, mailing
+address, amount, needed-by date, and reason remain deliberate entries: representative-payee profile
+context is reference information, not payment authorization. `CheckRequestPublication` is the one
+shared completeness/length rule owner.
+
+Only the assigned case manager may create, edit, or publish. Existing caseload supervisors may
+read and regenerate. Publication atomically saves the displayed values, derives the publisher from
+the signed-in/validated actor, writes `check-request.published`, and locks the row permanently.
+In the current manual-delivery phase, that publication means only “PDF prepared”: the case manager
+saves the attachment, emails it to Finance, and CCs the supervisor. It does not record delivery,
+supervisor approval, or an electronic signature. The later routing lifecycle must be a separate,
+server-authoritative state machine over the frozen version rather than overloading publication.
+Corrections are new requests. `CheckRequestPdfExporter` regenerates the one-page original-style
+form from frozen data; the PDF itself is saved by the user rather than duplicated in the database.
 
 ## Billing submission staging
 
@@ -717,6 +741,11 @@ Browser and mobile clients should be added when access, field work, installation
 justify them; they will consume the same API rather than inventing separate business rules.
 
 ### Current solution boundaries
+
+`SatiLogica.slnx` is the repository-wide solution. Its solution folders describe product ownership
+without moving source files: all projects that exist today are under `sati`, while `platform`,
+`karuna`, and `upekkha` reserve the agreed future shape. This metadata does not rename the Sati
+product, its assemblies or namespaces, or either database environment.
 
 - `Sati.csproj` is the existing WPF client. It retains presentation, local EF service
   implementations, and local-development workflows, but no longer owns the entity assembly or

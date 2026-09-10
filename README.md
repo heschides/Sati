@@ -138,6 +138,10 @@ Requirements:
 - Visual Studio with Windows desktop development support
 - SQL Server LocalDB
 
+The repository-wide solution is `SatiLogica.slnx`; `Sati.csproj` remains the WPF product project.
+Build or test the complete repository with `dotnet build SatiLogica.slnx` or
+`dotnet test SatiLogica.slnx`.
+
 Start Sati normally during development:
 
 ```powershell
