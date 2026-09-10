@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Identity.Client;
 using Sati.Contracts.V1;
 using Sati.Data;
+using Sati.Helpers;
 using Sati.Models;
 using Sati.Services;
 using Sati.ViewModels.Children;
@@ -38,6 +39,7 @@ namespace Sati.ViewModels
         private List<Note> _monthlyNotes = [];
         private DateTime _lastAbandonmentCheck = DateTime.Now;
         private int _remainingEligibleDays;
+        private int _eligibleDaysAfterToday;
         private List<ExemptDate> _exemptDatesForMonth = [];
         private readonly LatestRequestTracker _notesLoadRequests = new();
         private readonly LatestRequestTracker _upcomingEventLoadRequests = new();
@@ -348,13 +350,13 @@ CalendarViewModel calendarViewModel,
             get
             {
                 var billedDays = _monthlyNotes
-                    .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged
+                    .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged or NoteStatus.Approved
                              && n.EventDate.HasValue)
                     .Select(n => n.EventDate!.Value.Date)
                     .Distinct()
                     .Count();
                 if (billedDays <= 0) return 0;
-                var total = (PendingUnits ?? 0) + (LoggedUnits ?? 0);
+                var total = RecoverableUnits + SecuredUnits;
                 return Math.Round((double)total / billedDays, 1);
             }
         }
@@ -550,22 +552,75 @@ CalendarViewModel calendarViewModel,
         }
         public int SafeThreshold => Threshold > 0 ? Threshold : 1;
 
-        public decimal? PendingUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Pending).Sum(n => n.Units);
-        public decimal? LoggedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Logged).Sum(n => n.Units);
+        private int DocumentationWindowDays =>
+            Sati.Contracts.V1.ProductivityForecast.NormalizeDocumentationWindowDays(
+                _settings?.AbandonedAfterDays);
+
+        private ProductivityForecastResult ProductivityForecast => Sati.Contracts.V1.ProductivityForecast.Calculate(
+            Threshold,
+            _remainingEligibleDays,
+            _eligibleDaysAfterToday,
+            DateTime.Today,
+            DocumentationWindowDays,
+            _monthlyNotes.Select(note => new ProductivityNoteFact(
+                note.EventDate,
+                note.Status?.ToString(),
+                note.Minutes)));
+
+        public decimal RecoverableUnits => ProductivityForecast.RecoverableUnits;
+        public decimal SecuredUnits => ProductivityForecast.SecuredUnits;
+        public decimal DueTodayUnits => ProductivityForecast.DueTodayUnits;
+        public decimal? SecuredPace => ProductivityForecast.SecuredPace;
+        public decimal? ProjectedPace => ProductivityForecast.ProjectedPace;
+        public decimal? PaceIfDueTodayExpires => ProductivityForecast.PaceIfDueTodayExpires;
+        public bool HasDueTodayRisk => DueTodayUnits > 0;
+        public int PendingItemsWithoutUnits => ProductivityForecast.PendingItemsWithoutUnits;
+        public bool HasPendingItemsWithoutUnits => PendingItemsWithoutUnits > 0;
+        public string DueTodayRiskMessage => PaceIfDueTodayExpires is decimal after
+            ? $"{DueTodayUnits:0.#} recoverable units reach their documentation deadline today. Complete them today to keep the projected pace at {ProjectedPace ?? 0:0.0}; otherwise it rises to {after:0.0} units per future workday."
+            : $"{DueTodayUnits:0.#} recoverable units reach their documentation deadline today. There are no future workdays left to absorb them if they expire.";
+        public string PendingItemsWithoutUnitsMessage => PendingItemsWithoutUnits == 1
+            ? "1 pending note has no duration, so its units cannot be included in this forecast."
+            : $"{PendingItemsWithoutUnits} pending notes have no duration, so their units cannot be included in this forecast.";
+
+        // Kept as compatibility aliases for code that still names the old dashboard fields.
+        public decimal? PendingUnits => RecoverableUnits;
+        public decimal? LoggedUnits => SecuredUnits;
         public decimal? AbandonedUnits => _monthlyNotes.Where(n => n.Status == NoteStatus.Abandoned).Sum(n => n.Units);
 
-        public decimal EstimatedIncentive => _incentive?.Calculate(LoggedUnits ?? 0) ?? 0;
+        public decimal EstimatedIncentive => _incentive?.Calculate(SecuredUnits) ?? 0;
         public int RemainingEligibleDays => _remainingEligibleDays;
 
         public decimal? UnitsPerRemainingDay
         {
             get
             {
-                if (_remainingEligibleDays <= 0) return null;
-                var unitsNeeded = Threshold - ((LoggedUnits ?? 0) + (PendingUnits ?? 0));
-                if (unitsNeeded <= 0) return 0m;
-                return Math.Round(unitsNeeded / _remainingEligibleDays, 1);
+                return ProjectedPace;
             }
+        }
+
+        private void NotifyProductivityChanged()
+        {
+            OnPropertyChanged(nameof(PendingUnits));
+            OnPropertyChanged(nameof(LoggedUnits));
+            OnPropertyChanged(nameof(RecoverableUnits));
+            OnPropertyChanged(nameof(SecuredUnits));
+            OnPropertyChanged(nameof(DueTodayUnits));
+            OnPropertyChanged(nameof(SecuredPace));
+            OnPropertyChanged(nameof(ProjectedPace));
+            OnPropertyChanged(nameof(PaceIfDueTodayExpires));
+            OnPropertyChanged(nameof(HasDueTodayRisk));
+            OnPropertyChanged(nameof(DueTodayRiskMessage));
+            OnPropertyChanged(nameof(PendingItemsWithoutUnits));
+            OnPropertyChanged(nameof(HasPendingItemsWithoutUnits));
+            OnPropertyChanged(nameof(PendingItemsWithoutUnitsMessage));
+            OnPropertyChanged(nameof(AbandonedUnits));
+            OnPropertyChanged(nameof(EstimatedIncentive));
+            OnPropertyChanged(nameof(Threshold));
+            OnPropertyChanged(nameof(SafeThreshold));
+            OnPropertyChanged(nameof(DailyAverageUnits));
+            OnPropertyChanged(nameof(RemainingEligibleDays));
+            OnPropertyChanged(nameof(UnitsPerRemainingDay));
         }
 
         // -------------------------------------------------------------------------
@@ -804,7 +859,7 @@ CalendarViewModel calendarViewModel,
                 Matrix.Rebuild(People, DateTime.Today);
                 OnPropertyChanged(nameof(Matrix));
                 OnPropertyChanged(nameof(EffectiveDateGroups));
-                await _noteService.UpdateAbandonedNotesAsync(_settings.AbandonedAfterDays);
+                await _noteService.UpdateAbandonedNotesAsync(DocumentationWindowDays);
                 await LoadMonthlyNotesAsync();
                 await LoadUpcomingEventsAsync();
                 await Calendar.InitializeAsync();
@@ -986,27 +1041,30 @@ CalendarViewModel calendarViewModel,
         private async Task LoadMonthlyNotesAsync()
         {
             _monthlyNotes = await _noteService.GetMonthlyNotesAsync(LoggedInUser!.Id);
+            await RefreshFutureEligibleDaysAsync();
 
-            var workedDays = _monthlyNotes
-                            .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged && n.EventDate.HasValue)
-                            .Select(n => n.EventDate!.Value.Date)
-                            .ToHashSet();
-            var exemptDays = _exemptDatesForMonth
-                .Select(e => e.Date.Date)
-                .ToHashSet();
-            _remainingEligibleDays = await _incentiveService.GetRemainingEligibleDaysAsync(
-                DateTime.Now.Month, DateTime.Now.Year, workedDays, exemptDays);
-
-            OnPropertyChanged(nameof(PendingUnits));
-            OnPropertyChanged(nameof(LoggedUnits));
-            OnPropertyChanged(nameof(AbandonedUnits));
-            OnPropertyChanged(nameof(EstimatedIncentive));
-            OnPropertyChanged(nameof(Threshold));
-            OnPropertyChanged(nameof(SafeThreshold));
-            OnPropertyChanged(nameof(DailyAverageUnits));
-            OnPropertyChanged(nameof(RemainingEligibleDays));
-            OnPropertyChanged(nameof(UnitsPerRemainingDay));
+            NotifyProductivityChanged();
         }
+
+        private async Task RefreshFutureEligibleDaysAsync()
+        {
+            var today = DateTime.Today;
+            var monthEnd = new DateTime(today.Year, today.Month,
+                DateTime.DaysInMonth(today.Year, today.Month));
+            var agencyEligibleDays = await _incentiveService.GetEligibleDaysAsync(today, monthEnd);
+            var agencyDaysAfterToday = today < monthEnd
+                ? await _incentiveService.GetEligibleDaysAsync(today.AddDays(1), monthEnd)
+                : 0;
+            _remainingEligibleDays = Math.Max(0, agencyEligibleDays - CountEligibleExemptions(today, monthEnd));
+            _eligibleDaysAfterToday = Math.Max(0, agencyDaysAfterToday - CountEligibleExemptions(today.AddDays(1), monthEnd));
+        }
+
+        private int CountEligibleExemptions(DateTime start, DateTime end) =>
+            _exemptDatesForMonth.Count(exempt =>
+                exempt.Date.Date >= start &&
+                exempt.Date.Date <= end &&
+                exempt.Date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) &&
+                (_settings is null || !WorkdayHelper.IsAlwaysExcludedWorkday(exempt.Date.Date, _settings)));
 
         private async Task LoadUpcomingEventsAsync()
         {
@@ -1198,25 +1256,11 @@ CalendarViewModel calendarViewModel,
             _incentive = incentive;
             await LoadExemptDatesAsync();
 
-            // Recompute remaining days now that exempt dates are fresh.
-            // Reuses _monthlyNotes already in memory — no extra DB query.
-            var workedDays = _monthlyNotes
-                .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged
-                         && n.EventDate.HasValue)
-                .Select(n => n.EventDate!.Value.Date)
-                .ToHashSet();
-            var exemptDays = _exemptDatesForMonth
-                .Select(e => e.Date.Date)
-                .ToHashSet();
-            _remainingEligibleDays = await _incentiveService.GetRemainingEligibleDaysAsync(
-                DateTime.Now.Month, DateTime.Now.Year, workedDays, exemptDays);
+            // Future capacity comes from the API's agency-calendar window and then removes
+            // personal exemptions. Past blank days are represented only by pending notes.
+            await RefreshFutureEligibleDaysAsync();
 
-            OnPropertyChanged(nameof(Threshold));
-            OnPropertyChanged(nameof(SafeThreshold));
-            OnPropertyChanged(nameof(EstimatedIncentive));
-            OnPropertyChanged(nameof(DailyAverageUnits));
-            OnPropertyChanged(nameof(RemainingEligibleDays));
-            OnPropertyChanged(nameof(UnitsPerRemainingDay));
+            NotifyProductivityChanged();
         }
 
         public void Reset()
@@ -1231,6 +1275,8 @@ CalendarViewModel calendarViewModel,
             UpcomingEvents.Clear();
             _monthlyNotes = [];
             _incentive = null;
+            _remainingEligibleDays = 0;
+            _eligibleDaysAfterToday = 0;
             _settings = null;
             _exemptDatesForMonth = [];
             _hasLoadedDeadlineData = false;
@@ -1277,7 +1323,7 @@ CalendarViewModel calendarViewModel,
                     _abandonmentTimer.Stop();
                     try
                     {
-                        await _noteService.UpdateAbandonedNotesAsync(_settings?.AbandonedAfterDays ?? 8);
+                        await _noteService.UpdateAbandonedNotesAsync(DocumentationWindowDays);
                         _lastAbandonmentCheck = DateTime.Now;
                     }
                     catch (Exception ex)

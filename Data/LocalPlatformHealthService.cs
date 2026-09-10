@@ -20,18 +20,13 @@ public sealed class LocalPlatformHealthService(
         await using var context = contextFactory.CreateDbContext();
         var observedAt = DateTime.UtcNow;
         var start = observedAt.AddDays(-days);
-        var incidents = await context.IncidentGroups.AsNoTracking()
+        var incidentRows = await context.IncidentGroups.AsNoTracking()
             .Where(candidate => candidate.LastSeenUtc >= start)
             .OrderByDescending(candidate => candidate.LastSeenUtc)
             .ThenByDescending(candidate => candidate.Id)
             .Take(take)
-            .Select(candidate => new IncidentGroupDto(
-                candidate.Id, candidate.AgencyId, candidate.Scope, candidate.Source, candidate.Severity,
-                candidate.Operation, candidate.FirstRelease, candidate.LastRelease,
-                candidate.ExceptionFingerprint, candidate.Status, candidate.OccurrenceCount,
-                candidate.FirstSeenUtc, candidate.LastSeenUtc, candidate.LastReference,
-                candidate.LastActorRole))
             .ToListAsync(cancellationToken);
+        var incidents = incidentRows.Select(IncidentContractMapper.ToDto).ToList();
         var agencies = await context.Agencies.AsNoTracking()
             .OrderBy(candidate => candidate.Name)
             .Select(candidate => new { candidate.Id, candidate.Name })

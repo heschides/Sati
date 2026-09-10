@@ -182,7 +182,7 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Incentives | `GET /incentives/history` | Incentive `UserId` | Own user only. |
 | Incentives | `PUT /incentives/{id}` | Incentive `UserId` | Own user only. |
 | Incentives | `POST /incentives/eligible-days` | Settings `AgencyId` | Calculates with actor-agency settings. |
-| Incentives | `POST /incentives/remaining-days` | Settings `AgencyId` | Calculates with actor-agency settings. |
+| Incentives | `POST /incentives/remaining-days` | Settings `AgencyId` | Compatibility route; calculates today-through-month-end future capacity with actor-agency settings and caller-supplied personal exemptions. The legacy worked-date list is ignored. |
 | Reports | `GET /reports/consumer-billing-loss` | Each person's assigned user and agency | Own caseload only. |
 | Reports | `GET /reports/productivity-units` | Validated actor's user and agency | Own caseload only; both Person and Note agency markers must match, the request accepts no user id, and the response contains narrative-free monthly aggregates. |
 | Billing | `POST /billing/periods/{year}/{month}` | Billing period user's `AgencyId` | Billing permission; target user must be in actor agency. |
@@ -222,7 +222,7 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Annual documents | `GET /people/{personId}/documents` | Person's assigned user and agency | Accessible case manager only; lists live artifact metadata for one requested cycle after tenant validation. |
 | Document templates | `GET /agencies/{agencyId}/templates/{kind}` | Actor's agency | Administration permission only; requested agency must equal actor agency. Returns that agency's versions and Sati-default versions, never another agency's. |
 | Document templates | `POST /agencies/{agencyId}/templates/{kind}` | Actor's agency | Same Administration/agency gate; validates closed tokens and source bounds, derives author/version/timestamp, appends an immutable version plus audit event, and returns typed 409 on a version collision. Cannot publish a global default. |
-| Incidents | `POST /incidents` | Authenticated actor's `AgencyId` | Reports only a validated PHI-minimized envelope; agency is derived from the token, never the request. |
+| Incidents | `POST /incidents` | Authenticated actor's `AgencyId` | Reports only a validated PHI-minimized envelope; agency is derived from the token, never the request. Optional Windows crash metadata is a bounded `CrashDiagnosticDto`; paths and Event 1026 prose have no accepted field. |
 | Incidents | `GET /admin/incidents` | Incident `AgencyId` | Administration permission; actor agency only. |
 | Incidents | `PUT /admin/incidents/{incidentId}/status` | Incident `AgencyId` | Administration permission; same-agency status transition is audited. |
 | Platform health | `GET /platform/incidents` | All incident agencies | `PlatformOperator` only; every cross-tenant view is audited. Agency administration permission does not grant access. |

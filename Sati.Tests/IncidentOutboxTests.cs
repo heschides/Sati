@@ -31,6 +31,48 @@ public sealed class IncidentOutboxTests : IDisposable
     }
 
     [Fact]
+    public void MatchedCrashDiagnosticReplacesQueuedPendingEnvelopeWithTheSameReference()
+    {
+        var outbox = new IncidentOutbox(_root);
+        var heartbeat = DateTime.UtcNow.AddSeconds(-10);
+        var pending = Report("REF_CRASH_UPGRADE") with
+        {
+            CrashDiagnostic = new CrashDiagnosticDto(
+                CrashDiagnosticStatuses.PendingOrUnavailable,
+                1234,
+                "Sati",
+                heartbeat)
+        };
+        var matched = pending with
+        {
+            CrashDiagnostic = new CrashDiagnosticDto(
+                CrashDiagnosticStatuses.Matched,
+                1234,
+                "Sati",
+                heartbeat,
+                1000,
+                44,
+                heartbeat.AddSeconds(2),
+                "Application Error",
+                "Sati.exe",
+                "1.3.6.0",
+                "coreclr.dll",
+                "10.0.12.345",
+                "0xC0000005",
+                "0x000000000001ABCD",
+                true)
+        };
+
+        outbox.Enqueue(pending);
+        var inFlight = Assert.Single(outbox.ReadPending());
+        outbox.Enqueue(matched);
+        outbox.Complete(inFlight);
+
+        var upgraded = Assert.Single(outbox.ReadPending());
+        Assert.Equal(CrashDiagnosticStatuses.Matched, upgraded.Report.CrashDiagnostic?.Status);
+    }
+
+    [Fact]
     public async Task ReporterRetriesTheDurableEnvelopeAfterServiceRecovery()
     {
         var handler = new RecoveringHandler();

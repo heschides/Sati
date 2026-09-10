@@ -51,6 +51,28 @@ public partial class AdminDashboardViewModel(
     public bool HasSelectedPerson => SelectedPerson is not null;
     public bool HasHistory => PersonHistory.Count > 0;
     public bool IsDemoEnvironment => environmentInfo?.Environment == SatiDataEnvironment.Demo;
+    public string LocalDiagnosticLogFolder => AppErrorLog.DefaultDirectory;
+    public bool HasSelectedCrashDiagnostic => SelectedIncident?.LastCrashDiagnostic is not null;
+    public string SelectedCrashDiagnosticSummary => SelectedIncident?.LastCrashDiagnostic switch
+    {
+        { Status: CrashDiagnosticStatuses.Matched } diagnostic =>
+            $"Windows confirmed Application Error 1000 at {diagnostic.WindowsEventTimeUtc:u} for " +
+            $"{diagnostic.FaultingApplication} (PID {diagnostic.ProcessId}). Faulting module: " +
+            $"{diagnostic.FaultingModule}; exception code: {diagnostic.ExceptionCode ?? "not supplied"}; " +
+            $"fault offset: {diagnostic.FaultOffset ?? "not supplied"}. " +
+            (diagnostic.DotNetRuntimeEventObserved
+                ? "A nearby .NET Runtime 1026 signal was also observed; its free-text message was not collected."
+                : "No safely correlatable .NET Runtime 1026 signal was observed."),
+        { Status: CrashDiagnosticStatuses.PendingOrUnavailable } diagnostic =>
+            $"Sati detected an unclean exit for {diagnostic.ProcessName} (PID {diagnostic.ProcessId}), but " +
+            "Windows had not produced a matching Application Error record yet. The retained marker will be checked again at a later launch.",
+        { Status: CrashDiagnosticStatuses.ApplicationLogUnavailable } diagnostic =>
+            $"Sati detected an unclean exit for {diagnostic.ProcessName} (PID {diagnostic.ProcessId}), but " +
+            "the Windows Application log could not be read under the current Windows policy. Sati does not request elevation.",
+        { Status: CrashDiagnosticStatuses.CorrelationUnavailable } =>
+            "Sati detected an unclean exit from an older or damaged marker that did not contain a process ID, so exact Windows correlation was not possible.",
+        _ => string.Empty
+    };
     public string LastRefreshedLabel => LastRefreshedAt is null
         ? "Not loaded"
         : $"Updated {LastRefreshedAt:MMM d, h:mm tt}";
@@ -249,6 +271,8 @@ public partial class AdminDashboardViewModel(
         if (value is not null)
             SelectedIncidentStatus = value.Status == "Reopened" ? "Investigating" : value.Status;
         UpdateIncidentStatusCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasSelectedCrashDiagnostic));
+        OnPropertyChanged(nameof(SelectedCrashDiagnosticSummary));
     }
     partial void OnSelectedIncidentStatusChanged(string value) =>
         UpdateIncidentStatusCommand.NotifyCanExecuteChanged();
@@ -295,9 +319,11 @@ public partial class AdminDashboardViewModel(
             (IncidentStatusFilter == "All statuses" || item.Status == IncidentStatusFilter) &&
             (IncidentSeverityFilter == "All severities" || item.Severity == IncidentSeverityFilter) &&
             (search.Length == 0 ||
-             item.Operation.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-             item.LastReference.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-             item.LastRelease.Contains(search, StringComparison.OrdinalIgnoreCase)));
+              item.Operation.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+              item.LastReference.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+              item.LastRelease.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+              (item.LastCrashDiagnostic?.FaultingApplication?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+              (item.LastCrashDiagnostic?.FaultingModule?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)));
         Replace(FilteredIncidents, filtered);
     }
 

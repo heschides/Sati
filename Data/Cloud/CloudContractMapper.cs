@@ -137,7 +137,8 @@ internal static class CloudContractMapper
         VrAssistantTitle = VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle),
         AnnualPacketOpenDaysBefore = s.AnnualPacketOpenDaysBefore,
         BillingComplianceRequirements = s.BillingComplianceRequirements,
-        AbandonedAfterDays = s.AbandonedAfterDays,
+        AbandonedAfterDays = ProductivityForecast.NormalizeDocumentationWindowDays(
+            s.AbandonedAfterDays),
         ProductivityThreshold = s.ProductivityThreshold,
         BaseIncentive = s.BaseIncentive,
         PerUnitIncentive = s.PerUnitIncentive,

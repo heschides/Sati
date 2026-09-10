@@ -21,6 +21,7 @@ using PdfSharp.Fonts;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace Sati
 {
@@ -28,53 +29,14 @@ namespace Sati
     {
         private IHost? _host;
         private bool _isShowingUnhandledException;
+        private bool _globalFailureHandlersRegistered;
         private readonly HashSet<string> _shownUnhandledExceptionFingerprints = new(StringComparer.Ordinal);
         public IServiceProvider Services => _host!.Services;
 
         protected override async void OnStartup(StartupEventArgs e)
         {
-            DispatcherUnhandledException += (sender, args) =>
-            {
-                args.Handled = true;
-
-                // A WPF binding/layout exception can be raised again while its error
-                // dialog is activating. Never recursively open another dialog from
-                // inside the first exception handler.
-                if (_isShowingUnhandledException)
-                {
-                    Debug.WriteLine($"Suppressed reentrant UI exception: {args.Exception}");
-                    return;
-                }
-
-                // A failed WPF template can be retried on every layout pass. Showing
-                // a modal dialog for every retry traps the user in an endless loop.
-                // Report each technical failure shape once per process, then keep
-                // handling identical retries silently so the user can close Sati.
-                var fingerprint = CreateExceptionFingerprint(args.Exception);
-                if (!_shownUnhandledExceptionFingerprints.Add(fingerprint))
-                {
-                    Debug.WriteLine($"Suppressed repeated UI exception: {fingerprint}");
-                    return;
-                }
-
-                _isShowingUnhandledException = true;
-                try
-                {
-                    var reference = AppErrorLog.Record(args.Exception, "dispatcher.unhandled");
-                    if (_host?.Services.GetService<IIncidentReporter>() is { } reporter)
-                        _ = reporter.ReportAsync(args.Exception, "dispatcher.unhandled", reference);
-                    MessageBox.Show(
-                        "Sati encountered an unexpected problem. Your current action may not have completed. " +
-                        $"Please close and reopen Sati, and give support error reference {reference}.",
-                        "Sati Could Not Complete the Action",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                }
-                finally
-                {
-                    _isShowingUnhandledException = false;
-                }
-            };
+            RegisterGlobalFailureHandlers();
+            AppErrorLog.EnsureReady();
 
             try
             {
@@ -137,7 +99,9 @@ namespace Sati
                         // registered separately below and has no EF/SQL fallback.
                         services.AddTransient<IPasswordHasher, PasswordHasher>();
                         services.AddSingleton<ISessionService, SessionService>();
-                        services.AddSingleton<ApplicationRunState>();
+                        services.AddSingleton<IWindowsCrashEventReader, WindowsCrashEventReader>();
+                        services.AddSingleton(serviceProvider => new ApplicationRunState(
+                            serviceProvider.GetRequiredService<IWindowsCrashEventReader>()));
                         services.AddSingleton<IDatabaseActivityTracker, DatabaseActivityTracker>();
                         services.AddSingleton<DatabaseActivityViewModel>();
                         services.AddSingleton<DatabaseActivityPreview>();
@@ -361,11 +325,9 @@ namespace Sati
             }
             catch (Exception ex)
             {
-                var reference = AppErrorLog.Record(ex, "application.startup");
-                if (_host?.Services.GetService<IIncidentReporter>() is { } reporter)
-                    _ = reporter.ReportAsync(ex, "application.startup", reference, "Critical");
+                var reference = RecordAndReport(ex, "application.startup", IncidentSeverities.Critical);
                 MessageBox.Show(
-                    "Sati could not finish starting safely. No work session was opened. " +
+                    "Sati could not finish starting safely. No work session was opened. A diagnostic log was saved. " +
                     $"Please give support error reference {reference}.",
                     "Sati Could Not Start",
                     MessageBoxButton.OK,
@@ -374,6 +336,86 @@ namespace Sati
             }
 
             base.OnStartup(e);
+        }
+
+        private void RegisterGlobalFailureHandlers()
+        {
+            if (_globalFailureHandlersRegistered)
+                return;
+            DispatcherUnhandledException += OnDispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+            TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+            _globalFailureHandlersRegistered = true;
+        }
+
+        private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)
+        {
+            args.Handled = true;
+            if (_isShowingUnhandledException)
+            {
+                Debug.WriteLine($"Suppressed reentrant UI exception: {args.Exception.GetType().FullName}");
+                return;
+            }
+
+            var fingerprint = CreateExceptionFingerprint(args.Exception);
+            if (!_shownUnhandledExceptionFingerprints.Add(fingerprint))
+            {
+                Debug.WriteLine($"Suppressed repeated UI exception: {fingerprint}");
+                return;
+            }
+
+            _isShowingUnhandledException = true;
+            try
+            {
+                var reference = RecordAndReport(args.Exception, "dispatcher.unhandled", IncidentSeverities.Error);
+                MessageBox.Show(
+                    "Sati encountered an unexpected problem. Your current action may not have completed. " +
+                    $"A diagnostic log was saved. Please close and reopen Sati, and give support error reference {reference}.",
+                    "Sati Could Not Complete the Action",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isShowingUnhandledException = false;
+            }
+        }
+
+        private void OnDomainUnhandledException(object? sender, UnhandledExceptionEventArgs args)
+        {
+            var exception = args.ExceptionObject as Exception ??
+                new InvalidOperationException("A background thread terminated with a non-Exception failure object.");
+            RecordAndReport(exception, "application.background-thread-unhandled", IncidentSeverities.Critical,
+                waitBrieflyForReport: true);
+        }
+
+        private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs args)
+        {
+            args.SetObserved();
+            RecordAndReport(args.Exception, "application.unobserved-task", IncidentSeverities.Warning);
+        }
+
+        private string RecordAndReport(
+            Exception exception,
+            string operation,
+            string severity,
+            bool waitBrieflyForReport = false)
+        {
+            var reference = AppErrorLog.Record(exception, operation);
+            try
+            {
+                if (_host?.Services.GetService<IIncidentReporter>() is not { } reporter)
+                    return reference;
+
+                var report = reporter.ReportAsync(exception, operation, reference, severity);
+                if (waitBrieflyForReport)
+                    report.Wait(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception reportingException)
+            {
+                Debug.WriteLine($"Sati incident {reference} could not be queued. Reporter failure type: {reportingException.GetType().FullName}");
+            }
+            return reference;
         }
 
         internal static string CreateExceptionFingerprint(Exception exception) => string.Join('|',
@@ -386,11 +428,24 @@ namespace Sati
 
         protected override async void OnExit(ExitEventArgs e)
         {
-            if (_host is not null)
+            try
             {
-                await _host.StopAsync();
-                _host.Services.GetService<ApplicationRunState>()?.MarkGracefulExit();
-                _host.Dispose();
+                if (_host is not null)
+                {
+                    await _host.StopAsync();
+                    _host.Services.GetService<ApplicationRunState>()?.MarkGracefulExit();
+                    _host.Dispose();
+                }
+            }
+            finally
+            {
+                if (_globalFailureHandlersRegistered)
+                {
+                    DispatcherUnhandledException -= OnDispatcherUnhandledException;
+                    AppDomain.CurrentDomain.UnhandledException -= OnDomainUnhandledException;
+                    TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
+                    _globalFailureHandlersRegistered = false;
+                }
             }
 
             base.OnExit(e);

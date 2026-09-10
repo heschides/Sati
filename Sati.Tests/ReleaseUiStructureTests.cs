@@ -10,6 +10,32 @@ public sealed class ReleaseUiStructureTests
         "..", "..", "..", "..", ".."));
 
     [Fact]
+    public void ProductivityForecastSeparatesBacklogFromFutureCapacity()
+    {
+        var dashboard = File.ReadAllText(Path.Combine(
+            Root, "Views", "CaseManagerDashboardContentView.xaml"));
+
+        Assert.Contains("RECOVERABLE", dashboard);
+        Assert.Contains("SECURED", dashboard);
+        Assert.Contains("PROJECTED / DAY", dashboard);
+        Assert.Contains("FUTURE DAYS", dashboard);
+        Assert.Contains("Documentation deadline warning", dashboard);
+        Assert.DoesNotContain("Past days without notes are included", dashboard);
+    }
+
+    [Fact]
+    public void AdminIncidentSurfaceNamesTheLocalDiagnosticFolder()
+    {
+        var admin = File.ReadAllText(Path.Combine(Root, "Views", "AdminDashboardView.xaml"));
+
+        Assert.Contains("Local diagnostic log folder", admin);
+        Assert.Contains("LocalDiagnosticLogFolder", admin);
+        Assert.Contains("Agency incident groups", admin);
+        Assert.Contains("Selected incident Windows crash diagnostic", admin);
+        Assert.Contains("SelectedCrashDiagnosticSummary", admin);
+    }
+
+    [Fact]
     public void HelpAndDocumentsHaveSidebarsBelowTheFeatureTabs()
     {
         var section = File.ReadAllText(Path.Combine(Root, "Views", "CaseManagementView.xaml"));
@@ -277,7 +303,8 @@ public sealed class ReleaseUiStructureTests
         foreach (var name in new[]
                  {
                      "PineCoast", "BlueberryMist", "BlueGrayPearl", "CedarGrove", "HarborNight",
-                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
+                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
+                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor"
                  })
         {
             var supplied = ResourceKeys(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -295,6 +322,10 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("Art Nouveau", service);
         Assert.Contains("Mid-Century Modern", service);
         Assert.Contains("Vanilla Bean", service);
+        Assert.Contains("Walnut Linen", service);
+        Assert.Contains("Deep Current", service);
+        Assert.Contains("Redwood Blush", service);
+        Assert.Contains("Bodhi Watercolor", service);
     }
 
     [Fact]

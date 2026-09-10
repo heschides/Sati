@@ -118,30 +118,15 @@ public sealed class AdminService(
         await using var context = contextFactory.CreateDbContext();
         var observedAt = DateTime.UtcNow;
         var start = observedAt.AddDays(-days);
-        var incidents = await context.IncidentGroups.AsNoTracking()
+        var incidentRows = await context.IncidentGroups.AsNoTracking()
             .Where(candidate => candidate.AgencyId == actor.AgencyId &&
                                 candidate.Scope == IncidentScopes.Agency &&
                                 candidate.LastSeenUtc >= start)
             .OrderByDescending(candidate => candidate.LastSeenUtc)
             .ThenByDescending(candidate => candidate.Id)
             .Take(take)
-            .Select(candidate => new IncidentGroupDto(
-                candidate.Id,
-                candidate.AgencyId,
-                candidate.Scope,
-                candidate.Source,
-                candidate.Severity,
-                candidate.Operation,
-                candidate.FirstRelease,
-                candidate.LastRelease,
-                candidate.ExceptionFingerprint,
-                candidate.Status,
-                candidate.OccurrenceCount,
-                candidate.FirstSeenUtc,
-                candidate.LastSeenUtc,
-                candidate.LastReference,
-                candidate.LastActorRole))
             .ToListAsync(cancellationToken);
+        var incidents = incidentRows.Select(IncidentContractMapper.ToDto).ToList();
         return new AdminIncidentDashboardDto(
             observedAt,
             IncidentHealthScoring.Calculate(incidents, observedAt, days),
@@ -169,12 +154,7 @@ public sealed class AdminService(
             "IncidentGroup",
             metadataJson: JsonSerializer.Serialize(new { incidentId, status }));
         await context.SaveChangesAsync(cancellationToken);
-        return new IncidentGroupDto(
-            incident.Id, incident.AgencyId, incident.Scope, incident.Source, incident.Severity,
-            incident.Operation, incident.FirstRelease, incident.LastRelease,
-            incident.ExceptionFingerprint, incident.Status, incident.OccurrenceCount,
-            incident.FirstSeenUtc, incident.LastSeenUtc, incident.LastReference,
-            incident.LastActorRole);
+        return IncidentContractMapper.ToDto(incident);
     }
 
     public async Task<LegalHoldDto> PlaceLegalHoldAsync(

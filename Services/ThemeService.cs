@@ -38,7 +38,11 @@ namespace Sati.Services
             new("Paisley", "Paisley"),
             new("Art Nouveau", "ArtNouveau"),
             new("Mid-Century Modern", "MidCenturyModern"),
-            new("Vanilla Bean", "VanillaBean")
+            new("Vanilla Bean", "VanillaBean"),
+            new("Walnut Linen", "WalnutLinen"),
+            new("Deep Current", "DeepCurrent"),
+            new("Redwood Blush", "RedwoodBlush"),
+            new("Bodhi Watercolor", "BodhiWatercolor")
         ];
 
         public ThemeOption CurrentTheme { get; private set; }

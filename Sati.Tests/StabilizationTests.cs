@@ -639,9 +639,9 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.6", version);
+        Assert.Equal("1.3.7", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Check requests, prepared and preserved", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Honest pace, richer color, safer recovery", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Submitted claims now have a visible staging lane" &&
@@ -1213,6 +1213,46 @@ public sealed class StabilizationTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public void DiagnosticLogUsesPerProcessFilesAndPrunesExpiredRecords()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"sati-error-log-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var expired = Path.Combine(directory, "sati-20000101-1.jsonl");
+            File.WriteAllText(expired, "expired");
+            File.SetLastWriteTimeUtc(expired, DateTime.UtcNow.AddDays(-31));
+            var unrelated = Path.Combine(directory, "keep-me.txt");
+            File.WriteAllText(unrelated, "not a Sati diagnostic record");
+
+            AppErrorLog.EnsureReady(directory);
+            AppErrorLog.Record(new InvalidOperationException("redacted"), "test.retention", directory);
+
+            Assert.False(File.Exists(expired));
+            Assert.True(File.Exists(unrelated));
+            var current = Assert.Single(Directory.GetFiles(directory, "*.jsonl"));
+            Assert.Contains($"-{Environment.ProcessId}", Path.GetFileName(current));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ApplicationRegistersAllManagedCrashShapes()
+    {
+        const System.Reflection.BindingFlags handlers =
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+
+        Assert.NotNull(typeof(App).GetMethod("OnDispatcherUnhandledException", handlers));
+        Assert.NotNull(typeof(App).GetMethod("OnDomainUnhandledException", handlers));
+        Assert.NotNull(typeof(App).GetMethod("OnUnobservedTaskException", handlers));
+        Assert.NotNull(typeof(App).GetMethod("RecordAndReport", handlers));
     }
     [Fact]
     public void ApiPasswordHasherProducesVerifiableSaltedCredentials()

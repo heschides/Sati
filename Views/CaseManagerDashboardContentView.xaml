@@ -83,16 +83,16 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="PENDING"
+                        <TextBlock Text="RECOVERABLE"
                                    Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding PendingUnits}"
+                        <TextBlock Text="{Binding RecoverableUnits}"
                                    FontSize="20"
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="LOGGED"
+                        <TextBlock Text="SECURED"
                                    Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding LoggedUnits}"
+                        <TextBlock Text="{Binding SecuredUnits}"
                                    FontSize="20"
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
@@ -105,7 +105,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="3">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="DAILY AVG"
+                            <TextBlock Text="DOCUMENTED AVG"
                                        Style="{StaticResource LabelStyle}" />
                             <TextBlock Text="ⓘ"
                                        FontSize="12"
@@ -117,10 +117,10 @@
                                     <ToolTip>
                                         <TextBlock MaxWidth="220"
                                                    TextWrapping="Wrap">
-                                            <Run Text="Average units per day on days where notes have been logged.  When you enter your first note for a new day, this number will decrease significantly; it will continue to rise as you enter notes for that day."/>
+                                            <Run Text="Average known units on service days that already have pending, logged, or approved notes."/>
                                             <LineBreak />
                                             <LineBreak />
-                                            <Run Text="Days without logged notes are not included — they don't drag your average down. Use the calendar to mark non-working days as exempt, which removes them from your monthly target." />
+                                            <Run Text="A blank past day is not silently treated as future capacity. Recoverable pending notes and future workdays are shown separately below." />
                                              <LineBreak />
                                         </TextBlock>
                                     </ToolTip>
@@ -134,14 +134,14 @@
                 </Grid>
 
                 <TextBlock Style="{StaticResource LabelStyle}">
-                    <Run Text="{Binding LoggedUnits, Mode=OneWay}" />
+                    <Run Text="{Binding SecuredUnits, Mode=OneWay}" />
                     <Run Text=" / " />
                     <Run Text="{Binding Threshold, Mode=OneWay}" />
                     <Run Text=" units" />
                 </TextBlock>
                 <ProgressBar Minimum="0"
                              Maximum="{Binding SafeThreshold, TargetNullValue=1, FallbackValue=1}"
-                             Value="{Binding LoggedUnits, Mode=OneWay}"
+                             Value="{Binding SecuredUnits, Mode=OneWay}"
                              Height="10"
                              Margin="0,4,0,8"
                              Foreground="{DynamicResource AccentBrush}"
@@ -152,17 +152,25 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="NEEDED / DAY"
+                        <TextBlock Text="PROJECTED / DAY"
                                    Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding UnitsPerRemainingDay, StringFormat={}{0:F1}, TargetNullValue='—'}"
+                        <TextBlock Text="{Binding ProjectedPace, StringFormat={}{0:F1}, TargetNullValue='—'}"
                                    FontSize="20"
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1">
+                        <TextBlock Text="SECURED / DAY"
+                                   Style="{StaticResource LabelStyle}" />
+                        <TextBlock Text="{Binding SecuredPace, StringFormat={}{0:F1}, TargetNullValue='—'}"
+                                   FontSize="20"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="DAYS LEFT"
+                            <TextBlock Text="FUTURE DAYS"
                                        Style="{StaticResource LabelStyle}" />
                             <TextBlock Text="ⓘ"
                                        FontSize="12"
@@ -174,10 +182,10 @@
                                     <ToolTip>
                                         <TextBlock MaxWidth="220"
                                                    TextWrapping="Wrap">
-                                            <Run Text="Eligible workdays remaining in the month with no notes logged yet." />
+                                            <Run Text="Eligible workdays from today through the end of the month." />
                                             <LineBreak />
                                             <LineBreak />
-                                            <Run Text="Excludes weekends, holidays, and days marked exempt in the calendar. Past days without notes are included — you can still log notes for them." />
+                                            <Run Text="Excludes weekends, holidays, and days marked exempt in the calendar. Past days are represented only by recoverable pending notes; they are never counted as new work capacity." />
                                         </TextBlock>
                                     </ToolTip>
                                 </TextBlock.ToolTip>
@@ -188,6 +196,26 @@
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
                 </Grid>
+
+                <Border Background="{DynamicResource WarningFillBrush}"
+                        BorderBrush="{DynamicResource WarningBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="8"
+                        Margin="0,0,0,8"
+                        AutomationProperties.Name="Documentation deadline warning"
+                        Visibility="{Binding HasDueTodayRisk, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="{Binding DueTodayRiskMessage}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                </Border>
+
+                <TextBlock Text="{Binding PendingItemsWithoutUnitsMessage}"
+                           Margin="0,0,0,8"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           AutomationProperties.Name="Unestimated pending notes warning"
+                           Visibility="{Binding HasPendingItemsWithoutUnits, Converter={StaticResource BoolToVisibilityConverter}}" />
 
                 <TextBlock Text="ESTIMATED INCENTIVE"
                            Style="{StaticResource LabelStyle}" />

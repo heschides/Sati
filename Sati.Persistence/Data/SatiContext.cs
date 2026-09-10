@@ -896,6 +896,8 @@ namespace Sati.Data
                 entity.Property(incident => incident.Status).IsRequired().HasMaxLength(20);
                 entity.Property(incident => incident.LastReference).IsRequired().HasMaxLength(40);
                 entity.Property(incident => incident.LastActorRole).IsRequired().HasMaxLength(30);
+                entity.Property(incident => incident.LastCrashDiagnosticJson)
+                      .HasMaxLength(CrashDiagnosticRules.MaximumSerializedLength);
                 entity.HasOne<Agency>()
                       .WithMany()
                       .HasForeignKey(incident => incident.AgencyId)

@@ -431,6 +431,9 @@ public sealed record IncentiveDto(
 public sealed record IncentiveEnvelopeDto(IncentiveDto Incentive, bool WasCreated);
 
 public sealed record DateSetRequest(IReadOnlyList<DateTime> Dates);
+// DaysAlreadyWorked is retained for compatibility with deployed 1.3.x clients. Forecasting no
+// longer treats a past blank day as future capacity, and a note already entered today does not
+// prove that the case manager has no capacity left today.
 public sealed record RemainingEligibleDaysRequest(
     int Month,
     int Year,

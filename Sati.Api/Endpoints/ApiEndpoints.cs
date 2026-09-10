@@ -89,7 +89,8 @@ internal static partial class ApiEndpoints
                 request.ExceptionFingerprint,
                 occurredAt,
                 request.Reference,
-                actor.Role), cancellationToken);
+                actor.Role,
+                request.CrashDiagnostic), cancellationToken);
             return Results.Accepted(value: ToIncidentDto(incident));
         });
 
@@ -4136,7 +4137,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            var abandonedAfterDays = (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).AbandonedAfterDays;
+            var abandonedAfterDays = ProductivityForecast.NormalizeDocumentationWindowDays(
+                (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).AbandonedAfterDays);
             var threshold = clock.Today.AddDays(-abandonedAfterDays);
             var personIds = db.People.Where(x => x.UserId == actor.UserId).Select(x => x.Id);
             var count = await db.Notes
@@ -4162,10 +4164,10 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             if (!actor.HasAdminPermissions) return Results.Forbid();
-            if (request.AbandonedAfterDays < 0 || request.ProductivityThreshold < 0 ||
+            if (request.AbandonedAfterDays <= 0 || request.ProductivityThreshold < 0 ||
                 request.BaseIncentive < 0 || request.PerUnitIncentive < 0 ||
                 request.PassthroughRate is < 0 or > 1 || request.SalesTaxRate is < 0 or > 1)
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["settings"] = ["Settings contain an invalid negative value or percentage."] });
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["settings"] = ["The documentation window must be at least one day, monetary values cannot be negative, and percentages must be between zero and one."] });
             if (!BillingComplianceGate.IsSupported(request.BillingComplianceRequirements))
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["billingComplianceRequirements"] = ["The compliance requirement selection is invalid."] });
             if (request.AnnualPacketOpenDaysBefore is < 0 or > 180)
@@ -4476,17 +4478,19 @@ internal static partial class ApiEndpoints
             RemainingEligibleDaysRequest request,
             ClaimsPrincipal principal,
             ApiDbContext db,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
             var settings = await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken);
-            var worked = request.DaysAlreadyWorked.Select(x => x.Date).ToHashSet();
             var exempt = request.ExemptDates.Select(x => x.Date).ToHashSet();
+            var monthStart = new DateTime(request.Year, request.Month, 1);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var start = clock.Today > monthStart ? clock.Today : monthStart;
             var count = 0;
-            for (var day = 1; day <= DateTime.DaysInMonth(request.Year, request.Month); day++)
+            for (var date = start; date <= monthEnd; date = date.AddDays(1))
             {
-                var date = new DateTime(request.Year, request.Month, day);
-                if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday || WorkdayCalculator.IsExcluded(date, settings) || worked.Contains(date) || exempt.Contains(date))
+                if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday || WorkdayCalculator.IsExcluded(date, settings) || exempt.Contains(date))
                     continue;
                 count++;
             }
@@ -6995,6 +6999,26 @@ internal static partial class ApiEndpoints
             request.ExceptionFingerprint.Length is < 12 or > 64 ||
             request.ExceptionFingerprint.Any(character => !Uri.IsHexDigit(character)))
             errors["exceptionFingerprint"] = ["Exception fingerprint must be 12-64 hexadecimal characters."];
+        if (request.CrashDiagnostic is { } diagnostic)
+        {
+            if (!CrashDiagnosticRules.IsValid(diagnostic))
+            {
+                errors["crashDiagnostic"] = ["Crash diagnostic metadata is not in the supported bounded format."];
+            }
+            else
+            {
+                var heartbeat = DateTime.SpecifyKind(diagnostic.LastHeartbeatUtc, DateTimeKind.Utc);
+                var now = DateTime.UtcNow;
+                if (heartbeat < now.AddDays(-90) || heartbeat > now.AddMinutes(5))
+                    errors["crashDiagnostic.lastHeartbeatUtc"] = ["Crash heartbeat must be within the last 90 days and not in the future."];
+                if (diagnostic.WindowsEventTimeUtc is { } eventTime)
+                {
+                    eventTime = DateTime.SpecifyKind(eventTime, DateTimeKind.Utc);
+                    if (eventTime < heartbeat.AddMinutes(-1) || eventTime > heartbeat.AddMinutes(30))
+                        errors["crashDiagnostic.windowsEventTimeUtc"] = ["Windows event time is outside the bounded crash-correlation window."];
+                }
+            }
+        }
         return errors.Count == 0 ? null : errors;
     }
 
@@ -7017,7 +7041,8 @@ internal static partial class ApiEndpoints
         incident.FirstSeenUtc,
         incident.LastSeenUtc,
         incident.LastReference,
-        incident.LastActorRole);
+        incident.LastActorRole,
+        CrashDiagnosticRules.Deserialize(incident.LastCrashDiagnosticJson));
 
     /// <summary>
     /// Refuses a second directory entry for an organization this agency has already

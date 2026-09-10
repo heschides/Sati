@@ -2,7 +2,7 @@
 
 *Living document. The "why" behind choices that no diagram preserves. ARCHITECTURE.md
 says what owns what; this says why it was built that way and what was rejected. Newest
-sections at the bottom. Last updated: 2026-09-07.*
+sections at the bottom. Last updated: 2026-09-10.*
 
 ---
 
@@ -3718,3 +3718,84 @@ and Finance delivery events, with the actor and time recorded for each transitio
 names from an API payload, letting a supervisor edit another user's request, and treating typed
 names under a signature label as a legally reviewed electronic signature. Also rejected: treating
 PDF publication, an email CC, or the supervisor's printed name as approval.
+
+## 2026-09-09 — Richer themes remain light-surface themes
+
+Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor extend the palette between Sati's
+cream-heavy light themes and its true night themes. "Darker" here means richer brown, blue, red,
+and violet hue—not dark panels with light type. Each therefore keeps the ordinary dark-text
+contract and uses deeper navigation tint, borders, accents, and hover states for visual weight.
+
+Bodhi Watercolor derives its sequence from the Sati bodhi-leaf artwork: turquoise into clear blue,
+then violet and a small coral edge. The window and navigation gradients carry that movement while
+work surfaces remain quiet enough for forms and records. None of the four changes shared semantic
+status colors to make a palette pass. Surface luminance is raised only where the measured token
+audit proves a fixed green, red, amber, or orange status label would otherwise fall below WCAG AA.
+
+## 2026-09-10 — Productivity separates secured work, recoverable documentation, and future capacity
+
+A past service day can still contain recoverable work during its seven-calendar-day documentation
+window, but it is not another future workday. Those are different facts and must not share one
+denominator. The monthly forecast therefore treats Logged and Approved note units as secured,
+Pending note units with an open deadline as recoverable backlog, and only today-through-month-end
+eligible workdays as production capacity. If units expire after today, the consequence forecast
+uses workdays after today because today's capacity expires with them.
+
+The rejected alternatives were (1) counting every blank past weekday as remaining capacity, which
+keeps already-expired work alive indefinitely, and (2) counting only days with notes, which rewards
+documentation that is never entered. Sati instead reports what it knows and identifies what it
+cannot know. A Scheduled row is not proof of performed service, and an activity with no note or no
+duration cannot truthfully contribute a unit estimate.
+
+`Sati.Contracts.V1.ProductivityForecast` is the one calculation owner. Its output is advisory: it
+does not replace the server-authoritative note workflow or make a billing eligibility decision.
+
+## 2026-09-10 — Every managed desktop failure writes locally; Admin receives only the curated envelope
+
+Desktop diagnostic files have one stable home:
+`%LOCALAPPDATA%\SatiLogica\Sati\Logs`. Sati prepares it before startup work, writes a separate file
+per process, rolls a file at 5 MB, removes records older than 30 days, and limits the folder to
+50 MB. Dispatcher, background-thread, unobserved-task, and startup failures all use the same
+PHI-minimized writer. The user-facing UI names the occurrence reference and the Admin dashboard
+shows the folder path on that workstation.
+
+After authentication, the same occurrence also enters `IIncidentReporter`. The Admin-visible row
+contains only the existing curated envelope; exception messages and stacks remain local. Demo
+queues that envelope durably before attempting the API. Local Production aggregates it within the
+agency database. Native faults, stack overflow, forced termination, and power loss cannot be
+promised a last-moment managed write, so the existing run marker reports the unclean session at the
+next authenticated launch. A pre-login failure has a local diagnostic but cannot safely become an
+agency incident because no validated tenant actor exists yet.
+
+**Rejected:** copying raw crash files into the Admin database, silently uploading support bundles,
+or claiming a managed handler can catch a power loss or process kill. Those options either create
+an unnecessary PHI-bearing support store or promise evidence the operating system cannot produce.
+
+## 2026-09-10 — Fatal Windows faults are correlated after restart, never by the dying process
+
+An authenticated session marker now stores the Sati process name, PID, stable crash reference, and
+a heartbeat updated every 30 seconds. If that marker survives, the next matching agency session
+records the unclean exit first and then reads the ordinary Windows Application channel in a bounded
+window around the heartbeat. Application Error 1000 is accepted only when both structured
+`AppName` and `ProcessId` match. This avoids attributing another Sati edition—or a reused PID—to the
+failed session.
+
+The Admin-visible addition remains a curated envelope. `CrashDiagnosticDto` has fields only for the
+faulting application/version, module/version, exception code, fault offset, event record/time,
+process identity, and a yes/no nearby same-PID .NET Runtime signal. Application and module paths have no
+field. Event 1026 descriptions are never formatted or read because exception prose can contain PHI.
+The API revalidates the closed status set, character allowlists, lengths, and time bounds before it
+serializes the optional object into `IncidentGroups.LastCrashDiagnosticJson`.
+
+Windows Error Reporting can lag behind restart. One short retry is followed by an explicit
+pending/unavailable result, and the old marker remains available for a later launch. That later
+match carries the same support reference, replaces an unsent pending envelope, and enriches the
+existing incident without counting a second crash. Reading the Application channel requires no
+elevation under ordinary Windows policy; access failure becomes a diagnostic state rather than an
+elevation request.
+
+**Rejected:** reading or persisting raw Event 1026 text, matching only by executable name or only by
+time, treating an empty query as proof that no crash occurred, and automatically enabling WER
+LocalDumps. Dumps can contain process memory and PHI and would require a separate explicit decision
+for enablement, access, retention, and destruction. Also unchanged: a hard fault before sign-in has
+no tenant-safe marker and therefore cannot be assigned to an agency Admin record.

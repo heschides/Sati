@@ -32,7 +32,8 @@ internal sealed class ApiIncidentRecorder(IncidentAggregator aggregator)
                 fingerprint,
                 now,
                 context.TraceIdentifier,
-                actorRole), cancellationToken);
+                actorRole,
+                null), cancellationToken);
         }
         catch
         {

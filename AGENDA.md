@@ -1,5 +1,39 @@
 # Sati — Refactor Agenda
 
+## Unreleased — recoverable productivity forecast
+
+- [x] Stop counting blank past weekdays as future productivity capacity; count only eligible days
+      from today through month-end, with the post-deadline consequence using days after today.
+- [x] Add the narrative-free shared `ProductivityForecast` rule for secured units, recoverable
+      Pending-note units, units due today, expired Pending units, and unknown-duration warnings.
+- [x] Show both the conservative secured pace and the projected pace after recoverable notes, with
+      a non-color-only deadline warning that explains how the pace changes if today's units expire.
+- [x] Keep Scheduled work out of performed backlog and never invent units for an activity or note
+      whose duration is unknown.
+- [x] Add focused calculation and UI-structure regressions.
+
+## Unreleased — managed crash capture and diagnostic retention
+
+- [x] Keep workstation diagnostics in the stable
+      `%LOCALAPPDATA%\SatiLogica\Sati\Logs` folder and expose that exact path on the Admin screen.
+- [x] Capture WPF dispatcher, background-thread, unobserved-task, and startup failures without
+      copying exception messages or business payloads into the Admin incident envelope.
+- [x] Retain the unclean-run marker as the fallback for native faults, forced termination, and
+      power loss that cannot execute managed crash code; report it at the next authenticated launch.
+- [x] Use per-process JSONL files, 5 MB rolling files, 30-day expiry, and a 50 MB folder ceiling.
+- [x] Persist the authenticated Sati process name, PID, stable crash reference, and 30-second
+      heartbeat; after an unclean restart, query Windows Application Error 1000 and .NET Runtime
+      1026 in a bounded window. Require both process name and PID, retain late-WER work for a future
+      launch, and show only allowlisted structured metadata in Admin. LocalDumps remain disabled.
+- [x] Apply `20260910102153_AddCrashDiagnosticReadback` only through the controlled migration
+      process before deploying this API build. On 2026-09-10 the identity-validated Demo run added
+      one nullable, bounded metadata column to `IncidentGroups`; Local Production remains unchanged
+      until each workstation launches the matching Local release.
+- [ ] Complete the remaining `LOGGING_DESIGN.md` phases: shared plain-language error catalog,
+      breadcrumbs and run-marker tail, user-created support bundle, framework logger provider, and
+      desktop/API correlation-ID join. These remain documented work; raw logs must not be uploaded
+      or copied into the agency incident table as a shortcut.
+
 ## Unreleased — what the platform design changes in Sati
 
 From `PLATFORM_DOMAIN.md` and the two decisions of 2026-09-07. None of these waits on the
@@ -45,10 +79,10 @@ restructure, and all three get harder the longer they wait.
 
 Release 1.3.4 closed the contrast gaps that were visible to review. This work replaces review with
 measurement: `Helpers/ThemeContrast.cs` owns the WCAG arithmetic and `ThemeLegibilityTests` holds
-all twenty palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
+all twenty-four palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
 
 - [x] Score every text role against every surface role, and every fill against the ink named for
-      it, in all twenty themes. Correct the palettes by luminance only, never by hue.
+      it, in all twenty-four themes. Correct the palettes by luminance only, never by hue.
 - [x] Render every view under every theme and measure the resolved brushes, finding each run's
       background by hit test rather than by ancestor walk.
 - [x] Fail on any theme key a view names that no dictionary defines. `WarningSoftBrush` was
@@ -62,6 +96,10 @@ all twenty palettes to AA, both as token pairs and as rendered views. See `DECIS
       confirm label at about 1.3:1 in every dark theme.
 - [x] Add `PatternScrimBrush` and layer blur, scrim and controls in Settings so an illustrated
       theme stops competing with the densest screen in the application.
+- [x] Add Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor as richer light themes:
+      deeper brown, blue, and muted red families without night-mode light text or the yellow cast of
+      the cream palettes. Bodhi Watercolor follows the attached Sati leaf's turquoise, blue, violet,
+      and restrained coral sequence. All four pass the token and rendered-view AA gates.
 - [ ] Retire the remaining hard-coded literal colours in `ShellWindow`, `AdminDashboardView` and
       `PlatformHealthView`. Each is a self-consistent light pair, so it stays legible and the audit
       does not flag it, but it does not follow the theme and looks wrong on a dark palette.
@@ -107,6 +145,45 @@ same view loader as the theme legibility audit. See `DECISIONS.md`.
       ARIA rather than UI Automation, and that is where TalkBack and mobile browsers would apply.
 - [ ] Check keyboard operation at the two Easy Eyes scales and under Windows high-contrast themes,
       neither of which this pass exercises.
+
+## Release 1.3.7 — 2026-09-10
+
+"Honest pace, richer color, safer recovery." This release separates completed productivity from
+recoverable case-note backlog, adds four richer light themes, and carries safe Windows crash
+diagnostics into the existing agency incident workflow after restart.
+
+- [x] Implement and mutation-prove the shared seven-calendar-day productivity forecast, including
+      secured units, recoverable units, today's deadline consequence, unknown-duration disclosure,
+      and an old-server compatibility floor that refuses to let a zero-day payload break the UI or
+      age notes prematurely.
+- [x] Add Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor. All retain dark text on
+      light surfaces and pass the measured WCAG AA token and rendered-view checks.
+- [x] Add bounded local crash logs, managed fatal handlers, an authenticated PID/name/heartbeat
+      run marker, exact Windows event correlation after restart, late-report retry, safe incident
+      enrichment, and Admin readback. Raw Event 1026 text and LocalDumps remain excluded.
+- [x] Apply `20260910102153_AddCrashDiagnosticReadback` to identity-validated Azure `SatiDemo`
+      through `scripts/Apply-CrashDiagnosticReadbackMigration.ps1`: rollback-only dry run predicted
+      one nullable column and history row 98; the real run created both; the second real run made
+      no changes. The user removed the temporary exact-IP firewall rule immediately afterward and
+      a read-only Azure listing confirmed it absent.
+- [x] Release validation passed: the complete Release build finished with 0 errors and 9 existing
+      warnings; all 2,216 required tests passed, with only the optional local-AI competence test
+      skipped. Migration 98 matches the EF model, the symbolic migration replay found 0 problems,
+      and NuGet reported no known vulnerable direct or transitive package.
+- [ ] Source commit evidence pending.
+- [ ] Demo API package, deployment, health, release-version, and contract-revision evidence pending.
+- [ ] Demo and Local installer build, isolated acceptance, hashes, and distribution evidence pending.
+- [ ] Final evidence commit and local/remote equality pending.
+
+### Local Production machines
+
+This release adds migration 98. `SatiDemo` is migrated above; every Local Production database
+applies the migration only when that machine first launches the 1.3.7 Local client.
+
+- [ ] SatiLogica workstation: source builds are current, but the installed Local package and its
+      `SatiProduction` launch state have not yet been rechecked; treat the installed copy as behind.
+- [ ] Joshu workstation: installed version and migration state remain unverified; treat it as behind
+      until its operator installs 1.3.7 and confirms a successful Local startup.
 
 ## Release 1.3.6 — 2026-09-09 (Demo API alignment only)
 
@@ -2417,11 +2494,16 @@ release and are fixed; what remains:
       by `SupervisorId`, so an ordinary case manager sees an empty list either way and proves
       nothing. Verified: 11 of the 13 fail with every supervisor gate disabled. The two that
       survive are the positive controls, which is correct.
-- [ ] **Denial tests for the case-management gates.** Still outstanding. All API tests pass with
-      every `!actor.HasCaseManagerPermissions` gate disabled.
-- [ ] **Denial tests for `GET /admin/incidents`, `PUT /admin/incidents/{id}/status`, and
-      `ProviderDirectoryRules.CanCreateOrEdit`.** The only administration and provider gates with
-      no covering test.
+- [x] **Denial tests for the case-management gates — done 2026-09-10.** A billing-only actor is
+      temporarily made the real owner of a synthetic consumer, then is denied through the
+      self-caseload branch, `OwnsPersonAsync`, consumer creation, and agency Credible-match lookup.
+      This exercises each centralized case-management decision without relying on an empty query.
+- [x] **Denial tests for `GET /admin/incidents` and `PUT /admin/incidents/{id}/status` — done
+      2026-09-10.** A real case manager creates a permitted sanitized incident, is denied both
+      administration routes, and an Admin verifies the forbidden update left the group Open.
+- [x] **Denial tests for `ProviderDirectoryRules.CanCreateOrEdit` — done 2026-09-10.** A
+      billing-only user is denied provider create/edit and contact create/edit/delete across all
+      five API gates. This closes the provider-permission coverage gap recorded in the review.
 - [ ] **Finding 6: four caseload routes scope by owning `UserId` with no agency predicate.**
       `GET /people/{personId}/journal`, `PUT /people/{personId}`,
       `PUT /people/{personId}/contacts/{contactId}`, `DELETE /contacts/{contactId}`. Pre-existing,

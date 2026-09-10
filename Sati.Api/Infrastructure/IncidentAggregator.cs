@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
+using Sati.Contracts.V1;
 
 namespace Sati.Api.Infrastructure;
 
@@ -15,7 +16,8 @@ internal sealed record IncidentAggregation(
     string Fingerprint,
     DateTime OccurredAtUtc,
     string Reference,
-    string ActorRole);
+    string ActorRole,
+    CrashDiagnosticDto? CrashDiagnostic);
 
 internal sealed class IncidentAggregator(IDbContextFactory<ApiDbContext> contextFactory)
 {
@@ -39,6 +41,9 @@ internal sealed class IncidentAggregator(IDbContextFactory<ApiDbContext> context
         await gate.WaitAsync(cancellationToken);
         try
         {
+            var diagnosticJson = report.CrashDiagnostic is null
+                ? null
+                : CrashDiagnosticRules.Serialize(report.CrashDiagnostic);
             await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
             await using var transaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable,
@@ -76,7 +81,8 @@ internal sealed class IncidentAggregator(IDbContextFactory<ApiDbContext> context
                     FirstSeenUtc = report.OccurredAtUtc,
                     LastSeenUtc = report.OccurredAtUtc,
                     LastReference = report.Reference,
-                    LastActorRole = report.ActorRole
+                    LastActorRole = report.ActorRole,
+                    LastCrashDiagnosticJson = diagnosticJson
                 };
                 db.IncidentGroups.Add(incident);
             }
@@ -87,6 +93,10 @@ internal sealed class IncidentAggregator(IDbContextFactory<ApiDbContext> context
                 // the idempotency key for that individual occurrence.
                 if (incident.LastReference == report.Reference)
                 {
+                    incident.LastCrashDiagnosticJson = PreferDiagnostic(
+                        incident.LastCrashDiagnosticJson,
+                        diagnosticJson);
+                    await db.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                     return incident;
                 }
@@ -101,6 +111,8 @@ internal sealed class IncidentAggregator(IDbContextFactory<ApiDbContext> context
                     : incident.LastSeenUtc;
                 incident.LastReference = report.Reference;
                 incident.LastActorRole = report.ActorRole;
+                if (diagnosticJson is not null)
+                    incident.LastCrashDiagnosticJson = diagnosticJson;
                 incident.OccurrenceCount++;
                 if (incident.Status == "Resolved")
                     incident.Status = "Reopened";
@@ -114,6 +126,18 @@ internal sealed class IncidentAggregator(IDbContextFactory<ApiDbContext> context
         {
             gate.Release();
         }
+    }
+
+    private static string? PreferDiagnostic(string? currentJson, string? reportedJson)
+    {
+        if (reportedJson is null)
+            return currentJson;
+        var current = CrashDiagnosticRules.Deserialize(currentJson);
+        var reported = CrashDiagnosticRules.Deserialize(reportedJson);
+        return reported is not null &&
+               (current is null || CrashDiagnosticRules.Quality(reported.Status) > CrashDiagnosticRules.Quality(current.Status))
+            ? reportedJson
+            : currentJson;
     }
 
     private static string MoreSevere(string current, string reported)

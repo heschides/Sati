@@ -6,11 +6,34 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Check requests, prepared and preserved";
-    public const string ReleaseDate = "September 9, 2026";
+    public const string ReleaseName = "Honest pace, richer color, safer recovery";
+    public const string ReleaseDate = "September 10, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Productivity separates completed work from recoverable notes",
+            [
+                "The Overview now distinguishes units secured by completed notes, units still recoverable within the seven-calendar-day documentation window, and future eligible workdays.",
+                "A deadline warning shows the units that expire after today and how the required pace changes if they are not completed.",
+                "Scheduled work is never counted as performed work, and pending items without a duration are disclosed without inventing units.",
+                "Older settings responses with an absent or invalid documentation window safely use the seven-day policy instead of breaking the productivity panel."
+            ]),
+        new(
+            "Four richer light themes reduce the yellow cast",
+            [
+                "Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor add deeper brown, blue, muted red, turquoise, and violet choices while retaining dark text on light surfaces.",
+                "Bodhi Watercolor follows the turquoise, blue, violet, and restrained coral sequence of the Sati leaf.",
+                "All four palettes pass the same measured WCAG AA token and rendered-view checks as the established themes."
+            ]),
+        new(
+            "Crash recovery carries safe Windows diagnostics into Admin",
+            [
+                "Sati keeps a process ID, process name, stable reference, and heartbeat so an unclean run can be recognized after the next authenticated start.",
+                "When Windows records a matching application fault, Sati attaches only allowlisted event metadata to the existing incident; raw runtime error text, paths, note narratives, credentials, and memory dumps are excluded.",
+                "Delayed or unavailable Windows reports remain visibly pending instead of being silently lost, and the Admin incident view explains the diagnostic state.",
+                "Power loss, storage failure, and very early pre-login failures can still prevent detailed correlation; the incident record does not claim that every possible crash can be captured."
+            ]),
         new(
             "Representative-payee check requests are ready for Finance",
             [

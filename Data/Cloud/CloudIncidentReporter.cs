@@ -13,7 +13,25 @@ internal sealed class CloudIncidentReporter(CloudApiClient api, IncidentOutbox o
         string operation,
         string reference,
         string severity = IncidentSeverities.Error,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await ReportCoreAsync(exception, operation, reference, severity, null, cancellationToken);
+
+    public async Task ReportCrashAsync(
+        Exception exception,
+        string operation,
+        string reference,
+        CrashDiagnosticDto diagnostic,
+        string severity = IncidentSeverities.Critical,
+        CancellationToken cancellationToken = default) =>
+        await ReportCoreAsync(exception, operation, reference, severity, diagnostic, cancellationToken);
+
+    private async Task ReportCoreAsync(
+        Exception exception,
+        string operation,
+        string reference,
+        string severity,
+        CrashDiagnosticDto? diagnostic,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -24,7 +42,8 @@ internal sealed class CloudIncidentReporter(CloudApiClient api, IncidentOutbox o
                 AppErrorLog.SafeArea(operation),
                 Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown",
                 AppErrorLog.CreateFingerprint(exception),
-                DateTime.UtcNow));
+                DateTime.UtcNow,
+                diagnostic));
 
             await FlushAsync(cancellationToken);
         }

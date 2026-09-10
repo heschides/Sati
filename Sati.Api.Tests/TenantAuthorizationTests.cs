@@ -242,7 +242,7 @@ public sealed class TenantAuthorizationTests
 
         Assert.NotNull(release);
         Assert.Equal("Sati.Api", release["product"]);
-        Assert.Equal("1.3.6", release["releaseVersion"]);
+        Assert.Equal("1.3.7", release["releaseVersion"]);
     }
 
     [Fact]
@@ -404,6 +404,85 @@ public sealed class TenantAuthorizationTests
     }
 
     [Fact]
+    public async Task IncidentCollectionRejectsUnboundedOrPathLikeCrashMetadata()
+    {
+        using var client = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var heartbeat = DateTime.UtcNow.AddSeconds(-5);
+        var unsafeReport = new IncidentReportRequest(
+            "REF_BADCRASH01", "Desktop", "Critical", "application.previous-session-unclean", "1.3.6",
+            "C0DEC00123456789C0DEC00123456789", DateTime.UtcNow,
+            new CrashDiagnosticDto(
+                CrashDiagnosticStatuses.Matched,
+                1234,
+                "Sati",
+                heartbeat,
+                1000,
+                44,
+                heartbeat.AddSeconds(2),
+                "Application Error",
+                "C:\\Users\\Jane Example\\Sati.exe",
+                "1.3.6.0",
+                "coreclr.dll",
+                "10.0.12.345",
+                "0xC0000005",
+                "0x000000000001ABCD",
+                true));
+
+        var response = await client.PostAsJsonAsync("/api/v1/incidents", unsafeReport);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MatchingWindowsRecordEnrichesPendingCrashWithoutCountingASecondCrash()
+    {
+        using var reporter = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var heartbeat = DateTime.UtcNow.AddSeconds(-10);
+        var pending = new IncidentReportRequest(
+            "REF_CRASH01", "Desktop", "Critical", "application.previous-session-unclean", "1.3.6",
+            "C0DEC10123456789C0DEC10123456789", DateTime.UtcNow,
+            new CrashDiagnosticDto(
+                CrashDiagnosticStatuses.PendingOrUnavailable,
+                1234,
+                "Sati",
+                heartbeat));
+        var matched = pending with
+        {
+            CrashDiagnostic = new CrashDiagnosticDto(
+                CrashDiagnosticStatuses.Matched,
+                1234,
+                "Sati",
+                heartbeat,
+                1000,
+                44,
+                heartbeat.AddSeconds(2),
+                "Application Error",
+                "Sati.exe",
+                "1.3.6.0",
+                "coreclr.dll",
+                "10.0.12.345",
+                "0xC0000005",
+                "0x000000000001ABCD",
+                true)
+        };
+
+        Assert.Equal(HttpStatusCode.Accepted,
+            (await reporter.PostAsJsonAsync("/api/v1/incidents", pending)).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted,
+            (await reporter.PostAsJsonAsync("/api/v1/incidents", matched)).StatusCode);
+
+        using var admin = await _factory.CreateAuthenticatedClientAsync("admin-one");
+        var dashboard = await admin.GetFromJsonAsync<AdminIncidentDashboardDto>("/api/v1/admin/incidents");
+        var incident = Assert.Single(dashboard!.Incidents,
+            item => item.ExceptionFingerprint == pending.ExceptionFingerprint);
+        Assert.Equal(1, incident.OccurrenceCount);
+        Assert.Equal("REF_CRASH01", incident.LastReference);
+        Assert.Equal(CrashDiagnosticStatuses.Matched, incident.LastCrashDiagnostic?.Status);
+        Assert.Equal("coreclr.dll", incident.LastCrashDiagnostic?.FaultingModule);
+        Assert.True(incident.LastCrashDiagnostic?.DotNetRuntimeEventObserved);
+    }
+
+    [Fact]
     public async Task AgencyAdminMayResolveOnlyItsOwnIncidentAndTheChangeIsAudited()
     {
         using var reporter = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
@@ -428,6 +507,32 @@ public sealed class TenantAuthorizationTests
         Assert.Equal("Resolved", (await response.Content.ReadFromJsonAsync<IncidentGroupDto>())!.Status);
         var audit = await _factory.GetAuditEventsAsync("incident-status.updated");
         Assert.Contains(audit, item => item.AgencyId == 1 && item.ActorUserId == 11);
+    }
+
+    [Fact]
+    public async Task CaseManagerCannotReadOrChangeAgencyIncidentAdministration()
+    {
+        using var caseManager = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var createdResponse = await caseManager.PostAsJsonAsync(
+            "/api/v1/incidents",
+            new IncidentReportRequest(
+                "REF_DENIAL01", "Desktop", "Error", "application.authorization-test", "1.3.6",
+                "A1B2C30123456789A1B2C30123456789", DateTime.UtcNow));
+        createdResponse.EnsureSuccessStatusCode();
+        var created = await createdResponse.Content.ReadFromJsonAsync<IncidentGroupDto>();
+        Assert.NotNull(created);
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await caseManager.GetAsync("/api/v1/admin/incidents")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await caseManager.PutAsJsonAsync(
+                $"/api/v1/admin/incidents/{created.Id}/status",
+                new UpdateIncidentStatusRequest("Resolved"))).StatusCode);
+
+        using var admin = await _factory.CreateAuthenticatedClientAsync("admin-one");
+        var dashboard = await admin.GetFromJsonAsync<AdminIncidentDashboardDto>("/api/v1/admin/incidents");
+        Assert.Contains(dashboard!.Incidents,
+            incident => incident.Id == created.Id && incident.Status == "Open");
     }
 
     [Fact]
@@ -479,6 +584,63 @@ public sealed class TenantAuthorizationTests
             using var admin = await _factory.CreateAuthenticatedClientAsync("admin-one");
             if (created is not null)
                 await admin.DeleteAsync($"/api/v1/providers/{created.Id}");
+        }
+    }
+
+    [Fact]
+    public async Task BillingOnlyUserCannotCurateTheProviderDirectory()
+    {
+        using var billingOnly = await _factory.CreateAuthenticatedClientAsync("billing-only-one");
+        var provider = ProviderRequest("Permission denial provider");
+        var contact = new SaveProviderContactRequest(
+            "Permission denial contact", null, null, null, null, false, 0);
+        Func<HttpRequestMessage>[] requests =
+        [
+            () => JsonRequest(HttpMethod.Post, "/api/v1/providers", provider),
+            () => JsonRequest(HttpMethod.Put, "/api/v1/providers/301", provider),
+            () => JsonRequest(HttpMethod.Post, "/api/v1/providers/301/contacts", contact),
+            () => JsonRequest(HttpMethod.Put, "/api/v1/providers/301/contacts/999999", contact),
+            () => new HttpRequestMessage(HttpMethod.Delete, "/api/v1/providers/301/contacts/999999")
+        ];
+
+        foreach (var createRequest in requests)
+        {
+            using var request = createRequest();
+            using var response = await billingOnly.SendAsync(request);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task BillingOnlyOwnerCannotCrossAnyCaseManagementGate()
+    {
+        using var billingOnly = await _factory.CreateAuthenticatedClientAsync("billing-only-one");
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var person = await db.People.SingleAsync(candidate => candidate.Id == 101);
+        var originalOwnerId = person.UserId;
+        person.UserId = 15;
+        await db.SaveChangesAsync();
+
+        try
+        {
+            Assert.Equal(HttpStatusCode.Forbidden,
+                (await billingOnly.GetAsync("/api/v1/caseload?userId=15")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound,
+                (await billingOnly.GetAsync("/api/v1/people/101/notes")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden,
+                (await billingOnly.PostAsJsonAsync(
+                    "/api/v1/people/credible-matches",
+                    new CredibleClientLookupRequest(["111111"]))).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden,
+                (await billingOnly.PostAsJsonAsync(
+                    "/api/v1/people",
+                    ValidPersonRequestForPermissionTest())).StatusCode);
+        }
+        finally
+        {
+            person.UserId = originalOwnerId;
+            await db.SaveChangesAsync();
         }
     }
 
@@ -1579,6 +1741,11 @@ public sealed class TenantAuthorizationTests
             successful with { VrAssistantTitle = "   " });
         Assert.Equal(HttpStatusCode.BadRequest, invalidVrTitle.StatusCode);
 
+        var invalidDocumentationWindow = await agencyOneAdmin.PutAsJsonAsync(
+            "/api/v1/settings",
+            successful with { AbandonedAfterDays = 0 });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidDocumentationWindow.StatusCode);
+
         var staleResponse = await agencyOneAdmin.PutAsJsonAsync(
             "/api/v1/settings",
             original with { ProductivityThreshold = original.ProductivityThreshold + 13 });
@@ -2096,6 +2263,13 @@ public sealed class TenantAuthorizationTests
 
     private static SaveProviderRequest ProviderRequest(string name) => new(
         "Other", name, null, null, null, null, null, null, 0, false, null, null, null);
+
+    private static SavePersonRequest ValidPersonRequestForPermissionTest() => new(
+        "Permission", "Test", new DateTime(1990, 4, 3), "Unknown", null,
+        "A valid permission-boundary request.", "None", null, null, null, null,
+        false, false, null, null, null, null, null, null, null, null, null,
+        false, false, false, false, false, false, 1, false, false, false, [],
+        0, true, false, null, null, false, false, "permission@example.test");
 
     private static SaveNoteRequest NoteRequest(NoteDto note, string narrative, int expectedRevision) => new(
         narrative,

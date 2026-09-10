@@ -1,4 +1,4 @@
-# API security audit — 2026-08-14, 2026-08-15, 2026-08-30, 2026-08-31, 2026-09-05
+# API security audit — 2026-08-14, 2026-08-15, 2026-08-30, 2026-08-31, 2026-09-05, 2026-09-10
 
 Scope: the authorization surface of `Sati.Api`, the sensitive-data boundary between the server and
 distributed clients, and the artifacts the platform hands to a reviewer. Driven by the two risks
@@ -214,11 +214,11 @@ caller-supplied value reaches an actor field on any route.
 | Gate class | Sites | Mutation result |
 |---|---|---|
 | Billing (API) | 14 | **Covered.** 3 tests fail, including `EveryBillingRouteDeniesAnAdministratorWithoutBillingPermission`, which pins all 14. |
-| Administration (API) | 23 | **Partial.** 12 tests fail. Uncovered: `GET /admin/incidents`, `PUT /admin/incidents/{id}/status`, and the escalation guards in `PUT /users/{userId}`, `PUT /users/{userId}/password`, and `ValidateUserRequestAsync`. |
+| Administration (API) | 23 | **Partial.** The incident list and status-write gates are now covered by a denial test that fails when both gates are removed and verifies that the forbidden write changes no state. The escalation guards in `PUT /users/{userId}`, `PUT /users/{userId}/password`, and `ValidateUserRequestAsync` remain uncovered. |
 | Supervision (API) | 9 | **Uncovered.** All 278 tests pass with every supervisor gate disabled. |
-| Case management (API) | 3 plus the new `TenantAccess` clauses | **Uncovered.** All 278 pass with them disabled. |
+| Case management (API) | 3 plus the new `TenantAccess` clauses | **Covered at the centralized decisions added in this audit.** The billing-only-owner test fails independently when self-access, `OwnsPersonAsync`, Credible-match, or create-person enforcement is weakened. |
 | `ProviderDirectoryRules.CanDeleteOrMerge` | 4 | **Covered.** 2 tests fail. |
-| `ProviderDirectoryRules.CanCreateOrEdit` | 7 | **Uncovered.** |
+| `ProviderDirectoryRules.CanCreateOrEdit` | 7 | **API route gates covered.** A billing-only denial test spans all five API enforcement sites and fails when the shared rule is weakened. The transitional local-service call remains outside this API integration-test proof. |
 | Desktop billing actor validation | 1 | **Covered.** `BillingUsesTheCurrentPermissionInsteadOfTheRoleLabel` fails. |
 | Desktop `SettingsAccessPolicy` | 1 | **Covered.** 4 cases fail. |
 | Desktop reviewer gate (`SupervisorService` / `LocalTenantAccess.IsReviewer`) | 3 | **Covered.** `ReviewIsRefusedAcrossAssignmentAndAcrossAgency` fails. |
@@ -359,9 +359,13 @@ It is one issued claim away from a token value silently outranking the database 
    Done 2026-08-31, structurally rather than as a special case.
 3. ~~Move desktop user create/update enforcement out of the view models (finding 5).~~
    Done 2026-08-31.
-4. Add denial tests for the supervision and case-management gates, and for the two admin incident
-   routes. The bar is the project's own: confirm each fails against the ungated code. **Still
-   outstanding.**
+4. Add denial tests for the supervision gates. The case-management and incident-route portions
+   were completed 2026-09-10: a case manager is denied both the
+   list and status write, and the unchanged Open row is verified through an Admin. The same pass
+   added a billing-only denial across all five `ProviderDirectoryRules.CanCreateOrEdit` API gates.
+   A billing-only actor who genuinely owns a synthetic consumer now covers the self-caseload,
+   `OwnsPersonAsync`, create-person, and Credible-match case-management decisions without an empty
+   query masking a removed gate.
 
 Items 1, 2, and 3 are the ones that should block a release. The commit's own caveat — "Do not
 include this in a release until it has had one" — is discharged as to scope by this pass, and the
@@ -404,10 +408,11 @@ non-load-bearing, and a future edit could remove one without any test noticing.
 ### Still open from the third pass
 
 Findings 6 (four caseload routes scoped by owner without an agency predicate — pre-existing) and
-7 (the validated-permissions claim is shadowable by construction — low) are unchanged. The
-coverage gaps in the mutation table also remain: the nine supervision gates and the
-case-management gates are still largely untested, as are `GET /admin/incidents`,
-`PUT /admin/incidents/{id}/status`, and `ProviderDirectoryRules.CanCreateOrEdit`.
+7 (the validated-permissions claim is shadowable by construction — low) are unchanged. The nine
+supervision gates and the administration-escalation guards listed in the updated mutation table
+remain coverage gaps. The case-management decisions, both incident-administration routes, and all
+five API `ProviderDirectoryRules.CanCreateOrEdit` gates were covered by load-bearing denial tests
+on 2026-09-10.
 
 ### Found while fixing, unrelated to the audit
 
@@ -492,3 +497,20 @@ the earlier generated-SQL-script Npi batching problem or authorize an unmarked/h
 External hosting permissions, mail delivery events/alerts, hands-on browser/accessibility acceptance,
 legal/program decisions and real-data operations remain activation requirements. This is a targeted
 review of changed surfaces, not a new certification of the full application.
+
+## Limited route review — 2026-09-10: Windows crash readback
+
+`POST /incidents` still derives agency and scope only from the database-validated actor. Its new
+optional `CrashDiagnosticDto` is not an opaque log payload: `CrashDiagnosticRules` accepts a closed
+status set and bounded allowlisted metadata, while paths and Event 1026 prose have no contract
+field. The API independently validates shape and heartbeat/event time bounds before serializing the
+object into the incident group. A path-like application value is rejected by integration test.
+Disabling that endpoint validation changes the expected 400 into a 500, so the test is load-bearing
+rather than a rule-helper-only check.
+
+A late WER match retries with the original support reference. Both API and local aggregators update
+only a higher-quality diagnostic for that reference and do not increment the occurrence. The Admin
+routes retain their existing Administration and agency gates; no new caller-controlled tenant value
+or cross-tenant query was introduced. Disabling same-reference enrichment leaves the row Pending
+and fails the integration test. This was a limited review of the changed incident route and
+does not recertify the broader API.

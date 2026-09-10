@@ -130,18 +130,20 @@ namespace Sati.Data
         public async Task<int> GetRemainingEligibleDaysAsync(int month, int year, HashSet<DateTime> daysAlreadyWorked, HashSet<DateTime> exemptDates)
         {
             var settings = await _settingsService.LoadAsync();
-            var daysInMonth = DateTime.DaysInMonth(year, month);
+            var monthStart = new DateTime(year, month, 1);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var start = DateTime.Today > monthStart ? DateTime.Today : monthStart;
+            if (start > monthEnd)
+                return 0;
             var count = 0;
 
-            for (int day = 1; day <= daysInMonth; day++)
+            for (var date = start; date <= monthEnd; date = date.AddDays(1))
             {
-                var date = new DateTime(year, month, day);
                 var dow = date.DayOfWeek;
 
                 if (dow == DayOfWeek.Saturday || dow == DayOfWeek.Sunday) continue;
                 if (WorkdayHelper.IsAlwaysExcludedWorkday(date, settings)) continue;
                 if (exemptDates.Contains(date)) continue;
-                if (daysAlreadyWorked.Contains(date)) continue;
 
                 count++;
             }

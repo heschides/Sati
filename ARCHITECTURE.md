@@ -1,6 +1,28 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-09-09.*
+*Living document. Updated during structured review sessions. Last updated: 2026-09-10.*
+
+## Productivity forecast and documentation backlog
+
+The Overview productivity card no longer treats every blank weekday earlier in the month as a day
+of future production. It presents three different facts: `SecuredUnits` from Logged and Approved
+notes, `RecoverableUnits` from known Pending notes whose seven-calendar-day documentation window is
+still open, and future eligible workdays from today through month-end. `ProjectedPace` assumes the
+known recoverable notes are completed; `SecuredPace` makes no such assumption. Pending notes that
+reach their deadline today also show the next-day pace, using only workdays after today, so the
+warning expresses both the units at risk and the actual consequence of losing today's capacity.
+
+`Sati.Contracts.V1.ProductivityForecast` owns unit rounding and those categories. It consumes only
+narrative-free facts and does not decide whether a persisted note is billable; `NoteWorkflow` and
+the server-side abandonment transition retain that authority. An activity with no Pending note (or
+a Pending note with no duration) has no knowable unit value. The UI calls that incompleteness out
+instead of inventing units. Scheduled rows are plans, not proof that work occurred, and therefore
+never enter recoverable backlog.
+
+Future capacity uses `IIncentiveService.GetEligibleDaysAsync` for the agency-calendar window and
+then removes the signed-in user's eligible ExemptDates. This route already exists in the deployed
+API. `GetRemainingEligibleDaysAsync` remains temporarily for compatibility, but its corrected
+implementation also starts at today and ignores the old `DaysAlreadyWorked` input.
 
 ## Representative-payee check requests
 
@@ -186,7 +208,13 @@ Every theme dictionary now supplies `AccentButtonBrush`, `AccentButtonHoverBrush
 `AccentButtonPressedBrush`, and `OnAccentButtonBrush` alongside the accent tokens. Only
 `PrimaryButton` binds the button set; selection highlights and accent type still bind
 `AccentBrush`. A theme dictionary is swapped in whole, so a theme missing a key loses the fill
-rather than inheriting one — a structure test asserts all twenty supply all four.
+rather than inheriting one — a structure test asserts all twenty-four supply all four.
+
+Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor occupy the richer-light portion of
+the palette range: brown, coastal blue, muted red, and the Sati leaf's turquoise/blue/violet/coral
+sequence. They retain dark text rather than adopting the light-on-dark contract used by the night
+themes. Saturation and border depth carry their identity; shared content surfaces stay light enough
+for the fixed semantic status colors to remain readable.
 
 Decorative themes use tiled vector resources for the outer window and navigation chrome. Ironworks
 Matte, Paisley, Art Nouveau, Mid-Century Modern, and Vanilla Bean keep that pattern crisp on
@@ -216,7 +244,7 @@ frosted content boundary as the other illustrated themes.
 luminance, contrast ratio, alpha compositing, and the flattening of a gradient or tiled pattern
 into the colours a reader actually receives. Nothing else may reimplement it.
 
-`ThemeLegibilityTests` holds every one of the twenty palettes to WCAG AA (4.5:1) two ways. The
+`ThemeLegibilityTests` holds every one of the twenty-four palettes to WCAG AA (4.5:1) two ways. The
 token pass scores each text role against each surface role it can land on, plus each fill that
 carries its own named ink, so a pair fails before any screen ships that uses it. The rendered pass
 loads every view under every theme, reads the brushes WPF resolved, and finds each run's background
@@ -447,6 +475,23 @@ recurrence, and unresolved-age penalties. It deliberately does not claim crash-f
 availability, or background-job coverage until those denominators are collected safely. Local
 JSON-line diagnostics remain workstation-only for support; the aggregated dashboard receives the
 curated envelope, not those raw diagnostics.
+
+The desktop prepares `%LOCALAPPDATA%\SatiLogica\Sati\Logs` before startup work and writes one
+JSON-lines file per process. Files roll at 5 MB; records older than 30 days are pruned and the folder
+is held to 50 MB. Managed UI-thread, background-thread, unobserved-task, and startup failures all
+enter this writer. Authenticated failures are also sent through `IIncidentReporter`; Demo first
+persists the PHI-minimized envelope to `IncidentOutbox`, while Local Production aggregates it in
+the agency database. A process that cannot run a managed handler (power loss, forced termination,
+native access violation, or stack overflow) leaves `ApplicationRunState` behind and is reported as
+an unclean Critical incident at the next authenticated launch. The marker includes process name,
+PID, a stable reference, and a 30-second heartbeat. Readback queries only Windows' ordinary
+Application channel, bounded to the last heartbeat, and accepts Event 1000 only when both process
+name and PID match. Event 1026 contributes only a nearby same-PID signal flag; its untrusted
+free-text description is never read, persisted, or displayed. Late Windows Error Reporting is retried and
+retained as pending rather than misclassified as no crash. `CrashDiagnosticRules` bounds the
+optional Admin envelope, and same-reference enrichment does not increment the crash count.
+Pre-login failures always have a local file but cannot be assigned to an agency incident without
+an authenticated actor.
 
 Incident aggregation uses a bounded, keyed in-process gate plus a serializable database transaction.
 The gate avoids duplicate insert races inside one process; the transaction is the authority across
@@ -1309,8 +1354,10 @@ old rows as a side effect.
 
 ### `IncentiveService`
 - Owns `Incentive` CRUD and days-scheduled calc. `CalculateDaysScheduled` loops via
-  `WorkdayHelper.IsAlwaysExcludedWorkday`. `GetRemainingEligibleDaysAsync` takes exempt dates as a
-  parameter (leaky abstraction). `GetOrCreateAsync` self-corrects stale `DaysScheduled`/`UnitsPerDay`.
+  `WorkdayHelper.IsAlwaysExcludedWorkday`. The transitional
+  `GetRemainingEligibleDaysAsync` still takes exempt and worked-date inputs for deployed-client
+  compatibility, but only exempt dates affect its today-through-month-end result.
+  `GetOrCreateAsync` self-corrects stale `DaysScheduled`/`UnitsPerDay`.
 
 ### `SettingsService`
 - `LoadAsync` resolves the signed-in user's agency and seeds one settings row for that agency if
@@ -1567,7 +1614,7 @@ Previously excluded as "stateless, low-risk." One live bug surfaced and was fixe
 | **Cycle-membership convention** | `Person.FormBelongsToCycle` (the one definition), and confirm `BuildFormRows` is still deliberately excluded |
 | `Person.GetCurrentCycleBoundaries` logic | `GetCurrentCycleForm`, `EvaluateComplianceGate`, `EnsureCurrentCycleForms`, `AddMissingFormsForCycle`, `FormBelongsToCycle` |
 | `NoteStatus` enum | Stored as `int` — append only, never reorder; `NoteService.UpdateAbandonedNotesAsync`, status filters |
-| `ExemptDate` records | `WorkdayHelper`, `IncentiveService.GetRemainingEligibleDaysAsync`, productivity calc |
+| `ExemptDate` records | `WorkdayHelper`, both incentive eligible-day paths, `ProductivityForecast`, productivity UI |
 | Holiday flags on `Settings` | `WorkdayHelper.IsAlwaysExcludedWorkday`, `IncentiveService.CalculateDaysScheduled` |
 | `BillingStatus` enum | `BillingService` submit/unbilled paths, billing UI |
 | `PersonService.GetAllPeopleAsync` query | Anything needing fully-populated `Person`; don't bypass without replicating `Include`s (and `EnsureCurrentCycleForms` when re-enabled) |
@@ -1790,9 +1837,11 @@ pre-live checklist item above remains.
 ### Startup sequence
 Splash (3s) → Login → session set → `ShellViewModel.InitializeAsync` → `ShellWindow.Show`.
 `ShutdownMode.OnExplicitShutdown`. `db.Database.Migrate()` on every startup (idempotent).
-`DispatcherUnhandledException` shows the full exception in a `MessageBox` (dev-grade; add a log file
-+ shorter user message before team deployment — this handler is what surfaced the LocalDB timeout
-and the `BoardTabConverter` throw this session).
+Managed failure handlers write PHI-minimized local diagnostics. The UI-thread handler shows a short
+reference rather than exception text; background-thread failures synchronously attempt to queue the
+curated incident before termination, and unobserved tasks are recorded as warnings. See the current
+Incident and health boundary and `LOGGING_DESIGN.md` for the implemented core and remaining support-
+bundle work.
 
 ### Adaptive display mode
 

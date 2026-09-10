@@ -17,4 +17,5 @@ public sealed class IncidentGroup
     public DateTime LastSeenUtc { get; set; }
     public string LastReference { get; set; } = string.Empty;
     public string LastActorRole { get; set; } = string.Empty;
+    public string? LastCrashDiagnosticJson { get; set; }
 }

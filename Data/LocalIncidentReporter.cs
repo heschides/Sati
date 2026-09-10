@@ -20,7 +20,25 @@ public sealed class LocalIncidentReporter(
         string operation,
         string reference,
         string severity = IncidentSeverities.Error,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await ReportCoreAsync(exception, operation, reference, severity, null, cancellationToken);
+
+    public async Task ReportCrashAsync(
+        Exception exception,
+        string operation,
+        string reference,
+        CrashDiagnosticDto diagnostic,
+        string severity = IncidentSeverities.Critical,
+        CancellationToken cancellationToken = default) =>
+        await ReportCoreAsync(exception, operation, reference, severity, diagnostic, cancellationToken);
+
+    private async Task ReportCoreAsync(
+        Exception exception,
+        string operation,
+        string reference,
+        string severity,
+        CrashDiagnosticDto? diagnostic,
+        CancellationToken cancellationToken)
     {
         var actor = sessionService.CurrentUser;
         if (actor is null)
@@ -32,6 +50,7 @@ public sealed class LocalIncidentReporter(
             var safeOperation = AppErrorLog.SafeArea(operation);
             var release = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown";
             var occurredAt = DateTime.UtcNow;
+            var diagnosticJson = diagnostic is null ? null : CrashDiagnosticRules.Serialize(diagnostic);
             var gate = Gates[(int)((uint)HashCode.Combine(
                 actor.AgencyId,
                 actor.Role == UserRole.PlatformOperator ? IncidentScopes.Platform : IncidentScopes.Agency,
@@ -66,17 +85,30 @@ public sealed class LocalIncidentReporter(
                         FirstSeenUtc = occurredAt,
                         LastSeenUtc = occurredAt,
                         LastReference = reference,
-                        LastActorRole = actor.Role.ToString()
+                        LastActorRole = actor.Role.ToString(),
+                        LastCrashDiagnosticJson = diagnosticJson
                     });
                 }
                 else
                 {
+                    if (incident.LastReference == reference)
+                    {
+                        incident.LastCrashDiagnosticJson = PreferDiagnostic(
+                            incident.LastCrashDiagnosticJson,
+                            diagnosticJson);
+                        await context.SaveChangesAsync(cancellationToken);
+                        await transaction.CommitAsync(cancellationToken);
+                        return;
+                    }
+
                     incident.Severity = MoreSevere(incident.Severity, severity);
                     incident.FirstSeenUtc = occurredAt < incident.FirstSeenUtc ? occurredAt : incident.FirstSeenUtc;
                     incident.LastRelease = release;
                     incident.LastSeenUtc = occurredAt > incident.LastSeenUtc ? occurredAt : incident.LastSeenUtc;
                     incident.LastReference = reference;
                     incident.LastActorRole = actor.Role.ToString();
+                    if (diagnosticJson is not null)
+                        incident.LastCrashDiagnosticJson = diagnosticJson;
                     incident.OccurrenceCount++;
                     if (incident.Status == "Resolved")
                         incident.Status = "Reopened";
@@ -93,6 +125,18 @@ public sealed class LocalIncidentReporter(
         {
             // Error reporting must never replace or amplify the original failure.
         }
+    }
+
+    private static string? PreferDiagnostic(string? currentJson, string? reportedJson)
+    {
+        if (reportedJson is null)
+            return currentJson;
+        var current = CrashDiagnosticRules.Deserialize(currentJson);
+        var reported = CrashDiagnosticRules.Deserialize(reportedJson);
+        return reported is not null &&
+               (current is null || CrashDiagnosticRules.Quality(reported.Status) > CrashDiagnosticRules.Quality(current.Status))
+            ? reportedJson
+            : currentJson;
     }
 
     private static string MoreSevere(string current, string reported)

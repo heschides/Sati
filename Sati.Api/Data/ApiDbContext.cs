@@ -549,6 +549,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.Status).IsRequired().HasMaxLength(20);
             entity.Property(x => x.LastReference).IsRequired().HasMaxLength(40);
             entity.Property(x => x.LastActorRole).IsRequired().HasMaxLength(30);
+            entity.Property(x => x.LastCrashDiagnosticJson).HasMaxLength(CrashDiagnosticRules.MaximumSerializedLength);
             entity.HasOne<ServerAgency>()
                 .WithMany()
                 .HasForeignKey(x => x.AgencyId)
@@ -1316,6 +1317,7 @@ internal sealed class ServerIncidentGroup
     public DateTime LastSeenUtc { get; set; }
     public string LastReference { get; set; } = string.Empty;
     public string LastActorRole { get; set; } = string.Empty;
+    public string? LastCrashDiagnosticJson { get; set; }
 }
 
 internal sealed class ServerLegalHold

@@ -66,6 +66,9 @@ namespace Sati.Data
                 await context.SaveChangesAsync();
             }
 
+            settings.AbandonedAfterDays =
+                ProductivityForecast.NormalizeDocumentationWindowDays(settings.AbandonedAfterDays);
+
             return settings;
         }
 
@@ -79,6 +82,10 @@ namespace Sati.Data
             if (!BillingComplianceGate.IsSupported(settings.BillingComplianceRequirements))
                 throw new SettingsSaveException(
                     "The billing-compliance requirement selection is invalid.",
+                    new ArgumentOutOfRangeException(nameof(settings)));
+            if (settings.AbandonedAfterDays <= 0)
+                throw new SettingsSaveException(
+                    "The documentation window must be at least one day.",
                     new ArgumentOutOfRangeException(nameof(settings)));
             if (settings.AnnualPacketOpenDaysBefore is < 0 or > 180)
                 throw new ArgumentException("Annual packet opening must be 0–180 days.");

@@ -1,8 +1,11 @@
 # Sati Diagnostic Logging and Support Bundle — Design
 
-Status: **proposed, not implemented.** Nothing in this document exists yet except where it
-describes current behavior. Record the durable parts in `DECISIONS.md` and the remaining work in
-`AGENDA.md` only when a slice is actually built.
+Status: **partially implemented.** As of 2026-09-10, the stable folder, PHI-minimized JSONL writer,
+all managed crash handlers, per-process files, 5 MB rolling files, 30-day retention, 50 MB folder
+ceiling, durable Demo incident outbox, PID/heartbeat run markers, bounded Windows Application-log
+readback, unclean-run replay, and Admin incident/path surfaces exist. The error catalog,
+breadcrumbs, support bundle, framework logger provider, and desktop/API correlation join remain
+proposed and are tracked in `AGENDA.md`.
 
 Goal: when Sati fails on a user's workstation, that user can hand Josh a single file that explains
 what happened, and Josh can read it without a debugger, without the user's database, and without
@@ -15,11 +18,12 @@ receiving protected health information.
 | Piece | File | What it does |
 |---|---|---|
 | Crash-to-reference dialog | `App.xaml.cs:36` | Handles `DispatcherUnhandledException`, dedupes by fingerprint, shows a reference number |
-| Local diagnostic record | `Services/AppErrorLog.cs` | Appends one JSON object per failure to `%LOCALAPPDATA%\SatiLogica\Sati\Logs\sati-yyyyMMdd.jsonl` |
+| Local diagnostic record | `Services/AppErrorLog.cs` | Appends one JSON object per failure to `%LOCALAPPDATA%\SatiLogica\Sati\Logs\sati-yyyyMMdd-<pid>.jsonl` |
 | Exception fingerprint | `AppErrorLog.CreateFingerprint` | One-way hash of type, HResult, and target-method shape |
 | Aggregated incidents | `Data/LocalIncidentReporter.cs`, `Data/Cloud/CloudIncidentReporter.cs` | Deduplicated incident groups with severity, release, occurrence count |
 | Durable send queue | `Data/Cloud/IncidentOutbox.cs` | Atomic write-then-move envelopes, quarantine for unreadable files |
-| Unclean shutdown detection | `Services/ApplicationRunState.cs` | Per-agency run marker; a surviving marker at next launch reports a Critical incident |
+| Unclean shutdown detection | `Services/ApplicationRunState.cs` | Per-agency PID/heartbeat marker; a surviving marker at next launch reports a Critical incident with a stable retry reference |
+| External fault signature | `Services/WindowsCrashEventReader.cs` | After restart, queries Application Error 1000 and .NET Runtime 1026 in a heartbeat-bounded window and requires process name plus PID |
 | API correlation | `Sati.Api/Program.cs:147` | Logs unhandled API errors with `TraceIdentifier` and echoes `X-Correlation-ID` |
 
 Two existing decisions govern everything below and are not being reopened:
@@ -31,16 +35,20 @@ Two existing decisions govern everything below and are not being reopened:
 
 ### 1.1 Gaps this design closes
 
-1. **Only one crash shape is caught.** A failure on a background thread, an unobserved `Task`, or a
-   process-terminating fault produces no record at all.
+1. **Resolved 2026-09-10:** UI-thread, background-thread, unobserved-task, and startup failures are
+   handled. Faults that cannot execute managed code are detected by the surviving run marker at the
+   next authenticated launch. When Windows recorded an Application Error 1000, its bounded
+   structured signature is correlated by the persisted process name and PID. A missing or late WER
+   record remains explicitly pending/unavailable instead of being misreported as “no crash.”
 2. **A record names the failure but not the situation.** There is no trail of what the user was
    doing in the seconds before, so most records are unactionable.
 3. **No error codes and no plain language.** A record holds `System.InvalidOperationException` and
    an HResult. Neither the user nor a support conversation can use that.
 4. **No way to send anything.** Nothing in the product tells a user where the files are, and
    nothing packages them.
-5. **The log directory grows without bound.** No rotation, no size cap, no retention, no
-   per-failure rate limit. A failure that repeats on every layout pass can fill a disk.
+5. **Partially resolved 2026-09-10:** 5 MB rolling files, 30-day expiry, a 50 MB directory cap, and
+   existing dispatcher fingerprint suppression are in place. A general per-fingerprint budget and
+   end-of-session suppression record remain.
 6. **`Microsoft.Extensions.Logging` is referenced by `Sati.csproj:114` and never used.** Framework,
    EF Core, and `HttpClient` diagnostics are discarded.
 7. **Desktop and server records cannot be joined.** The desktop reference and the API correlation
@@ -227,10 +235,10 @@ asserts none of it appears in the written line or in a produced bundle.
 | Shape | Handler | Behavior |
 |---|---|---|
 | UI thread exception | `DispatcherUnhandledException` (exists) | Keep the reentrancy and fingerprint dedupe. Add code lookup and breadcrumb flush. |
-| Background thread | `AppDomain.CurrentDomain.UnhandledException` | Write synchronously and flush before the process dies. No dialog; the process is already terminating. |
-| Unobserved task | `TaskScheduler.UnobservedTaskException` | Mark observed, record as Warning, no dialog. |
+| Background thread | `AppDomain.CurrentDomain.UnhandledException` (exists) | Write synchronously and flush before the process dies. No dialog; the process is already terminating. |
+| Unobserved task | `TaskScheduler.UnobservedTaskException` (exists) | Mark observed, record as Warning, no dialog. |
 | Startup, pre-host | Existing `try/catch` in `OnStartup` | Already writes `application.startup`; add the code and environment block. |
-| Process-terminating fault | None possible in managed code | Covered by the run marker, below. |
+| Process-terminating fault | None possible in managed code | Run marker records the unclean fact; Windows Application-log readback adds a matching external signature when one exists. |
 
 Stack overflow, an access violation in a native dependency, a power loss, or a task-manager kill
 give no managed handler a chance to run. `ApplicationRunState` already detects these on the next
@@ -239,8 +247,29 @@ flushed tail of the last breadcrumbs, so the replay at next launch can say what 
 doing, not merely that it died. Flush the tail on navigation and on command completion, not on a
 timer, to keep it cheap and meaningful.
 
-The replayed record is written exactly once and the marker is deleted in the same pass, so a crash
-during replay cannot produce a duplicate on every subsequent launch.
+As of 2026-09-10, the run marker also carries the exact process ID, process name, session reference,
+and a 30-second heartbeat. On an unclean restart, Sati queries only the ordinary Windows
+**Application** channel in a window from one minute before through thirty minutes after the last
+heartbeat. An Application Error 1000 is accepted only when both its structured `AppName` and
+`ProcessId` match the marker. A nearby .NET Runtime 1026 contributes only a yes/no signal after that
+exact Event 1000 match and only when its System `ProcessID` also matches. Sati never calls
+`FormatDescription` or reads Event 1026 `EventData`, because
+that prose can contain an exception message and protected information. The bounded Event 1000
+fields—application/version, module/version, exception code, fault offset, event record/time, and
+PID—enter the curated incident envelope through `CrashDiagnosticRules`; application and module
+paths have no contract field.
+
+WER can finish after an impatient relaunch. Sati retries once after 750 ms, records
+`PendingOrUnavailable` rather than denying the unclean exit, and retains the previous marker for a
+later launch. A later match uses the same support reference, replaces a queued pending envelope,
+and enriches the existing incident without incrementing its occurrence count. The Application log
+is readable as a standard user on supported Windows installations; Sati requests no elevation and
+records `ApplicationLogUnavailable` if local policy denies access.
+
+The replay uses one stable session reference. A matched or inherently uncorrelatable legacy marker
+is deleted after reporting; a pending or temporarily unreadable marker is retained. Replays with
+the same reference are idempotent in both incident aggregators, and a later higher-quality result
+enriches rather than increments the occurrence.
 
 ---
 
@@ -418,6 +447,10 @@ Per `CLAUDE.md`, each of these must be shown to fail against the unfixed code.
 9. **Bundle without a host.** The builder produces a valid zip with no container, no database, and
    no network, and the manifest hashes match the entries.
 10. **Bundle size cap.** Oldest records drop first and the summary says so.
+11. **External-fault redaction.** Synthetic Event 1000 XML containing paths and PHI-like extra
+    fields persists only the allowlisted structured metadata; Event 1026 prose has no read path.
+12. **Exact Windows correlation and late-WER upgrade.** Both PID and full process name must match;
+    pending readback upgrades under the same reference without counting another crash.
 
 ---
 
@@ -445,7 +478,9 @@ worth opening.
   claim that, and this design does not add the safe denominators it would need.
 - **Windows Error Reporting local dumps** are useful for a native or stack-overflow fault, but they
   are a machine-level registry setting. If they are ever wanted, they are a documented step a user
-  or their IT department performs deliberately, never something Sati configures.
+  or their IT department performs deliberately, never something Sati configures. Phase 2 leaves
+  LocalDumps disabled: memory dumps can contain PHI and require an explicit retention, access, and
+  handling decision outside this diagnostic envelope.
 - **`REGULATORY_CONCERNS.md` needs a line** once phase 3 ships, stating that the support bundle is
   a user-initiated export designed to contain no protected health information, and naming the one
   user-authored file as the exception.

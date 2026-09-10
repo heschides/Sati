@@ -284,12 +284,20 @@
                                    Foreground="{DynamicResource AccentBrush}" />
                         <TextBlock Text="{Binding Health.AlertReason}" TextWrapping="Wrap"
                                    FontSize="9" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="Local crash details stay on this workstation:"
+                                   Margin="0,7,0,0" FontSize="9"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="{Binding LocalDiagnosticLogFolder}"
+                                   FontSize="9" TextWrapping="Wrap"
+                                   AutomationProperties.Name="Local diagnostic log folder"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
                     </StackPanel>
                     <Grid Grid.Column="1">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="120" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="{Binding Health.Explanation}"
                                    FontSize="9" TextWrapping="Wrap"
@@ -337,6 +345,18 @@
                                 <DataGridTextColumn Header="REFERENCE" Binding="{Binding LastReference}" Width="120" />
                             </DataGrid.Columns>
                         </DataGrid>
+                        <Border Grid.Row="3"
+                                Margin="0,7,0,0" Padding="8"
+                                Background="{DynamicResource SurfaceAltBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1" CornerRadius="4"
+                                AutomationProperties.Name="Selected incident Windows crash diagnostic"
+                                Visibility="{Binding HasSelectedCrashDiagnostic, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding SelectedCrashDiagnosticSummary}"
+                                       TextWrapping="Wrap"
+                                       FontSize="9"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </Border>
                     </Grid>
                 </Grid>
             </Border>

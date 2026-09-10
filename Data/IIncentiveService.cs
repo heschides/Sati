@@ -10,6 +10,9 @@ namespace Sati.Data
         Task<(Incentive incentive, bool wasCreated)> GetOrCreateAsync(int userId, int month, int year);
         Task SaveAsync(Incentive incentive);
 
+        // Future capacity only: today through month-end, excluding configured non-workdays and
+        // personal exemptions. daysAlreadyWorked remains in the transitional signature for wire
+        // compatibility, but past blank days and today's existing notes never change capacity.
         Task<int> GetRemainingEligibleDaysAsync(int month, int year, HashSet<DateTime> daysAlreadyWorked, HashSet<DateTime> exemptDates);
 
         // Read-only scheduled-day count for a selected statistics window. The
