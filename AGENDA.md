@@ -170,10 +170,32 @@ diagnostics into the existing agency incident workflow after restart.
       warnings; all 2,216 required tests passed, with only the optional local-AI competence test
       skipped. Migration 98 matches the EF model, the symbolic migration replay found 0 problems,
       and NuGet reported no known vulnerable direct or transitive package.
-- [ ] Source commit evidence pending.
-- [ ] Demo API package, deployment, health, release-version, and contract-revision evidence pending.
-- [ ] Demo and Local installer build, isolated acceptance, hashes, and distribution evidence pending.
-- [ ] Final evidence commit and local/remote equality pending.
+- [x] Source commit `ad33bfa37c67b8b96d2dcbc391c2451007d23730` was pushed normally to
+      `origin/master`; the remote contained that exact commit before packaging began. No branch was
+      merged or deleted. `claude/cool-jang-f6b3c4` remains worktree-owned, and
+      `second-machine-setup`, `team-chat-design`, `video-conferencing-design`, and remote
+      `claude/local-vs-github-workflow-dlcqpb` remain because they contain unique work.
+- [x] The clean framework-dependent x86 Demo API package
+      `artifacts/SatiApi-1.3.7-fx-x86.zip` was built from that pushed source: 8,832,338 bytes,
+      file version 1.3.7.0, no private settings or scratch output, and SHA-256
+      `3DE023E9788F8F9767C9409B764069C4090EE49289625C2B0DD5C88EE6320E42`.
+      OneDeploy deployment `16d13dd59cc44e0888a61c3487769072` succeeded to the existing Demo API
+      only. Live and ready returned HTTP 200, `/health/version` reports Sati.Api 1.3.7 and contract
+      revision `AF5889A2C7E5`, exactly matching the compiled client, and an anonymous Admin request
+      returned HTTP 401. The optional synthetic Admin credential was absent, so the authenticated
+      platform probe was not run. The prior 1.3.6 package and deployment evidence remain retained.
+- [x] Both installers passed isolated acceptance and were published with matching checksum files,
+      without overwriting an existing artifact. Demo completed five 15-second responsive sign-in
+      launches, normal closes, exact version, and cleanup; `SatiDemoSetup-1.3.7.exe` is 101,421,056
+      bytes with SHA-256 `AF648C66A0456A369919D776B6FBC9A7C39247A80BB70206D66FA3745409E763`
+      in `SatiLogica Demo Files`. Local passed exact version, integrated security, the valid
+      Microsoft-signed LocalDB prerequisite, and cleanup; `SatiLocalSetup-1.3.7.exe` is 203,721,767
+      bytes with SHA-256 `63785180CDE724CBDED970B4A682B9DA8F36586B04BD97105DFC84BF5DD0F066`
+      in `Sati Desktop`. The source artifacts, published executables, and checksum contents match.
+      Demo acceptance was isolated on the development workstation, not attested on an external
+      clean machine.
+- [x] Final release evidence is recorded here; the evidence commit is pushed and local/remote
+      equality is confirmed immediately after this ledger change.
 
 ### Local Production machines
 
