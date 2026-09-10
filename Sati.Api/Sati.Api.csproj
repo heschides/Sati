@@ -29,6 +29,13 @@
     <InternalsVisibleTo Include="Sati.Api.Tests" />
   </ItemGroup>
 
+  <!-- Ignored local test/publish scratch folders live under this project during development.
+       The Web SDK's default content glob must never sweep them into an Azure package. -->
+  <ItemGroup>
+    <Content Remove="artifacts\**\*;tmp\**\*" />
+    <None Remove="artifacts\**\*;tmp\**\*" />
+  </ItemGroup>
+
   <!--
     Ships the triggered WebJob inside the API package, at the App_Data path App Service scans.
     Co-located, not merged: the job is a separate process with its own trigger and its own
