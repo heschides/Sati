@@ -127,10 +127,19 @@ release and does not deploy anything to Production.
       local-AI evaluation skipped. The first post-version test run caught the intentionally changed
       release name's stale expected value; after that ledger assertion was corrected, the complete
       affected desktop suite passed 1,553 with the same one skip.
-- [ ] Commit and push the exact source, build the API package from that pushed commit, deploy it to
-      the existing Demo API only, and verify live, ready, release 1.3.6, and contract revision
-      `F286195242CA`.
-- [ ] No 1.3.6 installer is authorized or produced by this alignment. The published 1.3.5 Demo
+- [x] Source commits `c4cdb0665dfd6557978310dd3b270392926e8e7c` and
+      `b0261aa5525da9b279b9926fac73f4f1b65379e3` are pushed on `master`. The second explicitly
+      excludes ignored API test/publish scratch directories after pre-deploy ZIP inspection found
+      that the Web SDK's default content glob would otherwise include them.
+- [x] Clean API package `artifacts/SatiApi-1.3.6-fx-x86.zip` was built from pushed commit `b0261aa`:
+      8,819,873 bytes, 68 intended entries, file version 1.3.6.0, no private configuration or scratch
+      output, and SHA-256 `7CF6F2509B3BACF83E82F6B1220E028CB416F8FE093083D753F2DE504622B4F8`.
+      OneDeploy deployment `1d06555ef0b54b81830e643b5f8244c3` succeeded to the existing Demo
+      API only. Live and ready returned HTTP 200, `/health/version` reports Sati.Api 1.3.6 and
+      contract revision `AF5889A2C7E5`, exactly matching the compiled client, and the new protected
+      route returned HTTP 401 anonymously. The encrypted Global Admin credential was not present on
+      this workstation, so that optional authenticated platform probe was not run.
+- [x] No 1.3.6 installer was authorized or produced by this alignment. The published 1.3.5 Demo
       installer expects the prior contract and will correctly refuse the newer API; use the current
       debugger build until a separately invoked full release produces and accepts matching 1.3.6
       installers.

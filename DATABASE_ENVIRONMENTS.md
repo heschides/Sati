@@ -140,6 +140,15 @@ August 12, 2026. Authenticated verification also covered the agency-scoped Admin
 Person list rows, first-view lifecycle baseline creation, recent activity, and PDF export; anonymous
 Admin access returned HTTP 401.
 
+On September 9, 2026, the identity-validated Demo database received the additive
+`AddCheckRequests` migration and moved from 96 to 97 migration-history rows. The guarded runner
+completed a rollback-only rehearsal, the real application, and an idempotent second application.
+The user removed the temporary exact-IP workstation firewall rule immediately afterward, and the
+Azure allow-list confirmed it absent. Demo API 1.3.6 was then published with OneDeploy deployment
+`1d06555ef0b54b81830e643b5f8244c3`; live and ready returned HTTP 200 and contract revision
+`AF5889A2C7E5` matched the compiled debugger client. This was an API alignment only: no Production
+operation and no 1.3.6 installer publication occurred.
+
 On August 20, 2026, the Demo-only SSN Key Vault and guarded operational seed route
 were deployed with OneDeploy deployment `6bd6cf80e3a2490f80777135d60bf93f`.
 Post-deploy live and ready health returned HTTP 200, and the authenticated agency
