@@ -3887,3 +3887,41 @@ authoritative and may reflect older settings; recalculating them could rewrite a
 window. Unknown historical completion must not be invented. This bounded fix prevents new
 standalone deletions but does not reconstruct previously lost rows or retroactively invalidate
 claims. API cycle rollover and pre-EDI compliance revalidation remain explicit follow-up work.
+
+## 2026-09-11 — Assignments do not survive capability revocation as authority
+
+The September 10 review reproduced continued journal and annual-note access after case management
+was removed while Billing and consumer assignments remained. Follow-up synthetic tests identified
+additional own-casework writes and local services that trusted an old session, a caller's user ID,
+or no actor at all. The API now composes owned-person queries with current persisted capability
+and exact person/owner agency checks; accessible consumer operations use the common supervisory
+policy with the person's own agency checked as well.
+
+Local services reject stale actor facts against the database before protected work. Reauthentication
+rebuilds the local session with the persisted permissions, not a legacy role mapping, and leaves
+password hashes/salts out of the session. We intentionally require a new local sign-in rather than
+silently changing an actor midway through a command. Billing-only users can still create eligible
+claims under Billing authority, and supervision-only users retain their assigned review scope.
+Administration still authorizes its own record history/status work without needing CaseManagement.
+
+The desktop shell must honor the same separation when loading: Billing/Supervision/Admin-only
+accounts skip own-casework dashboard initialization, retain personal scratchpads, and do not load
+consumer-linked scheduled work. These presentation guards prevent denied preload errors; service
+authorization remains the actual security control.
+
+Missing or conflicting note agency markers are not inferred at read time. The existing
+`20260812213000_ReconcileTenantOwnership` migration already establishes exact note/person/owner
+agency consistency; unreconciled records need controlled investigation, not a permissive fallback.
+No migration or repair of real records was run here.
+
+Adding session boundaries exposed local AT signer impersonation through caller-supplied `User`
+and attestation fields. Publication now derives its signer from the session, ordinary Add/Update
+reject attestation input, and published deletion is refused as it already is over HTTP. The PCP
+view model passes the consumer's assigned author rather than the viewing supervisor as source
+selector. These are bounded authority corrections, not a claim that all local AT completion/audit
+semantics now match the API.
+
+**Rejected:** removing assignments as the only revocation mechanism, blanket CaseManagement gates
+on Billing or supervisory routes, and relying on hidden controls. Also rejected was declaring
+password/session revocation solved by permission checks: security stamps, disablement/offboarding,
+already-released local content, global maintenance, and direct-database trust remain separate work.

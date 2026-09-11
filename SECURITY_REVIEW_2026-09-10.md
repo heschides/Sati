@@ -1,6 +1,41 @@
 # Sati launch security review
 September 10, 2026 — repository assessment after clearinghouse intake development
 
+## Follow-up 2026-09-11: ordinary consumer-record permission revocation
+
+The authorized follow-up fixes B01's local login projection and B02's ordinary consumer
+service/route capability gaps. Retained assignments no longer authorize own casework after
+CaseManagement removal. API queries check current capability and person/owner agency; local
+services check persisted identity/permissions instead of trusting an old session. SSN preparation,
+AI context, consumer documents, review appointments, AT/PCP sources, and local supervisory/Admin
+record services are included. Note reads/transitions, review and billing candidates enforce the
+existing note-tenant reconciliation invariant; invalid markers are not inferred from assignment.
+
+Billing remains independent, including eligible claim creation; supervision-only and
+administration-only workflows retain their scope. This does not promise a Billing user sees no
+approved-note narrative: the existing candidate DTO contains it. That deserves a separate
+minimum-necessary workflow review. Local login copies actual permissions/contact fields and no
+password verifier. Local permission changes require a fresh sign-in; protected operations deny
+meanwhile. Already delivered/cached information is not remotely erased.
+
+Related local AT authority gaps were closed: publication derives its signer from the session,
+Add/Update cannot inject an attestation, and published requests cannot be deleted through the
+service. PCP supervisor source selection uses the consumer's assigned author. This does not close
+pre-existing local AT publication-completeness, identity-snapshot or audit-parity gaps.
+
+Synthetic HTTP/JWT and SQLite tests reproduced missing guards before repairs, checked denied
+operations left records unchanged, and verified positive persisted writes and Billing-only claims.
+The expanded old-API proof has 24 failures and 40 passing controls; final verification totals are
+recorded in the permission-revocation handoff. No real records, migrations or deployment were used.
+The detailed baseline findings below remain historical evidence, not present exploit claims.
+
+Still open: B05 password/session revocation and disablement; B04 globally scoped local maintenance;
+direct SQL trust; in-flight revocation races; the other billing/launch findings. Supervisory SQL
+target-user bit filters need alignment with the full supported-mask predicate for corrupted target
+rows (actor masks already fail closed). Local `PersonService.EditPerson` attaches a caller-supplied
+graph after root ownership validation; deep child ownership/workflow enforcement warrants a
+separate proof rather than an assumption of safety.
+
 ## Follow-up: standalone form-deletion bypass closed in source
 
 The subsequent user-authorized fix retires destructive standalone form deletion in both API and
@@ -18,7 +53,7 @@ retention assertion before the implementation changed.
 
 This does not repair previously missing rows or already-created claims, implement cloud cycle
 rollover, or revalidate compliance at every EDI export. Those require follow-up evidence-preserving
-work. The other authorization/session and launch findings remain open. No deployment or real-data
+work. The permission follow-up above updates B01/B02; session and other launch findings remain open. No deployment or real-data
 reconciliation was performed.
 
 ## Bottom line
@@ -32,9 +67,9 @@ This review found four existing defects through five repeatable synthetic tests.
 | Priority | Finding | Evidence and impact |
 |---|---|---|
 | 1 — standalone bypass closed; historical reconciliation pending | Deleting a never-attested overdue requirement removed a billing block (B03) | Both public deletion boundaries now refuse all persisted forms. Existing missing obligations and claims created before the fix still require controlled review; no dates are guessed or historical records silently rewritten. |
-| 2 — before agency launch | Capability removal does not consistently stop clinical access (B02) | Reproduced: journal and annual-note reads still succeed after CaseManagement is removed while Billing and assignments remain. Apply and test a complete route-by-route authorization matrix. |
+| 2 — ordinary consumer boundaries fixed in source | Capability removal did not consistently stop casework access (B02) | Reproduced and fixed across reviewed ordinary API/local consumer operations. Billing/Supervision/Admin remain independent. Global maintenance, direct SQL and session lifecycle are not covered by this closure. |
 | 3 — before agency launch | Password changes leave existing tokens usable and renewable (B05) | Reproduced against real HTTP/JWT handlers. Add account disablement, per-user/session security versions and revocation on password reset/offboarding. |
-| 4 — before distributed Local use | Local login reconstructs permissions from the legacy role (B01) | Source confirmed. Preserve actual persisted capabilities and revalidate them in authoritative local services. |
+| 4 — fixed in source | Local login reconstructed permissions from the legacy role (B01) | Login preserves persisted capabilities and omits password verifiers; ordinary consumer services recheck the current database actor. |
 | 5 — before claiming pre-submission prevention | Overdue notes can enter the supervisor queue through the API (B08) | Reproduced: direct submission persists Logged. Supervisor approval still rejects it; this finding is not proof that every invalid note becomes a payable claim. |
 | 6 — before concurrent real billing | Overlap validation has a read-then-write race (B09) | Source finding, not dynamically reproduced. Serialize conflicting staff/day writes and prove the behavior using SQL Server. |
 | 7 — before agency rollout | Privileged maintenance, direct database trust, distribution integrity and operations (B04/B06/B07/B10) | Local maintenance can operate globally; Local Production is not an API security boundary; signing, runtime SQL grants, restore/key recovery and operational controls require closure. |

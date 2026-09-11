@@ -7,11 +7,14 @@ namespace Sati.Data
     {
         private readonly IDbContextFactory<SatiContext> _contextFactory;
         private readonly ISettingsService _settingsService;
+        private readonly ISessionService _sessionService;
 
-        public ATRequestService(IDbContextFactory<SatiContext> contextFactory, ISettingsService settingsService)
+        public ATRequestService(IDbContextFactory<SatiContext> contextFactory, ISettingsService settingsService,
+            ISessionService sessionService)
         {
             _contextFactory = contextFactory;
             _settingsService = settingsService;
+            _sessionService = sessionService;
         }
 
         // The queue read. Projects to ATRequestListItem so the SnapshotPng blob
@@ -20,13 +23,15 @@ namespace Sati.Data
         // transfer), while CaseManagerName carries the frozen submitter for display.
         public async Task<List<ATRequestListItem>> GetAllForUserAsync(int userId)
         {
+            var actor = CurrentActor();
+            await using var context = _contextFactory.CreateDbContext();
+            if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
+                throw new UnauthorizedAccessException("That caseload is not available to this user.");
             var settings = await _settingsService.LoadAsync();
             var rate = settings.PassthroughRate;
 
-            await using var context = _contextFactory.CreateDbContext();
-
             return await context.ATRequests
-                .Where(a => a.Person!.UserId == userId)
+                .Where(a => a.Person!.UserId == userId && a.Person.AgencyId == actor.AgencyId)
                 .OrderByDescending(a => a.SubmittedDate ?? DateTime.MaxValue)
                 .Select(a => new ATRequestListItem
                 {
@@ -58,14 +63,15 @@ namespace Sati.Data
         //
         // Filtered on the REQUEST's PersonId rather than through Person.UserId,
         // because this list belongs to the client rather than to whoever currently
-        // carries them. The caller is responsible for having established that this
-        // client is theirs to look at; on the API path that is TenantAccess.
+        // carries them. The service rechecks current consumer access, just as the
+        // API path does; a previously opened profile is not authorization.
         public async Task<List<ATRequestListItem>> GetAllForPersonAsync(int personId)
         {
+            var actor = CurrentActor();
+            await using var context = _contextFactory.CreateDbContext();
+            await EnsureAccessiblePersonAsync(context, actor, personId);
             var settings = await _settingsService.LoadAsync();
             var rate = settings.PassthroughRate;
-
-            await using var context = _contextFactory.CreateDbContext();
 
             return await context.ATRequests
                 .Where(a => a.PersonId == personId)
@@ -98,6 +104,8 @@ namespace Sati.Data
         public async Task<ATRequest?> GetByIdAsync(int id)
         {
             await using var context = _contextFactory.CreateDbContext();
+            if (await AccessibleRequestPersonIdAsync(context, CurrentActor(), id) is null)
+                return null;
             return await context.ATRequests
                 .Include(a => a.Items)
                 .AsSplitQuery()
@@ -111,6 +119,8 @@ namespace Sati.Data
         public async Task<byte[]?> GetSnapshotAsync(int id)
         {
             await using var context = _contextFactory.CreateDbContext();
+            if (await AccessibleRequestPersonIdAsync(context, CurrentActor(), id) is null)
+                return null;
             return await context.ATRequests
                 .Where(a => a.Id == id)
                 .Select(a => a.SnapshotPng)
@@ -120,6 +130,9 @@ namespace Sati.Data
         public async Task<ATRequest> AddAsync(ATRequest request)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureAccessiblePersonAsync(context, CurrentActor(), request.PersonId);
+            EnsureNoCallerAttestation(request);
+            request.Person = null;
             context.ATRequests.Add(request);
             await context.SaveChangesAsync();
             return request;
@@ -128,6 +141,7 @@ namespace Sati.Data
         public async Task<ATRequest> UpdateAsync(ATRequest request)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureAccessibleRequestAsync(context, CurrentActor(), request);
             var stored = await context.ATRequests
                 .Include(candidate => candidate.Items)
                 .SingleOrDefaultAsync(candidate => candidate.Id == request.Id);
@@ -142,6 +156,7 @@ namespace Sati.Data
             if (stored.IsPublished)
                 throw new AtRequestLockedException();
 
+            EnsureNoCallerAttestation(request);
             CopyMutableValues(request, stored);
             stored.Revision++;
             try
@@ -156,13 +171,17 @@ namespace Sati.Data
             return request;
         }
 
-        // Save-and-publish. Locally the caller is the same process that owns the
-        // database, so "derive the signer from the session" means taking the User
-        // the desktop passes; over HTTP the equivalent method reads it from the
-        // token. Either way the attestation is stamped HERE, against the stored
-        // row, not accepted as an incoming value.
+        // Save-and-publish. Both implementations derive the signer from their
+        // authenticated session, never the legacy caseManager argument. Current
+        // consumer access is rechecked before stamping the attestation.
         public async Task<ATRequest> PublishAsync(ATRequest request, User caseManager)
         {
+            var actor = CurrentActor();
+            await using var context = _contextFactory.CreateDbContext();
+            if (request.Id == 0)
+                await EnsureAccessiblePersonAsync(context, actor, request.PersonId);
+            else
+                await EnsureAccessibleRequestAsync(context, actor, request);
             var signedAtUtc = DateTime.UtcNow;
 
             // Read at publication rather than taken from the caller: the rate the
@@ -175,11 +194,14 @@ namespace Sati.Data
             // goes on before the insert, so it lands in one round trip.
             if (request.Id == 0)
             {
-                request.Publish(caseManager, signedAtUtc, passthroughRate);
-                return await AddAsync(request);
+                EnsureNoCallerAttestation(request);
+                request.Publish(actor, signedAtUtc, passthroughRate);
+                request.Person = null;
+                context.ATRequests.Add(request);
+                await context.SaveChangesAsync();
+                return request;
             }
 
-            await using var context = _contextFactory.CreateDbContext();
             var stored = await context.ATRequests
                 .Include(candidate => candidate.Items)
                 .SingleOrDefaultAsync(candidate => candidate.Id == request.Id);
@@ -188,10 +210,11 @@ namespace Sati.Data
             if (stored.IsPublished)
                 throw new AtRequestLockedException();
 
+            EnsureNoCallerAttestation(request);
             // The caller's pending edits are saved as part of publishing, so what
             // is attested to is what the case manager was looking at.
             CopyMutableValues(request, stored);
-            stored.Publish(caseManager, signedAtUtc, passthroughRate);
+            stored.Publish(actor, signedAtUtc, passthroughRate);
             stored.Revision++;
             try
             {
@@ -221,6 +244,7 @@ namespace Sati.Data
         public async Task<ATRequest> ReopenAsync(ATRequest request)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureAccessibleRequestAsync(context, CurrentActor(), request);
             var stored = await context.ATRequests
                 .Include(candidate => candidate.Items)
                 .SingleOrDefaultAsync(candidate => candidate.Id == request.Id);
@@ -248,9 +272,12 @@ namespace Sati.Data
         public async Task DeleteAsync(ATRequest request)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureAccessibleRequestAsync(context, CurrentActor(), request);
             var stored = await context.ATRequests.SingleOrDefaultAsync(candidate => candidate.Id == request.Id);
             if (stored is null || stored.Revision != request.Revision)
                 throw new AtRequestConcurrencyException();
+            if (stored.IsPublished)
+                throw new AtRequestLockedException();
             context.ATRequests.Remove(stored);
             try
             {
@@ -259,6 +286,42 @@ namespace Sati.Data
             catch (DbUpdateConcurrencyException ex)
             {
                 throw new AtRequestConcurrencyException(ex);
+            }
+        }
+
+        private User CurrentActor() => _sessionService.CurrentUser
+            ?? throw new UnauthorizedAccessException("Sign in to use AT requests.");
+
+        private static async Task EnsureAccessiblePersonAsync(SatiContext context, User actor, int personId)
+        {
+            if (!await LocalTenantAccess.CanAccessPersonAsync(context, actor, personId))
+                throw new UnauthorizedAccessException("That consumer is not available to this user.");
+        }
+
+        private static async Task<int?> AccessibleRequestPersonIdAsync(SatiContext context, User actor, int id)
+        {
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
+            var personId = await context.ATRequests.AsNoTracking().Where(request => request.Id == id)
+                .Select(request => (int?)request.PersonId).SingleOrDefaultAsync();
+            if (personId is int person)
+                await EnsureAccessiblePersonAsync(context, actor, person);
+            return personId;
+        }
+
+        private static async Task EnsureAccessibleRequestAsync(SatiContext context, User actor, ATRequest request)
+        {
+            var storedPersonId = await AccessibleRequestPersonIdAsync(context, actor, request.Id);
+            if (storedPersonId is null || storedPersonId != request.PersonId)
+                throw new UnauthorizedAccessException("That request is not available to this user.");
+        }
+
+        private static void EnsureNoCallerAttestation(ATRequest request)
+        {
+            if (request.SignedByName is not null || request.SignedByRole is not null ||
+                request.SignedByUserId.HasValue || request.SignedAtUtc.HasValue ||
+                request.AttestationStatement is not null || request.PassthroughRate.HasValue)
+            {
+                throw new UnauthorizedAccessException("AT request attestations must be recorded by the publish operation.");
             }
         }
 
@@ -274,13 +337,8 @@ namespace Sati.Data
             target.DecisionDate = source.DecisionDate;
             target.SetStatus(source.Status);
 
-            // Carried because the publish save is an update: the attestation is
-            // written in memory by ATRequest.Publish and reaches the database
-            // through this copy. Reopening does NOT come through here — it clears
-            // the attestation on the stored row directly (see ReopenAsync).
-            target.RehydrateAttestation(
-                source.SignedByName, source.SignedByRole, source.SignedByUserId,
-                source.SignedAtUtc, source.AttestationStatement, source.PassthroughRate);
+            // Attestation fields are never ordinary editable values. PublishAsync
+            // stamps them from the authenticated actor after applying these edits.
             if (source.SnapshotPng is not null)
                 target.AttachSnapshot(source.SnapshotPng);
 

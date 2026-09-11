@@ -1,5 +1,30 @@
 # Sati — Refactor Agenda
 
+## Unreleased — consumer-record permission revocation
+
+- [x] Make retained assignments insufficient for own casework after CaseManagement is removed;
+      cover API journals, notes, form opening, consumer status and own-casework reports.
+- [x] Check person/owner agency consistently across accessible records and explicit note agency
+      on reads, transitions, review and billing candidates, using the existing migration invariant.
+- [x] Preserve persisted permissions in local login without copying password verifiers; enforce
+      live actor facts in local consumer, document, review, AT/PCP, Admin and AI-context services.
+- [x] Preserve separately granted Billing, Supervision and Administration; reject forged AT
+      publication identities and ordinary-save attestations; retain published AT requests.
+- [x] Skip own-casework startup/scheduled-work loads for accounts without CaseManagement while
+      preserving their personal scratchpads and existing Billing/Supervision/Admin navigation.
+- [x] Add synthetic red-before-fix regressions with retained assignments, stale/fresh sessions,
+      denied-write state checks and legitimate workflow controls.
+- [ ] Implement password-change/session revocation and account disablement/offboarding (B05).
+- [ ] Retire or secure the separately recorded globally scoped local maintenance tools (B04).
+- [ ] Complete local/API AT publication completeness and audit parity, and review billing
+      candidate narrative disclosure against the biller's actual minimum necessary workflow.
+- [ ] Align supervisory target-user SQL bit filters with the full supported-mask rule; the actor
+      already fails closed, but corrupt target-user masks should not appear in reviewer lists.
+- [ ] Prove and harden local detached-graph persistence: a validated Person root must not let
+      caller-supplied nested Forms/Notes bypass their own ownership or workflow rules.
+- [ ] Rehearse deployment and investigate any already-inconsistent tenant markers through approved
+      backup/reconciliation procedures; these source fixes do not deploy or repair real records.
+
 ## Unreleased — close standalone form-deletion billing bypass
 
 - [x] Retire destructive standalone form deletion in both the API and transitional local service.
@@ -29,9 +54,10 @@
       See SECURITY_REVIEW_2026-09-10.md; this is not clearance to launch with real consumer data.
 - [ ] Apply AddClearinghouseResponseIntake only through reviewed migration/backup procedures.
       No deployment or real database migration is authorized by this development work.
-- [ ] Clear the security review's remaining launch blockers: incomplete
-      route capability checks, password/session revocation, local permission projection and
+- [ ] Clear the security review's remaining launch blockers: password/session revocation and
       privileged maintenance boundaries; resolve service-time concurrency with SQL Server tests.
+      Ordinary consumer-record capability checks and local login projection are addressed by the
+      September 11 follow-up above; this is not general launch clearance.
 - [ ] Complete actual clearinghouse sandbox acceptance, supported variant/companion-guide checks,
       authorized raw receipt readback, rejected/corrected/void claim workflows, bank reconciliation,
       and approved API-mediated Production activation. Production import remains disabled.

@@ -25,19 +25,22 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
     public async Task<CheckRequest?> GetByIdAsync(int id)
     {
         await using var db = contextFactory.CreateDbContext();
-        var request = await db.CheckRequests.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
-        if (request is null) return null;
-        await EnsureCanReadPersonAsync(db, request.PersonId);
-        return request;
+        await LocalTenantAccess.EnsureCurrentActorAsync(db, Actor);
+        var personId = await db.CheckRequests.AsNoTracking().Where(x => x.Id == id)
+            .Select(x => (int?)x.PersonId).SingleOrDefaultAsync();
+        if (personId is null) return null;
+        await EnsureCanReadPersonAsync(db, personId.Value);
+        return await db.CheckRequests.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
     }
 
     public async Task<CheckRequest> CreateDraftAsync(int personId)
     {
         var actor = Actor;
         await using var db = contextFactory.CreateDbContext();
+        if (!await LocalTenantAccess.OwnsPersonAsync(db, actor, personId))
+            throw new UnauthorizedAccessException("Only the consumer's current assigned case manager can create a check request.");
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == personId)
             ?? throw new KeyNotFoundException("The consumer was not found.");
-        EnsureOwnsPerson(actor, person);
         var owner = await db.Users.AsNoTracking().Include(x => x.Agency).Include(x => x.Supervisor)
             .SingleAsync(x => x.Id == person.UserId);
         var request = CheckRequest.CreateForClient(person, owner, DateTime.UtcNow);
@@ -53,12 +56,14 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
     {
         var actor = Actor;
         await using var db = contextFactory.CreateDbContext();
+        if (!await LocalTenantAccess.CanAccessUserAsync(db, actor, actor.Id))
+            throw new UnauthorizedAccessException("A current case manager account is required.");
         var stored = await db.CheckRequests.SingleOrDefaultAsync(x => x.Id == incoming.Id);
         if (stored is null || stored.Revision != incoming.Revision)
             throw new CheckRequestConcurrencyException();
         if (stored.IsPublished)
             throw new CheckRequestLockedException();
-        if (!await OwnsPersonAsync(db, actor, stored.PersonId))
+        if (!await LocalTenantAccess.OwnsPersonAsync(db, actor, stored.PersonId))
             throw new UnauthorizedAccessException("Only the consumer's assigned case manager can change this request.");
 
         var errors = publish
@@ -98,23 +103,8 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
     private async Task EnsureCanReadPersonAsync(SatiContext db, int personId)
     {
         var actor = Actor;
-        var owner = await (from person in db.People.AsNoTracking()
-                           join user in db.Users.AsNoTracking() on person.UserId equals user.Id
-                           where person.Id == personId && person.AgencyId == actor.AgencyId
-                           select new CaseloadParticipant(user.Id, user.AgencyId, user.Permissions, user.SupervisorId))
-            .SingleOrDefaultAsync();
-        if (owner == default || !CaseloadTransferRules.CanReachOwnOrSupervisedCaseload(actor.ToAgencyActor(), owner))
+        if (!await LocalTenantAccess.CanAccessPersonAsync(db, actor, personId))
             throw new UnauthorizedAccessException("This consumer is outside your caseload access.");
-    }
-
-    private static async Task<bool> OwnsPersonAsync(SatiContext db, User actor, int personId) =>
-        await db.People.AsNoTracking().AnyAsync(person => person.Id == personId &&
-            person.UserId == actor.Id && person.AgencyId == actor.AgencyId && actor.HasCaseManagerPermissions);
-
-    private static void EnsureOwnsPerson(User actor, Person person)
-    {
-        if (person.UserId != actor.Id || person.AgencyId != actor.AgencyId || !actor.HasCaseManagerPermissions)
-            throw new UnauthorizedAccessException("Only the consumer's assigned case manager can create a check request.");
     }
 
     private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

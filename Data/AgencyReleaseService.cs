@@ -46,6 +46,9 @@ public sealed class AgencyReleaseService(
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await LocalTenantAccess.EnsureCurrentActorAsync(context, actor, cancellationToken);
+        if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, personId, cancellationToken))
+            throw new InvalidOperationException("That consumer is not on your current caseload.");
         var person = await context.People.AsNoTracking().SingleOrDefaultAsync(
             candidate => candidate.Id == personId &&
                          candidate.UserId == actor.Id &&

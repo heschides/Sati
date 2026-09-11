@@ -150,10 +150,7 @@ namespace Sati.Data
                 ?? throw new InvalidOperationException(
                     "A signed-in user is required to read a consumer's providers.");
 
-            var owned = await context.People.AsNoTracking().AnyAsync(person =>
-                person.Id == personId &&
-                person.UserId == user.Id &&
-                person.AgencyId == user.AgencyId);
+            var owned = await LocalTenantAccess.OwnsPersonAsync(context, user, personId);
             if (!owned)
                 throw new UnauthorizedAccessException(
                     "That consumer is not on your caseload.");

@@ -471,6 +471,37 @@ new user management edits the permission set directly. Unknown bits and an empty
 default. Billing UI visibility follows billing permission, but every billing route and the local
 billing service enforce it independently.
 
+### Consumer-record permission revocation (2026-09-11)
+
+`TenantAccess.OwnedPeople` is the API query boundary for assigned casework: current
+case-management capability plus exact persisted actor identity, person agency and owner agency.
+`CanAccessPersonAsync` adds the person's agency to the shared supervisory/caseload decision.
+An assignment left in place after permission removal is not continuing access. Billing and
+Administration retain their separately authorized, purpose-specific operations; neither becomes
+case-management authority. Note reads and transitions also require the note's agency marker to
+match, consistent with the existing `ReconcileTenantOwnership` migration.
+
+Local sign-in copies the actual persisted permission set and safe contact fields, never the legacy
+role's defaults or password verifier. `LocalTenantAccess` verifies persisted identity and current
+permissions before ordinary consumer service operations. A changed local permission set fails
+closed until sign-in refreshes the session; API requests resolve it afresh. Review items, AT
+requests and PCP source services now require session injection too. Supervisor and Admin record
+services repeat the live check; AI context and SSN/document preparation use the same own-caseload
+boundary. Existing annual-document, safety-plan and form services inherit the shared live check.
+
+AT publication derives the signer from the authenticated session; ordinary saves cannot stamp an
+attestation, and published requests cannot be deleted through the local service. This does not
+claim complete local/API AT workflow parity. Batch local review generation resolves stored person
+facts and checks the entire requested batch before writing. No schema or historical-data repair
+is part of this change. Previously delivered/cached information is not remotely erased, in-flight
+work is not a session-revocation protocol, and direct SQL access is outside these service guards.
+The separately recorded global maintenance and bearer-session findings remain open.
+
+The shell initializes own-casework panels only for CaseManagement, so a Billing-, Supervision-
+or Administration-only account can reach its workspace without a denied casework preload.
+Personal scratchpads remain available; consumer-linked scheduled work is not loaded for those
+accounts. Scheduled results also check the current session/permission before publishing to the UI.
+
 ## Incident and health boundary
 
 Unexpected desktop and authenticated API failures are grouped by agency, source, sanitized

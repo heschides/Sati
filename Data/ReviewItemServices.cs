@@ -6,24 +6,30 @@ namespace Sati.Data
     public class ReviewItemService : IReviewItemService
     {
         private readonly IDbContextFactory<SatiContext> _contextFactory;
+        private readonly ISessionService _sessionService;
 
-        public ReviewItemService(IDbContextFactory<SatiContext> contextFactory)
+        public ReviewItemService(IDbContextFactory<SatiContext> contextFactory, ISessionService sessionService)
         {
             _contextFactory = contextFactory;
+            _sessionService = sessionService;
         }
 
         public async Task<List<ReviewItem>> GetForCaseloadAsync(int userId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            var actor = CurrentActor();
+            if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
+                throw new UnauthorizedAccessException("The caseload is outside your current access.");
             return await context.ReviewItems
                 .Include(r => r.Appointment)
-                .Where(r => r.Person!.UserId == userId)
+                .Where(r => r.Person!.UserId == userId && r.Person.AgencyId == actor.AgencyId)
                 .ToListAsync();
         }
 
         public async Task<List<ReviewItem>> GetForPersonAsync(int personId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await EnsurePersonAccessAsync(context, CurrentActor(), personId);
             return await context.ReviewItems
                 .Where(r => r.PersonId == personId)
                 .ToListAsync();
@@ -36,9 +42,21 @@ namespace Sati.Data
         public async Task<int> EnsureCurrentCycleItemsAsync(IEnumerable<Person> people, DateTime today)
         {
             await using var context = _contextFactory.CreateDbContext();
+            var actor = CurrentActor();
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
+            if (!actor.HasCaseManagerPermissions && !actor.HasSupervisorPermissions)
+                throw new UnauthorizedAccessException("Current consumer-record permission is required.");
+            // IDs identify the request; cycle and provider facts come from stored records.
+            // Validate the entire batch before generating anything.
+            var storedPeople = new List<Person>();
+            foreach (var id in people.Select(person => person.Id).Distinct())
+            {
+                await EnsurePersonAccessAsync(context, actor, id);
+                storedPeople.Add(await context.People.AsNoTracking().SingleAsync(person => person.Id == id));
+            }
             var created = 0;
 
-            foreach (var person in people)
+            foreach (var person in storedPeople)
             {
                 var boundaries = person.GetCurrentCycleBoundaries(today);
                 if (boundaries is null)
@@ -74,6 +92,7 @@ namespace Sati.Data
 
             var item = await context.ReviewItems.FindAsync(reviewItemId)
                 ?? throw new InvalidOperationException($"ReviewItem {reviewItemId} not found.");
+            await EnsurePersonAccessAsync(context, CurrentActor(), item.PersonId);
 
             switch (stage)
             {
@@ -110,6 +129,7 @@ namespace Sati.Data
                 .Include(r => r.Appointment)
                 .FirstOrDefaultAsync(r => r.Id == reviewItemId)
                 ?? throw new InvalidOperationException($"ReviewItem {reviewItemId} not found.");
+            await EnsurePersonAccessAsync(context, CurrentActor(), item.PersonId);
 
             if (date is null)
             {
@@ -141,6 +161,7 @@ namespace Sati.Data
         public async Task<(Appointment? Medical, Appointment? Dental)> GetLatestAppointmentsAsync(int personId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await EnsurePersonAccessAsync(context, CurrentActor(), personId);
 
             var medical = await context.Appointments
                 .AsNoTracking()
@@ -157,6 +178,15 @@ namespace Sati.Data
                 .FirstOrDefaultAsync();
 
             return (medical, dental);
+        }
+
+        private User CurrentActor() => _sessionService.CurrentUser
+            ?? throw new UnauthorizedAccessException("A signed-in user is required.");
+
+        private static async Task EnsurePersonAccessAsync(SatiContext context, User actor, int personId)
+        {
+            if (!await LocalTenantAccess.CanAccessPersonAsync(context, actor, personId))
+                throw new UnauthorizedAccessException("The consumer is outside your current access.");
         }
     }
 }

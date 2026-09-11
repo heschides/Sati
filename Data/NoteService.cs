@@ -15,7 +15,7 @@ public class NoteService(
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
-        if (!await OwnsPersonAsync(context, actor, note.PersonId))
+        if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, note.PersonId))
             throw new UnauthorizedAccessException("You may create notes only for your own caseload.");
 
         note.AgencyId = actor.AgencyId;
@@ -31,11 +31,13 @@ public class NoteService(
         ArgumentNullException.ThrowIfNull(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await EnsureUserInScopeAsync(context, actor, actor.Id);
         var stored = await context.Notes.Include(candidate => candidate.Person)
             .SingleOrDefaultAsync(candidate => candidate.Id == note.Id);
         if (stored is null || stored.Revision != note.Revision)
             throw new NoteConcurrencyException();
-        if (!OwnsPerson(actor, stored.Person))
+        if (stored.AgencyId != actor.AgencyId ||
+            !await LocalTenantAccess.OwnsPersonAsync(context, actor, stored.PersonId))
             throw new UnauthorizedAccessException("You may delete notes only from your own caseload.");
         if (!NoteWorkflow.CanCaseManagerDelete((int?)stored.Status))
             throw new InvalidOperationException("Submitted and workflow-controlled notes are retained as part of the clinical record.");
@@ -52,11 +54,13 @@ public class NoteService(
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await EnsureUserInScopeAsync(context, actor, actor.Id);
         var stored = await context.Notes.Include(candidate => candidate.Person)
             .SingleOrDefaultAsync(candidate => candidate.Id == note.Id);
         if (stored is null || stored.Revision != note.Revision)
             throw new NoteConcurrencyException();
-        if (!OwnsPerson(actor, stored.Person))
+        if (stored.AgencyId != actor.AgencyId ||
+            !await LocalTenantAccess.OwnsPersonAsync(context, actor, stored.PersonId))
             throw new UnauthorizedAccessException("You may update notes only in your own caseload.");
         if (!NoteWorkflow.CanCaseManagerEdit((int?)stored.Status))
             throw new InvalidOperationException("Logged and approved notes cannot be edited. A supervisor must return a logged note before it can be corrected.");
@@ -68,6 +72,8 @@ public class NoteService(
         var targetPerson = stored.Person;
         if (note.PersonId != previousPersonId)
         {
+            if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, note.PersonId))
+                throw new UnauthorizedAccessException("You may reassign a note only within your current caseload.");
             targetPerson = await context.People.SingleOrDefaultAsync(person =>
                 person.Id == note.PersonId && person.UserId == actor.Id &&
                 person.AgencyId == actor.AgencyId)
@@ -109,7 +115,7 @@ public class NoteService(
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
         await EnsurePersonInScopeAsync(context, actor, personId);
-        return await context.Notes.Where(n => n.PersonId == personId).ToListAsync();
+        return await context.Notes.Where(n => n.PersonId == personId && n.AgencyId == actor.AgencyId).ToListAsync();
     }
 
     /// <summary>
@@ -125,9 +131,11 @@ public class NoteService(
 
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await EnsureUserInScopeAsync(context, actor, actor.Id);
         var threshold = DateTime.Today.AddDays(-abandonedAfterDays);
         var notes = await context.Notes.Where(n => n.Person.UserId == actor.Id &&
             n.Person.AgencyId == actor.AgencyId &&
+            n.AgencyId == actor.AgencyId &&
             n.Status == NoteStatus.Pending &&
             n.EventDate.HasValue && n.EventDate.Value < threshold).ToListAsync();
         foreach (var note in notes)
@@ -148,7 +156,7 @@ public class NoteService(
         var firstDay = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         var nextMonth = firstDay.AddMonths(1);
         return await context.Notes.Where(n => n.EventDate >= firstDay && n.EventDate < nextMonth &&
-            n.Person.UserId == userId).ToListAsync();
+            n.Person.UserId == userId && n.Person.AgencyId == actor.AgencyId && n.AgencyId == actor.AgencyId).ToListAsync();
     }
 
     public async Task<List<Note>> GetDayScheduleAsync(int userId, DateTime date)
@@ -158,6 +166,7 @@ public class NoteService(
         await EnsureUserInScopeAsync(context, actor, userId);
         var dayStart = date.Date;
         return await context.Notes.Include(n => n.Person).Where(n => n.Person.UserId == userId &&
+            n.Person.AgencyId == actor.AgencyId && n.AgencyId == actor.AgencyId &&
             n.EventDate.HasValue && n.EventDate.Value >= dayStart && n.EventDate.Value < dayStart.AddDays(1)).ToListAsync();
     }
 
@@ -169,6 +178,7 @@ public class NoteService(
         var firstDay = new DateTime(year, 1, 1);
         var end = firstDay.AddYears(1);
         return await context.Notes.Include(n => n.Person).Where(n => n.Person.UserId == userId &&
+            n.Person.AgencyId == actor.AgencyId && n.AgencyId == actor.AgencyId &&
             n.EventDate.HasValue && n.EventDate.Value >= firstDay && n.EventDate.Value < end).ToListAsync();
     }
 
@@ -199,13 +209,6 @@ public class NoteService(
         if (!await LocalTenantAccess.CanAccessPersonAsync(context, actor, personId))
             throw new UnauthorizedAccessException("You may read notes only for clients in your scope.");
     }
-
-    private static async Task<bool> OwnsPersonAsync(SatiContext context, User actor, int personId) =>
-        await context.People.AnyAsync(person => person.Id == personId && person.UserId == actor.Id &&
-            person.AgencyId == actor.AgencyId);
-
-    private static bool OwnsPerson(User actor, Person person) =>
-        person.UserId == actor.Id && person.AgencyId == actor.AgencyId;
 
     private static void ValidateCaseManagerInput(Note note)
     {
@@ -258,9 +261,13 @@ public class NoteService(
         if (windowProblem is not null) throw new InvalidOperationException(windowProblem);
         if (note.EventDate is not DateTime eventDate) return;
 
+        var agencyId = await context.Users.AsNoTracking().Where(user => user.Id == userId)
+            .Select(user => (int?)user.AgencyId).SingleOrDefaultAsync()
+            ?? throw new UnauthorizedAccessException("The note's case manager is no longer available.");
         var dayStart = eventDate.Date;
         var blocks = (await context.Notes.Include(existing => existing.Person)
-                .Where(existing => existing.Person.UserId == userId && existing.EventDate >= dayStart &&
+                .Where(existing => existing.Person.UserId == userId &&
+                    existing.Person.AgencyId == agencyId && existing.AgencyId == agencyId && existing.EventDate >= dayStart &&
                     existing.EventDate < dayStart.AddDays(1)).ToListAsync())
             .Select(existing => ServiceTimeline.TryCreateBlock(existing.Id, existing.StartTime,
                 existing.Minutes, existing.Status?.ToString(), $"a note for {existing.Person.FullName}"))

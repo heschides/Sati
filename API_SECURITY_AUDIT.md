@@ -1,4 +1,4 @@
-# API security audit — 2026-08-14, 2026-08-15, 2026-08-30, 2026-08-31, 2026-09-05, 2026-09-10
+# API security audit — 2026-08-14, 2026-08-15, 2026-08-30, 2026-08-31, 2026-09-05, 2026-09-10, 2026-09-11
 
 Scope: the authorization surface of `Sati.Api`, the sensitive-data boundary between the server and
 distributed clients, and the artifacts the platform hands to a reviewer. Driven by the two risks
@@ -11,13 +11,33 @@ substitute for an independent assessment, and it does not establish HIPAA compli
 The broader post-intake September 10 repository review is in `SECURITY_REVIEW_2026-09-10.md`.
 It includes synthetic reproductions of permission revocation, bearer-session, required-form
 deletion and pre-supervisory compliance defects. The follow-up form-deletion closure is described
-below; the other findings remain open. Older “fixed” statements in this
+below, followed by the September 11 ordinary consumer permission closure. Remaining findings are
+tracked explicitly in that review. Older “fixed” statements in this
 file apply only to their named paths; they must not be interpreted as launch clearance. The new
 response importer remains synthetic-only while real clearinghouse and operational gates are open.
 
 ---
 
 ## Fixed
+
+### Follow-up 2026-09-11 — retained assignments are not continuing casework authority
+
+Owned API queries require current CaseManagement and exact person/owner agency; accessible
+consumer routes include person agency and shared supervisory reach. Journals, note editing,
+deletion, annual reads, abandonment, form opening, own-casework reports and owner status no longer
+accept assignment alone. Note markers are checked, including mapped person-response notes and
+supervisor/billing candidates. Billing-only claims and supervision-only review remain authorized.
+
+Local login retains persisted permissions and no password verifier. Consumer services recheck
+current database actor facts; previously actor-free review, AT and PCP services require the
+session. Supervisor/Admin records, AI context and SSN/document preparation are included. Local AT
+also rejects caller-supplied publication identity/attestations and published deletion. Evidence
+includes failures before repairs, denied-write state checks and positive persisted-write controls;
+see SECURITY_REVIEW_2026-09-10.md and the permission-revocation handoff.
+
+Closure is limited to ordinary application boundaries. B04 global maintenance, B05 bearer session
+lifecycle, direct SQL, cached content, unsupported target-mask review edges and remaining launch/AT
+parity findings are not certified safe by it. No production change was made.
 
 ### Follow-up 2026-09-10 — standalone form-deletion billing bypass
 

@@ -411,17 +411,17 @@ namespace Sati.ViewModels
             }
 
             await Scratchpad.InitializeAsync();
-            // Awaited, not fire-and-forget: the dashboard's own People-load must finish
-            // before the NotesLog and Clients reloads run theirs. Overlapping People-loads
-            // each demand a LocalDB sort grant and stall on RESOURCE_SEMAPHORE; sequenced,
-            // only one grant is live at a time.
-            await NotesViewModel.InitializeAsync();
-            // NotesLog hosts its own NoteEntry instance; the dashboard's init only
-            // covers the dashboard's copy. This loads the module's settings so its
-            // narrative templates populate.
-            await NotesViewModel.NotesLog.NoteEntry.InitializeAsync();
-            await NotesViewModel.NotesLog.ReloadAsync();
-            await NotesViewModel.Clients.ReloadAsync();
+            if (IsCaseManagementAvailable)
+            {
+                // Own casework is not a prerequisite for billing, supervision or
+                // administration. Their service permissions remain independent.
+                // Keep these loads sequential to avoid overlapping LocalDB sort grants.
+                await NotesViewModel.InitializeAsync();
+                // NotesLog hosts its own NoteEntry instance and needs its own settings.
+                await NotesViewModel.NotesLog.NoteEntry.InitializeAsync();
+                await NotesViewModel.NotesLog.ReloadAsync();
+                await NotesViewModel.Clients.ReloadAsync();
+            }
 
             await NavigateByRoleAsync();
         }
@@ -463,13 +463,14 @@ namespace Sati.ViewModels
             }
 
             await Scratchpad.InitializeAsync();
-            await NotesViewModel.InitializeAsync();
-            // NotesLog hosts its own NoteEntry instance; the dashboard's init only
-            // covers the dashboard's copy. This loads the module's settings so its
-            // narrative templates populate.
-            await NotesViewModel.NotesLog.NoteEntry.InitializeAsync();
-            await NotesViewModel.NotesLog.ReloadAsync();
-            await NotesViewModel.Clients.ReloadAsync();
+            if (IsCaseManagementAvailable)
+            {
+                await NotesViewModel.InitializeAsync();
+                // NotesLog hosts its own NoteEntry instance and needs its own settings.
+                await NotesViewModel.NotesLog.NoteEntry.InitializeAsync();
+                await NotesViewModel.NotesLog.ReloadAsync();
+                await NotesViewModel.Clients.ReloadAsync();
+            }
 
             await NavigateByRoleAsync();
         }

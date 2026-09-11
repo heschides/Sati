@@ -110,7 +110,7 @@ public sealed class JournalReminderTests
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var outsider = fixture.PeopleAs(fixture.CaseManagerTwo);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => outsider.AddJournalReminderAsync(fixture.PersonOneId, "Not yours."));
 
         var untouched = await fixture.PeopleAs(fixture.CaseManagerOne)

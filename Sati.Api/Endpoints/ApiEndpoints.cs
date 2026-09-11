@@ -1495,6 +1495,7 @@ internal static partial class ApiEndpoints
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
                               where note.Status == NoteWorkflow.Logged &&
+                                    note.AgencyId == actor.AgencyId &&
                                     person.AgencyId == actor.AgencyId &&
                                     caseManagerIds.Contains(person.UserId) &&
                                     (!userId.HasValue || person.UserId == userId.Value) &&
@@ -1603,6 +1604,7 @@ internal static partial class ApiEndpoints
             var rows = await (from note in db.Notes.AsNoTracking()
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               where note.Status == NoteWorkflow.Logged &&
+                                    note.AgencyId == actor.AgencyId &&
                                     person.AgencyId == actor.AgencyId &&
                                     caseManagerIds.Contains(person.UserId)
                               orderby note.EventDate
@@ -1683,7 +1685,7 @@ internal static partial class ApiEndpoints
                     row.Note.Minutes, "Logged");
                 if (candidate is not null && row.Note.EventDate is DateTime date)
                 {
-                    var day = await LoadDayNotesAsync(db, row.Person.UserId, date, cancellationToken);
+                    var day = await LoadDayNotesAsync(db, row.Person.UserId, actor.AgencyId, date, cancellationToken);
                     var blocks = day.Select(item => ServiceTimeline.TryCreateBlock(item.Note.Id,
                         item.Note.StartTime, item.Note.Minutes, ContractMapper.NoteStatusName(item.Note.Status)))
                         .OfType<ServiceBlock>();
@@ -1817,13 +1819,13 @@ internal static partial class ApiEndpoints
             var people = await db.People.AsNoTracking()
                 // 0 == Sati.PersonStatus.Active. Archived people are excluded from the caseload
                 // load path entirely — see HANDOFF_CLIENT_DELETION_POLICY.md's archive semantics.
-                .Where(x => x.UserId == targetUserId && x.Status == 0)
+                .Where(x => x.UserId == targetUserId && x.AgencyId == actor.AgencyId && x.Status == 0)
                 .OrderBy(x => x.LastName)
                 .ThenBy(x => x.FirstName)
                 .ToListAsync(cancellationToken);
             var ids = people.Select(x => x.Id).ToList();
             var forms = await db.Forms.AsNoTracking().Where(x => ids.Contains(x.PersonId)).ToListAsync(cancellationToken);
-            var notes = await db.Notes.AsNoTracking().Where(x => ids.Contains(x.PersonId)).ToListAsync(cancellationToken);
+            var notes = await db.Notes.AsNoTracking().Where(x => ids.Contains(x.PersonId) && x.AgencyId == actor.AgencyId).ToListAsync(cancellationToken);
             var formsByPerson = forms.GroupBy(x => x.PersonId).ToDictionary(x => x.Key, x => (IReadOnlyList<ServerForm>)x.ToList());
             var notesByPerson = notes.GroupBy(x => x.PersonId).ToDictionary(x => x.Key, x => (IReadOnlyList<ServerNote>)x.ToList());
 
@@ -1840,8 +1842,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            var journal = await db.People.AsNoTracking()
-                .Where(x => x.Id == personId && x.UserId == actor.UserId)
+            var journal = await TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+                .Where(x => x.Id == personId)
                 .Select(x => new { x.Journal })
                 .SingleOrDefaultAsync(cancellationToken);
             return journal is null ? TypedResults.NotFound() : TypedResults.Ok<string?>(journal.Journal);
@@ -1857,8 +1859,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            var person = await db.People.SingleOrDefaultAsync(
-                x => x.Id == personId && x.UserId == actor.UserId && x.AgencyId == actor.AgencyId,
+            var person = await TenantAccess.OwnedPeople(db, actor).SingleOrDefaultAsync(
+                x => x.Id == personId,
                 cancellationToken);
             if (person is null)
                 return Results.NotFound();
@@ -1913,8 +1915,8 @@ internal static partial class ApiEndpoints
             // Same scope gate as the journal PUT: the person must be on this
             // caller's caseload AND in this caller's agency.
             var actor = Actor.From(principal);
-            var person = await db.People.SingleOrDefaultAsync(
-                x => x.Id == personId && x.UserId == actor.UserId && x.AgencyId == actor.AgencyId,
+            var person = await TenantAccess.OwnedPeople(db, actor).SingleOrDefaultAsync(
+                x => x.Id == personId,
                 cancellationToken);
             if (person is null)
                 return Results.NotFound();
@@ -2164,11 +2166,13 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            var person = await db.People.SingleOrDefaultAsync(
-                candidate => candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
-                cancellationToken);
+            var person = await LoadAuditablePersonAsync(db, actor, personId, cancellationToken);
             if (person is null)
                 return Results.NotFound();
+
+            if (!actor.HasAdminPermissions &&
+                !await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
 
             var refusal = PersonStatusRules.Describe(
                 actor.HasAdminPermissions, person.UserId == actor.UserId, request.Status);
@@ -2987,7 +2991,7 @@ internal static partial class ApiEndpoints
             if (!await TenantAccess.CanAccessUserAsync(db, actor, userId, cancellationToken)) return Results.Forbid();
             var items = await (from review in db.ReviewItems.AsNoTracking().Include(x => x.Appointment)
                                join person in db.People on review.PersonId equals person.Id
-                               where person.UserId == userId
+                               where person.UserId == userId && person.AgencyId == actor.AgencyId
                                select review)
                 .OrderBy(x => x.PersonId).ThenBy(x => x.CycleAnchor).ThenBy(x => x.Quarter)
                 .ThenBy(x => x.Category).ThenBy(x => x.SlotIndex).ToListAsync(cancellationToken);
@@ -3000,7 +3004,7 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == personId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) return Results.NotFound();
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) return Results.NotFound();
             var items = await db.ReviewItems.AsNoTracking().Include(x => x.Appointment)
                 .Where(x => x.PersonId == personId).OrderBy(x => x.CycleAnchor).ThenBy(x => x.Quarter)
                 .ThenBy(x => x.Category).ThenBy(x => x.SlotIndex).ToListAsync(cancellationToken);
@@ -3011,12 +3015,15 @@ internal static partial class ApiEndpoints
             EnsureReviewItemsRequest request, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if ((!actor.HasCaseManagerPermissions && !actor.HasSupervisorPermissions) ||
+                !await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                return Results.Forbid();
             var ids = request.PersonIds.Where(x => x > 0).Distinct().Take(500).ToList();
-            var people = await db.People.Where(x => ids.Contains(x.Id)).ToListAsync(cancellationToken);
+            var people = await db.People.Where(x => ids.Contains(x.Id) && x.AgencyId == actor.AgencyId).ToListAsync(cancellationToken);
             var created = 0;
             foreach (var person in people)
             {
-                if (!await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) continue;
+                if (!await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) continue;
                 var anchor = CurrentCycleAnchor(person.EffectiveDate, request.Today);
                 if (anchor is null) continue;
                 var existing = await db.ReviewItems.Where(x => x.PersonId == person.Id && x.CycleAnchor == anchor.Value)
@@ -3083,7 +3090,7 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == personId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) return Results.NotFound();
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) return Results.NotFound();
             var medical = await LatestAppointmentAsync(db, personId, "Medical", cancellationToken);
             var dental = await LatestAppointmentAsync(db, personId, "Dental", cancellationToken);
             return Results.Ok(new LatestAppointmentsDto(medical is null ? null : ContractMapper.ToAppointment(medical),
@@ -3211,7 +3218,7 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == personId, cancellationToken);
             if (person is null || person.UserId != preferredAuthorUserId ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) return Results.NotFound();
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) return Results.NotFound();
             var assessment = await db.ComprehensiveAssessments.AsNoTracking()
                 .Where(x => x.PersonId == personId && x.Status == "Approved")
                 .OrderByDescending(x => x.Version).FirstOrDefaultAsync(cancellationToken);
@@ -3530,7 +3537,7 @@ internal static partial class ApiEndpoints
             var rate = (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).PassthroughRate;
             var requests = await (from request in db.AtRequests.AsNoTracking()
                                   join person in db.People on request.PersonId equals person.Id
-                                  where person.UserId == userId
+                                  where person.UserId == userId && person.AgencyId == actor.AgencyId
                                   select new AtRequestRow
                                   {
                                       Id = request.Id, ClientName = request.ClientName, Status = request.Status,
@@ -3552,7 +3559,7 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Id == personId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
             var rate = (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).PassthroughRate;
@@ -3585,7 +3592,7 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.PersonId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) return Results.NotFound();
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) return Results.NotFound();
             var owner = await db.Users.AsNoTracking().SingleAsync(x => x.Id == person.UserId, cancellationToken);
             var agency = await db.Agencies.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actor.AgencyId, cancellationToken);
             var errors = ValidateAtRequest(input); if (errors.Count > 0) return Results.ValidationProblem(errors);
@@ -3742,7 +3749,7 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == personId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
             var rows = await db.CheckRequests.AsNoTracking()
@@ -3761,9 +3768,8 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             var request = await db.CheckRequests.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
             if (request is null) return Results.NotFound();
-            var ownerId = await db.People.AsNoTracking().Where(x => x.Id == request.PersonId)
-                .Select(x => (int?)x.UserId).SingleOrDefaultAsync(cancellationToken);
-            if (ownerId is null || !await TenantAccess.CanAccessUserAsync(db, actor, ownerId.Value, cancellationToken))
+            var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.PersonId, cancellationToken);
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             return Results.Ok(ContractMapper.ToCheckRequest(request));
         });
@@ -3943,7 +3949,7 @@ internal static partial class ApiEndpoints
             if (validation is not null)
                 return Results.ValidationProblem(validation);
             var row = await (from note in db.Notes
-                             join person in db.People on note.PersonId equals person.Id
+                             join person in TenantAccess.OwnedPeople(db, actor) on note.PersonId equals person.Id
                              where person.UserId == actor.UserId &&
                                    person.AgencyId == actor.AgencyId &&
                                    note.AgencyId == actor.AgencyId &&
@@ -3970,7 +3976,7 @@ internal static partial class ApiEndpoints
             var responsePerson = row.Person;
             if (request.PersonId != previousPersonId)
             {
-                responsePerson = await db.People.SingleOrDefaultAsync(person =>
+                responsePerson = await TenantAccess.OwnedPeople(db, actor).SingleOrDefaultAsync(person =>
                     person.Id == request.PersonId &&
                     person.UserId == actor.UserId &&
                     person.AgencyId == actor.AgencyId,
@@ -4030,8 +4036,8 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             var note = await (from candidate in db.Notes
-                              join person in db.People on candidate.PersonId equals person.Id
-                              where candidate.Id == id && person.UserId == actor.UserId
+                              join person in TenantAccess.OwnedPeople(db, actor) on candidate.PersonId equals person.Id
+                              where candidate.Id == id && candidate.AgencyId == actor.AgencyId
                               select candidate).SingleOrDefaultAsync(cancellationToken);
             if (note is null)
                 return Results.NotFound();
@@ -4064,7 +4070,7 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return TypedResults.NotFound();
-            var notes = await db.Notes.AsNoTracking().Where(x => x.PersonId == personId).ToListAsync(cancellationToken);
+            var notes = await db.Notes.AsNoTracking().Where(x => x.PersonId == personId && x.AgencyId == actor.AgencyId).ToListAsync(cancellationToken);
             return TypedResults.Ok(notes.Select(x => ContractMapper.ToNote(x)).ToList());
         });
 
@@ -4085,6 +4091,7 @@ internal static partial class ApiEndpoints
             var rows = await (from note in db.Notes.AsNoTracking()
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               where person.UserId == targetUserId &&
+                                    person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId &&
                                     note.EventDate >= first && note.EventDate < end
                               select new { Note = note, Person = person })
                 .ToListAsync(cancellationToken);
@@ -4106,7 +4113,7 @@ internal static partial class ApiEndpoints
             if (!await TenantAccess.CanAccessUserAsync(db, actor, targetUserId, cancellationToken))
                 return Results.Forbid();
 
-            var rows = await LoadDayNotesAsync(db, targetUserId, date, cancellationToken);
+            var rows = await LoadDayNotesAsync(db, targetUserId, actor.AgencyId, date, cancellationToken);
             return Results.Ok(rows.Select(x => ContractMapper.ToNote(x.Note, x.Person)).ToList());
         });
 
@@ -4119,11 +4126,13 @@ internal static partial class ApiEndpoints
             if (year is < 2000 or > 2200)
                 return Results.BadRequest();
             var actor = Actor.From(principal);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
             var first = new DateTime(year, 1, 1);
             var end = first.AddYears(1);
             var rows = await (from note in db.Notes.AsNoTracking()
-                              join person in db.People.AsNoTracking() on note.PersonId equals person.Id
-                              where person.UserId == actor.UserId &&
+                              join person in TenantAccess.OwnedPeople(db, actor).AsNoTracking() on note.PersonId equals person.Id
+                              where note.AgencyId == actor.AgencyId &&
                                     note.EventDate >= first && note.EventDate < end
                               select new { Note = note, Person = person })
                 .ToListAsync(cancellationToken);
@@ -4137,12 +4146,15 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            // Permission is checked before even lazily creating agency settings.
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
             var abandonedAfterDays = ProductivityForecast.NormalizeDocumentationWindowDays(
                 (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).AbandonedAfterDays);
             var threshold = clock.Today.AddDays(-abandonedAfterDays);
-            var personIds = db.People.Where(x => x.UserId == actor.UserId).Select(x => x.Id);
+            var personIds = TenantAccess.OwnedPeople(db, actor).Select(x => x.Id);
             var count = await db.Notes
-                .Where(x => personIds.Contains(x.PersonId) && x.Status == 1 && x.EventDate < threshold)
+                .Where(x => x.AgencyId == actor.AgencyId && personIds.Contains(x.PersonId) && x.Status == 1 && x.EventDate < threshold)
                 .ExecuteUpdateAsync(x => x
                     .SetProperty(n => n.Status, 8)
                     .SetProperty(n => n.Revision, n => n.Revision + 1), cancellationToken);
@@ -4520,8 +4532,10 @@ internal static partial class ApiEndpoints
 
             var actor = Actor.From(principal);
             var endExclusive = end.AddDays(1);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
             var rows = await (from note in db.Notes.AsNoTracking()
-                              join person in db.People.AsNoTracking()
+                              join person in TenantAccess.OwnedPeople(db, actor).AsNoTracking()
                                   on note.PersonId equals person.Id
                               where person.UserId == actor.UserId &&
                                     person.AgencyId == actor.AgencyId &&
@@ -4568,10 +4582,11 @@ internal static partial class ApiEndpoints
             }
 
             var actor = Actor.From(principal);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
             var complianceRequirements = (await GetOrCreateSettingsAsync(
                 db, actor.AgencyId, cancellationToken)).BillingComplianceRequirements;
-            var people = await db.People.AsNoTracking()
-                .Where(x => x.UserId == actor.UserId)
+            var people = await TenantAccess.OwnedPeople(db, actor).AsNoTracking()
                 .OrderBy(x => x.LastName)
                 .ThenBy(x => x.FirstName)
                 .Select(x => new BillingLossPersonRow(x.Id, x.FirstName, x.LastName, x.EffectiveDate))
@@ -4588,7 +4603,7 @@ internal static partial class ApiEndpoints
                 .ToListAsync(cancellationToken);
             var endExclusive = end.AddDays(1);
             var notes = await db.Notes.AsNoTracking()
-                .Where(x => personIds.Contains(x.PersonId) &&
+                .Where(x => personIds.Contains(x.PersonId) && x.AgencyId == actor.AgencyId &&
                             x.EventDate.HasValue &&
                             x.EventDate.Value >= start &&
                             x.EventDate.Value < endExclusive &&
@@ -5013,6 +5028,7 @@ internal static partial class ApiEndpoints
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
                               where note.Status == 6 && owner.AgencyId == actor.AgencyId &&
+                                    person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId &&
                                     !db.ClaimLines.Any(line => line.NoteId == note.Id)
                               orderby note.EventDate
                               select new ReviewableNote(note, person)).ToListAsync(cancellationToken);
@@ -5050,7 +5066,8 @@ internal static partial class ApiEndpoints
                              join person in db.People on note.PersonId equals person.Id
                              join owner in db.Users on person.UserId equals owner.Id
                              where note.Id == request.NoteId && note.Status == 6 &&
-                                   owner.AgencyId == actor.AgencyId
+                                   owner.AgencyId == actor.AgencyId &&
+                                   person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId
                              select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
             if (row is null)
                 return Results.NotFound();
@@ -5314,6 +5331,7 @@ internal static partial class ApiEndpoints
                                     join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
                                     where noteIds.Contains(note.Id) &&
                                           owner.AgencyId == actor.AgencyId &&
+                                          note.AgencyId == actor.AgencyId &&
                                           person.AgencyId == actor.AgencyId
                                     select new { Note = note, Person = person })
                 .ToListAsync(cancellationToken);
@@ -5663,7 +5681,7 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             if (person.EffectiveDate is not DateTime effectiveDate ||
                 AnnualDocumentCycle.CurrentStart(effectiveDate, request.CycleStart) != request.CycleStart.Date)
@@ -5700,7 +5718,7 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             var artifacts = await db.DocumentArtifacts.AsNoTracking()
                 .Where(artifact => artifact.PersonId == personId &&
@@ -5725,7 +5743,7 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             var form = await db.Forms.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == formId && candidate.PersonId == personId && candidate.Type == type,
@@ -5782,7 +5800,7 @@ internal static partial class ApiEndpoints
                     candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
                     cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
             var form = await db.Forms.SingleOrDefaultAsync(candidate =>
@@ -5963,7 +5981,7 @@ internal static partial class ApiEndpoints
                     candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
                     cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             var form = await db.Forms.SingleOrDefaultAsync(candidate =>
                 candidate.Id == request.FormId && candidate.PersonId == personId && candidate.Type == type,
@@ -6018,7 +6036,7 @@ internal static partial class ApiEndpoints
                     candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
                     cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             var forms = await db.Forms.AsNoTracking()
                 .Where(candidate => candidate.PersonId == personId)
@@ -6107,8 +6125,8 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             var form = await (from f in db.Forms
-                              join p in db.People on f.PersonId equals p.Id
-                              where f.Id == id && p.UserId == actor.UserId
+                              join p in TenantAccess.OwnedPeople(db, actor) on f.PersonId equals p.Id
+                              where f.Id == id
                               select f).SingleOrDefaultAsync(cancellationToken);
             if (form is null)
                 return TypedResults.NotFound();
@@ -6144,7 +6162,7 @@ internal static partial class ApiEndpoints
             .Where(x => x.PersonId == person.Id)
             .ToListAsync(cancellationToken);
         var notes = await db.Notes.AsNoTracking()
-            .Where(x => x.PersonId == person.Id)
+            .Where(x => x.PersonId == person.Id && x.AgencyId == person.AgencyId)
             .ToListAsync(cancellationToken);
         return ContractMapper.ToPerson(person, forms, notes);
     }
@@ -6155,7 +6173,7 @@ internal static partial class ApiEndpoints
         int personId,
         CancellationToken cancellationToken) =>
         (from person in db.People
-         join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
+         join owner in db.Users on person.UserId equals owner.Id
          where person.Id == personId &&
                person.AgencyId == actor.AgencyId &&
                owner.AgencyId == actor.AgencyId
@@ -6382,6 +6400,7 @@ internal static partial class ApiEndpoints
                       join person in db.People on note.PersonId equals person.Id
                       join owner in db.Users on person.UserId equals owner.Id
                       where note.Id == noteId && owner.AgencyId == actor.AgencyId &&
+                            note.AgencyId == actor.AgencyId &&
                             person.AgencyId == actor.AgencyId &&
                             (owner.Permissions & UserPermissions.CaseManagement) != 0 &&
                             (actor.HasAgencyWideSupervisionPermissions ||
@@ -6557,7 +6576,7 @@ internal static partial class ApiEndpoints
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
             x => x.Id == item.PersonId, cancellationToken);
         return person is not null &&
-               await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)
+               await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)
             ? item
             : null;
     }
@@ -6814,13 +6833,14 @@ internal static partial class ApiEndpoints
     private sealed record DayNoteRow(ServerNote Note, ServerPerson Person);
 
     private static async Task<List<DayNoteRow>> LoadDayNotesAsync(
-        ApiDbContext db, int userId, DateTime date, CancellationToken cancellationToken)
+        ApiDbContext db, int userId, int agencyId, DateTime date, CancellationToken cancellationToken)
     {
         var dayStart = date.Date;
         var dayEnd = dayStart.AddDays(1);
         return await (from note in db.Notes.AsNoTracking()
                       join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                       where person.UserId == userId &&
+                            person.AgencyId == agencyId && note.AgencyId == agencyId &&
                             note.EventDate >= dayStart && note.EventDate < dayEnd
                       select new DayNoteRow(note, person))
             .ToListAsync(cancellationToken);
@@ -6852,7 +6872,7 @@ internal static partial class ApiEndpoints
         if (request.EventDate is not DateTime eventDate)
             return null;
 
-        var sameDay = await LoadDayNotesAsync(db, actor.UserId, eventDate, cancellationToken);
+        var sameDay = await LoadDayNotesAsync(db, actor.UserId, actor.AgencyId, eventDate, cancellationToken);
         var blocks = sameDay
             .Select(row => ServiceTimeline.TryCreateBlock(
                 row.Note.Id,
@@ -7195,7 +7215,7 @@ internal static partial class ApiEndpoints
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
             x => x.Id == request.PersonId, cancellationToken);
         return person is not null &&
-               await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)
+               await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)
             ? request
             : null;
     }

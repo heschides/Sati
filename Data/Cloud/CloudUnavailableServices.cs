@@ -269,8 +269,8 @@ public sealed class CloudAtRequestService(CloudApiClient api) : IATRequestServic
     // what it now holds. The caseManager argument is ignored on this path — the
     // API derives the signer from the bearer token, and taking the client's word
     // for who signed is precisely what the publish route refuses to do. It stays
-    // in the signature because the desktop-local implementation, which has no
-    // token to read, genuinely needs it.
+    // in the interface for compatibility; desktop-local publication now derives
+    // its signer from the authenticated local session too.
     public async Task<ATRequest> PublishAsync(ATRequest request, User caseManager)
     {
         try

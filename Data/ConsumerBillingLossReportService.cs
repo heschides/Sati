@@ -17,10 +17,12 @@ namespace Sati.Data
         ];
 
         private readonly IDbContextFactory<SatiContext> _contextFactory;
+        private readonly ISessionService _sessionService;
 
-        public ConsumerBillingLossReportService(IDbContextFactory<SatiContext> contextFactory)
+        public ConsumerBillingLossReportService(IDbContextFactory<SatiContext> contextFactory, ISessionService sessionService)
         {
             _contextFactory = contextFactory;
+            _sessionService = sessionService;
         }
 
         public async Task<ConsumerBillingLossReport> GetAsync(
@@ -34,10 +36,11 @@ namespace Sati.Data
                 throw new ArgumentException("The report window end must not precede its start.");
 
             await using var context = _contextFactory.CreateDbContext();
-            var agencyId = await context.Users.AsNoTracking()
-                .Where(user => user.Id == userId)
-                .Select(user => user.AgencyId)
-                .SingleAsync();
+            var actor = _sessionService.CurrentUser
+                ?? throw new UnauthorizedAccessException("A signed-in user is required.");
+            if (actor.Id != userId || !await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
+                throw new UnauthorizedAccessException("This report requires current access to your own caseload.");
+            var agencyId = actor.AgencyId;
             var requirements = await context.Settings.AsNoTracking()
                 .Where(settings => settings.AgencyId == agencyId)
                 .Select(settings => (BillingComplianceRequirements?)settings.BillingComplianceRequirements)
@@ -47,7 +50,7 @@ namespace Sati.Data
             // Those unbounded columns are not needed to classify days or total units.
             var people = await context.People
                 .AsNoTracking()
-                .Where(p => p.UserId == userId)
+                .Where(p => p.UserId == userId && p.AgencyId == agencyId)
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .Select(p => new PersonReportItem(
@@ -75,6 +78,7 @@ namespace Sati.Data
             var notes = await context.Notes
                 .AsNoTracking()
                 .Where(n => personIds.Contains(n.PersonId)
+                         && n.AgencyId == agencyId
                          && n.EventDate.HasValue
                          && n.EventDate.Value >= start
                          && n.EventDate.Value < end.AddDays(1)

@@ -130,6 +130,10 @@ public sealed class DhhsFormService(
         var actor = sessionService.CurrentUser
             ?? throw new InvalidOperationException("No user is signed in.");
 
+        await LocalTenantAccess.EnsureCurrentActorAsync(context, actor, cancellationToken);
+        if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, personId, cancellationToken))
+            throw new InvalidOperationException("That consumer is not on your current caseload.");
+
         return await context.People.SingleOrDefaultAsync(
             candidate => candidate.Id == personId &&
                          candidate.UserId == actor.Id &&
@@ -159,13 +163,7 @@ public sealed class DhhsFormService(
         // Tracked, not AsNoTracking: the encrypted SSN lives in shadow properties, and
         // shadow values are held by the change tracker. An untracked entity has none,
         // so the number would silently read as absent and the box would print blank.
-        var person = await context.People
-            .SingleOrDefaultAsync(
-                candidate => candidate.Id == personId &&
-                             candidate.UserId == actor.Id &&
-                             candidate.AgencyId == actor.AgencyId,
-                cancellationToken)
-            ?? throw new InvalidOperationException("That consumer is not on your caseload.");
+        var person = await LoadOwnPersonAsync(context, personId, cancellationToken);
 
         var agency = await context.Agencies.AsNoTracking()
             .SingleOrDefaultAsync(candidate => candidate.Id == actor.AgencyId, cancellationToken);

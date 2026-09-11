@@ -34,6 +34,7 @@ namespace Sati.Data
 
             person.AgencyId = actor.AgencyId;
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
             if (person.IsTestData)
             {
                 var actorIsCurrentAdmin = await context.Users.AsNoTracking().AnyAsync(candidate =>
@@ -194,6 +195,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
 
             var person = await context.People.SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
@@ -272,14 +274,17 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
 
             var person = await context.People.SingleOrDefaultAsync(candidate =>
-                candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
+                candidate.Id == personId && candidate.AgencyId == actor.AgencyId &&
+                context.Users.Any(owner => owner.Id == candidate.UserId && owner.AgencyId == actor.AgencyId));
             if (person is null)
                 throw new InvalidOperationException("This Person was not found in your agency.");
 
-            var actorIsAdmin = (actor.Permissions & UserPermissions.Administration) != 0;
-            var refusal = PersonStatusRules.Describe(actorIsAdmin, person.UserId == actor.Id, status);
+            var actorIsAdmin = actor.HasAdminPermissions;
+            var ownsPerson = await LocalTenantAccess.OwnsPersonAsync(context, actor, person.Id);
+            var refusal = PersonStatusRules.Describe(actorIsAdmin, ownsPerson, status);
             if (refusal is not null)
             {
                 throw new PersonValidationException(new Dictionary<string, string[]>
@@ -357,6 +362,7 @@ namespace Sati.Data
                 return CredibleMatchLookupResult.Empty;
 
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
             var agencyActor = new AgencyActor(actor.Id, actor.AgencyId, actor.Permissions);
 
             var credibleMatches = new List<CredibleClientOwnerRow>();
@@ -365,7 +371,7 @@ namespace Sati.Data
                 credibleMatches = await (
                     from person in context.People.AsNoTracking()
                     join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
-                    where person.AgencyId == actor.AgencyId &&
+                    where person.AgencyId == actor.AgencyId && owner.AgencyId == actor.AgencyId &&
                           person.CredibleClientId != null &&
                           ids.Contains(person.CredibleClientId)
                     select new CredibleClientOwnerRow(
@@ -379,7 +385,7 @@ namespace Sati.Data
                 maineCareMatches = await (
                     from person in context.People.AsNoTracking()
                     join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
-                    where person.AgencyId == actor.AgencyId &&
+                    where person.AgencyId == actor.AgencyId && owner.AgencyId == actor.AgencyId &&
                           person.MaineCareId != null &&
                           mcIds.Contains(person.MaineCareId)
                     select new MaineCareOwnerRow(
@@ -396,7 +402,7 @@ namespace Sati.Data
                 nameMatches = await (
                     from person in context.People.AsNoTracking()
                     join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
-                    where person.AgencyId == actor.AgencyId &&
+                    where person.AgencyId == actor.AgencyId && owner.AgencyId == actor.AgencyId &&
                           person.LastName != null && person.FirstName != null
                     select new NameBirthDateOwnerRow(
                         person.LastName!, person.FirstName!, person.BirthDate,
@@ -485,7 +491,9 @@ namespace Sati.Data
         // empty journal; the caller treats both as "nothing to show."
         public async Task<string?> GetJournalAsync(int personId)
         {
+            var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureOwnPersonAsync(context, actor, personId);
             return await context.People
                 .Where(p => p.Id == personId)
                 .Select(p => p.Journal)
@@ -500,6 +508,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureOwnPersonAsync(context, actor, personId);
             var person = await context.People.SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
             if (person is null)
@@ -528,6 +537,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureOwnPersonAsync(context, actor, personId);
             var person = await context.People.SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
             if (person is null)
@@ -551,6 +561,18 @@ namespace Sati.Data
         private User CurrentActor() => _sessionService.CurrentUser
             ?? throw new InvalidOperationException("A signed-in user is required for this operation.");
 
+        private static async Task EnsureOwnPersonAsync(SatiContext context, User actor, int personId)
+        {
+            if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, personId))
+                throw new UnauthorizedAccessException("This consumer is not available in your current caseload.");
+        }
+
+        private static async Task EnsureUserInScopeAsync(SatiContext context, User actor, int userId)
+        {
+            if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
+                throw new UnauthorizedAccessException("This caseload is not available with your current access.");
+        }
+
         // Only a collision on the forms this call was inserting is a lost race worth
         // swallowing. Any other constraint failure is a real error and must surface.
         private static bool IsDuplicateFormViolation(SatiContext context) =>
@@ -572,10 +594,12 @@ namespace Sati.Data
 
         public async Task<List<Person>> GetAllPeopleAsync(int userId)
         {
+            var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureUserInScopeAsync(context, actor, userId);
             var people = await context.People
-                .Where(p => p.UserId == userId && p.Status == PersonStatus.Active)
-                .Include(p => p.Notes)
+                .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
+                .Include(p => p.Notes.Where(note => note.AgencyId == actor.AgencyId))
                 .Include(p => p.Forms)
                 .OrderBy(p => p.LastName)
                 .AsSplitQuery()
@@ -626,9 +650,10 @@ namespace Sati.Data
                         }
 
                         await using var reread = _contextFactory.CreateDbContext();
+                        await EnsureUserInScopeAsync(reread, actor, userId);
                         return await reread.People
-                            .Where(p => p.UserId == userId && p.Status == PersonStatus.Active)
-                            .Include(p => p.Notes)
+                            .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
+                            .Include(p => p.Notes.Where(note => note.AgencyId == actor.AgencyId))
                             .Include(p => p.Forms)
                             .OrderBy(p => p.LastName)
                             .AsSplitQuery()
@@ -647,7 +672,9 @@ namespace Sati.Data
         // EnsureCurrentCycleForms — this is a read path, not the write-bearing full load.
         public async Task<List<PersonSummary>> GetPeopleForSummaryAsync(int userId)
         {
+            var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureUserInScopeAsync(context, actor, userId);
 
             // Two flat queries stitched in memory, NOT one query joining both Forms and
             // Notes. A single query with both collections produces a Forms×Notes Cartesian
@@ -658,7 +685,7 @@ namespace Sati.Data
             // Query 1: people + their forms (one-to-many, no second collection = no product).
             var summaries = await context.People
                 .AsNoTracking()
-                .Where(p => p.UserId == userId && p.Status == PersonStatus.Active)
+                .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
                 .OrderBy(p => p.LastName)
                 .Select(p => new PersonSummary
                 {
@@ -676,7 +703,7 @@ namespace Sati.Data
             var personIds = summaries.Select(s => s.Id).ToList();
             var notesByPerson = (await context.Notes
                     .AsNoTracking()
-                    .Where(n => personIds.Contains(n.PersonId))
+                    .Where(n => personIds.Contains(n.PersonId) && n.AgencyId == actor.AgencyId)
                     .Select(n => new { n.PersonId, n.Status, n.EventDate, n.NoteType })
                     .ToListAsync())
                 .GroupBy(n => n.PersonId)

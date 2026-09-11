@@ -21,6 +21,7 @@ public sealed class AtRequestServiceLockTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly IDbContextFactory<SatiContext> _factory;
+    private readonly SessionService _session = new();
 
     public AtRequestServiceLockTests()
     {
@@ -41,8 +42,10 @@ public sealed class AtRequestServiceLockTests : IDisposable
                 UserRole.CaseManager, null, 1);
             context.Users.Add(owner);
             context.SaveChanges();
+            _session.SetUser(owner);
 
             var person = Person.Rehydrate(0, owner.Id);
+            person.AgencyId = owner.AgencyId;
             person.FirstName = "Test";
             person.LastName = "Client";
             context.People.Add(person);
@@ -58,7 +61,7 @@ public sealed class AtRequestServiceLockTests : IDisposable
 
     public void Dispose() => _connection.Dispose();
 
-    private ATRequestService NewService() => new(_factory, new StubSettingsService());
+    private ATRequestService NewService() => new(_factory, new StubSettingsService(), _session);
 
     private static User CaseManager(int id = 7, string name = "Casey Manager") =>
         User.Create(id, "cmanager", name, string.Empty, string.Empty, UserRole.CaseManager, null, 1);
@@ -87,8 +90,8 @@ public sealed class AtRequestServiceLockTests : IDisposable
         var stored = await service.GetByIdAsync(request.Id);
         Assert.NotNull(stored);
         Assert.True(stored!.IsPublished);
-        Assert.Equal("Joshua White", stored.SignedByName);
-        Assert.Equal(42, stored.SignedByUserId);
+        Assert.Equal(_session.CurrentUser!.DisplayName, stored.SignedByName);
+        Assert.Equal(_session.CurrentUser.Id, stored.SignedByUserId);
         Assert.Equal(ATRequestStatus.Review, stored.Status);
         Assert.NotNull(stored.AttestationStatement);
     }

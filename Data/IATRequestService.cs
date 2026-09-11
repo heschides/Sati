@@ -23,13 +23,13 @@ namespace Sati.Data
         Task<ATRequest> AddAsync(ATRequest request);
 
         // Throws AtRequestLockedException when the STORED request is already
-        // published. Publishing is itself an update — the attestation travels with
-        // the request — so this is the last save a request accepts until it is
-        // reopened.
+        // published. Incoming attestation fields are refused; only PublishAsync
+        // may stamp them from the authenticated actor.
         Task<ATRequest> UpdateAsync(ATRequest request);
 
-        // Save the request and record the case manager's attestation in one
-        // operation, then lock it.
+        // Save the request and record the authenticated user's attestation in one
+        // operation, then lock it. The legacy caseManager argument is not trusted
+        // as signer authority by either implementation.
         //
         // Publication is a named operation rather than "an update that happens to
         // carry a signature" because of where the trust boundary sits. Over HTTP,

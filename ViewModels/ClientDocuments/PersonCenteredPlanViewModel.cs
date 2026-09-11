@@ -66,7 +66,7 @@ public sealed partial class PersonCenteredPlanViewModel : ObservableObject
             if (person is null || user is null)
                 return;
 
-            var source = await _sourceService.GetSourceAsync(person.Id, user.Id);
+            var source = await _sourceService.GetSourceAsync(person.Id, person.UserId);
             if (source is null)
             {
                 SourceNotice = "Begin the Comprehensive Assessment first. Identified needs and person-centered answers will appear here automatically.";

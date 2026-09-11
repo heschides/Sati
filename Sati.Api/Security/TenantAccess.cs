@@ -59,21 +59,33 @@ internal static class TenantAccess
         return rows.Count == 1 ? rows[0] : null;
     }
 
+    public static async Task<bool> CanAccessPersonAsync(
+        ApiDbContext db, Actor actor, ServerPerson person, CancellationToken cancellationToken) =>
+        person.AgencyId == actor.AgencyId &&
+        await CanAccessUserAsync(db, actor, person.UserId, cancellationToken);
+
     public static Task<bool> OwnsPersonAsync(
         ApiDbContext db,
         Actor actor,
         int personId,
         CancellationToken cancellationToken) =>
-        (from person in db.People.AsNoTracking()
-         join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
-         where person.Id == personId &&
-               actor.HasCaseManagerPermissions &&
+        OwnedPeople(db, actor).AsNoTracking().AnyAsync(person => person.Id == personId, cancellationToken);
+
+    /// <summary>
+    /// Own casework requires a current capability as well as an assignment. Keep the
+    /// person and persisted owner's tenant markers in the query, including for writes.
+    /// This is not the authorization scope for separately permitted billing or review.
+    /// </summary>
+    public static IQueryable<ServerPerson> OwnedPeople(ApiDbContext db, Actor actor) =>
+        from person in db.People
+         join owner in db.Users on person.UserId equals owner.Id
+         where actor.HasCaseManagerPermissions &&
                owner.Id == actor.UserId &&
                owner.AgencyId == actor.AgencyId &&
                owner.Role == actor.Role &&
                owner.Permissions == actor.Permissions &&
                person.AgencyId == actor.AgencyId
-         select person.Id).AnyAsync(cancellationToken);
+         select person;
 
     public static async Task<bool> CanAuthorAssessmentAsync(
         ApiDbContext db,

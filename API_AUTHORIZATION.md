@@ -35,12 +35,14 @@ Every protected route has two layers of protection:
 2. `ValidatedActorFilter` confirms that identity and agency against the database, then resolves the
    current persisted permission set before every endpoint runs. Permissions are deliberately not
    trusted from the token. Effective revocation additionally requires each endpoint to enforce
-   the current capability; the September 10 security review found owner-only clinical routes
-   that still omit that check. `TenantAccess` supplies the shared actor, caseload, and supervisory
-   checks that feature endpoints must consistently use. See SECURITY_REVIEW_2026-09-10.md.
+   the current capability. The September 11 follow-up replaces owner-only casework checks with
+   `TenantAccess.OwnedPeople`, and accessible consumer routes use `CanAccessPersonAsync` to
+   include both person and owner agency. `TenantAccess` supplies the shared live actor, caseload
+   and supervisory checks. See SECURITY_REVIEW_2026-09-10.md for evidence and remaining limits.
 
-“Own user” means the authenticated user. “Own caseload” means a person assigned to that user and
-the same agency. “Accessible case manager” means the actor themself when they have case-management
+“Own user” means the authenticated user. “Own caseload” requires current CaseManagement permission,
+an assignment to that current actor, and matching person and owner agency.
+“Accessible case manager” means the actor themself when they have case-management
 permission, an assigned case manager when they have supervision permission, or any case manager in
 the agency when they also have agency-wide supervision.
 
@@ -49,6 +51,13 @@ administration implies it. The two were briefly conflated: the legacy `Director`
 agency-wide review WITHOUT any administration route, so a backfill that mapped it to
 administration handed every existing Director the audit export, settings writes, destructive
 test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
+
+The September 11 casework follow-up also requires matching Note.AgencyId on note lists,
+person-response note hydration, note transitions, supervisor queues and billing-candidate/claim
+creation reads. Null/conflicting markers are not treated as inherited authority: the existing
+`ReconcileTenantOwnership` migration establishes that invariant. No data repair runs on access.
+Billing retains its own permission and existing DTOs; personal scratchpads, exemptions and
+incentives are separate own-user information, not an extension of consumer caseload rights.
 
 | Feature | Protected route | Authoritative tenant owner | Access rule |
 |---|---|---|---|
@@ -125,7 +134,7 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Contacts | `DELETE /contacts/{contactId}` | Contact's person and assigned user | Own caseload and current permission rechecked inside the write transaction; soft archive and signing-access invalidation commit together. |
 | Reviews | `GET /reviews` | Review person's assigned user and agency | Accessible case manager only. |
 | Reviews | `GET /people/{personId}/reviews` | Review person's assigned user and agency | Accessible case manager only. |
-| Reviews | `POST /reviews/ensure-current` | Each review person's assigned user and agency | Processes only people belonging to accessible case managers; inaccessible IDs are skipped. |
+| Reviews | `POST /reviews/ensure-current` | Each review person's assigned user and agency | Requires current CaseManagement or Supervision even for an empty batch; processes only people belonging to accessible case managers in the same agency. Inaccessible IDs are skipped. |
 | Reviews | `PUT /reviews/{reviewItemId}/stage` | Review person's assigned user and agency | Accessible case manager only. |
 | Reviews | `PUT /reviews/{reviewItemId}/appointment` | Review person's assigned user and agency | Accessible case manager only. |
 | Reviews | `GET /people/{personId}/appointments/latest` | Appointment review's person, assigned user, and agency | Accessible case manager only. |
@@ -168,8 +177,8 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Notes | `GET /people/{personId}/notes` | Note person's assigned user and agency | Own caseload only. |
 | Notes | `GET /notes/monthly` | Target user's `AgencyId` | Accessible case manager only. |
 | Notes | `GET /notes/day` | Target user's `AgencyId` | Accessible case manager only; returns one date across that user's whole caseload for the service-time overlap rule. |
-| Notes | `GET /notes/year/{year}` | Own user and caseload | Own user only. |
-| Notes | `POST /notes/abandon-overdue` | Own user and caseload | Own user only; only that user's eligible notes are transitioned, with each revision incremented. |
+| Notes | `GET /notes/year/{year}` | Own user, person and note agency | Current CaseManagement and own caseload only. |
+| Notes | `POST /notes/abandon-overdue` | Own user, person and note agency | Current CaseManagement and own caseload only; denied before settings creation. Only eligible matching-agency notes are transitioned, with each revision incremented. |
 | Settings | `GET /settings` | Settings `AgencyId` | Actor's agency only. |
 | Settings | `PUT /settings` | Settings `AgencyId` | Administration permission in actor's agency; provider references must share the agency. |
 | Scratchpad | `GET /scratchpad/today` | Scratchpad `UserId` | Own user only. |

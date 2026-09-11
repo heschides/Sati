@@ -261,10 +261,7 @@ public sealed class FormService(
         // Even an empty request must validate the persisted actor. The session's
         // capabilities alone may be stale after an administrator changes access.
         if (!actor.HasCaseManagerPermissions ||
-            !await context.Users.AsNoTracking().AnyAsync(user =>
-                user.Id == actor.Id && user.AgencyId == actor.AgencyId &&
-                user.Role == actor.Role && user.Permissions == actor.Permissions &&
-                (user.Permissions & UserPermissions.CaseManagement) != 0))
+            !await LocalTenantAccess.IsCurrentActorAsync(context, actor))
         {
             throw new UnauthorizedAccessException("A current case manager account is required.");
         }

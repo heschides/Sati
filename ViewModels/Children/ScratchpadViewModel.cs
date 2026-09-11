@@ -132,7 +132,8 @@ namespace Sati.ViewModels.Children
         [RelayCommand]
         private async Task OpenScheduledWork(WorkAgendaItem? item)
         {
-            if (item is not null && ScheduledWorkOpeningAsync is not null)
+            if (_sessionService.CurrentUser?.HasCaseManagerPermissions == true &&
+                item is not null && ScheduledWorkOpeningAsync is not null)
                 await ScheduledWorkOpeningAsync(item);
         }
 
@@ -268,6 +269,8 @@ namespace Sati.ViewModels.Children
         {
             if (_workAgendaService is null || _sessionService.CurrentUser is not { } user)
                 throw new InvalidOperationException("The structured Work Agenda is unavailable.");
+            if (!user.HasCaseManagerPermissions)
+                throw new UnauthorizedAccessException("Case-management access is required for structured work.");
 
             try
             {
@@ -296,9 +299,10 @@ namespace Sati.ViewModels.Children
         private async Task<bool> RefreshScheduledWorkAsync(int userId)
         {
             var request = _scheduledWorkLoads.Begin();
-            if (_workAgendaService is null)
+            var user = _sessionService.CurrentUser;
+            if (_workAgendaService is null || user is not { HasCaseManagerPermissions: true } || user.Id != userId)
             {
-                ReplaceScheduledWork([]);
+                ClearScheduledWork();
                 return true;
             }
 
@@ -307,8 +311,9 @@ namespace Sati.ViewModels.Children
             {
                 var items = await _workAgendaService.LoadAsync(userId, DateTime.Today);
                 if (!_scheduledWorkLoads.IsCurrent(request) ||
-                    _sessionService.CurrentUser?.Id != userId)
+                    !ReferenceEquals(_sessionService.CurrentUser, user) || !user.HasCaseManagerPermissions)
                 {
+                    if (_scheduledWorkLoads.IsCurrent(request)) ClearScheduledWork();
                     return false;
                 }
 
@@ -321,8 +326,9 @@ namespace Sati.ViewModels.Children
             {
                 Debug.WriteLine($"Scheduled Work load failed: {ex.Message}");
                 if (!_scheduledWorkLoads.IsCurrent(request) ||
-                    _sessionService.CurrentUser?.Id != userId)
+                    !ReferenceEquals(_sessionService.CurrentUser, user) || !user.HasCaseManagerPermissions)
                 {
+                    if (_scheduledWorkLoads.IsCurrent(request)) ClearScheduledWork();
                     return false;
                 }
 
@@ -338,6 +344,14 @@ namespace Sati.ViewModels.Children
                 if (_scheduledWorkLoads.IsCurrent(request))
                     IsScheduledWorkBusy = false;
             }
+        }
+
+        private void ClearScheduledWork()
+        {
+            ReplaceScheduledWork([]);
+            HasScheduledWorkLoadError = false;
+            ScheduledWorkLoadErrorMessage = string.Empty;
+            IsScheduledWorkBusy = false;
         }
 
         private void ReplaceScheduledWork(IEnumerable<WorkAgendaItem> items)
