@@ -142,7 +142,7 @@ public sealed class AdminTestDataDeletionTests
                 fixture.TestPersonRevision,
                 TestDataDeletionRules.ConsumerAttestation));
 
-        Assert.Contains("current Admin", error.Message);
+        Assert.Equal("Your account access has changed. Sign in again before continuing.", error.Message);
         Assert.Equal(before, await fixture.SnapshotAsync());
     }
 

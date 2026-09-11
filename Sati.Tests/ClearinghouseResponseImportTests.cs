@@ -126,7 +126,7 @@ public sealed class ClearinghouseResponseImportTests
     }
 
     [Fact]
-    public async Task ResponseUploadCapturesTheOriginalCredentialWithoutAnInterveningRenewal()
+    public async Task ResponseUploadKeepsOriginalCredentialAndDiscardsReceiptAfterReplacementSignIn()
     {
         var sent = new TaskCompletionSource<HttpRequestMessage>();
         var completion = new TaskCompletionSource<HttpResponseMessage>();
@@ -141,7 +141,8 @@ public sealed class ClearinghouseResponseImportTests
         Assert.Equal("/api/v1/billing/responses", request.RequestUri!.AbsolutePath);
         Assert.Equal("original-synthetic-token", request.Headers.Authorization!.Parameter);
         completion.SetResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Receipt()) });
-        await upload;
+        await Assert.ThrowsAsync<CloudSessionEndedException>(() => upload);
+        Assert.False(api.HasSessionEnded);
     }
 
     [Fact]

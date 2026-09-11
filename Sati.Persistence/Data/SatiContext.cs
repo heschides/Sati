@@ -305,6 +305,10 @@ namespace Sati.Data
                       .HasConversion<string>();
                 entity.Property(u => u.Permissions)
                       .HasConversion<int>();
+                entity.Property(u => u.IsEnabled).HasDefaultValue(true);
+                entity.Property(u => u.SecurityVersion)
+                      .HasDefaultValue(1L)
+                      .IsConcurrencyToken();
                 entity.HasOne(u => u.Supervisor)
                       .WithMany(u => u.Supervisees)
                       .HasForeignKey(u => u.SupervisorId)

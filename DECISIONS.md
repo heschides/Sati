@@ -3925,3 +3925,30 @@ semantics now match the API.
 on Billing or supervisory routes, and relying on hidden controls. Also rejected was declaring
 password/session revocation solved by permission checks: security stamps, disablement/offboarding,
 already-released local content, global maintenance, and direct-database trust remain separate work.
+
+## 2026-09-11 — revocation belongs to retained account state
+
+**Decision:** use enabled state plus a positive, monotonically increasing `SecurityVersion`, shared
+policy in `AccountSessionRules`, and live server/local service validation. A password change or
+reset invalidates every existing sign-in, including the caller's; successful credential entry is
+required again. Explicit administrator revocation does the same without changing the password.
+Disabling and re-enabling advances the version, so restoring access cannot revive a stolen token.
+An enabled-state no-op does not advance it; explicit revocation always does.
+
+Agency administrators may manage only their agency's workforce accounts, not platform operators,
+and cannot disable themselves. Lifecycle changes and their audit evidence commit together, using
+serialized actor checks and optimistic version conflict detection. General user/profile updates
+cannot overwrite lifecycle state. Offboarding retains authorship, records and assignments for
+review and explicit reassignment rather than deleting accounts or hiding their caseloads.
+
+The migration preserves existing users as enabled with version 1. Legacy JWTs without an explicit
+version are rejected, not silently assigned 1. Both database schema and updated application builds
+must be rolled out together under a separate approved deployment. A rollback that drops revocation
+state is not a safe live downgrade. No real database migration was performed during development.
+
+**Rejected:** relying on token expiration alone, accepting renewals that adopt a newer account
+version after a password change, using zero permissions as disablement, deleting users to revoke
+access, or describing local direct-database checks as protection against a modified database client.
+Cloud request generations also prevent late old responses/renewals from mutating a replacement
+sign-in. Existing authorized work already in flight and broader last-administrator recovery still
+need separately scoped concurrency/operations work.

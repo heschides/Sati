@@ -25,9 +25,9 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
 {
     private const string TestPassword = "Correct-Horse-42!";
     private const string TestSigningKey = "integration-test-signing-key-that-is-at-least-32-characters";
-    private const string TestDatabaseConnection =
-        "Data Source=SatiApiTests;Mode=Memory;Cache=Shared;Default Timeout=30";
-    private readonly SqliteConnection _connection = new(TestDatabaseConnection);
+    private readonly string _testDatabaseConnection =
+        $"Data Source=SatiApiTests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Default Timeout=30";
+    private readonly SqliteConnection _connection;
     private readonly SemaphoreSlim _seedLock = new(1, 1);
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
     private readonly SemaphoreSlim _testDataLock = new(1, 1);
@@ -42,6 +42,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
 
     public SatiApiFactory()
     {
+        _connection = new SqliteConnection(_testDatabaseConnection);
         _connection.Open();
         // Minimal-host startup reads these before WebApplicationFactory applies
         // ConfigureWebHost. They exist only in this test process; the production
@@ -91,7 +92,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IDbContextOptionsConfiguration<ApiDbContext>>();
             services.RemoveAll<IDatabaseProvider>();
             services.AddDbContextFactory<ApiDbContext>(options =>
-                options.UseSqlite(TestDatabaseConnection)
+                options.UseSqlite(_testDatabaseConnection)
                     .ReplaceService<IExecutionStrategyFactory, TestRetryingExecutionStrategyFactory>());
             services.AddScoped(provider =>
                 provider.GetRequiredService<IDbContextFactory<ApiDbContext>>().CreateDbContext());
@@ -148,7 +149,20 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         try
         {
             if (_tokens.TryGetValue(username, out var cached))
-                return cached;
+            {
+                // A newly requested test client is a new sign-in, not an old
+                // session resurrected after another test resets its credential.
+                // Existing HttpClient headers remain unchanged for revocation proofs.
+                await using var scope = Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+                var version = await db.Users.Where(x => x.Username == username && x.IsEnabled)
+                    .Select(x => (long?)x.SecurityVersion).SingleOrDefaultAsync();
+                var claim = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(cached)
+                    .Claims.SingleOrDefault(x => x.Type == TokenIssuer.SecurityVersionClaim)?.Value;
+                if (long.TryParse(claim, out var tokenVersion) && version == tokenVersion)
+                    return cached;
+                _tokens.Remove(username);
+            }
 
             using var client = CreateClient(new WebApplicationFactoryClientOptions
             {

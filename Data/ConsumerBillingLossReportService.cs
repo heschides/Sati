@@ -36,6 +36,7 @@ namespace Sati.Data
                 throw new ArgumentException("The report window end must not precede its start.");
 
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var actor = _sessionService.CurrentUser
                 ?? throw new UnauthorizedAccessException("A signed-in user is required.");
             if (actor.Id != userId || !await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))

@@ -20,7 +20,7 @@ namespace Sati.Data
             var userEntity = await context.Users
                 .SingleOrDefaultAsync(u => u.Username == username);
 
-            if (userEntity is null)
+            if (userEntity is null || !userEntity.IsEnabled || userEntity.SecurityVersion <= 0)
                 return null;
 
             var passwordHasher = new PasswordHasher();
@@ -50,6 +50,8 @@ namespace Sati.Data
                 userEntity.AgencyId
             );
             sessionUser.Permissions = userEntity.Permissions;
+            sessionUser.IsEnabled = userEntity.IsEnabled;
+            sessionUser.SecurityVersion = userEntity.SecurityVersion;
             sessionUser.Email = userEntity.Email;
             sessionUser.Phone = userEntity.Phone;
             return sessionUser;

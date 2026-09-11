@@ -8,17 +8,20 @@ namespace Sati.Data
     {
         private readonly IDbContextFactory<SatiContext> _contextFactory;
         private readonly ISettingsService _settingsService;
+        private readonly ISessionService _sessionService;
 
-        public IncentiveService(IDbContextFactory<SatiContext> context, ISettingsService settingsService)
+        public IncentiveService(IDbContextFactory<SatiContext> context, ISettingsService settingsService, ISessionService sessionService)
         {
             _contextFactory = context;
             _settingsService = settingsService;
+            _sessionService = sessionService;
         }
 
         public async Task<(Incentive incentive, bool wasCreated)> GetOrCreateAsync(int userId, int month, int year)
         {
 
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureUserAsync(context, userId);
             var settings = await _settingsService.LoadAsync();
 
             var incentive = await context.Incentives
@@ -74,8 +77,10 @@ namespace Sati.Data
         public async Task SaveAsync(Incentive incentive)
         {
             await using var context = _contextFactory.CreateDbContext();
-
-            context.Incentives.Update(incentive);
+            await EnsureUserAsync(context, incentive.UserId);
+            var stored = await context.Incentives.SingleOrDefaultAsync(item => item.Id == incentive.Id && item.UserId == incentive.UserId)
+                ?? throw new UnauthorizedAccessException("This incentive is outside your calendar.");
+            context.Entry(stored).CurrentValues.SetValues(incentive);
             await context.SaveChangesAsync();
         }
 
@@ -154,6 +159,7 @@ namespace Sati.Data
         public async Task<List<Incentive>> GetHistoryAsync(int userId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await EnsureUserAsync(context, userId);
 
             return await context.Incentives
                 .AsNoTracking()
@@ -161,6 +167,13 @@ namespace Sati.Data
                 .OrderBy(i => i.Year)
                 .ThenBy(i => i.Month)
                 .ToListAsync();
+        }
+
+        private async Task EnsureUserAsync(SatiContext context, int userId)
+        {
+            var actor = await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
+                throw new UnauthorizedAccessException("This incentive is outside your current caseload access.");
         }
     }
 }

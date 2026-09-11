@@ -22,6 +22,8 @@ internal static class CloudContractMapper
         user.Permissions = dto.Permissions;
         user.Email = dto.Email;
         user.Phone = dto.Phone;
+        user.IsEnabled = dto.IsEnabled;
+        user.SecurityVersion = dto.SecurityVersion;
         return user;
     }
 

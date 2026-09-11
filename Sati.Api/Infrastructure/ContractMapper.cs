@@ -33,7 +33,9 @@ internal static class ContractMapper
         user.SupervisorId,
         user.AgencyId,
         user.Email,
-        user.Phone);
+        user.Phone,
+        user.IsEnabled,
+        user.SecurityVersion);
 
     public static PersonDto ToPerson(
         ServerPerson person,

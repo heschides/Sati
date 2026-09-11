@@ -24,6 +24,7 @@ public sealed class AdminService(
     {
         var actor = await CurrentAdminAsync(cancellationToken);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var now = DateTime.UtcNow;
         var today = now.Date;
         var thirtyDaysAgo = now.AddDays(-30);
@@ -80,6 +81,7 @@ public sealed class AdminService(
     {
         var actor = await CurrentAdminAsync(cancellationToken);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var auditCount = await context.AuditEvents.AsNoTracking()
             .LongCountAsync(candidate => candidate.AgencyId == actor.AgencyId, cancellationToken);
         var ediCount = await context.EdiGenerations.AsNoTracking()
@@ -116,6 +118,7 @@ public sealed class AdminService(
         if (days is < 1 or > 90 || take is < 1 or > 500)
             throw new ArgumentOutOfRangeException(nameof(days));
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var observedAt = DateTime.UtcNow;
         var start = observedAt.AddDays(-days);
         var incidentRows = await context.IncidentGroups.AsNoTracking()
@@ -142,6 +145,7 @@ public sealed class AdminService(
         if (status is not ("Open" or "Investigating" or "Resolved"))
             throw new ArgumentException("Status must be Open, Investigating, or Resolved.", nameof(status));
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var incident = await context.IncidentGroups.SingleOrDefaultAsync(candidate =>
             candidate.Id == incidentId && candidate.AgencyId == actor.AgencyId &&
             candidate.Scope == IncidentScopes.Agency,
@@ -165,6 +169,7 @@ public sealed class AdminService(
             throw new ArgumentException("A reason is required to place a legal hold.", nameof(request));
 
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var personExists = await context.People.AsNoTracking().AnyAsync(candidate =>
             candidate.Id == request.PersonId && candidate.AgencyId == actor.AgencyId,
             cancellationToken);
@@ -194,6 +199,7 @@ public sealed class AdminService(
     {
         var actor = await CurrentAdminAsync(cancellationToken);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var hold = await context.LegalHolds.SingleOrDefaultAsync(candidate =>
             candidate.Id == legalHoldId && candidate.AgencyId == actor.AgencyId,
             cancellationToken) ??
@@ -217,6 +223,7 @@ public sealed class AdminService(
     {
         var actor = await CurrentAdminAsync(cancellationToken);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         return await context.LegalHolds.AsNoTracking()
             .Where(hold => hold.PersonId == personId && hold.AgencyId == actor.AgencyId)
             .OrderByDescending(hold => hold.PlacedAtUtc)
@@ -267,6 +274,7 @@ public sealed class AdminService(
             throw new ArgumentException("A reason is required to delete a consumer.", nameof(reason));
 
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await using var transaction = await context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             cancellationToken);
@@ -523,6 +531,7 @@ public sealed class AdminService(
         }
 
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var rows = await (
             from auditEvent in context.AuditEvents.AsNoTracking()
             join user in context.Users.AsNoTracking() on auditEvent.ActorUserId equals user.Id into users
@@ -563,6 +572,7 @@ public sealed class AdminService(
     {
         var actor = await CurrentAdminAsync(cancellationToken);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var rows = await (
             from person in context.People.AsNoTracking()
             join user in context.Users.AsNoTracking() on person.UserId equals user.Id
@@ -608,6 +618,7 @@ public sealed class AdminService(
             throw new ArgumentException("The required test-data affirmation was not supplied.", nameof(attestation));
 
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await using var transaction = await context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             cancellationToken);
@@ -758,6 +769,7 @@ public sealed class AdminService(
             throw new ArgumentOutOfRangeException(nameof(days), "Use 1-366 days and request 1-500 rows.");
 
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var start = DateTime.UtcNow.AddDays(-days);
         return await (
             from auditEvent in context.AuditEvents.AsNoTracking()
@@ -784,6 +796,7 @@ public sealed class AdminService(
     {
         var actor = await CurrentAdminAsync(cancellationToken);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var person = await LoadPersonAsync(context, actor, personId, cancellationToken)
             ?? throw new InvalidOperationException("This Person was not found in your agency.");
         await PersonLifecycleLedger.EnsureBaselineAsync(context, person, cancellationToken);
@@ -799,6 +812,7 @@ public sealed class AdminService(
     {
         var actor = await CurrentAdminAsync(cancellationToken);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var person = await LoadPersonAsync(context, actor, personId, cancellationToken)
             ?? throw new InvalidOperationException("This Person was not found in your agency.");
         await PersonLifecycleLedger.EnsureBaselineAsync(context, person, cancellationToken);
@@ -869,6 +883,7 @@ public sealed class AdminService(
         if (!actor.HasAdminPermissions)
             throw new UnauthorizedAccessException("Only an Admin can open this dashboard.");
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         if (!await LocalTenantAccess.IsCurrentActorAsync(context, actor, cancellationToken))
             throw new UnauthorizedAccessException("A current Admin session is required. Sign in again before continuing.");
         return actor;

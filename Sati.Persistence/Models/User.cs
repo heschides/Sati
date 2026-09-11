@@ -14,6 +14,10 @@ namespace Sati.Models
         public string DisplayName { get; private set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
         public string Salt { get; set; } = string.Empty;
+        // Revocation never removes the user or their authored records. Authenticated
+        // sessions retain the version observed at sign-in, not a live entity reference.
+        public bool IsEnabled { get; set; } = true;
+        public long SecurityVersion { get; set; } = 1;
         // Role remains only as a compatibility/display label and for the orthogonal
         // PlatformOperator identity. Authorization must use Permissions.
         public UserRole Role { get; set; }
@@ -103,7 +107,7 @@ namespace Sati.Models
         [NotMapped]
         public string PermissionSummary => UserPermissionRules.Describe(Permissions);
 
-        public AgencyActor ToAgencyActor() => new(Id, AgencyId, Permissions);
+        public AgencyActor ToAgencyActor() => new(Id, AgencyId, Permissions, SecurityVersion);
 
         private void SetPermission(UserPermissions permission, bool enabled)
         {

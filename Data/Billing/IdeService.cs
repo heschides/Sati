@@ -28,10 +28,11 @@ namespace Sati.Edi
             if (!Guid.TryParse(idempotencyKey, out var parsedKey))
                 throw new ArgumentException("A valid EDI idempotency key is required.", nameof(idempotencyKey));
             var normalizedKey = parsedKey.ToString("N");
-            var actor = _sessionService.CurrentUser
-                ?? throw new InvalidOperationException("An authenticated user is required to generate EDI.");
             await using var context = _contextFactory.CreateDbContext();
             await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            var actor = await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            if (!actor.HasBillingPermissions)
+                throw new UnauthorizedAccessException("Billing permission is required to generate EDI.");
 
             var previous = await context.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(generation =>
                 generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.Id &&

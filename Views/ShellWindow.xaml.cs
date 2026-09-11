@@ -89,6 +89,7 @@ namespace Sati.Views
 
             _databaseActivity.PropertyChanged += OnDatabaseActivityPropertyChanged;
             _sessionLifetime.SessionEnded += OnSessionEnded;
+            _shellViewModel.ReauthenticationRequested += OnReauthenticationRequested;
             Activated += (_, _) => _shellViewModel.SetChatWindowVisible(true);
             Deactivated += (_, _) => _shellViewModel.SetChatWindowVisible(false);
 
@@ -237,6 +238,7 @@ namespace Sati.Views
             {
                 await _shellViewModel.Chat.StopAsync();
                 _sessionLifetime.SessionEnded -= OnSessionEnded;
+                _shellViewModel.ReauthenticationRequested -= OnReauthenticationRequested;
                 _databaseActivity.PropertyChanged -= OnDatabaseActivityPropertyChanged;
                 _idleTimer.Stop();
                 InputManager.Current.PreProcessInput -= OnPreProcessInput;
@@ -342,9 +344,13 @@ namespace Sati.Views
         private void OnSessionEnded(object? sender, EventArgs e) =>
             Dispatcher.BeginInvoke(new Action(async () =>
             {
+                if (!_sessionLifetime.HasSessionEnded || _shellViewModel.IsSessionReauthenticationRequired) return;
                 _shellViewModel.Chat.SuspendAndClear();
                 await PromptForReauthenticationAsync();
             }));
+
+        private async void OnReauthenticationRequested(object? sender, EventArgs e) =>
+            await PromptForReauthenticationAsync();
 
         /// <summary>
         /// Asks for credentials in place rather than making the user restart Sati.
@@ -372,7 +378,7 @@ namespace Sati.Views
             var sameAccountReauthenticated = false;
             try
             {
-                _shellViewModel.BeginAccountTransition();
+                _shellViewModel.RequireReauthentication();
                 await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
                 var login = _loginWindowFactory();
                 login.Owner = this;
@@ -380,15 +386,27 @@ namespace Sati.Views
                 if (login.ShowDialog() != true || login.LoggedInUser is not { } user)
                     return;
 
-                if (user.Id == expected.Id)
+                if (_shellViewModel.CanResumeReauthenticatedSession(user))
                 {
-                    _shellViewModel.Scratchpad.ResumeAfterReauthentication();
+                    _shellViewModel.ResumeReauthenticatedSession(user);
                     sameAccountReauthenticated = true;
+                    return;
+                }
+
+                if (MessageBox.Show(this,
+                    "This sign-in changes the account or its access. Reloading the workspace will discard unsaved editor changes. " +
+                    "Reload now? Choosing No keeps those drafts hidden and pauses access.",
+                    "Reload workspace?", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                {
+                    // Cloud login has installed a token already. Declining the
+                    // workspace change must not leave it usable by old callbacks.
+                    _sessionLifetime.Invalidate();
                     return;
                 }
 
                 _shellViewModel.ClearOutgoingAccountContent();
                 _sessionService.SetUser(user);
+                _sessionLifetime.ResumeAccess();
                 accountChanged = true;
                 await _textShortcutService.LoadForUserAsync(user.Id);
                 await _applicationRunState.StartSessionAsync(user, _incidentReporter);
@@ -400,8 +418,8 @@ namespace Sati.Views
             {
                 if (accountChanged)
                     _shellViewModel.CompleteAccountTransition();
-                else
-                    _shellViewModel.CancelAccountTransition(sameAccountReauthenticated);
+                else if (!sameAccountReauthenticated)
+                    _shellViewModel.RequireReauthentication();
                 _accountSwitchGate.Release();
             }
         }

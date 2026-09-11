@@ -2,6 +2,42 @@
 
 *Living document. Updated during structured review sessions. Last updated: 2026-09-10.*
 
+## Account lifecycle and session revocation — September 11 follow-up
+
+`AccountSessionRules` in `Sati.Contracts.V1` owns enabled/version interpretation, safe version
+advancement and administrator lifecycle policy. Persistence `User` and API `ServerUser` both
+carry `IsEnabled` and `SecurityVersion`; the latter is also an EF concurrency token. Authenticated
+user snapshots and `AgencyActor` retain the version captured at sign-in rather than fetching a
+new version to authorize an old credential. Safe profile contracts expose state/version but never
+password hashes, salts or bearer tokens as profile fields.
+
+The API issues a mandatory version claim and checks it against an enabled account on protected
+requests, renewal and chat authorization leases. Password change/reset and administrator revocation
+advance the version; disable/re-enable advances it on a real state change. Ordinary profile saves
+cannot express account state or version. Lifecycle administration retains records, uses a serialized
+transaction with a current administrator check and excludes self-disable/platform identities.
+
+Transitional local services repeat live checks, including personal data and independent Billing,
+Administration and Supervision paths. Local EDI checks precede generation/replay and require Billing.
+Session-ended notification locks access until a fresh sign-in; it is not remote erasure of already
+delivered data. Cloud transport generation guards reject responses and renewals belonging to an
+older sign-in rather than installing them into a replacement session.
+
+Reauthentication separately pauses authenticated transport, and entering a candidate credential
+does not clear that pause. Accepted identity publication precedes resuming requests and timers;
+declining a changed account/access set invalidates the candidate and leaves access paused. The
+shell underlay is disabled while its shield is up, with a usable retry control. Same-access
+reauthentication replaces the captured user identity without clearing editors. Already-open child
+windows and previously delivered/cache contents are not remotely erased by the shell shield.
+
+Migration `20260911120000_AddAccountSessionLifecycle` adds enabled-by-default retained accounts
+with initial version 1. Its frozen target model matches the persistence snapshot. It has not been
+applied to a real database. Upgrade requires a reviewed migration and coordinated updated clients
+and server, followed by fresh sign-in; old JWTs without a version are intentionally rejected.
+Direct SQL/old desktop clients, global maintenance utilities and operations already authorized and
+in flight remain separate limitations. Do not describe this change as immediate remote wiping,
+SQL Server concurrency certification, a deployment, or general launch clearance.
+
 ## Productivity forecast and documentation backlog
 
 The Overview productivity card no longer treats every blank weekday earlier in the month as a day
@@ -165,7 +201,8 @@ client content. Passive chat reads/socket opening do not renew sessions. The she
 visibility and account boundaries; room editing retains its original concurrency revision.
 
 See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
-`TEAM_CHAT_VALIDATION.md`. Account suspension/session revocation, retained-message discovery/export,
+`TEAM_CHAT_VALIDATION.md`. Account suspension/session revocation is implemented in the follow-up
+above but still needs approved rollout. Retained-message discovery/export,
 broad legal holds including backups, retention and agency acceptance remain real-data prerequisites.
 
 ## Inactivity privacy screen

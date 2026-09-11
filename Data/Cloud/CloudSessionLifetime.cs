@@ -19,4 +19,8 @@ public sealed class CloudSessionLifetime : ISessionLifetime
     }
 
     public event EventHandler? SessionEnded;
+    public bool HasSessionEnded => _api.HasSessionEnded;
+    public void Invalidate() => _api.InvalidateCurrentSession();
+    public void SuspendAccess() => _api.SuspendAccess();
+    public void ResumeAccess() => _api.ResumeAccess();
 }

@@ -43,6 +43,7 @@ public sealed class SupervisorService(
     {
         var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
 
@@ -93,6 +94,7 @@ public sealed class SupervisorService(
 
         var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
 
@@ -125,6 +127,7 @@ public sealed class SupervisorService(
 
         var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
 
@@ -147,6 +150,7 @@ public sealed class SupervisorService(
         var actor = await CurrentReviewerAsync(supervisorId);
         var appliedFilter = filter ?? new NoteReviewQuery();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var agencyWide = UserPermissionRules.HasAgencyWideSupervisionPermissions(actor.Permissions);
         var term = NormalizeSearchTerm(appliedFilter.SearchTerm);
         var fromDate = appliedFilter.FromDate?.Date;
@@ -188,6 +192,7 @@ public sealed class SupervisorService(
     {
         var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var agencyWide = UserPermissionRules.HasAgencyWideSupervisionPermissions(actor.Permissions);
         var users = await context.Users.AsNoTracking()
             .Where(user => user.AgencyId == actor.AgencyId &&
@@ -224,6 +229,7 @@ public sealed class SupervisorService(
         _ = allSupervisees;
         var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var canReviewAgency = UserPermissionRules.HasAgencyWideSupervisionPermissions(actor.Permissions);
         var caseManagerIds = await context.Users.AsNoTracking()
             .Where(user => user.AgencyId == actor.AgencyId &&
@@ -272,6 +278,7 @@ public sealed class SupervisorService(
             throw new UnauthorizedAccessException("Only the signed-in reviewer may perform this action.");
         }
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
         return actor;
     }
@@ -281,6 +288,7 @@ public sealed class SupervisorService(
         var actor = sessionService.CurrentUser
             ?? throw new UnauthorizedAccessException("A signed-in reviewer is required.");
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
         return await context.Settings.AsNoTracking()
             .Where(settings => settings.AgencyId == actor.AgencyId)

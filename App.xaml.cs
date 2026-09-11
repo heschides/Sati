@@ -463,7 +463,7 @@ namespace Sati
             services.AddTransient<INoteService, NoteService>();
             services.AddTransient<IAuthService, AuthService>();
             services.AddTransient<IUserService, UserService>();
-            services.AddSingleton<ISessionLifetime, NeverEndingSessionLifetime>();
+            services.AddSingleton<ISessionLifetime>(sp => (ISessionLifetime)sp.GetRequiredService<ISessionService>());
             services.AddTransient<IScratchpadService, ScratchpadService>();
             services.AddSingleton<IChatService, ChatUnavailableService>();
             services.AddTransient<IIncentiveService, IncentiveService>();

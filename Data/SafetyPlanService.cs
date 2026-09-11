@@ -14,6 +14,7 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
     {
         var actor = Actor;
         await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await RequirePerson(db, actor, personId, cycleStart);
         var plan = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycleStart.Date)
             .OrderByDescending(x => x.Version).FirstOrDefaultAsync();
@@ -23,6 +24,7 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
     {
         var actor = Actor;
         await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         var person = await RequirePerson(db, actor, personId, cycleStart);
         if (!SafetyPlanRules.CanAuthor(actor.Id, actor.Permissions, person.UserId)) throw new UnauthorizedAccessException();
         var prior = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycleStart.Date)
@@ -42,6 +44,7 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
     {
         var actor = Actor;
         await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         var plan = await db.SafetyPlans.SingleOrDefaultAsync(x => x.Id == requested.Id) ?? throw new UnauthorizedAccessException();
         var person = await RequirePerson(db, actor, plan.PersonId, plan.CycleStart);
         if (action is not ("approve" or "return") && !SafetyPlanRules.CanAuthor(actor.Id, actor.Permissions, person.UserId))
@@ -59,6 +62,7 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
     {
         var actor = Actor;
         await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         var person = await RequirePerson(db, actor, personId, cycleStart);
         var plan = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycleStart.Date)
             .OrderByDescending(x => x.Version).FirstOrDefaultAsync() ?? throw new InvalidOperationException("Start the safety plan first.");

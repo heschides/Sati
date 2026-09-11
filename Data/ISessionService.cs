@@ -10,5 +10,7 @@ namespace Sati.Data
         bool AllowComplianceOverride { get; set; }
         User? CurrentUser { get; }
         void SetUser(User user);
+        bool HasSessionEnded => false;
+        void Invalidate(User capturedUser) { }
     }
 }

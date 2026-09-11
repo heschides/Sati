@@ -15,6 +15,7 @@ public class NoteService(
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, note.PersonId))
             throw new UnauthorizedAccessException("You may create notes only for your own caseload.");
 
@@ -31,6 +32,7 @@ public class NoteService(
         ArgumentNullException.ThrowIfNull(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, actor.Id);
         var stored = await context.Notes.Include(candidate => candidate.Person)
             .SingleOrDefaultAsync(candidate => candidate.Id == note.Id);
@@ -54,6 +56,7 @@ public class NoteService(
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, actor.Id);
         var stored = await context.Notes.Include(candidate => candidate.Person)
             .SingleOrDefaultAsync(candidate => candidate.Id == note.Id);
@@ -114,6 +117,7 @@ public class NoteService(
     {
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsurePersonInScopeAsync(context, actor, personId);
         return await context.Notes.Where(n => n.PersonId == personId && n.AgencyId == actor.AgencyId).ToListAsync();
     }
@@ -131,6 +135,7 @@ public class NoteService(
 
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, actor.Id);
         var threshold = DateTime.Today.AddDays(-abandonedAfterDays);
         var notes = await context.Notes.Where(n => n.Person.UserId == actor.Id &&
@@ -152,6 +157,7 @@ public class NoteService(
     {
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, userId);
         var firstDay = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         var nextMonth = firstDay.AddMonths(1);
@@ -163,6 +169,7 @@ public class NoteService(
     {
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, userId);
         var dayStart = date.Date;
         return await context.Notes.Include(n => n.Person).Where(n => n.Person.UserId == userId &&
@@ -174,6 +181,7 @@ public class NoteService(
     {
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, userId);
         var firstDay = new DateTime(year, 1, 1);
         var end = firstDay.AddYears(1);

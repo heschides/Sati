@@ -20,6 +20,7 @@ public sealed class ComprehensiveAssessmentService(
             throw new UnauthorizedAccessException("A case manager account is required.");
 
         await using var db = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
         var ownsPerson = await LocalTenantAccess.OwnsPersonAsync(db, actor, personId);
         if (!ownsPerson)
             throw new UnauthorizedAccessException("Only the assigned case manager may read this assessment.");
@@ -35,6 +36,7 @@ public sealed class ComprehensiveAssessmentService(
     {
         var actor = CurrentAuthor(authorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
         var canAuthor = await LocalTenantAccess.OwnsPersonAsync(db, actor, personId);
         if (!canAuthor)
             throw new UnauthorizedAccessException("Only the assigned case manager may author this assessment.");
@@ -119,6 +121,7 @@ public sealed class ComprehensiveAssessmentService(
     {
         var actor = CurrentAuthor(assessment.AuthorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
         await LocalTenantAccess.EnsureCurrentActorAsync(db, actor);
         var stored = await db.ComprehensiveAssessments
             .Include(candidate => candidate.Person)
@@ -143,6 +146,7 @@ public sealed class ComprehensiveAssessmentService(
     {
         var actor = CurrentAuthor(assessment.AuthorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
         await LocalTenantAccess.EnsureCurrentActorAsync(db, actor);
         var stored = await db.ComprehensiveAssessments
             .Include(candidate => candidate.Person)

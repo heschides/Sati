@@ -25,6 +25,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
                 throw new UnauthorizedAccessException("That caseload is not available to this user.");
             var settings = await _settingsService.LoadAsync();
@@ -69,6 +70,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureAccessiblePersonAsync(context, actor, personId);
             var settings = await _settingsService.LoadAsync();
             var rate = settings.PassthroughRate;
@@ -104,6 +106,7 @@ namespace Sati.Data
         public async Task<ATRequest?> GetByIdAsync(int id)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             if (await AccessibleRequestPersonIdAsync(context, CurrentActor(), id) is null)
                 return null;
             return await context.ATRequests
@@ -119,6 +122,7 @@ namespace Sati.Data
         public async Task<byte[]?> GetSnapshotAsync(int id)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             if (await AccessibleRequestPersonIdAsync(context, CurrentActor(), id) is null)
                 return null;
             return await context.ATRequests
@@ -130,6 +134,7 @@ namespace Sati.Data
         public async Task<ATRequest> AddAsync(ATRequest request)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureAccessiblePersonAsync(context, CurrentActor(), request.PersonId);
             EnsureNoCallerAttestation(request);
             request.Person = null;
@@ -141,6 +146,7 @@ namespace Sati.Data
         public async Task<ATRequest> UpdateAsync(ATRequest request)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureAccessibleRequestAsync(context, CurrentActor(), request);
             var stored = await context.ATRequests
                 .Include(candidate => candidate.Items)
@@ -178,6 +184,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             if (request.Id == 0)
                 await EnsureAccessiblePersonAsync(context, actor, request.PersonId);
             else
@@ -244,6 +251,7 @@ namespace Sati.Data
         public async Task<ATRequest> ReopenAsync(ATRequest request)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureAccessibleRequestAsync(context, CurrentActor(), request);
             var stored = await context.ATRequests
                 .Include(candidate => candidate.Items)
@@ -272,6 +280,7 @@ namespace Sati.Data
         public async Task DeleteAsync(ATRequest request)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureAccessibleRequestAsync(context, CurrentActor(), request);
             var stored = await context.ATRequests.SingleOrDefaultAsync(candidate => candidate.Id == request.Id);
             if (stored is null || stored.Revision != request.Revision)

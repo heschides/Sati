@@ -15,6 +15,7 @@ public sealed class PersonCenteredPlanSourceService(IDbContextFactory<SatiContex
         var actor = sessionService.CurrentUser
             ?? throw new UnauthorizedAccessException("Sign in to read a person-centered plan source.");
         await using var db = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
         if (!await LocalTenantAccess.CanAccessPersonAsync(db, actor, personId) ||
             !await db.People.AsNoTracking().AnyAsync(person =>
                 person.Id == personId && person.UserId == preferredAuthorUserId && person.AgencyId == actor.AgencyId))

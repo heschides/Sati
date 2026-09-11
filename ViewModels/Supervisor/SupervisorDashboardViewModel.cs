@@ -32,6 +32,7 @@ namespace Sati.ViewModels.Supervisor
         private readonly OverdueItemsViewModel _overdueItemsViewModel;
         private readonly MonthlyProductivityViewModel _monthlyProductivityViewModel;
         private readonly UserManagementViewModel _userManagementViewModel;
+        public UserManagementViewModel UserManagement => _userManagementViewModel;
         private readonly PendingApprovalsViewModel _pendingApprovalsViewModel;
         private readonly CaseloadDistributionViewModel _caseloadDistributionViewModel;
         private readonly CaseloadImportViewModel _caseloadImportViewModel;
@@ -68,6 +69,8 @@ namespace Sati.ViewModels.Supervisor
             // has its own try/catch, so nothing escapes unobserved.
             _userManagementViewModel.UsersChanged += async () =>
             {
+                if (_sessionService.CurrentUser?.HasSupervisorPermissions != true || _sessionService.HasSessionEnded)
+                    return;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 await InitializeAsync();
                 sw.Stop();
@@ -332,6 +335,7 @@ namespace Sati.ViewModels.Supervisor
         public void ClearForAccountSwitch()
         {
             _accountLoads.Invalidate();
+            _userManagementViewModel.ClearForAccountSwitch();
             SelectedCaseManager = null;
             CaseManagers.Clear();
             _pendingApprovalsViewModel.ClearForAccountSwitch();

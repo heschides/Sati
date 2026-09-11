@@ -45,6 +45,7 @@ public sealed class AgencyReleaseService(
             ?? throw new InvalidOperationException("An agency release cannot be generated without a signed-in user.");
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         await LocalTenantAccess.EnsureCurrentActorAsync(context, actor, cancellationToken);
         if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, personId, cancellationToken))

@@ -386,6 +386,7 @@ public sealed class ChatApiTests(SatiApiFactory factory) : IAsyncLifetime
     {
         var now = DateTimeOffset.UtcNow;
         ClaimsPrincipal Claims(DateTimeOffset exp, DateTimeOffset auth) => new(new ClaimsIdentity([
+            new("sati_security_version", "1"),
             new("exp", exp.ToUnixTimeSeconds().ToString()), new("sati_auth_time", auth.ToUnixTimeSeconds().ToString())]));
         Assert.False(ApiEndpoints.TryChatLease(Claims(now.AddSeconds(-1), now), 720, out _));
         Assert.False(ApiEndpoints.TryChatLease(Claims(now.AddMinutes(30), now.AddHours(-13)), 720, out _));

@@ -12,6 +12,7 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
     public async Task<List<CheckRequestListItem>> GetAllForPersonAsync(int personId)
     {
         await using var db = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await EnsureCanReadPersonAsync(db, personId);
         return await db.CheckRequests.AsNoTracking()
             .Where(x => x.PersonId == personId)
@@ -25,6 +26,7 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
     public async Task<CheckRequest?> GetByIdAsync(int id)
     {
         await using var db = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await LocalTenantAccess.EnsureCurrentActorAsync(db, Actor);
         var personId = await db.CheckRequests.AsNoTracking().Where(x => x.Id == id)
             .Select(x => (int?)x.PersonId).SingleOrDefaultAsync();
@@ -37,6 +39,7 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
     {
         var actor = Actor;
         await using var db = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         if (!await LocalTenantAccess.OwnsPersonAsync(db, actor, personId))
             throw new UnauthorizedAccessException("Only the consumer's current assigned case manager can create a check request.");
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == personId)
@@ -56,6 +59,7 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
     {
         var actor = Actor;
         await using var db = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         if (!await LocalTenantAccess.CanAccessUserAsync(db, actor, actor.Id))
             throw new UnauthorizedAccessException("A current case manager account is required.");
         var stored = await db.CheckRequests.SingleOrDefaultAsync(x => x.Id == incoming.Id);

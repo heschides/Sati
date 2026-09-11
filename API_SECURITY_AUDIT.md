@@ -20,6 +20,26 @@ response importer remains synthetic-only while real clearinghouse and operationa
 
 ## Fixed
 
+### Follow-up 2026-09-11 — retained account state invalidates old sign-ins
+
+Accounts now have enabled state and a monotonic security version. The API rejects disabled,
+missing-version and stale-version identities before protected routes, including renewal; chat
+leases recheck account validity. Password change/reset and administrator revocation advance the
+version. Disable/re-enable preserves records and cannot revive old tokens. The local services
+mirror these checks, including personal data, template administration and EDI generation/replay.
+Cloud response/renewal generation guards prevent an older sign-in from replacing a newer one.
+
+The password-reset review additionally exposed an assigned-user takeover: testing only the
+target's CaseManagement bit let a supervisor reset a user who also held stronger permissions.
+`UserManagementRules.DescribeTargetRefusal` now owns the stored-target check for profile changes
+and resets. Non-administrators may manage only assigned, case-management-only users.
+
+Synthetic tests demonstrate the earlier password/token, client-response, template and target-user
+failures before correction, plus positive workflows and concurrency conflict handling. The
+handoff records final runner totals separately. Migration and rollout have not been performed.
+Global local-maintenance helpers, direct-SQL clients, data already delivered, ordinary authorized
+work already in flight, MFA and the other launch findings are not closed by this change.
+
 ### Follow-up 2026-09-11 — retained assignments are not continuing casework authority
 
 Owned API queries require current CaseManagement and exact person/owner agency; accessible

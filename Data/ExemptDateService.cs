@@ -20,6 +20,7 @@ namespace Sati.Data
         {
             EnsureCurrentUser(userId);
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             return await context.ExemptDates
                 .Where(e => e.UserId == userId && e.Date.Year == year)
                 .OrderBy(e => e.Date)
@@ -30,6 +31,7 @@ namespace Sati.Data
         {
             EnsureCurrentUser(userId);
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var exemptDate = new ExemptDate
             {
                 UserId = userId,
@@ -45,6 +47,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var exemptDate = await context.ExemptDates.FindAsync(id);
             if (exemptDate is null) return;
             if (exemptDate.UserId != actor.Id)

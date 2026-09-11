@@ -9,10 +9,10 @@ namespace Sati.Data;
 /// load because the session is gone must say so: presenting an empty list instead
 /// reads as "there is nothing here", which is a different and false statement.
 ///
-/// Only the cloud services throw it. A local Production session holds no token and
-/// therefore has no expiry to report.
+/// Cloud and local services throw it when the authenticated account session is no
+/// longer valid, including account disablement and credential/session revocation.
 /// </summary>
 public sealed class SessionExpiredException(Exception innerException)
     : Exception(
-        "Your Demo session has expired. Sign in again to continue.",
+        "Your session has ended. Sign in again to continue.",
         innerException);

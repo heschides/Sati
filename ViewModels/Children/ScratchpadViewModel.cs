@@ -590,7 +590,7 @@ namespace Sati.ViewModels.Children
             _sessionExpiredDuringSave = true;
             HasScratchpadSessionExpired = true;
             ScratchpadSessionExpiredMessage =
-                "Your Demo session expired. Your unsaved agenda text remains here. " +
+                "Your session ended. Your unsaved agenda text remains here. " +
                 "Sign in again when prompted and it will save.";
         }
 
@@ -607,6 +607,13 @@ namespace Sati.ViewModels.Children
         {
             ClearExpiredSessionWarning();
             StartScratchpadTimer();
+        }
+
+        public void SuspendForReauthentication()
+        {
+            _scratchpadTimer?.Stop();
+            _sessionExpiredDuringSave = true;
+            _scheduledWorkLoads.Invalidate();
         }
 
         private void ClearExpiredSessionWarning()

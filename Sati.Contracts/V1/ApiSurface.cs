@@ -63,6 +63,7 @@ public static class ApiSurface
         "annual-packet-and-receipt-v1",
         "team-chat-v1",
         "signature-evidence-v1",
+        "account-session-lifecycle-v1",
         // A reset rotates the Demo database instance identifier embedded in access tokens,
         // making every session issued against the replaced baseline unusable.
         "demo-full-reset-v1",
@@ -86,6 +87,7 @@ public static class ApiSurface
         "DELETE /api/v1/people/{personId:int}/providers/{linkId:int}",
         "DELETE /api/v1/providers/{id:int}",
         "DELETE /api/v1/providers/{providerId:int}/contacts/{contactId:int}",
+        "DELETE /api/v1/users/{userId:int}/sessions",
         "GET /api/v1/admin/activity",
         "GET /api/v1/admin/incidents",
         "GET /api/v1/admin/legal-holds",
@@ -257,6 +259,7 @@ public static class ApiSurface
         "PUT /api/v1/settings",
         "PUT /api/v1/users/me/password",
         "PUT /api/v1/users/{userId:int}",
+        "PUT /api/v1/users/{userId:int}/enabled",
         "PUT /api/v1/users/{userId:int}/password"
     ];
 

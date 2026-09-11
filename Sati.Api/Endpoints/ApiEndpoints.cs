@@ -30,6 +30,7 @@ internal static partial class ApiEndpoints
         MapAudit(api);
         MapAdmin(api);
         MapUsers(api);
+        MapAccountLifecycle(api);
         MapSupervisor(api);
         MapCaseload(api);
         MapPeople(api);
@@ -1240,7 +1241,13 @@ internal static partial class ApiEndpoints
             // VerifyMissingUser never returns true, so a null user cannot reach
             // past here; the explicit null check states that for the compiler and
             // fails closed if that ever changes.
-            if (!authenticated || user is null)
+            if (!authenticated || user is null || !user.IsEnabled || user.SecurityVersion <= 0 ||
+                !UserPermissionRules.IsSupported(user.Permissions) ||
+                !await db.Users.AsNoTracking().AnyAsync(current => current.Id == user.Id &&
+                    current.IsEnabled && current.SecurityVersion == user.SecurityVersion &&
+                    current.PasswordHash == user.PasswordHash && current.Salt == user.Salt &&
+                    current.AgencyId == user.AgencyId && current.Role == user.Role &&
+                    current.Permissions == user.Permissions, cancellationToken))
             {
                 logger.LogWarning("Sati authentication failed from {RemoteAddress}.", context.Connection.RemoteIpAddress);
                 return TypedResults.Unauthorized();
@@ -1248,7 +1255,7 @@ internal static partial class ApiEndpoints
 
             attemptGuard.Reset(username);
             var actor = new Actor(
-                user.Id, user.AgencyId, user.Role, user.DisplayName, user.Permissions);
+                user.Id, user.AgencyId, user.Role, user.DisplayName, user.Permissions, user.SecurityVersion);
             auditTrail.Record(actor, AuditActions.AuthenticationSucceeded, "User", user.Id);
             await db.SaveChangesAsync(cancellationToken);
             var instanceId = await db.DatabaseIdentities.AsNoTracking()
@@ -1277,7 +1284,9 @@ internal static partial class ApiEndpoints
             if (!long.TryParse(authenticatedAtValue, out var authenticatedAtSeconds))
                 return TypedResults.Unauthorized();
 
-            var authenticatedAt = DateTimeOffset.FromUnixTimeSeconds(authenticatedAtSeconds);
+            DateTimeOffset authenticatedAt;
+            try { authenticatedAt = DateTimeOffset.FromUnixTimeSeconds(authenticatedAtSeconds); }
+            catch (ArgumentOutOfRangeException) { return TypedResults.Unauthorized(); }
             var now = DateTimeOffset.UtcNow;
             if (authenticatedAt > now.AddSeconds(30) ||
                 now - authenticatedAt > TimeSpan.FromMinutes(authenticationOptions.Value.MaxSessionMinutes))
@@ -1286,7 +1295,8 @@ internal static partial class ApiEndpoints
             }
 
             var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(
-                x => x.Id == actor.UserId && x.AgencyId == actor.AgencyId,
+                x => x.Id == actor.UserId && x.AgencyId == actor.AgencyId &&
+                    x.Role == actor.Role && x.IsEnabled && x.SecurityVersion == actor.SecurityVersion,
                 cancellationToken);
             if (user is null)
                 return TypedResults.Unauthorized();
@@ -1363,12 +1373,13 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             if (!actor.HasSupervisorPermissions && !actor.HasAdminPermissions) return Results.Forbid();
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var user = await db.Users.SingleOrDefaultAsync(x => x.Id == userId && x.AgencyId == actor.AgencyId, cancellationToken);
             if (user is null) return Results.NotFound();
             if (user.Role == "PlatformOperator") return Results.NotFound();
-            if (!actor.HasAdminPermissions &&
-                (!UserPermissionRules.HasCaseManagerPermissions(user.Permissions) ||
-                 user.SupervisorId != actor.UserId)) return Results.Forbid();
+            if (UserManagementRules.DescribeTargetRefusal(actor.ToAgencyActor(), user.Permissions,
+                user.SupervisorId, user.AgencyId, user.Role) is not null) return Results.Forbid();
             var errors = await ValidateUserRequestAsync(db, actor, request, userId, cancellationToken);
             if (errors.Count > 0) return Results.ValidationProblem(errors);
             user.Username = request.Username.Trim();
@@ -1379,7 +1390,12 @@ internal static partial class ApiEndpoints
             user.Email = Normalize(request.Email);
             user.Phone = Normalize(request.Phone);
             auditTrail.Record(actor, AuditActions.UserUpdated, "User", userId);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) { return AccountStateConflict(); }
             return Results.Ok(ContractMapper.ToProfile(user));
         });
 
@@ -1391,17 +1407,24 @@ internal static partial class ApiEndpoints
             if (!actor.HasSupervisorPermissions && !actor.HasAdminPermissions) return Results.Forbid();
             if (!ValidPassword(request.NewPassword)) return Results.ValidationProblem(
                 new Dictionary<string, string[]> { ["password"] = ["The new password must be between 8 and 128 characters."] });
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var user = await db.Users.SingleOrDefaultAsync(x => x.Id == userId && x.AgencyId == actor.AgencyId, cancellationToken);
             if (user is null) return Results.NotFound();
             if (user.Role == "PlatformOperator") return Results.NotFound();
-            if (!actor.HasAdminPermissions &&
-                (!UserPermissionRules.HasCaseManagerPermissions(user.Permissions) ||
-                 user.SupervisorId != actor.UserId)) return Results.Forbid();
+            if (UserManagementRules.DescribeTargetRefusal(actor.ToAgencyActor(), user.Permissions,
+                user.SupervisorId, user.AgencyId, user.Role) is not null) return Results.Forbid();
             var credential = passwordVerifier.Hash(request.NewPassword);
+            if (!TryAdvanceSecurityVersion(user)) return AccountStateConflict();
             user.PasswordHash = credential.Hash;
             user.Salt = credential.Salt;
             auditTrail.Record(actor, AuditActions.UserPasswordReset, "User", userId);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) { return AccountStateConflict(); }
             return Results.NoContent();
         });
 
@@ -1412,16 +1435,25 @@ internal static partial class ApiEndpoints
             if (!ValidPassword(request.NewPassword)) return Results.ValidationProblem(
                 new Dictionary<string, string[]> { ["password"] = ["The new password must be between 8 and 128 characters."] });
             var actor = Actor.From(principal);
-            var user = await db.Users.SingleOrDefaultAsync(x => x.Id == actor.UserId && x.AgencyId == actor.AgencyId, cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
+            var user = await db.Users.SingleOrDefaultAsync(x => x.Id == actor.UserId && x.AgencyId == actor.AgencyId &&
+                x.IsEnabled && x.SecurityVersion == actor.SecurityVersion, cancellationToken);
             if (user is null) return Results.NotFound();
             if (!passwordVerifier.Verify(request.CurrentPassword, user.PasswordHash, user.Salt))
                 return Results.BadRequest(new ApiErrorDto(
                     "invalid_current_password", "The current password is incorrect.", string.Empty));
             var credential = passwordVerifier.Hash(request.NewPassword);
+            if (!TryAdvanceSecurityVersion(user)) return AccountStateConflict();
             user.PasswordHash = credential.Hash;
             user.Salt = credential.Salt;
             auditTrail.Record(actor, AuditActions.UserPasswordChanged, "User", actor.UserId);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) { return AccountStateConflict(); }
             return Results.NoContent();
         });
     }

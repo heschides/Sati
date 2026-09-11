@@ -47,6 +47,11 @@
             <Grid.Style>
                 <Style TargetType="Grid">
                     <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsAccountTransitionActive}" Value="True">
+                            <Setter Property="IsEnabled" Value="False" />
+                            <Setter Property="KeyboardNavigation.TabNavigation" Value="None" />
+                            <Setter Property="KeyboardNavigation.ControlTabNavigation" Value="None" />
+                        </DataTrigger>
                         <DataTrigger Binding="{Binding Idle.IsOverlayVisible}" Value="True">
                             <Setter Property="Effect">
                                 <Setter.Value>
@@ -205,6 +210,13 @@
                                 views:NavTab.IsActive="{Binding IsSupervisorActive}"
                                 Command="{Binding NavigateToSupervisorDashboardCommand}"
                                 Visibility="{Binding IsSupervisionAvailable,
+                                    Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <Button Content="Users"
+                                Style="{StaticResource ShellNavTabButton}"
+                                AutomationProperties.Name="User management"
+                                views:NavTab.IsActive="{Binding IsUserManagementActive}"
+                                Command="{Binding NavigateToUserManagementCommand}"
+                                Visibility="{Binding IsUserManagementAvailable,
                                     Converter={StaticResource BoolToVisibilityConverter}}" />
                         <Button Content="Billing"
                                 Style="{StaticResource ShellNavTabButton}"
@@ -416,18 +428,22 @@
                        Stretch="Uniform"
                        HorizontalAlignment="Center"
                        RenderOptions.BitmapScalingMode="HighQuality" />
-                <TextBlock Text="Switching account"
+                <TextBlock Text="{Binding AccountTransitionTitle}"
                            Margin="0,16,0,0"
                            HorizontalAlignment="Center"
                            FontSize="22"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimaryBrush}" />
-                <TextBlock Text="The previous account's information is hidden while Sati prepares the next workspace."
+                <TextBlock Text="{Binding AccountTransitionMessage}"
                            Margin="0,8,0,0"
                            TextAlignment="Center"
                            TextWrapping="Wrap"
                            FontSize="13"
                            Foreground="{DynamicResource TextSecondaryBrush}" />
+                <Button Content="Sign in again" Command="{Binding ReauthenticateCommand}"
+                        AutomationProperties.Name="Sign in again"
+                        Visibility="{Binding IsSessionReauthenticationRequired, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" />
             </StackPanel>
         </Border>
 

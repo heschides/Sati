@@ -82,6 +82,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.Username).HasMaxLength(50);
             entity.Property(x => x.Role).HasMaxLength(50);
             entity.Property(x => x.Permissions).HasConversion<int>();
+            entity.Property(x => x.IsEnabled).HasDefaultValue(true);
+            entity.Property(x => x.SecurityVersion).HasDefaultValue(1L).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<ServerPerson>(entity =>
@@ -671,6 +673,8 @@ internal sealed class ServerDatabaseIdentity
 
 internal sealed class ServerUser
 {
+    public bool IsEnabled { get; set; } = true;
+    public long SecurityVersion { get; set; } = 1;
     public int Id { get; set; }
     public string Username { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;

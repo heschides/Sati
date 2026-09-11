@@ -31,6 +31,25 @@ public static class UserManagementRules
         UserPermissionRules.HasSupervisorPermissions(permissions) ||
         UserPermissionRules.HasAdminPermissions(permissions);
 
+    /// <summary>The stored target must be manageable before a profile change or
+    /// password reset. Testing only its CaseManagement bit would let a supervisor
+    /// take over an assigned account that also holds administration or billing.</summary>
+    public static Refusal? DescribeTargetRefusal(
+        AgencyActor actor, UserPermissions targetPermissions, int? targetSupervisorId,
+        int targetAgencyId, string targetRole)
+    {
+        if (!UserPermissionRules.IsSupported(actor.Permissions) || !CanManageUsers(actor.Permissions))
+            return new("permissions", RequiresUserManagement);
+        if (targetAgencyId != actor.AgencyId)
+            return new("agencyId", ForeignAgency);
+        if (string.Equals(targetRole, "PlatformOperator", StringComparison.Ordinal))
+            return new("user", PlatformOperatorNotManageable);
+        if (!UserPermissionRules.HasAdminPermissions(actor.Permissions) &&
+            (targetPermissions != UserPermissions.CaseManagement || targetSupervisorId != actor.UserId))
+            return new("permissions", SupervisorScope);
+        return null;
+    }
+
     /// <summary>
     /// Null when <paramref name="actor"/> may write a user carrying
     /// <paramref name="requestedPermissions"/>; otherwise the reason it is refused.

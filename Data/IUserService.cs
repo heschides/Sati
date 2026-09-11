@@ -40,5 +40,10 @@ namespace Sati.Data
         Task ChangePasswordAsync(User user, SecureString currentPassword, SecureString newPassword);
         Task<List<User>> GetSuperviseesAsync(int supervisorId);
 
+        Task SetEnabledAsync(AgencyActor actor, User user, bool isEnabled) =>
+            throw new NotSupportedException("Account enablement is not available in this service.");
+        Task RevokeSessionsAsync(AgencyActor actor, User user) =>
+            throw new NotSupportedException("Session revocation is not available in this service.");
+
     }
 }

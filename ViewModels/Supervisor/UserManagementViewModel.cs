@@ -8,6 +8,8 @@ using Sati.Views;
 using System.Security;
 using System.Runtime.InteropServices;
 using Sati.Data.Cloud;
+using Sati.Services;
+using Sati.Contracts.V1;
 
 namespace Sati.ViewModels.Supervisor
 {
@@ -20,6 +22,7 @@ namespace Sati.ViewModels.Supervisor
         private readonly IUserService _userService;
         private readonly ISessionService _sessionService;
         private readonly Func<NewUserWindow> _newUserWindowFactory;
+        private readonly LatestRequestTracker _loads = new();
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -50,6 +53,7 @@ namespace Sati.ViewModels.Supervisor
         [ObservableProperty] private bool statusIsError;
         [ObservableProperty] private SecureString? resetPasswordValue;
         [ObservableProperty] private SecureString? resetPasswordConfirmation;
+        [ObservableProperty] private bool isManagingAccount;
 
         public event Action? ResetPasswordInputsCleared;
 
@@ -70,6 +74,21 @@ namespace Sati.ViewModels.Supervisor
         // this decides what to offer rather than what is allowed.
         public bool CanAssignExpandedPermissions =>
             _sessionService.CurrentUser?.HasAdminPermissions == true;
+        public bool CanManageAccountLifecycle => CanAssignExpandedPermissions && SelectedUser is not null && !IsManagingAccount;
+        public string SelectedAccountState => SelectedUser?.IsEnabled == false
+            ? "Disabled — sign-in blocked" : "Enabled";
+        private bool CanEnableAccount() => CanManageAccountLifecycle && SelectedUser?.IsEnabled == false;
+        private bool CanDisableAccount() => CanManageAccountLifecycle && SelectedUser?.IsEnabled == true &&
+            SelectedUser.Id != _sessionService.CurrentUser?.Id;
+        private void NotifyAccountControls()
+        {
+            OnPropertyChanged(nameof(CanManageAccountLifecycle));
+            OnPropertyChanged(nameof(SelectedAccountState));
+            EnableAccountCommand.NotifyCanExecuteChanged();
+            DisableAccountCommand.NotifyCanExecuteChanged();
+            RevokeSessionsCommand.NotifyCanExecuteChanged();
+        }
+        partial void OnIsManagingAccountChanged(bool value) => NotifyAccountControls();
 
         private Sati.Contracts.V1.AgencyActor CurrentActor() =>
             _sessionService.CurrentUser?.ToAgencyActor()
@@ -84,6 +103,7 @@ namespace Sati.ViewModels.Supervisor
         partial void OnSelectedUserChanged(User? value)
         {
             OnPropertyChanged(nameof(HasSelectedUser));
+            NotifyAccountControls();
             StatusMessage = string.Empty;
             ClearResetPasswordInputs();
 
@@ -106,6 +126,59 @@ namespace Sati.ViewModels.Supervisor
         // -------------------------------------------------------------------------
         // Commands
         // -------------------------------------------------------------------------
+
+        [RelayCommand(CanExecute = nameof(CanEnableAccount))]
+        private Task EnableAccount() => ChangeAccountLifecycleAsync(true);
+
+        [RelayCommand(CanExecute = nameof(CanDisableAccount))]
+        private Task DisableAccount() => ChangeAccountLifecycleAsync(false);
+
+        [RelayCommand(CanExecute = nameof(CanManageAccountLifecycle))]
+        private Task RevokeSessions() => ChangeAccountLifecycleAsync(null);
+
+        private async Task ChangeAccountLifecycleAsync(bool? enabled)
+        {
+            var account = _sessionService.CurrentUser;
+            var target = SelectedUser;
+            if (account is null || target is null || !CanManageAccountLifecycle) return;
+            var refusal = AccountSessionRules.DescribeManagementRefusal(account.ToAgencyActor(),
+                target.Id, target.AgencyId, target.Role.ToString(), enabled);
+            if (refusal is not null) { SetStatus(refusal.Message, true); return; }
+            IsManagingAccount = true;
+            try
+            {
+                if (enabled is bool value)
+                    await _userService.SetEnabledAsync(account.ToAgencyActor(), target, value);
+                else
+                    await _userService.RevokeSessionsAsync(account.ToAgencyActor(), target);
+                if (!ReferenceEquals(account, _sessionService.CurrentUser)) return;
+                if (enabled is bool state) target.IsEnabled = state;
+                NotifyAccountControls();
+                var message = enabled switch
+                {
+                    true => $"Account enabled for {target.DisplayName}. Previous sessions remain signed out.",
+                    false => $"Account disabled for {target.DisplayName}. Sign-in is blocked and sessions are ended.",
+                    _ => $"All sessions signed out for {target.DisplayName}. Sign in again to continue."
+                };
+                // Own revocation is already committed; do not follow it with an
+                // authenticated refresh that would misreport that success as failure.
+                if (target.Id != account.Id)
+                {
+                    try { await RefreshAsync(); }
+                    catch { message += " Refresh the user list to see the latest state."; }
+                }
+                if (ReferenceEquals(account, _sessionService.CurrentUser)) SetStatus(message);
+                if (enabled.HasValue && ReferenceEquals(account, _sessionService.CurrentUser)) UsersChanged?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(account, _sessionService.CurrentUser))
+                    SetStatus(ex is UnauthorizedAccessException or InvalidOperationException or SessionExpiredException
+                        ? $"Account access was not changed. {ex.Message}"
+                        : "Sati could not confirm the account change. Refresh the user list before retrying.", true);
+            }
+            finally { IsManagingAccount = false; }
+        }
 
         [RelayCommand]
         private async Task CreateUser()
@@ -239,23 +312,39 @@ namespace Sati.ViewModels.Supervisor
 
         public async Task InitializeAsync()
         {
+            OnPropertyChanged(nameof(CanAssignExpandedPermissions));
+            NotifyAccountControls();
             await RefreshAsync();
+        }
+
+        public void ClearForAccountSwitch()
+        {
+            _loads.Invalidate();
+            SelectedUser = null;
+            SelectedSupervisor = null;
+            Users.Clear();
+            Supervisors.Clear();
+            StatusMessage = string.Empty;
+            OnPropertyChanged(nameof(CanAssignExpandedPermissions));
+            NotifyAccountControls();
         }
 
         private async Task RefreshAsync()
         {
+            var generation = _loads.Begin();
+            var actor = _sessionService.CurrentUser;
             var all = await _userService.GetAllAsync();
+            if (!_loads.IsCurrent(generation) || !ReferenceEquals(actor, _sessionService.CurrentUser)) return;
 
             Users.Clear();
-            var actor = _sessionService.CurrentUser;
             var visibleUsers = CanAssignExpandedPermissions
                 ? all
-                : all.Where(user => user.SupervisorId == actor?.Id && user.HasCaseManagerPermissions);
+                : all.Where(user => user.SupervisorId == actor?.Id && user.Permissions == UserPermissions.CaseManagement);
             foreach (var user in visibleUsers.OrderBy(u => u.DisplayName))
                 Users.Add(user);
 
             Supervisors.Clear();
-            foreach (var user in all.Where(u => u.HasSupervisorPermissions)
+            foreach (var user in all.Where(u => u.IsEnabled && u.HasSupervisorPermissions)
                 .OrderBy(u => u.DisplayName))
                 Supervisors.Add(user);
 

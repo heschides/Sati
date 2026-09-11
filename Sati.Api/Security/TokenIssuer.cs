@@ -11,6 +11,7 @@ internal sealed class TokenIssuer(IOptions<Api.Infrastructure.ApiAuthenticationO
 {
     internal const string AuthenticatedAtClaim = "sati_auth_time";
     internal const string DatabaseInstanceClaim = "sati_demo_instance";
+    internal const string SecurityVersionClaim = "sati_security_version";
     private readonly Api.Infrastructure.ApiAuthenticationOptions _options = options.Value;
 
     public (string Token, DateTimeOffset ExpiresAtUtc) Issue(
@@ -18,6 +19,9 @@ internal sealed class TokenIssuer(IOptions<Api.Infrastructure.ApiAuthenticationO
         Guid databaseInstanceId,
         DateTimeOffset? authenticatedAtUtc = null)
     {
+        if (!Sati.Contracts.V1.AccountSessionRules.IsCurrentSession(
+                user.IsEnabled, user.SecurityVersion, user.SecurityVersion))
+            throw new UnauthorizedAccessException("The account cannot start a session.");
         var issuedAt = DateTimeOffset.UtcNow;
         var authenticatedAt = authenticatedAtUtc ?? issuedAt;
         var expiresAt = issuedAt.AddMinutes(_options.TokenMinutes);
@@ -32,6 +36,7 @@ internal sealed class TokenIssuer(IOptions<Api.Infrastructure.ApiAuthenticationO
             new Claim(JwtRegisteredClaimNames.Iat, issuedAt.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new Claim(AuthenticatedAtClaim, authenticatedAt.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new Claim(DatabaseInstanceClaim, databaseInstanceId.ToString("D")),
+            new Claim(SecurityVersionClaim, user.SecurityVersion.ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64),
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.DisplayName),
             new Claim(ClaimTypes.Role, user.Role),

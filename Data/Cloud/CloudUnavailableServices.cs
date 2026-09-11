@@ -75,10 +75,12 @@ public sealed class CloudUserService(CloudApiClient api) : IUserService
         api.PutAsync($"/api/v1/users/{user.Id}", ToRequest(user));
     public async Task ResetPasswordAsync(AgencyActor actor, User user, SecureString newPassword)
     {
+        var generation = api.SessionGeneration;
         var plainText = ToPlainText(newPassword);
         try
         {
             await api.PutAsync($"/api/v1/users/{user.Id}/password", new ResetPasswordRequest(plainText));
+            if (actor.UserId == user.Id) api.InvalidateCurrentSession(generation);
         }
         finally
         {
@@ -87,18 +89,33 @@ public sealed class CloudUserService(CloudApiClient api) : IUserService
     }
     public async Task ChangePasswordAsync(User user, SecureString currentPassword, SecureString newPassword)
     {
+        var generation = api.SessionGeneration;
         var currentPlainText = ToPlainText(currentPassword);
         var newPlainText = ToPlainText(newPassword);
         try
         {
             await api.PutAsync("/api/v1/users/me/password",
                 new ChangePasswordRequest(currentPlainText, newPlainText));
+            api.InvalidateCurrentSession(generation);
         }
         finally
         {
             currentPlainText = string.Empty;
             newPlainText = string.Empty;
         }
+    }
+    public async Task SetEnabledAsync(AgencyActor actor, User user, bool isEnabled)
+    {
+        var generation = api.SessionGeneration;
+        await api.PutAsync($"/api/v1/users/{user.Id}/enabled", new SetUserEnabledRequest(isEnabled));
+        if (actor.UserId == user.Id && !isEnabled) api.InvalidateCurrentSession(generation);
+    }
+
+    public async Task RevokeSessionsAsync(AgencyActor actor, User user)
+    {
+        var generation = api.SessionGeneration;
+        await api.DeleteAsync($"/api/v1/users/{user.Id}/sessions");
+        if (actor.UserId == user.Id) api.InvalidateCurrentSession(generation);
     }
     public async Task<List<User>> GetSuperviseesAsync(int supervisorId) =>
         (await api.GetAsync<List<UserProfileDto>>("/api/v1/supervisor/supervisees"))

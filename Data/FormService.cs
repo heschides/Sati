@@ -13,6 +13,7 @@ public sealed class FormService(
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
 
         if (stored.CompletedDate?.Date != form.CompletedDate?.Date)
@@ -37,6 +38,7 @@ public sealed class FormService(
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         if (stored.CompletedDate is not null)
             throw new InvalidOperationException(
@@ -149,6 +151,7 @@ public sealed class FormService(
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         var cycle = FormAttestationRules.ResolveCycle(
             stored.Person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
@@ -179,6 +182,7 @@ public sealed class FormService(
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await using var transaction = await context.Database.BeginTransactionAsync();
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         var entry = AnnualDocumentCatalog.ForFormType(stored.Type.ToString())
@@ -210,6 +214,7 @@ public sealed class FormService(
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         if (stored.CompletedDate is null)
             return;
@@ -258,6 +263,7 @@ public sealed class FormService(
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         // Even an empty request must validate the persisted actor. The session's
         // capabilities alone may be stale after an administrator changes access.
         if (!actor.HasCaseManagerPermissions ||

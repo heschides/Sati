@@ -1,6 +1,36 @@
 # Sati launch security review
 September 10, 2026 — repository assessment after clearinghouse intake development
 
+## Follow-up 2026-09-11: account lifecycle implemented in source
+
+B05's password/session-revocation and explicit disablement gap is closed at the reviewed API and
+ordinary local service entry points. Retained account state uses an enabled flag and monotonic
+security version; password change/reset, explicit revocation and enabled-state changes invalidate
+previous sign-ins. Renewal cannot adopt a newer version for an old credential. Missing-version
+JWTs are intentionally refused after upgrade. Chat invalidation follows its bounded lease check,
+not an immediate push that erases previously delivered content.
+
+Same-agency administrator controls retain users and records, prevent self-disable, exclude platform
+operators and audit changes. Review also found and closed a related password-reset/profile-change
+takeover: supervisors must not manage an assigned user who also has Billing, Administration or any
+other stronger capability. The shared target rule now requires case-management-only targets for
+non-administrators. Local template administration and EDI replay/generation now check the current
+session before accessing records; EDI additionally requires Billing.
+
+API/JWT, local SQLite, client-transport and concurrency regression tests captured failures before
+correction. Final verification and change scope are recorded in the lifecycle handoff. The schema
+migration is source only: no real accounts, passwords, database records or deployed services were
+changed. Deployment rehearsal, coordinated updated clients/server and fresh sign-ins remain
+required. Session inventory/per-device revocation, MFA, full account recovery, direct-SQL trust,
+global maintenance and ordinary in-flight-operation serialization remain separate work. This
+follow-up is not a renewed complete audit or launch clearance.
+
+Final solution verification: 2,719 tests passed across desktop (1,874), API (715), signatures
+(118), portal (8) and Carika (4); one optional native-AI competence test was skipped. The API and
+desktop suites include 160 additional cases compared with the preceding permission-revocation
+handoff. The schema snapshot and SQL Server migration-script generation were checked without
+connecting to SQL Server. This does not replace a controlled production-engine concurrency rehearsal.
+
 ## Follow-up 2026-09-11: ordinary consumer-record permission revocation
 
 The authorized follow-up fixes B01's local login projection and B02's ordinary consumer
@@ -29,7 +59,7 @@ The expanded old-API proof has 24 failures and 40 passing controls; final verifi
 recorded in the permission-revocation handoff. No real records, migrations or deployment were used.
 The detailed baseline findings below remain historical evidence, not present exploit claims.
 
-Still open: B05 password/session revocation and disablement; B04 globally scoped local maintenance;
+Still open after the lifecycle follow-up: approved B05 rollout; B04 globally scoped local maintenance;
 direct SQL trust; in-flight revocation races; the other billing/launch findings. Supervisory SQL
 target-user bit filters need alignment with the full supported-mask predicate for corrupted target
 rows (actor masks already fail closed). Local `PersonService.EditPerson` attaches a caller-supplied
@@ -68,7 +98,7 @@ This review found four existing defects through five repeatable synthetic tests.
 |---|---|---|
 | 1 — standalone bypass closed; historical reconciliation pending | Deleting a never-attested overdue requirement removed a billing block (B03) | Both public deletion boundaries now refuse all persisted forms. Existing missing obligations and claims created before the fix still require controlled review; no dates are guessed or historical records silently rewritten. |
 | 2 — ordinary consumer boundaries fixed in source | Capability removal did not consistently stop casework access (B02) | Reproduced and fixed across reviewed ordinary API/local consumer operations. Billing/Supervision/Admin remain independent. Global maintenance, direct SQL and session lifecycle are not covered by this closure. |
-| 3 — before agency launch | Password changes leave existing tokens usable and renewable (B05) | Reproduced against real HTTP/JWT handlers. Add account disablement, per-user/session security versions and revocation on password reset/offboarding. |
+| 3 — implemented in source; approved rollout pending | Password/session revocation and account disablement (B05) | Reproduced and corrected with enabled state, mandatory security versions, password/reset revocation and administrator controls. Schema/client/server rollout, MFA and operations remain prerequisites. |
 | 4 — fixed in source | Local login reconstructed permissions from the legacy role (B01) | Login preserves persisted capabilities and omits password verifiers; ordinary consumer services recheck the current database actor. |
 | 5 — before claiming pre-submission prevention | Overdue notes can enter the supervisor queue through the API (B08) | Reproduced: direct submission persists Logged. Supervisor approval still rejects it; this finding is not proof that every invalid note becomes a payable claim. |
 | 6 — before concurrent real billing | Overlap validation has a read-then-write race (B09) | Source finding, not dynamically reproduced. Serialize conflicting staff/day writes and prove the behavior using SQL Server. |
@@ -169,7 +199,10 @@ This is source evidence, not penetration-test or compliance certification. Histo
 - Remediation: retire completed maintenance tools or make them authorized, tenant-scoped, explicitly reviewed operations with protected/redacted report locations and identified audit actor.
 - Historical finding: SATI-SEC-004 remains open; its assertion of no bulk audit is partially stale.
 
-### B05 — High: Password changes/resets do not revoke bearer sessions; no account-disable state
+### B05 — High, historical baseline: password changes/resets did not revoke bearer sessions
+
+Status: password/session revocation and disablement are implemented in the September 11 source
+follow-up above. This evidence predates that fix; deployment, MFA and broader operations remain open.
 
 - Evidence: `Sati.Api/Security/TokenIssuer.cs:35-45` includes random jti/auth time/database generation but no user security version or session record. `ApiEndpoints.cs:1268-1299` renews using auth time/user existence. `ApiEndpoints.cs:1408-1425` password change writes hash/salt only. `ServerUser` in `Sati.Api/Data/ApiDbContext.cs` has no active/disabled/security-stamp field. `ApiAuthenticationOptions` defaults to 30-minute JWT and 720-minute renewal window; Program permits maximum session 1,440 minutes.
 - Trigger/consequence: a stolen JWT remains usable and renewable after password change until original authentication age limit. Role/agency changes can invalidate old claims, but there is no reliable dedicated user/session revocation operation. Empty permission sets are not a supported disable mechanism.

@@ -27,6 +27,7 @@ namespace Sati.Data
         public async Task<List<PersonProvider>> GetByPersonAsync(int personId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnedPersonAsync(context, personId);
 
             return await context.PersonProviders.AsNoTracking()
@@ -40,6 +41,7 @@ namespace Sati.Data
         public async Task<PersonProvider> SaveAsync(PersonProvider link)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnedPersonAsync(context, link.PersonId);
 
             link.Role = Normalize(link.Role);
@@ -71,6 +73,7 @@ namespace Sati.Data
         public async Task EndAsync(int personId, int linkId, DateTime endDate)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var link = await LoadOwnedLinkAsync(context, personId, linkId);
             link.EndDate = endDate.Date;
             await context.SaveChangesAsync();
@@ -79,6 +82,7 @@ namespace Sati.Data
         public async Task RemoveAsync(int personId, int linkId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var link = await LoadOwnedLinkAsync(context, personId, linkId);
             context.PersonProviders.Remove(link);
             await context.SaveChangesAsync();

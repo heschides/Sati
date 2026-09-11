@@ -1,5 +1,35 @@
 # Sati — Refactor Agenda
 
+## Unreleased — account disablement and session revocation
+
+- [x] Add retained `IsEnabled` and monotonic `SecurityVersion` account state, with an EF
+      concurrency token; share lifecycle policy between API and transitional local services.
+- [x] Require an enabled account and matching positive version for authenticated access and
+      renewal. Password change/reset, explicit session revocation and enabled-state changes
+      invalidate old sign-ins; re-enabling never revives an old credential.
+- [x] Add same-agency administrator controls without deleting users or their records; refuse
+      self-disable and platform-operator management. Keep disabled caseloads reviewable/transferable.
+- [x] Check local template administration and EDI generation/replay before protected reads;
+      EDI additionally requires the independently granted Billing capability.
+- [x] Close the related assigned-privileged-user takeover: supervisor profile changes and
+      password resets require a stored case-management-only target, not merely that capability bit.
+- [x] Require explicit enabled-state JSON; an empty object must not silently mean disable.
+- [x] Pause protected cloud requests while candidate sign-in credentials await workspace
+      acceptance; preserve same-access drafts and require confirmation before changed-access reload.
+- [x] Preserve contact drafts and show inline feedback for expired, denied or unconfirmed saves;
+      discard late completion effects after a person/session change.
+- [x] Verify all five test projects: 2,719 passed, one optional native-AI test skipped; preserve
+      red-before-fix evidence and unchanged-record assertions.
+- [ ] Rehearse the `20260911120000_AddAccountSessionLifecycle` migration and coordinated
+      server/client rollout on an approved non-production copy; do not run it implicitly at startup.
+- [ ] Deploy only with separate authorization, require fresh sign-in after upgrade, and retire
+      old direct-SQL desktop clients. Source-level local checks cannot constrain a database client
+      that bypasses them.
+- [ ] Exercise concurrent account administration and ordinary in-flight clinical writes using
+      SQL Server. SQLite regression coverage is not production-engine concurrency certification.
+- [ ] Define a broader last-administrator recovery/provisioning policy, including legacy
+      permission-demotion paths; self-disable prevention is not complete account-recovery policy.
+
 ## Unreleased — consumer-record permission revocation
 
 - [x] Make retained assignments insufficient for own casework after CaseManagement is removed;
@@ -14,7 +44,8 @@
       preserving their personal scratchpads and existing Billing/Supervision/Admin navigation.
 - [x] Add synthetic red-before-fix regressions with retained assignments, stale/fresh sessions,
       denied-write state checks and legitimate workflow controls.
-- [ ] Implement password-change/session revocation and account disablement/offboarding (B05).
+- [x] Implement password-change/session revocation and account disablement/offboarding (B05);
+      see the unreleased lifecycle section above for rollout and remaining limits.
 - [ ] Retire or secure the separately recorded globally scoped local maintenance tools (B04).
 - [ ] Complete local/API AT publication completeness and audit parity, and review billing
       candidate narrative disclosure against the biller's actual minimum necessary workflow.
@@ -54,7 +85,7 @@
       See SECURITY_REVIEW_2026-09-10.md; this is not clearance to launch with real consumer data.
 - [ ] Apply AddClearinghouseResponseIntake only through reviewed migration/backup procedures.
       No deployment or real database migration is authorized by this development work.
-- [ ] Clear the security review's remaining launch blockers: password/session revocation and
+- [ ] Clear the security review's remaining launch blockers: approved session-lifecycle rollout and
       privileged maintenance boundaries; resolve service-time concurrency with SQL Server tests.
       Ordinary consumer-record capability checks and local login projection are addressed by the
       September 11 follow-up above; this is not general launch clearance.

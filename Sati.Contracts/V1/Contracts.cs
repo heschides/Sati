@@ -20,7 +20,9 @@ public sealed record UserProfileDto(
     int? SupervisorId,
     int AgencyId,
     string? Email,
-    string? Phone);
+    string? Phone,
+    bool IsEnabled = true,
+    long SecurityVersion = 1);
 
 public sealed record CreateUserRequest(
     string Username, string DisplayName, UserPermissions Permissions, int? SupervisorId,
@@ -33,6 +35,9 @@ public sealed record SaveUserRequest(
 public sealed record ResetPasswordRequest(string NewPassword);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+public sealed record SetUserEnabledRequest(
+    [property: System.Text.Json.Serialization.JsonRequired] bool IsEnabled);
 
 public sealed record FormDto(
     int Id,

@@ -1,6 +1,6 @@
 # API authorization and tenant ownership
 
-*Route manifest mechanically counted 2026-09-10: 177 protected routes. The table is maintained with
+*Route manifest updated 2026-09-11: 179 protected routes. The table is maintained with
 `ApiSurface.Routes` after excluding health and anonymous login, and `ApiSurfaceTests` checks that
 manifest against live endpoint registration. Every route added, removed, or rescoped must be
 reflected here in the same change.*
@@ -31,8 +31,10 @@ must not be removed as dead code.
 
 Every protected route has two layers of protection:
 
-1. JWT authentication establishes a claimed user, legacy identity label, and agency.
-2. `ValidatedActorFilter` confirms that identity and agency against the database, then resolves the
+1. JWT authentication establishes a claimed user, legacy identity label, agency and mandatory
+   positive `sati_security_version`. Tokens missing that version must sign in again after upgrade.
+2. `ValidatedActorFilter` confirms an enabled account and exact current security version as well
+   as identity and agency against the database, then resolves the
    current persisted permission set before every endpoint runs. Permissions are deliberately not
    trusted from the token. Effective revocation additionally requires each endpoint to enforce
    the current capability. The September 11 follow-up replaces owner-only casework checks with
@@ -105,8 +107,10 @@ incentives are separate own-user information, not an extension of consumer casel
 | Admin | `POST /admin/audit-export.csv` | Audit event's `AgencyId` | Administration permission; agency derived from the actor and never from the caller. Requires a 10–250 character reason and a window of at most 366 days, caps at 10,000 rows, marks the response `no-store`, and records one `audit.exported` event. Exported values are neutralized against spreadsheet formula evaluation. |
 | Users | `POST /users` | New user's `AgencyId` | Supervision or administration permission; requested agency must equal actor agency. A non-administrator may create only a case-management-only user assigned to themself. |
 | Users | `PUT /users/{userId}` | Target user's `AgencyId` | Supervision or administration permission in the same agency; non-administrators only manage assigned case-management-only users. |
-| Users | `PUT /users/{userId}/password` | Target user's `AgencyId` | Same rule as user update. |
-| Users | `PUT /users/me/password` | User's `AgencyId` | Own user plus current-password verification. |
+| Users | `PUT /users/{userId}/password` | Target user's `AgencyId` | Same rule as user update; successful reset advances the target's security version and invalidates existing sign-ins. |
+| Users | `PUT /users/me/password` | User's `AgencyId` | Own current sign-in plus current-password verification; successful change invalidates existing sign-ins, including the caller's. |
+| Users | `PUT /users/{userId}/enabled` | Target user's `AgencyId` | Current same-agency Administration; platform operators and disabling oneself are refused. A state change advances the version, retains the user and records, and is audited. |
+| Users | `DELETE /users/{userId}/sessions` | Target user's `AgencyId` | Current same-agency Administration; platform operators excluded. Advances the target's version and audits revocation; does not delete user or session-history records. |
 | Supervisor | `GET /supervisor/supervisees` | Case manager user's `AgencyId` | Supervision permission sees assigned users with case-management permission; the current route returns directly assigned users. |
 | Supervisor | `GET /supervisor/notes` | Note person's own and owning user's `AgencyId` | Supervision permission sees assigned case managers; agency-wide supervision broadens that to every case manager in the agency. Administration implies agency-wide supervision but does not on its own substitute for supervision. |
 | Supervisor | `GET /supervisor/notes/page` | Note person's own and owning user's `AgencyId` | Existing paged review route: same supervision and caseload scope, bounded by the review page size and captured upper note ID. Added to this inventory during chat reconciliation; not a new chat route. |

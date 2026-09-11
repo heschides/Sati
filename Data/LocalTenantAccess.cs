@@ -20,11 +20,44 @@ internal static class LocalTenantAccess
     public static bool IsReviewer(UserPermissions permissions) =>
         UserPermissionRules.HasSupervisorPermissions(permissions);
 
-    public static Task<bool> IsCurrentActorAsync(
-        SatiContext context, User actor, CancellationToken cancellationToken = default) =>
-        context.Users.AsNoTracking().AnyAsync(user =>
+    public static async Task<bool> IsCurrentActorAsync(
+        SatiContext context, User actor, CancellationToken cancellationToken = default)
+    {
+        await EnsureCurrentSessionAsync(context, actor, cancellationToken);
+        return await context.Users.AsNoTracking().AnyAsync(user =>
             user.Id == actor.Id && user.AgencyId == actor.AgencyId &&
-            user.Role == actor.Role && user.Permissions == actor.Permissions, cancellationToken);
+            user.Role == actor.Role && user.Permissions == actor.Permissions &&
+            user.IsEnabled && user.SecurityVersion == actor.SecurityVersion, cancellationToken);
+    }
+
+    public static async Task<User> EnsureSessionAsync(
+        SatiContext context, ISessionService session, CancellationToken cancellationToken = default)
+    {
+        var actor = session.CurrentUser ?? throw new UnauthorizedAccessException("A signed-in user is required.");
+        if (session.HasSessionEnded)
+            throw new SessionExpiredException(new UnauthorizedAccessException(AccountSessionRules.SessionExpired));
+        try
+        {
+            await EnsureCurrentActorAsync(context, actor, cancellationToken);
+            return actor;
+        }
+        catch (SessionExpiredException)
+        {
+            session.Invalidate(actor);
+            throw;
+        }
+    }
+
+    public static async Task EnsureCurrentSessionAsync(
+        SatiContext context, User actor, CancellationToken cancellationToken = default)
+    {
+        var state = await context.Users.AsNoTracking().Where(user => user.Id == actor.Id)
+            .Select(user => new { user.IsEnabled, user.SecurityVersion }).SingleOrDefaultAsync(cancellationToken);
+        if (state is null)
+            throw new UnauthorizedAccessException("The signed-in account no longer exists.");
+        if (!actor.IsEnabled || !AccountSessionRules.IsCurrentSession(state.IsEnabled, state.SecurityVersion, actor.SecurityVersion))
+            throw new SessionExpiredException(new UnauthorizedAccessException(AccountSessionRules.SessionExpired));
+    }
 
     public static async Task EnsureCurrentActorAsync(
         SatiContext context, User actor, CancellationToken cancellationToken = default)
@@ -33,15 +66,19 @@ internal static class LocalTenantAccess
             throw new UnauthorizedAccessException("Your account access has changed. Sign in again before continuing.");
     }
 
-    public static Task<bool> OwnsPersonAsync(
-        SatiContext context, User actor, int personId, CancellationToken cancellationToken = default) =>
-        (from person in context.People.AsNoTracking()
+    public static async Task<bool> OwnsPersonAsync(
+        SatiContext context, User actor, int personId, CancellationToken cancellationToken = default)
+    {
+        await EnsureCurrentSessionAsync(context, actor, cancellationToken);
+        return await (from person in context.People.AsNoTracking()
          join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
          where actor.HasCaseManagerPermissions && person.Id == personId && person.AgencyId == actor.AgencyId &&
                owner.Id == actor.Id && owner.AgencyId == actor.AgencyId &&
                owner.Role == actor.Role && owner.Permissions == actor.Permissions &&
+               owner.IsEnabled && owner.SecurityVersion == actor.SecurityVersion &&
                (owner.Permissions & UserPermissions.CaseManagement) != 0
          select person.Id).AnyAsync(cancellationToken);
+    }
 
     public static async Task<bool> CanAccessUserAsync(
         SatiContext context, User actor, int targetUserId, CancellationToken cancellationToken = default)

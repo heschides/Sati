@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Sati.Contracts.V1;
 using Sati.Data;
+using Sati.Data.Cloud;
 using Sati.Helpers;
 using Sati.Models;
 using Sati.Reporting;
@@ -978,7 +979,9 @@ namespace Sati.ViewModels
         [RelayCommand]
         private async Task SaveContact()
         {
-            if (SelectedPerson is null)
+            var person = SelectedPerson;
+            var account = _sessionService.CurrentUser;
+            if (person is null || account is null)
                 return;
 
             if (string.IsNullOrWhiteSpace(ContactFirstName) ||
@@ -990,7 +993,7 @@ namespace Sati.ViewModels
 
             var contact = IsEditingContact && SelectedContact is not null
                 ? SelectedContact
-                : new PersonContact { PersonId = SelectedPerson.Id };
+                : new PersonContact { PersonId = person.Id };
 
             contact.FirstName = ContactFirstName;
             contact.LastName = ContactLastName;
@@ -1002,13 +1005,40 @@ namespace Sati.ViewModels
             contact.IsEmergencyContact = ContactIsEmergencyContact;
             contact.HasActiveRelease = ContactHasActiveRelease;
 
-            await _personContactService.SaveAsync(contact);
-            await LoadContactsAsync(SelectedPerson);
-
-            IsContactEditorOpen = false;
-            IsEditingContact = false;
-            SelectedContact = null;
-            ClearContactEditor();
+            bool stillCurrent() => ReferenceEquals(SelectedPerson, person) &&
+                ReferenceEquals(_sessionService.CurrentUser, account);
+            var saved = false;
+            try
+            {
+                await _personContactService.SaveAsync(contact);
+                saved = true;
+                if (!stillCurrent()) return;
+                // Refresh without closing the editor first. A refused refresh must
+                // not erase a draft or misreport a confirmed save as a failed write.
+                var contacts = await _personContactService.GetActiveByPersonAsync(person.Id);
+                if (!stillCurrent()) return;
+                Contacts.Clear();
+                foreach (var item in contacts) Contacts.Add(item);
+                IsContactEditorOpen = false;
+                IsEditingContact = false;
+                SelectedContact = null;
+                ClearContactEditor();
+            }
+            catch (Exception ex) when (ex is SessionExpiredException or CloudApiException or
+                UnauthorizedAccessException or CloudConnectivityException or InvalidOperationException)
+            {
+                if (!stillCurrent()) return;
+                ContactStatusMessage = saved
+                    ? "The contact was saved, but the list could not refresh. Do not repeat the save; sign in again if prompted, then refresh the contact list."
+                    : ex switch
+                    {
+                        SessionExpiredException or CloudSessionEndedException =>
+                            "Your session ended. Your draft is still here. Sign in again and refresh the contact list before retrying the save.",
+                        UnauthorizedAccessException =>
+                            "The contact was not saved because this account no longer has permission. Your draft is still here.",
+                        _ => "Sati could not confirm the contact save. Your draft is still here; refresh the contact list before retrying."
+                    };
+            }
         }
 
         [RelayCommand]

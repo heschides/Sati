@@ -13,12 +13,14 @@ namespace Sati.Services.Billing
     {
         public bool SupportsMockClearinghouse => false;
         private readonly IDbContextFactory<SatiContext> _contextFactory;
+        private readonly ISessionService? _sessionService;
         private BillingComplianceRequirements _complianceRequirements =
             BillingComplianceGate.DefaultRequirements;
 
-        public BillingService(IDbContextFactory<SatiContext> contextFactory)
+        public BillingService(IDbContextFactory<SatiContext> contextFactory, ISessionService? sessionService = null)
         {
             _contextFactory = contextFactory;
+            _sessionService = sessionService;
         }
 
         public async Task<BillingPeriod> GetOrCreateBillingPeriodAsync(AgencyActor suppliedActor, int userId, int month, int year)
@@ -595,7 +597,7 @@ namespace Sati.Services.Billing
             line.PlaceOfService,
             line.ClaimSnapshotJson);
 
-        private static async Task<User> ValidateBillingActorAsync(
+        private async Task<User> ValidateBillingActorAsync(
             SatiContext context,
             AgencyActor suppliedActor)
         {
@@ -603,12 +605,26 @@ namespace Sati.Services.Billing
                 !UserPermissionRules.HasBillingPermissions(suppliedActor.Permissions))
                 throw new UnauthorizedAccessException("Billing permission is required.");
 
-            return await context.Users.SingleOrDefaultAsync(user =>
-                       user.Id == suppliedActor.UserId &&
-                       user.AgencyId == suppliedActor.AgencyId &&
-                       user.Permissions == suppliedActor.Permissions)
+            var actor = await context.Users.SingleOrDefaultAsync(user =>
+                       user.Id == suppliedActor.UserId)
                    ?? throw new UnauthorizedAccessException(
                        "The billing actor no longer matches the current user record.");
+            if (!AccountSessionRules.IsCurrentSession(actor.IsEnabled, actor.SecurityVersion, suppliedActor.SecurityVersion))
+            {
+                if (_sessionService?.CurrentUser is User current && current.Id == suppliedActor.UserId &&
+                    current.SecurityVersion == suppliedActor.SecurityVersion)
+                    _sessionService.Invalidate(current);
+                throw new SessionExpiredException(new UnauthorizedAccessException(AccountSessionRules.SessionExpired));
+            }
+            if (actor.AgencyId != suppliedActor.AgencyId || actor.Permissions != suppliedActor.Permissions)
+                throw new UnauthorizedAccessException("The billing actor no longer matches the current user record.");
+            if (_sessionService is not null)
+            {
+                var signedIn = await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+                if (signedIn.Id != suppliedActor.UserId || signedIn.SecurityVersion != suppliedActor.SecurityVersion)
+                    throw new UnauthorizedAccessException("The billing actor does not match the signed-in account.");
+            }
+            return actor;
         }
     }
 }

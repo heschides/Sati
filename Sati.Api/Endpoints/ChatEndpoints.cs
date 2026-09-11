@@ -372,7 +372,7 @@ internal static partial class ApiEndpoints
     private static ChatRoomScope Scope(ServerChatRoom room) => new(room.Id, room.AgencyId, room.ArchivedAtUtc is not null);
     private static ChatMembership? Membership(ServerChatRoomMember? member) => member is null ? null :
         new(member.RoomId, member.UserId, member.AgencyId, member.RemovedAtUtc is null);
-    private static Actor ChatActor(ServerUser user) => new(user.Id, user.AgencyId, user.Role, user.DisplayName, user.Permissions);
+    private static Actor ChatActor(ServerUser user) => new(user.Id, user.AgencyId, user.Role, user.DisplayName, user.Permissions, user.SecurityVersion);
     private static ServerChatChange Change(ServerChatRoom room, Actor actor, string kind) => new()
     { RoomId = room.Id, AgencyId = room.AgencyId, Sequence = room.Revision, Kind = kind,
         ActorUserId = actor.UserId, ChangedAtUtc = DateTime.UtcNow };

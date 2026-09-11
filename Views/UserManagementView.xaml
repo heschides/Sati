@@ -60,6 +60,19 @@
                                     <TextBlock Text="{Binding PermissionSummary}"
                                                FontSize="10"
                                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="Disabled — sign-in blocked" FontSize="10"
+                                               Foreground="{DynamicResource TextSecondaryBrush}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
@@ -165,6 +178,28 @@
                             Margin="0,0,0,12" />
 
                     <!-- Password reset -->
+                    <Border Background="{DynamicResource SurfaceMutedBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            CornerRadius="6" Padding="14" Margin="0,0,0,16"
+                            Visibility="{Binding CanAssignExpandedPermissions, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="ACCOUNT ACCESS" Style="{StaticResource LabelStyle}" />
+                            <TextBlock Text="{Binding SelectedAccountState}" Margin="0,8,0,8"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       AutomationProperties.Name="{Binding SelectedAccountState}" />
+                            <TextBlock Text="Disabling blocks sign-in and ends existing sessions. Records and assignments are retained. Enabling requires a fresh sign-in."
+                                       TextWrapping="Wrap" Margin="0,0,0,12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <WrapPanel>
+                                <Button Content="Enable account" Command="{Binding EnableAccountCommand}"
+                                        AutomationProperties.Name="Enable account" Style="{StaticResource SmallButton}" Margin="0,0,8,8" />
+                                <Button Content="Disable account" Command="{Binding DisableAccountCommand}"
+                                        AutomationProperties.Name="Disable account" Style="{StaticResource SmallButton}" Margin="0,0,8,8" />
+                                <Button Content="Sign out all sessions" Command="{Binding RevokeSessionsCommand}"
+                                        AutomationProperties.Name="Sign out all sessions" Style="{StaticResource SmallButton}" Margin="0,0,0,8" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
                     <Border Background="{DynamicResource SurfaceMutedBrush}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1"

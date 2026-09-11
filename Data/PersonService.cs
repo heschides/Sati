@@ -34,6 +34,7 @@ namespace Sati.Data
 
             person.AgencyId = actor.AgencyId;
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
             if (person.IsTestData)
             {
@@ -76,6 +77,7 @@ namespace Sati.Data
             var actor = CurrentActor();
             ValidatePerson(person, requireNewForms: person.Forms.Any(form => form.Id == 0));
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await using var signatureChangeTransaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, person.Id))
                 throw new InvalidOperationException("This consumer is not available in your current caseload.");
@@ -195,6 +197,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
 
             var person = await context.People.SingleOrDefaultAsync(candidate =>
@@ -213,7 +216,7 @@ namespace Sati.Data
             }
 
             var denial = CaseloadTransferRules.Evaluate(
-                new AgencyActor(actor.Id, actor.AgencyId, actor.Permissions),
+                actor.ToAgencyActor(),
                 currentOwner.Value,
                 target.Value);
             if (denial is not CaseloadTransferDenial.None)
@@ -274,6 +277,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
 
             var person = await context.People.SingleOrDefaultAsync(candidate =>
@@ -362,8 +366,9 @@ namespace Sati.Data
                 return CredibleMatchLookupResult.Empty;
 
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
-            var agencyActor = new AgencyActor(actor.Id, actor.AgencyId, actor.Permissions);
+            var agencyActor = actor.ToAgencyActor();
 
             var credibleMatches = new List<CredibleClientOwnerRow>();
             if (ids.Count > 0)
@@ -493,6 +498,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnPersonAsync(context, actor, personId);
             return await context.People
                 .Where(p => p.Id == personId)
@@ -508,6 +514,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnPersonAsync(context, actor, personId);
             var person = await context.People.SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
@@ -537,6 +544,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnPersonAsync(context, actor, personId);
             var person = await context.People.SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
@@ -596,6 +604,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureUserInScopeAsync(context, actor, userId);
             var people = await context.People
                 .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
@@ -650,6 +659,7 @@ namespace Sati.Data
                         }
 
                         await using var reread = _contextFactory.CreateDbContext();
+                        await LocalTenantAccess.EnsureSessionAsync(reread, _sessionService);
                         await EnsureUserInScopeAsync(reread, actor, userId);
                         return await reread.People
                             .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
@@ -674,6 +684,7 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureUserInScopeAsync(context, actor, userId);
 
             // Two flat queries stitched in memory, NOT one query joining both Forms and

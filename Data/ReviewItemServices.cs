@@ -17,6 +17,7 @@ namespace Sati.Data
         public async Task<List<ReviewItem>> GetForCaseloadAsync(int userId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var actor = CurrentActor();
             if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
                 throw new UnauthorizedAccessException("The caseload is outside your current access.");
@@ -29,6 +30,7 @@ namespace Sati.Data
         public async Task<List<ReviewItem>> GetForPersonAsync(int personId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsurePersonAccessAsync(context, CurrentActor(), personId);
             return await context.ReviewItems
                 .Where(r => r.PersonId == personId)
@@ -42,6 +44,7 @@ namespace Sati.Data
         public async Task<int> EnsureCurrentCycleItemsAsync(IEnumerable<Person> people, DateTime today)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var actor = CurrentActor();
             await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
             if (!actor.HasCaseManagerPermissions && !actor.HasSupervisorPermissions)
@@ -89,6 +92,7 @@ namespace Sati.Data
         public async Task<ReviewItem> SetStageDateAsync(int reviewItemId, ReviewStage stage, DateTime? date)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
 
             var item = await context.ReviewItems.FindAsync(reviewItemId)
                 ?? throw new InvalidOperationException($"ReviewItem {reviewItemId} not found.");
@@ -124,6 +128,7 @@ namespace Sati.Data
         public async Task<ReviewItem> SetAppointmentAsync(int reviewItemId, DateTime? date, string? providerName)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
 
             var item = await context.ReviewItems
                 .Include(r => r.Appointment)
@@ -161,6 +166,7 @@ namespace Sati.Data
         public async Task<(Appointment? Medical, Appointment? Dental)> GetLatestAppointmentsAsync(int personId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsurePersonAccessAsync(context, CurrentActor(), personId);
 
             var medical = await context.Appointments

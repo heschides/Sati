@@ -44,13 +44,28 @@ public sealed class SignatureSignerChangeTests
             await db.SaveChangesAsync();
             contact = await db.PersonContacts.AsNoTracking().SingleAsync();
         }
-        var contacts = new PersonContactService(fixture.Factory, fixture.Session());
-        if (operation == "read") await Assert.ThrowsAsync<InvalidOperationException>(() => contacts.GetActiveByPersonAsync(person.Id));
+        var session = fixture.Session();
+        var contacts = new PersonContactService(fixture.Factory, session);
         contact.Email = "changed@example.test";
-        if (operation == "save") await Assert.ThrowsAsync<InvalidOperationException>(() => contacts.SaveAsync(contact));
-        if (operation == "archive") await Assert.ThrowsAsync<InvalidOperationException>(() => contacts.ArchiveAsync(contact.Id));
         person.Email = "changed@example.test";
-        if (operation == "profile") await Assert.ThrowsAsync<InvalidOperationException>(() => new PersonService(fixture.Factory, new SettingsService(), fixture.Session()).EditPersonAsync(person));
+        Func<Task> request = operation switch
+        {
+            "read" => () => contacts.GetActiveByPersonAsync(person.Id),
+            "save" => () => contacts.SaveAsync(contact),
+            "archive" => () => contacts.ArchiveAsync(contact.Id),
+            "profile" => () => new PersonService(fixture.Factory, new SettingsService(), session).EditPersonAsync(person),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+        if (boundary is "removed-permission" or "removed-role")
+        {
+            // A stale identity fails the common authentication boundary before a
+            // consumer lookup. Ownership-only failures retain their existing type.
+            var error = await Assert.ThrowsAsync<UnauthorizedAccessException>(request);
+            Assert.Equal("Your account access has changed. Sign in again before continuing.", error.Message);
+        }
+        else
+            await Assert.ThrowsAsync<InvalidOperationException>(request);
+        Assert.False(session.HasSessionEnded); // Permission drift is not lifecycle revocation.
         await using var verify = fixture.Factory.CreateDbContext();
         Assert.Equal("synthetic@example.test", (await verify.PersonContacts.SingleAsync()).Email);
         Assert.True((await verify.PersonContacts.SingleAsync()).IsActive);

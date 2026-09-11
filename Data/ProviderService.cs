@@ -25,6 +25,7 @@ namespace Sati.Data
         public async Task<List<Provider>> GetAllAsync()
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             return await context.Providers
                 .Where(p => p.AgencyId == CurrentAgencyId())
                 .OrderBy(p => p.Name)
@@ -34,6 +35,7 @@ namespace Sati.Data
         public async Task<List<Provider>> GetPassthroughProvidersAsync()
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             return await context.Providers
                 .Where(p => p.AgencyId == CurrentAgencyId() && p.ProvidesPassthroughService)
                 .OrderBy(p => p.Name)
@@ -44,6 +46,7 @@ namespace Sati.Data
         {
             EnsureCanCreateOrEdit();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             provider.AgencyId = CurrentAgencyId();
             await GuardDuplicateIdentifierAsync(context, provider, null);
             await GuardAffiliationAsync(context, provider, 0);
@@ -56,6 +59,7 @@ namespace Sati.Data
         {
             EnsureCanCreateOrEdit();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var tracked = await context.Providers.SingleOrDefaultAsync(
                 x => x.Id == provider.Id && x.AgencyId == CurrentAgencyId())
                 ?? throw new InvalidOperationException("The provider is outside the current agency.");
@@ -140,6 +144,7 @@ namespace Sati.Data
                 throw new UnauthorizedAccessException(ProviderDirectoryRules.DeleteRequiresAdminMessage);
 
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var actorIsCurrentAdmin = await context.Users.AsNoTracking().AnyAsync(user =>
                 user.Id == actor.Id && user.AgencyId == actor.AgencyId &&
                 (user.Permissions & UserPermissions.Administration) != 0);
@@ -179,6 +184,7 @@ namespace Sati.Data
         public async Task<List<ProviderContact>> GetContactsAsync(int providerId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnedProviderAsync(context, providerId);
 
             return await context.ProviderContacts.AsNoTracking()
@@ -193,6 +199,7 @@ namespace Sati.Data
         {
             EnsureCanCreateOrEdit();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnedProviderAsync(context, contact.ProviderId);
 
             contact.Name = contact.Name.Trim();
@@ -255,6 +262,7 @@ namespace Sati.Data
         {
             EnsureCanCreateOrEdit();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnedProviderAsync(context, providerId);
 
             var contact = await context.ProviderContacts.SingleOrDefaultAsync(
@@ -274,6 +282,7 @@ namespace Sati.Data
                 throw new UnauthorizedAccessException(ProviderDirectoryRules.MergeRequiresAdminMessage);
 
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var actorIsCurrentAdmin = await context.Users.AsNoTracking().AnyAsync(user =>
                 user.Id == actor.Id && user.AgencyId == actor.AgencyId &&
                 (user.Permissions & UserPermissions.Administration) != 0);

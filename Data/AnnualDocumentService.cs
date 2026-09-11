@@ -17,6 +17,7 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
     public async Task<AnnualDocumentsStatusDto> GetStatusAsync(int personId, DateTime cycleStart)
     {
         var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         var person = await RequirePerson(db, actor, personId);
         return await GetStatusCoreAsync(db, actor, person, cycleStart);
     }
@@ -35,6 +36,7 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
     public async Task<DocumentAcknowledgmentDto> AcknowledgeAsync(int personId, AcknowledgeDocumentRequest request)
     {
         var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await RequirePerson(db, actor, personId);
         var artifact = await db.DocumentArtifacts.SingleOrDefaultAsync(x => x.Id == request.DocumentArtifactId && x.PersonId == personId &&
             x.AgencyId == actor.AgencyId && x.Kind == AnnualDocumentKind.PrivacyPractices && x.Origin == DocumentArtifactOrigin.GeneratedInSati && x.SupersededByArtifactId == null)
@@ -51,6 +53,7 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
     public async Task<VerifyDocumentResult> VerifyAsync(int personId, VerifyDocumentRequest request)
     {
         var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await RequirePerson(db, actor, personId);
         var artifact = await db.DocumentArtifacts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DocumentArtifactId &&
             x.PersonId == personId && x.AgencyId == actor.AgencyId) ?? throw new UnauthorizedAccessException();
@@ -62,6 +65,7 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
     public async Task<AgencyReleaseResult> SavePacketAsync(int personId, DateTime cycleStart)
     {
         var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var person = await RequirePerson(db, actor, personId);
         if (!SafetyPlanRules.CanAuthor(actor.Id, actor.Permissions, person.UserId)) throw new UnauthorizedAccessException();

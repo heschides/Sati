@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
+using Sati.Models;
 using Sati.Services;
 using Sati.ViewModels.Billing;
 using Sati.ViewModels.Children;
@@ -21,6 +22,7 @@ namespace Sati.ViewModels
         private readonly CaseManagementViewModel _caseManagementViewModel;
         private readonly SupervisorDashboardViewModel _supervisorDashboardViewModel;
         private readonly ISessionService _sessionService;
+        private readonly ISessionLifetime _sessionLifetime;
         private readonly BillingDashboardViewModel _billingDashboardViewModel;
         private readonly AdminDashboardViewModel _adminDashboardViewModel;
         private readonly PlatformHealthViewModel _platformHealthViewModel;
@@ -48,12 +50,14 @@ namespace Sati.ViewModels
             DatabaseActivityViewModel databaseActivity,
             EasyEyesPreferenceService easyEyesPreferences,
             IdleLockPreferenceService idlePreferences,
-            ChatViewModel chatViewModel)
+            ChatViewModel chatViewModel,
+            ISessionLifetime sessionLifetime)
         {
             _apiCompatibility = apiCompatibility;
             _caseManagementViewModel = caseManagementViewModel;
             _supervisorDashboardViewModel = supervisorViewModel;
             _sessionService = sessionService;
+            _sessionLifetime = sessionLifetime;
             Scratchpad = scratchpadViewModel;
             Chat = chatViewModel;
             _billingDashboardViewModel = billingDashboardViewModel;
@@ -96,6 +100,8 @@ namespace Sati.ViewModels
         // Settings is the one window behind the greeting badge. Switching accounts is
         // asked for from inside it, so the shell no longer raises a request of its own.
         public event EventHandler<bool>? OpenSettingsWindowRequested;
+        public event EventHandler? ReauthenticationRequested;
+        [RelayCommand] private void Reauthenticate() => ReauthenticationRequested?.Invoke(this, EventArgs.Empty);
 
         // -------------------------------------------------------------------------
         // Observable properties
@@ -106,6 +112,16 @@ namespace Sati.ViewModels
         // Opaque shell-wide privacy boundary used while account credentials and
         // user-scoped workspaces are changing. This is independent of the idle screen.
         [ObservableProperty] private bool isAccountTransitionActive;
+        [ObservableProperty] private bool isSessionReauthenticationRequired;
+        public string AccountTransitionTitle => IsSessionReauthenticationRequired ? "Sign-in required" : "Switching account";
+        public string AccountTransitionMessage => IsSessionReauthenticationRequired
+            ? "Your session ended. Your unsaved work is retained behind this screen. Sign in again to continue; closing Sati may discard unsaved changes."
+            : "The previous account's information is hidden while Sati prepares the next workspace.";
+        partial void OnIsSessionReauthenticationRequiredChanged(bool value)
+        {
+            OnPropertyChanged(nameof(AccountTransitionTitle));
+            OnPropertyChanged(nameof(AccountTransitionMessage));
+        }
 
         // Open/closed state of the scratchpad panel. The actual column collapse and
         // width-restore lives in ShellWindow.xaml.cs, which reacts to this changing —
@@ -160,6 +176,8 @@ namespace Sati.ViewModels
 
         public bool IsSupervisionAvailable =>
             _sessionService.CurrentUser?.HasSupervisorPermissions == true;
+        public bool IsUserManagementAvailable => IsSupervisionAvailable || IsAdminAvailable;
+        public bool IsUserManagementActive => CurrentViewModel is UserManagementViewModel;
 
         // Active tab indicators
         public bool IsCaseManagementActive => CurrentViewModel is CaseManagementViewModel;
@@ -200,6 +218,7 @@ namespace Sati.ViewModels
         {
             OnPropertyChanged(nameof(IsCaseManagementActive));
             OnPropertyChanged(nameof(IsSupervisorActive));
+            OnPropertyChanged(nameof(IsUserManagementActive));
             OnPropertyChanged(nameof(IsBillingActive));
             OnPropertyChanged(nameof(IsAdminActive));
             OnPropertyChanged(nameof(IsPlatformHealthActive));
@@ -225,6 +244,13 @@ namespace Sati.ViewModels
         private void NavigateToSupervisorDashboard()
         {
             if (IsSupervisionAvailable) CurrentViewModel = _supervisorDashboardViewModel;
+        }
+        [RelayCommand]
+        private async Task NavigateToUserManagement()
+        {
+            if (!IsUserManagementAvailable) return;
+            CurrentViewModel = _supervisorDashboardViewModel.UserManagement;
+            await _supervisorDashboardViewModel.UserManagement.InitializeAsync();
         }
         [RelayCommand] public void OpenSettingsWindow() => OpenSettingsWindowRequested?.Invoke(this, true);
         [RelayCommand]
@@ -287,6 +313,7 @@ namespace Sati.ViewModels
 
         public void CompleteAccountTransition()
         {
+            IsSessionReauthenticationRequired = false;
             IsScratchpadVisible = true;
             IsAccountTransitionActive = false;
             ResumeChatAccount();
@@ -297,6 +324,34 @@ namespace Sati.ViewModels
             IsAccountTransitionActive = false;
             if (resumeChat)
                 ResumeChatAccount();
+        }
+
+        public void RequireReauthentication()
+        {
+            _sessionLifetime.SuspendAccess();
+            IsSessionReauthenticationRequired = true;
+            BeginAccountTransition();
+            Scratchpad.SuspendForReauthentication();
+        }
+
+        public bool CanResumeReauthenticatedSession(User user) =>
+            user.IsEnabled && user.SecurityVersion > 0 && _sessionService.CurrentUser is { } previous &&
+            user.Id == previous.Id && user.AgencyId == previous.AgencyId &&
+            user.Role == previous.Role && user.Permissions == previous.Permissions &&
+            user.SupervisorId == previous.SupervisorId;
+
+        public void ResumeReauthenticatedSession(User user)
+        {
+            if (!CanResumeReauthenticatedSession(user))
+                throw new InvalidOperationException("Changed account access requires reloading the workspace.");
+            // Replace the identity, never mutate the object captured by older work.
+            // Editors keep their unsaved content; future commands use the new stamp.
+            _sessionService.SetUser(user);
+            _sessionLifetime.ResumeAccess();
+            NotesViewModel.LoggedInUser = _sessionService.CurrentUser;
+            NotifyRoleDependentProperties();
+            Scratchpad.ResumeAfterReauthentication();
+            CompleteAccountTransition();
         }
 
         private void ApplyEasyEyesMode(bool enabled)
@@ -310,7 +365,7 @@ namespace Sati.ViewModels
         private async Task ToggleEasyEyes()
         {
             var userId = _sessionService.CurrentUser?.Id;
-            if (userId is null || _isTogglingEasyEyes)
+            if (userId is null || _isTogglingEasyEyes || IsAccountTransitionActive)
                 return;
 
             _isTogglingEasyEyes = true;
@@ -481,6 +536,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(UserInitials));
             OnPropertyChanged(nameof(AvatarBrush));
             OnPropertyChanged(nameof(IsSupervisionAvailable));
+            OnPropertyChanged(nameof(IsUserManagementAvailable));
             OnPropertyChanged(nameof(IsCaseManagementAvailable));
             OnPropertyChanged(nameof(IsBillingAvailable));
             OnPropertyChanged(nameof(IsAdminAvailable));

@@ -19,6 +19,7 @@ namespace Sati.Data
         public async Task<Settings> LoadAsync()
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var agencyId = CurrentAgencyId();
             var settings = await context.Settings.SingleOrDefaultAsync(x => x.AgencyId == agencyId);
 
@@ -99,6 +100,7 @@ namespace Sati.Data
                 VocationalRehabilitationProfile.NormalizeAssistantTitle(settings.VrAssistantTitle);
 
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var agencyId = CurrentAgencyId();
             var tracked = await context.Settings.SingleOrDefaultAsync(x => x.Id == settings.Id && x.AgencyId == agencyId)
                 ?? throw new InvalidOperationException("The settings record is outside the current agency.");

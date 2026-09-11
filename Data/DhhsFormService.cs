@@ -50,6 +50,7 @@ public sealed class DhhsFormService(
         CancellationToken cancellationToken = default)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var person = await LoadOwnPersonAsync(context, personId, cancellationToken);
 
         return new SsnStatusDto(
@@ -66,6 +67,7 @@ public sealed class DhhsFormService(
             ?? throw new InvalidOperationException("An SSN cannot be stored without a signed-in user.");
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var person = await LoadOwnPersonAsync(context, personId, cancellationToken);
 
         var normalized = SsnMask.Normalize(socialSecurityNumber);
@@ -102,6 +104,7 @@ public sealed class DhhsFormService(
             ?? throw new InvalidOperationException("An SSN cannot be read without a signed-in user.");
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var person = await LoadOwnPersonAsync(context, personId, cancellationToken);
 
         var ssn = await ssnStore.RevealAsync(context, person, cancellationToken);
@@ -154,6 +157,7 @@ public sealed class DhhsFormService(
             ?? throw new InvalidOperationException("A form cannot be filled without a signed-in user.");
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var agencyId = actor.AgencyId;
 
