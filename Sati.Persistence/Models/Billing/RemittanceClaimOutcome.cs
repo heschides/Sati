@@ -21,6 +21,8 @@ public sealed class RemittanceClaimOutcome
     public string? Explanation { get; set; }
     public string? PaymentReference { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
+    public long? EdiGenerationId { get; set; }
 
     public BillingPeriod? BillingPeriod { get; set; }
 }

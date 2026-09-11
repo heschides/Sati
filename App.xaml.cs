@@ -120,6 +120,7 @@ namespace Sati
                         services.AddSingleton<ConsumerPickerSortPreferenceService>();
                         services.AddSingleton<IOutlookCalendarService, OutlookCalendarService>();
                         services.AddSingleton<IOutlookCalendarFilePicker, Sati.Views.OutlookCalendarFilePicker>();
+                        services.AddSingleton<IClearinghouseResponseFilePicker, Sati.Views.Billing.ClearinghouseResponseFilePicker>();
                         services.AddSingleton<TextShortcutHook>();
                         services.AddSingleton<ICaseNoteFormatter, FoundryLocalCaseNoteFormatter>();
 

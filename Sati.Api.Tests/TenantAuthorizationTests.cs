@@ -891,7 +891,8 @@ public sealed class TenantAuthorizationTests
             await ediResponse.Content.ReadAsStringAsync());
         var edi = await ediResponse.Content.ReadFromJsonAsync<EdiFileDto>();
         Assert.Contains(".OATEST", edi!.FileName);
-        Assert.Contains($"CLM*{claim.BillingPeriodId}-{approved.Id}", edi.Content);
+        var interchangeControl = edi.Content.Split('~')[0].Split('*')[13];
+        Assert.Contains($"CLM*{interchangeControl}-{claim.BillingPeriodId}-{approved.Id}*", edi.Content);
         Assert.Contains("ST*837*", edi.Content);
     }
 
@@ -1111,7 +1112,10 @@ public sealed class TenantAuthorizationTests
         Assert.Equal(first, retry);
         Assert.Contains("NM1*IL*1*Two*Person****MI*222222~", first!.Content);
         Assert.Contains("N3*20 Test Street~", first.Content);
-        Assert.Contains("CLM*1202-603*33.25***11::1", first.Content);
+        var interchangeControl = first.Content.Split('~')[0].Split('*')[13];
+        Assert.Contains($"CLM*{interchangeControl}-1202-603*33.25***11::1", first.Content);
+        Assert.Contains($"GE*1*{interchangeControl}~", first.Content);
+        Assert.Contains("REF*6R*603~", first.Content);
         Assert.Contains("SV1*HC:G9012:HI*33.25*UN*1.33*11", first.Content);
         Assert.Equal(106, first.Content.Split('~', StringSplitOptions.RemoveEmptyEntries)[0].Length + 1);
         var segments = first.Content.Split('~', StringSplitOptions.RemoveEmptyEntries);

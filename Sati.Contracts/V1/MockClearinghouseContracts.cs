@@ -75,4 +75,10 @@ public sealed record ClaimResponseIngestResultDto(
     string? StageRecorded,
     int ClaimOutcomesRecorded,
     bool DepositRecorded,
-    string Explanation);
+    string Explanation)
+{
+    public Guid ResponseId { get; init; }
+    public bool AlreadyImported { get; init; }
+    public DateTime ReceivedAtUtc { get; init; }
+    public IReadOnlyList<int> BillingPeriodIds { get; init; } = [];
+}

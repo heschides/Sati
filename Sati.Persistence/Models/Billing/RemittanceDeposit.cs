@@ -14,4 +14,5 @@ public sealed class RemittanceDeposit
     public decimal RemittancePaymentAmount { get; set; }
     public decimal? EftDepositAmount { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
 }

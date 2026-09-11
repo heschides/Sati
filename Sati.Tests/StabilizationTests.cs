@@ -600,7 +600,14 @@ public sealed class StabilizationTests
         Assert.Contains("NM1*IL*1*Example*Alex****MI*987654321~", edi);
         Assert.Contains("N3*10 Claim Street~", edi);
         Assert.Contains("N4*Portland*ME*04101~", edi);
-        Assert.Contains("CLM*77-99*33.25***11::1", edi);
+        Assert.Contains("CLM*123456789-77-99*33.25***11::1", edi);
+        Assert.Contains("GS*HC*SATITEST1*330897513*20260813*0910*123456789*", edi);
+        Assert.Contains("GE*1*123456789~", edi);
+        Assert.Contains("REF*6R*99~", edi);
+        var another = EdiGenerator.Generate(period, true,
+            new DateTime(2026, 8, 13, 9, 10, 0), "987654321");
+        Assert.Contains("CLM*987654321-77-99*", another);
+        Assert.DoesNotContain("CLM*123456789-77-99*", another);
         Assert.Contains("SV1*HC:G9012:HI*33.25*UN*1.33*11", edi);
         Assert.Equal(106, edi.Split('~', StringSplitOptions.RemoveEmptyEntries)[0].Length + 1);
         var segments = edi.Split('~', StringSplitOptions.RemoveEmptyEntries);

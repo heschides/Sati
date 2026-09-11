@@ -4799,7 +4799,8 @@ internal static partial class ApiEndpoints
                                   item.Id, period.Id, period.Year, period.Month, owner.DisplayName,
                                   period.Lines.Count, item.OccurredAtUtc, item.Stage.ToString(),
                                   item.Reference, item.ResponseType, item.ResponseCode,
-                                  item.Explanation, item.IsSynthetic)).ToListAsync(cancellationToken);
+                                  item.Explanation, item.IsSynthetic)
+                              { EdiGenerationId = item.EdiGenerationId, ResponseId = item.ResponseId }).ToListAsync(cancellationToken);
             return Results.Ok(rows);
         });
 
@@ -4854,72 +4855,7 @@ internal static partial class ApiEndpoints
             }).ToList());
         });
 
-        // Ingest a clearinghouse or payer response. This is the permanent path and it
-        // takes documents, so a real Office Ally response and a simulated one arrive the
-        // same way. It is not environment-gated: ingesting a genuine remittance is the
-        // actual feature, and whether the resulting rows are synthetic is decided by the
-        // document's own ISA15 usage indicator rather than by where the code is running.
-        api.MapPost("/billing/periods/{periodId:int}/responses", async Task<IResult> (
-            int periodId,
-            ClaimResponseIngestRequest request,
-            ClaimsPrincipal principal,
-            ApiDbContext db,
-            AuditTrail auditTrail,
-            CancellationToken cancellationToken) =>
-        {
-            var actor = Actor.From(principal);
-            if (!actor.HasBillingPermissions)
-                return Results.Forbid();
-            if (string.IsNullOrWhiteSpace(request.Document))
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["document"] = ["A response document is required."]
-                });
-            }
-
-            // The period is resolved through its owning user's agency, so a caller cannot
-            // attach a response to another tenant's billing history by guessing an id.
-            var period = await (from candidate in db.BillingPeriods.AsNoTracking()
-                                join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
-                                where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
-                                select candidate).SingleOrDefaultAsync(cancellationToken);
-            if (period is null)
-                return Results.NotFound();
-
-            ClaimResponseIngestOutcome outcome;
-            try
-            {
-                outcome = await new ClaimResponseIngestion(db).IngestAsync(
-                    request.Document, actor.AgencyId, periodId, DateTime.UtcNow, cancellationToken);
-            }
-            catch (Exception failure) when (failure is InvalidOperationException or FormatException)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["document"] = [$"The response could not be read: {failure.Message}"]
-                });
-            }
-
-            if (outcome.Kind == ClaimResponseKind.Unrecognised)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["document"] = [outcome.Explanation]
-                });
-            }
-
-            auditTrail.Record(actor, AuditActions.BillingEdiGenerated, "BillingPeriod", periodId);
-            await db.SaveChangesAsync(cancellationToken);
-
-            return Results.Ok(new ClaimResponseIngestResultDto(
-                outcome.Kind.ToString(),
-                outcome.IsSynthetic,
-                outcome.StageRecorded?.ToString(),
-                outcome.ClaimOutcomesRecorded,
-                outcome.DepositRecorded,
-                outcome.Explanation));
-        });
+        MapClaimResponseIntake(api);
 
         // Drive the mock clearinghouse. Scaffolding: it fabricates responses and then hands
         // them to the same ingestion path above, rather than writing rows directly, so the
@@ -4932,6 +4868,7 @@ internal static partial class ApiEndpoints
             AuditTrail auditTrail,
             IOptions<SatiApiOptions> options,
             IHostEnvironment hostEnvironment,
+            ClaimResponseIngestion ingestion,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -5015,7 +4952,6 @@ internal static partial class ApiEndpoints
                 });
             }
 
-            var ingestion = new ClaimResponseIngestion(db);
             var stages = new List<string> { BillingSubmissionStage.Transmitted.ToString() };
             var claimOutcomes = 0;
             var depositRecorded = false;
@@ -5024,6 +4960,7 @@ internal static partial class ApiEndpoints
             {
                 AgencyId = actor.AgencyId,
                 BillingPeriodId = periodId,
+                EdiGenerationId = generation.Id,
                 OccurredAtUtc = receivedAt,
                 Stage = BillingSubmissionStage.Transmitted,
                 Reference = generation.FileName,
@@ -5031,6 +4968,8 @@ internal static partial class ApiEndpoints
                 Explanation = "Test 837P submitted to the mock clearinghouse.",
                 IsSynthetic = true
             });
+            auditTrail.Record(actor, AuditActions.BillingEdiTransmitted, "BillingPeriod", periodId);
+            await db.SaveChangesAsync(cancellationToken);
 
             foreach (var document in new[]
                      {
@@ -5042,16 +4981,14 @@ internal static partial class ApiEndpoints
                 if (document is null)
                     continue;
 
-                var outcome = await ingestion.IngestAsync(
-                    document, actor.AgencyId, periodId, receivedAt, cancellationToken);
+                ClaimResponseIngestResultDto outcome;
+                try { outcome = await ingestion.ImportAsync(document, actor, periodId, cancellationToken); }
+                catch (ClaimResponseRejected rejected) { return ClaimResponseFailure(rejected); }
                 if (outcome.StageRecorded is { } stage)
-                    stages.Add(stage.ToString());
+                    stages.Add(stage);
                 claimOutcomes += outcome.ClaimOutcomesRecorded;
                 depositRecorded |= outcome.DepositRecorded;
             }
-
-            auditTrail.Record(actor, AuditActions.BillingEdiTransmitted, "BillingPeriod", periodId);
-            await db.SaveChangesAsync(cancellationToken);
 
             return Results.Ok(new MockClearinghouseResultDto(
                 request.Scenario.ToString(),
@@ -5390,26 +5327,33 @@ internal static partial class ApiEndpoints
 
             var generatedAt = DateTime.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
+            if (await db.EdiGenerations.AnyAsync(item => item.AgencyId == actor.AgencyId &&
+                    item.IsTest == request.IsTest && item.ControlNumber == controlNumber, cancellationToken))
+                return Results.Conflict(new ApiErrorDto("edi_control_conflict",
+                    "This submission identity has already been used. Start a new generation attempt.", string.Empty));
             var content = ServerEdiGenerator.Generate(
                 period, request.IsTest, generatedAt, controlNumber);
             var timestamp = generatedAt.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture);
             var testMarker = request.IsTest ? ".OATEST" : string.Empty;
             var file = new EdiFileDto($"837P{testMarker}_{period.Year}{period.Month:D2}_{timestamp}_{normalizedKey[..8]}.txt", content);
-            db.EdiGenerations.Add(new ServerEdiGeneration
+            var retainedGeneration = new ServerEdiGeneration
             {
                 AgencyId = actor.AgencyId,
                 ActorUserId = actor.UserId,
                 BillingPeriodId = periodId,
                 IdempotencyKey = normalizedKey,
                 IsTest = request.IsTest,
+                ControlNumber = controlNumber,
                 FileName = file.FileName,
                 Content = file.Content,
                 CreatedAtUtc = DateTime.UtcNow
-            });
+            };
+            db.EdiGenerations.Add(retainedGeneration);
             db.BillingSubmissionEvents.Add(new ServerBillingSubmissionEvent
             {
                 AgencyId = actor.AgencyId,
                 BillingPeriodId = periodId,
+                EdiGeneration = retainedGeneration,
                 OccurredAtUtc = DateTime.UtcNow,
                 Stage = BillingSubmissionStage.Generated,
                 Reference = file.FileName,

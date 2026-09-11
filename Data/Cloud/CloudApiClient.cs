@@ -145,6 +145,20 @@ public sealed class CloudApiClient
     public Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest request, CancellationToken cancellationToken = default) =>
         SendAsync<TResponse>(HttpMethod.Post, path, request, cancellationToken);
 
+    /// <summary>
+    /// Captures the authorizing session before the first await. A file chosen by one
+    /// account must never be posted with credentials installed during session renewal.
+    /// An expired token is refused; the biller may safely re-import after signing in.
+    /// </summary>
+    internal async Task<TResponse> PostWithCapturedSessionAsync<TRequest, TResponse>(
+        string path, TRequest body, CancellationToken cancellationToken = default)
+    {
+        if (HasSessionEnded) throw new CloudSessionEndedException();
+        using var request = CreateRequest(HttpMethod.Post, path, body);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        return await ReadAsync<TResponse>(response, cancellationToken);
+    }
+
     public Task<TResponse> PutAsync<TRequest, TResponse>(string path, TRequest request, CancellationToken cancellationToken = default) =>
         SendAsync<TResponse>(HttpMethod.Put, path, request, cancellationToken);
 

@@ -51,14 +51,16 @@ public enum BillingSubmissionProgress
 /// batch settles at <c>Paid</c>, which is the furthest the system can honestly claim.
 /// </para>
 /// </remarks>
-public static class BillingSubmissionProgressRules
+public static partial class BillingSubmissionProgressRules
 {
     public static BillingSubmissionProgress Classify(BillingSubmissionStage stage) => stage switch
     {
         BillingSubmissionStage.TransportFailed
             or BillingSubmissionStage.FunctionalRejected
             or BillingSubmissionStage.ClaimRejected
-            or BillingSubmissionStage.PartiallyAccepted => BillingSubmissionProgress.NeedsAttention,
+            or BillingSubmissionStage.PartiallyAccepted
+            or BillingSubmissionStage.ClaimNeedsReview
+            or BillingSubmissionStage.RemittanceNeedsReview => BillingSubmissionProgress.NeedsAttention,
 
         BillingSubmissionStage.Paid
             or BillingSubmissionStage.Reconciled => BillingSubmissionProgress.Settled,

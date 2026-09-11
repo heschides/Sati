@@ -7,6 +7,11 @@ namespace Sati.Data.Billing
     public interface IBillingService
     {
         bool SupportsMockClearinghouse => false;
+        bool SupportsResponseImport => false;
+        Task<ClaimResponseIngestResultDto> ImportResponseAsync(
+            AgencyActor actor, string document, CancellationToken cancellationToken = default) =>
+            Task.FromException<ClaimResponseIngestResultDto>(new NotSupportedException(
+                "Clearinghouse response import requires an API connection."));
         Task<BillingPeriod> GetOrCreateBillingPeriodAsync(AgencyActor actor, int userId, int month, int year);
         Task<IEnumerable<BillingPeriod>> GetBillingPeriodsAsync(AgencyActor actor, int userId);
         Task<IEnumerable<BillingPeriod>> GetAllBillingPeriodsAsync(AgencyActor actor);

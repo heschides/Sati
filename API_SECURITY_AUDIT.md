@@ -8,6 +8,12 @@ the server.
 This is a point-in-time review of the code as of this date, not a certification. It does not
 substitute for an independent assessment, and it does not establish HIPAA compliance.
 
+The broader post-intake September 10 repository review is in `SECURITY_REVIEW_2026-09-10.md`.
+It includes synthetic reproductions of still-open permission revocation, bearer-session,
+required-form deletion and pre-supervisory compliance defects. Older “fixed” statements in this
+file apply only to their named paths; they must not be interpreted as launch clearance. The new
+response importer remains synthetic-only while real clearinghouse and operational gates are open.
+
 ---
 
 ## Fixed

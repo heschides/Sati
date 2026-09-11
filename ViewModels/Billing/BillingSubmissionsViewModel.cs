@@ -16,6 +16,9 @@ namespace Sati.ViewModels.Billing
         private readonly IBillingService _billingService;
         private readonly IEdiService _ediService;
         private readonly ISessionService _sessionService;
+        private readonly IClearinghouseResponseFilePicker? _responseFilePicker;
+        private readonly LatestRequestTracker _responseImports = new();
+        private CancellationTokenSource? _responseImportCancellation;
         private readonly SemaphoreSlim _loadGate = new(1, 1);
         private readonly LatestRequestTracker _accountLoads = new();
         private readonly Dictionary<int, string> _pendingEdiKeys = [];
@@ -27,11 +30,13 @@ namespace Sati.ViewModels.Billing
         public BillingSubmissionsViewModel(
             IBillingService billingService,
             IEdiService ediService,
-            ISessionService sessionService)
+            ISessionService sessionService,
+            IClearinghouseResponseFilePicker? responseFilePicker = null)
         {
             _billingService = billingService;
             _ediService = ediService;
             _sessionService = sessionService;
+            _responseFilePicker = responseFilePicker;
         }
 
         public ObservableCollection<BillingPeriod> BillingPeriods { get; } = [];
@@ -73,6 +78,7 @@ namespace Sati.ViewModels.Billing
         [ObservableProperty] private string? lastGeneratedPath;
         [ObservableProperty] private string? statusMessage;
         [ObservableProperty] private bool isGenerating;
+        [ObservableProperty] private bool isImportingResponse;
         [ObservableProperty] private bool isTestMode = true;
         [ObservableProperty] private DateTime? rangeStart;
         [ObservableProperty] private DateTime? rangeEnd;
@@ -98,7 +104,7 @@ namespace Sati.ViewModels.Billing
             ? "No draft periods are waiting to be submitted. Submitted periods appear in the 837 range and Submission Home below."
             : $"{DraftBillingPeriods.Count} draft {(DraftBillingPeriods.Count == 1 ? "period is" : "periods are")} waiting. Submitted periods leave this list and move to the 837 workflow below.";
         public bool HasGeneratedFile => !string.IsNullOrWhiteSpace(LastGeneratedPath);
-        public bool CanSubmitPeriod => !IsGenerating && SelectedPeriod is
+        public bool CanSubmitPeriod => !IsGenerating && !IsImportingResponse && SelectedPeriod is
             { Status: BillingStatus.Draft, Lines.Count: > 0 } period &&
             period.Lines.All(line => line.IsReadyForSubmission) &&
             !HasInvalidClaimAmounts(period);
@@ -120,10 +126,13 @@ namespace Sati.ViewModels.Billing
             { } period =>
                 $"{PeriodName(period)} is {period.Status.ToString().ToLowerInvariant()} and cannot be submitted again."
         };
-        public bool CanGenerateEdi => !IsGenerating && IsRangeValid && GenerationPeriods.Count > 0;
+        public bool CanGenerateEdi => !IsGenerating && !IsImportingResponse && IsRangeValid && GenerationPeriods.Count > 0;
+        public bool ShowsResponseImport => _billingService.SupportsResponseImport;
+        public bool CanImportResponse => ShowsResponseImport && _responseFilePicker is not null &&
+            !IsGenerating && !IsImportingResponse && _sessionService.CurrentUser?.HasBillingPermissions == true;
         public bool ShowsMockClearinghouse => _billingService.SupportsMockClearinghouse;
         public bool CanSubmitToMockClearinghouse =>
-            ShowsMockClearinghouse && IsTestMode && !IsGenerating && MockSubmissionPeriods().Count > 0;
+            ShowsMockClearinghouse && IsTestMode && !IsGenerating && !IsImportingResponse && MockSubmissionPeriods().Count > 0;
         public string MockClearinghouseAvailabilityMessage
         {
             get
@@ -170,6 +179,17 @@ namespace Sati.ViewModels.Billing
         {
             OnPropertyChanged(nameof(CanSubmitPeriod));
             OnPropertyChanged(nameof(CanGenerateEdi));
+            OnPropertyChanged(nameof(CanImportResponse));
+            ImportResponseCommand.NotifyCanExecuteChanged();
+            NotifyMockClearinghouseStateChanged();
+        }
+
+        partial void OnIsImportingResponseChanged(bool value)
+        {
+            OnPropertyChanged(nameof(CanSubmitPeriod));
+            OnPropertyChanged(nameof(CanGenerateEdi));
+            OnPropertyChanged(nameof(CanImportResponse));
+            ImportResponseCommand.NotifyCanExecuteChanged();
             NotifyMockClearinghouseStateChanged();
         }
 
@@ -250,6 +270,8 @@ namespace Sati.ViewModels.Billing
                 RebuildGenerationPeriods();
 
                 HasLoaded = true;
+                OnPropertyChanged(nameof(CanImportResponse));
+                ImportResponseCommand.NotifyCanExecuteChanged();
             }
             catch (Exception ex)
             {
@@ -289,6 +311,81 @@ namespace Sati.ViewModels.Billing
                 IsGenerating = false;
             }
         }
+
+        [RelayCommand(CanExecute = nameof(CanImportResponse))]
+        private async Task ImportResponse(CancellationToken cancellationToken)
+        {
+            if (!CanImportResponse || _responseFilePicker is null || _sessionService.CurrentUser is not { } account)
+                return;
+
+            var request = _responseImports.Begin();
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _responseImportCancellation = cancellation;
+            bool Current() => _responseImports.IsCurrent(request) &&
+                ReferenceEquals(_sessionService.CurrentUser, account) && !cancellation.IsCancellationRequested;
+            string? document = null;
+            var recorded = false;
+            try
+            {
+                IsImportingResponse = true;
+                document = await _responseFilePicker.ReadResponseAsync(cancellation.Token);
+                if (!Current() || document is null) return;
+                StatusMessage = "Checking the response and matching its original claims...";
+                var result = await _billingService.ImportResponseAsync(account.ToAgencyActor(), document, cancellation.Token);
+                document = null;
+                if (!Current()) return;
+                recorded = true;
+                var kind = result.Kind switch
+                {
+                    nameof(ClaimResponseKind.FunctionalAcknowledgement) => "999 acknowledgment",
+                    nameof(ClaimResponseKind.ClaimAcknowledgement) => "277CA acknowledgment",
+                    nameof(ClaimResponseKind.RemittanceAdvice) => "835 remittance",
+                    _ => "clearinghouse response"
+                };
+                var receipt = result.ResponseId == Guid.Empty ? string.Empty : $" Receipt: {result.ResponseId:D}.";
+                var outcome = result.AlreadyImported
+                    ? $"This {kind} was already imported. No records were duplicated.{receipt}"
+                    : $"Imported {kind} for {result.BillingPeriodIds.Count} billing period(s). " +
+                      $"Recorded {result.ClaimOutcomesRecorded} claim outcome(s).{receipt} " +
+                      "Review Submission Home and Remittances for the results.";
+                StatusMessage = outcome;
+                await RefreshSubmissionHistoryAsync();
+                if (Current()) StatusMessage = outcome;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                // Account replacement invalidates the operation and clears its visible state.
+            }
+            catch (Exception failure)
+            {
+                if (!Current()) return;
+                StatusMessage = recorded
+                    ? "The response was recorded, but the display could not refresh. Reload Submission Home. Re-importing the same file is safe."
+                    : ImportFailureMessage(failure);
+            }
+            finally
+            {
+                document = null;
+                if (_responseImports.IsCurrent(request))
+                {
+                    _responseImportCancellation = null;
+                    IsImportingResponse = false;
+                }
+            }
+        }
+
+        private static string ImportFailureMessage(Exception failure) => failure switch
+        {
+            FormatException => "The file is empty, too large, or is not an original ASCII X12 response. Choose the file downloaded from the clearinghouse.",
+            System.IO.IOException or UnauthorizedAccessException => "The response file could not be read. Check that it is available and try again.",
+            Sati.Data.Cloud.CloudApiException { StatusCode: System.Net.HttpStatusCode.Unauthorized } => "Sign in again, then re-import the response. The same file can be retried safely.",
+            Sati.Data.Cloud.CloudApiException { StatusCode: System.Net.HttpStatusCode.Forbidden } => "Your account is not permitted to import clearinghouse responses.",
+            Sati.Data.Cloud.CloudApiException { StatusCode: System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Conflict } =>
+                "The response was not imported. It is unsupported, does not match one exact submission in this agency, or conflicts with a retained response. Check the original file and its test/production mode.",
+            Sati.Data.Cloud.CloudApiException { StatusCode: System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.ServiceUnavailable } =>
+                "Clearinghouse response import is not enabled for this connection. Production activation requires a reviewed deployment.",
+            _ => "Sati could not confirm the import outcome. Re-import the same file to check safely; an existing import will not be duplicated."
+        };
 
         [RelayCommand]
         private async Task GenerateEdi()
@@ -494,7 +591,7 @@ namespace Sati.ViewModels.Billing
         [RelayCommand]
         private async Task ReturnToDraft(BillingGenerationStageRow? row)
         {
-            if (row is null || IsGenerating || !BlockedSubmittedPeriods.Contains(row))
+            if (row is null || IsGenerating || IsImportingResponse || !BlockedSubmittedPeriods.Contains(row))
                 return;
 
             try
@@ -539,6 +636,10 @@ namespace Sati.ViewModels.Billing
 
         public void ClearForAccountSwitch()
         {
+            _responseImports.Invalidate();
+            _responseImportCancellation?.Cancel();
+            _responseImportCancellation = null;
+            IsImportingResponse = false;
             _accountLoads.Invalidate();
             SelectedPeriod = null;
             BillingPeriods.Clear();
@@ -598,7 +699,7 @@ namespace Sati.ViewModels.Billing
             foreach (var group in SubmissionHistory.GroupBy(item => item.BillingPeriodId))
             {
                 var ordered = group.OrderBy(item => item.OccurredAtUtc).ToList();
-                var latest = ordered[^1];
+                var latest = BillingSubmissionProgressRules.Current(ordered) ?? ordered[^1];
                 var period = BillingPeriods.SingleOrDefault(item => item.Id == group.Key);
                 var transmitted = ordered.FirstOrDefault(item => item.Stage == BillingSubmissionStage.Transmitted.ToString());
                 _allSubmissionBatches.Add(new BillingSubmissionBatchRow(
@@ -741,6 +842,15 @@ namespace Sati.ViewModels.Billing
     {
         /// <summary>The heading this batch sits under: not submitted, needs attention, awaiting payer, or settled.</summary>
         public string ProgressName => BillingSubmissionProgressRules.Describe(Progress);
+
+        public string CurrentStatusDisplay => CurrentStatus switch
+        {
+            nameof(BillingSubmissionStage.ClaimReceived) => "Receipt acknowledged",
+            nameof(BillingSubmissionStage.ClaimNeedsReview) => "Claim response needs review",
+            nameof(BillingSubmissionStage.RemittanceReceived) => "Partial remittance received",
+            nameof(BillingSubmissionStage.RemittanceNeedsReview) => "Remittance needs review",
+            _ => CurrentStatus
+        };
 
         /// <summary>
         /// What <see cref="LastActivityAtUtc"/> means for this batch. A single timestamp

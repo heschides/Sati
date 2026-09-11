@@ -576,9 +576,41 @@ Prior review (2026-06-25) covered Models, services, helpers, all ViewModel layer
 - `Seed-BillingPipelineData.ps1` remains hard-limited to a Demo identity and adds eight submission
   stages plus six remittance and four deposit contingencies, all explicitly synthetic. A separate history consumer
   keeps the established three-ready/seven-blocked queue examples intact.
-- This is a read model and scenario catalog, not transport or import. Real X12 parsing, validation,
-  matching, posting, reconciliation, corrections, retention decisions, and payer certification
-  remain outstanding.
+- The original read model/scenario catalog is now backed by the bounded response intake described
+  below. Live transport, full implementation-guide validation, bank reconciliation, corrected/void
+  claims, operational retention approval, and payer certification remain outstanding.
+
+### Bounded clearinghouse response intake (2026-09-10; unreleased)
+
+`ClaimResponseReader` in Contracts owns strict envelope and supported 999/277CA/835 parsing; it is
+not a full X12 implementation-guide validator. One ISA/GS/ST and at most 2 MiB of printable ASCII
+plus line endings are supported. Unsupported, malformed, unmatched, or ambiguous documents fail
+closed. Response interchange controls are not outbound correlation controls: 999 matches AK1/AK2,
+and claim responses match the exact retained CLM references. New generators share
+`ClaimSubmissionIdentity` for generation-specific CLM01 and preserve the original note in REF6R.
+
+`ClaimResponseIngestion` owns API authorization, exact authenticated-agency/test-mode/sender and
+receiver correlation, serializable receipt/effect persistence, and safe retry handling. It checks
+retained submissions rather than accepting a caller-selected period as authority. The legacy
+period route remains only as an additional assertion. This slice is enabled only for exact
+Demo/SatiDemo or Testing/SatiApiTests identities and accepts ISA15=T; Production stays disabled.
+
+`ClearinghouseResponseReceipt` preserves the raw original in envelope encryption with field binding,
+parser version, hashes and safe receipt metadata. `ClearinghouseResponseMatch` links immutable
+receipt evidence to generations and claims. Unique exact/semantic/document/payment identities
+prevent duplicate financial effects; conflicting identity reuse is rejected. Import does not
+retain local file paths, place raw X12 in audit metadata, or expose raw evidence through a new read
+route. Authorized receipt readback/export and operational retention remain follow-up work.
+
+Submission/remittance/deposit facts are appended in the same transaction as the receipt and audit.
+An 835 may match several periods but creates one deposit observation, with no invented bank EFT.
+Shared lifecycle reduction protects financial/review state from late earlier acknowledgments.
+Receiving an 835 does not mean the bank deposit is reconciled or corrections are complete.
+
+The desktop picker reads bounded original bytes. `BillingSubmissionsViewModel` cancels and
+invalidates import work on account changes; upload captures the original credential without an
+intervening renewal/account handoff. A committed receipt survives a later refresh failure and an
+uncertain upload can be retried safely. Direct-database Local Production exposes no importer.
 
 Representative-payee profile:
 
@@ -913,7 +945,7 @@ is absent.
 | `ClaimLine` | `Sati.Models.Billing` | One billable service note within a billing period. |
 | `EdiGeneration` | `Sati.Models.Billing` | Exact 837P response retained for tenant- and actor-scoped idempotent replay. |
 | `BillingSubmissionEvent` | `Sati.Models.Billing` | Append-only generated/transmitted/acknowledgment event with explicit synthetic provenance. |
-| `RemittanceClaimOutcome` | `Sati.Models.Billing` | Append-only claim-level payment/denial/reversal matching read model; raw 835 import is pending. |
+| `RemittanceClaimOutcome` | `Sati.Models.Billing` | Append-only claim-level payment/denial/reversal observations linked to matched response receipts; live activation is pending. |
 | `RemittanceDeposit` | `Sati.Models.Billing` | Append-only 835/EFT reconciliation anchor with explicit PLB adjustment and derived match state. |
 | `BillingValidationResult` | `Sati.Models.Billing` | Immutable result record from billing validation. |
 | `ComprehensiveAssessment` | `Sati.Models.Assessments` | Versioned assessment envelope: ownership, workflow, timestamps, and serialized document aggregate. |

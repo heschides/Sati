@@ -1,5 +1,26 @@
 # Sati — Refactor Agenda
 
+## Unreleased — clearinghouse response intake and launch security review
+
+- [x] Add Billing Submissions file import for a single original 999, 277CA, or 835; match retained
+      outbound evidence automatically within the current agency and test environment.
+- [x] Preserve encrypted immutable raw receipts, generation/claim matches, and atomic financial
+      observations; replay exact or semantically duplicate responses without duplicate effects.
+- [x] Give new submissions generation-specific claim references, validate envelope controls and
+      amounts strictly, and keep late acknowledgments from replacing financial progress.
+- [x] Protect file selection/upload/result publication across account switches; use safe errors
+      and distinguish committed receipts from a subsequent screen-refresh failure.
+- [x] Independently review the implementation and audit repository security with synthetic proofs.
+      See SECURITY_REVIEW_2026-09-10.md; this is not clearance to launch with real consumer data.
+- [ ] Apply AddClearinghouseResponseIntake only through reviewed migration/backup procedures.
+      No deployment or real database migration is authorized by this development work.
+- [ ] Clear the security review's launch blockers: required-form deletion bypass, incomplete
+      route capability checks, password/session revocation, local permission projection and
+      privileged maintenance boundaries; resolve service-time concurrency with SQL Server tests.
+- [ ] Complete actual clearinghouse sandbox acceptance, supported variant/companion-guide checks,
+      authorized raw receipt readback, rejected/corrected/void claim workflows, bank reconciliation,
+      and approved API-mediated Production activation. Production import remains disabled.
+
 ## Unreleased — Overview scratchpad history and Umber Facets
 
 - [x] Replace the scratchpad-history search modal with a History tab beside Today's Work and

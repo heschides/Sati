@@ -37,6 +37,8 @@ namespace Sati.Data
         public DbSet<BillingPeriod> BillingPeriods { get; set; }
         public DbSet<ClaimLine> ClaimLines { get; set; }
         public DbSet<EdiGeneration> EdiGenerations { get; set; }
+        public DbSet<ClearinghouseResponseReceipt> ClearinghouseResponseReceipts => Set<ClearinghouseResponseReceipt>();
+        public DbSet<ClearinghouseResponseMatch> ClearinghouseResponseMatches => Set<ClearinghouseResponseMatch>();
         public DbSet<BillingSubmissionEvent> BillingSubmissionEvents { get; set; }
         public DbSet<RemittanceClaimOutcome> RemittanceClaimOutcomes { get; set; }
         public DbSet<RemittanceDeposit> RemittanceDeposits { get; set; }
@@ -84,6 +86,9 @@ namespace Sati.Data
 
         private void EnsureAuditEventsAreAppendOnly()
         {
+            ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
+            if (ChangeTracker.Entries<EdiGeneration>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+                throw new InvalidOperationException("Generated EDI records are immutable.");
             SignaturePersistenceModel.ProtectWrites(ChangeTracker);
             SignaturePersistenceModel.ProtectDocumentArtifacts<DocumentArtifact>(ChangeTracker);
             ChatPersistenceModel.ProtectWrites<ChatRoom, ChatRoomMember, ChatMessage, ChatChange, ChatReadMarker>(ChangeTracker);
@@ -115,6 +120,7 @@ namespace Sati.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            ClearinghousePersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration>(modelBuilder);
             SignaturePersistenceModel.Configure(modelBuilder);
             SignaturePersistenceModel.ConfigureClinicalRelationships<DocumentArtifact, Agency, User, Person, PersonContact>(modelBuilder);
             ChatPersistenceModel.Configure<ChatRoom, ChatRoomMember, ChatMessage, ChatChange, ChatReadMarker,
@@ -810,6 +816,8 @@ namespace Sati.Data
 
             modelBuilder.Entity<EdiGeneration>(entity =>
             {
+                entity.Property(x => x.ControlNumber).HasMaxLength(9);
+                entity.HasIndex(x => new { x.AgencyId, x.IsTest, x.ControlNumber }).IsUnique().HasFilter("[ControlNumber] IS NOT NULL");
                 entity.HasKey(generation => generation.Id);
                 entity.HasIndex(generation => new
                     { generation.AgencyId, generation.ActorUserId, generation.IdempotencyKey })
@@ -829,6 +837,8 @@ namespace Sati.Data
 
             modelBuilder.Entity<BillingSubmissionEvent>(entity =>
             {
+                entity.HasOne(item => item.EdiGeneration).WithMany().HasForeignKey(item => item.EdiGenerationId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasKey(item => item.Id);
                 entity.HasIndex(item => new { item.AgencyId, item.OccurredAtUtc });
                 entity.Property(item => item.Reference).HasMaxLength(80);
@@ -843,6 +853,8 @@ namespace Sati.Data
 
             modelBuilder.Entity<RemittanceClaimOutcome>(entity =>
             {
+                entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<EdiGeneration>().WithMany().HasForeignKey(item => item.EdiGenerationId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasKey(item => item.Id);
                 entity.HasIndex(item => new { item.AgencyId, item.ReceivedAtUtc });
                 entity.Property(item => item.ClaimReference).IsRequired().HasMaxLength(80);
@@ -863,6 +875,7 @@ namespace Sati.Data
 
             modelBuilder.Entity<RemittanceDeposit>(entity =>
             {
+                entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasKey(item => item.Id);
                 entity.HasIndex(item => new { item.AgencyId, item.ReceivedAtUtc });
                 entity.Property(item => item.PaymentReference).IsRequired().HasMaxLength(80);

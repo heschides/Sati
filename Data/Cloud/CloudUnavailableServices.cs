@@ -558,6 +558,11 @@ public sealed class CloudConsumerBillingLossReportService(CloudApiClient api) : 
 public sealed class CloudBillingService(CloudApiClient api) : IBillingService
 {
     public bool SupportsMockClearinghouse => true;
+    public bool SupportsResponseImport => true;
+    public Task<ClaimResponseIngestResultDto> ImportResponseAsync(
+        AgencyActor actor, string document, CancellationToken cancellationToken = default) =>
+        api.PostWithCapturedSessionAsync<ClaimResponseIngestRequest, ClaimResponseIngestResultDto>(
+            "/api/v1/billing/responses", new ClaimResponseIngestRequest(document), cancellationToken);
     private readonly Dictionary<int, IReadOnlyList<string>> _candidateErrors = [];
 
     public async Task<BillingPeriod> GetOrCreateBillingPeriodAsync(AgencyActor actor, int userId, int month, int year) =>

@@ -1,6 +1,13 @@
 # Audit events
 
-*Current as of 2026-09-03.*
+*Current as of 2026-09-10.*
+
+Clearinghouse intake adds `billing-response.imported` in the same transaction as its encrypted
+immutable receipt, generation/claim matches and financial observations. Metadata contains receipt
+ID, response kind and counts only; no raw X12, payer/member names, note narratives, file paths or
+credentials. An exact/semantic replay returns the original receipt without another event or
+financial row. The original actor and receive time remain unchanged. Protected raw receipt
+readback is not exposed by this release; adding it requires a separately authorized, audited route.
 
 Sati records a small, append-only event when a protected action succeeds. The event answers
 “who did what, to which record, for which agency, and during which request?” It is not a second

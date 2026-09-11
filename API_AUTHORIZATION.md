@@ -1,6 +1,6 @@
 # API authorization and tenant ownership
 
-*Route inventory mechanically reconciled 2026-09-06: 170 protected routes. The table matches
+*Route manifest mechanically counted 2026-09-10: 177 protected routes. The table is maintained with
 `ApiSurface.Routes` after excluding health and anonymous login, and `ApiSurfaceTests` checks that
 manifest against live endpoint registration. Every route added, removed, or rescoped must be
 reflected here in the same change.*
@@ -34,8 +34,10 @@ Every protected route has two layers of protection:
 1. JWT authentication establishes a claimed user, legacy identity label, and agency.
 2. `ValidatedActorFilter` confirms that identity and agency against the database, then resolves the
    current persisted permission set before every endpoint runs. Permissions are deliberately not
-   trusted from the token, so revocation takes effect immediately. `TenantAccess` supplies the
-   shared actor, caseload, and supervisory checks used by feature endpoints.
+   trusted from the token. Effective revocation additionally requires each endpoint to enforce
+   the current capability; the September 10 security review found owner-only clinical routes
+   that still omit that check. `TenantAccess` supplies the shared actor, caseload, and supervisory
+   checks that feature endpoints must consistently use. See SECURITY_REVIEW_2026-09-10.md.
 
 “Own user” means the authenticated user. “Own caseload” means a person assigned to that user and
 the same agency. “Accessible case manager” means the actor themself when they have case-management
@@ -187,7 +189,8 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Reports | `GET /reports/productivity-units` | Validated actor's user and agency | Own caseload only; both Person and Note agency markers must match, the request accepts no user id, and the response contains narrative-free monthly aggregates. |
 | Billing | `POST /billing/periods/{year}/{month}` | Billing period user's `AgencyId` | Billing permission; target user must be in actor agency. |
 | Billing | `GET /billing/periods` | Billing period user's `AgencyId` | Billing permission; response joined to actor agency. Each returned line includes only its frozen client display name and shared 837P-readiness errors; raw note narrative is not returned. |
-| Billing | `POST /billing/periods/{periodId}/responses` | Billing period user's `AgencyId` | Billing permission; the period is resolved through its owning user's agency, so a response cannot be attached to another tenant's history. No tenant is ever read from the document. `IsSynthetic` comes from the document's ISA15 usage indicator, not from configuration. |
+| Billing | `POST /billing/responses` | Validated actor, retained generation agency and period owning user's agency | Current Billing permission; exact Demo/Testing identity and ISA15=T only. Every claim/group must match retained outbound evidence, mode and interchange parties uniquely within the agency. Encrypted receipt, immutable matches/effects and audit commit atomically; duplicates replay without effects. |
+| Billing | `POST /billing/periods/{periodId}/responses` | Same as automatic intake, plus selected period owner agency | Compatibility route only. Same intake and limits; the period is an additional assertion, never matching authority. Unknown/foreign periods are 404; a response matching another period is rejected. |
 | Billing | `POST /billing/periods/{periodId}/mock-clearinghouse` | Billing period user's `AgencyId` | Billing permission, and additionally restricted to a validated `SatiDemo`/`Demo` deployment or the isolated test host. Returns 404 elsewhere so the route is absent in effect on Production. Requires a retained test 837P, consumes its exact immutable content once, records a synthetic `Transmitted` event, and ingests fabricated responses through the same path as a real response. |
 | Billing | `GET /billing/submissions` | Event `AgencyId` plus billing period user's `AgencyId` | Billing permission; both ownership markers must equal actor agency. Synthetic provenance is explicit. |
 | Billing | `GET /billing/remittances` | Outcome `AgencyId` | Billing permission; returns bounded claim-level outcomes for actor agency, without raw 835 or note narrative. |

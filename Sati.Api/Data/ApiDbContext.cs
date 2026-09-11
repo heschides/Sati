@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
+using Sati.Models.Billing;
 
 namespace Sati.Api.Data;
 
@@ -37,6 +38,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerBillingPeriod> BillingPeriods => Set<ServerBillingPeriod>();
     public DbSet<ServerClaimLine> ClaimLines => Set<ServerClaimLine>();
     public DbSet<ServerEdiGeneration> EdiGenerations => Set<ServerEdiGeneration>();
+    public DbSet<ClearinghouseResponseReceipt> ClearinghouseResponseReceipts => Set<ClearinghouseResponseReceipt>();
+    public DbSet<ClearinghouseResponseMatch> ClearinghouseResponseMatches => Set<ClearinghouseResponseMatch>();
     public DbSet<ServerBillingSubmissionEvent> BillingSubmissionEvents => Set<ServerBillingSubmissionEvent>();
     public DbSet<ServerRemittanceClaimOutcome> RemittanceClaimOutcomes => Set<ServerRemittanceClaimOutcome>();
     public DbSet<ServerRemittanceDeposit> RemittanceDeposits => Set<ServerRemittanceDeposit>();
@@ -61,6 +64,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        ClearinghousePersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration>(modelBuilder);
         modelBuilder.Entity<ServerDatabaseIdentity>(entity =>
         {
             entity.ToTable("SatiDatabaseIdentity");
@@ -354,6 +358,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.ToTable("EdiGenerations");
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.AgencyId, x.ActorUserId, x.IdempotencyKey }).IsUnique();
+            entity.Property(x => x.ControlNumber).HasMaxLength(9);
+            entity.HasIndex(x => new { x.AgencyId, x.IsTest, x.ControlNumber }).IsUnique().HasFilter("[ControlNumber] IS NOT NULL");
             entity.Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(32);
             entity.Property(x => x.FileName).IsRequired().HasMaxLength(260);
             entity.Property(x => x.Content).IsRequired();
@@ -372,6 +378,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(item => item.ResponseType).HasMaxLength(20);
             entity.Property(item => item.ResponseCode).HasMaxLength(30);
             entity.Property(item => item.Explanation).HasMaxLength(500);
+            entity.HasOne(item => item.EdiGeneration).WithMany().HasForeignKey(item => item.EdiGenerationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ServerBillingPeriod>()
                 .WithMany()
                 .HasForeignKey(item => item.BillingPeriodId)
@@ -380,6 +388,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
         modelBuilder.Entity<ServerRemittanceClaimOutcome>(entity =>
         {
+            entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerEdiGeneration>().WithMany().HasForeignKey(item => item.EdiGenerationId).OnDelete(DeleteBehavior.Restrict);
             entity.ToTable("RemittanceClaimOutcomes");
             entity.HasKey(item => item.Id);
             entity.HasIndex(item => new { item.AgencyId, item.ReceivedAtUtc });
@@ -401,6 +411,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
         modelBuilder.Entity<ServerRemittanceDeposit>(entity =>
         {
+            entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
             entity.ToTable("RemittanceDeposits");
             entity.HasKey(item => item.Id);
             entity.HasIndex(item => new { item.AgencyId, item.ReceivedAtUtc });
@@ -617,6 +628,9 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
     private void EnsureAuditEventsAreAppendOnly()
     {
+        ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
+        if (ChangeTracker.Entries<ServerEdiGeneration>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Generated EDI records are immutable.");
         SignaturePersistenceModel.ProtectWrites(ChangeTracker);
         SignaturePersistenceModel.ProtectDocumentArtifacts<ServerDocumentArtifact>(ChangeTracker);
         ChatPersistenceModel.ProtectWrites<ServerChatRoom, ServerChatRoomMember, ServerChatMessage, ServerChatChange,
@@ -1050,6 +1064,7 @@ internal sealed class ServerEdiGeneration
     public int BillingPeriodId { get; set; }
     public string IdempotencyKey { get; set; } = string.Empty;
     public bool IsTest { get; set; }
+    public string? ControlNumber { get; set; }
     public string FileName { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
@@ -1067,6 +1082,9 @@ internal sealed class ServerBillingSubmissionEvent
     public string? ResponseCode { get; set; }
     public string? Explanation { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
+    public long? EdiGenerationId { get; set; }
+    public ServerEdiGeneration? EdiGeneration { get; set; }
 }
 
 internal sealed class ServerRemittanceClaimOutcome
@@ -1088,6 +1106,8 @@ internal sealed class ServerRemittanceClaimOutcome
     public string? Explanation { get; set; }
     public string? PaymentReference { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
+    public long? EdiGenerationId { get; set; }
 }
 
 internal sealed class ServerRemittanceDeposit
@@ -1104,6 +1124,7 @@ internal sealed class ServerRemittanceDeposit
     public decimal RemittancePaymentAmount { get; set; }
     public decimal? EftDepositAmount { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
 }
 
 internal sealed class ServerReviewItem

@@ -119,6 +119,7 @@ else
 }
 
 builder.Services.AddSingleton<EnvelopeProtector>();
+builder.Services.AddScoped<ClaimResponseIngestion>();
 builder.Services.AddSingleton<IncidentAggregator>();
 builder.Services.AddSingleton<ApiIncidentRecorder>();
 builder.Services.AddHostedService<DatabaseIdentityHostedService>();
@@ -210,6 +211,26 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseHttpsRedirection();
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+    if (HttpMethods.IsPost(context.Request.Method) &&
+        (path.Equals("/api/v1/billing/responses", StringComparison.OrdinalIgnoreCase) ||
+         path.StartsWith("/api/v1/billing/periods/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/responses", StringComparison.OrdinalIgnoreCase)))
+    {
+        // JSON may encode each ASCII document character as six bytes (\uXXXX).
+        // Bound the wire body before model binding and the decoded X12 separately.
+        const long maximumBody = ClaimResponseIngestion.MaximumDocumentCharacters * 6L + 1024;
+        if (context.Request.ContentLength > maximumBody)
+        {
+            context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            return;
+        }
+        var feature = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+        if (feature is { IsReadOnly: false }) feature.MaxRequestBodySize = maximumBody;
+    }
+    await next();
+});
 app.UseRouting();
 app.UseAuthentication();
 app.UseRateLimiter();

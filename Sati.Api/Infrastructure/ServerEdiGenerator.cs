@@ -17,6 +17,7 @@ internal static class ServerEdiGenerator
         DateTime generatedAt,
         string controlNumber)
     {
+        ClaimSubmissionIdentity.RequireControlNumber(controlNumber);
         var rows = ReadAndValidateRows(period);
         var envelope = rows[0].Snapshot;
         var submitterId = envelope.SubmitterId;
@@ -27,7 +28,7 @@ internal static class ServerEdiGenerator
         builder.AppendLine(Segment("ISA", "00", "          ", "00", "          ", "ZZ",
             submitterId.PadRight(15), "ZZ", OaReceiverId.PadRight(15), date[2..], time,
             "^", "00501", controlNumber, "0", isTest ? "T" : "P", SubSep));
-        builder.AppendLine(Segment("GS", "HC", submitterId, OaReceiverId, date, time, "1", "X", VersionCode));
+        builder.AppendLine(Segment("GS", "HC", submitterId, OaReceiverId, date, time, controlNumber, "X", VersionCode));
         builder.AppendLine(Segment("ST", "837", "0001", VersionCode));
         builder.AppendLine(Segment("BHT", "0019", "00", controlNumber, date, time, "CH"));
         builder.AppendLine(Segment("NM1", "41", "2", envelope.BillingProviderName, "", "", "", "", "46", submitterId));
@@ -63,7 +64,7 @@ internal static class ServerEdiGenerator
                 var charge = BillingRules.FormatDecimal(line.ChargeAmount);
                 var procedure = $"HC{SubSep}{line.ProcedureCode}" +
                     (string.IsNullOrWhiteSpace(line.ProcedureModifier) ? string.Empty : $"{SubSep}{line.ProcedureModifier}");
-                builder.AppendLine(Segment("CLM", $"{period.Id}-{line.NoteId}", charge, "", "",
+                builder.AppendLine(Segment("CLM", ClaimSubmissionIdentity.ClaimReference(controlNumber, period.Id, line.NoteId), charge, "", "",
                     $"{line.PlaceOfService:D2}{SubSep}{SubSep}1", "Y", "A", "Y", "I"));
                 builder.AppendLine(Segment("DTP", "472", "D8", line.DateOfService.ToString("yyyyMMdd", CultureInfo.InvariantCulture)));
                 builder.AppendLine(Segment("HI", $"ABK{SubSep}{line.DiagnosisCode}"));
@@ -71,13 +72,14 @@ internal static class ServerEdiGenerator
                 builder.AppendLine(Segment("SV1", procedure, charge, "UN", units,
                     line.PlaceOfService.ToString("D2", CultureInfo.InvariantCulture), "", ""));
                 builder.AppendLine(Segment("DTP", "472", "D8", line.DateOfService.ToString("yyyyMMdd", CultureInfo.InvariantCulture)));
+                builder.AppendLine(Segment("REF", "6R", line.NoteId.ToString(CultureInfo.InvariantCulture)));
             }
         }
 
         // SE01 counts ST through SE inclusive; ISA and GS are outside the transaction set.
         var segmentCount = builder.ToString().Count(character => character == '~') - 1;
         builder.AppendLine(Segment("SE", segmentCount.ToString(CultureInfo.InvariantCulture), "0001"));
-        builder.AppendLine(Segment("GE", "1", "1"));
+        builder.AppendLine(Segment("GE", "1", controlNumber));
         builder.AppendLine(Segment("IEA", "1", controlNumber));
         return builder.ToString();
     }

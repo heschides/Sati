@@ -230,7 +230,8 @@ public sealed class ClaimExchangeLoopTests
         Assert.NotNull(deposits);
         var deposit = deposits.First(row => row.ProviderLevelAdjustmentAmount != 0m);
 
-        Assert.Equal(25m, deposit.ProviderLevelAdjustmentAmount);
+        Assert.Equal(-25m, deposit.ProviderLevelAdjustmentAmount);
+        Assert.Equal(deposit.ClaimPaymentAmount + deposit.ProviderLevelAdjustmentAmount, deposit.RemittancePaymentAmount);
         Assert.NotEqual(deposit.ClaimPaymentAmount, deposit.RemittancePaymentAmount);
     }
 }

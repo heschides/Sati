@@ -3834,3 +3834,32 @@ darkened on open canvas and retained more brightly in accents and buttons, whose
 measured separately. Dark-theme semantic colors are overridden by luminance, not meaning, and the
 complete palette participates in the same token, rendered-view, patterned-surface, and primary-button
 contrast tests as every other theme.
+
+## 2026-09-10 — response intake matches evidence, not the selected billing period
+
+The initial importer accepts one bounded original 999, 277CA, or 835 in the exact synthetic
+Demo/Testing environments. `ClaimResponseReader` owns strict supported syntax; the API owns
+authorization, correlation and persistence. The response's ISA13 identifies that incoming
+interchange, not our outgoing file. A 999 uses original AK1/AK2 controls; claim acknowledgments
+and remittances use the exact retained CLM reference, source parties and mode. New submissions
+include the generation control in CLM01; REF6R preserves the note identity. An ambiguous legacy
+reference is rejected, never assigned to the latest batch. Database control uniqueness also
+rejects collisions rather than quietly reusing a generated identifier.
+
+One serializable transaction preserves an encrypted immutable original, hashes, parser version,
+actor/time, explicit matches, financial observations and safe audit metadata. Exact or semantic
+replays return the original receipt; changed document/payment identity reuse is a conflict.
+This permits safe retry after uncertain network completion. A multi-period 835 creates one
+deposit observation, not one copy per period. EFT is left unknown until independently reconciled.
+Repeated financial outcomes require review; a late earlier-stage acknowledgment cannot erase
+payment/review history. Cross-generation correction/void reconciliation remains unfinished.
+
+The desktop invalidates pending selections and results on account changes and captures the
+original upload credential without an intervening renewal. A post-commit refresh failure says
+the receipt was recorded, instead of claiming the operation failed without a write.
+
+**Rejected:** caller-selected correlation, ISA13-as-original-reference, permissive zero money on
+malformed input, treating A1 receipt as acceptance, appending a second payment on retry, partial
+document commits, plaintext evidence/audit payloads, or enabling Production because mock tests
+pass. Actual vendor files, companion-guide acceptance, protected receipt readback, SQL Server
+rehearsal, bank reconciliation, correction workflows and launch security blockers remain gates.
