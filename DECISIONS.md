@@ -3799,3 +3799,38 @@ time, treating an empty query as proof that no crash occurred, and automatically
 LocalDumps. Dumps can contain process memory and PHI and would require a separate explicit decision
 for enablement, access, retention, and destruction. Also unchanged: a hard fault before sign-in has
 no tenant-safe marker and therefore cannot be assigned to an agency Admin record.
+
+## 2026-09-10 — Scratchpad history is an Overview workspace, not another window
+
+The shell still owns exactly one live `ScratchpadView`. While that view is in Overview's center host,
+it offers History as a third tab beside Today's Work and Tomorrow's Agenda. When navigation moves the
+same control into the narrow side dock, History disappears and selection returns to Today's Work.
+This keeps dated drafts and tab state on the one instance the shell already saves, without forcing a
+wide date-range browser into a 250-unit rail.
+
+`ScratchpadHistoryViewModel` is now a child of that existing scratchpad view model. It loads only when
+History is selected, invalidates outstanding reads on account clear, and checks the current user
+before publishing a result. The former Window, open-request event, factory, and service registrations
+are removed. Retrospective comments remain append-only; a confirmed comment is added to the visible
+entry without altering its original text.
+
+The tab animation is presentation-only: the incoming view moves from the direction of travel over
+175 milliseconds with an ease-out curve, and it is skipped when Windows disables client-area
+animation. The history control stacks its picker over results below 640 effective units.
+
+**Rejected:** retaining the magnifying-glass modal as a second route, showing the wide History tab
+inside the side dock, or resolving a second scratchpad view model for the center. Each would preserve
+duplicate navigation, create an unusable narrow layout, or risk splitting unsaved state.
+
+## 2026-09-10 — Umber Facets translates the reference palette into an accessible dark theme
+
+Umber Facets uses WPF vector polygons rather than embedding the supplied reference image. Broad
+intersections retain its espresso, chestnut, caramel, ochre, and tan progression without importing
+the reference's words, controls, or branding. The crisp geometry belongs to uncovered shell canvas;
+navigation and working surfaces use the established blurred, low-opacity motif over dark solids.
+
+The brightest reference tans cannot sit behind light body text at full luminance. They are therefore
+darkened on open canvas and retained more brightly in accents and buttons, whose dark foreground is
+measured separately. Dark-theme semantic colors are overridden by luminance, not meaning, and the
+complete palette participates in the same token, rendered-view, patterned-surface, and primary-button
+contrast tests as every other theme.

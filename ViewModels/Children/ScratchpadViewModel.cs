@@ -43,13 +43,14 @@ namespace Sati.ViewModels.Children
             _scratchpadService = scratchpadService;
             _sessionService = sessionService;
             _workAgendaService = workAgendaService;
+            History = new ScratchpadHistoryViewModel(scratchpadService, sessionService);
         }
 
         // -------------------------------------------------------------------------
-        // Events
+        // Child state and host callbacks
         // -------------------------------------------------------------------------
 
-        public event EventHandler? OpenScratchpadHistoryRequested;
+        public ScratchpadHistoryViewModel History { get; }
 
         // The shell supplies the host action so this child never reaches into a
         // parent ViewModel or creates a View. Awaiting it through an async command
@@ -77,6 +78,7 @@ namespace Sati.ViewModels.Children
         [ObservableProperty] private bool hasScheduledWorkLoadError;
         [ObservableProperty] private string scheduledWorkLoadErrorMessage = string.Empty;
         [ObservableProperty] private bool isScheduledWorkBusy;
+        [ObservableProperty] private int selectedAgendaTabIndex;
 
         public ObservableCollection<WorkAgendaItem> PaperworkItems { get; } = [];
         public ObservableCollection<WorkAgendaItem> VisitItems { get; } = [];
@@ -127,8 +129,6 @@ namespace Sati.ViewModels.Children
         }
 
         [RelayCommand] private void DecreaseScratchpadFont() => ScratchpadFontSize = Math.Max(ScratchpadFontSize - 2, 10);
-        [RelayCommand] private void OpenScratchpadHistory() => OpenScratchpadHistoryRequested?.Invoke(this, EventArgs.Empty);
-
         [RelayCommand]
         private async Task OpenScheduledWork(WorkAgendaItem? item)
         {
@@ -474,6 +474,8 @@ namespace Sati.ViewModels.Children
             HasScheduledWorkLoadError = false;
             ScheduledWorkLoadErrorMessage = string.Empty;
             IsScheduledWorkBusy = false;
+            SelectedAgendaTabIndex = 0;
+            History.Clear();
         }
 
         private async Task<bool> SaveTodayCoreAsync()

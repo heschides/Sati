@@ -304,7 +304,7 @@ public sealed class ReleaseUiStructureTests
                  {
                      "PineCoast", "BlueberryMist", "BlueGrayPearl", "CedarGrove", "HarborNight",
                      "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
-                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor"
+                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor", "UmberFacets"
                  })
         {
             var supplied = ResourceKeys(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -326,6 +326,7 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("Deep Current", service);
         Assert.Contains("Redwood Blush", service);
         Assert.Contains("Bodhi Watercolor", service);
+        Assert.Contains("Umber Facets", service);
     }
 
     [Fact]
@@ -333,7 +334,8 @@ public sealed class ReleaseUiStructureTests
     {
         foreach (var name in new[]
                  {
-                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
+                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
+                     "UmberFacets"
                  })
         {
             var document = XDocument.Load(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -355,7 +357,7 @@ public sealed class ReleaseUiStructureTests
     [Fact]
     public void OpenAreasKeepCrispPatternsAndContentSurfacesFrostThem()
     {
-        foreach (var name in new[] { "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean" })
+        foreach (var name in new[] { "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean", "UmberFacets" })
         {
             var document = XDocument.Load(Path.Combine(Root, "Themes", $"{name}.xaml"));
             XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
@@ -398,7 +400,7 @@ public sealed class ReleaseUiStructureTests
                      "ComplianceReviewWindow", "ConfirmationDialogue", "DailyAgendaWindow",
                      "DatabasePatienceWindow", "DataEnvironmentWindow", "FirstRunAdminWindow",
                      "IncorrectPasswordDialog", "LoginWindow", "NewUserWindow", "PromptWindow",
-                     "ScratchpadHistoryWindow", "SettingsWindow", "SplashScreenWindow",
+                     "SettingsWindow", "SplashScreenWindow",
                      "SwitchUserWindow", "TypedConfirmationDialog", "UserMessageDialog"
                  })
         {
@@ -679,7 +681,8 @@ public sealed class ReleaseUiStructureTests
     {
         foreach (var name in new[]
                  {
-                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
+                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
+                     "UmberFacets"
                  })
         {
             var theme = File.ReadAllText(Path.Combine(Root, "Themes", $"{name}.xaml"));

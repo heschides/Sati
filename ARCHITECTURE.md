@@ -208,7 +208,7 @@ Every theme dictionary now supplies `AccentButtonBrush`, `AccentButtonHoverBrush
 `AccentButtonPressedBrush`, and `OnAccentButtonBrush` alongside the accent tokens. Only
 `PrimaryButton` binds the button set; selection highlights and accent type still bind
 `AccentBrush`. A theme dictionary is swapped in whole, so a theme missing a key loses the fill
-rather than inheriting one — a structure test asserts all twenty-four supply all four.
+rather than inheriting one — a structure test asserts all twenty-five supply all four.
 
 Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor occupy the richer-light portion of
 the palette range: brown, coastal blue, muted red, and the Sati leaf's turquoise/blue/violet/coral
@@ -217,7 +217,7 @@ themes. Saturation and border depth carry their identity; shared content surface
 for the fixed semantic status colors to remain readable.
 
 Decorative themes use tiled vector resources for the outer window and navigation chrome. Ironworks
-Matte, Paisley, Art Nouveau, Mid-Century Modern, and Vanilla Bean keep that pattern crisp on
+Matte, Paisley, Art Nouveau, Mid-Century Modern, Vanilla Bean, and Umber Facets keep that pattern crisp on
 uncovered canvas.
 Their shared `SurfaceBrush` is a frosted-glass tile: the same motif is blurred inside the brush,
 reduced to 12–14 percent opacity, and laid over a high-opacity theme tint. `NavBackgroundBrush`
@@ -237,6 +237,9 @@ larger compositions reduce obvious row-and-column repetition while remaining lig
 Vanilla Bean uses a 300-by-220 cream tile with broad pale folds and scattered, irregular short
 strokes and ellipses that read as vanilla-seed flecks. Its brown-and-caramel palette uses the same
 frosted content boundary as the other illustrated themes.
+Umber Facets uses broad intersecting espresso, chestnut, caramel, ochre, and tan polygons. It is a
+dark-surface theme, so its text and semantic-state luminance follow the same measured contract as
+the established night themes while the reference palette remains recognizable on open canvas.
 
 ## Theme legibility
 
@@ -244,7 +247,7 @@ frosted content boundary as the other illustrated themes.
 luminance, contrast ratio, alpha compositing, and the flattening of a gradient or tiled pattern
 into the colours a reader actually receives. Nothing else may reimplement it.
 
-`ThemeLegibilityTests` holds every one of the twenty-four palettes to WCAG AA (4.5:1) two ways. The
+`ThemeLegibilityTests` holds every one of the twenty-five palettes to WCAG AA (4.5:1) two ways. The
 token pass scores each text role against each surface role it can land on, plus each fill that
 carries its own named ink, so a pair fails before any screen ships that uses it. The rendered pass
 loads every view under every theme, reads the brushes WPF resolved, and finds each run's background
@@ -325,6 +328,13 @@ preserves both dated drafts, selection, and editor state; reflow creates no seco
 performs no domain write or reload. Shell navigation spacing and the Clients workspace also react
 to their own measured widths, so the Clients user's compact-list choice is no longer overwritten by
 a startup monitor decision.
+
+The same control exposes History as a third tab only while it occupies the Overview host. History
+is a child of the shell's existing `ScratchpadViewModel`, loads on tab entry, and uses a
+`LatestRequestTracker` before publishing user-scoped rows. Moving back to the side dock removes the
+tab and returns the selection to Today's Work. `ScratchpadHistoryView` owns only the Calendar
+selection and responsive two-column/stacked presentation; the former modal window and factory no
+longer exist.
 
 `NoteEntryView` retains the same controls and bindings in every size. Below 840 units it exposes
 Details and Write sections under a pinned context header; changing sections collapses Grid rows

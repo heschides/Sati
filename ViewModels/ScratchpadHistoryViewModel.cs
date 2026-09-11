@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
 using Sati.Models;
+using Sati.Services;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 
@@ -12,6 +13,8 @@ namespace Sati.ViewModels
         private readonly IScratchpadService _scratchpadService;
         private readonly ISessionService _sessionService;
         private readonly List<Scratchpad> _allEntries = [];
+        private readonly LatestRequestTracker _historyLoads = new();
+        private int? _loadedUserId;
 
         public ScratchpadHistoryViewModel(
             IScratchpadService scratchpadService,
@@ -21,11 +24,10 @@ namespace Sati.ViewModels
             _sessionService = sessionService;
         }
 
-        public event EventHandler? CommentSaved;
-
         [ObservableProperty] private DateTime? selectionStart;
         [ObservableProperty] private DateTime? selectionEnd;
         [ObservableProperty] private bool isEditorUnlocked;
+        [ObservableProperty] private bool isLoading;
         [ObservableProperty] private bool isSaving;
         [ObservableProperty] private string newComment = string.Empty;
         [ObservableProperty] private string? statusMessage;
@@ -73,16 +75,79 @@ namespace Sati.ViewModels
 
         public async Task InitializeAsync()
         {
-            var user = _sessionService.CurrentUser
-                ?? throw new InvalidOperationException("A signed-in user is required to view scratchpad history.");
+            var user = _sessionService.CurrentUser;
+            if (user is null)
+            {
+                Clear();
+                return;
+            }
 
+            var request = _historyLoads.Begin();
+            var previousStart = _loadedUserId == user.Id ? SelectionStart : null;
+            var previousEnd = _loadedUserId == user.Id ? SelectionEnd : null;
+            IsLoading = true;
+            StatusMessage = null;
+
+            try
+            {
+                var entries = await _scratchpadService.GetHistoryAsync(user.Id);
+                if (!_historyLoads.IsCurrent(request) ||
+                    _sessionService.CurrentUser?.Id != user.Id)
+                {
+                    return;
+                }
+
+                _allEntries.Clear();
+                _allEntries.AddRange(entries);
+                _loadedUserId = user.Id;
+
+                var initialDate = _allEntries.FirstOrDefault()?.Date.Date ?? LatestSelectableDate;
+                InitialDisplayDate = previousStart ?? initialDate;
+                InitialSelectedDate = previousStart ?? initialDate;
+                SetSelectedDates(previousStart.HasValue && previousEnd.HasValue
+                    ? DatesInRange(previousStart.Value, previousEnd.Value)
+                    : [initialDate]);
+            }
+            catch (Exception ex)
+            {
+                if (!_historyLoads.IsCurrent(request) ||
+                    _sessionService.CurrentUser?.Id != user.Id)
+                {
+                    return;
+                }
+
+                Debug.WriteLine($"ScratchpadHistoryViewModel.InitializeAsync failed: {ex.Message}");
+                var reference = AppErrorLog.Record(ex, "scratchpad.history.load");
+                _allEntries.Clear();
+                VisibleEntries.Clear();
+                NotifySelectionStateChanged();
+                StatusMessage =
+                    "Scratchpad history could not be loaded. Return to History to try again. " +
+                    $"Support reference: {reference}.";
+            }
+            finally
+            {
+                if (_historyLoads.IsCurrent(request))
+                    IsLoading = false;
+            }
+        }
+
+        public void Clear()
+        {
+            _historyLoads.Invalidate();
+            _loadedUserId = null;
             _allEntries.Clear();
-            _allEntries.AddRange(await _scratchpadService.GetHistoryAsync(user.Id));
-
-            var initialDate = _allEntries.FirstOrDefault()?.Date.Date ?? LatestSelectableDate;
-            InitialDisplayDate = initialDate;
-            InitialSelectedDate = initialDate;
-            SetSelectedDates([initialDate]);
+            VisibleEntries.Clear();
+            SelectionStart = null;
+            SelectionEnd = null;
+            IsEditorUnlocked = false;
+            IsLoading = false;
+            IsSaving = false;
+            NewComment = string.Empty;
+            StatusMessage = null;
+            InitialDisplayDate = LatestSelectableDate;
+            InitialSelectedDate = LatestSelectableDate;
+            NotifySelectionStateChanged();
         }
 
         public void SetSelectedDates(IEnumerable<DateTime> dates)
@@ -142,18 +207,18 @@ namespace Sati.ViewModels
                 IsSaving = true;
                 StatusMessage = null;
                 var entry = VisibleEntries[0];
-                await _scratchpadService.AddCommentAsync(
+                var savedComment = await _scratchpadService.AddCommentAsync(
                     entry.Id,
                     user.Id,
                     user.DisplayName,
                     NewComment);
+                if (_sessionService.CurrentUser?.Id != user.Id)
+                    return;
 
-                // Existing comments render safely when the window opens. Injecting a
-                // new nested data template while the containing ScrollViewer is in a
-                // measure pass can make WPF recursively re-enter template creation.
-                // Close after a confirmed save and let the next open load the durable
-                // database state normally.
-                CommentSaved?.Invoke(this, EventArgs.Empty);
+                entry.Comments.Add(savedComment);
+                NewComment = string.Empty;
+                IsEditorUnlocked = false;
+                StatusMessage = "Comment saved.";
             }
             catch (Exception ex)
             {
@@ -185,6 +250,11 @@ namespace Sati.ViewModels
                 }
             }
 
+            NotifySelectionStateChanged();
+        }
+
+        private void NotifySelectionStateChanged()
+        {
             OnPropertyChanged(nameof(HasVisibleEntries));
             OnPropertyChanged(nameof(IsSelectionEmpty));
             OnPropertyChanged(nameof(IsSingleDateSelection));
@@ -193,6 +263,12 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(EntryCountSummary));
             OnPropertyChanged(nameof(EditorToolTip));
             NotifyEditorStateChanged();
+        }
+
+        private static IEnumerable<DateTime> DatesInRange(DateTime start, DateTime end)
+        {
+            for (var date = start.Date; date <= end.Date; date = date.AddDays(1))
+                yield return date;
         }
 
         private void NotifyEditorStateChanged()

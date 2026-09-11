@@ -68,7 +68,11 @@ namespace Sati.Views
                 return;
             }
 
-            AgendaHost.Content = new ScratchpadView { DataContext = viewModel.Scratchpad };
+            AgendaHost.Content = new ScratchpadView
+            {
+                DataContext = viewModel.Scratchpad,
+                IsHistoryAvailable = true
+            };
         }
 
         private void AdaptiveGrid_SizeChanged(object sender, SizeChangedEventArgs e)

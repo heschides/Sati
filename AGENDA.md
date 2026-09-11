@@ -1,5 +1,17 @@
 # Sati — Refactor Agenda
 
+## Unreleased — Overview scratchpad history and Umber Facets
+
+- [x] Replace the scratchpad-history search modal with a History tab beside Today's Work and
+      Tomorrow's Agenda in the Overview's centered Work Agenda.
+- [x] Keep History out of the narrow side dock, preserve one live agenda instance, load history
+      only when selected, and prevent an old account's delayed load from publishing after a switch.
+- [x] Add a short direction-aware sliding transition, preserve reduced-motion behavior, and stack
+      the date picker above results when the centered panel is compact.
+- [x] Remove the obsolete history window, event, factory, and dependency registrations.
+- [x] Add Umber Facets from the supplied brown intersecting-shapes palette as a complete vector
+      theme with frosted work surfaces and measured dark-theme contrast.
+
 ## Unreleased — recoverable productivity forecast
 
 - [x] Stop counting blank past weekdays as future productivity capacity; count only eligible days
@@ -79,10 +91,10 @@ restructure, and all three get harder the longer they wait.
 
 Release 1.3.4 closed the contrast gaps that were visible to review. This work replaces review with
 measurement: `Helpers/ThemeContrast.cs` owns the WCAG arithmetic and `ThemeLegibilityTests` holds
-all twenty-four palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
+all twenty-five palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
 
 - [x] Score every text role against every surface role, and every fill against the ink named for
-      it, in all twenty-four themes. Correct the palettes by luminance only, never by hue.
+      it, in all twenty-five themes. Correct the palettes by luminance only, never by hue.
 - [x] Render every view under every theme and measure the resolved brushes, finding each run's
       background by hit test rather than by ancestor walk.
 - [x] Fail on any theme key a view names that no dictionary defines. `WarningSoftBrush` was

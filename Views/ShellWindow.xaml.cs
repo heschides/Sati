@@ -50,7 +50,6 @@ namespace Sati.Views
             IIncidentReporter incidentReporter,
             ApplicationRunState applicationRunState,
             Func<SettingsWindow> settingsWindowFactory,
-            Func<ScratchpadHistoryWindow> scratchpadHistoryWindowFactory,
             Func<SwitchUserWindow> switchUserWindowFactory,
             Func<LoginWindow> loginWindowFactory,
             Func<DatabasePatienceWindow> databasePatienceWindowFactory,
@@ -139,14 +138,6 @@ namespace Sati.Views
                 // user and rebuilds every view model the window was bound to.
                 if (switchRequested)
                     await OpenSwitchUserFlowAsync();
-            };
-
-            shellViewModel.Scratchpad.OpenScratchpadHistoryRequested += async (s, e) =>
-            {
-                var win = scratchpadHistoryWindowFactory();
-                win.Owner = this;
-                await win.InitializeAsync();
-                win.Show();
             };
 
             Closing += async (s, e) =>
@@ -555,6 +546,7 @@ namespace Sati.Views
 
             if (_workAgendaParent?.Content == _workAgendaView)
                 _workAgendaParent.Content = null;
+            _workAgendaView.IsHistoryAvailable = ReferenceEquals(target, _overviewAgendaHost);
             target.Content = _workAgendaView;
             _workAgendaParent = target;
         }
