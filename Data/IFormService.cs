@@ -25,6 +25,11 @@ namespace Sati.Data
             throw new NotSupportedException("External document recording is not available on this data path.");
         Task RevokeAttestationAsync(Form form, string reason);
         Task OpenFormAsync(Form form);
+        /// <summary>
+        /// Compatibility boundary only: an authorized empty selection is a no-op;
+        /// persisted forms cannot be deleted because their billing history must survive.
+        /// Completion corrections use attestation/revocation instead.
+        /// </summary>
         Task DeleteFormsAsync(IEnumerable<Form> forms);
     }
 }

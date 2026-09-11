@@ -6057,36 +6057,45 @@ internal static partial class ApiEndpoints
             ApiDbContext db,
             CancellationToken cancellationToken) =>
         {
-            var ids = request.FormIds.Where(id => id > 0).Distinct().ToList();
-            if (ids.Count > 100)
+            var actor = Actor.From(principal);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
+
+            if (request.FormIds is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    ["formIds"] = ["No more than 100 forms may be deleted at once."]
+                    ["formIds"] = ["Form IDs are required."]
+                });
+            }
+            var ids = request.FormIds.Where(id => id > 0).Distinct()
+                .Take(FormRetentionRules.MaximumRequestIds + 1).ToList();
+            if (ids.Count > FormRetentionRules.MaximumRequestIds)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["formIds"] = [FormRetentionRules.RequestLimitMessage]
                 });
             }
             if (ids.Count == 0)
                 return Results.Ok(new CountDto(0));
 
-            var actor = Actor.From(principal);
             var ownedIds = await (from form in db.Forms.AsNoTracking()
                                   join person in db.People.AsNoTracking() on form.PersonId equals person.Id
-                                  where ids.Contains(form.Id) && person.UserId == actor.UserId
+                                  join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
+                                  where ids.Contains(form.Id) && person.UserId == actor.UserId &&
+                                        person.AgencyId == actor.AgencyId && owner.AgencyId == actor.AgencyId &&
+                                        owner.Role == actor.Role && owner.Permissions == actor.Permissions
                                   select form.Id).ToListAsync(cancellationToken);
             if (ownedIds.Count != ids.Count)
                 return Results.NotFound();
-            if (await db.FormAttestations.AsNoTracking()
-                    .AnyAsync(attestation => ownedIds.Contains(attestation.FormId), cancellationToken))
-            {
-                return Results.Conflict(new ApiErrorDto(
-                    "form_history_locked",
-                    "A form with attestation history cannot be deleted.",
-                    string.Empty));
-            }
 
-            var deleted = await db.Forms.Where(form => ownedIds.Contains(form.Id))
-                .ExecuteDeleteAsync(cancellationToken);
-            return Results.Ok(new CountDto(deleted));
+            // Stored due dates are billing evidence even without an attestation.
+            // This compatibility endpoint never deletes or regenerates form rows.
+            return Results.Conflict(new ApiErrorDto(
+                FormRetentionRules.ErrorCode,
+                FormRetentionRules.Message,
+                string.Empty));
         });
 
         api.MapPut("/forms/{id:int}", async Task<IResult> (

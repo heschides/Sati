@@ -40,6 +40,7 @@ public static class ApiSurface
         "billing-compliance-settings-v1",
         "billing-exchange-history-v4",
         "claim-response-ingestion-v2",
+        "form-retention-v1",
         "schema-drift-report-v1",
         "admin-test-consumer-deletion-v2",
         "person-test-data-v1",

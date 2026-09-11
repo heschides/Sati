@@ -9,14 +9,29 @@ This is a point-in-time review of the code as of this date, not a certification.
 substitute for an independent assessment, and it does not establish HIPAA compliance.
 
 The broader post-intake September 10 repository review is in `SECURITY_REVIEW_2026-09-10.md`.
-It includes synthetic reproductions of still-open permission revocation, bearer-session,
-required-form deletion and pre-supervisory compliance defects. Older “fixed” statements in this
+It includes synthetic reproductions of permission revocation, bearer-session, required-form
+deletion and pre-supervisory compliance defects. The follow-up form-deletion closure is described
+below; the other findings remain open. Older “fixed” statements in this
 file apply only to their named paths; they must not be interpreted as launch clearance. The new
 response importer remains synthetic-only while real clearinghouse and operational gates are open.
 
 ---
 
 ## Fixed
+
+### Follow-up 2026-09-10 — standalone form-deletion billing bypass
+
+The API and local service formerly permitted deletion of an owned form with no attestation.
+That removed the row supplying a current or historical billing block. New synthetic regressions
+failed against both original implementations. Every authorized nonempty standalone request now
+returns the shared retention refusal without writing. The API additionally enforces current
+case-management permission and exact person/owner tenant scope before returning that conflict.
+Future, optional and completed forms are retained too. Attestation/revocation, audited duplicate
+repair and separately controlled whole-consumer deletion remain distinct workflows.
+
+This closes the exposed standalone deletion path, not previously missing obligations or claims
+created while the bypass existed. No historical date reconstruction, real-data cleanup, migration
+or deployment was performed. API rollover and pre-EDI revalidation remain explicit follow-ups.
 
 ### 0. Unauthenticated account creation on the sign-in screen — added 2026-08-15
 

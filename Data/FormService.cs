@@ -257,23 +257,40 @@ public sealed class FormService(
     public async Task DeleteFormsAsync(IEnumerable<Form> forms)
     {
         var actor = CurrentCaseManager();
-        var ids = forms.Select(candidate => candidate.Id).Where(id => id > 0).Distinct().ToList();
         await using var context = await contextFactory.CreateDbContextAsync();
-        var owned = await (from stored in context.Forms
-                           join person in context.People on stored.PersonId equals person.Id
-                           where ids.Contains(stored.Id) &&
-                                 person.UserId == actor.Id &&
-                                 person.AgencyId == actor.AgencyId
-                           select stored).ToListAsync();
-        if (owned.Count != ids.Count)
-            throw new UnauthorizedAccessException("One or more forms are outside the signed-in caseload.");
-        if (await context.FormAttestations.AnyAsync(attestation => ids.Contains(attestation.FormId)))
+        // Even an empty request must validate the persisted actor. The session's
+        // capabilities alone may be stale after an administrator changes access.
+        if (!actor.HasCaseManagerPermissions ||
+            !await context.Users.AsNoTracking().AnyAsync(user =>
+                user.Id == actor.Id && user.AgencyId == actor.AgencyId &&
+                user.Role == actor.Role && user.Permissions == actor.Permissions &&
+                (user.Permissions & UserPermissions.CaseManagement) != 0))
         {
-            throw new InvalidOperationException(
-                "A form with attestation history cannot be deleted. Its compliance history is append-only.");
+            throw new UnauthorizedAccessException("A current case manager account is required.");
         }
-        context.Forms.RemoveRange(owned);
-        await context.SaveChangesAsync();
+
+        ArgumentNullException.ThrowIfNull(forms);
+        var ids = forms.Select(candidate => candidate.Id).Where(id => id > 0).Distinct()
+            .Take(FormRetentionRules.MaximumRequestIds + 1).ToList();
+        if (ids.Count > FormRetentionRules.MaximumRequestIds)
+            throw new ArgumentException(FormRetentionRules.RequestLimitMessage, nameof(forms));
+        if (ids.Count == 0)
+            return;
+
+        var ownedIds = await (from stored in context.Forms.AsNoTracking()
+                              join person in context.People.AsNoTracking() on stored.PersonId equals person.Id
+                              join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
+                              where ids.Contains(stored.Id) &&
+                                    person.UserId == actor.Id && person.AgencyId == actor.AgencyId &&
+                                    owner.AgencyId == actor.AgencyId &&
+                                    owner.Role == actor.Role && owner.Permissions == actor.Permissions
+                              select stored.Id).ToListAsync();
+        if (ownedIds.Count != ids.Count)
+            throw new UnauthorizedAccessException("One or more forms are outside the signed-in caseload.");
+
+        // Do not infer deletion safety from today's requirements or missing
+        // attestations: removing an overdue row would erase the billing block.
+        throw new InvalidOperationException(FormRetentionRules.Message);
     }
 
     private User CurrentCaseManager()

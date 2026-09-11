@@ -1017,7 +1017,18 @@ records generated under the old 120-day setting.
   which does not touch `IsCompliant`.
 - **Cascade rule:** persisted completion changes go through attestation/revocation. Both database
   contexts reject updates or deletes of ledger rows, the Form relationship uses restricted delete,
-  and form deletion refuses any row with attestation history.
+  and standalone form deletion refuses every persisted row, including rows without attestations.
+  `FormRetentionRules` in Contracts owns the shared refusal code/message and request bound. The API
+  and local service first verify current persisted case-management permission and exact tenant/
+  caseload ownership, then reject nonempty requests without a database write. This prevents removal
+  of the evidence used by current and historical billing gates. Empty authorized requests remain
+  harmless compatibility no-ops. Named audited duplicate repair and whole-consumer lifecycle
+  deletion remain separate operations; no global EF deletion rule is introduced here.
+
+Stored due dates remain authoritative: this guard does not regenerate missing obligations using
+today's settings or manufacture completion history. Already-deleted rows and claims created before
+the fix require a separately approved reconciliation. Cloud cycle rollover and pre-EDI compliance
+revalidation remain tracked in AGENDA.md.
 
 ### Form Generation
 

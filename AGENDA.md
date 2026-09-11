@@ -1,5 +1,20 @@
 # Sati — Refactor Agenda
 
+## Unreleased — close standalone form-deletion billing bypass
+
+- [x] Retire destructive standalone form deletion in both the API and transitional local service.
+      Every persisted form is retained, including unattested, future, completed and currently
+      optional forms. Refusal makes no write; mixed batches cannot partially delete.
+- [x] Revalidate current case-management permission and exact tenant/caseload ownership, including
+      empty requests; return a shared retention conflict for authorized nonempty requests.
+- [x] Reproduce the old bypass with failing API and local regressions before changing the guards.
+      Keep stored due/completion dates and billing-window semantics unchanged.
+- [ ] Reconcile already-missing cloud obligations and review any claims created while the bypass
+      existed through a separately authorized evidence-preserving process. This fix does not
+      invent historical completion dates, reconstruct deleted rows, or change existing claims.
+- [ ] Complete authoritative API cycle rollover and pre-EDI compliance revalidation; those are
+      adjacent integrity gaps, not solved by refusing standalone form deletion.
+
 ## Unreleased — clearinghouse response intake and launch security review
 
 - [x] Add Billing Submissions file import for a single original 999, 277CA, or 835; match retained
@@ -14,7 +29,7 @@
       See SECURITY_REVIEW_2026-09-10.md; this is not clearance to launch with real consumer data.
 - [ ] Apply AddClearinghouseResponseIntake only through reviewed migration/backup procedures.
       No deployment or real database migration is authorized by this development work.
-- [ ] Clear the security review's launch blockers: required-form deletion bypass, incomplete
+- [ ] Clear the security review's remaining launch blockers: incomplete
       route capability checks, password/session revocation, local permission projection and
       privileged maintenance boundaries; resolve service-time concurrency with SQL Server tests.
 - [ ] Complete actual clearinghouse sandbox acceptance, supported variant/companion-guide checks,

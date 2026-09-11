@@ -3863,3 +3863,27 @@ malformed input, treating A1 receipt as acceptance, appending a second payment o
 document commits, plaintext evidence/audit payloads, or enabling Production because mock tests
 pass. Actual vendor files, companion-guide acceptance, protected receipt readback, SQL Server
 rehearsal, bank reconciliation, correction workflows and launch security blockers remain gates.
+
+## 2026-09-10 — persisted forms cannot be deleted through the standalone operation
+
+An overdue unattested form could be deleted through the API or local form service. Billing gates
+correctly evaluated the rows they received, but deleting the blocking row removed the historical
+obligation from their input. Synthetic regressions reproduced both paths before implementation.
+
+Standalone deletion now refuses every persisted form, not just one that is already overdue or
+currently required. Future forms age into requirements, disabled requirement types can be enabled
+later, and completed forms retain permanent historical gaps. `FormRetentionRules` owns one shared
+error contract. Both boundaries validate current persisted case-management authority and exact
+tenant/caseload ownership before refusing. A refused request executes no write, so it cannot race
+an attestation or partially remove a batch. Authorized empty selections remain no-ops.
+
+There is no current product UI caller: the old destructive regeneration call was already removed.
+Keeping a compatibility refusal gives old clients a useful conflict instead of a success that
+silently removes evidence. Attestation/revocation and named audited duplicate repair remain usable;
+whole-consumer deletion remains under its separate lifecycle/retention controls.
+
+**Rejected:** regenerating hypothetical obligations inside the billing gate. Stored due dates are
+authoritative and may reflect older settings; recalculating them could rewrite a historical billing
+window. Unknown historical completion must not be invented. This bounded fix prevents new
+standalone deletions but does not reconstruct previously lost rows or retroactively invalidate
+claims. API cycle rollover and pre-EDI compliance revalidation remain explicit follow-up work.

@@ -1,6 +1,26 @@
 # Sati launch security review
 September 10, 2026 — repository assessment after clearinghouse intake development
 
+## Follow-up: standalone form-deletion bypass closed in source
+
+The subsequent user-authorized fix retires destructive standalone form deletion in both API and
+local service. Current permission/tenant/caseload checks precede a shared retention refusal; no
+persisted form is removed regardless of attestation or current requirement settings. Both new
+regressions failed against the original implementation. Stored billing-window dates are unchanged.
+The original audit evidence below is retained as a historical finding, not a claim that the
+standalone operation remains exploitable after this fix.
+
+Verification after the fix: 27 new API/local cases pass; the complete API suite passes 622 tests
+and the complete desktop suite passes 1,610 tests with one optional native-AI competence test
+skipped. No ordinary regression test fails. The original API's expanded baseline had 11 intended
+failures and 5 unaffected controls passing; the original local deletion also failed its secure
+retention assertion before the implementation changed.
+
+This does not repair previously missing rows or already-created claims, implement cloud cycle
+rollover, or revalidate compliance at every EDI export. Those require follow-up evidence-preserving
+work. The other authorization/session and launch findings remain open. No deployment or real-data
+reconciliation was performed.
+
 ## Bottom line
 
 The bounded clearinghouse importer is implemented for synthetic Demo/Testing use. I would not approve a general real-consumer, multi-user launch yet. The most important remaining work is authorization and billing-integrity hardening, not another feature.
@@ -11,7 +31,7 @@ This review found four existing defects through five repeatable synthetic tests.
 
 | Priority | Finding | Evidence and impact |
 |---|---|---|
-| 1 — before real billing | Deleting a never-attested overdue requirement can remove a billing block (B03) | Reproduced: claim rejected before form deletion, same claim accepted afterward. Derive required obligations independently of existing rows and replace generic deletion with controlled retirement. |
+| 1 — standalone bypass closed; historical reconciliation pending | Deleting a never-attested overdue requirement removed a billing block (B03) | Both public deletion boundaries now refuse all persisted forms. Existing missing obligations and claims created before the fix still require controlled review; no dates are guessed or historical records silently rewritten. |
 | 2 — before agency launch | Capability removal does not consistently stop clinical access (B02) | Reproduced: journal and annual-note reads still succeed after CaseManagement is removed while Billing and assignments remain. Apply and test a complete route-by-route authorization matrix. |
 | 3 — before agency launch | Password changes leave existing tokens usable and renewable (B05) | Reproduced against real HTTP/JWT handlers. Add account disablement, per-user/session security versions and revocation on password reset/offboarding. |
 | 4 — before distributed Local use | Local login reconstructs permissions from the legacy role (B01) | Source confirmed. Preserve actual persisted capabilities and revalidate them in authoritative local services. |
