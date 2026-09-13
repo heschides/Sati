@@ -32,6 +32,43 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
     public bool CanManageTemplates => session.CurrentUser?.HasAdminPermissions == true;
     public string ReceiptStatus => status?.Artifacts.FirstOrDefault(x => x.Kind == "PrivacyPractices") is { } notice &&
         status.AcknowledgedArtifactIds.Contains(notice.Id) ? "Receipt or good-faith effort is recorded for the current notice." : "Receipt or good-faith effort has not been recorded for the current notice.";
+    public DocumentTemplateRenderContext TemplatePreviewContext
+    {
+        get
+        {
+            var start = CycleStart?.Date ?? DateTime.Today;
+            var effective = person?.EffectiveDate;
+            var end = effective is DateTime effectiveDate && CycleStart is DateTime cycle
+                ? AnnualDocumentCycle.EndInclusive(effectiveDate, cycle.Date)
+                : start.AddYears(1).AddDays(-1);
+            var agency = person?.Agency;
+            var actor = session.CurrentUser;
+            return new(
+                agency?.Name,
+                ComposeAddress(agency?.Street, agency?.City, agency?.State, agency?.Zip),
+                agency?.EdiContactPhone,
+                person?.FullName,
+                person is null ? null : person.BirthDate,
+                start,
+                end,
+                actor?.DisplayName,
+                actor?.Role.ToString());
+        }
+    }
+    public string TemplateValidationMessage
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(TemplateBody))
+                return "Enter template content to see the live document preview.";
+            var errors = DocumentTemplateRules.Validate(AnnualDocumentKind.PrivacyPractices, TemplateBody);
+            return errors.Count == 0
+                ? "Template is valid and ready to publish as a new version."
+                : string.Join(" ", errors.SelectMany(item => item.Value));
+        }
+    }
+    public bool CanPublishTemplate => CanManageTemplates &&
+        DocumentTemplateRules.Validate(AnnualDocumentKind.PrivacyPractices, TemplateBody).Count == 0;
     public event Action<AgencyReleaseResult>? FileReady;
     public Func<Task<(string Hash, long Length)?>>? ChooseVerificationFileAsync { get; set; }
     partial void OnIsBusyChanged(bool value) => NotifyState();
@@ -41,7 +78,14 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         requests.Invalidate(); status = null; Artifacts.Clear(); IsBusy = false;
         Signatures?.SetContext(person?.Id ?? 0, []);
         ReceivedOn = null; GoodFaithEffortReason = ""; VerificationArtifactId = 0;
-        Reminder = ""; WindowDescription = ""; Message = "Load the selected annual cycle."; NotifyState();
+        Reminder = ""; WindowDescription = ""; Message = "Load the selected annual cycle.";
+        OnPropertyChanged(nameof(TemplatePreviewContext)); NotifyState();
+    }
+    partial void OnTemplateBodyChanged(string value)
+    {
+        OnPropertyChanged(nameof(TemplateValidationMessage));
+        OnPropertyChanged(nameof(CanPublishTemplate));
+        PublishTemplateCommand.NotifyCanExecuteChanged();
     }
     private void NotifyState()
     {
@@ -55,7 +99,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         IsBusy = false; ReceivedOn = null; GoodFaithEffortReason = ""; VerificationArtifactId = 0;
         Message = ""; Reminder = ""; WindowDescription = "";
         CycleStart = selected?.EffectiveDate is DateTime effective ? AnnualPacketWindow.SuggestedCycle(effective, DateTime.Today, 30) : null;
-        NotifyState(); _ = InitializeAsync();
+        OnPropertyChanged(nameof(TemplatePreviewContext)); NotifyState(); _ = InitializeAsync();
     }
     private async Task InitializeAsync()
     {
@@ -133,10 +177,22 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
             TemplateBody = versions.OrderByDescending(x => x.AgencyId is not null).ThenByDescending(x => x.Version).FirstOrDefault()?.Body ?? ""; }
         catch (Exception) { Message = "The privacy template could not be loaded."; }
     }
-    [RelayCommand] private async Task PublishTemplateAsync()
+    [RelayCommand(CanExecute = nameof(CanPublishTemplate))] private async Task PublishTemplateAsync()
     {
         if (!CanManageTemplates) return;
         try { await templates.PublishAsync(AnnualDocumentKind.PrivacyPractices, TemplateBody); Message = "A new agency template version was published."; }
         catch (Exception) { Message = "The template was not published. Check its text and supported tokens."; }
+    }
+
+    private static string? ComposeAddress(string? street, string? city, string? state, string? zip)
+    {
+        var locality = string.Join(", ", new[] { city?.Trim(), state?.Trim() }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+        if (!string.IsNullOrWhiteSpace(zip))
+            locality = string.IsNullOrWhiteSpace(locality) ? zip.Trim() : $"{locality} {zip.Trim()}";
+        var lines = new[] { street?.Trim(), locality }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+        var result = string.Join(Environment.NewLine, lines);
+        return result.Length == 0 ? null : result;
     }
 }

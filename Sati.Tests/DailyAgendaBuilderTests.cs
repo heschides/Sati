@@ -47,6 +47,31 @@ public sealed class DailyAgendaBuilderTests
     }
 
     [Fact]
+    public void DisabledSatiAuthoringDoesNotDisableEvergreenAttestationBillingGates()
+    {
+        var person = PersonWithForms(
+            "Alex",
+            new Form(FormType.PCP, Today.AddDays(-2)),
+            new Form(FormType.ComprehensiveAssessment, Today.AddDays(-1)));
+        var settings = new Settings
+        {
+            IsPersonCenteredPlanAuthoringEnabled = false,
+            IsComprehensiveAssessmentAuthoringEnabled = false,
+            BillingComplianceRequirements =
+                BillingComplianceRequirements.Pcp |
+                BillingComplianceRequirements.ComprehensiveAssessment
+        };
+
+        var result = new DailyAgendaBuilder(new StubUpcomingEventService())
+            .Build([person], settings, Today);
+
+        Assert.Equal(2, result.OverdueTotal);
+        Assert.All(result.OverdueItems, item => Assert.True(item.BlocksBilling));
+        Assert.Contains(result.OverdueItems, item => item.Title == "PCP");
+        Assert.Contains(result.OverdueItems, item => item.Title == "Comprehensive Assessment");
+    }
+
+    [Fact]
     public void LookbackShowsFiveOldestWhileKeepingTheTrueTotal()
     {
         var forms = Enumerable.Range(1, 8)

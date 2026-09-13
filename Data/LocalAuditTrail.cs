@@ -57,6 +57,8 @@ internal static class LocalAuditActions
     // Mirrors AuditActions.PersonReassigned on the API side.
     public const string PersonReassigned = "person.reassigned";
     public const string PersonSsnUpdated = "person.ssn-updated";
+    public const string PersonPhotoUpdated = "person.photo-updated";
+    public const string PersonPhotoRemoved = "person.photo-removed";
     // A read is the disclosure, so it is recorded separately from whatever document
     // occasioned it. Mirrors AuditActions.PersonSsnDecrypted on the API side.
     public const string PersonSsnRevealed = "person.ssn-revealed";

@@ -1825,6 +1825,52 @@ namespace Sati.Migrations
                     b.ToTable("PersonContacts");
                 });
 
+            modelBuilder.Entity("Sati.Models.PersonPhoto", b =>
+                {
+                    b.Property<int>("PersonId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AgencyId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentSha256")
+                        .IsRequired()
+                        .HasColumnType("char(64)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("PixelHeight")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PixelWidth")
+                        .HasColumnType("int");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("PersonId");
+
+                    b.HasIndex("AgencyId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("PersonPhotos");
+                });
+
             modelBuilder.Entity("Sati.Models.PersonProvider", b =>
                 {
                     b.Property<int>("Id")
@@ -2231,7 +2277,6 @@ namespace Sati.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("BillingComplianceRequirements")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(31);
 
@@ -2311,6 +2356,21 @@ namespace Sati.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("nvarchar(max)")
                         .HasDefaultValue("[\"Other\"]");
+
+                    b.Property<bool>("IsClassificationAuthoringEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsComprehensiveAssessmentAuthoringEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsPersonCenteredPlanAuthoringEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<decimal>("PassthroughRate")
                         .ValueGeneratedOnAdd()
@@ -3839,6 +3899,27 @@ namespace Sati.Migrations
                         .IsRequired();
 
                     b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("Sati.Models.PersonPhoto", b =>
+                {
+                    b.HasOne("Sati.Models.Agency", null)
+                        .WithMany()
+                        .HasForeignKey("AgencyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sati.Person", null)
+                        .WithOne()
+                        .HasForeignKey("Sati.Models.PersonPhoto", "PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sati.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sati.Models.PersonProvider", b =>

@@ -205,6 +205,53 @@ public sealed class ConcurrencySafetyTests
 
         Assert.False(await viewModel.SaveAllScratchpadsAsync());
         Assert.Equal(1, service.SaveCalls);
+
+        service.RejectSaves = false;
+        await viewModel.ResumeAfterReauthenticationAsync();
+
+        Assert.False(viewModel.HasScratchpadSessionExpired);
+        Assert.Equal(3, service.SaveCalls);
+        Assert.Equal(["unsaved today", "unsaved tomorrow"], service.SavedContents);
+    }
+
+    [Fact]
+    public async Task SuspendedCleanScratchpadDoesNotReportASuccessfulFlush()
+    {
+        var service = new BlockingScratchpadService();
+        service.ReleaseFirstSave.TrySetResult();
+        var viewModel = new ScratchpadViewModel(
+            service,
+            CreateSession(UserRole.CaseManager));
+        await viewModel.InitializeAsync();
+
+        viewModel.SuspendForReauthentication();
+
+        Assert.False(await viewModel.SaveAllScratchpadsAsync());
+        Assert.Empty(service.SavedContents);
+    }
+
+    [Fact]
+    public async Task RolloverSessionExpiryPreservesDraftsAndRetriesAfterSignIn()
+    {
+        var service = new RolloverSessionExpiringScratchpadService();
+        var viewModel = new ScratchpadViewModel(
+            service,
+            CreateSession(UserRole.CaseManager));
+        await viewModel.InitializeAsync();
+
+        Assert.False(await viewModel.RollForwardIfNeededAsync());
+
+        Assert.True(viewModel.HasScratchpadSessionExpired);
+        Assert.Equal("previous day's work", viewModel.ScratchpadContent);
+        Assert.Equal("work planned before expiry", viewModel.TomorrowAgendaContent);
+        Assert.Equal(1, service.TomorrowLoads);
+
+        await viewModel.ResumeAfterReauthenticationAsync();
+
+        Assert.False(viewModel.HasScratchpadSessionExpired);
+        Assert.Equal("current day's work", viewModel.ScratchpadContent);
+        Assert.Equal("next workday's agenda", viewModel.TomorrowAgendaContent);
+        Assert.Equal(2, service.TomorrowLoads);
     }
 
     [Fact]
@@ -413,6 +460,8 @@ public sealed class ConcurrencySafetyTests
     private sealed class ExpiredScratchpadService : IScratchpadService
     {
         public int SaveCalls { get; private set; }
+        public bool RejectSaves { get; set; } = true;
+        public List<string> SavedContents { get; } = [];
 
         public Task<Scratchpad> LoadTodayAsync(int userId) => Task.FromResult(new Scratchpad
         {
@@ -437,8 +486,69 @@ public sealed class ConcurrencySafetyTests
         public Task SaveAsync(Scratchpad scratchpad)
         {
             SaveCalls++;
-            throw new ScratchpadSessionExpiredException(new InvalidOperationException("401"));
+            if (RejectSaves)
+                throw new ScratchpadSessionExpiredException(new InvalidOperationException("401"));
+
+            SavedContents.Add(scratchpad.Content);
+            scratchpad.Revision++;
+            return Task.CompletedTask;
         }
+    }
+
+    private sealed class RolloverSessionExpiringScratchpadService : IScratchpadService
+    {
+        private int _todayLoads;
+        public int TomorrowLoads { get; private set; }
+
+        public Task<Scratchpad> LoadTodayAsync(int userId)
+        {
+            _todayLoads++;
+            if (_todayLoads == 1)
+            {
+                return Task.FromResult(new Scratchpad
+                {
+                    Id = 1,
+                    UserId = userId,
+                    Date = DateTime.Today.AddDays(-1),
+                    Content = "previous day's work",
+                    Revision = 1
+                });
+            }
+
+            if (_todayLoads == 2)
+            {
+                return Task.FromException<Scratchpad>(new SessionExpiredException(
+                    new InvalidOperationException("Synthetic expired rollover request.")));
+            }
+
+            return Task.FromResult(new Scratchpad
+            {
+                Id = 2,
+                UserId = userId,
+                Date = DateTime.Today,
+                Content = "current day's work",
+                Revision = 1
+            });
+        }
+
+        public Task<Scratchpad> LoadTomorrowAsync(int userId)
+        {
+            TomorrowLoads++;
+            return Task.FromResult(new Scratchpad
+            {
+                Id = 3,
+                UserId = userId,
+                Date = WorkAgendaDates.NextWorkday(DateTime.Today),
+                Content = _todayLoads <= 1 ? "work planned before expiry" : "next workday's agenda",
+                Revision = 1
+            });
+        }
+
+        public Task<List<Scratchpad>> GetHistoryAsync(int userId) => Task.FromResult(new List<Scratchpad>());
+        public Task<ScratchpadComment> AddCommentAsync(
+            int scratchpadId, int userId, string authorDisplayName, string content) =>
+            throw new NotSupportedException();
+        public Task SaveAsync(Scratchpad scratchpad) => Task.CompletedTask;
     }
 
     private sealed class BlockingBillingService : IBillingService

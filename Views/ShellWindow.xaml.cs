@@ -388,8 +388,8 @@ namespace Sati.Views
 
                 if (_shellViewModel.CanResumeReauthenticatedSession(user))
                 {
-                    _shellViewModel.ResumeReauthenticatedSession(user);
                     sameAccountReauthenticated = true;
+                    await _shellViewModel.ResumeReauthenticatedSessionAsync(user);
                     return;
                 }
 

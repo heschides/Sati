@@ -13,6 +13,7 @@ using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati;
 using Sati.Contracts.V1;
+using Sati.Data;
 using Sati.Forms;
 
 namespace Sati.Api.Endpoints;
@@ -34,9 +35,12 @@ internal static partial class ApiEndpoints
         MapSupervisor(api);
         MapCaseload(api);
         MapPeople(api);
+        MapPersonPhotos(api);
         MapReviews(api);
         MapAssessments(api);
         MapSafetyPlans(api);
+        MapCwicPackets(api);
+        MapHousingSupportFunds(api);
         MapChat(api);
         MapAnnualPackets(api);
         MapSignatures(api);
@@ -1687,6 +1691,15 @@ internal static partial class ApiEndpoints
             var row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
             if (row is null)
                 return actor.HasSupervisorPermissions ? Results.NotFound() : Results.Forbid();
+            var scheduleOwnerId = row.Person.UserId;
+            db.ChangeTracker.Clear();
+            await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(db,
+                actor.AgencyId, scheduleOwnerId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                return Results.Unauthorized();
+            row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
+            if (row is null || row.Person.UserId != scheduleOwnerId)
+                return StaleNoteConflict();
             if (request.ExpectedRevision != row.Note.Revision)
                 return StaleNoteConflict();
             if (!NoteWorkflow.CanSupervisorTransition(row.Note.Status, NoteWorkflow.Approved))
@@ -1706,6 +1719,10 @@ internal static partial class ApiEndpoints
                     string.Empty));
             }
 
+            var reviewTimeConflict = await FindReviewServiceTimeProblemAsync(db, row, actor.AgencyId, cancellationToken);
+            if (reviewTimeConflict is not null)
+                return reviewTimeConflict;
+
             if (request.MaximumUnits is int limit)
             {
                 if (!NoteReviewRules.Eligible(limit, row.Note.Status,
@@ -1713,18 +1730,6 @@ internal static partial class ApiEndpoints
                     row.Note.EventDate, row.Note.Minutes, row.Note.StartTime, clock.Today))
                     return Results.Conflict(new ApiErrorDto("batch_ineligible",
                         "This note is not eligible for automatic approval.", string.Empty));
-                var candidate = ServiceTimeline.TryCreateBlock(row.Note.Id, row.Note.StartTime,
-                    row.Note.Minutes, "Logged");
-                if (candidate is not null && row.Note.EventDate is DateTime date)
-                {
-                    var day = await LoadDayNotesAsync(db, row.Person.UserId, actor.AgencyId, date, cancellationToken);
-                    var blocks = day.Select(item => ServiceTimeline.TryCreateBlock(item.Note.Id,
-                        item.Note.StartTime, item.Note.Minutes, ContractMapper.NoteStatusName(item.Note.Status)))
-                        .OfType<ServiceBlock>();
-                    if (ServiceTimeline.FindConflicts(candidate, blocks).Count > 0)
-                        return Results.Conflict(new ApiErrorDto("batch_ineligible",
-                            "This note overlaps another service time.", string.Empty));
-                }
             }
 
             row.Note.Status = 6;
@@ -1736,6 +1741,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await scheduleWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -1765,10 +1771,23 @@ internal static partial class ApiEndpoints
             var row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
             if (row is null)
                 return actor.HasSupervisorPermissions ? Results.NotFound() : Results.Forbid();
+            var scheduleOwnerId = row.Person.UserId;
+            db.ChangeTracker.Clear();
+            await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(db,
+                actor.AgencyId, scheduleOwnerId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                return Results.Unauthorized();
+            row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
+            if (row is null || row.Person.UserId != scheduleOwnerId)
+                return StaleNoteConflict();
             if (request.ExpectedRevision != row.Note.Revision)
                 return StaleNoteConflict();
             if (!NoteWorkflow.CanSupervisorTransition(row.Note.Status, NoteWorkflow.Approved))
                 return Results.Conflict(new ApiErrorDto("invalid_note_status", "Only logged notes can be approved.", string.Empty));
+
+            var reviewTimeConflict = await FindReviewServiceTimeProblemAsync(db, row, actor.AgencyId, cancellationToken);
+            if (reviewTimeConflict is not null)
+                return reviewTimeConflict;
 
             var now = DateTime.UtcNow;
             row.Note.Status = 6;
@@ -1783,6 +1802,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await scheduleWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -3137,6 +3157,9 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
 
@@ -3154,6 +3177,9 @@ internal static partial class ApiEndpoints
             AuditTrail auditTrail, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             if (authorUserId != actor.UserId ||
                 !await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
@@ -3191,6 +3217,9 @@ internal static partial class ApiEndpoints
             try { using var _ = JsonDocument.Parse(request.DocumentJson); }
             catch (JsonException) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["document"] = ["Assessment data is invalid."] }); }
             var actor = Actor.From(principal);
+            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             var assessment = await db.ComprehensiveAssessments.SingleOrDefaultAsync(x => x.Id == assessmentId, cancellationToken);
             if (assessment is null ||
                 !await TenantAccess.CanAuthorAssessmentAsync(db, actor, assessment, cancellationToken))
@@ -3219,6 +3248,9 @@ internal static partial class ApiEndpoints
             AuditTrail auditTrail, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             var assessment = await db.ComprehensiveAssessments.SingleOrDefaultAsync(x => x.Id == assessmentId, cancellationToken);
             if (assessment is null || authorUserId != actor.UserId ||
                 !await TenantAccess.CanAuthorAssessmentAsync(db, actor, assessment, cancellationToken))
@@ -3247,6 +3279,9 @@ internal static partial class ApiEndpoints
             int personId, int preferredAuthorUserId, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if (!await IsPersonCenteredPlanAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == personId, cancellationToken);
             if (person is null || person.UserId != preferredAuthorUserId ||
@@ -3937,8 +3972,14 @@ internal static partial class ApiEndpoints
             var validation = ValidateNote(request);
             if (validation is not null)
                 return Results.ValidationProblem(validation);
+            await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(db,
+                actor.AgencyId, actor.UserId, cancellationToken);
             if (!await TenantAccess.OwnsPersonAsync(db, actor, request.PersonId, cancellationToken))
                 return Results.NotFound();
+
+            var submissionProblem = await FindNoteSubmissionProblemAsync(db, actor, request, clock.Today, cancellationToken);
+            if (submissionProblem is not null)
+                return submissionProblem;
 
             var timeConflict = await FindServiceTimeProblemAsync(db, actor, request, null, cancellationToken);
             if (timeConflict is not null)
@@ -3963,6 +4004,7 @@ internal static partial class ApiEndpoints
             };
             db.Notes.Add(note);
             await db.SaveChangesAsync(cancellationToken);
+            await scheduleWrite.CommitAsync(cancellationToken);
             return Results.Ok(ContractMapper.ToNote(note));
         });
 
@@ -3980,6 +4022,8 @@ internal static partial class ApiEndpoints
             var validation = ValidateNote(request);
             if (validation is not null)
                 return Results.ValidationProblem(validation);
+            await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(db,
+                actor.AgencyId, actor.UserId, cancellationToken);
             var row = await (from note in db.Notes
                              join person in TenantAccess.OwnedPeople(db, actor) on note.PersonId equals person.Id
                              where person.UserId == actor.UserId &&
@@ -4017,6 +4061,10 @@ internal static partial class ApiEndpoints
                     return Results.NotFound();
             }
 
+            var submissionProblem = await FindNoteSubmissionProblemAsync(db, actor, request, clock.Today, cancellationToken);
+            if (submissionProblem is not null)
+                return submissionProblem;
+
             var timeConflict = await FindServiceTimeProblemAsync(db, actor, request, id, cancellationToken);
             if (timeConflict is not null)
                 return timeConflict;
@@ -4051,6 +4099,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await scheduleWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -5118,6 +5167,14 @@ internal static partial class ApiEndpoints
             if (errors.Count > 0)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = errors.ToArray() });
 
+            // Older database rows can predate the service-time reservation guard.
+            // Approval normally rechecks this rule, but claim creation is the final
+            // financial boundary and must not turn a legacy overlap into billing.
+            var serviceTimeConflict = await FindReviewServiceTimeProblemAsync(
+                db, row, actor.AgencyId, cancellationToken);
+            if (serviceTimeConflict is not null)
+                return serviceTimeConflict;
+
             var serviceDate = row.Note.EventDate!.Value.Date;
             var period = await db.BillingPeriods
                 .Include(candidate => candidate.Lines)
@@ -5335,45 +5392,19 @@ internal static partial class ApiEndpoints
             var normalizedKey = parsedKey.ToString("N");
             await using var transaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                return Results.Unauthorized();
             var previous = await db.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(generation =>
                 generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                 generation.IdempotencyKey == normalizedKey, cancellationToken);
-            if (previous is not null)
+            if (previous is not null && (previous.BillingPeriodId != periodId || previous.IsTest != request.IsTest))
                 return ReplayEdiOrConflict(previous, periodId, request.IsTest);
 
-            var period = await (from candidate in db.BillingPeriods.AsNoTracking().Include(value => value.Lines)
-                                join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
-                                where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
-                                select candidate).SingleOrDefaultAsync(cancellationToken);
-            if (period is null)
-                return Results.NotFound();
-            if (period.Lines.Count == 0)
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["period"] = ["The billing period has no claim lines."] });
-            if (period.Status != 1)
-                return Results.Conflict(new ApiErrorDto(
-                    "billing_period_not_submitted",
-                    "Submit and lock the billing period before generating its 837P file.",
-                    string.Empty));
-            if (EdiReadinessConflict(period) is { } readinessConflict)
-                return readinessConflict;
-
-            var noteIds = period.Lines.Select(line => line.NoteId).Distinct().ToList();
-            var sourceRows = await (from note in db.Notes.AsNoTracking()
-                                    join person in db.People.AsNoTracking() on note.PersonId equals person.Id
-                                    join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
-                                    where noteIds.Contains(note.Id) &&
-                                          owner.AgencyId == actor.AgencyId &&
-                                          note.AgencyId == actor.AgencyId &&
-                                          person.AgencyId == actor.AgencyId
-                                    select new { Note = note, Person = person })
-                .ToListAsync(cancellationToken);
-            if (sourceRows.Select(row => row.Note.Id).Distinct().Count() != noteIds.Count)
-            {
-                return Results.Conflict(new ApiErrorDto(
-                    "invalid_billing_source",
-                    "The billing period contains a note outside the agency boundary or a missing source record.",
-                    string.Empty));
-            }
+            var export = await LoadExportablePeriodAsync(db, actor, periodId, cancellationToken);
+            if (export.Failure is not null) return export.Failure;
+            var period = export.Period!;
+            if (previous is not null)
+                return ReplayEdiOrConflict(previous, periodId, request.IsTest);
 
             var generatedAt = DateTime.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
@@ -5421,7 +5452,14 @@ internal static partial class ApiEndpoints
             catch (DbUpdateException exception) when (IsDuplicateEdiGeneration(exception))
             {
                 await transaction.RollbackAsync(cancellationToken);
+                await transaction.DisposeAsync();
                 db.ChangeTracker.Clear();
+                // Rollback ended the first authorization/source read boundary.
+                // A competing completed file is not an exemption from the gate.
+                await using var replayTransaction = await db.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable, cancellationToken);
+                var replay = await LoadExportablePeriodAsync(db, actor, periodId, cancellationToken);
+                if (replay.Failure is not null) return replay.Failure;
                 var completed = await db.EdiGenerations.AsNoTracking().SingleAsync(generation =>
                     generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                     generation.IdempotencyKey == normalizedKey, cancellationToken);
@@ -5763,6 +5801,47 @@ internal static partial class ApiEndpoints
 
     private static void MapForms(RouteGroupBuilder api)
     {
+        api.MapGet("/people/{personId:int}/forms/{type}/attestations", async Task<IResult> (
+            int personId,
+            string type,
+            int formId,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
+                candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
+            if (person is null ||
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
+                return Results.NotFound();
+            var formExists = await db.Forms.AsNoTracking().AnyAsync(candidate =>
+                candidate.Id == formId && candidate.PersonId == personId && candidate.Type == type,
+                cancellationToken);
+            if (!formExists)
+                return Results.NotFound();
+
+            var history = await (
+                from entry in db.FormAttestations.AsNoTracking()
+                join user in db.Users.AsNoTracking()
+                    on entry.ActorUserId equals (int?)user.Id into actorUsers
+                from user in actorUsers.DefaultIfEmpty()
+                where entry.FormId == formId
+                orderby entry.RecordedAtUtc descending, entry.Id descending
+                select new FormAttestationHistoryDto(
+                    entry.Id,
+                    entry.FormId,
+                    entry.Kind,
+                    entry.CompletedOn,
+                    entry.ActorKind,
+                    entry.ActorUserId,
+                    user == null ? "Sati" : user.DisplayName,
+                    entry.RecordedAtUtc,
+                    entry.EvidenceNoteId,
+                    entry.Reason)).ToListAsync(cancellationToken);
+            return Results.Ok(history);
+        });
+
         api.MapGet("/people/{personId:int}/forms/{type}/prerequisite", async Task<IResult> (
             int personId,
             string type,
@@ -6440,6 +6519,29 @@ internal static partial class ApiEndpoints
                       select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
     }
 
+    private static async Task<IResult?> FindNoteSubmissionProblemAsync(
+        ApiDbContext db, Actor actor, SaveNoteRequest request, DateTime today,
+        CancellationToken cancellationToken)
+    {
+        ContractMapper.TryParseNoteStatus(request.Status, out var status);
+        if (status != NoteWorkflow.Logged) return null;
+
+        // Ownership has already been checked. Read the target consumer's current
+        // persisted evidence, never the client's displayed forms or FormType tag.
+        var person = await TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+            .SingleAsync(x => x.Id == request.PersonId, cancellationToken);
+        var forms = await db.Forms.AsNoTracking().Where(x => x.PersonId == person.Id)
+            .Select(x => new ComplianceFormSnapshot(x.Type, x.DueDate, x.CompletedDate))
+            .ToListAsync(cancellationToken);
+        var requirements = await db.Settings.AsNoTracking().Where(x => x.AgencyId == actor.AgencyId)
+            .Select(x => (BillingComplianceRequirements?)x.BillingComplianceRequirements)
+            .SingleOrDefaultAsync(cancellationToken) ?? BillingComplianceGate.DefaultRequirements;
+        var result = NoteSubmissionGate.Evaluate(status, person.EffectiveDate, forms,
+            request.EventDate, today, requirements);
+        return result.Passed ? null : Results.Conflict(new ApiErrorDto(
+            NoteSubmissionGate.RefusalCode, result.Message, string.Empty));
+    }
+
     private static BillingComplianceResult EvaluatePersonCompliance(
         ServerPerson person,
         IReadOnlyList<ServerForm> forms,
@@ -6862,6 +6964,24 @@ internal static partial class ApiEndpoints
         return settings;
     }
 
+    private static async Task<bool> IsComprehensiveAssessmentAuthoringEnabledAsync(
+        ApiDbContext db,
+        int agencyId,
+        CancellationToken cancellationToken) =>
+        await db.Settings.AsNoTracking()
+            .Where(settings => settings.AgencyId == agencyId)
+            .Select(settings => (bool?)settings.IsComprehensiveAssessmentAuthoringEnabled)
+            .SingleOrDefaultAsync(cancellationToken) ?? false;
+
+    private static async Task<bool> IsPersonCenteredPlanAuthoringEnabledAsync(
+        ApiDbContext db,
+        int agencyId,
+        CancellationToken cancellationToken) =>
+        await db.Settings.AsNoTracking()
+            .Where(settings => settings.AgencyId == agencyId)
+            .Select(settings => (bool?)settings.IsPersonCenteredPlanAuthoringEnabled)
+            .SingleOrDefaultAsync(cancellationToken) ?? false;
+
     private sealed record DayNoteRow(ServerNote Note, ServerPerson Person);
 
     private static async Task<List<DayNoteRow>> LoadDayNotesAsync(
@@ -6885,12 +7005,23 @@ internal static partial class ApiEndpoints
     /// this runs on every create and update regardless of what the client sent.
     /// Returns null when the request claims no time or claims only free time.
     /// </summary>
-    private static async Task<IResult?> FindServiceTimeProblemAsync(
+    private static Task<IResult?> FindReviewServiceTimeProblemAsync(
+        ApiDbContext db, ReviewableNote row, int agencyId, CancellationToken cancellationToken) =>
+        FindServiceTimeProblemAsync(db, row.Person.UserId, agencyId,
+            new SaveNoteRequest(row.Note.Narrative, row.Note.EventDate, "Logged", row.Note.Minutes,
+                row.Note.StartTime, row.Person.Id, null, null, null, null), row.Note.Id, cancellationToken);
+
+    private static Task<IResult?> FindServiceTimeProblemAsync(
         ApiDbContext db,
         Actor actor,
         SaveNoteRequest request,
         int? editingNoteId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        FindServiceTimeProblemAsync(db, actor.UserId, actor.AgencyId, request, editingNoteId, cancellationToken);
+
+    private static async Task<IResult?> FindServiceTimeProblemAsync(
+        ApiDbContext db, int caseManagerId, int agencyId, SaveNoteRequest request,
+        int? editingNoteId, CancellationToken cancellationToken)
     {
         var candidate = ServiceTimeline.TryCreateBlock(
             editingNoteId ?? 0, request.StartTime, request.Minutes, request.Status);
@@ -6904,7 +7035,7 @@ internal static partial class ApiEndpoints
         if (request.EventDate is not DateTime eventDate)
             return null;
 
-        var sameDay = await LoadDayNotesAsync(db, actor.UserId, actor.AgencyId, eventDate, cancellationToken);
+        var sameDay = await LoadDayNotesAsync(db, caseManagerId, agencyId, eventDate, cancellationToken);
         var blocks = sameDay
             .Select(row => ServiceTimeline.TryCreateBlock(
                 row.Note.Id,

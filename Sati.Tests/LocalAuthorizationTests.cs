@@ -92,6 +92,38 @@ public sealed class LocalAuthorizationTests
     }
 
     [Fact]
+    public async Task DisabledAssessmentAuthoringRejectsLocalBuilderWithoutChangingBillingPolicy()
+    {
+        await using var fixture = await LocalFixture.CreateAsync(enableAssessmentAuthoring: false);
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var settings = await db.Settings.SingleAsync(x => x.AgencyId == fixture.CaseManagerOne.AgencyId);
+            settings.BillingComplianceRequirements =
+                Sati.Contracts.V1.BillingComplianceRequirements.Pcp |
+                Sati.Contracts.V1.BillingComplianceRequirements.ComprehensiveAssessment;
+            await db.SaveChangesAsync();
+        }
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var service = new ComprehensiveAssessmentService(fixture.Factory, session);
+
+        var readError = await Assert.ThrowsAsync<NotSupportedException>(() =>
+            service.GetLatestForAgendaAsync(fixture.PersonOneId));
+        var createError = await Assert.ThrowsAsync<NotSupportedException>(() =>
+            service.GetOrCreateDraftAsync(fixture.PersonOneId, fixture.CaseManagerOne.Id));
+
+        Assert.Contains("Evergreen completion", readError.Message, StringComparison.Ordinal);
+        Assert.Contains("Evergreen completion", createError.Message, StringComparison.Ordinal);
+        await using var verification = fixture.Factory.CreateDbContext();
+        var requirements = await verification.Settings
+            .Where(settings => settings.AgencyId == fixture.CaseManagerOne.AgencyId)
+            .Select(settings => settings.BillingComplianceRequirements)
+            .SingleAsync();
+        Assert.True((requirements & Sati.Contracts.V1.BillingComplianceRequirements.Pcp) != 0);
+        Assert.True((requirements & Sati.Contracts.V1.BillingComplianceRequirements.ComprehensiveAssessment) != 0);
+    }
+
+    [Fact]
     public async Task SupervisorAllScopeNeverCrossesAssignmentOrAgency()
     {
         await using var fixture = await LocalFixture.CreateAsync();
@@ -176,7 +208,7 @@ public sealed class LocalAuthorizationTests
         public int UnassignedNoteId { get; private set; }
         public int ForeignNoteId { get; private set; }
 
-        public static async Task<LocalFixture> CreateAsync()
+        public static async Task<LocalFixture> CreateAsync(bool enableAssessmentAuthoring = true)
         {
             var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
@@ -184,17 +216,28 @@ public sealed class LocalAuthorizationTests
                 .UseSqlite(connection)
                 .Options;
             var fixture = new LocalFixture(connection, options);
-            await fixture.SeedAsync();
+            await fixture.SeedAsync(enableAssessmentAuthoring);
             return fixture;
         }
 
-        private async Task SeedAsync()
+        private async Task SeedAsync(bool enableAssessmentAuthoring)
         {
             await using var db = Factory.CreateDbContext();
             await db.Database.EnsureCreatedAsync();
             db.Agencies.AddRange(
                 new Agency { Id = 101, Name = "Agency One" },
                 new Agency { Id = 102, Name = "Agency Two" });
+            db.Settings.AddRange(
+                new Settings
+                {
+                    AgencyId = 101,
+                    IsComprehensiveAssessmentAuthoringEnabled = enableAssessmentAuthoring
+                },
+                new Settings
+                {
+                    AgencyId = 102,
+                    IsComprehensiveAssessmentAuthoringEnabled = enableAssessmentAuthoring
+                });
 
             SupervisorOne = User.Create(1101, "supervisor-one-local", "Supervisor One", "hash", "salt", UserRole.Supervisor, null, 101);
             SupervisorTwo = User.Create(1201, "supervisor-two-local", "Supervisor Two", "hash", "salt", UserRole.Supervisor, null, 102);

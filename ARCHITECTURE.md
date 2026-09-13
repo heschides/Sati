@@ -1,6 +1,53 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-09-10.*
+*Living document. Updated during structured review sessions. Last updated: 2026-09-13.*
+
+## Housing Support Funds application
+
+`HousingSupportFundsRules` owns the June 30, 2025 source label, the form's closed housing choices,
+$3,000 request ceiling, subsidy detail requirement, bounded text, and review-item wording. The
+request contains application-specific answers, while `HousingSupportFundsService` and the API route
+derive consumer identity, waiver, Shared Living status, guardian, assigned case manager, and agency
+provider facts after current session, capability, caseload, and tenant checks. Profile facts cannot
+be substituted by the request.
+
+`HousingSupportFundsPdfGenerator` edits the exact fillable three-page OADS AcroForm supplied for
+this feature. It retains the original page content and interactive fields, installs portable field
+appearances, and wraps the narrative inside its printed box. It never fills the consumer/guardian
+signature or date fields and never fills any field on the page labeled DHHS Staff Only. The source
+has a fixed revision-bearing resource name and regression hash, so replacement is an explicit,
+reviewed change.
+
+The entry workspace shows the application structure and profile-derived facts while the user types.
+Shared Living, an existing housing subsidy, missing supporting proof, and unsigned attestation are
+prominent review items taken from the published form and official program page; Sati does not turn
+them into an unreviewed eligibility determination. Each generation returns a no-store PDF, appends
+audits, and records a versioned `HousingSupportFundsApplication` Draft artifact through the existing
+append-and-supersede mechanism. It is not an annual packet member and satisfies no billing gate.
+Electronic signing, transmission to OADS, receipt tracking, and approval status are intentionally
+outside this draft-generation workflow.
+
+## CWIC / Benefits Counseling referral packet
+
+`CwicPacketRules` owns the packet's bounded request contract, closed choices, one-year Maine DOL
+release window, source label, and incomplete-field advisory. The request deliberately excludes
+consumer identity, birth date, age, and SSN. `CwicPacketService` and the API route derive identity
+from the authorized person; the API decrypts the SSN only in process and returns PDF bytes rather
+than plaintext. The local path repeats current-session/caseload authorization and uses the existing
+DPAPI-backed SSN envelope. Both paths audit SSN reads separately from packet generation.
+
+`CwicPacketPdfGenerator` imports the exact ten-page MaineHealth packet supplied for this feature
+and draws values over it. It does not recreate logos or legal text. The embedded resource has a
+fixed revision-bearing name and a regression hash, so replacing the source is an explicit reviewed
+change. The entry workspace previews the same user-controlled answers live while the final PDF
+retains every original page. Signatures, signature dates, and unanswered sensitive choices stay
+blank.
+
+Each generation records a `CwicReferralPacket` `DocumentArtifact` with MaineHealth/source-version
+provenance and `Draft` origin. Regeneration uses the existing append-and-supersede mechanism; it
+does not rewrite the previous artifact. The packet is not an annual-packet member and does not
+satisfy a billing form. Electronic signature routing is policy-disabled pending written confirmation
+for the packet's several independent authorization/signature sections.
 
 ## Account lifecycle and session revocation — September 11 follow-up
 
@@ -2279,3 +2326,20 @@ per-note approval method with optional `MaximumUnits`. Both persistence implemen
 `NoteReviewRules` and `ServiceTimeline`; existing compliance, scope, optimistic concurrency and
 audit remain authoritative. The API approval DTO gains only an optional threshold; no schema
 migration or new write endpoint is required. Deploy the updated API before distributing this client.
+
+## Consumer profile photographs — 2026-09-12
+
+`PersonPhoto` is a separate, one-row-per-consumer current-media record. Its bounded JPG/PNG bytes
+never join `Person` or the caseload query, so opening the client list does not multiply image memory
+or copy binary data into every `PersonVersion` snapshot. `PersonPhotoRules` identifies the format
+from the bytes and applies the shared 5 MB, 4096-pixel-side and total-pixel limits before either the
+local or HTTP-backed service writes.
+
+An authorized consumer reader may load the dedicated, non-cacheable photo route; only the assigned
+case manager may replace or remove it. Writes recheck ownership in a serializable transaction, use
+an expected revision, and append PHI-free update/removal audit actions. The desktop clears the old
+image as soon as selection changes and uses `LatestRequestTracker`, so a delayed response cannot
+place one consumer's portrait on another profile. The view displays the original image without
+an opacity feather and exposes named keyboard-accessible change and remove actions. Migration
+`20260912053013_AddPersonPhotos` creates the storage; it was generated
+and tested here but was not applied to a real database or deployment.

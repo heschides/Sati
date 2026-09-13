@@ -54,6 +54,10 @@
                         views:NavTab.IsActive="{Binding IsAuthorizedRepresentativeSubActive}" Command="{Binding NavigateToAuthorizedRepresentativeCommand}" />
                 <Button Content="Releases" Style="{StaticResource NavTabButton}" AutomationProperties.Name="Release forms"
                         views:NavTab.IsActive="{Binding IsReleasesSubActive}" Command="{Binding NavigateToReleasesCommand}" />
+                <Button Content="CWIC Packet" Style="{StaticResource NavTabButton}" AutomationProperties.Name="Benefits counseling referral packet"
+                        views:NavTab.IsActive="{Binding IsCwicPacketSubActive}" Command="{Binding NavigateToCwicPacketCommand}" />
+                <Button Content="Housing Funds" Style="{StaticResource NavTabButton}" AutomationProperties.Name="Housing Support Funds application"
+                        views:NavTab.IsActive="{Binding IsHousingSupportFundsSubActive}" Command="{Binding NavigateToHousingSupportFundsCommand}" />
      </StackPanel>
     </ScrollViewer>
    </Border>

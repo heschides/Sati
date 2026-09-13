@@ -13,6 +13,17 @@ namespace Sati.Models
         public int Revision { get; set; } = 1;
         public int AnnualPacketOpenDaysBefore { get; set; } = Contracts.V1.AnnualPacketWindow.DefaultOpenDays;
 
+        // Optional, unfinished OADS authoring workflows. They are off by default in
+        // release builds and may be enabled deliberately for a demonstration.
+        // These switches never change BillingComplianceRequirements. While work is
+        // completed in Evergreen, a human's timestamped FormAttestation satisfies
+        // the gate. A future finalized Sati-authored document should append the same
+        // evidence projection automatically, without asking for a duplicate human
+        // attestation.
+        public bool IsComprehensiveAssessmentAuthoringEnabled { get; set; }
+        public bool IsClassificationAuthoringEnabled { get; set; }
+        public bool IsPersonCenteredPlanAuthoringEnabled { get; set; }
+
         // Agency policy. Off by default: importing into an existing profile can
         // replace current demographics, so an administrator must opt the agency in.
         public bool AllowCredibleProfileUpdates { get; set; }

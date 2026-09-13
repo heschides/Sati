@@ -47,9 +47,25 @@
     <StackPanel>
      <TextBlock Text="Publish a new version after agency review. Existing versions remain unchanged. Supported tokens are listed in DOCUMENT_TEMPLATES.md." TextWrapping="Wrap"/>
      <Button Content="Load current template" Command="{Binding LoadTemplateCommand}" HorizontalAlignment="Left"/>
-     <TextBox Text="{Binding TemplateBody, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
-      MinHeight="200" MaxHeight="450" MaxLength="100000" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Agency privacy template source"/>
-     <Button Content="Publish new template version" Command="{Binding PublishTemplateCommand}" HorizontalAlignment="Left"/>
+     <Grid Margin="0,8,0,0">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="3*" MinWidth="330"/>
+       <ColumnDefinition Width="16"/>
+       <ColumnDefinition Width="2*" MinWidth="360"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+       <TextBlock Text="Template source" FontWeight="SemiBold" Margin="0,0,0,4"/>
+       <TextBox Text="{Binding TemplateBody, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
+        MinHeight="360" MaxHeight="620" MaxLength="100000" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Agency privacy template source"/>
+      </StackPanel>
+      <StackPanel Grid.Column="2">
+       <local:DocumentTemplatePreview Source="{Binding TemplateBody}" Context="{Binding TemplatePreviewContext}" MinHeight="360" MaxHeight="620"/>
+       <TextBlock Text="Bracketed preview placeholders identify information that is not available in this screen; generated PDFs leave those fields blank."
+        TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,5,0,0"/>
+      </StackPanel>
+     </Grid>
+     <TextBlock Text="{Binding TemplateValidationMessage}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
+     <Button Content="Publish new template version" Command="{Binding PublishTemplateCommand}" IsEnabled="{Binding CanPublishTemplate}" HorizontalAlignment="Left"/>
     </StackPanel>
    </Expander>
   </StackPanel>

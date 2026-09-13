@@ -94,6 +94,8 @@ builder.Services.AddScoped<PersonLifecycle>();
 builder.Services.AddScoped<ILegalHoldRegistry, ApiLegalHoldRegistry>();
 builder.Services.AddSingleton<PersonAuditPdfGenerator>();
 builder.Services.AddSingleton<DhhsFormFiller>();
+builder.Services.AddSingleton<CwicPacketPdfGenerator>();
+builder.Services.AddSingleton<HousingSupportFundsPdfGenerator>();
 builder.Services.AddSingleton<AgencyReleasePdfGenerator>();
 builder.Services.AddSingleton<MedicalReleasePdfGenerator>();
 builder.Services.AddSingleton<DocumentTemplatePdfComposer>();

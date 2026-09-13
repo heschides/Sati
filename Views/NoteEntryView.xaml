@@ -460,19 +460,19 @@
                                     CornerRadius="4"
                                     Padding="10,8"
                                     Margin="0,0,0,10"
-                                    Visibility="{Binding HasStaleNoteMessage,
+                                    Visibility="{Binding HasNoteAttentionMessage,
                                         Converter={StaticResource BoolToVisibilityConverter}}">
                                 <StackPanel>
-                                    <TextBlock Text="NOTE CHANGED ON THE SERVER"
+                                    <TextBlock Text="NOTE NEEDS ATTENTION"
                                                FontSize="10"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource DangerStrongBrush}"
                                                Margin="0,0,0,4" />
-                                    <TextBlock Text="{Binding StaleNoteMessage}"
+                                    <TextBlock Text="{Binding NoteAttentionMessage}"
                                                FontSize="12"
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                TextWrapping="Wrap"
-                                               AutomationProperties.Name="Note changed on the server"
+                                               AutomationProperties.Name="{Binding NoteAttentionAutomationName}"
                                                AutomationProperties.LiveSetting="Assertive" />
                                 </StackPanel>
                             </Border>
@@ -1278,7 +1278,7 @@
             <!-- MaxHeight bound to the overlay Grid keeps the dialog inside the
                  module's clip bounds (module-only dimming). Inside, a DockPanel
                  pins the button row to the bottom and lets the message + reasons +
-                 justification scroll — so buttons are reachable no matter how many
+                 explanation scroll — so buttons are reachable no matter how many
                  compliance reasons or how long the client name. -->
             <Border Background="{DynamicResource WindowBackgroundBrush}"
                     BorderBrush="{DynamicResource OverdueBorderBrush}"
@@ -1296,7 +1296,7 @@
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 Margin="0,16,0,0">
-                        <Button Content="Cancel"
+                        <Button Content="Return to Note"
                                 Padding="14,6"
                                 FontSize="12"
                                 Cursor="Hand"
@@ -1336,25 +1336,6 @@
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
-                        <Button Content="Send to Supervisor"
-                                Padding="14,6"
-                                FontSize="12"
-                                Cursor="Hand"
-                                BorderThickness="0"
-                                Background="{DynamicResource DangerStrongBrush}"
-                                Foreground="{DynamicResource OnDangerStrongBrush}"
-                                Command="{Binding SendToSupervisorCommand}">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                                            CornerRadius="4"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter HorizontalAlignment="Center"
-                                                          VerticalAlignment="Center" />
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
                     </StackPanel>
 
                     <!-- Fill: everything above the buttons, scrolling as a unit. -->
@@ -1372,7 +1353,7 @@
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        Margin="0,0,0,12">
                                 <Run Text="{Binding SelectedPerson.FullName, FallbackValue='This client', Mode=OneWay}" />
-                                <Run Text="does not currently meet billing compliance requirements. You may hold this note in your queue until compliance is resolved, or send it to your supervisor with a written justification." />
+                                <Run Text="does not meet the requirements for submission. Keep the service documentation on hold or return to the note. Completing paperwork later does not make service inside a past compliance gap billable." />
                             </TextBlock>
 
                             <Border Background="{DynamicResource SurfaceRaisedBrush}"
@@ -1397,24 +1378,6 @@
                         </ScrollViewer>
                     </Border>
 
-                    <TextBlock Text="JUSTIFICATION"
-                               FontSize="10"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   Margin="0,0,0,4" />
-                        <TextBlock Text="Required if sending to supervisor. Ignored if holding."
-                                   FontSize="10"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   Margin="0,0,0,6" />
-                            <TextBox AutomationProperties.Name="Pending note justification" Text="{Binding PendingJustification, UpdateSourceTrigger=PropertyChanged}"
-                                     AcceptsReturn="True"
-                                     TextWrapping="Wrap"
-                                     Height="90"
-                                     Padding="8"
-                                     FontSize="12"
-                                     Background="{DynamicResource SurfaceBrush}"
-                                     BorderBrush="{DynamicResource OverdueBorderBrush}"
-                                     VerticalScrollBarVisibility="Auto"
-                                     Margin="0,0,0,0" />
 
                         </StackPanel>
                     </ScrollViewer>

@@ -262,6 +262,25 @@ public sealed class CloudConnectivityTests
         Assert.Equal(4, scratchpad.Revision);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UnauthorizedScratchpadAgendaReadBecomesASessionExpiry(bool today)
+    {
+        var handler = new SequenceHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        using var http = NewHttpClient(handler);
+        var api = new CloudApiClient(http, (_, _) => Task.CompletedTask);
+        api.SetAccessToken("expired-token");
+        var service = new CloudScratchpadService(api);
+
+        var error = await Assert.ThrowsAsync<SessionExpiredException>(() => today
+            ? service.LoadTodayAsync(9)
+            : service.LoadTomorrowAsync(9));
+
+        Assert.Equal(1, handler.Calls);
+        Assert.IsType<CloudSessionEndedException>(error.InnerException);
+    }
+
     [Fact]
     public async Task ValidationProblemPreservesSpecificFieldGuidanceFromApi()
     {

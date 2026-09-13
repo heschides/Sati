@@ -11,6 +11,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerDatabaseIdentity> DatabaseIdentities => Set<ServerDatabaseIdentity>();
     public DbSet<ServerUser> Users => Set<ServerUser>();
     public DbSet<ServerPerson> People => Set<ServerPerson>();
+    public DbSet<ServerPersonPhoto> PersonPhotos => Set<ServerPersonPhoto>();
     public DbSet<ServerForm> Forms => Set<ServerForm>();
     public DbSet<ServerFormAttestation> FormAttestations => Set<ServerFormAttestation>();
     public DbSet<ServerDocumentArtifact> DocumentArtifacts => Set<ServerDocumentArtifact>();
@@ -121,6 +122,29 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .WithOne()
                 .HasForeignKey(x => x.PersonId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ServerPersonPhoto>(entity =>
+        {
+            entity.ToTable("PersonPhotos");
+            entity.HasKey(photo => photo.PersonId);
+            entity.Property(photo => photo.Content).IsRequired();
+            entity.Property(photo => photo.ContentType).IsRequired().HasMaxLength(20);
+            entity.Property(photo => photo.ContentSha256).IsRequired().HasColumnType("char(64)");
+            entity.Property(photo => photo.Revision).IsConcurrencyToken();
+            entity.HasIndex(photo => photo.AgencyId);
+            entity.HasOne<ServerPerson>()
+                .WithOne()
+                .HasForeignKey<ServerPersonPhoto>(photo => photo.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ServerAgency>()
+                .WithMany()
+                .HasForeignKey(photo => photo.AgencyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerUser>()
+                .WithMany()
+                .HasForeignKey(photo => photo.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ServerForm>(entity =>
@@ -236,6 +260,9 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.ToTable("Settings");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.IsComprehensiveAssessmentAuthoringEnabled).HasDefaultValue(false);
+            entity.Property(x => x.IsClassificationAuthoringEnabled).HasDefaultValue(false);
+            entity.Property(x => x.IsPersonCenteredPlanAuthoringEnabled).HasDefaultValue(false);
             entity.Property(x => x.BillingComplianceRequirements)
                 .HasConversion<int>();
             entity.HasIndex(x => x.AgencyId).IsUnique();
@@ -762,6 +789,20 @@ internal sealed class ServerPerson
     public List<ServerForm> Forms { get; set; } = [];
 }
 
+internal sealed class ServerPersonPhoto
+{
+    public int PersonId { get; set; }
+    public int AgencyId { get; set; }
+    public byte[] Content { get; set; } = [];
+    public string ContentType { get; set; } = string.Empty;
+    public string ContentSha256 { get; set; } = string.Empty;
+    public int PixelWidth { get; set; }
+    public int PixelHeight { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public int UpdatedByUserId { get; set; }
+    public long Revision { get; set; } = 1;
+}
+
 internal sealed class ServerForm
 {
     public int Id { get; set; }
@@ -863,6 +904,9 @@ internal sealed class ServerSettings
     public int Id { get; set; }
     public int AgencyId { get; set; }
     public int Revision { get; set; } = 1;
+    public bool IsComprehensiveAssessmentAuthoringEnabled { get; set; }
+    public bool IsClassificationAuthoringEnabled { get; set; }
+    public bool IsPersonCenteredPlanAuthoringEnabled { get; set; }
     public bool AllowCredibleProfileUpdates { get; set; }
     public string VrAssistantTitle { get; set; } =
         VocationalRehabilitationProfile.DefaultAssistantTitle;

@@ -1,5 +1,41 @@
 # Sati — Refactor Agenda
 
+## Unreleased — Housing Support Funds application
+
+- [x] Embed the exact fillable three-page Maine DHHS OADS application dated June 30, 2025,
+      preserve the form fields, and expose one live entry/preview workspace from Clients and
+      Documents navigation.
+- [x] Prefill authoritative consumer, waiver, Shared Living, guardian, assigned case manager and
+      provider facts while keeping application-specific contact, landlord, payee, amount and
+      narrative entries in the user's control.
+- [x] Enforce the form's $3,000 ceiling and closed choices; prominently flag subsidy, Shared Living,
+      missing proof, and missing-signature review needs rather than silently deciding eligibility.
+- [x] Leave consumer/guardian signatures and dates blank and leave the entire DHHS Staff Only page
+      untouched; keep electronic signing unavailable pending program and agency confirmation.
+- [x] Return a non-cacheable PDF, audit generation, and record a versioned Draft artifact tied to
+      the controlled OADS source without rewriting prior draft history.
+- [ ] Revalidate the OADS application link before each public release; the official Housing
+      Services page currently links the June 30, 2025 source embedded here.
+- [ ] Define any future electronic submission, receipt, and OADS decision-status workflow
+      separately. Generating this draft does not submit it or represent OADS approval.
+
+## Unreleased — CWIC / Benefits Counseling referral packet
+
+- [x] Reproduce MaineHealth's currently linked ten-page BCS referral packet from the exact
+      supplied PDF, with a live WPF entry preview and one packet workflow in both Clients and
+      Documents navigation.
+- [x] Prefill identity, age, address/contact, guardian, employment, MaineCare and VR facts that
+      Sati already knows while keeping every answer editable and leaving signatures blank.
+- [x] Keep SSN plaintext inside the authorized local/API generation process, return only the
+      finished no-store PDF, and audit each decryption and packet generation.
+- [x] Record each generated packet as a versioned Draft artifact tied to the fixed MaineHealth
+      source revision; regeneration supersedes the prior live draft without rewriting history.
+- [x] Validate closed choice sets, bounded text and the Maine DOL one-year release window; block
+      electronic signature routing pending explicit MaineHealth/program/agency confirmation.
+- [x] Add the separately versioned Housing Support Funds application workflow described above.
+- [ ] Revalidate the MaineHealth source link before each public release; the currently published
+      packet still carries 2013/2019/2020 component revision labels.
+
 ## Unreleased — account disablement and session revocation
 
 - [x] Add retained `IsEnabled` and monotonic `SecurityVersion` account state, with an EF
@@ -5534,3 +5570,19 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
       and record completion or cancellation. Each transition needs role/tenant authorization,
       revision checks, timestamps, actors, append-only events, idempotency, and notification-failure
       handling; publication itself must never be treated as approval or proof of delivery.
+
+## Consumer profile photos — implemented 2026-09-12
+
+- [x] Add a prominent portrait at the top of the consumer profile and increase the selected
+      consumer's name by 20%; the current approved treatment uses clean image edges.
+- [x] Add dedicated JPG/PNG storage with shared byte/type/dimension limits, separate local and
+      cloud services, a controlled migration, and person-scoped API routes.
+- [x] Recheck tenant and caseload authority on the server, require expected revisions for
+      replacement/removal, prevent response caching, and audit update/removal without photo bytes.
+- [x] Clear the portrait on every consumer switch and regression-test that a delayed old load
+      cannot display the wrong consumer's image.
+- [ ] Apply migration `20260912053013_AddPersonPhotos` and release compatible API and desktop
+      builds through the normal approved deployment process. No live database was changed here.
+- [ ] Before storing real consumer photographs, adopt agency-approved consent/notice, minimum-use,
+      retention/legal-hold, export and deletion procedures. The feature supplies technical access
+      controls; it does not decide those policies.

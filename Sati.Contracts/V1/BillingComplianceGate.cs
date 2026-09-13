@@ -52,6 +52,12 @@ public static class BillingComplianceGate
         // it is not an incomplete overdue document and therefore cannot fail this gate.
         _ = effectiveDate;
 
+        // TODO(human): decide whether an unreadable requirement value fails this gate.
+        // IsSupported(requirements) is false when the stored setting carries bits this
+        // build does not know. Today that makes every form type non-required, so nothing
+        // is overdue and the gate reports Passed. UnsupportedConfigurationReason holds
+        // the shared wording if you choose to fail closed here.
+
         var overdue = forms
             .Where(form => IsRequired(form.Type, requirements))
             .Where(form => IsIncompleteAndOverdue(form.DueDate, form.CompletedDate, today))
@@ -109,6 +115,14 @@ public static class BillingComplianceGate
         return requirement != BillingComplianceRequirements.None &&
                (requirements & requirement) == requirement;
     }
+
+    /// <summary>
+    /// One wording for a requirement value this build cannot read. The export gate
+    /// and the submission gate both surface it, so the sentence has a single owner
+    /// rather than a hand-written copy per gate.
+    /// </summary>
+    public const string UnsupportedConfigurationReason =
+        "The agency billing compliance configuration is invalid.";
 
     public static bool IsSupported(BillingComplianceRequirements requirements) =>
         (requirements & ~BillingComplianceRequirements.All) == 0;

@@ -459,3 +459,18 @@ The design assumes the conservative answer throughout: ordinary documentation fl
 relationship, and the three specially protected categories the agency release form already names —
 substance use, mental and behavioural health, HIV — cross only when a signed release names them.
 That is the reading that is safe to relax later if counsel permits it.
+
+## Consumer photographs: identifying clinical information (engineering note, 2026-09-12)
+
+A consumer photograph is identifying health-record information in Sati's context. The implemented
+design therefore keeps bytes off caseload/list responses, serves them only from a person-scoped
+non-cacheable route, applies the existing consumer-access rule to reads, and limits replacement or
+removal to the assigned case manager with revision checks and PHI-free audit actions. The original
+bounded JPG/PNG is retained and displayed without a feathering effect.
+
+Those technical safeguards do not decide whether an agency should collect a photograph. Before
+real-client use, the agency should approve the purpose and minimum-necessary audience, notice or
+consent practice where applicable, retention and legal-hold treatment, access-review procedure,
+export/correction/removal handling, backup disposition, and incident response. A profile-photo
+feature must not quietly become facial recognition, identity proof, or a substitute for verifying
+the person. This engineering note is not legal advice or a finding of regulatory compliance.

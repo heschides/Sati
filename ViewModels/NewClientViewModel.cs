@@ -38,6 +38,9 @@ namespace Sati.ViewModels
         private readonly IIncidentReporter _incidentReporter;
         public BillingComplianceRequirements BillingComplianceRequirements { get; private set; } =
             BillingComplianceGate.DefaultRequirements;
+        public bool IsComprehensiveAssessmentAuthoringEnabled { get; private set; }
+        public bool IsClassificationAuthoringEnabled { get; private set; }
+        public bool IsPersonCenteredPlanAuthoringEnabled { get; private set; }
         private readonly ATRequestPdfExporter _atRequestPdfExporter;
 
         public DhhsFormsViewModel DhhsForms { get; }
@@ -57,10 +60,13 @@ namespace Sati.ViewModels
         /// <summary>The Credible import review panel. Fills this form; never saves.</summary>
         public ConsumerImportViewModel ConsumerImport { get; }
         public AgencyReleaseViewModel AgencyRelease { get; }
+        public CwicPacketViewModel? CwicPacket { get; }
+        public HousingSupportFundsViewModel? HousingSupportFunds { get; }
         public SafetyPlanViewModel? SafetyPlan { get; }
         public AnnualDocumentsViewModel? AnnualDocuments { get; }
         public CheckRequestsViewModel? CheckRequests { get; }
         public FormAttestationViewModel Attestation { get; }
+        public PersonPhotoViewModel PersonPhoto { get; }
 
         // Per-consumer journal state. The timer debounces saves to 2s after the last
         // keystroke — Stop()+Start() on every edit means it fires once typing pauses,
@@ -349,6 +355,8 @@ namespace Sati.ViewModels
             ConsumerProviders.SetPerson(value);
             DhhsForms.SetPerson(value);
             AgencyRelease.SetPerson(value);
+            CwicPacket?.SetPerson(value);
+            HousingSupportFunds?.SetPerson(value);
             CheckRequests?.SetPerson(value);
             SafetyPlan?.SetPerson(value);
             AnnualDocuments?.SetPerson(value);
@@ -613,7 +621,10 @@ namespace Sati.ViewModels
                            ConsumerImportViewModel consumerImport,
                            SafetyPlanViewModel? safetyPlan = null,
                            AnnualDocumentsViewModel? annualDocuments = null,
-                           CheckRequestsViewModel? checkRequests = null)
+                           CheckRequestsViewModel? checkRequests = null,
+                           IPersonPhotoService? personPhotoService = null,
+                           CwicPacketViewModel? cwicPacket = null,
+                           HousingSupportFundsViewModel? housingSupportFunds = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -628,11 +639,14 @@ namespace Sati.ViewModels
             DhhsForms = dhhsForms;
             SsnPanel = ssnPanel;
             AgencyRelease = agencyRelease;
+            CwicPacket = cwicPacket;
+            HousingSupportFunds = housingSupportFunds;
             SafetyPlan = safetyPlan;
             AnnualDocuments = annualDocuments;
             CheckRequests = checkRequests;
             ConsumerProviders = consumerProviders;
             ConsumerImport = consumerImport;
+            PersonPhoto = new PersonPhotoViewModel(personPhotoService, session);
             Attestation = new FormAttestationViewModel(formService)
             {
                 AttestationChangedAsync = AfterAttestationChangedAsync
@@ -1440,7 +1454,8 @@ namespace Sati.ViewModels
                 CaptureWorkspaceLoadAsync("case notes", () => LoadSelectedPersonNotesAsync(person)),
                 CaptureWorkspaceLoadAsync("appointments", () => LoadAppointmentsAsync(person)),
                 CaptureWorkspaceLoadAsync("contacts", () => LoadContactsAsync(person)),
-                CaptureWorkspaceLoadAsync("AT requests", () => LoadAtRequestsAsync(person)));
+                CaptureWorkspaceLoadAsync("AT requests", () => LoadAtRequestsAsync(person)),
+                CaptureWorkspaceLoadAsync("profile photo", () => PersonPhoto.LoadForAsync(person)));
             var failures = results.Where(result => result.Exception is not null).ToList();
             if (failures.Count == 0 ||
                 !_workspaceLoads.IsCurrent(request) ||
@@ -1744,6 +1759,12 @@ namespace Sati.ViewModels
                 settings.VrAssistantTitle);
             BillingComplianceRequirements = settings.BillingComplianceRequirements;
             OnPropertyChanged(nameof(BillingComplianceRequirements));
+            IsComprehensiveAssessmentAuthoringEnabled = settings.IsComprehensiveAssessmentAuthoringEnabled;
+            IsClassificationAuthoringEnabled = settings.IsClassificationAuthoringEnabled;
+            IsPersonCenteredPlanAuthoringEnabled = settings.IsPersonCenteredPlanAuthoringEnabled;
+            OnPropertyChanged(nameof(IsComprehensiveAssessmentAuthoringEnabled));
+            OnPropertyChanged(nameof(IsClassificationAuthoringEnabled));
+            OnPropertyChanged(nameof(IsPersonCenteredPlanAuthoringEnabled));
             RefreshComplianceFlags();
             HealthcareSystems.Clear();
             foreach (var name in HealthcareSystemOptions.Normalize(settings.HealthcareSystems))

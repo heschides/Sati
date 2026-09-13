@@ -1305,6 +1305,77 @@ public sealed class TenantAuthorizationTests
     }
 
     [Fact]
+    public async Task DisabledOadsAuthoringHidesBuildersButLeavesComplianceAndSsnRoutesAvailable()
+    {
+        using var caseManager = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        using var admin = await _factory.CreateAuthenticatedClientAsync("admin-one");
+        var baseline = await admin.GetFromJsonAsync<SettingsDto>("/api/v1/settings");
+        Assert.NotNull(baseline);
+        var original = (
+            ComprehensiveAssessment: baseline.IsComprehensiveAssessmentAuthoringEnabled,
+            Classification: baseline.IsClassificationAuthoringEnabled,
+            PersonCenteredPlan: baseline.IsPersonCenteredPlanAuthoringEnabled);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var settings = await db.Settings.SingleAsync(candidate => candidate.AgencyId == 1);
+            settings.IsComprehensiveAssessmentAuthoringEnabled = false;
+            settings.IsClassificationAuthoringEnabled = false;
+            settings.IsPersonCenteredPlanAuthoringEnabled = false;
+            await db.SaveChangesAsync();
+        }
+
+        try
+        {
+            var latest = await caseManager.GetAsync("/api/v1/people/101/assessments/latest");
+            var draft = await caseManager.PostAsync(
+                "/api/v1/people/101/assessments/draft?authorUserId=12",
+                content: null);
+            var update = await caseManager.PutAsJsonAsync(
+                "/api/v1/assessments/701/document",
+                new SaveAssessmentDocumentRequest("{}", 1));
+            var submit = await caseManager.PostAsync(
+                "/api/v1/assessments/701/submit?authorUserId=12&expectedRevision=1",
+                content: null);
+            var pcpSource = await caseManager.GetAsync(
+                "/api/v1/people/101/pcp-source?preferredAuthorUserId=12");
+
+            Assert.Equal(HttpStatusCode.NotFound, latest.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, draft.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, submit.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, pcpSource.StatusCode);
+
+            var settings = await admin.GetFromJsonAsync<SettingsDto>("/api/v1/settings");
+            Assert.NotNull(settings);
+            Assert.False(settings.IsComprehensiveAssessmentAuthoringEnabled);
+            Assert.False(settings.IsClassificationAuthoringEnabled);
+            Assert.False(settings.IsPersonCenteredPlanAuthoringEnabled);
+            Assert.True((settings.BillingComplianceRequirements & BillingComplianceRequirements.Pcp) != 0);
+            Assert.True((settings.BillingComplianceRequirements &
+                         BillingComplianceRequirements.ComprehensiveAssessment) != 0);
+
+            var caseload = await caseManager.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload");
+            var ownPerson = Assert.Single(caseload!, person => person.Id == 101);
+            Assert.Contains(ownPerson.Forms, form => form.Type == "PCP");
+            Assert.Contains(ownPerson.Forms, form => form.Type == "ComprehensiveAssessment");
+
+            var ssn = await caseManager.GetAsync("/api/v1/people/101/ssn");
+            Assert.Equal(HttpStatusCode.OK, ssn.StatusCode);
+        }
+        finally
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var settings = await db.Settings.SingleAsync(candidate => candidate.AgencyId == 1);
+            settings.IsComprehensiveAssessmentAuthoringEnabled = original.ComprehensiveAssessment;
+            settings.IsClassificationAuthoringEnabled = original.Classification;
+            settings.IsPersonCenteredPlanAuthoringEnabled = original.PersonCenteredPlan;
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
     public async Task SupervisorCannotActOnAnotherAgencysNote()
     {
         using var client = await _factory.CreateAuthenticatedClientAsync("supervisor-one");

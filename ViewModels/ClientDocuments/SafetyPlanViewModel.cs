@@ -14,6 +14,7 @@ public partial class SafetyPlanViewModel(ISafetyPlanService service, ISessionSer
     private readonly LatestRequestTracker requests = new();
     private Person? person;
     private SafetyPlanDto? plan;
+    [ObservableProperty] private string personName = "Select a consumer";
     [ObservableProperty] private DateTime? cycleStart;
     [ObservableProperty] private string message = "Select a consumer.";
     [ObservableProperty] private string returnReason = "";
@@ -25,6 +26,7 @@ public partial class SafetyPlanViewModel(ISafetyPlanService service, ISessionSer
     public bool CanReview => plan is not null && session.CurrentUser is { } actor &&
         SafetyPlanRules.CanReview(actor.Id, actor.Permissions, plan.AuthorUserId) && plan.Status == "ReadyForReview" && !IsBusy;
     public string Status => plan is null ? "No plan for this cycle" : $"Version {plan.Version} · {plan.Status}";
+    public bool IsApproved => plan?.Status == "Approved";
     public event Action<AgencyReleaseResult>? PdfReady;
     partial void OnIsBusyChanged(bool value) => NotifyState();
     partial void OnCycleStartChanged(DateTime? value)
@@ -35,6 +37,7 @@ public partial class SafetyPlanViewModel(ISafetyPlanService service, ISessionSer
     public void SetPerson(Person? selected)
     {
         requests.Invalidate(); person = selected; plan = null; Sections.Clear(); IsBusy = false;
+        PersonName = selected?.FullName ?? "Select a consumer";
         CycleStart = selected?.EffectiveDate is DateTime effective ? AnnualDocumentCycle.CurrentStart(effective, DateTime.Today) : null;
         ReturnReason = ""; Message = ""; NotifyState();
         _ = ReloadAsync();
@@ -43,6 +46,7 @@ public partial class SafetyPlanViewModel(ISafetyPlanService service, ISessionSer
     {
         OnPropertyChanged(nameof(CanAuthor)); OnPropertyChanged(nameof(CanEdit));
         OnPropertyChanged(nameof(CanReview)); OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(IsApproved));
     }
     private void Apply(SafetyPlanDto? value)
     {
@@ -97,5 +101,8 @@ public partial class SafetyPlanSectionViewModel(string id, string text) : Observ
 {
     public string Id { get; } = id;
     public string Title => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Id.Replace('-', ' '));
-    [ObservableProperty] private string text = text;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PreviewText))]
+    private string text = text;
+    public string PreviewText => string.IsNullOrWhiteSpace(Text) ? "[Not yet completed]" : Text.Trim();
 }

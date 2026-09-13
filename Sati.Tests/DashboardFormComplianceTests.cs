@@ -9,6 +9,39 @@ namespace Sati.Tests;
 
 public sealed class DashboardFormComplianceTests
 {
+    [Fact]
+    public async Task PcpAndAssessmentRequireAnExplicitEvergreenAttestation()
+    {
+        var service = new RecordingFormService();
+        var viewModel = new FormAttestationViewModel(service);
+        var effectiveDate = DateTime.Today.AddMonths(-6);
+        var form = new Form(FormType.PCP, DateTime.Today.AddDays(20)) { PersonId = 42 };
+
+        viewModel.Begin(form, effectiveDate, "Person-Centered Plan — Demo Consumer");
+        viewModel.CompletionDate = DateTime.Today;
+
+        Assert.True(viewModel.RequiresEvergreenConfirmation);
+        Assert.Contains("completed in Evergreen", viewModel.AttestationStatement,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.False(viewModel.CompleteAttestationCommand.CanExecute(null));
+
+        viewModel.HasConfirmedEvergreenCompletion = true;
+
+        Assert.True(viewModel.CompleteAttestationCommand.CanExecute(null));
+        await viewModel.CompleteAttestationCommand.ExecuteAsync(null);
+        Assert.Equal(DateTime.Today, form.CompletedDate);
+    }
+
+    [Fact]
+    public void DashboardRendersTheAttestationPanelOpenedByItsFormActions()
+    {
+        var view = File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "Views", "CaseManagerDashboardContentView.xaml"));
+
+        Assert.Contains("<views:FormAttestationControl", view, StringComparison.Ordinal);
+        Assert.Contains("DataContext=\"{Binding Attestation}\"", view, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(CompletionPath.DashboardToggle)]
     [InlineData(CompletionPath.TaskBoard)]
@@ -229,6 +262,10 @@ public sealed class DashboardFormComplianceTests
             throw new NotSupportedException();
         public Task RemoveAsync(int id) => throw new NotSupportedException();
     }
+
+    private static string RepositoryRoot(
+        [System.Runtime.CompilerServices.CallerFilePath] string callerPath = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(callerPath)!, ".."));
 
     private sealed class StubIncentiveService : IIncentiveService
     {

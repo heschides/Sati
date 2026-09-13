@@ -427,7 +427,7 @@
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                Margin="0,0,0,12">
                         <Run Text="{Binding SelectedNote.Person.FullName, FallbackValue='This client', Mode=OneWay}" />
-                        <Run Text="does not currently meet billing compliance requirements. You may hold this note in your queue until compliance is resolved, or send it to your supervisor with a written justification." />
+                        <Run Text="does not meet the requirements for submission. Keep the service documentation on hold or return to the note. Completing paperwork later does not make service inside a past compliance gap billable." />
                     </TextBlock>
 
                     <Border Background="{DynamicResource SurfaceRaisedBrush}"
@@ -449,28 +449,10 @@
                         </ItemsControl>
                     </Border>
 
-                    <TextBlock Text="JUSTIFICATION"
-                               FontSize="10"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="0,0,0,4" />
-                    <TextBlock Text="Required if sending to supervisor. Ignored if holding."
-                               FontSize="10"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="0,0,0,6" />
-                    <TextBox AutomationProperties.Name="Pending note justification" Text="{Binding PendingJustification, UpdateSourceTrigger=PropertyChanged}"
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"
-                             Height="90"
-                             Padding="8"
-                             FontSize="12"
-                             Background="{DynamicResource SurfaceBrush}"
-                             BorderBrush="{DynamicResource OverdueBorderBrush}"
-                             VerticalScrollBarVisibility="Auto"
-                             Margin="0,0,0,16" />
 
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right">
-                        <Button Content="Cancel"
+                        <Button Content="Return to Note"
                                 Padding="14,6"
                                 FontSize="12"
                                 Cursor="Hand"
@@ -499,25 +481,6 @@
                                 Foreground="{DynamicResource OnAccentBrush}"
                                 Margin="0,0,6,0"
                                 Command="{Binding HoldForComplianceCommand}">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                                            CornerRadius="4"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter HorizontalAlignment="Center"
-                                                          VerticalAlignment="Center" />
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                        <Button Content="Send to Supervisor"
-                                Padding="14,6"
-                                FontSize="12"
-                                Cursor="Hand"
-                                BorderThickness="0"
-                                Background="{DynamicResource DangerStrongBrush}"
-                                Foreground="{DynamicResource OnDangerStrongBrush}"
-                                Command="{Binding SendToSupervisorCommand}">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="{TemplateBinding Background}"

@@ -6,12 +6,14 @@ namespace Sati.Data;
 
 public class NoteService(
     IDbContextFactory<SatiContext> contextFactory,
-    ISessionService sessionService) : INoteService
+    ISessionService sessionService,
+    TimeProvider? timeProvider = null) : INoteService
 {
     public async Task<Note> AddNoteAsync(Note note)
     {
         ArgumentNullException.ThrowIfNull(note);
-        NormalizeScheduling(note);
+        var today = BillingRules.MaineBusinessDate((timeProvider ?? TimeProvider.System).GetUtcNow());
+        NormalizeScheduling(note, today);
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
@@ -20,6 +22,7 @@ public class NoteService(
             throw new UnauthorizedAccessException("You may create notes only for your own caseload.");
 
         note.AgencyId = actor.AgencyId;
+        await EnsureSubmissionAllowedAsync(context, actor, note, today);
         await EnsureServiceTimeAvailableAsync(context, actor.Id, note, null);
         context.Notes.Add(note);
         LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteCreated, "Note");
@@ -52,7 +55,8 @@ public class NoteService(
     public async Task UpdateNoteAsync(Note note)
     {
         ArgumentNullException.ThrowIfNull(note);
-        NormalizeScheduling(note);
+        var today = BillingRules.MaineBusinessDate((timeProvider ?? TimeProvider.System).GetUtcNow());
+        NormalizeScheduling(note, today);
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
@@ -84,6 +88,7 @@ public class NoteService(
                     "You may reassign a note only to another client on your own caseload.");
         }
 
+        await EnsureSubmissionAllowedAsync(context, actor, note, today);
         await EnsureServiceTimeAvailableAsync(context, actor.Id, note, stored.Id);
         CopyCaseManagerValues(note, stored);
         stored.PersonId = note.PersonId;
@@ -233,11 +238,11 @@ public class NoteService(
             throw new InvalidOperationException("That note status is controlled by a supervisor workflow.");
     }
 
-    private static void NormalizeScheduling(Note note)
+    private static void NormalizeScheduling(Note note, DateTime today)
     {
         var values = NoteSchedulingPolicy.Normalize(
             note.EventDate,
-            DateTime.Today,
+            today,
             note.Status?.ToString(),
             note.Minutes,
             note.StartTime,
@@ -258,6 +263,22 @@ public class NoteService(
 
     private static T? ParseNullable<T>(string? value) where T : struct, Enum =>
         value is null ? null : Enum.Parse<T>(value, ignoreCase: false);
+
+    private static async Task EnsureSubmissionAllowedAsync(
+        SatiContext context, User actor, Note note, DateTime today)
+    {
+        if (note.Status != NoteStatus.Logged) return;
+        var person = await context.People.AsNoTracking().SingleAsync(x =>
+            x.Id == note.PersonId && x.UserId == actor.Id && x.AgencyId == actor.AgencyId);
+        var forms = await context.Forms.AsNoTracking().Where(x => x.PersonId == person.Id).ToListAsync();
+        var requirements = await context.Settings.AsNoTracking().Where(x => x.AgencyId == actor.AgencyId)
+            .Select(x => (BillingComplianceRequirements?)x.BillingComplianceRequirements)
+            .SingleOrDefaultAsync() ?? BillingComplianceGate.DefaultRequirements;
+        var result = NoteSubmissionGate.Evaluate((int?)note.Status, person.EffectiveDate,
+            forms.Select(x => new ComplianceFormSnapshot(x.Type.ToString(), x.DueDate, x.CompletedDate)),
+            note.EventDate, today, requirements);
+        if (!result.Passed) throw new NoteSubmissionException(result.Message);
+    }
 
     internal static async Task EnsureServiceTimeAvailableAsync(
         SatiContext context, int userId, Note note, int? editingNoteId)

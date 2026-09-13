@@ -710,6 +710,10 @@ namespace Sati.ViewModels
         [ObservableProperty] private string contactTemplate = string.Empty;
         [ObservableProperty] private string documentationTemplate = string.Empty;
 
+        [ObservableProperty] private bool isComprehensiveAssessmentAuthoringEnabled;
+        [ObservableProperty] private bool isClassificationAuthoringEnabled;
+        [ObservableProperty] private bool isPersonCenteredPlanAuthoringEnabled;
+
         [ObservableProperty] private bool excludeMonday;
         [ObservableProperty] private bool excludeTuesday;
         [ObservableProperty] private bool excludeWednesday;
@@ -812,6 +816,9 @@ namespace Sati.ViewModels
             ComplianceAgencyRelease = compliance.HasFlag(BillingComplianceRequirements.AgencyRelease);
             ComplianceDhhsRelease = compliance.HasFlag(BillingComplianceRequirements.DhhsRelease);
             ComplianceMedicalRelease = compliance.HasFlag(BillingComplianceRequirements.MedicalRelease);
+            IsComprehensiveAssessmentAuthoringEnabled = _settings.IsComprehensiveAssessmentAuthoringEnabled;
+            IsClassificationAuthoringEnabled = _settings.IsClassificationAuthoringEnabled;
+            IsPersonCenteredPlanAuthoringEnabled = _settings.IsPersonCenteredPlanAuthoringEnabled;
             VisitTemplate = _settings.VisitTemplate;
             ContactTemplate = _settings.ContactTemplate;
             DocumentationTemplate = _settings.DocumentationTemplate;
@@ -887,6 +894,9 @@ namespace Sati.ViewModels
             _settings.ProductivityThreshold = ProductivityThreshold;
             _settings.BaseIncentive = BaseIncentive;
             _settings.PerUnitIncentive = PerUnitIncentive;
+            _settings.IsComprehensiveAssessmentAuthoringEnabled = IsComprehensiveAssessmentAuthoringEnabled;
+            _settings.IsClassificationAuthoringEnabled = IsClassificationAuthoringEnabled;
+            _settings.IsPersonCenteredPlanAuthoringEnabled = IsPersonCenteredPlanAuthoringEnabled;
             _settings.BillingComplianceRequirements =
                 (ComplianceQuarterlyReviews ? BillingComplianceRequirements.QuarterlyReviews : 0) |
                 (CompliancePcp ? BillingComplianceRequirements.Pcp : 0) |

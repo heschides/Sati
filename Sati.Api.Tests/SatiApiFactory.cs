@@ -574,6 +574,23 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                     EdiPayerId = "MCDME", EdiContactName = "Test Billing",
                     EdiContactPhone = "2075550102"
                 });
+            // Endpoint authorization tests exercise the dormant authoring prototypes.
+            // Enable them explicitly here; the release/database defaults remain off.
+            db.Settings.AddRange(
+                new ServerSettings
+                {
+                    AgencyId = 1,
+                    IsComprehensiveAssessmentAuthoringEnabled = true,
+                    IsClassificationAuthoringEnabled = true,
+                    IsPersonCenteredPlanAuthoringEnabled = true
+                },
+                new ServerSettings
+                {
+                    AgencyId = 2,
+                    IsComprehensiveAssessmentAuthoringEnabled = true,
+                    IsClassificationAuthoringEnabled = true,
+                    IsPersonCenteredPlanAuthoringEnabled = true
+                });
             db.Users.AddRange(
                 CreateUser(verifier, 11, "admin-one", "Admin", 1),
                 CreateUser(verifier, 12, "case-manager-one", "CaseManager", 1, 13),
@@ -1200,6 +1217,11 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         await using var scope = Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
         var nextId = await db.Notes.MaxAsync(note => note.Id) + 1;
+        // Every synthetic source person gets a private historical billing month.
+        // Billing periods belong to the case manager rather than the consumer, so
+        // reusing one hard-coded month lets an unrelated test's submitted period
+        // make a later test fail with period_submitted.
+        var serviceDate = new DateTime(2020, 1, 15).AddMonths(-(personId - 202));
         var approvedAt = new DateTime(2026, 8, 4, 12, 0, 0, DateTimeKind.Utc);
         db.Notes.Add(new ServerNote
         {
@@ -1207,7 +1229,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
             PersonId = personId,
             AgencyId = 1,
             Narrative = "Approved billable note",
-            EventDate = new DateTime(2026, 8, 3),
+            EventDate = serviceDate,
             Minutes = minutes,
             Status = 6,
             ApprovedById = 13,

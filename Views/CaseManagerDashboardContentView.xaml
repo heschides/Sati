@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sati="clr-namespace:Sati;assembly=Sati.Persistence"
              xmlns:vm="clr-namespace:Sati.ViewModels"
+             xmlns:views="clr-namespace:Sati.Views"
              xmlns:models="clr-namespace:Sati.Models;assembly=Sati.Persistence"
              Background="{DynamicResource WindowBackgroundBrush}"
              TextElement.FontFamily="{StaticResource AppFont}">
@@ -604,7 +605,18 @@
             </Grid>
         </Border>
 
-      
+        <!-- Board context-menu actions open the same deliberate attestation panel
+             used by Clients and Reviews. It must live in this view or those actions
+             would update an invisible view model. -->
+        <views:FormAttestationControl Grid.Row="0"
+                                      Grid.RowSpan="3"
+                                      Grid.Column="0"
+                                      Grid.ColumnSpan="7"
+                                      Panel.ZIndex="50"
+                                      MaxWidth="720"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      DataContext="{Binding Attestation}" />
 
     </Grid>
 </UserControl>

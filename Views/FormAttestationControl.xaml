@@ -17,6 +17,13 @@
                        Margin="0,3,0,0"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        AutomationProperties.LiveSetting="Polite" />
+            <TextBlock Text="{Binding CurrentAttestationEvidenceText}"
+                       Margin="0,3,0,0"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       Visibility="{Binding HasCurrentAttestationEvidence, Converter={StaticResource BoolToVisibilityConverter}}"
+                       AutomationProperties.LiveSetting="Polite" />
             <TextBlock Text="{Binding PrerequisiteSummary}"
                        Margin="0,3,0,8"
                        FontSize="11"
@@ -65,8 +72,19 @@
                            Margin="0,4,0,0"
                            TextWrapping="Wrap"
                            AutomationProperties.LiveSetting="Assertive" />
+                <CheckBox IsChecked="{Binding HasConfirmedEvergreenCompletion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          Margin="0,10,0,0"
+                          MaxWidth="620"
+                          HorizontalAlignment="Left"
+                          Visibility="{Binding RequiresEvergreenConfirmation, Converter={StaticResource BoolToVisibilityConverter}}"
+                          AutomationProperties.Name="Confirm Evergreen form completion attestation"
+                          AutomationProperties.HelpText="Required before recording a timestamped billing-compliance attestation.">
+                    <TextBlock Text="{Binding AttestationStatement}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                </CheckBox>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button Content="Complete attestation"
+                    <Button Content="Record timestamped attestation"
                             Command="{Binding CompleteAttestationCommand}"
                             AutomationProperties.Name="Complete form attestation"
                             Padding="12,6" />
@@ -101,6 +119,48 @@
                             Padding="12,6" />
                 </StackPanel>
             </StackPanel>
+
+            <Separator Margin="0,12,0,8" />
+            <TextBlock Text="ATTESTATION HISTORY" Style="{StaticResource LabelStyle}" />
+            <TextBlock Text="{Binding HistoryStatusText}"
+                       Margin="0,2,0,0"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Visibility="{Binding HasHistoryStatus, Converter={StaticResource BoolToVisibilityConverter}}"
+                       AutomationProperties.LiveSetting="Polite" />
+            <ScrollViewer MaxHeight="190"
+                          VerticalScrollBarVisibility="Auto"
+                          Visibility="{Binding HasAttestationHistory, Converter={StaticResource BoolToVisibilityConverter}}">
+                <ItemsControl ItemsSource="{Binding AttestationHistory}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Padding="0,7">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ActionText}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding DetailText}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    <TextBlock Text="{Binding ActorAndTimestampText}"
+                                               FontSize="11"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding ReasonText}"
+                                               FontSize="11"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource WarningBrush}"
+                                               Visibility="{Binding HasReason, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </StackPanel>
     </Border>
 </UserControl>

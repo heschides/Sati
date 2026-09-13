@@ -2,7 +2,7 @@
 
 *Living document. The "why" behind choices that no diagram preserves. ARCHITECTURE.md
 says what owns what; this says why it was built that way and what was rejected. Newest
-sections at the bottom. Last updated: 2026-09-10.*
+sections at the bottom. Last updated: 2026-09-13.*
 
 ---
 
@@ -3952,3 +3952,83 @@ access, or describing local direct-database checks as protection against a modif
 Cloud request generations also prevent late old responses/renewals from mutating a replacement
 sign-in. Existing authorized work already in flight and broader last-administrator recovery still
 need separately scoped concurrency/operations work.
+
+## 2026-09-12 — Profile photos are separate current media
+
+**Decision:** store one current `PersonPhoto` beside the consumer rather than adding image bytes to
+`Person` or its version snapshots. The caseload and ordinary person contracts must stay lightweight;
+an image is loaded only for the deliberately selected consumer. Replacing a photo is a revisioned,
+audited change, but it is not a demographic profile version and it does not duplicate the previous
+binary into the lifecycle ledger.
+
+The service trusts neither an extension nor the request's MIME label. Shared rules inspect the
+bytes, accept only bounded JPG/PNG content, and the API applies the same tenant, assignment and
+stale-write rules as the desktop's local service. The client deliberately clears before loading a
+new selection. **Rejected:** base64 on `Person`, image bytes in caseload results, unbounded uploads,
+extension-only validation, and styling that permanently alters or overwrites the stored original.
+
+## 2026-09-13 — The canonical Demo is a rolling calendar template
+
+**Decision:** baseline capture records a `TimelineAnchorDate` in a singleton
+`SatiDemoResetState` table that is deliberately excluded from `demo_baseline`. After restoring the
+snapshot, the reset procedure clears its last-applied marker. The versioned showcase seed then
+moves effective dates, forms and their evidence, quarterly-review workflow dates, appointments,
+and scratchpad history by the elapsed-day delta. A direct seed rerun uses the last-applied date
+instead of the original anchor, so same-day runs are no-ops and later direct runs move only by the
+additional days. The marker commits in the same transaction as the date changes.
+
+Scheduled notes are working plans rather than historical records. They are rebuilt deterministically
+across a rolling 90-day horizon, one item per case manager per day while seeded records are
+available. Post-commit validation refuses to call the refresh successful unless its marker equals
+the requested business date and both incomplete forms and scheduled work exist in the next 30 days.
+General audit, billing, and published-document history stays fixed; form evidence and scratchpad
+comments move only because their parent workflow dates move.
+
+**Rejected:** hard-coded annual date edits, cumulative shifts from the original anchor on every
+rerun, deriving the anchor from whichever dated row happens to be newest, and declaring reset
+success from record counts alone. A replacement baseline must be deliberately recaptured so its
+anchor and its curated date relationships begin together.
+
+## 2026-09-13 — The CWIC packet keeps the publisher's pages and Sati supplies an overlay
+
+**Decision:** embed the exact MaineHealth Benefits Counseling Services packet supplied for this
+feature under a revision-bearing resource name, copy all ten pages unchanged, and draw only the
+authorized profile facts and explicit user answers over them. The current MaineHealth service page
+still links to this packet filename even though its component forms carry older revision labels.
+The resource hash makes a future replacement deliberate and reviewable; release preparation must
+recheck the publisher rather than assuming that link will remain current.
+
+Identity, date of birth, age, and SSN are derived after tenant/caseload authorization. The request
+cannot substitute them. SSN plaintext stays inside the generation process and each read is audited.
+Every output is a Draft because the packet contains several consumer/guardian signatures that Sati
+does not supply. Regeneration appends and supersedes artifact metadata with fixed source provenance.
+Electronic signing remains unavailable pending written confirmation that one evidence workflow may
+legitimately satisfy all of the packet's separate authorizations.
+
+**Rejected:** redrawing the packet as a Sati-branded lookalike, storing plaintext SSNs or returning
+them in a prefill response, inferring sensitive disclosure consent from the profile, flattening a
+generated draft into a completed record, and silently swapping the embedded source PDF.
+
+## 2026-09-13 — Housing Support Funds uses the controlled OADS AcroForm as a draft
+
+**Decision:** embed the exact three-page fillable Maine DHHS OADS application dated June 30, 2025,
+retain its page content and fields, and fill only applicant-side facts and explicit user answers.
+The official Housing Services page currently links the same named revision and describes Section
+21/29, subsidy, Shared Living, annual application, proof, and OADS approval constraints. The source
+hash and versioned resource name make any future replacement deliberate and reviewable.
+
+Tenant/caseload authorization precedes derivation of consumer identity, waiver, Shared Living,
+guardian, assigned case manager, and provider information. The request cannot override those facts.
+The $3,000 ceiling and required subsidy explanation are validation rules. Shared Living, subsidy,
+supporting proof, and signatures are visible review items: Sati warns from the published application
+but does not silently infer final program eligibility or claim OADS approval.
+
+The generator preserves interactivity and supplies explicit portable appearances so printed values
+and checkbox state agree across viewers. Consumer/guardian signatures and dates remain blank, and
+every field on the DHHS Staff Only page remains untouched. Each output is a versioned Draft artifact;
+generation is audited and does not mean transmission, receipt, approval, or completion. Electronic
+signature routing remains unavailable until the program and agency confirm that workflow.
+
+**Rejected:** recreating a lookalike form, accepting caller-supplied authoritative profile facts,
+filling staff-only or signature fields, hiding known application conflicts, treating generation as
+submission, and silently replacing the controlled source when OADS publishes a later revision.

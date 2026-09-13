@@ -940,6 +940,113 @@ public sealed class NotePipelineTests
     // Fixture
     // ---------------------------------------------------------------------
 
+    [Theory]
+    [InlineData(false, "current")]
+    [InlineData(true, "current")]
+    [InlineData(false, "historical")]
+    [InlineData(true, "historical")]
+    [InlineData(false, "form-tag")]
+    [InlineData(true, "form-tag")]
+    [InlineData(false, "justification")]
+    [InlineData(true, "justification")]
+    public async Task LoggedSubmissionRefusesComplianceFailuresWithoutWriting(bool update, string contingency)
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        await SeedSubmissionRequirementAsync(fixture, today.AddDays(-5),
+            contingency == "historical" ? today : null);
+        var service = fixture.NotesAs(fixture.CaseManagerOne);
+        var note = update
+            ? await fixture.DetachedNoteAsync(await fixture.SeedNoteAsync(
+                fixture.PersonOneId, NoteStatus.Pending, today.AddDays(-2)))
+            : Note.Create("Do not lose this clinical draft.", today.AddDays(-2), NoteStatus.Pending, 30,
+                fixture.PersonOneId);
+        var before = update ? await fixture.NoteAsync(note.Id) : null;
+        note.Narrative = "Do not lose this clinical draft.";
+        note.Status = NoteStatus.Logged;
+        if (contingency == "form-tag")
+        {
+            note.NoteType = NoteType.Form;
+            note.FormType = FormType.PCP;
+        }
+        if (contingency == "justification") note.CaseManagerJustification = "Please override the gate.";
+
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(async () =>
+        {
+            if (update) await service.UpdateNoteAsync(note);
+            else await service.AddNoteAsync(note);
+        });
+
+        Assert.Contains("PCP", error.Message);
+        Assert.Contains("Pending", error.Message);
+        Assert.Equal("Do not lose this clinical draft.", note.Narrative);
+        Assert.Equal(update ? before!.Revision : 1, note.Revision);
+        await using var verification = fixture.Factory.CreateDbContext();
+        Assert.False(await verification.AuditEvents.AnyAsync());
+        if (update)
+        {
+            var stored = await fixture.NoteAsync(note.Id);
+            Assert.Equal(before!.Narrative, stored.Narrative);
+            Assert.Equal(before.Status, stored.Status);
+            Assert.Equal(before.Revision, stored.Revision);
+        }
+        else Assert.False(await verification.Notes.AnyAsync());
+    }
+
+    [Theory]
+    [InlineData(NoteStatus.Pending)]
+    [InlineData(NoteStatus.HeldForCompliance)]
+    [InlineData(NoteStatus.ComplianceBlocked)]
+    public async Task NoncompliantSubmissionDocumentationStillSavesAndEdits(NoteStatus status)
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        await SeedSubmissionRequirementAsync(fixture, today.AddDays(-5), null);
+        var service = fixture.NotesAs(fixture.CaseManagerOne);
+        var saved = await service.AddNoteAsync(Note.Create("Clinical documentation", today, status, 30,
+            fixture.PersonOneId));
+        saved.Narrative = "Corrected clinical documentation";
+
+        await service.UpdateNoteAsync(saved);
+
+        Assert.Equal(status, await fixture.StatusOfAsync(saved.Id));
+        Assert.Equal(saved.Narrative, await fixture.NarrativeOfAsync(saved.Id));
+    }
+
+    [Theory]
+    [InlineData("due-today")]
+    [InlineData("future-due")]
+    [InlineData("completed-today")]
+    [InlineData("requirement-disabled")]
+    public async Task LoggedSubmissionPreservesConfiguredDateBoundaries(string contingency)
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        await SeedSubmissionRequirementAsync(fixture,
+            contingency == "due-today" ? today : contingency == "future-due" ? today.AddDays(1) : today.AddDays(-5),
+            contingency == "completed-today" ? today : null,
+            contingency == "requirement-disabled" ? BillingComplianceRequirements.None : BillingComplianceRequirements.Pcp);
+
+        var saved = await fixture.NotesAs(fixture.CaseManagerOne).AddNoteAsync(Note.Create(
+            "Compliant submission", today, NoteStatus.Logged, 30, fixture.PersonOneId));
+
+        Assert.Equal(NoteStatus.Logged, await fixture.StatusOfAsync(saved.Id));
+    }
+
+    private static async Task SeedSubmissionRequirementAsync(PipelineFixture fixture, DateTime dueDate,
+        DateTime? completedDate, BillingComplianceRequirements requirements = BillingComplianceRequirements.Pcp)
+    {
+        await using var db = fixture.Factory.CreateDbContext();
+        var form = new Form(FormType.PCP, dueDate, completedDate) { PersonId = fixture.PersonOneId };
+        db.Forms.Add(form);
+        db.Settings.Add(new Settings
+        {
+            AgencyId = fixture.CaseManagerOne.AgencyId,
+            BillingComplianceRequirements = requirements
+        });
+        await db.SaveChangesAsync();
+    }
+
     private sealed class PipelineFixture : IAsyncDisposable
     {
         private const int AgencyOne = 101;

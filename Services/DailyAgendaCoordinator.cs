@@ -42,17 +42,25 @@ public sealed class DailyAgendaCoordinator(
 
             if (agenda.AssessmentSuggestion is { } suggestion)
             {
-                try
+                if (!settings.IsComprehensiveAssessmentAuthoringEnabled)
                 {
-                    var assessment = await assessments.GetLatestForAgendaAsync(suggestion.PersonId);
-                    assessmentProgress = assessment is null
-                        ? "Not started."
-                        : DescribeAssessmentProgress(assessment);
+                    assessmentProgress =
+                        "Evergreen is the source. Attest completion in Sati when the assessment is finished.";
                 }
-                catch (Exception ex)
+                else
                 {
-                    AppErrorLog.Record(ex, "daily-agenda.assessment-progress");
-                    agenda = agenda with { AssessmentSuggestion = null };
+                    try
+                    {
+                        var assessment = await assessments.GetLatestForAgendaAsync(suggestion.PersonId);
+                        assessmentProgress = assessment is null
+                            ? "Not started."
+                            : DescribeAssessmentProgress(assessment);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppErrorLog.Record(ex, "daily-agenda.assessment-progress");
+                        agenda = agenda with { AssessmentSuggestion = null };
+                    }
                 }
             }
 

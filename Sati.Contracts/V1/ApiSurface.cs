@@ -53,9 +53,15 @@ public static class ApiSurface
         // SettingsDto gained the existing-profile Credible policy and configurable VR
         // assistant title. Both must round-trip through the agency-authoritative API.
         "settings-profile-import-and-vr-label-v1",
+        // The three OADS authoring switches are independent from the external-work
+        // attestation and billing-compliance requirements.
+        "oads-authoring-settings-v1",
         // Form completion is now an explicit, append-only attestation with a
         // separately revocable projection and a derived evidence queue.
         "form-attestation-v1",
+        // Authorized users can see the signer, timestamp, completion date, and
+        // revocation history behind the current form-compliance projection.
+        "form-attestation-history-v1",
         "form-attestation-prerequisite-v1",
         "annual-document-artifact-v1",
         "document-template-v1",
@@ -69,7 +75,10 @@ public static class ApiSurface
         "demo-full-reset-v1",
         // Prevent same-month periods for different case managers from rendering identically.
         "billing-period-case-manager-name-v1",
-        "check-request-v1"
+        "check-request-v1",
+        "cwic-referral-packet-v1",
+        "housing-support-funds-v1",
+        "person-photo-v1"
     ];
 
     /// <summary>
@@ -84,6 +93,7 @@ public static class ApiSurface
         "DELETE /api/v1/contacts/{contactId:int}",
         "DELETE /api/v1/exempt-dates/{id:int}",
         "DELETE /api/v1/notes/{id:int}",
+        "DELETE /api/v1/people/{personId:int}/photo",
         "DELETE /api/v1/people/{personId:int}/providers/{linkId:int}",
         "DELETE /api/v1/providers/{id:int}",
         "DELETE /api/v1/providers/{providerId:int}/contacts/{contactId:int}",
@@ -131,12 +141,14 @@ public static class ApiSurface
         "GET /api/v1/people/{personId:int}/attestations/pending",
         "GET /api/v1/people/{personId:int}/contacts",
         "GET /api/v1/people/{personId:int}/documents",
+        "GET /api/v1/people/{personId:int}/forms/{type}/attestations",
         "GET /api/v1/people/{personId:int}/forms/{type}/prerequisite",
         "GET /api/v1/people/{personId:int}/history",
         "GET /api/v1/people/{personId:int}/history.pdf",
         "GET /api/v1/people/{personId:int}/journal",
         "GET /api/v1/people/{personId:int}/notes",
         "GET /api/v1/people/{personId:int}/pcp-source",
+        "GET /api/v1/people/{personId:int}/photo",
         "GET /api/v1/people/{personId:int}/providers",
         "GET /api/v1/people/{personId:int}/reviews",
         "GET /api/v1/people/{personId:int}/safety-plans/latest",
@@ -207,6 +219,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/annual-packet",
         "POST /api/v1/people/{personId:int}/assessments/draft",
         "POST /api/v1/people/{personId:int}/contacts",
+        "POST /api/v1/people/{personId:int}/cwic-referral.pdf",
         "POST /api/v1/people/{personId:int}/documents/privacy-practices/acknowledgment",
         "POST /api/v1/people/{personId:int}/documents/verify",
         "POST /api/v1/people/{personId:int}/documents/{artifactId:int}/freeze",
@@ -215,6 +228,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/forms.pdf",
         "POST /api/v1/people/{personId:int}/forms/{type}/attestation",
         "POST /api/v1/people/{personId:int}/forms/{type}/attestation/revoke",
+        "POST /api/v1/people/{personId:int}/housing-support-funds.pdf",
         "POST /api/v1/people/{personId:int}/journal/entries",
         "POST /api/v1/people/{personId:int}/providers",
         "POST /api/v1/people/{personId:int}/safety-plans/draft",
@@ -247,6 +261,7 @@ public static class ApiSurface
         "PUT /api/v1/people/{personId:int}/contacts/{contactId:int}",
         "PUT /api/v1/people/{personId:int}/journal",
         "PUT /api/v1/people/{personId:int}/owner",
+        "PUT /api/v1/people/{personId:int}/photo",
         "PUT /api/v1/people/{personId:int}/providers/{linkId:int}",
         "PUT /api/v1/people/{personId:int}/ssn",
         "PUT /api/v1/people/{personId:int}/status",

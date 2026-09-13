@@ -163,6 +163,34 @@ public sealed class LocalAtAndPcpPermissionTests
     }
 
     [Fact]
+    public async Task DisabledPcpAuthoringRejectsLocalWorkspaceButLeavesEvergreenGateEnabled()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        await SeedAsync(fixture);
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var settings = await db.Settings.SingleAsync(x => x.AgencyId == fixture.CaseManagerOne.AgencyId);
+            settings.IsPersonCenteredPlanAuthoringEnabled = false;
+            settings.BillingComplianceRequirements = BillingComplianceRequirements.Pcp;
+            await db.SaveChangesAsync();
+        }
+
+        var error = await Assert.ThrowsAsync<NotSupportedException>(() =>
+            new PersonCenteredPlanSourceService(
+                    fixture.Factory,
+                    SessionFor(fixture.CaseManagerOne))
+                .GetSourceAsync(fixture.PersonOneId, fixture.CaseManagerOne.Id));
+
+        Assert.Contains("Evergreen completion", error.Message, StringComparison.Ordinal);
+        await using var verification = fixture.Factory.CreateDbContext();
+        var requirements = await verification.Settings
+            .Where(settings => settings.AgencyId == fixture.CaseManagerOne.AgencyId)
+            .Select(settings => settings.BillingComplianceRequirements)
+            .SingleAsync();
+        Assert.Equal(BillingComplianceRequirements.Pcp, requirements);
+    }
+
+    [Fact]
     public async Task DetachedRequestCannotRepointAnExistingRequestToAnAccessibleConsumer()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
@@ -236,6 +264,14 @@ public sealed class LocalAtAndPcpPermissionTests
         request.AttachSnapshot([1, 2, 3]);
         if (published) request.Publish(fixture.CaseManagerOne, DateTime.UtcNow, 0.1m);
         await using var db = fixture.Factory.CreateDbContext();
+        if (!await db.Settings.AnyAsync(x => x.AgencyId == fixture.CaseManagerOne.AgencyId))
+        {
+            db.Settings.Add(new Settings
+            {
+                AgencyId = fixture.CaseManagerOne.AgencyId,
+                IsPersonCenteredPlanAuthoringEnabled = true
+            });
+        }
         db.ATRequests.Add(request);
         db.ComprehensiveAssessments.Add(new ComprehensiveAssessment
         {

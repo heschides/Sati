@@ -26,6 +26,7 @@ public sealed class AnnualDocumentViewRenderTests
             Assert.Same(model.SubmitCommand, submit.Command); Assert.False(submit.IsEnabled);
             Assert.Same(model.ApproveCommand, buttons.Single(x => Equals(x.Content, "Approve submitted plan")).Command);
             Assert.NotNull(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Safety plan cycle beginning"));
+            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(view, "Live safety plan preview"));
             SavePreview(view, "safety-workspace.png");
         });
     }
@@ -44,6 +45,11 @@ public sealed class AnnualDocumentViewRenderTests
             var receipt = buttons.Single(x => Equals(x.Content, "Record receipt or effort"));
             Assert.Same(model.AcknowledgeCommand, receipt.Command); Assert.False(receipt.IsEnabled);
             Assert.NotNull(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Privacy notice received on"));
+            var templateEditor = WpfUiHarness.Descendants(view).OfType<Expander>()
+                .Single(x => Equals(x.Header, "Agency privacy template (administrators)"));
+            templateEditor.IsExpanded = true;
+            view.UpdateLayout();
+            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(view, "Live privacy template preview"));
             SavePreview(view, "annual-workspace.png");
         });
     }

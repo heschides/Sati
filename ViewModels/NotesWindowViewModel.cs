@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
 using Sati.Services;
@@ -180,23 +181,15 @@ namespace Sati.ViewModels
         {
             if (SelectedNote is null) return;
 
-            var (passed, reasons) = SelectedNote.Person.EvaluateComplianceGate(DateTime.Today,
-                SelectedNote.NoteType == NoteType.Form ? SelectedNote.FormType : null,
-                NoteEntry.ComplianceRequirements);
+            var decision = NoteSubmissionGate.Evaluate(NoteWorkflow.Logged, SelectedNote.Person.EffectiveDate,
+                SelectedNote.Person.Forms.Select(form => new ComplianceFormSnapshot(
+                    form.Type.ToString(), form.DueDate, form.CompletedDate)), SelectedNote.EventDate,
+                BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow), NoteEntry.ComplianceRequirements);
 
-            // Window check keyed to the note's date — previously missing here,
-            // which let notes inside a missed-form window get Logged from the
-            // context menu when the dashboard would have blocked them. Notes
-            // without an EventDate skip the window check (nothing to key on).
-            var windowReasons = SelectedNote.EventDate is DateTime eventDate
-                ? SelectedNote.Person.EvaluateBillingWindow(
-                    eventDate, NoteEntry.ComplianceRequirements)
-                : [];
-
-            if (!passed || windowReasons.Count > 0)
+            if (!decision.Passed)
             {
-                _dialogIsWindowBlock = windowReasons.Count > 0;
-                ComplianceFailureReasons = reasons.Concat(windowReasons).ToList();
+                _dialogIsWindowBlock = decision.HistoricalWindowBlocked;
+                ComplianceFailureReasons = decision.Reasons.ToList();
                 PendingJustification = string.Empty;
                 IsComplianceDialogVisible = true;
                 return;
@@ -208,8 +201,15 @@ namespace Sati.ViewModels
         private async Task LogNoteDirectlyAsync()
         {
             if (SelectedNote is null) return;
-            SelectedNote.Status = NoteStatus.Logged;
-            if (!await TryUpdateNoteAsync(SelectedNote)) return;
+            var note = SelectedNote;
+            var previousStatus = note.Status;
+            note.Status = NoteStatus.Logged;
+            if (!await TryUpdateNoteAsync(note))
+            {
+                note.Status = previousStatus;
+                RefreshView();
+                return;
+            }
             RefreshView();
             RefreshPanelForSelectedNote();
             NoteStatusChanged?.Invoke(this, EventArgs.Empty);
@@ -245,17 +245,9 @@ namespace Sati.ViewModels
         [RelayCommand]
         private async Task SendToSupervisor()
         {
-            if (SelectedNote is null) return;
-            if (string.IsNullOrWhiteSpace(PendingJustification)) return;
-
-            SelectedNote.Status = NoteStatus.Logged;
-            SelectedNote.CaseManagerJustification = PendingJustification;
-            if (!await TryUpdateNoteAsync(SelectedNote)) return;
-            _dialogIsWindowBlock = false;
-            IsComplianceDialogVisible = false;
+            // Retained only for compatibility; it cannot skip the normal gate.
             PendingJustification = string.Empty;
-            RefreshView();
-            RefreshPanelForSelectedNote();
+            await MarkNoteLogged();
         }
 
         [RelayCommand]
@@ -401,6 +393,11 @@ namespace Sati.ViewModels
             {
                 await _noteService.UpdateNoteAsync(note);
                 return true;
+            }
+            catch (NoteSubmissionException ex)
+            {
+                NoteEntry.ShowSubmissionRefusal(ex.Message);
+                return false;
             }
             catch (NoteConcurrencyException)
             {

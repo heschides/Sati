@@ -1,0 +1,84 @@
+<UserControl x:Class="Sati.Views.ClientDocuments.AgencyReleaseDocument"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="Live release document preview">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Border Background="White" Padding="22" TextElement.Foreground="#17324D">
+            <StackPanel>
+                <TextBlock Text="SATI  |  RELEASE OF INFORMATION" FontSize="9" FontWeight="Bold"
+                           Foreground="#2F7D7A" />
+                <Separator Background="#2F7D7A" Margin="0,5,0,14" />
+                <TextBlock Text="{Binding WorkspaceTitle}" FontSize="21" FontWeight="Bold" />
+                <TextBlock Text="{Binding PersonName}" FontSize="12" Margin="0,3,0,12" Foreground="#586571" />
+
+                <Border Background="#EEF6F5" BorderBrush="#2F7D7A" BorderThickness="3,0,0,0"
+                        Padding="9" Margin="0,0,0,12">
+                    <TextBlock Text="{Binding AuthorizationChoice.DisplayName, TargetNullValue='Prepared draft — authorization not yet selected'}"
+                               FontWeight="SemiBold" TextWrapping="Wrap" />
+                </Border>
+
+                <TextBlock Text="RECIPIENT / CONTACT" FontWeight="Bold" Foreground="#2F7D7A" Margin="0,5,0,4" />
+                <TextBlock Text="{Binding ContactName, TargetNullValue=[Contact name]}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ContactType}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Relationship}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ContactAddress}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ContactCity}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ContactState}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ContactPhone, StringFormat=Telephone: {0}}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ContactFax, StringFormat=Fax: {0}}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ContactEmail, StringFormat=Email: {0}}" TextWrapping="Wrap" />
+
+                <TextBlock Text="AUTHORIZATION WINDOW" FontWeight="Bold" Foreground="#2F7D7A" Margin="0,13,0,4" />
+                <TextBlock Text="{Binding SelectedScope.DisplayName, TargetNullValue=Disclosure scope not selected}" />
+                <TextBlock Text="{Binding StartDate, StringFormat='Start date: {0:MMM d, yyyy}', TargetNullValue='Start date not entered'}" />
+                <TextBlock Text="{Binding ExpirationDate, StringFormat='Expiration date: {0:MMM d, yyyy}', TargetNullValue='Expiration date not entered'}" />
+                <TextBlock Text="{Binding ReleaseWithoutReviewChoice.DisplayName, StringFormat=Release without prior review: {0}, TargetNullValue=Release-without-review choice not entered}"
+                           TextWrapping="Wrap" />
+
+                <TextBlock Text="INFORMATION TO DISCLOSE AND / OR OBTAIN" FontWeight="Bold"
+                           Foreground="#2F7D7A" Margin="0,13,0,4" />
+                <ItemsControl ItemsSource="{Binding InformationCategories}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Content="{Binding DisplayName}" IsChecked="{Binding IsSelected}"
+                                      IsHitTestVisible="False" Focusable="False" Foreground="#17324D" Margin="0,1" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding OtherInformation, StringFormat=Other: {0}}" TextWrapping="Wrap" Margin="0,3,0,0" />
+
+                <TextBlock Text="SPECIAL PERMISSIONS" FontWeight="Bold" Foreground="#2F7D7A" Margin="0,13,0,4" />
+                <TextBlock Text="{Binding DrugAlcoholChoice.DisplayName, StringFormat=Drug/alcohol information: {0}, TargetNullValue=Drug/alcohol information: not selected}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding MentalHealthChoice.DisplayName, StringFormat=Mental/behavioral health: {0}, TargetNullValue=Mental/behavioral health: not selected}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding HivAidsChoice.DisplayName, StringFormat=HIV/AIDS information: {0}, TargetNullValue=HIV/AIDS information: not selected}"
+                           TextWrapping="Wrap" />
+
+                <Border Background="#FFF7E6" BorderBrush="#9A5C00" BorderThickness="3,0,0,0"
+                        Padding="9" Margin="0,13,0,0"
+                        Visibility="{Binding IsRevocation, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="{Binding RevokedOn, StringFormat='REVOCATION — effective {0:MMM d, yyyy}'}"
+                               FontWeight="Bold" TextWrapping="Wrap" />
+                </Border>
+
+                <TextBlock Text="IMPORTANT RIGHTS AND DISCLOSURE TERMS" FontWeight="Bold"
+                           Foreground="#2F7D7A" Margin="0,14,0,4" />
+                <TextBlock Text="The person may review released information and may revoke this authorization in writing, subject to action already taken and applicable law. Required consumer and representative signatures remain separate."
+                           TextWrapping="Wrap" FontSize="10" />
+
+                <TextBlock Text="Consumer or legally responsible person: ____________________   Date: __________"
+                           Margin="0,18,0,8" TextWrapping="Wrap" />
+                <TextBlock Text="Guardian / representative, if applicable: __________________   Date: __________"
+                           TextWrapping="Wrap" />
+
+                <Border Background="#EEF6F5" BorderBrush="#2F7D7A" BorderThickness="1"
+                        Padding="9" Margin="0,14,0,0"
+                        Visibility="{Binding DidObtainRoi, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="STAFF ATTESTATION WILL BE ATTACHED AT GENERATION"
+                               FontWeight="Bold" TextWrapping="Wrap" />
+                </Border>
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
+</UserControl>

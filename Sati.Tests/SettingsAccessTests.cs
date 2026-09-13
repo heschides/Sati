@@ -73,6 +73,42 @@ public sealed class SettingsAccessTests
         Assert.DoesNotContain("CanManageAgencySettings", appearanceTab, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void OadsAuthoringControlsHideOnlyBuildersAndPreserveComplianceAttestations()
+    {
+        var settings = File.ReadAllText(Path.Combine(RepositoryRoot(), "Views", "SettingsWindow.xaml"));
+        var clients = File.ReadAllText(Path.Combine(RepositoryRoot(), "Views", "ClientsView.xaml"));
+
+        Assert.Contains("IsComprehensiveAssessmentAuthoringEnabled", settings, StringComparison.Ordinal);
+        Assert.Contains("IsClassificationAuthoringEnabled", settings, StringComparison.Ordinal);
+        Assert.Contains("IsPersonCenteredPlanAuthoringEnabled", settings, StringComparison.Ordinal);
+        Assert.Contains("keeps historical records, Evergreen attestations, deadlines, reminders, and billing rules", settings, StringComparison.Ordinal);
+
+        Assert.Contains("Header=\"Comprehensive Assessment\"", clients, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"{Binding IsComprehensiveAssessmentAuthoringEnabled", clients, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Person-Centered Plan\"", clients, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"{Binding IsPersonCenteredPlanAuthoringEnabled", clients, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Classification\"", clients, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"{Binding IsClassificationAuthoringEnabled", clients, StringComparison.Ordinal);
+
+        Assert.Contains("IsChecked=\"{Binding PcpCompliant, Mode=OneWay}\"", clients, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding CompAssessmentCompliant, Mode=OneWay}\"", clients, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding ReclassificationCompliant, Mode=OneWay}\"", clients, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UnfinishedOadsBuildersAreOffByDefault()
+    {
+        var defaults = new Settings();
+
+        Assert.False(defaults.IsComprehensiveAssessmentAuthoringEnabled);
+        Assert.False(defaults.IsClassificationAuthoringEnabled);
+        Assert.False(defaults.IsPersonCenteredPlanAuthoringEnabled);
+
+        var settingsView = File.ReadAllText(Path.Combine(RepositoryRoot(), "Views", "SettingsWindow.xaml"));
+        Assert.Contains("unfinished workflows are off by default", settingsView, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string RepositoryRoot([System.Runtime.CompilerServices.CallerFilePath] string callerPath = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(callerPath)!, ".."));
 

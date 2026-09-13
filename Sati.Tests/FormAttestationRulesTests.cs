@@ -205,6 +205,22 @@ public sealed class FormAttestationRulesTests
         await service.AttestAsync(detached, completedOn);
         await service.RevokeAttestationAsync(detached, "Entered against the wrong cycle.");
 
+        var visibleHistory = await service.GetAttestationHistoryAsync(detached);
+        Assert.Collection(
+            visibleHistory,
+            revocation =>
+            {
+                Assert.Equal("Revoked", revocation.Kind);
+                Assert.Equal(fixture.CaseManagerOne.DisplayName, revocation.ActorDisplayName);
+                Assert.Equal("Entered against the wrong cycle.", revocation.Reason);
+            },
+            attestation =>
+            {
+                Assert.Equal("Attested", attestation.Kind);
+                Assert.Equal(completedOn, attestation.CompletedOn);
+                Assert.Equal(fixture.CaseManagerOne.DisplayName, attestation.ActorDisplayName);
+            });
+
         await using var verification = fixture.Factory.CreateDbContext();
         var stored = await verification.Forms.AsNoTracking()
             .SingleAsync(candidate => candidate.Id == formId);

@@ -14,6 +14,7 @@ namespace Sati.Data
 
         public DbSet<Agency> Agencies { get; set; }
         public DbSet<Person> People { get; set; }
+        public DbSet<PersonPhoto> PersonPhotos { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Form> Forms { get; set; }
         public DbSet<FormAttestation> FormAttestations { get; set; }
@@ -391,6 +392,28 @@ namespace Sati.Data
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
+            modelBuilder.Entity<PersonPhoto>(entity =>
+            {
+                entity.HasKey(photo => photo.PersonId);
+                entity.Property(photo => photo.Content).IsRequired();
+                entity.Property(photo => photo.ContentType).IsRequired().HasMaxLength(20);
+                entity.Property(photo => photo.ContentSha256).IsRequired().HasColumnType("char(64)");
+                entity.Property(photo => photo.Revision).IsConcurrencyToken();
+                entity.HasIndex(photo => photo.AgencyId);
+                entity.HasOne<Person>()
+                      .WithOne()
+                      .HasForeignKey<PersonPhoto>(photo => photo.PersonId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<Agency>()
+                      .WithMany()
+                      .HasForeignKey(photo => photo.AgencyId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<User>()
+                      .WithMany()
+                      .HasForeignKey(photo => photo.UpdatedByUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<PersonContact>(entity =>
             {
                 entity.HasKey(c => c.Id);
@@ -703,9 +726,13 @@ namespace Sati.Data
             {
                 entity.HasKey(s => s.Id);
                 entity.Property(s => s.Revision).IsConcurrencyToken();
+                entity.Property(s => s.IsComprehensiveAssessmentAuthoringEnabled).HasDefaultValue(false);
+                entity.Property(s => s.IsClassificationAuthoringEnabled).HasDefaultValue(false);
+                entity.Property(s => s.IsPersonCenteredPlanAuthoringEnabled).HasDefaultValue(false);
                 entity.Property(s => s.BillingComplianceRequirements)
                       .HasConversion<int>()
-                      .HasDefaultValue(Contracts.V1.BillingComplianceGate.DefaultRequirements);
+                      .HasDefaultValue(Contracts.V1.BillingComplianceGate.DefaultRequirements)
+                      .ValueGeneratedNever();
                 entity.HasIndex(s => s.AgencyId).IsUnique();
                 entity.HasOne<Agency>()
                       .WithMany()

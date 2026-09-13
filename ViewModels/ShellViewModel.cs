@@ -340,7 +340,7 @@ namespace Sati.ViewModels
             user.Role == previous.Role && user.Permissions == previous.Permissions &&
             user.SupervisorId == previous.SupervisorId;
 
-        public void ResumeReauthenticatedSession(User user)
+        public async Task ResumeReauthenticatedSessionAsync(User user)
         {
             if (!CanResumeReauthenticatedSession(user))
                 throw new InvalidOperationException("Changed account access requires reloading the workspace.");
@@ -350,8 +350,17 @@ namespace Sati.ViewModels
             _sessionLifetime.ResumeAccess();
             NotesViewModel.LoggedInUser = _sessionService.CurrentUser;
             NotifyRoleDependentProperties();
-            Scratchpad.ResumeAfterReauthentication();
-            CompleteAccountTransition();
+            try
+            {
+                await Scratchpad.ResumeAfterReauthenticationAsync();
+            }
+            finally
+            {
+                // Authentication succeeded even if restoring an unrelated workspace
+                // later reports its own recoverable failure. Do not leave the privacy
+                // shield claiming that credentials are still required.
+                CompleteAccountTransition();
+            }
         }
 
         private void ApplyEasyEyesMode(bool enabled)

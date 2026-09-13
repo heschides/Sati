@@ -191,12 +191,15 @@ namespace Sati.ViewModels.Children
             await _saveGate.WaitAsync();
             try
             {
+                // A clean draft still must not let an overnight rollover make an
+                // authenticated request while the reauthentication shield is up.
+                if (_sessionExpiredDuringSave)
+                    return false;
+
                 var todayDirty = IsTodayDirty;
                 var tomorrowDirty = IsTomorrowDirty;
                 if (!todayDirty && !tomorrowDirty)
                     return true;
-                if (_sessionExpiredDuringSave)
-                    return false;
 
                 var todaySaved = !todayDirty ||
                     (!HasScratchpadConflict && await SaveTodayCoreAsync());
@@ -215,6 +218,8 @@ namespace Sati.ViewModels.Children
 
         public async Task<bool> RollForwardIfNeededAsync()
         {
+            if (_sessionExpiredDuringSave)
+                return false;
             if (_scratchpad is null || _scratchpad.Date.Date == DateTime.Today)
                 return true;
 
@@ -226,13 +231,24 @@ namespace Sati.ViewModels.Children
             await _saveGate.WaitAsync();
             try
             {
-                var userId = _sessionService.CurrentUser!.Id;
-                var todayTask = _scratchpadService.LoadTodayAsync(userId);
-                var tomorrowTask = _scratchpadService.LoadTomorrowAsync(userId);
-                await Task.WhenAll(todayTask, tomorrowTask);
+                if (_sessionService.CurrentUser is not { } user)
+                {
+                    SuspendForReauthentication();
+                    return false;
+                }
 
-                _scratchpad = await todayTask;
-                _tomorrowAgenda = await tomorrowTask;
+                var userId = user.Id;
+                // Load sequentially but publish neither result until both succeed.
+                // This avoids starting a second authenticated request after the
+                // first one has already ended the session, while keeping the two
+                // visible tabs on one coherent pair of dates.
+                var nextScratchpad = await _scratchpadService.LoadTodayAsync(userId);
+                var nextTomorrowAgenda = await _scratchpadService.LoadTomorrowAsync(userId);
+                if (_sessionService.CurrentUser?.Id != userId || _loadedUserId != userId)
+                    return false;
+
+                _scratchpad = nextScratchpad;
+                _tomorrowAgenda = nextTomorrowAgenda;
                 _lastSavedScratchpadContent = _scratchpad.Content;
                 _lastSavedTomorrowAgendaContent = _tomorrowAgenda.Content;
                 ScratchpadContent = _scratchpad.Content;
@@ -245,11 +261,20 @@ namespace Sati.ViewModels.Children
                 await RefreshScheduledWorkAsync(userId);
                 return true;
             }
+            catch (Exception ex) when (ex is SessionExpiredException or ScratchpadSessionExpiredException)
+            {
+                // The API has already notified the shell, which owns the sign-in
+                // prompt. Rollover only needs to freeze the drafts and stop polling.
+                HandleExpiredSession(ex);
+                return false;
+            }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Work agenda rollover failed: {ex.Message}");
+                var reference = AppErrorLog.Record(ex, "scratchpad.roll-forward");
                 MessageBox.Show(
-                    "Sati could not move the work agenda to the new day. Your previous drafts remain visible.",
+                    "Sati could not update the work agenda for the new day. Your previous drafts remain visible.\n\n" +
+                    $"Support reference: {reference}\n\nCheck the connection and try again.",
                     "Agenda Rollover Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
@@ -583,9 +608,9 @@ namespace Sati.ViewModels.Children
         private bool IsTomorrowDirty =>
             _tomorrowAgenda is not null && TomorrowAgendaContent != _lastSavedTomorrowAgendaContent;
 
-        private void HandleExpiredSession(ScratchpadSessionExpiredException ex)
+        private void HandleExpiredSession(Exception ex)
         {
-            Debug.WriteLine($"Scratchpad save paused after session expiry: {ex.Message}");
+            Debug.WriteLine($"Scratchpad access paused after session expiry: {ex.Message}");
             _scratchpadTimer?.Stop();
             _sessionExpiredDuringSave = true;
             HasScratchpadSessionExpired = true;
@@ -603,10 +628,18 @@ namespace Sati.ViewModels.Children
         /// protected. A different person signing in is an account switch, which
         /// reinitializes through its own path.
         /// </summary>
-        public void ResumeAfterReauthentication()
+        public async Task ResumeAfterReauthenticationAsync()
         {
             ClearExpiredSessionWarning();
             StartScratchpadTimer();
+
+            // The visible text deliberately remained authoritative while access was
+            // paused. Save it before changing dated rows, then complete any rollover
+            // that was interrupted by the expired session.
+            if (!await SaveAllScratchpadsAsync())
+                return;
+
+            await RollForwardIfNeededAsync();
         }
 
         public void SuspendForReauthentication()

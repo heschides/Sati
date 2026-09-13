@@ -55,12 +55,16 @@ internal static class AuditActions
     // its own action rather than a person.updated with different fields.
     public const string PersonReassigned = "person.reassigned";
     public const string PersonSsnUpdated = "person.ssn-updated";
+    public const string PersonPhotoUpdated = "person.photo-updated";
+    public const string PersonPhotoRemoved = "person.photo-removed";
     // Recorded on every decryption, separately from the form generation that caused
     // it. An SSN read is a disclosure, and accounting of disclosures needs the read
     // itself in the trail, not merely the document that occasioned it.
     public const string PersonSsnDecrypted = "person.ssn-decrypted";
     public const string DhhsFormGenerated = "dhhs-form.generated";
     public const string AgencyReleaseGenerated = "agency-release.generated";
+    public const string CwicPacketGenerated = "cwic-packet.generated";
+    public const string HousingSupportFundsGenerated = "housing-support-funds.generated";
     public const string PersonHistoryViewed = "person-history.viewed";
     public const string PersonHistoryPdfGenerated = "person-history-pdf.generated";
     public const string TestConsumerDeleted = "test-data.consumer-deleted";

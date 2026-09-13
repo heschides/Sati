@@ -951,6 +951,30 @@
                     <StackPanel Margin="36,30">
 
                 <!-- NOTE TEMPLATES -->
+                <TextBlock Text="OPTIONAL OADS WORKFLOWS"
+                           Style="{StaticResource SectionHeader}"
+                           Margin="0,8,0,8" />
+                <Separator />
+                <TextBlock Text="These unfinished workflows are off by default. Turn one on only for a deliberate demonstration. Leaving it off hides Sati's builder but keeps historical records, Evergreen attestations, deadlines, reminders, and billing rules."
+                           TextWrapping="Wrap"
+                           MaxWidth="620"
+                           HorizontalAlignment="Left"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="0,0,0,12" />
+                <CheckBox Content="Comprehensive Assessment"
+                          AutomationProperties.Name="Enable Comprehensive Assessment workflow"
+                          IsChecked="{Binding IsComprehensiveAssessmentAuthoringEnabled}"
+                          Margin="0,0,0,8" />
+                <CheckBox Content="Classification"
+                          AutomationProperties.Name="Enable Classification workflow"
+                          IsChecked="{Binding IsClassificationAuthoringEnabled}"
+                          Margin="0,0,0,8" />
+                <CheckBox Content="Person-Centered Plan (PCP)"
+                          AutomationProperties.Name="Enable Person-Centered Plan workflow"
+                          IsChecked="{Binding IsPersonCenteredPlanAuthoringEnabled}"
+                          Margin="0,0,0,20" />
+
+                <!-- NOTE TEMPLATES -->
                 <TextBlock Text="NOTE TEMPLATES"
                            Style="{StaticResource SectionHeader}"
                            Margin="0,8,0,8" />

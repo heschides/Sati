@@ -392,7 +392,10 @@ public sealed record SettingsDto(
         BillingComplianceGate.DefaultRequirements,
     bool AllowCredibleProfileUpdates = false,
     string VrAssistantTitle = VocationalRehabilitationProfile.DefaultAssistantTitle,
-    int AnnualPacketOpenDaysBefore = AnnualPacketWindow.DefaultOpenDays);
+    int AnnualPacketOpenDaysBefore = AnnualPacketWindow.DefaultOpenDays,
+    bool IsComprehensiveAssessmentAuthoringEnabled = false,
+    bool IsClassificationAuthoringEnabled = false,
+    bool IsPersonCenteredPlanAuthoringEnabled = false);
 
 public sealed record ScratchpadDto(
     int Id,
@@ -824,6 +827,17 @@ public sealed record AttestFormRequest(
     int? EvidenceNoteId = null,
     string? SupervisorOverrideReason = null);
 public sealed record RevokeFormAttestationRequest(int FormId, string Reason);
+public sealed record FormAttestationHistoryDto(
+    long Id,
+    int FormId,
+    string Kind,
+    DateTime? CompletedOn,
+    string ActorKind,
+    int? ActorUserId,
+    string ActorDisplayName,
+    DateTime RecordedAtUtc,
+    int? EvidenceNoteId,
+    string? Reason);
 public sealed record PendingAttestationDto(
     int FormId,
     int PersonId,

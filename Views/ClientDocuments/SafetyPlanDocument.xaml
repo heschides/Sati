@@ -1,0 +1,33 @@
+<UserControl x:Class="Sati.Views.ClientDocuments.SafetyPlanDocument"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="Live safety plan preview">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Border Background="White" Padding="24" TextElement.Foreground="#17324D">
+            <StackPanel>
+                <TextBlock Text="SATI  |  SAFETY PLAN" FontSize="9" FontWeight="Bold" Foreground="#2F7D7A" />
+                <Separator Background="#2F7D7A" Margin="0,5,0,14" />
+                <TextBlock Text="Safety Plan" FontSize="22" FontWeight="Bold" />
+                <TextBlock Text="{Binding PersonName, StringFormat=Consumer: {0}}" Margin="0,5,0,0" />
+                <TextBlock Text="{Binding CycleStart, StringFormat='Cycle beginning: {0:MMMM d, yyyy}'}" />
+                <TextBlock Text="{Binding Status, StringFormat=Status: {0}}" Margin="0,0,0,10" />
+                <Border Background="#FDEFEF" BorderBrush="#972C2C" BorderThickness="3,0,0,0" Padding="8" Margin="0,0,0,10"
+                        Visibility="{Binding IsApproved, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    <TextBlock Text="DRAFT — NOT APPROVED FOR FINAL USE" FontWeight="Bold" Foreground="#972C2C" />
+                </Border>
+                <ItemsControl ItemsSource="{Binding Sections}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,7,0,8">
+                                <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="11" Foreground="#2F7D7A" />
+                                <TextBlock Text="{Binding PreviewText}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Separator Margin="0,14,0,5" />
+                <TextBlock Text="CONFIDENTIAL" FontSize="9" HorizontalAlignment="Center" Foreground="#586571" />
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
+</UserControl>

@@ -196,6 +196,7 @@ namespace Sati.ViewModels.Children
         // was done about it. Null whenever the panel is showing a copy it has no
         // reason to doubt.
         [ObservableProperty] private string? staleNoteMessage;
+        [ObservableProperty] private string? submissionFailureMessage;
         [ObservableProperty] private double narrativeFontSize = 14;
         [ObservableProperty] private bool isComplianceDialogVisible;
         [ObservableProperty] private string pendingJustification = string.Empty;
@@ -347,6 +348,11 @@ namespace Sati.ViewModels.Children
         public bool HasReturnReason => !string.IsNullOrWhiteSpace(ReturnReason);
 
         public bool HasStaleNoteMessage => !string.IsNullOrWhiteSpace(StaleNoteMessage);
+        public string? NoteAttentionMessage => SubmissionFailureMessage ?? StaleNoteMessage;
+        public bool HasNoteAttentionMessage => !string.IsNullOrWhiteSpace(NoteAttentionMessage);
+        public string NoteAttentionAutomationName => !string.IsNullOrWhiteSpace(SubmissionFailureMessage)
+            ? "Note submission refused"
+            : "Note changed on the server";
         public string StatusGuidance => IsCalendarReminder
             ? CalendarReminderGuidance
             : IsReminderNote
@@ -447,8 +453,22 @@ namespace Sati.ViewModels.Children
         partial void OnReturnReasonChanged(string? value) =>
             OnPropertyChanged(nameof(HasReturnReason));
 
-        partial void OnStaleNoteMessageChanged(string? value) =>
+        partial void OnStaleNoteMessageChanged(string? value)
+        {
             OnPropertyChanged(nameof(HasStaleNoteMessage));
+            OnPropertyChanged(nameof(NoteAttentionMessage));
+            OnPropertyChanged(nameof(HasNoteAttentionMessage));
+            OnPropertyChanged(nameof(NoteAttentionAutomationName));
+        }
+
+        partial void OnSubmissionFailureMessageChanged(string? value)
+        {
+            OnPropertyChanged(nameof(NoteAttentionMessage));
+            OnPropertyChanged(nameof(HasNoteAttentionMessage));
+            OnPropertyChanged(nameof(NoteAttentionAutomationName));
+        }
+
+        internal void ShowSubmissionRefusal(string message) => SubmissionFailureMessage = message;
 
         partial void OnEventDateChanged(DateTime? value)
         {
@@ -1543,6 +1563,7 @@ namespace Sati.ViewModels.Children
             // still in flight for it has nothing left to say.
             _freshnessChecks.Invalidate();
             StaleNoteMessage = null;
+            SubmissionFailureMessage = null;
 
             // Select the person without treating navigation between saved records
             // as a user-requested reassignment. The note is attached only after
@@ -1916,19 +1937,15 @@ namespace Sati.ViewModels.Children
             {
                 if (Status == NoteStatus.Logged)
                 {
-                    var (passed, reasons) = SelectedPerson!.EvaluateComplianceGate(DateTime.Today,
-                        SelectedNoteType == NoteType.Form ? SelectedFormType : null,
-                        ComplianceRequirements);
+                    var decision = NoteSubmissionGate.Evaluate((int?)Status, SelectedPerson!.EffectiveDate,
+                        SelectedPerson.Forms.Select(form => new ComplianceFormSnapshot(
+                            form.Type.ToString(), form.DueDate, form.CompletedDate)), EventDate,
+                        BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow), ComplianceRequirements);
 
-                    // Window check is keyed to the NOTE's date, not today.
-                    // EventDate is non-null here — validated above.
-                    var windowReasons = SelectedPerson!.EvaluateBillingWindow(
-                        EventDate!.Value, ComplianceRequirements);
-
-                    if (!passed || windowReasons.Count > 0)
+                    if (!decision.Passed)
                     {
-                        _dialogIsWindowBlock = windowReasons.Count > 0;
-                        ComplianceFailureReasons = reasons.Concat(windowReasons).ToList();
+                        _dialogIsWindowBlock = decision.HistoricalWindowBlocked;
+                        ComplianceFailureReasons = decision.Reasons.ToList();
                         PendingJustification = string.Empty;
                         IsComplianceDialogVisible = true;
                         return;
@@ -1936,6 +1953,10 @@ namespace Sati.ViewModels.Children
                 }
 
                 await SaveAsync();
+            }
+            catch (NoteSubmissionException ex)
+            {
+                ShowSubmissionRefusal(ex.Message);
             }
             catch (Exception ex)
             {
@@ -2008,12 +2029,10 @@ namespace Sati.ViewModels.Children
         [RelayCommand]
         private async Task SendToSupervisor()
         {
-            if (string.IsNullOrWhiteSpace(PendingJustification)) return;
-            var justification = PendingJustification;
-            _dialogIsWindowBlock = false;
-            IsComplianceDialogVisible = false;
+            // Kept as a compatibility command, but no longer an alternate save
+            // path. A case-manager justification is not an approved exception.
             PendingJustification = string.Empty;
-            await SaveAsync(justification);
+            await SubmitNote();
         }
 
         [RelayCommand]
@@ -2031,8 +2050,9 @@ namespace Sati.ViewModels.Children
         // One save path for new and edited notes — the fork the old dashboard code
         // expressed as SubmitNewNoteAsync/SubmitEditedNoteAsync collapses to a
         // branch on _editingNote.
-        private async Task SaveAsync(string? caseManagerJustification = null)
+        private async Task SaveAsync()
         {
+            SubmissionFailureMessage = null;
             // Last check before the record exists. The API repeats this as the
             // authoritative gate; this covers the desktop's direct database path
             // and catches time claimed since the bar was drawn.
@@ -2061,9 +2081,6 @@ namespace Sati.ViewModels.Children
                 note.FormType = SelectedFormType;
                 note.VisitDocumentation = BuildVisitDocumentation();
                 note.PersonId = selectedPerson.Id;
-                if (caseManagerJustification is not null)
-                    note.CaseManagerJustification = caseManagerJustification;
-
                 try
                 {
                     await _noteService.UpdateNoteAsync(note);
@@ -2089,9 +2106,6 @@ namespace Sati.ViewModels.Children
                     SelectedPerson!.Id, SelectedFormType, SelectedNoteType);
                 note.StartTime = SelectedStartTime?.Minutes;
                 note.VisitDocumentation = BuildVisitDocumentation();
-                if (caseManagerJustification is not null)
-                    note.CaseManagerJustification = caseManagerJustification;
-
                 await _noteService.AddNoteAsync(note);
             }
 
@@ -2232,6 +2246,7 @@ namespace Sati.ViewModels.Children
         // same client in a row.
         private void ClearNoteFields()
         {
+            SubmissionFailureMessage = null;
             Status = null;
             Narrative = string.Empty;
             EventDate = null;

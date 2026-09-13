@@ -131,6 +131,8 @@ namespace Sati
                         services.AddSingleton<ATRequestPdfExporter>();
                         services.AddSingleton<Sati.Forms.AgencyReleasePdfGenerator>();
                         services.AddSingleton<Sati.Forms.MedicalReleasePdfGenerator>();
+                        services.AddSingleton<Sati.Forms.CwicPacketPdfGenerator>();
+                        services.AddSingleton<Sati.Forms.HousingSupportFundsPdfGenerator>();
 
                         if (dataEnvironment.UsesCloudApi)
                             AddCloudDataServices(services, dataEnvironment);
@@ -185,6 +187,8 @@ namespace Sati
                         services.AddTransient<NewClientViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.DhhsFormsViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.AgencyReleaseViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.CwicPacketViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.HousingSupportFundsViewModel>();
                         services.AddSingleton<Sati.Forms.DocumentTemplatePdfComposer>();
                         services.AddSingleton<Sati.Forms.SafetyPlanPdfGenerator>();
                         services.AddSingleton<Sati.Forms.DhhsFormFiller>();
@@ -453,6 +457,7 @@ namespace Sati
         {
             services.AddSingleton<DatabaseIdentityValidator>();
             services.AddTransient<IPersonService, PersonService>();
+            services.AddTransient<IPersonPhotoService, PersonPhotoService>();
             services.AddTransient<IAdminService, AdminService>();
             services.AddTransient<ILegalHoldRegistry, LocalLegalHoldRegistry>();
             services.AddTransient<IIncidentReporter, LocalIncidentReporter>();
@@ -483,6 +488,8 @@ namespace Sati
             services.AddTransient<ICheckRequestService, CheckRequestService>();
             services.AddTransient<IProviderService, ProviderService>();
             services.AddTransient<IDhhsFormService, DhhsFormService>();
+            services.AddTransient<ICwicPacketService, CwicPacketService>();
+            services.AddTransient<IHousingSupportFundsService, HousingSupportFundsService>();
             // Local SSN protection: the same envelope the API uses, wrapped by the
             // Windows user account key instead of Key Vault. Singleton because none
             // of the three holds per-request state.
@@ -525,6 +532,7 @@ namespace Sati
             services.AddTransient<IIncidentReporter, CloudIncidentReporter>();
             services.AddTransient<IPlatformHealthService, CloudPlatformHealthService>();
             services.AddTransient<IPersonService, CloudPersonService>();
+            services.AddTransient<IPersonPhotoService, CloudPersonPhotoService>();
             services.AddTransient<INoteService, CloudNoteService>();
             services.AddTransient<ISettingsService, CloudSettingsService>();
             services.AddTransient<IScratchpadService, CloudScratchpadService>();
@@ -541,6 +549,8 @@ namespace Sati
             services.AddTransient<ICheckRequestService, CloudCheckRequestService>();
             services.AddTransient<IProviderService, CloudProviderService>();
             services.AddTransient<IDhhsFormService, CloudDhhsFormService>();
+            services.AddTransient<ICwicPacketService, CloudCwicPacketService>();
+            services.AddTransient<IHousingSupportFundsService, CloudHousingSupportFundsService>();
             services.AddTransient<IApiCompatibilityService, CloudApiCompatibilityService>();
             services.AddTransient<IAgencyReleaseService, CloudAgencyReleaseService>();
             services.AddTransient<IDocumentTemplateService, CloudDocumentTemplateService>();
