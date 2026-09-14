@@ -646,38 +646,22 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.9", version);
+        Assert.Equal("1.3.10", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Financial workflows, clearer records, timely prompts", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Safe Local startup restored", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Account access ends when it should" &&
-            section.Items.Any(item => item.Contains("disable", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("stale session", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Local startup works with its safety checks intact" &&
+            section.Items.Any(item => item.Contains("SatiProduction", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("before opening", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Consumer and billing records keep their evidence" &&
-            section.Items.Any(item => item.Contains("form deletion", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("clearinghouse", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "The Local installer now proves its startup configuration" &&
+            section.Items.Any(item => item.Contains("build", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("acceptance", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Evergreen work has an explicit Sati attestation" &&
-            section.Items.Any(item => item.Contains("time-stamped", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("authoring", StringComparison.OrdinalIgnoreCase)));
-        Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Two public-program packets now have live builders" &&
-            section.Items.Any(item => item.Contains("Benefits Counseling", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("Housing Support Funds", StringComparison.OrdinalIgnoreCase)));
-        Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Document work is easier to verify before it becomes history" &&
-            section.Items.Any(item => item.Contains("goal-progress", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("Consumer photos", StringComparison.OrdinalIgnoreCase)));
-        Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "The public Demo stays on a useful calendar" &&
-            section.Items.Any(item => item.Contains("timeline anchor", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("idempotent", StringComparison.OrdinalIgnoreCase)));
-        Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Still required before commercial Production use" &&
-            section.Items.Any(item => item.Contains("direct-database Production", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("corrected", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "No records or workflows changed" &&
+            section.Items.Any(item => item.Contains("migration", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("1.3.9", StringComparison.OrdinalIgnoreCase)));
 
         var loginView = File.ReadAllText(Path.Combine(
             directory!.FullName,
@@ -938,6 +922,27 @@ public sealed class StabilizationTests
         Assert.Contains("IsIndeterminate = $true", progress);
         Assert.Contains("Sati installation in progress", progress);
         Assert.Contains("AutomationProperties]::SetName", progress);
+    }
+
+    [Fact]
+    public void LocalInstallerBuildAndAcceptanceValidateTheCompleteStartupConfiguration()
+    {
+        var root = FindRepositoryRootFromSource();
+        var builder = File.ReadAllText(Path.Combine(root, "installer", "Build-LocalInstaller.ps1"));
+        var acceptance = File.ReadAllText(Path.Combine(root, "scripts", "Test-LocalInstaller.ps1"));
+        var validator = File.ReadAllText(Path.Combine(root, "installer", "Test-SatiLocalConfiguration.ps1"));
+        var publicSettings = File.ReadAllText(Path.Combine(root, "appsettings.Public.json"));
+
+        Assert.Contains("'appsettings.Public.json'", builder);
+        Assert.Contains("Test-SatiLocalConfiguration", builder);
+        Assert.Contains("'appsettings.Public.json'", acceptance);
+        Assert.Contains("Test-SatiLocalConfiguration", acceptance);
+        Assert.Contains("ExpectedDatabaseName", validator);
+        Assert.Contains("SatiProduction", validator);
+        Assert.Contains("Integrated Security", validator);
+        Assert.Contains("Trusted_Connection", validator);
+        Assert.Contains("\"Production\"", publicSettings);
+        Assert.Contains("\"ExpectedDatabaseName\": \"SatiProduction\"", publicSettings);
     }
 
     [Fact]

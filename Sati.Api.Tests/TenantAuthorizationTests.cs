@@ -242,7 +242,7 @@ public sealed class TenantAuthorizationTests
 
         Assert.NotNull(release);
         Assert.Equal("Sati.Api", release["product"]);
-        Assert.Equal("1.3.9", release["releaseVersion"]);
+        Assert.Equal("1.3.10", release["releaseVersion"]);
     }
 
     [Fact]

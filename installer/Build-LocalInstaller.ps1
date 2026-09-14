@@ -1,6 +1,6 @@
 param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = '1.3.9',
+    [string]$Version = '1.3.10',
 
     [Parameter(Mandatory)]
     [string]$LocalDbMsiPath
@@ -15,6 +15,8 @@ $stageRoot = Join-Path $workRoot 'stage'
 $artifactRoot = Join-Path $repoRoot 'artifacts\SatiLocalInstaller'
 $installerPath = Join-Path $artifactRoot "SatiLocalSetup-$Version.exe"
 $transientArtifactPattern = "~SatiLocalSetup-$Version.*"
+$configurationTestScript = Join-Path $PSScriptRoot 'Test-SatiLocalConfiguration.ps1'
+. $configurationTestScript
 
 try {
     $resolvedLocalDbMsi = [System.IO.Path]::GetFullPath($LocalDbMsiPath)
@@ -63,25 +65,20 @@ try {
         -Destination (Join-Path $publishRoot $versionedIconName) `
         -Force
 
-    $requiredFiles = @('Sati.exe', 'appsettings.json', $versionedIconName)
+    $requiredFiles = @('Sati.exe', 'appsettings.json', 'appsettings.Public.json', $versionedIconName)
     foreach ($requiredFile in $requiredFiles) {
         if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $requiredFile) -PathType Leaf)) {
             throw "The publish output is missing '$requiredFile'."
         }
     }
 
-    # Local Production is allowed to carry its workstation connection mapping, but
-    # never a reusable SQL credential. The shipped configuration must use the
-    # signed-in Windows identity.
-    $privateConfiguration = Get-Content -LiteralPath (
-        Join-Path $publishRoot 'appsettings.json') -Raw
-    if ($privateConfiguration -match '(?i)Password\s*=' -or
-        $privateConfiguration -match '(?i)User ID\s*=') {
-        throw 'The LocalDB publish contains a SQL username or password.'
-    }
-    if ($privateConfiguration -notmatch '(?i)(Trusted_Connection|Integrated Security)\s*=\s*true') {
-        throw 'The LocalDB publish does not use Windows integrated security.'
-    }
+    # Exercise the same merged configuration contract the application resolves at
+    # startup. This prevents a syntactically valid package from passing merely
+    # because its private connection string uses integrated security while the
+    # required public Production database name is absent or disagrees.
+    Test-SatiLocalConfiguration `
+        -PrivateConfigurationPath (Join-Path $publishRoot 'appsettings.json') `
+        -PublicConfigurationPath (Join-Path $publishRoot 'appsettings.Public.json') | Out-Null
 
     Copy-Item -Path (Join-Path $publishRoot '*') -Destination $stageRoot -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-SatiLocal.ps1') -Destination $stageRoot

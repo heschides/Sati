@@ -1,5 +1,46 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.10 — 2026-09-14
+
+"Safe Local startup restored." This patch corrects the Local package configuration that made 1.3.9
+stop before database access, and makes the installer build and acceptance gates prove the complete
+startup configuration rather than checking only its private connection string.
+
+- [x] Diagnose Joshu's two 1.3.9 startup refusals from the payload-free diagnostic records. Both
+      stopped in `DataEnvironmentResolver` before provisioning, identity validation, migration, or
+      application queries, so the Local database and consumer records were not touched.
+- [x] Restore the tracked, non-secret Production expected database name in
+      `appsettings.Public.json`. The Local private configuration retains only its integrated-security
+      connection mapping; the resolver can now cross-check both halves before opening the database.
+- [x] Add one shared Local configuration validator to installer construction and isolated installer
+      acceptance. Both now require the public and private files, exact `SatiProduction` agreement,
+      Windows integrated security, and no SQL username/password before an artifact can pass.
+- [x] Add direct resolver regression coverage for the exact missing-setting failure shipped in
+      1.3.9 and structural coverage binding both installer gates to the shared validator. Focused
+      validation passes 3/3; the complete desktop suite passes 1,990 with the external local-AI and
+      opt-in Local SQL concurrency tests skipped as expected.
+- [x] Complete DATT preflight against GitHub `master` at
+      `3cc20f2c0083b5db51f8bb4ef217b9add9798493`. No branch was merged or deleted. Retain the
+      divergent setup/design branches, stale tracking refs, and the separate heavily modified user
+      checkout untouched.
+- [x] Confirm there is no schema or API-contract change, no 1.3.10 artifact collision, and no need
+      for a database, baseline, or firewall operation. The existing Microsoft LocalDB prerequisite
+      remains Authenticode-valid with SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+- [x] Complete coordinated 1.3.10 versioning and validation. The full Release build passed with
+      zero warnings and zero errors. All five standard test projects passed 2,917 tests and reported
+      seven skipped entries: five opt-in API SQL tests, one opt-in Local SQL theory, and the external
+      local-AI model check. Enabling the SQL tests exercised all seven underlying SQL cases (five API
+      cases plus two Local theory rows), and all seven passed against disposable LocalDB databases.
+      Focused resolver/shared-installer validation passed 3/3 and directly rejected the exact
+      missing-Production-name configuration from 1.3.9. Contract revision remains `66A9F0D2949E`.
+- [ ] Commit and push the verified 1.3.10 source to GitHub `master` without rewriting history.
+- [ ] Publish and verify the existing Demo API at release 1.3.10 with matching contract revision.
+- [ ] Build, isolated-acceptance-test, and publish new non-overwritten 1.3.10 Demo and Local
+      installers and checksum files.
+- [ ] Record deployment, test, artifact, distribution, and known workstation evidence; push the
+      final evidence commit; and confirm local/GitHub equality with a clean tracked tree.
+
 ## Release 1.3.9 — 2026-09-14
 
 "Financial workflows, clearer records, timely prompts." This release adds a PHI-minimized Finance
