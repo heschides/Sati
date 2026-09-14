@@ -27,11 +27,14 @@ namespace Sati.Views
         private readonly TextShortcutService _textShortcutService;
         private readonly TextShortcutHook _textShortcutHook;
         private readonly DailyAgendaLauncher _dailyAgendaLauncher;
+        private readonly CheckRequestPromptLauncher _checkRequestPromptLauncher;
         private readonly ScratchpadView _workAgendaView;
         private ContentControl? _overviewAgendaHost;
         private ContentControl? _workAgendaParent;
         private readonly SemaphoreSlim _accountSwitchGate = new(1, 1);
         private readonly DispatcherTimer _idleTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+        private readonly DispatcherTimer _dateRolloverTimer = new() { Interval = TimeSpan.FromMinutes(1) };
+        private DateOnly _observedLocalDate = DateOnly.FromDateTime(DateTime.Today);
         private const double PointerMoveTolerance = 2.0;
         private Point _lastPointerPosition;
         private DatabasePatienceWindow? _databasePatienceWindow;
@@ -56,6 +59,7 @@ namespace Sati.Views
             TextShortcutService textShortcutService,
             TextShortcutHook textShortcutHook,
             DailyAgendaLauncher dailyAgendaLauncher,
+            CheckRequestPromptLauncher checkRequestPromptLauncher,
             SessionKeepAlive? sessionKeepAlive = null)
         {
             InitializeComponent();
@@ -73,6 +77,7 @@ namespace Sati.Views
             _textShortcutService = textShortcutService;
             _textShortcutHook = textShortcutHook;
             _dailyAgendaLauncher = dailyAgendaLauncher;
+            _checkRequestPromptLauncher = checkRequestPromptLauncher;
             DataContext = shellViewModel;
 
             _workAgendaView = new ScratchpadView { DataContext = shellViewModel.Scratchpad };
@@ -84,12 +89,17 @@ namespace Sati.Views
                 if (_sessionService.CurrentUser is { } currentUser)
                     await _textShortcutService.LoadForUserAsync(currentUser.Id);
                 _textShortcutHook.Start(this);
+                await _checkRequestPromptLauncher.TryShowAsync(
+                    this, _shellViewModel, CheckRequestPromptReason.SignIn);
+                await _checkRequestPromptLauncher.TryShowDayBeforeTimeOffAsync(
+                    this, _shellViewModel);
                 await _dailyAgendaLauncher.TryShowAsync(this, _shellViewModel);
             };
 
             _databaseActivity.PropertyChanged += OnDatabaseActivityPropertyChanged;
             _sessionLifetime.SessionEnded += OnSessionEnded;
             _shellViewModel.ReauthenticationRequested += OnReauthenticationRequested;
+            _shellViewModel.NotesViewModel.Calendar.TimeOffScheduled += OnTimeOffScheduledAsync;
             Activated += (_, _) => _shellViewModel.SetChatWindowVisible(true);
             Deactivated += (_, _) => _shellViewModel.SetChatWindowVisible(false);
 
@@ -166,6 +176,10 @@ namespace Sati.Views
                 if (confirmation.ShowDialog() != true)
                     return;
 
+                if (!await _checkRequestPromptLauncher.TryShowAsync(
+                        this, _shellViewModel, CheckRequestPromptReason.Shutdown))
+                    return;
+
                 _isSavingOnClose = true;
 
                 try
@@ -233,14 +247,27 @@ namespace Sati.Views
             InputManager.Current.PreProcessInput += OnPreProcessInput;
             _idleTimer.Tick += (_, _) => _shellViewModel.Idle.Evaluate();
             _idleTimer.Start();
+            _dateRolloverTimer.Tick += async (_, _) =>
+            {
+                var today = DateOnly.FromDateTime(DateTime.Today);
+                if (today == _observedLocalDate) return;
+                _observedLocalDate = today;
+                await _checkRequestPromptLauncher.TryShowAsync(
+                    this, _shellViewModel, CheckRequestPromptReason.NewDay);
+                await _checkRequestPromptLauncher.TryShowDayBeforeTimeOffAsync(
+                    this, _shellViewModel);
+            };
+            _dateRolloverTimer.Start();
 
             Closed += async (s, e) =>
             {
                 await _shellViewModel.Chat.StopAsync();
                 _sessionLifetime.SessionEnded -= OnSessionEnded;
                 _shellViewModel.ReauthenticationRequested -= OnReauthenticationRequested;
+                _shellViewModel.NotesViewModel.Calendar.TimeOffScheduled -= OnTimeOffScheduledAsync;
                 _databaseActivity.PropertyChanged -= OnDatabaseActivityPropertyChanged;
                 _idleTimer.Stop();
+                _dateRolloverTimer.Stop();
                 InputManager.Current.PreProcessInput -= OnPreProcessInput;
                 _textShortcutHook.Dispose();
                 CloseDatabasePatienceWindow();
@@ -412,6 +439,10 @@ namespace Sati.Views
                 await _applicationRunState.StartSessionAsync(user, _incidentReporter);
                 await _incidentReporter.FlushAsync();
                 await _shellViewModel.ReinitializeAsync();
+                await _checkRequestPromptLauncher.TryShowAsync(
+                    this, _shellViewModel, CheckRequestPromptReason.SignIn);
+                await _checkRequestPromptLauncher.TryShowDayBeforeTimeOffAsync(
+                    this, _shellViewModel);
                 await _dailyAgendaLauncher.TryShowAsync(this, _shellViewModel);
             }
             finally
@@ -481,6 +512,10 @@ namespace Sati.Views
                     await _applicationRunState.StartSessionAsync(newUser, _incidentReporter);
                     await _incidentReporter.FlushAsync();
                     await _shellViewModel.ReinitializeAsync();
+                    await _checkRequestPromptLauncher.TryShowAsync(
+                        this, _shellViewModel, CheckRequestPromptReason.SignIn);
+                    await _checkRequestPromptLauncher.TryShowDayBeforeTimeOffAsync(
+                        this, _shellViewModel);
                     await _dailyAgendaLauncher.TryShowAsync(this, _shellViewModel);
                 }
             }
@@ -568,5 +603,9 @@ namespace Sati.Views
             target.Content = _workAgendaView;
             _workAgendaParent = target;
         }
+
+        private Task OnTimeOffScheduledAsync(DateTime date) =>
+            _checkRequestPromptLauncher.TryShowNewlyScheduledTimeOffAsync(
+                this, _shellViewModel, date);
     }
 }

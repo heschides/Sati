@@ -45,6 +45,10 @@ for content; the audit event is only its activity index.
 - `scratchpad.updated`
 - `billing-claim-line.created`, `billing-period.submitted`, `billing-edi.generated`
 - `at-request.published`, `at-request.reopened`
+- `check-request.published`, `check-request.submitted`, `check-request.approved`,
+  `check-request.returned`, `check-request.released`, `check-request.receipt-acknowledged`
+- `check-request-template.updated`, `check-request.draft-generated`
+- `representative-payee.ledger-entry-added`
 - `form.attested`, `form.attestation-revoked`, `form.prerequisite-overridden`
 - `document.generated`, `document.recorded-external`
 - `document-template.published`
@@ -148,6 +152,19 @@ and `BillingPeriod.Status` is a concurrency token for simultaneous requests.
 
 `EdiGeneration` contains protected billing content, unlike the PHI-minimized `AuditEvent` envelope.
 The pending retention/legal-hold policy must explicitly cover these replay records and their access.
+
+Check-request workflow actions point to the frozen Check Request and carry no payee, consumer name,
+reason, amount, or workflow note in general audit metadata. The append-only workflow event is the
+protected authoritative source for action, actor, time, and note. A manual Representative Payee
+ledger write points to the Person and may include only the generated ledger-entry id and entry kind;
+amount and description remain solely on the protected append-only ledger row. Check release commits
+its workflow event, one negative ledger entry, and the audit event in the same transaction.
+
+Weekly-default changes point to the Person and do not copy the payee, address, amount, or reason into
+general audit metadata. Automatic generation also points to the Person and records only the template
+id, scheduled occurrence date, and a non-identifying `time-off` trigger when preparation was
+explicitly requested from that reminder; the protected template and generated Check Request remain
+the authoritative financial records.
 
 ## Person lifecycle history
 

@@ -70,13 +70,74 @@
                     BorderThickness="1" CornerRadius="8" Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0" Margin="0,0,0,12">
                         <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
                         <TextBlock Text="Request details" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                     </DockPanel>
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+
+                    <Expander Grid.Row="1" Header="Weekly auto-generation default"
+                              IsEnabled="{Binding CanManageTemplate}"
+                              AutomationProperties.Name="Weekly check-request default"
+                              Margin="0,0,0,12">
+                        <ScrollViewer MaxHeight="430" VerticalScrollBarVisibility="Auto">
+                        <Border Background="{DynamicResource PersonGroupAltBrush}" CornerRadius="6" Padding="10" Margin="0,6,4,0">
+                            <StackPanel>
+                                <CheckBox Content="Generate a draft each week"
+                                          IsChecked="{Binding TemplateIsEnabled}"
+                                          AutomationProperties.Name="Generate a weekly check-request draft"
+                                          Margin="0,0,0,8" />
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Draft day" Style="{StaticResource LabelStyle}" />
+                                        <ComboBox ItemsSource="{Binding WeeklyDays}"
+                                                  SelectedItem="{Binding TemplateGenerateOn}"
+                                                  AutomationProperties.Name="Weekly draft day" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Needed after (days)" Style="{StaticResource LabelStyle}" />
+                                        <TextBox Text="{Binding TemplateNeededByDaysAfterRequest, UpdateSourceTrigger=PropertyChanged, Delay=200}"
+                                                 AutomationProperties.Name="Days from draft to needed-by date" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="Check payable to" Style="{StaticResource LabelStyle}" />
+                                <TextBox Text="{Binding TemplatePayableTo, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Weekly default payee" />
+                                <TextBlock Text="Mailing address" Style="{StaticResource LabelStyle}" />
+                                <TextBox Text="{Binding TemplateMailingAddress, UpdateSourceTrigger=PropertyChanged}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48"
+                                         AutomationProperties.Name="Weekly default mailing address" />
+                                <TextBlock Text="Amount" Style="{StaticResource LabelStyle}" />
+                                <TextBox Text="{Binding TemplateAmount, UpdateSourceTrigger=PropertyChanged, Delay=200}"
+                                         AutomationProperties.Name="Weekly default amount" />
+                                <TextBlock Text="Reason" Style="{StaticResource LabelStyle}" />
+                                <TextBox Text="{Binding TemplateReason, UpdateSourceTrigger=PropertyChanged}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="58"
+                                         AutomationProperties.Name="Weekly default reason" />
+                                <TextBlock Text="{Binding TemplateMessage}" FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"
+                                           AutomationProperties.LiveSetting="Polite" Margin="0,0,0,8" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Button Content="Copy current request" Command="{Binding CopyCurrentToTemplateCommand}"
+                                            IsEnabled="{Binding HasSelection}"
+                                            AutomationProperties.Name="Copy current request into weekly default" />
+                                    <Button Grid.Column="2" Content="Save weekly default"
+                                            Command="{Binding SaveTemplateCommand}"
+                                            Style="{StaticResource PrimaryButton}"
+                                            AutomationProperties.Name="Save weekly check-request default" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        </ScrollViewer>
+                    </Expander>
+
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                         <StackPanel IsEnabled="{Binding CanEdit}">
                             <TextBlock Text="Request date" Style="{StaticResource LabelStyle}" />
                             <DatePicker SelectedDate="{Binding RequestDate}" AutomationProperties.Name="Request date" Margin="0,3,0,10" />
@@ -101,7 +162,7 @@
                                      AcceptsReturn="True" TextWrapping="Wrap" MinHeight="86" VerticalScrollBarVisibility="Auto" Margin="0,3,0,10" />
                         </StackPanel>
                     </ScrollViewer>
-                    <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}"
+                    <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}"
                             Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                         <StackPanel VerticalAlignment="Center" Margin="12" MaxWidth="270">
                             <TextBlock Text="Ready for a new request?" FontSize="16" FontWeight="SemiBold"
@@ -113,7 +174,7 @@
                                     AutomationProperties.Name="Create a new check request draft" />
                         </StackPanel>
                     </Border>
-                    <StackPanel Grid.Row="2" Margin="0,12,0,0">
+                    <StackPanel Grid.Row="3" Margin="0,12,0,0">
                         <Border Background="{DynamicResource PersonGroupAltBrush}" CornerRadius="6" Padding="10" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock Text="CURRENT DELIVERY" FontSize="10" FontWeight="Bold"
@@ -135,6 +196,9 @@
                         </Grid>
                         <Button Content="Save prepared PDF again" Command="{Binding RegenerateCommand}" IsEnabled="{Binding CanRegenerate}"
                                 Margin="0,8,0,0" AutomationProperties.Name="Save the prepared check request PDF again" />
+                        <Button Content="Submit to supervisor" Command="{Binding SubmitCommand}" IsEnabled="{Binding CanSubmit}"
+                                Margin="0,8,0,0" Style="{StaticResource PrimaryButton}"
+                                AutomationProperties.Name="Submit prepared check request to supervisor" />
                     </StackPanel>
                 </Grid>
             </Border>

@@ -23,6 +23,7 @@ public sealed class NoteSubmissionFeedbackTests
         panel.SelectedNoteType = NoteType.Contact;
         panel.EventDate = DateTime.Today;
         panel.Status = NoteStatus.Logged;
+        panel.GoalProgress = GoalProgressLevel.Moderate;
         panel.Narrative = "The clinical draft must remain on screen.";
         panel.Minutes = 30;
         await using (var db = fixture.Factory.CreateDbContext())
@@ -53,6 +54,7 @@ public sealed class NoteSubmissionFeedbackTests
         panel.SelectedNoteType = NoteType.Contact;
         panel.EventDate = DateTime.Today;
         panel.Status = NoteStatus.Logged;
+        panel.GoalProgress = GoalProgressLevel.Moderate;
         panel.Narrative = "The clinical draft must remain on screen.";
         panel.Minutes = 30;
         await panel.SubmitNoteCommand.ExecuteAsync(null);

@@ -242,7 +242,7 @@ public sealed class TenantAuthorizationTests
 
         Assert.NotNull(release);
         Assert.Equal("Sati.Api", release["product"]);
-        Assert.Equal("1.3.8", release["releaseVersion"]);
+        Assert.Equal("1.3.9", release["releaseVersion"]);
     }
 
     [Fact]
@@ -856,7 +856,8 @@ public sealed class TenantAuthorizationTests
                 draft.NoteType,
                 draft.CaseManagerJustification,
                 draft.VisitDocumentationJson,
-                draft.Revision));
+                draft.Revision,
+                "Moderate"));
         Assert.Equal(HttpStatusCode.OK, loggedResponse.StatusCode);
         var logged = await loggedResponse.Content.ReadFromJsonAsync<NoteDto>();
 
@@ -1588,7 +1589,8 @@ public sealed class TenantAuthorizationTests
         Assert.NotNull(overview);
         Assert.Equal(1, overview.AgencyId);
         Assert.Equal("Agency One", overview.AgencyName);
-        Assert.Equal(9, overview.UserCount);
+        // The agency seed now includes the independently authorized Finance user.
+        Assert.Equal(10, overview.UserCount);
         Assert.Equal(3, overview.PersonCount);
         Assert.Equal(1, overview.NotesThisMonth);
         Assert.NotEmpty(people!);
@@ -2188,8 +2190,27 @@ public sealed class TenantAuthorizationTests
         // machine, so 0.6 leaves clear room on both sides.
         using var client = await _factory.CreateSeededAnonymousClientAsync();
 
-        var unknown = await MinimumLoginMillisecondsAsync(client, "no-such-account-timing");
-        var wrongPassword = await MinimumLoginMillisecondsAsync(client, "stale-badge-user");
+        var unknownSamples = new List<double>();
+        var wrongPasswordSamples = new List<double>();
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            // Interleave and reverse the order so JIT, CPU scheduling, or power
+            // management cannot consistently favor one credential path.
+            if (attempt % 2 == 0)
+            {
+                var unknownElapsed = await LoginMillisecondsAsync(client, "no-such-account-timing");
+                var wrongElapsed = await LoginMillisecondsAsync(client, "stale-badge-user");
+                if (attempt > 0) { unknownSamples.Add(unknownElapsed); wrongPasswordSamples.Add(wrongElapsed); }
+            }
+            else
+            {
+                var wrongElapsed = await LoginMillisecondsAsync(client, "stale-badge-user");
+                var unknownElapsed = await LoginMillisecondsAsync(client, "no-such-account-timing");
+                wrongPasswordSamples.Add(wrongElapsed); unknownSamples.Add(unknownElapsed);
+            }
+        }
+        var unknown = Median(unknownSamples);
+        var wrongPassword = Median(wrongPasswordSamples);
 
         Assert.True(
             unknown >= wrongPassword * 0.6,
@@ -2197,24 +2218,21 @@ public sealed class TenantAuthorizationTests
             "for a wrong password, which lets an attacker enumerate valid usernames by timing.");
     }
 
-    private static async Task<double> MinimumLoginMillisecondsAsync(HttpClient client, string username)
+    private static async Task<double> LoginMillisecondsAsync(HttpClient client, string username)
     {
-        // One warm-up so JIT and connection setup are not measured, then the
-        // minimum of two samples — the least noise-prone timing statistic.
-        // Attempt counts stay well under the per-username lockout of 12.
-        var best = double.MaxValue;
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            using var response = await client.PostAsJsonAsync(
-                "/api/v1/auth/login", new LoginRequest(username, "WrongPassword!1"));
-            stopwatch.Stop();
-            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-            if (attempt > 0)
-                best = Math.Min(best, stopwatch.Elapsed.TotalMilliseconds);
-        }
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        using var response = await client.PostAsJsonAsync(
+            "/api/v1/auth/login", new LoginRequest(username, "WrongPassword!1"));
+        stopwatch.Stop();
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        return stopwatch.Elapsed.TotalMilliseconds;
+    }
 
-        return best;
+    private static double Median(IEnumerable<double> samples)
+    {
+        var ordered = samples.Order().ToArray();
+        Assert.NotEmpty(ordered);
+        return ordered[ordered.Length / 2];
     }
 
     // ── Audit export must be inert when opened in a spreadsheet ───────────────

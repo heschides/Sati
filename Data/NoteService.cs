@@ -22,11 +22,14 @@ public class NoteService(
             throw new UnauthorizedAccessException("You may create notes only for your own caseload.");
 
         note.AgencyId = actor.AgencyId;
+        await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(
+            context, actor.AgencyId, actor.Id);
         await EnsureSubmissionAllowedAsync(context, actor, note, today);
         await EnsureServiceTimeAvailableAsync(context, actor.Id, note, null);
         context.Notes.Add(note);
         LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteCreated, "Note");
         await context.SaveChangesAsync();
+        await scheduleWrite.CommitAsync();
         return note;
     }
 
@@ -37,6 +40,8 @@ public class NoteService(
         await using var context = contextFactory.CreateDbContext();
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, actor.Id);
+        await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(
+            context, actor.AgencyId, actor.Id);
         var stored = await context.Notes.Include(candidate => candidate.Person)
             .SingleOrDefaultAsync(candidate => candidate.Id == note.Id);
         if (stored is null || stored.Revision != note.Revision)
@@ -48,7 +53,11 @@ public class NoteService(
             throw new InvalidOperationException("Submitted and workflow-controlled notes are retained as part of the clinical record.");
 
         context.Notes.Remove(stored);
-        try { await context.SaveChangesAsync(); }
+        try
+        {
+            await context.SaveChangesAsync();
+            await scheduleWrite.CommitAsync();
+        }
         catch (DbUpdateConcurrencyException ex) { throw new NoteConcurrencyException(ex); }
     }
 
@@ -62,6 +71,8 @@ public class NoteService(
         await using var context = contextFactory.CreateDbContext();
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, actor.Id);
+        await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(
+            context, actor.AgencyId, actor.Id);
         var stored = await context.Notes.Include(candidate => candidate.Person)
             .SingleOrDefaultAsync(candidate => candidate.Id == note.Id);
         if (stored is null || stored.Revision != note.Revision)
@@ -112,6 +123,7 @@ public class NoteService(
         try
         {
             await context.SaveChangesAsync();
+            await scheduleWrite.CommitAsync();
             note.Revision = stored.Revision;
             note.Person = targetPerson;
         }
@@ -204,6 +216,7 @@ public class NoteService(
         target.StartTime = source.StartTime;
         target.FormType = source.FormType;
         target.NoteType = source.NoteType;
+        target.GoalProgress = source.GoalProgress;
         target.CaseManagerJustification = source.CaseManagerJustification;
         target.VisitDocumentationJson = source.VisitDocumentationJson;
     }
@@ -236,6 +249,8 @@ public class NoteService(
             throw new ArgumentException("Service start time must fall inside the logging window.", nameof(note));
         if (!NoteWorkflow.IsCaseManagerWritableStatus((int?)note.Status))
             throw new InvalidOperationException("That note status is controlled by a supervisor workflow.");
+        if (note.Status == NoteStatus.Logged && note.GoalProgress is null)
+            throw new ArgumentException("Goal progress is required before a note can be submitted for review.", nameof(note));
     }
 
     private static void NormalizeScheduling(Note note, DateTime today)
@@ -249,7 +264,8 @@ public class NoteService(
             note.FormType?.ToString(),
             note.NoteType?.ToString(),
             note.CaseManagerJustification,
-            note.VisitDocumentationJson);
+            note.VisitDocumentationJson,
+            note.GoalProgress?.ToString());
 
         note.EventDate = values.EventDate;
         note.Status = ParseNullable<NoteStatus>(values.Status);
@@ -259,6 +275,7 @@ public class NoteService(
         note.NoteType = ParseNullable<NoteType>(values.NoteType);
         note.CaseManagerJustification = values.CaseManagerJustification;
         note.VisitDocumentationJson = values.VisitDocumentationJson;
+        note.GoalProgress = ParseNullable<GoalProgressLevel>(values.GoalProgress);
     }
 
     private static T? ParseNullable<T>(string? value) where T : struct, Enum =>

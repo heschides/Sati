@@ -311,7 +311,8 @@ public sealed record NoteDto(
     DateTime? OverrideApprovedAt,
     int Revision,
     PersonReferenceDto? Person,
-    IReadOnlyList<string>? ComplianceFailureReasons = null);
+    IReadOnlyList<string>? ComplianceFailureReasons = null,
+    string? GoalProgress = null);
 
 public sealed record SaveNoteRequest(
     string Narrative,
@@ -324,7 +325,8 @@ public sealed record SaveNoteRequest(
     string? NoteType,
     string? CaseManagerJustification,
     string? VisitDocumentationJson,
-    int ExpectedRevision = 0);
+    int ExpectedRevision = 0,
+    string? GoalProgress = null);
 
 public sealed record PersonReferenceDto(int Id, int UserId, string? FirstName, string? LastName);
 
@@ -668,7 +670,17 @@ public sealed record SaveBillingConfigurationRequest(
     string ContactName,
     string ContactPhone);
 
-public sealed record BillingCandidateDto(NoteDto Note, IReadOnlyList<string> Errors);
+// Deliberately narrower than NoteDto. Billing staff need the service facts used to
+// create a claim, but the billing queue must not carry the clinical narrative,
+// visit documentation, return history, or the consumer's name into that UI.
+public sealed record BillingCandidateDto(
+    int NoteId,
+    DateTime? EventDate,
+    int? Minutes,
+    int PersonId,
+    int PersonOwnerUserId,
+    bool ComplianceOverride,
+    IReadOnlyList<string> Errors);
 public sealed record CreateClaimLineRequest(int NoteId, bool IsComplianceException, string? ComplianceExceptionReason);
 public sealed record GenerateEdiRequest(bool IsTest, string IdempotencyKey);
 public sealed record EdiFileDto(string FileName, string Content);
@@ -781,7 +793,10 @@ public sealed record CheckRequestListItemDto(
     string? PayableTo,
     decimal Amount,
     DateTime? NeededByDate,
-    DateTime? PublishedAtUtc);
+    DateTime? PublishedAtUtc,
+    CheckRequestWorkflowStatus WorkflowStatus = CheckRequestWorkflowStatus.Draft,
+    int? TemplateId = null,
+    DateTime? ScheduledForDate = null);
 
 public sealed record CheckRequestDto(
     int Id,
@@ -800,7 +815,10 @@ public sealed record CheckRequestDto(
     DateTime CreatedAtUtc,
     DateTime? PublishedAtUtc,
     int? PublishedByUserId,
-    string? PublishedByName);
+    string? PublishedByName,
+    CheckRequestWorkflowStatus WorkflowStatus = CheckRequestWorkflowStatus.Draft,
+    int? TemplateId = null,
+    DateTime? ScheduledForDate = null);
 
 public sealed record CreateCheckRequestRequest(int PersonId);
 

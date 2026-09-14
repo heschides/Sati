@@ -156,7 +156,7 @@ public sealed class JoinedBillingPipelineAcceptanceTests
             var draft = (await create.Content.ReadFromJsonAsync<NoteDto>())!;
             Assert.Equal("Pending", draft.Status);
             using var submit = await author.PutAsJsonAsync($"/api/v1/notes/{draft.Id}",
-                request with { Status = "Logged", ExpectedRevision = draft.Revision });
+                request with { Status = "Logged", ExpectedRevision = draft.Revision, GoalProgress = "Moderate" });
             await RequireSuccessAsync(submit);
             var logged = (await submit.Content.ReadFromJsonAsync<NoteDto>())!;
             Assert.Equal("Logged", logged.Status);

@@ -1154,16 +1154,131 @@ namespace Sati.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ScheduledForDate")
+                        .HasColumnType("date");
+
                     b.Property<string>("SupervisorName")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int?>("TemplateId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PersonId", "RequestDate");
 
+                    b.HasIndex("TemplateId", "ScheduledForDate")
+                        .IsUnique()
+                        .HasFilter("[TemplateId] IS NOT NULL AND [ScheduledForDate] IS NOT NULL");
+
                     b.ToTable("CheckRequests");
+                });
+
+            modelBuilder.Entity("Sati.Models.CheckRequestTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<string>("GenerateOn")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MailingAddress")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("NeededByDaysAfterRequest")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PayableTo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("PersonId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId")
+                        .IsUnique();
+
+                    b.ToTable("CheckRequestTemplates");
+                });
+
+            modelBuilder.Entity("Sati.Models.CheckRequestWorkflowEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ActorUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CheckRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Checkpoint")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CheckRequestId", "Checkpoint")
+                        .IsUnique();
+
+                    b.ToTable("CheckRequestWorkflowEvents");
                 });
 
             modelBuilder.Entity("Sati.Models.DocumentAcknowledgment", b =>
@@ -1714,6 +1829,9 @@ namespace Sati.Migrations
                     b.Property<int?>("FormType")
                         .HasColumnType("int");
 
+                    b.Property<int?>("GoalProgress")
+                        .HasColumnType("int");
+
                     b.Property<int?>("Minutes")
                         .HasColumnType("int");
 
@@ -2122,6 +2240,58 @@ namespace Sati.Migrations
                     b.HasIndex("ProviderId", "SortOrder");
 
                     b.ToTable("ProviderContacts");
+                });
+
+            modelBuilder.Entity("Sati.Models.RepresentativePayeeLedgerEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("CheckRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("EntryDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("PersonId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RecordedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("RecordedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CheckRequestId")
+                        .IsUnique()
+                        .HasFilter("[CheckRequestId] IS NOT NULL");
+
+                    b.HasIndex("PersonId", "EntryDate", "Id");
+
+                    b.ToTable("RepresentativePayeeLedgerEntries");
                 });
 
             modelBuilder.Entity("Sati.Models.SafetyPlan", b =>
@@ -3706,7 +3876,36 @@ namespace Sati.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Sati.Models.CheckRequestTemplate", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Person");
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("Sati.Models.CheckRequestTemplate", b =>
+                {
+                    b.HasOne("Sati.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("Sati.Models.CheckRequestWorkflowEvent", b =>
+                {
+                    b.HasOne("Sati.Models.CheckRequest", "CheckRequest")
+                        .WithMany()
+                        .HasForeignKey("CheckRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CheckRequest");
                 });
 
             modelBuilder.Entity("Sati.Models.DocumentAcknowledgment", b =>
@@ -3971,6 +4170,24 @@ namespace Sati.Migrations
                         .HasForeignKey("ProviderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Sati.Models.RepresentativePayeeLedgerEntry", b =>
+                {
+                    b.HasOne("Sati.Models.CheckRequest", "CheckRequest")
+                        .WithMany()
+                        .HasForeignKey("CheckRequestId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sati.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CheckRequest");
+
+                    b.Navigation("Person");
                 });
 
             modelBuilder.Entity("Sati.Models.SafetyPlan", b =>

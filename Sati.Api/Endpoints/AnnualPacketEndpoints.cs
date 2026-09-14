@@ -108,12 +108,27 @@ internal static partial class ApiEndpoints
     {
         var days = await db.Settings.Where(x => x.AgencyId == actor.AgencyId).Select(x => (int?)x.AnnualPacketOpenDaysBefore).FirstOrDefaultAsync(ct) ?? 30;
         var window = AnnualPacketWindow.ForCycle(person.EffectiveDate ?? throw new ArgumentException("Set an effective date first."), cycle.Date, DateTime.Today, days);
-        var artifacts = (await db.DocumentArtifacts.AsNoTracking().Where(x => x.PersonId == person.Id && x.CycleStart == cycle.Date &&
-            x.SupersededByArtifactId == null).ToListAsync(ct)).Select(DocumentArtifactPersistence.ToDto).ToList();
+        var activeArtifacts = await db.DocumentArtifacts.AsNoTracking().Where(x => x.PersonId == person.Id &&
+            x.SupersededByArtifactId == null &&
+            (x.CycleStart == cycle.Date || x.Kind == nameof(AnnualDocumentKind.DhhsAuthorizedRepresentative)))
+            .ToListAsync(ct);
+        var authorizedRepresentative = activeArtifacts
+            .Where(x => x.Kind == nameof(AnnualDocumentKind.DhhsAuthorizedRepresentative))
+            .OrderByDescending(x => x.GeneratedAtUtc).ThenByDescending(x => x.Id)
+            .FirstOrDefault();
+        var artifacts = activeArtifacts
+            .Where(x => x.CycleStart == cycle.Date && x.Kind != nameof(AnnualDocumentKind.DhhsAuthorizedRepresentative))
+            .Select(DocumentArtifactPersistence.ToDto).ToList();
+        if (authorizedRepresentative is not null)
+            artifacts.Add(DocumentArtifactPersistence.ToDto(authorizedRepresentative));
+        var authorizedRepresentativeOnFile = activeArtifacts.Any(x =>
+            x.Kind == nameof(AnnualDocumentKind.DhhsAuthorizedRepresentative) &&
+            x.Origin == nameof(DocumentArtifactOrigin.RecordedAsExternal));
         var ids = artifacts.Select(x => x.Id).ToArray();
         var acknowledged = await db.DocumentAcknowledgments.Where(x => ids.Contains(x.DocumentArtifactId)).Select(x => x.DocumentArtifactId).Distinct().ToListAsync(ct);
         var pcp = await db.Forms.AnyAsync(x => x.PersonId == person.Id && x.Type == "PCP" && x.CompletedDate != null &&
             x.DueDate > cycle && x.DueDate <= window.EndsOn.AddDays(1), ct);
-        return new(window, artifacts, acknowledged, AnnualDocumentReminder.Describe(window.IsOpen, pcp, artifacts));
+        return new(window, artifacts, acknowledged, AnnualDocumentReminder.Describe(window.IsOpen, pcp, artifacts),
+            authorizedRepresentativeOnFile);
     }
 }

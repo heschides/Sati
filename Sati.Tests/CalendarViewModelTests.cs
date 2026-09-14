@@ -123,9 +123,15 @@ public sealed class CalendarViewModelTests
         var originalDay = FindDay(viewModel, date);
         viewModel.SelectDayCommand.Execute(originalDay);
         var subscriberCalls = 0;
+        var scheduledDates = new List<DateTime>();
         viewModel.ExemptDateChanged += () =>
         {
             subscriberCalls++;
+            return Task.CompletedTask;
+        };
+        viewModel.TimeOffScheduled += scheduledDate =>
+        {
+            scheduledDates.Add(scheduledDate);
             return Task.CompletedTask;
         };
 
@@ -136,6 +142,7 @@ public sealed class CalendarViewModelTests
         Assert.Equal("Restore workday", viewModel.SelectedDayExemptActionLabel);
         Assert.Single(exemptDates.AddedDates);
         Assert.Equal(1, subscriberCalls);
+        Assert.Equal([date], scheduledDates);
 
         // Deliberately pass the replaced, stale day object. The command must use
         // the canonical exemption collection and remove rather than add again.
@@ -145,6 +152,7 @@ public sealed class CalendarViewModelTests
         Assert.Single(exemptDates.AddedDates);
         Assert.Single(exemptDates.RemovedIds);
         Assert.Equal(2, subscriberCalls);
+        Assert.Equal([date], scheduledDates);
     }
 
     [Fact]

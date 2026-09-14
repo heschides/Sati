@@ -25,7 +25,8 @@ public static class AnnualPacketWindow
 }
 
 public sealed record AnnualDocumentsStatusDto(AnnualPacketWindowDto Window,
-    IReadOnlyList<DocumentArtifactDto> Artifacts, IReadOnlyList<int> AcknowledgedArtifactIds, string Reminder);
+    IReadOnlyList<DocumentArtifactDto> Artifacts, IReadOnlyList<int> AcknowledgedArtifactIds, string Reminder,
+    bool AuthorizedRepresentativeOnFile = false);
 public sealed record AcknowledgeDocumentRequest(int DocumentArtifactId, DateTime? ReceivedOn, string? GoodFaithEffortReason);
 public sealed record DocumentAcknowledgmentDto(int Id, int DocumentArtifactId, DateTime? ReceivedOn,
     string? GoodFaithEffortReason, int RecordedByUserId, DateTime RecordedAtUtc);

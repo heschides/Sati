@@ -28,6 +28,11 @@ internal sealed class SingleAttemptWriteFilter(IDbContextFactory<ApiDbContext> f
             return Results.Conflict(new ApiErrorDto("service_time_busy", failure.Message,
                 context.HttpContext.TraceIdentifier));
         }
+        catch (BillingPeriodWriteConflictException failure)
+        {
+            return Results.Conflict(new ApiErrorDto("billing_period_busy", failure.Message,
+                context.HttpContext.TraceIdentifier));
+        }
     }
 
     private sealed class SingleAttempt(ApiDbContext context) : ExecutionStrategy(context, 0, TimeSpan.Zero)

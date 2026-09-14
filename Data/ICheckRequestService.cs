@@ -1,4 +1,5 @@
 using Sati.Models;
+using Sati.Contracts.V1;
 
 namespace Sati.Data;
 
@@ -18,8 +19,14 @@ public sealed record CheckRequestListItem(
     string? PayableTo,
     decimal Amount,
     DateTime? NeededByDate,
-    DateTime? PublishedAtUtc)
+    DateTime? PublishedAtUtc,
+    CheckRequestWorkflowStatus? StoredWorkflowStatus = null,
+    int? TemplateId = null,
+    DateTime? ScheduledForDate = null)
 {
     public bool IsPublished => PublishedAtUtc is not null;
-    public string Status => IsPublished ? "PDF prepared" : "Draft";
+    public CheckRequestWorkflowStatus WorkflowStatus => StoredWorkflowStatus ??
+        (IsPublished ? CheckRequestWorkflowStatus.Prepared : CheckRequestWorkflowStatus.Draft);
+    public string Status => CheckRequestWorkflowRules.Describe(WorkflowStatus);
+    public bool IsAutomaticallyGenerated => TemplateId is not null && ScheduledForDate is not null;
 }

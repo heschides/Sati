@@ -6,11 +6,27 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Safer access, living forms, current demonstrations";
-    public const string ReleaseDate = "September 13, 2026";
+    public const string ReleaseName = "Financial workflows, clearer records, timely prompts";
+    public const string ReleaseDate = "September 14, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Finance and Representative Payee work have a dedicated path",
+            [
+                "Finance users can work with billing without exposing unnecessary consumer health details in the billing interface.",
+                "The Representative Payee workspace provides consumer ledgers, supervisor-approved check requests, check release, and receipt acknowledgement with an audit trail.",
+                "Weekly defaults create reviewable check-request drafts rather than submitting or releasing money automatically.",
+                "Case managers receive sign-in, shutdown, and time-off prompts for due drafts and can turn personal reminders off in Settings."
+            ]),
+        new(
+            "Required case-note and annual-document work is clearer",
+            [
+                "Submitted case notes require a deliberate goal-progress choice: None, Minimal, Moderate, or Substantial.",
+                "Annual Documents separates each required document type, provides a clear send-for-review action, and shows pending, denied, and signed status history.",
+                "Safety Plans now describe the annual load cycle in plain language.",
+                "Historical records remain unchanged when administrators revise forms or staff prepare a new draft."
+            ]),
         new(
             "Account access ends when it should",
             [

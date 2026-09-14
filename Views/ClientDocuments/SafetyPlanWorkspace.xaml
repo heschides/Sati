@@ -14,11 +14,15 @@
     <TextBlock Text="Safety plan" FontSize="20" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"/>
     <TextBlock Text="Save a draft, submit it for review, then have your supervisor approve it. Returned and approved versions remain unchanged; start a new revision to edit." TextWrapping="Wrap" Margin="0,8"/>
     <WrapPanel>
-     <TextBlock Text="Cycle beginning" VerticalAlignment="Center" Margin="0,0,8,0"/>
-     <DatePicker SelectedDate="{Binding CycleStart}" AutomationProperties.Name="Safety plan cycle beginning"/>
-     <Button Content="Load cycle" Command="{Binding ReloadCommand}" Margin="8,0"/>
+     <TextBlock Text="Annual period begins" VerticalAlignment="Center" Margin="0,0,8,0"/>
+     <DatePicker SelectedDate="{Binding CycleStart}" AutomationProperties.Name="Safety plan annual period beginning"/>
+     <Button Content="Open selected period" Command="{Binding ReloadCommand}" Margin="8,0"
+             AutomationProperties.Name="Open selected safety plan period"
+             ToolTip="Loads the saved safety plan for this annual period without changing it."/>
      <Button Content="Start / revise plan" Command="{Binding StartCommand}" IsEnabled="{Binding CanAuthor}"/>
     </WrapPanel>
+    <TextBlock Text="An annual period is the consumer's service year beginning on their effective-date anniversary. Opening a period only shows its saved safety plan; it does not create or change one."
+               TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0"/>
     <TextBlock Text="{Binding Status}" FontWeight="SemiBold" Margin="0,12"/>
     <TextBlock Text="{Binding Message}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
     <ItemsControl ItemsSource="{Binding Sections}" IsEnabled="{Binding CanEdit}">

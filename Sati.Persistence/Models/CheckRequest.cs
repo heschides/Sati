@@ -24,12 +24,18 @@ public class CheckRequest
     public decimal Amount { get; set; }
     public DateTime? NeededByDate { get; set; }
     public string? Reason { get; set; }
+    public int? TemplateId { get; private set; }
+    public CheckRequestTemplate? Template { get; private set; }
+    public DateTime? ScheduledForDate { get; private set; }
+    public bool IsAutomaticallyGenerated => TemplateId is not null && ScheduledForDate is not null;
 
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? PublishedAtUtc { get; private set; }
     public int? PublishedByUserId { get; private set; }
     public string? PublishedByName { get; private set; }
     public bool IsPublished => PublishedAtUtc is not null;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public CheckRequestWorkflowStatus WorkflowStatus { get; private set; } = CheckRequestWorkflowStatus.Draft;
 
     protected CheckRequest() { }
 
@@ -49,7 +55,10 @@ public class CheckRequest
         string consumerName, string agencyName, string caseManagerName, string supervisorName,
         DateTime? requestDate, string? payableTo, string? mailingAddress, decimal amount,
         DateTime? neededByDate, string? reason, DateTime createdAtUtc,
-        DateTime? publishedAtUtc, int? publishedByUserId, string? publishedByName) => new()
+        DateTime? publishedAtUtc, int? publishedByUserId, string? publishedByName,
+        CheckRequestWorkflowStatus? workflowStatus = null,
+        int? templateId = null,
+        DateTime? scheduledForDate = null) => new()
     {
         Id = id,
         PersonId = personId,
@@ -67,7 +76,12 @@ public class CheckRequest
         CreatedAtUtc = createdAtUtc,
         PublishedAtUtc = publishedAtUtc,
         PublishedByUserId = publishedByUserId,
-        PublishedByName = publishedByName
+        PublishedByName = publishedByName,
+        TemplateId = templateId,
+        ScheduledForDate = scheduledForDate,
+        WorkflowStatus = workflowStatus ?? (publishedAtUtc is null
+            ? CheckRequestWorkflowStatus.Draft
+            : CheckRequestWorkflowStatus.Prepared)
     };
 
     public void RehydrateIdentity(int id) { if (Id == 0) Id = id; }
@@ -86,5 +100,17 @@ public class CheckRequest
         PublishedAtUtc = publishedAtUtc;
         PublishedByUserId = publishedByUserId;
         PublishedByName = publishedByName;
+        if (WorkflowStatus == CheckRequestWorkflowStatus.Draft && publishedAtUtc is not null)
+            WorkflowStatus = CheckRequestWorkflowStatus.Prepared;
+    }
+
+    public void RehydrateWorkflow(CheckRequestWorkflowStatus status) => WorkflowStatus = status;
+
+    public void MarkAutomaticallyGenerated(int templateId, DateTime scheduledForDate)
+    {
+        if (Id != 0 || TemplateId is not null)
+            throw new InvalidOperationException("Automatic-generation provenance can be assigned only to a new draft.");
+        TemplateId = templateId;
+        ScheduledForDate = scheduledForDate.Date;
     }
 }

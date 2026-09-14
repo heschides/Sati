@@ -13,6 +13,8 @@ namespace Sati.ViewModels.ClientDocuments;
 
 public partial class CheckRequestsViewModel(
     ICheckRequestService service,
+    ICheckRequestAutomationService automationService,
+    IRepresentativePayeeService workflowService,
     ISessionService session,
     CheckRequestPdfExporter pdfExporter) : ObservableObject
 {
@@ -31,6 +33,17 @@ public partial class CheckRequestsViewModel(
     [ObservableProperty] private string reason = "";
     [ObservableProperty] private string message = "Select a consumer.";
     [ObservableProperty] private bool isBusy;
+    [ObservableProperty] private bool templateIsEnabled = true;
+    [ObservableProperty] private DayOfWeek templateGenerateOn = DayOfWeek.Monday;
+    [ObservableProperty] private int templateNeededByDaysAfterRequest;
+    [ObservableProperty] private string templatePayableTo = "";
+    [ObservableProperty] private string templateMailingAddress = "";
+    [ObservableProperty] private decimal templateAmount;
+    [ObservableProperty] private string templateReason = "";
+    [ObservableProperty] private string templateMessage = "No weekly default saved yet.";
+    private int templateRevision;
+
+    public IReadOnlyList<DayOfWeek> WeeklyDays { get; } = Enum.GetValues<DayOfWeek>();
 
     public string ConsumerName => current?.ConsumerName ?? person?.FullName ?? "Consumer";
     public string AgencyName => current?.AgencyName ?? session.CurrentUser?.Agency?.Name ?? "";
@@ -38,28 +51,41 @@ public partial class CheckRequestsViewModel(
     public string SupervisorName => current?.SupervisorName ?? session.CurrentUser?.Supervisor?.DisplayName ?? "";
     public bool HasItems => Items.Count > 0;
     public bool HasSelection => current is not null;
-    public bool CanCreate => person is not null && person.UserId == session.CurrentUser?.Id && !IsBusy;
+    public bool CanCreate => person is { CaseManagerIsRepPayee: true } &&
+        person.UserId == session.CurrentUser?.Id && !IsBusy;
     public bool CanEdit => CanCreate && current is { IsPublished: false };
     public bool CanPublish => CanEdit;
+    public bool CanSubmit => CanCreate && current?.WorkflowStatus == CheckRequestWorkflowStatus.Prepared;
     public bool CanRegenerate => current?.IsPublished == true && !IsBusy;
+    public bool CanManageTemplate => CanCreate;
     public string EditorPrompt
     {
         get
         {
             if (person is null) return "Select a consumer to view their check requests.";
             if (IsBusy) return "Loading check requests…";
+            if (!person.CaseManagerIsRepPayee)
+                return "Representative Payee is not enabled for this consumer, so a check request cannot be created or submitted.";
             if (person.UserId != session.CurrentUser?.Id)
                 return "You can review this consumer's requests, but only their assigned case manager can create or edit one.";
             return "Choose Create draft to start entering a new check request, or select an existing request from the history.";
         }
     }
-    public string Status => current is null ? "No request selected" : current.IsPublished ? "PDF prepared · read-only" : "Draft";
+    public string Status => current is null ? "No request selected" :
+        CheckRequestWorkflowRules.Describe(current.WorkflowStatus);
     public string PublicationNote => current?.PublishedAtUtc is DateTime published
-        ? $"PDF prepared {published.ToLocalTime():g} by {current.PublishedByName}. This records neither supervisor approval nor delivery to Finance."
+        ? $"PDF prepared {published.ToLocalTime():g} by {current.PublishedByName}. Preparing the PDF does not approve or release the check."
         : "Publish PDF freezes this version and creates the attachment. The printed staff names preserve the existing form; they are not electronic signatures or supervisor approval.";
-    public string DeliveryInstructions => current?.IsPublished == true
-        ? "Save the PDF, attach it to your email to Finance, and CC your supervisor."
-        : "Current process: prepare the PDF, email it to Finance, and CC your supervisor. Sati does not send or approve it yet.";
+    public string DeliveryInstructions => current?.WorkflowStatus switch
+    {
+        CheckRequestWorkflowStatus.Prepared => "Review the prepared PDF, then submit the frozen request to your supervisor.",
+        CheckRequestWorkflowStatus.Submitted => "Submitted to your supervisor for review.",
+        CheckRequestWorkflowStatus.Approved => "Approved and waiting in the Finance queue.",
+        CheckRequestWorkflowStatus.Returned => "Returned by your supervisor. Create a new request for the corrected version.",
+        CheckRequestWorkflowStatus.Released => "Finance recorded the check release.",
+        CheckRequestWorkflowStatus.ReceiptAcknowledged => "Finance recorded the check release and receipt acknowledgement.",
+        _ => "Prepare the PDF when every request field is complete."
+    };
 
     public event Action<CheckRequestPdfReadyEventArgs>? PdfReady;
 
@@ -71,6 +97,7 @@ public partial class CheckRequestsViewModel(
         Items.Clear();
         SelectedItem = null;
         ClearEditor();
+        ClearTemplate();
         Message = selected is null ? "Select a consumer." : "Loading check requests…";
         NotifyState();
         _ = ReloadAsync();
@@ -96,7 +123,9 @@ public partial class CheckRequestsViewModel(
         OnPropertyChanged(nameof(CanCreate));
         OnPropertyChanged(nameof(CanEdit));
         OnPropertyChanged(nameof(CanPublish));
+        OnPropertyChanged(nameof(CanSubmit));
         OnPropertyChanged(nameof(CanRegenerate));
+        OnPropertyChanged(nameof(CanManageTemplate));
         OnPropertyChanged(nameof(EditorPrompt));
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(PublicationNote));
@@ -113,10 +142,17 @@ public partial class CheckRequestsViewModel(
         IsBusy = true;
         try
         {
-            var rows = await service.GetAllForPersonAsync(selected.Id);
+            var rowsTask = service.GetAllForPersonAsync(selected.Id);
+            var templateTask = selected.UserId == account?.Id && selected.CaseManagerIsRepPayee
+                ? automationService.GetTemplateAsync(selected.Id)
+                : Task.FromResult<CheckRequestTemplateDto?>(null);
+            await Task.WhenAll(rowsTask, templateTask);
+            var rows = await rowsTask;
+            var template = await templateTask;
             if (!requests.IsCurrent(ticket) || person?.Id != selected.Id || !ReferenceEquals(session.CurrentUser, account)) return;
             Items.Clear();
             foreach (var row in rows) Items.Add(row);
+            ApplyTemplate(template);
             Message = rows.Count == 0 ? "No check requests yet. Create the first draft when one is needed." : "";
             NotifyState();
         }
@@ -146,6 +182,82 @@ public partial class CheckRequestsViewModel(
         finally { if (requests.IsCurrent(ticket)) IsBusy = false; }
     }
 
+    [RelayCommand]
+    private async Task SaveTemplateAsync()
+    {
+        if (!CanManageTemplate || person is null) return;
+        var errors = CheckRequestTemplateRules.Validate(
+            TemplateGenerateOn,
+            TemplateNeededByDaysAfterRequest,
+            TemplatePayableTo,
+            TemplateMailingAddress,
+            TemplateAmount,
+            TemplateReason);
+        if (errors.Count > 0)
+        {
+            TemplateMessage = string.Join(" ", errors);
+            return;
+        }
+
+        var selectedPersonId = person.Id;
+        var ticket = requests.Begin();
+        IsBusy = true;
+        TemplateMessage = "Saving weekly default...";
+        try
+        {
+            var saved = await automationService.SaveTemplateAsync(selectedPersonId,
+                new SaveCheckRequestTemplateRequest(
+                    templateRevision,
+                    TemplateIsEnabled,
+                    TemplateGenerateOn,
+                    TemplateNeededByDaysAfterRequest,
+                    TemplatePayableTo,
+                    TemplateMailingAddress,
+                    TemplateAmount,
+                    TemplateReason));
+            if (!requests.IsCurrent(ticket) || person?.Id != selectedPersonId) return;
+            ApplyTemplate(saved);
+            TemplateMessage = TemplateIsEnabled
+                ? $"Weekly default saved. The next due {TemplateGenerateOn} draft will be created for review."
+                : "Weekly default saved but paused for this consumer.";
+        }
+        catch (Exception error)
+        {
+            if (requests.IsCurrent(ticket)) TemplateMessage = Friendly(error);
+        }
+        finally
+        {
+            if (requests.IsCurrent(ticket)) IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void CopyCurrentToTemplate()
+    {
+        if (!CanManageTemplate || current is null) return;
+        TemplatePayableTo = PayableTo;
+        TemplateMailingAddress = MailingAddress;
+        TemplateAmount = Amount;
+        TemplateReason = Reason;
+        if (RequestDate is DateTime requestDate && NeededByDate is DateTime neededByDate)
+            TemplateNeededByDaysAfterRequest = Math.Clamp(
+                (neededByDate.Date - requestDate.Date).Days,
+                0,
+                CheckRequestTemplateRules.MaximumNeededByDaysAfterRequest);
+        TemplateMessage =
+            "Current request copied into the weekly default editor. Choose Save weekly default to keep it.";
+    }
+
+    public async Task OpenRequestAsync(int id)
+    {
+        await ReloadAsync();
+        var item = Items.FirstOrDefault(candidate => candidate.Id == id);
+        suppressSelectionLoad = true;
+        try { SelectedItem = item; }
+        finally { suppressSelectionLoad = false; }
+        await LoadAsync(id);
+    }
+
     private async Task LoadAsync(int id)
     {
         var ticket = requests.Begin();
@@ -164,6 +276,30 @@ public partial class CheckRequestsViewModel(
 
     [RelayCommand] private Task SaveAsync() => SaveCoreAsync(publish: false);
     [RelayCommand] private Task PublishAsync() => SaveCoreAsync(publish: true);
+
+    [RelayCommand]
+    private async Task SubmitAsync()
+    {
+        if (!CanSubmit || current is null) return;
+        var ticket = requests.Begin();
+        IsBusy = true;
+        try
+        {
+            var result = await workflowService.ApplyActionAsync(
+                current.Id, CheckRequestWorkflowAction.Submitted,
+                "Submitted by the assigned case manager.");
+            if (!requests.IsCurrent(ticket)) return;
+            current.RehydrateWorkflow(result.Status);
+            await RefreshListAsync(current.Id, ticket);
+            Message = "Check request submitted to the assigned supervisor.";
+            NotifyState();
+        }
+        catch (Exception error)
+        {
+            if (requests.IsCurrent(ticket)) Message = Friendly(error);
+        }
+        finally { if (requests.IsCurrent(ticket)) IsBusy = false; }
+    }
 
     private async Task SaveCoreAsync(bool publish)
     {
@@ -243,6 +379,25 @@ public partial class CheckRequestsViewModel(
         RequestDate = null; PayableTo = ""; MailingAddress = ""; Amount = 0;
         NeededByDate = null; Reason = "";
     }
+
+    private void ApplyTemplate(CheckRequestTemplateDto? template)
+    {
+        templateRevision = template?.Revision ?? 0;
+        TemplateIsEnabled = template?.IsEnabled ?? true;
+        TemplateGenerateOn = template?.GenerateOn ?? DayOfWeek.Monday;
+        TemplateNeededByDaysAfterRequest = template?.NeededByDaysAfterRequest ?? 0;
+        TemplatePayableTo = template?.PayableTo ?? "";
+        TemplateMailingAddress = template?.MailingAddress ?? "";
+        TemplateAmount = template?.Amount ?? 0;
+        TemplateReason = template?.Reason ?? "";
+        TemplateMessage = template is null
+            ? "No weekly default saved yet."
+            : template.IsEnabled
+                ? $"Active weekly default. Drafts are due each {template.GenerateOn}."
+                : "This consumer's weekly default is paused.";
+    }
+
+    private void ClearTemplate() => ApplyTemplate(null);
 
     private static string Friendly(Exception error) => error switch
     {

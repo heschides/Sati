@@ -49,6 +49,9 @@ namespace Sati.Data
         public DbSet<ATRequest> ATRequests { get; set; }
         public DbSet<ATRequestItem> ATRequestItems { get; set; }
         public DbSet<CheckRequest> CheckRequests { get; set; }
+        public DbSet<CheckRequestTemplate> CheckRequestTemplates { get; set; }
+        public DbSet<CheckRequestWorkflowEvent> CheckRequestWorkflowEvents { get; set; }
+        public DbSet<RepresentativePayeeLedgerEntry> RepresentativePayeeLedgerEntries { get; set; }
         public DbSet<Provider> Providers { get; set; }
         public DbSet<ProviderContact> ProviderContacts { get; set; }
         public DbSet<PersonContact> PersonContacts { get; set; }
@@ -112,6 +115,10 @@ namespace Sati.Data
                 ChangeTracker.Entries<RemittanceClaimOutcome>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
                 ChangeTracker.Entries<RemittanceDeposit>()
+                    .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+                ChangeTracker.Entries<CheckRequestWorkflowEvent>()
+                    .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+                ChangeTracker.Entries<RepresentativePayeeLedgerEntry>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             {
                 throw new InvalidOperationException("Audit, form-attestation, document-template, Person history, and billing exchange records are append-only.");
@@ -713,12 +720,60 @@ namespace Sati.Data
                 entity.Property(x => x.MailingAddress).HasMaxLength(CheckRequestPublication.MailingAddressMaxLength);
                 entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
                 entity.Property(x => x.NeededByDate).HasColumnType("date");
+                entity.Property(x => x.ScheduledForDate).HasColumnType("date");
                 entity.Property(x => x.Reason).HasMaxLength(CheckRequestPublication.ReasonMaxLength);
                 entity.Property(x => x.PublishedByName).HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
                 entity.HasIndex(x => new { x.PersonId, x.RequestDate });
+                entity.HasIndex(x => new { x.TemplateId, x.ScheduledForDate })
+                    .IsUnique().HasFilter("[TemplateId] IS NOT NULL AND [ScheduledForDate] IS NOT NULL");
                 entity.HasOne(x => x.Person)
                     .WithMany()
                     .HasForeignKey(x => x.PersonId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(x => x.Template).WithMany().HasForeignKey(x => x.TemplateId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<CheckRequestWorkflowEvent>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Checkpoint).HasConversion<string>().HasMaxLength(20);
+                entity.Property(x => x.Action).HasConversion<string>().HasMaxLength(30);
+                entity.Property(x => x.ActorName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+                entity.Property(x => x.Note).HasMaxLength(CheckRequestWorkflowRules.NoteMaxLength);
+                entity.HasIndex(x => new { x.CheckRequestId, x.Checkpoint }).IsUnique();
+                entity.HasOne(x => x.CheckRequest).WithMany().HasForeignKey(x => x.CheckRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<RepresentativePayeeLedgerEntry>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.EntryDate).HasColumnType("date");
+                entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+                entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(x => x.Description).IsRequired().HasMaxLength(RepresentativePayeeLedgerRules.DescriptionMaxLength);
+                entity.Property(x => x.RecordedByName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+                entity.HasIndex(x => new { x.PersonId, x.EntryDate, x.Id });
+                entity.HasIndex(x => x.CheckRequestId).IsUnique().HasFilter("[CheckRequestId] IS NOT NULL");
+                entity.HasOne(x => x.Person).WithMany().HasForeignKey(x => x.PersonId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(x => x.CheckRequest).WithMany().HasForeignKey(x => x.CheckRequestId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<CheckRequestTemplate>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Revision).IsConcurrencyToken();
+                entity.Property(x => x.GenerateOn).HasConversion<string>().HasMaxLength(10);
+                entity.Property(x => x.PayableTo).IsRequired().HasMaxLength(CheckRequestPublication.PayableToMaxLength);
+                entity.Property(x => x.MailingAddress).IsRequired().HasMaxLength(CheckRequestPublication.MailingAddressMaxLength);
+                entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(x => x.Reason).IsRequired().HasMaxLength(CheckRequestPublication.ReasonMaxLength);
+                entity.Property(x => x.EffectiveFrom).HasColumnType("date");
+                entity.HasIndex(x => x.PersonId).IsUnique();
+                entity.HasOne(x => x.Person).WithMany().HasForeignKey(x => x.PersonId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
 

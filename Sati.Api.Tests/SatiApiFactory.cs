@@ -612,6 +612,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                 CreateUser(verifier, 18, "demoted-supervisor-one", "CaseManager", 1,
                     permissions: UserPermissions.CaseManagement),
                 CreateUser(verifier, 19, "supervisee-of-demoted-one", "CaseManager", 1, 18),
+                CreateUser(verifier, 20, "finance-one", "Finance", 1),
                 CreateUser(verifier, 21, "admin-two", "Admin", 2),
                 CreateUser(verifier, 22, "case-manager-two", "CaseManager", 2, 23),
                 CreateUser(verifier, 23, "supervisor-two", "Supervisor", 2),
@@ -625,6 +626,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                     DiagnosisCode = "F89", PlaceOfService = 11,
                     BillingStreet = "10 Test Street", BillingCity = "Portland",
                     BillingState = "ME", BillingZip = "04101",
+                    CaseManagerIsRepPayee = true, RepPayeeMonthlyIncome = 1200m,
                     Forms =
                     [
                         CompliantForm(101, "PCP"),

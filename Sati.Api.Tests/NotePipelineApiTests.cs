@@ -129,6 +129,37 @@ public sealed class NotePipelineApiTests
     }
 
     [Fact]
+    public async Task GoalProgressIsRequiredForSubmissionAndRoundTripsAsADeliberateChoice()
+    {
+        using var client = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var draftResponse = await client.PostAsJsonAsync("/api/v1/notes",
+            new SaveNoteRequest("Goal progress test.", new DateTime(2026, 8, 3), "Pending",
+                15, null, 101, null, "Contact", null, null));
+        Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
+        var draft = (await draftResponse.Content.ReadFromJsonAsync<NoteDto>())!;
+        Assert.Null(draft.GoalProgress);
+
+        var missing = await client.PutAsJsonAsync($"/api/v1/notes/{draft.Id}",
+            new SaveNoteRequest(draft.Narrative, draft.EventDate, "Logged", draft.Minutes,
+                null, draft.PersonId, null, draft.NoteType, null, null, draft.Revision));
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        Assert.Contains("goal progress", await missing.Content.ReadAsStringAsync(),
+            StringComparison.OrdinalIgnoreCase);
+
+        var answeredDraft = await client.PutAsJsonAsync($"/api/v1/notes/{draft.Id}",
+            new SaveNoteRequest(draft.Narrative, draft.EventDate, "Pending", draft.Minutes,
+                null, draft.PersonId, null, draft.NoteType, null, null, draft.Revision,
+                "None"));
+        Assert.Equal(HttpStatusCode.OK, answeredDraft.StatusCode);
+        var answered = (await answeredDraft.Content.ReadFromJsonAsync<NoteDto>())!;
+        Assert.Equal("None", answered.GoalProgress);
+
+        var deleted = await client.DeleteAsync(
+            $"/api/v1/notes/{answered.Id}?expectedRevision={answered.Revision}");
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
+
+    [Fact]
     public async Task ApprovalAndReturnAcceptOnlyASubmittedNote()
     {
         using var client = await _factory.CreateAuthenticatedClientAsync("supervisor-one");
@@ -342,7 +373,7 @@ public sealed class NotePipelineApiTests
 
         var edit = await client.PutAsJsonAsync($"/api/v1/notes/{foreignNote}",
             new SaveNoteRequest("Taken over", new DateTime(2026, 8, 3), "Logged", 60, null,
-                201, null, null, null, null, revision));
+                201, null, null, null, null, revision, "Moderate"));
         var delete = await client.DeleteAsync(
             $"/api/v1/notes/{foreignNote}?expectedRevision={revision}");
 
@@ -461,7 +492,7 @@ public sealed class NotePipelineApiTests
 
         var create = await author.PostAsJsonAsync("/api/v1/notes",
             new SaveNoteRequest("Community support contact.", new DateTime(2026, 8, 3), "Logged",
-                60, null, personId, null, null, null, null));
+                60, null, personId, null, null, null, null, GoalProgress: "Moderate"));
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
         var note = await create.Content.ReadFromJsonAsync<NoteDto>();
 
@@ -528,5 +559,5 @@ public sealed class NotePipelineApiTests
 
     private static SaveNoteRequest SaveRequest(int status, int expectedRevision, string narrative) =>
         new(narrative, new DateTime(2026, 8, 3), StatusNames[status], 60, null, 101,
-            null, null, null, null, expectedRevision);
+            null, null, null, null, expectedRevision, "Moderate");
 }

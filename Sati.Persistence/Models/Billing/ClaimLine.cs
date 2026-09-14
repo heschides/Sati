@@ -29,6 +29,9 @@
         public string ClientName { get; set; } = string.Empty;
 
         [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public string ClientDisplayName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
         public IReadOnlyList<string> ReadinessErrors { get; set; } = [];
 
         [System.ComponentModel.DataAnnotations.Schema.NotMapped]

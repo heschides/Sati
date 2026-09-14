@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Sati.Converters;
 using Sati.Views.ClientDocuments;
 using Xunit;
 
@@ -24,6 +25,21 @@ public sealed class SignatureRequestsViewRenderTests
             Assert.True(pin.Focusable); Assert.True(KeyboardNavigation.GetIsTabStop(pin));
             Assert.DoesNotContain(WpfUiHarness.Descendants(view).OfType<TextBox>(), box => box.Name.Contains("Pin", StringComparison.OrdinalIgnoreCase));
             Assert.True(WpfUiHarness.FindByAutomationName<ComboBox>(view, "Intended signer").Focusable);
+            Assert.Contains(WpfUiHarness.Descendants(view).OfType<Button>(),
+                button => Equals(button.Content, "Submit to consumer or guardian for review"));
+            var history = WpfUiHarness.FindByAutomationName<DataGrid>(view, "Signature request history");
+            Assert.Contains(history.Columns, column => Equals(column.Header, "Status"));
+            Assert.DoesNotContain(history.Columns, column => Equals(column.Header, "Outcome"));
         });
+    }
+
+    [Fact]
+    public void SignatureRequestStatesUseTheRequestedWorkflowWords()
+    {
+        var converter = new SignatureLabelConverter();
+        Assert.Equal("Pending", converter.Convert("Issued", typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal("Pending — opened for review", converter.Convert("Viewed", typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal("Denied", converter.Convert("Declined", typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal("Signed", converter.Convert("Signed", typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture));
     }
 }

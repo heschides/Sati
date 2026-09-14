@@ -32,7 +32,7 @@ public partial class SafetyPlanViewModel(ISafetyPlanService service, ISessionSer
     partial void OnCycleStartChanged(DateTime? value)
     {
         requests.Invalidate(); plan = null; Sections.Clear(); ReturnReason = ""; IsBusy = false;
-        Message = "Load or start the plan for this cycle."; NotifyState();
+        Message = "Open the selected annual period to view its saved plan, or start a new revision."; NotifyState();
     }
     public void SetPerson(Person? selected)
     {

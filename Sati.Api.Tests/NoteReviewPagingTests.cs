@@ -26,7 +26,8 @@ public sealed class NoteReviewPagingTests(SatiApiFactory factory)
         var narrative = $"review-filter-{Guid.NewGuid():N}";
         var eventDate = new DateTime(2026, 9, 6);
         var createdResponse = await caseManager.PostAsJsonAsync("/api/v1/notes", new SaveNoteRequest(
-            narrative, eventDate, "Logged", 15, null, 101, null, "Contact", null, null));
+            narrative, eventDate, "Logged", 15, null, 101, null, "Contact", null, null,
+            GoalProgress: "Moderate"));
         createdResponse.EnsureSuccessStatusCode();
         var created = await createdResponse.Content.ReadFromJsonAsync<NoteDto>();
         var options = await client.GetFromJsonAsync<NoteReviewFilterOptions>(

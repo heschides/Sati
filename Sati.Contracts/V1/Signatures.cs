@@ -47,7 +47,11 @@ public static class SignatureMeaningCatalog
         new(AnnualDocumentKind.HousingSupportFundsApplication, "Housing Support Funds application", SignatureMeaning.PlanAgreement,
             SignaturePolicyStatus.PendingProgramConfirmation, [SignerCapacity.Consumer, SignerCapacity.Guardian],
             "I intend to sign the consumer attestation in this exact Housing Support Funds application in the name and capacity shown.",
-            "Electronic signing is unavailable until Maine DHHS OADS and the agency confirm the accepted signing method for this state-owned application.")
+            "Electronic signing is unavailable until Maine DHHS OADS and the agency confirm the accepted signing method for this state-owned application."),
+        new(AnnualDocumentKind.DhhsAuthorizedRepresentative, "DHHS Authorized Representative", SignatureMeaning.Authorization,
+            SignaturePolicyStatus.PendingProgramConfirmation, AllCapacities,
+            "I intend to sign this exact appointment in the name and capacity shown.",
+            "Electronic signing is unavailable pending written confirmation that this state-owned appointment form and evidence method are accepted.")
     ];
 
     public static SignatureMeaningEntry? Find(AnnualDocumentKind kind) => All.SingleOrDefault(x => x.Kind == kind);

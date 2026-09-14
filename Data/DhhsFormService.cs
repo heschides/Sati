@@ -204,21 +204,27 @@ public sealed class DhhsFormService(
 
         var pdf = new DhhsFormFiller().Fill(form, subject, selections);
         var blankFields = DhhsFormDefinition.UnfilledFields(form, subject).ToList();
-        if (form == DhhsFormDefinition.FormKey.AuthorizationToRelease)
+        if (form is DhhsFormDefinition.FormKey.AuthorizationToRelease or
+            DhhsFormDefinition.FormKey.AuthorizedRepresentative)
         {
             var isDraft = (selections.Checks?.Count ?? 0) == 0 &&
                 (selections.Text?.Count ?? 0) == 0;
             if (isDraft)
-                blankFields.Add("Consumer authorization choices");
+                blankFields.Add(form == DhhsFormDefinition.FormKey.AuthorizationToRelease
+                    ? "Consumer authorization choices"
+                    : "Representative authority choices");
             var fileName = SuggestedFileName(form, person.LastName, person.FirstName, personId);
             var cycleStart = AnnualDocumentCycle.CurrentStart(
                 person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
                 DateTime.Today);
+            var documentKind = form == DhhsFormDefinition.FormKey.AuthorizationToRelease
+                ? AnnualDocumentKind.ReleaseDhhs
+                : AnnualDocumentKind.DhhsAuthorizedRepresentative;
             await DocumentArtifactStore.StageGeneratedAsync(
                 context,
                 personId,
                 actor.AgencyId,
-                AnnualDocumentKind.ReleaseDhhs,
+                documentKind,
                 cycleStart,
                 isDraft ? DocumentArtifactOrigin.Draft : DocumentArtifactOrigin.GeneratedInSati,
                 DateTime.UtcNow,
@@ -235,7 +241,7 @@ public sealed class DhhsFormService(
                 personId,
                 System.Text.Json.JsonSerializer.Serialize(new
                 {
-                    kind = AnnualDocumentKind.ReleaseDhhs.ToString(),
+                    kind = documentKind.ToString(),
                     cycleStart = cycleStart.ToString("yyyy-MM-dd"),
                     origin = isDraft ? DocumentArtifactOrigin.Draft.ToString() : DocumentArtifactOrigin.GeneratedInSati.ToString()
                 }));

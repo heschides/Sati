@@ -296,6 +296,32 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Border>
+                <Border Cursor="Hand" CornerRadius="4" Padding="12,4" Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToCheckRequestApprovalsCommand}"
+                        AutomationProperties.Name="Check request approvals">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCheckRequestApprovalsActive}" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Check requests" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCheckRequestApprovalsActive}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
                 <!-- Monthly productivity -->
                 <Border Cursor="Hand"
                         CornerRadius="4"

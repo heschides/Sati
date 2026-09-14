@@ -6,16 +6,52 @@
  <ScrollViewer VerticalScrollBarVisibility="Auto">
   <StackPanel Margin="18">
    <TextBlock Text="Annual documents" FontSize="20" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"/>
-   <WrapPanel Margin="0,12">
-    <TextBlock Text="Cycle beginning" VerticalAlignment="Center" Margin="0,0,8,0"/>
-    <DatePicker SelectedDate="{Binding CycleStart}" AutomationProperties.Name="Annual document cycle beginning"/>
-    <Button Content="Load cycle" Command="{Binding ReloadCommand}" Margin="8,0"/>
+   <WrapPanel Margin="0,12,0,0">
+    <TextBlock Text="Annual period begins" VerticalAlignment="Center" Margin="0,0,8,0"/>
+    <DatePicker SelectedDate="{Binding CycleStart}" AutomationProperties.Name="Annual document period beginning"/>
+    <Button Content="Open selected period" Command="{Binding ReloadCommand}" Margin="8,0"
+            AutomationProperties.Name="Open selected annual document period"
+            ToolTip="Loads document status for this annual period without changing historical records."/>
     <Button Content="Save Annual Documents Locally" Command="{Binding SavePacketCommand}" IsEnabled="{Binding CanSavePacket}"/>
    </WrapPanel>
+   <TextBlock Text="An annual period is the consumer's service year beginning on their effective-date anniversary. Opening a period shows its saved documents and signature activity; it does not change historical records."
+              TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,12"/>
    <TextBlock Text="{Binding WindowDescription}" TextWrapping="Wrap"/>
    <TextBlock Text="{Binding Reminder}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
    <TextBlock Text="The ZIP includes available drafts and a manifest. Completed releases already recorded in Sati must be retrieved from their saved or signed copies." TextWrapping="Wrap" Margin="0,8"/>
+   <TextBlock Text="Document workflow" FontSize="18" FontWeight="SemiBold" Margin="0,12,0,4"
+              AutomationProperties.HeadingLevel="Level2"/>
+   <ItemsControl ItemsSource="{Binding DocumentWorkflow}" AutomationProperties.Name="Annual document workflow by type">
+    <ItemsControl.ItemTemplate>
+     <DataTemplate>
+      <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6"
+              Background="{DynamicResource PersonGroupAltBrush}" Padding="12" Margin="0,4">
+       <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock Grid.Column="1" Text="{Binding Status}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="12,0"/>
+        <TextBlock Grid.Column="2" Text="{Binding Instructions}" TextWrapping="Wrap"/>
+       </Grid>
+      </Border>
+     </DataTemplate>
+    </ItemsControl.ItemTemplate>
+   </ItemsControl>
+   <TextBlock Text="{Binding AuthorizedRepresentativeRecordedMessage}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
+   <StackPanel Margin="0,4,0,12" AutomationProperties.Name="Record DHHS Authorized Representative form already on file">
+    <StackPanel.Style>
+     <Style TargetType="StackPanel">
+      <Setter Property="Visibility" Value="Visible"/>
+      <Style.Triggers><DataTrigger Binding="{Binding NeedsAuthorizedRepresentative}" Value="False"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers>
+     </Style>
+    </StackPanel.Style>
+    <TextBlock Text="If the signed once-only DHHS Authorized Representative form is already retained outside Sati, describe where or how you verified it. Sati records the fact and audit trail, not the document bytes." TextWrapping="Wrap"/>
+    <TextBox Text="{Binding AuthorizedRepresentativeOnFileNote, UpdateSourceTrigger=PropertyChanged}" MaxLength="1000"
+             AcceptsReturn="True" TextWrapping="Wrap" MinHeight="52" Margin="0,6"
+             AutomationProperties.Name="DHHS Authorized Representative on-file verification note"/>
+    <Button Content="Record signed form already on file" Command="{Binding RecordAuthorizedRepresentativeOnFileCommand}"
+            IsEnabled="{Binding CanRecordAuthorizedRepresentativeOnFile}" HorizontalAlignment="Left"/>
+   </StackPanel>
    <GroupBox Header="Privacy notice" Margin="0,12">
     <StackPanel Margin="12">
      <Button Content="Generate privacy notice PDF" Command="{Binding GenerateNoticeCommand}" HorizontalAlignment="Left"/>
@@ -28,11 +64,13 @@
      <Button Content="Record receipt or effort" Command="{Binding AcknowledgeCommand}" IsEnabled="{Binding CanRecordReceipt}" HorizontalAlignment="Left" Margin="0,8"/>
     </StackPanel>
    </GroupBox>
+   <TextBlock Text="Current document records" FontSize="18" FontWeight="SemiBold" Margin="0,12,0,4"
+              AutomationProperties.HeadingLevel="Level2"/>
    <DataGrid ItemsSource="{Binding Artifacts}" AutoGenerateColumns="False" IsReadOnly="True" MaxHeight="240" AutomationProperties.Name="Current document records">
     <DataGrid.Columns>
      <DataGridTextColumn Header="Artifact ID" Binding="{Binding Id}"/>
      <DataGridTextColumn Header="Document" Binding="{Binding Kind}"/>
-     <DataGridTextColumn Header="Status" Binding="{Binding Origin}"/>
+     <DataGridTextColumn Header="Preparation" Binding="{Binding Origin}"/>
      <DataGridTextColumn Header="Generated" Binding="{Binding GeneratedAtUtc}"/>
     </DataGrid.Columns>
    </DataGrid>

@@ -23,6 +23,8 @@ namespace Sati.ViewModels
 {
     public partial class NewClientViewModel : ObservableValidator
     {
+        public const int CheckRequestsTabIndex = 10;
+
         // -------------------------------------------------------------------------
         // Services
         // -------------------------------------------------------------------------

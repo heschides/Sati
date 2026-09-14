@@ -17,6 +17,7 @@ namespace Sati.Models
         public Person Person { get; set; } = null!;
         public FormType? FormType { get; set; }
         public NoteType? NoteType { get; set; }
+        public GoalProgressLevel? GoalProgress { get; set; }
         public int? AgencyId { get; set; }
         public Agency? Agency { get; set; }
         public string? ReturnReason { get; set; }

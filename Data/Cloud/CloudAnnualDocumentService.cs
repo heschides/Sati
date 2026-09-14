@@ -7,6 +7,11 @@ public sealed class CloudAnnualDocumentService(CloudApiClient api) : IAnnualDocu
         api.GetAsync<AnnualDocumentsStatusDto>($"/api/v1/people/{personId}/annual-documents?cycleStart={cycleStart:yyyy-MM-dd}");
     public Task<DocumentAcknowledgmentDto> AcknowledgeAsync(int personId, AcknowledgeDocumentRequest request) =>
         api.PostAsync<AcknowledgeDocumentRequest, DocumentAcknowledgmentDto>($"/api/v1/people/{personId}/documents/privacy-practices/acknowledgment", request);
+    public Task<DocumentArtifactDto> RecordAuthorizedRepresentativeOnFileAsync(
+        int personId, DateTime cycleStart, string note) =>
+        api.PostAsync<RecordExternalDocumentRequest, DocumentArtifactDto>(
+            $"/api/v1/people/{personId}/documents/{AnnualDocumentKind.DhhsAuthorizedRepresentative}/external",
+            new RecordExternalDocumentRequest(cycleStart, note));
     public Task<VerifyDocumentResult> VerifyAsync(int personId, VerifyDocumentRequest request) =>
         api.PostAsync<VerifyDocumentRequest, VerifyDocumentResult>($"/api/v1/people/{personId}/documents/verify", request);
     public async Task<AgencyReleaseResult> SavePacketAsync(int personId, DateTime cycleStart) =>

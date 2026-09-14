@@ -1,5 +1,172 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.9 — 2026-09-14
+
+"Financial workflows, clearer records, timely prompts." This release adds a PHI-minimized Finance
+role and Representative Payee ledger/check workflow, weekly check-request drafts and reminders,
+required case-note goal progress, clearer annual-document work, live form previews, two new public-
+program packet builders, Evergreen completion attestations while OADS authoring remains off, and a
+date-aware Demo baseline.
+
+- [x] Confirm the releasable work is based on GitHub `master` at release 1.3.8, with no relevant
+      completed branches to merge or safely delete. Retain the active, divergent, historical, and
+      uniquely valuable branches and leave the separate dirty user checkout untouched.
+- [x] Apply and verify the three additive migrations on identity-checked Local `SatiProduction` and
+      Azure `SatiDemo`, including rollback rehearsals, a verified Local backup, and an idempotent
+      second pass. Both databases contain 105 migration-history rows.
+- [x] Capture and verify the authorized 56-table canonical SatiDemo reset baseline with timeline
+      anchor 2026-09-14, and verify a complete reset inside a rolled-back outer transaction.
+- [x] Verify the temporary exact-IP Azure SQL firewall rule is closed. Only the permanent Demo API
+      outbound rules and refresh-function outbound rules remain.
+- [x] Complete the coordinated 1.3.9 Release build and all five automated test projects. The final
+      build has zero errors; 2,914 standard tests pass. The default run skips one external local-AI
+      model check and seven opt-in SQL Server cases; all seven SQL Server cases pass separately
+      against disposable LocalDB databases. The release gate also fixed a billing-period insertion/
+      submission race, Local service-time create/move races, a sliding WebSocket revalidation delay,
+      and a noisy authentication-timing measurement.
+- [ ] Complete API and installer package security checks and focused installed-app acceptance.
+- [ ] Commit and push the verified 1.3.9 source to GitHub `master` without rewriting history.
+- [ ] Publish and verify the existing Demo API at release 1.3.9 with the matching contract revision.
+- [ ] Build, isolated-acceptance-test, and publish new 1.3.9 Local and Demo installers and checksum
+      files without overwriting an existing artifact.
+- [ ] Record deployment identifiers, package paths, sizes, SHA-256 hashes, test totals, distribution
+      verification, and known Local Production machine release status; then push final evidence.
+
+## Unreleased — 2026-09-14 controlled migration application
+
+- [x] Add a guarded, transactional, rerunnable runner for the Representative Payee workflow,
+      weekly check-request automation, and case-note goal-progress migrations. It refuses a wrong
+      database/environment marker and verifies the new tables, columns, indexes, and foreign keys.
+- [x] Rehearse all three changes with rollback on identity-checked Local `SatiProduction` and Azure
+      `SatiDemo`, then apply and rerun idempotently. Both databases moved from 102 to 105 migration
+      history rows; the second pass made zero schema, permission, or history changes.
+- [x] Back up Local Production before application to
+      `SatiProduction-2026-09-14-063854.bak` and verify it with SQL Server checksum restore
+      verification. Azure retains its configured point-in-time recovery.
+- [x] Verify the deployed Demo API remains live and ready after the additive schema change. The
+      currently deployed API remains release 1.3.8/contract `5B9D8ED7F252`; publishing the new
+      compatible API and desktop builds is still a separate release step.
+- [x] After separate explicit authorization, recapture the canonical SatiDemo reset baseline with
+      timeline anchor 2026-09-14. All 56 live resettable tables match 56 baseline tables with zero
+      missing/extra tables and zero row-count differences; the three new workflow tables are
+      present as empty canonical tables.
+- [x] Recreate and verify the reset procedure and managed-identity permissions, then exercise the
+      complete 56-table reset inside an outer transaction. It produced zero row-count differences,
+      left every foreign key/check constraint trusted and enabled, retained 177 People and all 105
+      migration rows, rotated identity/reset state inside the rehearsal, and restored the exact
+      pre-rehearsal live state when the outer transaction rolled back.
+- [x] Verify the temporary exact-IP Azure SQL firewall rule is closed after the authorized database
+      work. The remaining rules are the permanent Demo API outbound rules and refresh-function
+      outbound rules; the migration runner did not alter firewall settings.
+
+## Unreleased — live form draft previews
+
+- [x] Keep a document-shaped live preview beside every currently editable form workspace: AT
+      Request, Check Request, Agency Release, DHHS forms, Safety Plan, Privacy Practices, CWIC
+      packet, and Housing Support Funds application.
+- [x] Send bound text into the in-memory draft while the user types. Numeric AT Request and weekly
+      check-default fields use a short typing delay, so valid values reach the draft without making
+      the user leave the field and incomplete numeric text does not replace the last valid value.
+- [x] Keep disabled OADS authoring out of this scope. PCP and Comprehensive Assessment remain
+      Evergreen attestations, and Classification remains unavailable unless their separately gated
+      Sati authoring features are enabled in the future.
+- [x] Keep preview changes non-destructive: they update only the open draft. Published documents,
+      generated artifacts, and immutable template versions are not rewritten.
+- [x] Expand the UI contract and WPF render tests across all eight editable workspaces; the focused
+      preview suite passes 5/5.
+
+## Unreleased — required case-note goal progress
+
+- [x] Add a case-note Goal Progress combobox with the required state choices: None, Minimal,
+      Moderate, and Substantial. Blank remains distinct from None so the UI cannot silently answer
+      the question for the case manager.
+- [x] Require a deliberate choice when a note enters Logged/submitted-for-review status in both the
+      local service and API. Pending drafts may remain incomplete, and future Scheduled work and
+      Reminders clear the field because no service outcome exists yet.
+- [x] Preserve the choice through local/cloud save, read, edit, concurrency comparison, supervisor
+      review, and historical display. Existing historical notes remain readable without invented data.
+- [x] Keep goal progress as an independent historical observation. A future PCP-goal reference can
+      be added alongside it when PCP authoring goes live without changing these recorded choices.
+- [x] Add compatibility shape `case-note-goal-progress-v1`, migration
+      `20260914030703_AddGoalProgressToCaseNotes`, and focused local/API/UI tests.
+- [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
+      idempotency evidence through the controlled 2026-09-14 runner.
+- [ ] Deploy compatible API/desktop builds through the normal approved release process.
+
+## Unreleased — weekly check-request drafts and reminders
+
+- [x] Add one revisioned weekly default per Representative Payee consumer. The assigned case
+      manager chooses the weekday, needed-by offset, payee, mailing address, amount, and reason;
+      changes affect future drafts only.
+- [x] Generate at most one draft for each scheduled occurrence, preserve template and schedule
+      provenance, and keep every generated request as an ordinary frozen draft requiring review,
+      PDF preparation, submission, supervisor approval, and Finance release.
+- [x] Prompt the case manager at sign-in, after an open workstation crosses into a new day, and
+      again during shutdown until the generated request has been submitted. Defer changes no data.
+- [x] Add a per-user, per-environment personal opt-out in Settings. Turning it off stops generation
+      and reminders on that computer without deleting defaults or existing drafts.
+- [x] Treat a newly scheduled calendar exemption as time off: when its weekday matches an enabled
+      consumer default, prompt the case manager immediately with Prepare now or Later. Prepare now
+      creates or opens the matching draft early without submitting it.
+- [x] Check tomorrow's scheduled time off at sign-in and calendar-day rollover and prompt again for
+      any matching request that has not been submitted. Removing time off does not create a prompt.
+- [x] Add local/cloud services, tenant-scoped API routes, compatibility shape, narrative-free audit
+      events, migration `20260914023645_AddWeeklyCheckRequestAutomation`, and focused schedule,
+      persistence, API, authorization, preference, and UI-contract tests. Current focused runs:
+      desktop/domain/UI 26/26 and API/route surface 12/12; the broader related regression sets also
+      passed 52/52 desktop and 77/77 API before the time-off extension.
+- [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
+      idempotency evidence through the controlled 2026-09-14 runner.
+- [ ] Deploy compatible API/desktop builds through the normal approved release process.
+
+## Unreleased — Finance and Representative Payee workflow
+
+- [x] Add an independently assignable Representative Payee permission. The legacy Finance role
+      maps to Billing plus Representative Payee, while administrators can grant either capability
+      separately without granting case-management access.
+- [x] Add a Finance Representative Payee workspace with an agency-scoped consumer ledger, signed
+      manual deposits/expenses, current balance, approved-check queue, check-release control, and
+      receipt acknowledgement.
+- [x] Add a server-authoritative workflow over each frozen check request: the assigned case manager
+      submits, the assigned/agency-wide supervisor approves or returns it, and Finance records
+      release and receipt. Each checkpoint is an append-only, actor- and UTC-stamped event; return
+      requires a reason, and duplicate/concurrent checkpoint writes are refused.
+- [x] Post each released check to the consumer ledger atomically with the release event. Ledger rows
+      are append-only, one release can post only once, and ordinary consumer deletion is refused
+      when financial ledger history exists.
+- [x] Remove consumer identity from Finance-only Billing grids and replace the Billing candidate
+      network contract with minimum-necessary service facts that cannot serialize note narrative,
+      visit documentation, exception text, or consumer names.
+- [x] Add supervisor Check Request review UI, case-manager submission UI, user-management controls,
+      local/cloud services, API authorization, audit actions, compatibility inventory, and migration
+      `20260914015314_AddRepresentativePayeeWorkflow`.
+- [x] Focused validation passed: API surface/privacy/workflow tests 11/11 and relevant desktop,
+      domain, annual-document, permission, and UI tests 55/55. Five separate DPAPI tests require a
+      normal signed-in Windows profile and cannot run inside the restricted test sandbox.
+- [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
+      idempotency evidence through the controlled 2026-09-14 runner.
+- [ ] Deploy compatible API/desktop builds through the normal approved release process.
+
+## Unreleased — clearer annual-document workflow
+
+- [x] Replace the unexplained “Load cycle” wording in Safety Plan and Annual Documents with
+      “Open selected period,” explain that the period is the consumer's service year beginning on
+      the effective-date anniversary, and state that opening it does not change historical records.
+- [x] Give the date selectors and open-period controls specific accessible names and retain the
+      existing read-only reload behavior behind the clearer wording.
+- [x] Present separate workflow rows for DHHS release, Medical Provider Release, Agency Release,
+      Safety Plan, Privacy Practices, and the once-only DHHS Authorized Representative form, with
+      plain-language preparation status and the next workspace/action for each.
+- [x] Give the Authorized Representative form its own artifact kind instead of conflating it with
+      the annual DHHS release. A generated draft does not count as on file; the assigned case manager
+      can record a verified signed physical copy with a required protected note and audit event.
+      Once recorded, the form carries across annual periods and is no longer shown as annual work.
+- [x] Rename the e-signature action to “Submit to consumer or guardian for review” and present signer
+      request status as Pending, Denied, Signed, or the narrower terminal state when applicable.
+- [x] Focused validation passed: 32 desktop/domain/UI tests and 8 API authorization/artifact tests,
+      including cross-caseload refusal, duplicate once-only refusal, status carry-forward, accessible
+      controls, and distinct DHHS document identities.
+
 ## Unreleased — Housing Support Funds application
 
 - [x] Embed the exact fillable three-page Maine DHHS OADS application dated June 30, 2025,
@@ -5641,11 +5808,11 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
 - [ ] Before real operational use, have the agency confirm that the preserved “Signature” labels
       and routing meet its finance procedure. Sati identifies the staff and records the publisher;
       this feature does not claim electronic-signature or supervisor-approval status.
-- [ ] Add the server-authoritative workflow over a frozen request: submit to the assigned
+- [x] Add the server-authoritative workflow over a frozen request: submit to the assigned
       supervisor, approve or return with a reason, deliver to an authorized Finance destination,
-      and record completion or cancellation. Each transition needs role/tenant authorization,
-      revision checks, timestamps, actors, append-only events, idempotency, and notification-failure
-      handling; publication itself must never be treated as approval or proof of delivery.
+      and record check release and receipt acknowledgement. Each checkpoint has role/tenant
+      authorization, timestamps, actors, append-only events, and database uniqueness; publication
+      itself is still only PDF preparation and never approval or proof of delivery.
 
 ## Consumer profile photos — implemented 2026-09-12
 

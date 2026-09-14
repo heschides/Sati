@@ -339,6 +339,9 @@ public sealed class AdminService(
                     cancellationToken));
         if (ConsumerDeletionRules.HasTransmittedBilling(billingFacts))
             throw new InvalidOperationException(ConsumerDeletionRules.TransmittedBillingMessage);
+        if (await context.RepresentativePayeeLedgerEntries.AsNoTracking()
+                .AnyAsync(entry => entry.PersonId == personId, cancellationToken))
+            throw new InvalidOperationException(ConsumerDeletionRules.RepresentativePayeeLedgerMessage);
 
         // Itemized tombstone, captured before any delete. Ids, dates, and types only — never
         // narrative, name, MaineCareId, birth date, or address. This is the one remaining
@@ -445,8 +448,14 @@ public sealed class AdminService(
         var atRequestsDeleted = await context.ATRequests
             .Where(request => request.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
+        await context.RepresentativePayeeLedgerEntries
+            .Where(entry => entry.PersonId == personId)
+            .ExecuteDeleteAsync(cancellationToken);
         var checkRequestsDeleted = await context.CheckRequests
             .Where(request => request.PersonId == personId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await context.CheckRequestTemplates
+            .Where(template => template.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
         var assessmentsDeleted = await context.ComprehensiveAssessments
             .Where(assessment => assessment.PersonId == personId)
@@ -688,8 +697,14 @@ public sealed class AdminService(
         var atRequestsDeleted = await context.ATRequests
             .Where(request => request.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
+        await context.RepresentativePayeeLedgerEntries
+            .Where(entry => entry.PersonId == personId)
+            .ExecuteDeleteAsync(cancellationToken);
         var checkRequestsDeleted = await context.CheckRequests
             .Where(request => request.PersonId == personId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await context.CheckRequestTemplates
+            .Where(template => template.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
         var assessmentsDeleted = await context.ComprehensiveAssessments
             .Where(assessment => assessment.PersonId == personId)

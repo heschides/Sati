@@ -25,12 +25,15 @@ namespace Sati.ViewModels
         private readonly DatabaseActivityPreview _databaseActivityPreview;
         private readonly TextShortcutService _textShortcutService;
         private readonly DailyAgendaPreferenceService _dailyAgendaPreferences;
+        private readonly CheckRequestAutomationPreferenceService _checkRequestAutomationPreferences;
         private readonly EasyEyesPreferenceService _easyEyesPreferences;
         private readonly IdleLockPreferenceService _idlePreferences;
         private readonly ConsumerPickerSortPreferenceService _consumerPickerSortPreferences;
         private Settings? _settings;
         private bool _loadingDailyAgendaPreference;
         private bool _savedShowDailyAgendaAtSignIn = true;
+        private bool _loadingCheckRequestAutomationPreference;
+        private bool _savedEnableWeeklyCheckRequestAutomation = true;
         private bool _loadingEasyEyesPreference;
         private bool _savedEasyEyesMode;
         private bool _loadingIdlePreference;
@@ -47,6 +50,7 @@ namespace Sati.ViewModels
             DatabaseActivityPreview databaseActivityPreview,
             TextShortcutService textShortcutService,
             DailyAgendaPreferenceService dailyAgendaPreferences,
+            CheckRequestAutomationPreferenceService checkRequestAutomationPreferences,
             EasyEyesPreferenceService easyEyesPreferences,
             IdleLockPreferenceService idlePreferences,
             ConsumerPickerSortPreferenceService consumerPickerSortPreferences,
@@ -66,6 +70,7 @@ namespace Sati.ViewModels
             _databaseActivityPreview = databaseActivityPreview;
             _textShortcutService = textShortcutService;
             _dailyAgendaPreferences = dailyAgendaPreferences;
+            _checkRequestAutomationPreferences = checkRequestAutomationPreferences;
             _easyEyesPreferences = easyEyesPreferences;
             _idlePreferences = idlePreferences;
             _consumerPickerSortPreferences = consumerPickerSortPreferences;
@@ -76,6 +81,7 @@ namespace Sati.ViewModels
                     .Select(digit => new TextShortcutEditorViewModel(digit)));
             _ = LoadTextShortcutsAsync();
             _ = LoadDailyAgendaPreferenceAsync();
+            _ = LoadCheckRequestAutomationPreferenceAsync();
             _ = LoadEasyEyesPreferenceAsync();
             _ = LoadIdlePreferenceAsync();
             _ = LoadConsumerPickerSortPreferenceAsync();
@@ -122,6 +128,12 @@ namespace Sati.ViewModels
 
         [ObservableProperty]
         private string dailyAgendaPreferenceStatus = string.Empty;
+
+        [ObservableProperty]
+        private bool enableWeeklyCheckRequestAutomation = true;
+
+        [ObservableProperty]
+        private string checkRequestAutomationPreferenceStatus = string.Empty;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(EasyEyesScale))]
@@ -199,6 +211,12 @@ namespace Sati.ViewModels
         {
             if (!_loadingDailyAgendaPreference)
                 _ = SaveDailyAgendaPreferenceAsync(value);
+        }
+
+        partial void OnEnableWeeklyCheckRequestAutomationChanged(bool value)
+        {
+            if (!_loadingCheckRequestAutomationPreference)
+                _ = SaveCheckRequestAutomationPreferenceAsync(value);
         }
 
         partial void OnEasyEyesModeChanged(bool value)
@@ -450,6 +468,67 @@ namespace Sati.ViewModels
                 }
 
                 DailyAgendaPreferenceStatus = $"Preference was not changed. {exception.Message}";
+            }
+        }
+
+        private async Task LoadCheckRequestAutomationPreferenceAsync()
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            if (userId is null)
+            {
+                CheckRequestAutomationPreferenceStatus =
+                    "Sign in to change the weekly check-request reminder preference.";
+                return;
+            }
+
+            var enabled = await _checkRequestAutomationPreferences.LoadForUserAsync(userId.Value);
+            _loadingCheckRequestAutomationPreference = true;
+            try
+            {
+                EnableWeeklyCheckRequestAutomation = enabled;
+                _savedEnableWeeklyCheckRequestAutomation = enabled;
+            }
+            finally
+            {
+                _loadingCheckRequestAutomationPreference = false;
+            }
+
+            CheckRequestAutomationPreferenceStatus =
+                _checkRequestAutomationPreferences.LastLoadWarning ??
+                "This personal setting is saved immediately for this Sati account on this computer.";
+        }
+
+        private async Task SaveCheckRequestAutomationPreferenceAsync(bool value)
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            if (userId is null)
+            {
+                CheckRequestAutomationPreferenceStatus =
+                    "Sign in before changing the weekly check-request reminder preference.";
+                return;
+            }
+
+            CheckRequestAutomationPreferenceStatus = "Saving weekly check-request preference...";
+            try
+            {
+                await _checkRequestAutomationPreferences.SetEnabledAsync(userId.Value, value);
+                _savedEnableWeeklyCheckRequestAutomation = value;
+                CheckRequestAutomationPreferenceStatus = "Weekly check-request preference saved.";
+            }
+            catch (CheckRequestAutomationPreferenceSaveException exception)
+            {
+                _loadingCheckRequestAutomationPreference = true;
+                try
+                {
+                    EnableWeeklyCheckRequestAutomation = _savedEnableWeeklyCheckRequestAutomation;
+                }
+                finally
+                {
+                    _loadingCheckRequestAutomationPreference = false;
+                }
+
+                CheckRequestAutomationPreferenceStatus =
+                    $"Preference was not changed. {exception.Message}";
             }
         }
 

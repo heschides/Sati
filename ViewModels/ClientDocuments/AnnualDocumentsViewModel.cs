@@ -24,12 +24,21 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
     [ObservableProperty] private string reminder = "";
     [ObservableProperty] private string windowDescription = "";
     [ObservableProperty] private string templateBody = "";
+    [ObservableProperty] private string authorizedRepresentativeOnFileNote = "";
     [ObservableProperty] private bool isBusy;
     [ObservableProperty] private int verificationArtifactId;
     public ObservableCollection<DocumentArtifactDto> Artifacts { get; } = [];
+    public ObservableCollection<AnnualDocumentWorkflowItem> DocumentWorkflow { get; } = [];
     public bool CanSavePacket => !IsBusy && status?.Window.IsOpen == true && person?.UserId == session.CurrentUser?.Id;
     public bool CanRecordReceipt => !IsBusy && status?.Artifacts.Any(x => x.Kind == "PrivacyPractices" && x.Origin == "GeneratedInSati") == true;
     public bool CanManageTemplates => session.CurrentUser?.HasAdminPermissions == true;
+    public bool NeedsAuthorizedRepresentative => status is not null && !status.AuthorizedRepresentativeOnFile;
+    public bool CanRecordAuthorizedRepresentativeOnFile => NeedsAuthorizedRepresentative && !IsBusy &&
+        person?.UserId == session.CurrentUser?.Id &&
+        AnnualDocumentRules.ValidateExternalNote(AuthorizedRepresentativeOnFileNote) is null;
+    public string AuthorizedRepresentativeRecordedMessage => status?.AuthorizedRepresentativeOnFile == true
+        ? "A signed DHHS Authorized Representative form is already recorded on file. This once-only document is not repeated in each annual period."
+        : "";
     public string ReceiptStatus => status?.Artifacts.FirstOrDefault(x => x.Kind == "PrivacyPractices") is { } notice &&
         status.AcknowledgedArtifactIds.Contains(notice.Id) ? "Receipt or good-faith effort is recorded for the current notice." : "Receipt or good-faith effort has not been recorded for the current notice.";
     public DocumentTemplateRenderContext TemplatePreviewContext
@@ -78,8 +87,9 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         requests.Invalidate(); status = null; Artifacts.Clear(); IsBusy = false;
         Signatures?.SetContext(person?.Id ?? 0, []);
         ReceivedOn = null; GoodFaithEffortReason = ""; VerificationArtifactId = 0;
-        Reminder = ""; WindowDescription = ""; Message = "Load the selected annual cycle.";
-        OnPropertyChanged(nameof(TemplatePreviewContext)); NotifyState();
+        AuthorizedRepresentativeOnFileNote = "";
+        Reminder = ""; WindowDescription = ""; Message = "Open the selected annual period to view its documents and signature activity.";
+        RebuildDocumentWorkflow(); OnPropertyChanged(nameof(TemplatePreviewContext)); NotifyState();
     }
     partial void OnTemplateBodyChanged(string value)
     {
@@ -87,19 +97,25 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         OnPropertyChanged(nameof(CanPublishTemplate));
         PublishTemplateCommand.NotifyCanExecuteChanged();
     }
+    partial void OnAuthorizedRepresentativeOnFileNoteChanged(string value) => NotifyState();
     private void NotifyState()
     {
         OnPropertyChanged(nameof(CanSavePacket)); OnPropertyChanged(nameof(CanRecordReceipt));
         OnPropertyChanged(nameof(CanManageTemplates)); OnPropertyChanged(nameof(ReceiptStatus));
+        OnPropertyChanged(nameof(NeedsAuthorizedRepresentative));
+        OnPropertyChanged(nameof(CanRecordAuthorizedRepresentativeOnFile));
+        OnPropertyChanged(nameof(AuthorizedRepresentativeRecordedMessage));
+        RecordAuthorizedRepresentativeOnFileCommand.NotifyCanExecuteChanged();
     }
     public void SetPerson(Person? selected)
     {
         requests.Invalidate(); person = selected; status = null; Artifacts.Clear();
         Signatures?.SetContext(selected?.Id ?? 0, []);
         IsBusy = false; ReceivedOn = null; GoodFaithEffortReason = ""; VerificationArtifactId = 0;
+        AuthorizedRepresentativeOnFileNote = "";
         Message = ""; Reminder = ""; WindowDescription = "";
         CycleStart = selected?.EffectiveDate is DateTime effective ? AnnualPacketWindow.SuggestedCycle(effective, DateTime.Today, 30) : null;
-        OnPropertyChanged(nameof(TemplatePreviewContext)); NotifyState(); _ = InitializeAsync();
+        RebuildDocumentWorkflow(); OnPropertyChanged(nameof(TemplatePreviewContext)); NotifyState(); _ = InitializeAsync();
     }
     private async Task InitializeAsync()
     {
@@ -127,7 +143,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         status = value; Artifacts.Clear(); foreach (var artifact in value.Artifacts) Artifacts.Add(artifact);
         Signatures?.SetContext(person?.Id ?? 0, value.Artifacts);
         WindowDescription = value.Window.IsOpen ? $"Packet available through {value.Window.EndsOn:d}." : $"Packet opens {value.Window.OpensOn:d}.";
-        Reminder = value.Reminder; NotifyState();
+        Reminder = value.Reminder; RebuildDocumentWorkflow(); NotifyState();
     }
     private async Task Run(Func<int, DateTime, Task<string?>> operation)
     {
@@ -161,6 +177,15 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         var request = new AcknowledgeDocumentRequest(notice.Id, ReceivedOn, GoodFaithEffortReason);
         return Run(async (id, _) => { await service.AcknowledgeAsync(id, request); return "Privacy notice receipt recorded."; });
     }
+    [RelayCommand(CanExecute = nameof(CanRecordAuthorizedRepresentativeOnFile))]
+    private Task RecordAuthorizedRepresentativeOnFileAsync() =>
+        Run(async (id, cycle) =>
+        {
+            await service.RecordAuthorizedRepresentativeOnFileAsync(
+                id, cycle, AuthorizedRepresentativeOnFileNote.Trim());
+            AuthorizedRepresentativeOnFileNote = "";
+            return "The signed DHHS Authorized Representative form is recorded as already on file.";
+        });
     [RelayCommand] private async Task VerifyAsync()
     {
         if (ChooseVerificationFileAsync is null || VerificationArtifactId <= 0) { Message = "Enter the artifact ID from the manifest or list."; return; }
@@ -195,4 +220,54 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         var result = string.Join(Environment.NewLine, lines);
         return result.Length == 0 ? null : result;
     }
+
+    private void RebuildDocumentWorkflow()
+    {
+        DocumentWorkflow.Clear();
+        foreach (var definition in AnnualWorkflowDefinitions)
+        {
+            var artifact = status?.Artifacts
+                .Where(item => item.Kind == definition.Kind.ToString())
+                .OrderByDescending(item => item.GeneratedAtUtc)
+                .FirstOrDefault();
+            var preparationStatus = status is null ? "Open an annual period" : DescribeArtifact(artifact);
+            if (definition.Kind == AnnualDocumentKind.PrivacyPractices && artifact is not null &&
+                status!.AcknowledgedArtifactIds.Contains(artifact.Id))
+                preparationStatus = "Receipt recorded";
+            DocumentWorkflow.Add(new(definition.DisplayName, preparationStatus, definition.Instructions));
+        }
+
+        if (NeedsAuthorizedRepresentative)
+        {
+            var artifact = status!.Artifacts
+                .Where(item => item.Kind == AnnualDocumentKind.DhhsAuthorizedRepresentative.ToString())
+                .OrderByDescending(item => item.GeneratedAtUtc)
+                .FirstOrDefault();
+            DocumentWorkflow.Add(new(
+                "DHHS Authorized Representative",
+                DescribeArtifact(artifact),
+                "This appointment is required only once. Prepare it in Authorized Rep; after a signed physical copy is retained through the agency's approved process, record that fact below."));
+        }
+    }
+
+    private static string DescribeArtifact(DocumentArtifactDto? artifact) => artifact?.Origin switch
+    {
+        nameof(DocumentArtifactOrigin.Draft) => "Draft",
+        nameof(DocumentArtifactOrigin.GeneratedInSati) => artifact.BlankFields.Count == 0
+            ? "Ready for review"
+            : "Needs completion",
+        nameof(DocumentArtifactOrigin.RecordedAsExternal) => "Recorded on file",
+        _ => "Not started"
+    };
+
+    private static readonly (AnnualDocumentKind Kind, string DisplayName, string Instructions)[] AnnualWorkflowDefinitions =
+    [
+        (AnnualDocumentKind.ReleaseDhhs, "DHHS release", "Prepare the authorization in Releases, then submit the completed saved PDF for review and signature."),
+        (AnnualDocumentKind.ReleaseMedical, "Medical Provider Release", "Prepare the medical release in Releases, then submit the completed saved PDF for review and signature."),
+        (AnnualDocumentKind.ReleaseAgency, "Agency Release", "Prepare the agency release in Releases, then submit the completed saved PDF for review and signature."),
+        (AnnualDocumentKind.SafetyPlan, "Safety Plan", "Complete the plan in Safety Plan and obtain supervisor approval before requesting the consumer or guardian's review."),
+        (AnnualDocumentKind.PrivacyPractices, "Privacy Practices", "Generate the current notice here, then record receipt or a good-faith delivery effort. Electronic acknowledgment remains a separate signer action.")
+    ];
 }
+
+public sealed record AnnualDocumentWorkflowItem(string DisplayName, string Status, string Instructions);

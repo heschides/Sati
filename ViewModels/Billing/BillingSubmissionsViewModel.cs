@@ -160,7 +160,12 @@ namespace Sati.ViewModels.Billing
             if (value is not null)
             {
                 foreach (var line in value.Lines.OrderBy(line => line.DateOfService).ThenBy(line => line.Id))
+                {
+                    line.ClientDisplayName = _sessionService.CurrentUser?.HasCaseManagerPermissions == true
+                        ? line.ClientName
+                        : $"Consumer record {line.Id}";
                     SelectedPeriodLines.Add(line);
+                }
             }
             OnPropertyChanged(nameof(HasSelectedPeriod));
             OnPropertyChanged(nameof(HasSelectedPeriodLines));

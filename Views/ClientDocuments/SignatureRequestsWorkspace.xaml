@@ -6,7 +6,7 @@
  Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}">
  <UserControl.Resources><converters:SignatureLabelConverter x:Key="SignatureLabel"/></UserControl.Resources>
  <StackPanel>
-  <TextBlock Text="Electronic signing — fictional-data testing" FontSize="18" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"/>
+  <TextBlock Text="Electronic review and signature — fictional-data testing" FontSize="18" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"/>
   <TextBlock Text="{Binding ConsumerContext}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
   <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Margin="0,8"/>
   <TextBlock Text="Paper, in-person and assisted options remain available without disadvantage. Each request is for one named signer." TextWrapping="Wrap"/>
@@ -21,7 +21,7 @@
     </StackPanel></DataTemplate></ItemsControl.ItemTemplate>
    </ItemsControl>
   </Expander>
-  <GroupBox Header="Prepare one signing request" Margin="0,12" IsEnabled="{Binding IsEnabled}">
+  <GroupBox Header="Prepare one review request" Margin="0,12" IsEnabled="{Binding IsEnabled}">
    <StackPanel Margin="12">
     <TextBlock Text="Current document record"/>
     <ComboBox ItemsSource="{Binding Artifacts}" SelectedItem="{Binding SelectedArtifact}" AutomationProperties.Name="Document to sign">
@@ -50,7 +50,8 @@
     <TextBlock Text="Provide the code by an independently verified channel. It is cleared after every attempt and is never shown in the request history." TextWrapping="Wrap"/>
     <WrapPanel Margin="0,8"><TextBlock Text="Link expires after hours (24 to 168)" VerticalAlignment="Center"/>
      <TextBox Text="{Binding ExpiryHours, UpdateSourceTrigger=PropertyChanged}" Width="70" Margin="8,0" AutomationProperties.Name="Signature request expiry hours"/>
-     <Button Content="Create signing request" Click="CreateRequest" IsEnabled="{Binding CanCreate}"/>
+     <Button Content="Submit to consumer or guardian for review" Click="CreateRequest" IsEnabled="{Binding CanCreate}"
+             AutomationProperties.Name="Submit selected document for consumer or guardian review"/>
     </WrapPanel>
    </StackPanel>
   </GroupBox>
@@ -62,7 +63,7 @@
     <DataGridTextColumn Header="Document" Binding="{Binding DocumentName}"/>
     <DataGridTextColumn Header="Signer" Binding="{Binding SignerName}"/>
     <DataGridTextColumn Header="Capacity" Binding="{Binding SignerCapacity, Converter={StaticResource SignatureLabel}}"/>
-    <DataGridTextColumn Header="Outcome" Binding="{Binding State, Converter={StaticResource SignatureLabel}}"/>
+    <DataGridTextColumn Header="Status" Binding="{Binding State, Converter={StaticResource SignatureLabel}}"/>
     <DataGridTextColumn Header="Delivery" Binding="{Binding DeliveryState, Converter={StaticResource SignatureLabel}}"/>
     <DataGridTextColumn Header="Signed-copy notice" Binding="{Binding ReceiptDeliveryState, Converter={StaticResource SignatureLabel}}"/>
     <DataGridCheckBoxColumn Header="Code locked" Binding="{Binding IsLocked}"/>

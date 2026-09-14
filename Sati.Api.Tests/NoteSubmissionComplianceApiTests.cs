@@ -150,5 +150,5 @@ public sealed class NoteSubmissionComplianceApiTests(SatiApiFactory factory)
 
     private static SaveNoteRequest Request(int personId, string status, DateTime serviceDate, int revision = 0) =>
         new("Do not lose this clinical draft.", serviceDate, status, 30, null, personId,
-            null, "Contact", null, null, ExpectedRevision: revision);
+            null, "Contact", null, null, ExpectedRevision: revision, GoalProgress: "Moderate");
 }

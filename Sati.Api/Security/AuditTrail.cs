@@ -78,6 +78,14 @@ internal static class AuditActions
     public const string AtRequestPublished = "at-request.published";
     public const string AtRequestReopened = "at-request.reopened";
     public const string CheckRequestPublished = "check-request.published";
+    public const string CheckRequestSubmitted = "check-request.submitted";
+    public const string CheckRequestApproved = "check-request.approved";
+    public const string CheckRequestReturned = "check-request.returned";
+    public const string CheckRequestReleased = "check-request.released";
+    public const string CheckRequestReceiptAcknowledged = "check-request.receipt-acknowledged";
+    public const string CheckRequestTemplateUpdated = "check-request-template.updated";
+    public const string CheckRequestDraftGenerated = "check-request.draft-generated";
+    public const string RepresentativePayeeLedgerEntryAdded = "representative-payee.ledger-entry-added";
     public const string AuditExported = "audit.exported";
     public const string PlatformIncidentsViewed = "platform-incidents.viewed";
     public const string IncidentStatusUpdated = "incident-status.updated";

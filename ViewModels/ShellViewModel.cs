@@ -7,6 +7,7 @@ using Sati.ViewModels.Billing;
 using Sati.ViewModels.Children;
 using Sati.ViewModels.Supervisor;
 using Sati.ViewModels.Admin;
+using Sati.ViewModels.Finance;
 using System.Windows;
 using System.Windows.Media;
 
@@ -25,6 +26,7 @@ namespace Sati.ViewModels
         private readonly ISessionLifetime _sessionLifetime;
         private readonly BillingDashboardViewModel _billingDashboardViewModel;
         private readonly AdminDashboardViewModel _adminDashboardViewModel;
+        private readonly RepresentativePayeeDashboardViewModel _representativePayeeDashboardViewModel;
         private readonly PlatformHealthViewModel _platformHealthViewModel;
         private readonly DataEnvironmentInfo _dataEnvironment;
         private readonly IApiCompatibilityService _apiCompatibility;
@@ -44,6 +46,7 @@ namespace Sati.ViewModels
             ISessionService sessionService,
             BillingDashboardViewModel billingDashboardViewModel,
             AdminDashboardViewModel adminDashboardViewModel,
+            RepresentativePayeeDashboardViewModel representativePayeeDashboardViewModel,
             PlatformHealthViewModel platformHealthViewModel,
             DataEnvironmentInfo dataEnvironment,
             IApiCompatibilityService apiCompatibility,
@@ -62,6 +65,7 @@ namespace Sati.ViewModels
             Chat = chatViewModel;
             _billingDashboardViewModel = billingDashboardViewModel;
             _adminDashboardViewModel = adminDashboardViewModel;
+            _representativePayeeDashboardViewModel = representativePayeeDashboardViewModel;
             _platformHealthViewModel = platformHealthViewModel;
             _dataEnvironment = dataEnvironment;
             _easyEyesPreferences = easyEyesPreferences;
@@ -158,6 +162,8 @@ namespace Sati.ViewModels
             _sessionService.CurrentUser?.HasCaseManagerPermissions == true;
         public bool IsBillingAvailable =>
             _sessionService.CurrentUser?.HasBillingPermissions == true;
+        public bool IsRepresentativePayeeAvailable =>
+            _sessionService.CurrentUser?.HasRepresentativePayeePermissions == true;
         public bool IsAdminAvailable =>
             _sessionService.CurrentUser?.HasAdminPermissions == true;
         public bool IsPlatformHealthAvailable => _sessionService.CurrentUser?.Role is UserRole.PlatformOperator;
@@ -171,6 +177,7 @@ namespace Sati.ViewModels
         public string ScratchpadToggleAutomationName => "Show or hide Work Agenda";
 
         public bool IsBillingActive => CurrentViewModel is BillingDashboardViewModel;
+        public bool IsRepresentativePayeeActive => CurrentViewModel is RepresentativePayeeDashboardViewModel;
         public bool IsAdminActive => CurrentViewModel is AdminDashboardViewModel;
         public bool IsPlatformHealthActive => CurrentViewModel is PlatformHealthViewModel;
 
@@ -220,6 +227,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(IsSupervisorActive));
             OnPropertyChanged(nameof(IsUserManagementActive));
             OnPropertyChanged(nameof(IsBillingActive));
+            OnPropertyChanged(nameof(IsRepresentativePayeeActive));
             OnPropertyChanged(nameof(IsAdminActive));
             OnPropertyChanged(nameof(IsPlatformHealthActive));
             OnPropertyChanged(nameof(IsChatActive));
@@ -257,6 +265,13 @@ namespace Sati.ViewModels
         private void NavigateToBilling()
         {
             if (IsBillingAvailable) CurrentViewModel = _billingDashboardViewModel;
+        }
+        [RelayCommand]
+        private async Task NavigateToRepresentativePayee()
+        {
+            if (!IsRepresentativePayeeAvailable) return;
+            CurrentViewModel = _representativePayeeDashboardViewModel;
+            await _representativePayeeDashboardViewModel.InitializeAsync();
         }
         [RelayCommand]
         private async Task NavigateToAdmin()
@@ -308,6 +323,7 @@ namespace Sati.ViewModels
             NotesViewModel.Reset();
             _supervisorDashboardViewModel.ClearForAccountSwitch();
             _billingDashboardViewModel.ClearForAccountSwitch();
+            _representativePayeeDashboardViewModel.ClearForAccountSwitch();
             _adminDashboardViewModel.ClearForAccountSwitch();
         }
 
@@ -432,6 +448,27 @@ namespace Sati.ViewModels
                 await NotesViewModel.OpenFormAsync(formType);
         }
 
+        public async Task OpenGeneratedCheckRequestDraftAsync(
+            Sati.Contracts.V1.GeneratedCheckRequestDraftDto draft)
+        {
+            if (!IsCaseManagementAvailable)
+                return;
+
+            CurrentViewModel = _caseManagementViewModel;
+            NotesViewModel.NavigateToClientsCommand.Execute(null);
+            var person = NotesViewModel.People.FirstOrDefault(candidate =>
+                candidate.Id == draft.PersonId);
+            if (person is null)
+                return;
+
+            NotesViewModel.NoteEntry.SelectedPerson = person;
+            NotesViewModel.Clients.SelectedPerson = person;
+            NotesViewModel.Clients.ClientWorkspaceTabIndex =
+                NewClientViewModel.CheckRequestsTabIndex;
+            if (NotesViewModel.Clients.CheckRequests is not null)
+                await NotesViewModel.Clients.CheckRequests.OpenRequestAsync(draft.CheckRequestId);
+        }
+
         private async Task OpenScheduledWorkItemAsync(WorkAgendaItem item)
         {
             if (!IsCaseManagementAvailable)
@@ -548,6 +585,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(IsUserManagementAvailable));
             OnPropertyChanged(nameof(IsCaseManagementAvailable));
             OnPropertyChanged(nameof(IsBillingAvailable));
+            OnPropertyChanged(nameof(IsRepresentativePayeeAvailable));
             OnPropertyChanged(nameof(IsAdminAvailable));
             OnPropertyChanged(nameof(IsPlatformHealthAvailable));
             OnPropertyChanged(nameof(IsChatAvailable));
@@ -569,6 +607,7 @@ namespace Sati.ViewModels
                 await _billingDashboardViewModel.InitializeAsync();
                 NavigateToBilling();
             }
+            else if (IsRepresentativePayeeAvailable) await NavigateToRepresentativePayee();
             else if (IsAdminAvailable) await NavigateToAdmin();
         }
 

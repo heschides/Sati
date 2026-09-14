@@ -51,9 +51,15 @@ internal static partial class ApiEndpoints
                         true, sendLimit.Token);
                 }
                 using var wait = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
-                var remaining = deadline - DateTimeOffset.UtcNow;
-                wait.CancelAfter(remaining < TimeSpan.FromSeconds(20) ? remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero
-                    : TimeSpan.FromSeconds(20));
+                var now = DateTimeOffset.UtcNow;
+                var remaining = deadline - now;
+                var untilValidation = nextValidation - now;
+                var waitFor = TimeSpan.FromSeconds(20);
+                if (remaining < waitFor) waitFor = remaining;
+                if (untilValidation < waitFor) waitFor = untilValidation;
+                // A busy room can wake this loop repeatedly. Never let those
+                // notices slide session revalidation farther into the future.
+                wait.CancelAfter(waitFor > TimeSpan.Zero ? waitFor : TimeSpan.Zero);
                 var notice = subscription.Signals.Reader.ReadAsync(wait.Token).AsTask();
                 var completed = await Task.WhenAny(notice, incoming);
                 if (completed == incoming) break;

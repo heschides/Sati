@@ -4032,3 +4032,108 @@ signature routing remains unavailable until the program and agency confirm that 
 **Rejected:** recreating a lookalike form, accepting caller-supplied authoritative profile facts,
 filling staff-only or signature fields, hiding known application conflicts, treating generation as
 submission, and silently replacing the controlled source when OADS publishes a later revision.
+
+## 2026-09-13 — The DHHS Authorized Representative appointment is once-only annual-work context
+
+**Decision:** distinguish Maine DHHS's Appointment of Authorized Representative from the annual
+DHHS Authorization to Release/Obtain Information. They are separate documents with different
+renewal behavior; a generated appointment must never satisfy or replace the annual DHHS release.
+The appointment receives its own `DhhsAuthorizedRepresentative` artifact kind.
+
+Generation records only preparation state. It does not prove that the appointment was signed or is
+retained. The assigned case manager may record a verified signed physical copy already held through
+the agency's approved process. That record is a protected external artifact with a required note,
+server-derived actor/time and audit event; PDF bytes are not copied into the clinical database. A
+live on-file assertion carries across annual periods, suppresses the appointment from recurring
+annual work, and cannot be recorded twice.
+
+The Annual Documents screen presents fixed document-type rows and a separate signer-request grid.
+Pending, Denied and Signed are staff-facing labels over the more exact immutable request states;
+they do not change signature evidence, document preparation, supervisor approval, or form
+attestation. Electronic signing for the state-owned appointment remains unavailable until the
+agency/program confirms the accepted method.
+
+**Rejected:** using the annual DHHS release artifact as a proxy for the appointment, treating a
+generated unsigned PDF as “on file,” inferring the document from an authorized-representative
+contact, repeating the appointment every year, or storing an unverified checkbox without an actor,
+timestamp, note and audit event.
+
+## 2026-09-13 — Check-request workflow and Representative Payee ledger are append-only records
+
+**Decision:** keep the published Check Request immutable and layer operational routing over it as
+append-only events. PDF preparation does not approve a payment. The assigned case manager submits,
+the assigned or agency-wide supervisor approves or returns, and a user with Representative Payee
+permission records check release and receipt acknowledgement. Each request has one database-enforced
+event per workflow checkpoint, with authenticated actor and UTC time. A returned frozen request is
+not edited or resubmitted; the case manager creates a corrected request.
+
+Check release and its negative consumer-ledger row are one serializable transaction. The ledger is
+signed: positive amounts are money received and negative amounts are money spent. Manual entries
+require a date and description, are actor/time stamped, and cannot be edited or deleted through the
+application. A unique check-request link prevents double posting. Existing ledger history blocks
+ordinary consumer deletion.
+
+Representative Payee is an independent permission. The legacy Finance label maps to Billing plus
+Representative Payee without granting case-management access. Finance-only Billing grids omit
+consumer names, and the Billing candidate contract is intentionally too narrow to carry clinical
+narrative, visit documentation, override explanations, or consumer names.
+
+**Rejected:** mutating the published request to store routing state, treating PDF publication as
+approval, letting Finance skip supervisor approval, letting a client name the acting user or time,
+using unsigned ledger amounts, editing financial history in place, posting release outside the
+workflow transaction, or hiding PHI only visually while still returning clinical note content in
+the Billing candidate payload.
+
+## 2026-09-13 — Weekly check-request automation creates review drafts, never payments
+
+**Decision:** store one current, revisioned weekly default per Representative Payee consumer and
+copy its fields into an ordinary Check Request when the configured occurrence becomes due. The
+template's effective date and a unique template/date key prevent historical backfill and duplicate
+generation. A pending generated request suppresses later automatic drafts for that template until
+the case manager submits it, preventing an unattended backlog of speculative payments.
+
+The desktop ensures due drafts and prompts at sign-in, day rollover, and shutdown. Review opens the
+normal editor; Defer changes no record and the request remains promptable. The per-user setting is
+local presentation state, isolated by environment and account. Disabling it stops generation and
+reminders on that computer but preserves agency defaults and existing financial records.
+
+Generated means draft only. The case manager must review the copied values, prepare the immutable
+PDF, and submit it; supervisor approval, Finance release, ledger posting, and receipt acknowledgement
+remain the existing separate actor- and time-stamped workflow. **Rejected:** auto-submission,
+auto-approval, auto-release, mutating earlier requests when a default changes, generating multiple
+unsubmitted weeks for one consumer, and treating Defer or a reminder display as financial action.
+
+Scheduled time off reuses the existing per-user `ExemptDate` calendar rather than inventing leave
+records. Adding an exemption prompts immediately only when its weekday collides with an enabled
+weekly default; sign-in and date rollover repeat the check one day before the leave. Prepare now is
+the explicit authorization to create or open that future draft, and Later has no write side effect.
+The actual early preparation date and the intended scheduled occurrence are stored separately.
+Removing time off never generates a request. **Rejected:** inferring time off from Outlook text,
+creating future requests merely because a date was marked exempt, and moving submission, approval,
+or release ahead without their required actors.
+
+## 2026-09-13 — Goal progress is required at case-note submission, not draft creation
+
+**Decision:** a case manager must explicitly select None, Minimal, Moderate, or Substantial before a
+case note enters Logged status. Null remains a separate “not answered” state so a default cannot
+silently create the state-required answer. Pending drafts may remain null; future Scheduled work and
+Reminders store null because progress cannot be assessed before service occurs. Existing historical
+notes are not backfilled with a guess.
+
+The recorded level stands on its own. A later PCP feature may add an optional goal reference beside
+it, but enabling PCP authoring will not reinterpret or rewrite prior progress observations.
+**Rejected:** defaulting every note to None, blocking incomplete drafts, attaching the field to a
+nonexistent goal table now, and inventing values for historical notes.
+
+## 2026-09-13 — A live form preview observes a draft; it does not become the record
+
+**Decision:** every form that can currently be edited in Sati shows a document-shaped preview bound
+to the open draft. Text updates while the user types; numeric bindings use a short delay so valid
+changes appear without a focus change while incomplete numeric text leaves the last valid value in
+place. Final generation or publication remains an explicit, separately validated action.
+
+Published requests, prior artifacts, and prior template versions remain immutable. PCP,
+Comprehensive Assessment, and Classification are excluded while their Sati authoring gates are off;
+adding a cosmetic preview must not accidentally make those workflows live. **Rejected:** updating
+the preview only on focus loss, treating the preview as submission, rewriting old documents when a
+template changes, or exposing a disabled OADS authoring workspace merely to satisfy a UI inventory.

@@ -88,6 +88,45 @@ public sealed class DocumentArtifactApiTests(SatiApiFactory factory)
     }
 
     [Fact]
+    public async Task AuthorizedRepresentativeIsDistinctAndAnExternalSignedCopyIsRecordedOnlyOnce()
+    {
+        const int personId = 101;
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        using var outsider = await factory.CreateAuthenticatedClientAsync("case-manager-two");
+        await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.DhhsAuthorizedRepresentative);
+        try
+        {
+            var person = (await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload"))!
+                .Single(candidate => candidate.Id == personId);
+            var cycleStart = AnnualDocumentCycle.CurrentStart(person.EffectiveDate!.Value, DateTime.Today);
+            var route = $"/api/v1/people/{personId}/documents/{AnnualDocumentKind.DhhsAuthorizedRepresentative}/external";
+
+            (await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms.pdf",
+                new DhhsFormRequest(
+                    nameof(DhhsFormDefinition.FormKey.AuthorizedRepresentative),
+                    new Dictionary<string, bool> { ["Sign and submit app"] = true })))
+                .EnsureSuccessStatusCode();
+            var prepared = await owner.GetFromJsonAsync<List<DocumentArtifactDto>>(
+                $"/api/v1/people/{personId}/documents?cycleStart={cycleStart:yyyy-MM-dd}");
+            Assert.Equal(DocumentArtifactOrigin.GeneratedInSati.ToString(),
+                Assert.Single(prepared!, item => item.Kind == AnnualDocumentKind.DhhsAuthorizedRepresentative.ToString()).Origin);
+
+            var request = new RecordExternalDocumentRequest(cycleStart, "Verified signed paper copy in the agency record.");
+            Assert.Equal(HttpStatusCode.NotFound, (await outsider.PostAsJsonAsync(route, request)).StatusCode);
+            (await owner.PostAsJsonAsync(route, request)).EnsureSuccessStatusCode();
+            var status = await owner.GetFromJsonAsync<AnnualDocumentsStatusDto>(
+                $"/api/v1/people/{personId}/annual-documents?cycleStart={cycleStart:yyyy-MM-dd}");
+            Assert.True(status!.AuthorizedRepresentativeOnFile);
+            Assert.Equal(HttpStatusCode.Conflict, (await owner.PostAsJsonAsync(route, request)).StatusCode);
+        }
+        finally
+        {
+            await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.DhhsAuthorizedRepresentative);
+        }
+    }
+
+    [Fact]
     public async Task MedicalDraftDoesNotSatisfyPrerequisiteButFinishedGeneratorOutputDoes()
     {
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");

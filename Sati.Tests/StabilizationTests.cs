@@ -646,9 +646,9 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.8", version);
+        Assert.Equal("1.3.9", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Safer access, living forms, current demonstrations", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Financial workflows, clearer records, timely prompts", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Account access ends when it should" &&

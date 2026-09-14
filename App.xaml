@@ -7,11 +7,13 @@
              xmlns:supervisor="clr-namespace:Sati.ViewModels.Supervisor"
              xmlns:supervisorVms="clr-namespace:Sati.ViewModels.Supervisor"
              xmlns:billingVms="clr-namespace:Sati.ViewModels.Billing"
+             xmlns:financeVms="clr-namespace:Sati.ViewModels.Finance"
              xmlns:clientDocumentVms="clr-namespace:Sati.ViewModels.ClientDocuments"
              xmlns:adminVms="clr-namespace:Sati.ViewModels.Admin"
              xmlns:views="clr-namespace:Sati.Views"
              xmlns:clientDocumentViews="clr-namespace:Sati.Views.ClientDocuments"
-             xmlns:billingViews="clr-namespace:Sati.Views.Billing">
+             xmlns:billingViews="clr-namespace:Sati.Views.Billing"
+             xmlns:financeViews="clr-namespace:Sati.Views.Finance">
     <Application.Resources>
         <ResourceDictionary>
 
@@ -1210,6 +1212,9 @@
             <DataTemplate DataType="{x:Type supervisorVms:PendingApprovalsViewModel}">
                 <views:PendingApprovalsView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type supervisorVms:CheckRequestApprovalsViewModel}">
+                <views:CheckRequestApprovalsView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type supervisorVms:CaseloadDistributionViewModel}">
                 <views:CaseloadDistributionView />
             </DataTemplate>
@@ -1244,6 +1249,9 @@
 
             <DataTemplate DataType="{x:Type billingVms:BillingAlertsViewModel}">
                 <billingViews:BillingAlertsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type financeVms:RepresentativePayeeDashboardViewModel}">
+                <financeViews:RepresentativePayeeDashboardView />
             </DataTemplate>
 
         </ResourceDictionary>

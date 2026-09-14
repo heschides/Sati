@@ -166,6 +166,7 @@ namespace Sati.ViewModels.Children
 
         [ObservableProperty] private Person? selectedPerson;
         [ObservableProperty] private NoteStatus? status;
+        [ObservableProperty] private GoalProgressLevel? goalProgress;
         [ObservableProperty] private NoteType? selectedNoteType;
         [ObservableProperty] private FormType? selectedFormType;
         [ObservableProperty] private string? narrative;
@@ -305,6 +306,8 @@ namespace Sati.ViewModels.Children
             NoteStatus.Cancelled,
             NoteStatus.Delayed
         ];
+        public static IReadOnlyList<GoalProgressLevel> GoalProgressOptions { get; } =
+            Enum.GetValues<GoalProgressLevel>();
         public string SaveActionLabel => IsCalendarReminder
             ? "Add to Calendar"
             : IsReminderNote
@@ -405,6 +408,7 @@ namespace Sati.ViewModels.Children
         // leaves its actual start time empty until the case manager starts it.
         public bool IsStatusEnabled => AreNoteFieldsEnabled && !IsFutureScheduledWork;
         public bool IsServiceTimeEnabled => AreNoteFieldsEnabled && !IsFutureScheduledWork;
+        public bool IsGoalProgressEnabled => AreNoteFieldsEnabled && !IsFutureScheduledWork;
         public bool IsDateEnabled => !IsLocked;
         public string NarrativeLabel => IsReminderNote ? "REMINDER" : "NARRATIVE";
 
@@ -417,6 +421,8 @@ namespace Sati.ViewModels.Children
             // Cancelled and Delayed release the time the draft was holding.
             RedrawServiceDay();
         }
+
+        partial void OnGoalProgressChanged(GoalProgressLevel? value) => MarkDirty();
 
         partial void OnIsEditingChanged(bool value)
         {
@@ -443,6 +449,7 @@ namespace Sati.ViewModels.Children
             OnPropertyChanged(nameof(IsDateEnabled));
             OnPropertyChanged(nameof(IsStatusEnabled));
             OnPropertyChanged(nameof(IsServiceTimeEnabled));
+            OnPropertyChanged(nameof(IsGoalProgressEnabled));
             SubmitNoteCommand.NotifyCanExecuteChanged();
             FormatNarrativeWithAiCommand.NotifyCanExecuteChanged();
             BuildCaseNoteTemplateCommand.NotifyCanExecuteChanged();
@@ -482,6 +489,7 @@ namespace Sati.ViewModels.Children
             OnPropertyChanged(nameof(IsFutureScheduledWork));
             OnPropertyChanged(nameof(IsStatusEnabled));
             OnPropertyChanged(nameof(IsServiceTimeEnabled));
+            OnPropertyChanged(nameof(IsGoalProgressEnabled));
             NotifyReminderModeChanged();
             MarkDirty();
             _ = RefreshServiceDayAsync();
@@ -593,6 +601,7 @@ namespace Sati.ViewModels.Children
             // note being edited belongs to the previous client. Editing client
             // changes return above; this branch is the New Note workflow.
             Status = null;
+            GoalProgress = null;
             Narrative = string.Empty;
             EventDate = null;
             SelectedNoteType = null;
@@ -635,6 +644,7 @@ namespace Sati.ViewModels.Children
             OnPropertyChanged(nameof(IsFutureScheduledWork));
             OnPropertyChanged(nameof(IsStatusEnabled));
             OnPropertyChanged(nameof(IsServiceTimeEnabled));
+            OnPropertyChanged(nameof(IsGoalProgressEnabled));
             OnPropertyChanged(nameof(NarrativeLabel));
             OnPropertyChanged(nameof(IsSuggestedFollowUpVisible));
             OnPropertyChanged(nameof(SuggestedFollowUpToolTip));
@@ -669,6 +679,7 @@ namespace Sati.ViewModels.Children
                 if (!isCalendarReminder)
                     EventDate = null;
                 SelectedStartTime = null;
+                GoalProgress = null;
                 ClearAiReview();
                 AiStatusMessage = string.Empty;
             }
@@ -703,6 +714,7 @@ namespace Sati.ViewModels.Children
             {
                 Status = NoteStatus.Scheduled;
                 SelectedStartTime = null;
+                GoalProgress = null;
                 _pendingVisitDocumentation = null;
                 ResetVisitDocumentation(clearAttendees: false);
             }
@@ -1585,6 +1597,7 @@ namespace Sati.ViewModels.Children
                 Minutes = note.Minutes;
                 SelectedStartTime = FindStartOption(note.StartTime);
                 Status = note.Status;
+                GoalProgress = note.GoalProgress;
                 SelectedNoteType = note.NoteType;
                 SelectedFormType = note.FormType;
                 ApplyVisitDocumentation(note.VisitDocumentation);
@@ -1913,6 +1926,8 @@ namespace Sati.ViewModels.Children
             if (EventDate is null) errors.Add("• Please enter a date.");
             if (string.IsNullOrWhiteSpace(Narrative)) errors.Add("• Please enter a narrative.");
             if (SelectedNoteType is null) errors.Add("• Please select a note type.");
+            if (Status == NoteStatus.Logged && GoalProgress is null)
+                errors.Add("• Please select goal progress. Choose None when no progress was made.");
             if (SelectedNoteType == NoteType.Visit &&
                 (VisitAppearanceOptions.Any(option =>
                      option.IsSelected && option.Value == VisitAppearance.ConcernObserved) ||
@@ -2079,6 +2094,7 @@ namespace Sati.ViewModels.Children
                 note.Status = Status;
                 note.NoteType = SelectedNoteType;
                 note.FormType = SelectedFormType;
+                note.GoalProgress = GoalProgress;
                 note.VisitDocumentation = BuildVisitDocumentation();
                 note.PersonId = selectedPerson.Id;
                 try
@@ -2106,6 +2122,7 @@ namespace Sati.ViewModels.Children
                     SelectedPerson!.Id, SelectedFormType, SelectedNoteType);
                 note.StartTime = SelectedStartTime?.Minutes;
                 note.VisitDocumentation = BuildVisitDocumentation();
+                note.GoalProgress = GoalProgress;
                 await _noteService.AddNoteAsync(note);
             }
 
@@ -2237,6 +2254,7 @@ namespace Sati.ViewModels.Children
             if (draft.Status != latest.Status) fields.Add("status");
             if (draft.NoteType != latest.NoteType) fields.Add("note type");
             if (draft.FormType != latest.FormType) fields.Add("form type");
+            if (draft.GoalProgress != latest.GoalProgress) fields.Add("goal progress");
             if (draft.CaseManagerJustification != latest.CaseManagerJustification) fields.Add("justification");
             if (draft.VisitDocumentationJson != latest.VisitDocumentationJson) fields.Add("visit documentation");
             return fields;
@@ -2248,6 +2266,7 @@ namespace Sati.ViewModels.Children
         {
             SubmissionFailureMessage = null;
             Status = null;
+            GoalProgress = null;
             Narrative = string.Empty;
             EventDate = null;
             SelectedFormType = null;
