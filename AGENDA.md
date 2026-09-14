@@ -24,13 +24,46 @@ date-aware Demo baseline.
       against disposable LocalDB databases. The release gate also fixed a billing-period insertion/
       submission race, Local service-time create/move races, a sliding WebSocket revalidation delay,
       and a noisy authentication-timing measurement.
-- [ ] Complete API and installer package security checks and focused installed-app acceptance.
-- [ ] Commit and push the verified 1.3.9 source to GitHub `master` without rewriting history.
-- [ ] Publish and verify the existing Demo API at release 1.3.9 with the matching contract revision.
-- [ ] Build, isolated-acceptance-test, and publish new 1.3.9 Local and Demo installers and checksum
-      files without overwriting an existing artifact.
-- [ ] Record deployment identifiers, package paths, sizes, SHA-256 hashes, test totals, distribution
+- [x] Complete API and installer package security checks and focused installed-app acceptance. The
+      API ZIP contains 70 entries with no bad path separators, forbidden filenames, private
+      configuration, credentials, or secret-like values. The Demo installer contains only public
+      endpoint configuration; the Local installer uses integrated security and embeds the
+      Authenticode-valid Microsoft SQL LocalDB prerequisite.
+- [x] Commit source release `04689f486a9500a83317804a185ab1adf11e6925` and push it normally to
+      `https://github.com/heschides/Sati`, branch `master`, without rewriting history. GitHub
+      contained that exact commit before packaging began.
+- [x] Publish only the existing Demo API. The 9,973,829-byte framework-dependent x86 package at
+      `artifacts/SatiApi-1.3.9-fx-x86.zip` has SHA-256
+      `E91BF8CE3BD0628AA62F66D2A328FD46F328E95406DEEADB2EED801888542EA0` and file version 1.3.9.0.
+      OneDeploy deployment `84cab975b62a4160a90811c13b2ee66c` succeeded; live and ready returned
+      HTTP 200, `/health/version` reported Sati.Api 1.3.9 and contract revision `66A9F0D2949E`, and
+      anonymous Admin access returned HTTP 401. The optional encrypted synthetic global Admin
+      credential was absent, so the authenticated probe was not run.
+- [x] Build new non-overwritten installers and pass isolated acceptance. Demo completed five
+      responsive 15-second launches with graceful exits and cleanup; its 102,584,320-byte
+      `SatiDemoSetup-1.3.9.exe` has SHA-256
+      `60D1437919B9F043C37E14D1F48F2244710D37AC3B1C31A952B1CA0527B5B349`. Local passed exact-version,
+      integrated-security, embedded-prerequisite, and cleanup checks; its 204,900,391-byte
+      `SatiLocalSetup-1.3.9.exe` has SHA-256
+      `F96E33C12A1B2CB026DEB055E1C197C6867E8E0D26BE4AB0494428F64667CA16`. Each installer and its
+      matching checksum were atomically published without overwrite to the designated
+      `SatiLogica Demo Files` and `Sati Desktop` distribution folders; final hashes matched and no
+      staging file remained. Acceptance ran on the build workstation, not an external clean machine.
+- [x] Record deployment identifiers, package paths, sizes, SHA-256 hashes, test totals, distribution
       verification, and known Local Production machine release status; then push final evidence.
+
+### Local Production machines
+
+This release adds migrations 103 through 105. Azure `SatiDemo` and the development workstation's
+Local `SatiProduction` both contain all 105 migration-history rows, but database migration and
+desktop installation remain separate facts.
+
+- [ ] SatiLogica workstation: Local `SatiProduction` is current, but the normally installed Local
+      client is still version 1.3.2.0. Install 1.3.9 outside isolated acceptance before treating the
+      installed client as current.
+- [ ] Joshu workstation: its installation folder is not readable from this Windows profile, so its
+      installed version and Local migration state remain unverified. The user plans to install 1.3.9;
+      treat the workstation as behind until that installation starts successfully.
 
 ## Unreleased — 2026-09-14 controlled migration application
 
@@ -91,7 +124,7 @@ date-aware Demo baseline.
       `20260914030703_AddGoalProgressToCaseNotes`, and focused local/API/UI tests.
 - [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
       idempotency evidence through the controlled 2026-09-14 runner.
-- [ ] Deploy compatible API/desktop builds through the normal approved release process.
+- [x] Deploy compatible API/desktop builds through the normal approved 1.3.9 release process.
 
 ## Unreleased — weekly check-request drafts and reminders
 
@@ -117,7 +150,7 @@ date-aware Demo baseline.
       passed 52/52 desktop and 77/77 API before the time-off extension.
 - [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
       idempotency evidence through the controlled 2026-09-14 runner.
-- [ ] Deploy compatible API/desktop builds through the normal approved release process.
+- [x] Deploy compatible API/desktop builds through the normal approved 1.3.9 release process.
 
 ## Unreleased — Finance and Representative Payee workflow
 
@@ -145,7 +178,7 @@ date-aware Demo baseline.
       normal signed-in Windows profile and cannot run inside the restricted test sandbox.
 - [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
       idempotency evidence through the controlled 2026-09-14 runner.
-- [ ] Deploy compatible API/desktop builds through the normal approved release process.
+- [x] Deploy compatible API/desktop builds through the normal approved 1.3.9 release process.
 
 ## Unreleased — clearer annual-document workflow
 
