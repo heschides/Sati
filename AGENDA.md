@@ -331,15 +331,27 @@ CWIC and Housing Support Funds packet builders, and keeps the canonical Demo cal
       replay covered all 102 migrations with 0 problems, and every package-bearing solution
       project reported no known vulnerable direct or transitive dependency from the current NuGet
       sources.
-- [ ] Commit and push the 1.3.8 source release normally, then verify GitHub contains that exact
-      commit before packaging.
-- [ ] Publish only the existing Demo API, verify its deployment id, package hash, live/ready health,
-      version 1.3.8, contract revision parity, and anonymous Admin refusal.
-- [ ] Build and pass isolated acceptance for new, non-overwritten Demo and Local installers; record
-      exact sizes and SHA-256 hashes, then atomically publish each installer and checksum to its
-      designated distribution folder.
-- [ ] Commit and push final evidence, confirm the tracked working tree is clean, and confirm local
-      `master` equals GitHub `master`.
+- [x] Commit source release `d209c367034586a4479ee8fee53dd7b7fe9af965` and push it normally to
+      `https://github.com/heschides/Sati`, branch `master`. GitHub contained that exact commit before
+      packaging began.
+- [x] Publish only the existing Demo API. The 9,753,567-byte framework-dependent x86 package had
+      SHA-256 `9C75C0929855F8CE266D7C9F00661E130A98B9238789D5B3A7B3B3EAA8CD3F60`, file
+      version 1.3.8.0, 70 entries, and no private configuration or secret-like content. OneDeploy
+      deployment `5e93037e1cf24738b70d442485bd641a` succeeded; live and ready returned HTTP
+      200, `/health/version` reported Sati.Api 1.3.8 and contract revision `5B9D8ED7F252`, exactly
+      matching the compiled client, and anonymous Admin access returned HTTP 401. The optional
+      encrypted synthetic global Admin credential was absent, so the authenticated probe was not run.
+- [x] Build new non-overwritten installers and pass isolated acceptance. Demo completed five
+      responsive 15-second launches with graceful exits and cleanup; its 102,457,344-byte installer
+      has SHA-256 `E842CBAAA016592046FF3677322113870B9487BACF450EFDA16C04BA3924174A`.
+      Local passed version, integrated-security, embedded-prerequisite, and cleanup checks; its
+      204,523,047-byte installer has SHA-256
+      `2F35D39607E6ACF5944FE62E7228A82C2A4F0489F70B4A1F35059FEC15E3E0C8`.
+      Each installer and its matching checksum were atomically published without overwrite to the
+      designated `SatiLogica Demo Files` and `Sati Desktop` distribution folders, respectively;
+      final hashes matched and no staging file remained.
+- [x] Record and push final release evidence, confirm the tracked working tree is clean, and confirm
+      local `master` equals GitHub `master`.
 
 ### Local Production machines
 
