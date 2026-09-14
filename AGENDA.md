@@ -14,8 +14,9 @@
       untouched; keep electronic signing unavailable pending program and agency confirmation.
 - [x] Return a non-cacheable PDF, audit generation, and record a versioned Draft artifact tied to
       the controlled OADS source without rewriting prior draft history.
-- [ ] Revalidate the OADS application link before each public release; the official Housing
-      Services page currently links the June 30, 2025 source embedded here.
+- [x] Revalidated for release 1.3.8 on 2026-09-13: the official Housing Services page still links
+      the exact June 30, 2025 source embedded here (SHA-256
+      `F44074E0FFE5096369BDCB32B30DE645155108B8A96093A75B62E9DDD8588190`).
 - [ ] Define any future electronic submission, receipt, and OADS decision-status workflow
       separately. Generating this draft does not submit it or represent OADS approval.
 
@@ -33,8 +34,9 @@
 - [x] Validate closed choice sets, bounded text and the Maine DOL one-year release window; block
       electronic signature routing pending explicit MaineHealth/program/agency confirmation.
 - [x] Add the separately versioned Housing Support Funds application workflow described above.
-- [ ] Revalidate the MaineHealth source link before each public release; the currently published
-      packet still carries 2013/2019/2020 component revision labels.
+- [x] Revalidated for release 1.3.8 on 2026-09-13: MaineHealth still links the exact embedded packet
+      (SHA-256 `07450B91D9756AD4EC26D0B7F570FCE9DEBE152722A2D981ACE4CB195D3A1013`),
+      whose component forms retain their 2013/2019/2020 revision labels.
 
 ## Unreleased — account disablement and session revocation
 
@@ -286,6 +288,68 @@ same view loader as the theme legibility audit. See `DECISIONS.md`.
       ARIA rather than UI Automation, and that is where TalkBack and mobile browsers would apply.
 - [ ] Check keyboard operation at the two Easy Eyes scales and under Windows high-contrast themes,
       neither of which this pass exercises.
+
+## Release 1.3.8 — 2026-09-13
+
+"Safer access, living forms, current demonstrations." This release closes account/session and
+consumer-record authorization gaps, preserves compliance and clearinghouse evidence, adds live
+CWIC and Housing Support Funds packet builders, and keeps the canonical Demo calendar current.
+
+- [x] Preflight resolved GitHub's default branch as `master`, found it equal to the reviewed
+      `d9ac8724ee44c3ca7b0e2ab724f4fe2f6c633f70`, and found a clean tracked working tree before
+      release coordination. No branch was merged or deleted. Unique or uncertain work remains on
+      `claude/local-vs-github-workflow-dlcqpb`, `second-machine-setup`, `team-chat-design`, the
+      local-origin-only `video-conferencing-design`, and worktree-owned
+      `claude/cool-jang-f6b3c4`.
+- [x] Confirm the releasable scope: retained account disablement/session revocation, current
+      permission enforcement, non-destructive form retention, stricter note/billing concurrency,
+      immutable clearinghouse response intake, consumer photos, live document previews, explicit
+      Evergreen PCP/Comprehensive Assessment attestations, agency authoring gates, CWIC and Housing
+      Support Funds packet builders, and rolling Demo seed dates.
+- [x] Revalidate both publisher sources immediately before release. MaineHealth and Maine OADS
+      still link bytes identical to Sati's embedded resources; hashes are recorded in the two
+      unreleased sections above.
+- [x] Apply the four new EF migrations to identity-validated Local `SatiProduction` and Azure
+      `SatiDemo`: `20260911022820_AddClearinghouseResponseIntake`,
+      `20260911120000_AddAccountSessionLifecycle`, `20260912053013_AddPersonPhotos`, and
+      `20260913164040_AddOadsAuthoringSettings`. Both targets reported zero pending afterward;
+      Local backup `SatiProduction-2026-09-13-194940.bak` was taken first. The Demo run was
+      explicitly authorized, verified, and rerun as already current.
+- [x] After separate explicit authorization, replace the synthetic `SatiDemo` canonical baseline
+      with timeline anchor 2026-09-13. The reset route was closed during capture, all 53 resettable
+      tables matched 53 baseline tables, the reset procedure was recreated, and the route was
+      restored with the current protected host key. Updated refresh Function deployment
+      `fb27d8750f6d4ef9a5d338cb0cff39b6` used a 51,209-byte package with SHA-256
+      `AB21706936AF7D82CC74966FAB0DBDE65099D7C1BAEA85FF3C1F64290B1EC58C`.
+- [x] The user removed `datt-workstation-temp` immediately after the controlled work; a read-only
+      Azure listing confirmed it absent before release editing continued.
+- [x] Complete coordinated 1.3.8 version/release notes and validation. The full Release build
+      passed with 0 errors and 13 existing analyzer/nullability/NuGet-audit warnings. All five test
+      projects passed: 2,885 passed, 7 skipped, 0 failed (790/5 API, 1,965/2 desktop/domain,
+      118 Signatures, 8 Portal, 4 Carika). The skips were the documented local-AI competence test
+      and six SQL Server checks whose external test connection was not configured. The symbolic
+      replay covered all 102 migrations with 0 problems, and every package-bearing solution
+      project reported no known vulnerable direct or transitive dependency from the current NuGet
+      sources.
+- [ ] Commit and push the 1.3.8 source release normally, then verify GitHub contains that exact
+      commit before packaging.
+- [ ] Publish only the existing Demo API, verify its deployment id, package hash, live/ready health,
+      version 1.3.8, contract revision parity, and anonymous Admin refusal.
+- [ ] Build and pass isolated acceptance for new, non-overwritten Demo and Local installers; record
+      exact sizes and SHA-256 hashes, then atomically publish each installer and checksum to its
+      designated distribution folder.
+- [ ] Commit and push final evidence, confirm the tracked working tree is clean, and confirm local
+      `master` equals GitHub `master`.
+
+### Local Production machines
+
+This release adds migrations 99 through 102. Demo and the development workstation's Local
+`SatiProduction` are current, but installing a client and migrating a machine are separate facts.
+
+- [ ] SatiLogica workstation: Local `SatiProduction` has all four migrations, but the installed
+      Local client remains on its prior package until 1.3.8 is installed outside isolated acceptance.
+- [ ] Joshu workstation: installed version and migration state remain unverified; treat it as
+      behind until its operator installs 1.3.8 and confirms a successful Local startup.
 
 ## Release 1.3.7 — 2026-09-10
 

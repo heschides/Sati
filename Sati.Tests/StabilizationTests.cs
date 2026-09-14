@@ -646,42 +646,38 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.7", version);
+        Assert.Equal("1.3.8", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Honest pace, richer color, safer recovery", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Safer access, living forms, current demonstrations", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Submitted claims now have a visible staging lane" &&
-            section.Items.Any(item => item.Contains("837 staging", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("return", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Account access ends when it should" &&
+            section.Items.Any(item => item.Contains("disable", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("stale session", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "The daily Demo refresh repairs synthetic claim snapshots" &&
-            section.Items.Any(item => item.Contains("diagnosis", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Consumer and billing records keep their evidence" &&
+            section.Items.Any(item => item.Contains("form deletion", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("clearinghouse", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Billing shows what will be submitted" &&
-            section.Items.Any(item => item.Contains("claim line", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("Submit & Lock", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Evergreen work has an explicit Sati attestation" &&
+            section.Items.Any(item => item.Contains("time-stamped", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("authoring", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Setup stays out of the command window" &&
-            section.Items.Any(item => item.Contains("progress", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Two public-program packets now have live builders" &&
+            section.Items.Any(item => item.Contains("Benefits Counseling", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("Housing Support Funds", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Five decorative themes" &&
-            section.Items.Any(item => item.Contains("Art Nouveau", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("Vanilla Bean", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Document work is easier to verify before it becomes history" &&
+            section.Items.Any(item => item.Contains("goal-progress", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("Consumer photos", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "The Overview now fits the space you have" &&
-            section.Items.Any(item => item.Contains("Work Agenda", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("Focus note", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("Easy Eyes", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "The public Demo stays on a useful calendar" &&
+            section.Items.Any(item => item.Contains("timeline anchor", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("idempotent", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Supervisors can work through large approval queues" &&
-            section.Items.Any(item => item.Contains("10 notes", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("4 units", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("never approves", StringComparison.OrdinalIgnoreCase)));
-        Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Still planned before commercial production" &&
-            section.Items.Any(item => item.Contains("Dual-control", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("corrected claim", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Still required before commercial Production use" &&
+            section.Items.Any(item => item.Contains("direct-database Production", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("corrected", StringComparison.OrdinalIgnoreCase)));
 
         var loginView = File.ReadAllText(Path.Combine(
             directory!.FullName,
