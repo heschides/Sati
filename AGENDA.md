@@ -34,12 +34,44 @@ startup configuration rather than checking only its private connection string.
       cases plus two Local theory rows), and all seven passed against disposable LocalDB databases.
       Focused resolver/shared-installer validation passed 3/3 and directly rejected the exact
       missing-Production-name configuration from 1.3.9. Contract revision remains `66A9F0D2949E`.
-- [ ] Commit and push the verified 1.3.10 source to GitHub `master` without rewriting history.
-- [ ] Publish and verify the existing Demo API at release 1.3.10 with matching contract revision.
-- [ ] Build, isolated-acceptance-test, and publish new non-overwritten 1.3.10 Demo and Local
-      installers and checksum files.
-- [ ] Record deployment, test, artifact, distribution, and known workstation evidence; push the
+- [x] Commit source release `f594e672740ac066fa7ea4b9ba23969acf2854cf` and push it normally to
+      `https://github.com/heschides/Sati`, branch `master`, without rewriting history. GitHub
+      contained that exact commit before packaging began.
+- [x] Publish only the existing Demo API. The 9,679,338-byte framework-dependent x86 package at
+      `artifacts/SatiApi-1.3.10-fx-x86.zip` has SHA-256
+      `E699C6F4FF7B4FC2A043563DABC6912D5F30ECF7E87FDFA326DBFDE5D76FBE6C`, file version 1.3.10.0,
+      and 65 entries. It contains no malformed paths, private settings, forbidden files,
+      credentials, or secret-like values. OneDeploy deployment `88e5f219c0c444179afca374571dfab3`
+      succeeded; live and ready returned Healthy, `/health/version` reported Sati.Api 1.3.10 and
+      contract `66A9F0D2949E`, and anonymous Admin access returned HTTP 401. The optional encrypted
+      synthetic global Admin credential was absent, so the authenticated probe was not run.
+- [x] Build and pass isolated acceptance for both new installers. Demo completed five responsive
+      15-second launches with graceful exits and cleanup; its 102,572,032-byte
+      `SatiDemoSetup-1.3.10.exe` has SHA-256
+      `F5B06D2C46A86A401B201BB0CE17FA16A310A96F17B1D9B1C6B40055C70ED7D3`. Its 92-byte checksum file
+      has SHA-256 `63A7412DA8E5A078A02D360189B28FB4FF7BA9BF3C3E9220D59CA8F44C882755`. Local acceptance proved
+      version 1.3.10.0, exact `SatiProduction` public/private agreement, integrated security,
+      embedded prerequisite, and cleanup; its 204,896,297-byte `SatiLocalSetup-1.3.10.exe` has
+      SHA-256 `7BA61D990ED585E786F306DB4928353EEE78336767A9E2CE8B831FE9677A8174`. Its 93-byte checksum file has
+      SHA-256 `C1CCE1E897A73EF0FFB0425DAE75D483B854C8FC565A50266319642C3AC13811`.
+- [x] Atomically publish the accepted Demo and Local installer/checksum pairs without overwrite to
+      the designated `SatiLogica Demo Files` and `Sati Desktop` distribution folders. Final hashes
+      and checksum records match the build artifacts, and no staging file remains.
+- [x] Record deployment, test, artifact, distribution, and known workstation evidence; push the
       final evidence commit; and confirm local/GitHub equality with a clean tracked tree.
+
+### Local Production machines
+
+Release 1.3.10 adds no migration. Database state therefore does not change merely by installing
+this hotfix; the Local client still applies any older pending migrations safely during startup.
+
+- [ ] SatiLogica workstation: Local `SatiProduction` already contains all 105 migrations, while its
+      normally installed client remains version 1.3.2.0 until 1.3.10 is installed outside isolated
+      acceptance.
+- [ ] Joshu workstation: diagnostics prove 1.3.9 is installed and that both reported launches
+      stopped in configuration resolution before database access. Its Local migration state remains
+      unverified. Install 1.3.10 and confirm that it reaches Local sign-in before treating this
+      workstation as current.
 
 ## Release 1.3.9 — 2026-09-14
 
