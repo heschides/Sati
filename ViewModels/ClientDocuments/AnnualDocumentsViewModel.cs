@@ -54,7 +54,8 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         Signatures?.SetContext(selected?.Id ?? 0, []);
         IsBusy = false; ReceivedOn = null; GoodFaithEffortReason = ""; VerificationArtifactId = 0;
         Message = ""; Reminder = ""; WindowDescription = "";
-        CycleStart = selected?.EffectiveDate is DateTime effective ? AnnualPacketWindow.SuggestedCycle(effective, DateTime.Today, 30) : null;
+        // No suggestion until the agency's packet window loads; InitializeAsync selects it.
+        CycleStart = null;
         NotifyState(); _ = InitializeAsync();
     }
     private async Task InitializeAsync()

@@ -85,9 +85,20 @@ signature-never-attests items retained later as history.
       `Release*DueDate` properties, was removed and `ReleaseUiStructureTests` now guards against a
       current-cycle lookup of a legacy release form. The note-entry form-type picker still offers
       the three release categories as note subjects; that tags documentation, not an obligation.
-- [ ] Make Safety Plan, DHHS, Annual Documents, and annual-packet artifact workflows select and
+- [x] Make Safety Plan, DHHS, Annual Documents, and annual-packet artifact workflows select and
       persist the exact annual target/release obligation instead of defaulting from today's cycle or
-      a separate 30-day packet window.
+      a separate 30-day packet window. Verified 2026-09-15: Safety Plan suggests its target from its
+      own configured availability, DHHS artifacts bind to the selected `ReleaseObligationId` and
+      target, and packet status/persistence read the exact `TargetEffectiveDate`. Annual Documents
+      no longer holds a hard-coded 30-day suggestion before the agency setting loads; a failed load
+      leaves no cycle selected. The window's default remains a separate, deferred item below.
+- [ ] Deferred by Josh 2026-09-15: reconcile the Annual Documents packet window with obligation
+      availability. With defaults, next-target PCP/Safety/Privacy/release obligations open at
+      target−90, but `AnnualPacketOpenDaysBefore` (30) keeps Annual Documents on the current
+      target and `CanSavePacket` false until target−30. This is packet-assembly friction, not a
+      clinical deadline or billing gate. Options considered: a 90-day default for new agencies,
+      deriving the window from included obligations and retiring the setting, or explicit
+      current/upcoming target selection. No stored agency value may change silently.
 - [x] Retire the old Local Production due-date backfill UI/service/DI path. Make current duplicate
       repair key only on explicit `TargetEffectiveDate`; matching deadlines across distinct targets
       never merge, and differing deadlines inside one target are left conflicted. Preserve the old

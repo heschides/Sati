@@ -22,9 +22,15 @@ Implement the clarified annual compliance and service-date billing rules. Source
   `dotnet test Sati.Tests/Sati.Tests.csproj --no-restore -p:BaseOutputPath=C:\Users\SatiLogica\source\repos\heschides\Sati\.test-artifacts6\bin\ -p:SelfContained=false --logger "trx;LogFileName=compliance-full.trx"`
 - Use an isolated output folder because the running Sati app can lock normal output binaries. Preserve the extra `bin` depth so source-based tests resolve the repository correctly.
 
+## 2026-09-15 continuation (Claude)
+
+- `a673e8b` (pushed): release generation/presentation item verified and closed. Removed the last legacy presenter (unbound `NewClientViewModel.Release*DueDate`) and added `ReleaseUiStructureTests.DesktopSurfacesDoNotPresentLegacyCategoryReleaseForms`, confirmed failing first.
+- Packet window: Josh chose to defer the 90-vs-30 mismatch (tracked in AGENDA). Only the hard-coded 30 in `AnnualDocumentsViewModel.SetPerson` was fixed; a failed settings load now leaves no cycle selected. `AnnualDocumentSelectionTests.PacketCycleStaysUnselectedWhenAgencySettingsCannotLoad` was confirmed failing first.
+- Remaining unchecked AGENDA items are all outside source scope: matrix/new-client 0/N projections after the targetless fallback is retired, migration rehearsal on an approved non-production copy, the deferred packet window, and separate legal/accessibility/operations review plus authorized release.
+
 ## Next work
 
-1. Review unchecked active AGENDA compatibility/rollout items honestly before declaring the entire rollout complete. PersonSaveRules already excludes generic release forms, local person creation/caseload loading and API assignment changes reconcile exact releases; the checklist item grouping generation and presentation is partly stale. Verify presentation before closing that combined item.
-2. Safety Plan supports selected annual targets/configured availability, DHHS selects exact release obligations, and annual packet persistence uses exact targets. Annual Documents still suggests a target using its separate configured packet window (default 30 days). Underlying attestation does not require a packet. Decide whether the remaining packet-window/UI compatibility cleanup belongs in this correction or later rollout; do not silently change the user's clinical deadlines.
+1. Items 1 and 2 of the previous list are resolved above.
+2. Do not declare the rollout complete: the remaining items need an approved non-production copy, stakeholder review, or explicit release authorization.
 3. Core synthetic suites are now green. Architecture/decision text has been corrected for exact packet identity, clinical approval, repeat recovery, missing-obligation projection, atomic policy changes, and draft submission revalidation.
 4. Commit and push checkpoints to origin's existing branch. Never apply migrations or deploy as a side effect. Migration rehearsal needs an approved non-production copy, and release requires separate authorization.

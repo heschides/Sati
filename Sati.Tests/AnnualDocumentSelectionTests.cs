@@ -79,6 +79,24 @@ public sealed class AnnualDocumentSelectionTests
         Assert.Empty(vm.Artifacts);
     }
 
+    // The packet cycle comes from the agency's AnnualPacketOpenDaysBefore. Before that
+    // setting loads there is no cycle to suggest, so a failed load must leave the
+    // selection empty rather than a guess made from the 30-day default.
+    [Fact]
+    public void PacketCycleStaysUnselectedWhenAgencySettingsCannotLoad()
+    {
+        var vm = new AnnualDocumentsViewModel(new AnnualService(), null!, new FailingSettingsService(), new Session());
+        vm.SetPerson(Person.CreatePerson(12, "Synthetic", "Person", "", DateTime.Today.AddYears(-30), DateTime.Today.AddYears(-1), WaiverType.Section21, new Settings()));
+        Assert.Null(vm.CycleStart);
+        Assert.False(vm.CanSavePacket);
+    }
+
+    private sealed class FailingSettingsService : ISettingsService
+    {
+        public Task<Settings> LoadAsync() => Task.FromException<Settings>(new InvalidOperationException("synthetic"));
+        public Task SaveAsync(Settings settings) => throw new NotSupportedException();
+    }
+
     private sealed class Session : ISessionService
     {
         public bool AllowComplianceOverride { get; set; }
