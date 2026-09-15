@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Sati.Api.Data;
 using Sati.Contracts.V1;
 using Xunit;
 
@@ -452,6 +455,45 @@ public sealed class NotePipelineApiTests
     }
 
     [Fact]
+    public async Task LaterOverdueFormDoesNotBlockEarlierServiceFromApprovalOrBilling()
+    {
+        var personId = await _factory.CreateBillingWorkflowPersonAsync();
+        var noteId = await _factory.CreateNoteInStatusAsync(Logged, personId);
+        var serviceDate = DateTime.Today.AddDays(-7);
+        var laterDueDate = DateTime.Today.AddDays(-5);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var note = await db.Notes.SingleAsync(candidate => candidate.Id == noteId);
+            note.EventDate = serviceDate;
+            db.Forms.Add(new ServerForm
+            {
+                PersonId = personId,
+                Type = "PCP",
+                TargetEffectiveDate = laterDueDate,
+                DueDate = laterDueDate
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var supervisor = await _factory.CreateAuthenticatedClientAsync("supervisor-one");
+        var (_, revision) = await _factory.GetNoteStateAsync(noteId);
+        using var approval = await supervisor.PostAsJsonAsync(
+            $"/api/v1/supervisor/notes/{noteId}/approve",
+            new SupervisorNoteActionRequest(null, revision));
+        Assert.Equal(HttpStatusCode.OK, approval.StatusCode);
+
+        using var billing = await _factory.CreateAuthenticatedClientAsync("admin-one");
+        using var claim = await billing.PostAsJsonAsync(
+            "/api/v1/billing/claim-lines",
+            new CreateClaimLineRequest(noteId, false, null));
+
+        Assert.Equal(HttpStatusCode.OK, claim.StatusCode);
+        Assert.Equal(serviceDate.Date,
+            (await claim.Content.ReadFromJsonAsync<ClaimLineDto>())!.DateOfService.Date);
+    }
+
+    [Fact]
     public async Task ANoteTravelsFromDraftToASubmittedClaim()
     {
         using var author = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
@@ -495,12 +537,61 @@ public sealed class NotePipelineApiTests
         using var supervisor = await _factory.CreateAuthenticatedClientAsync("supervisor-one");
         using var admin = await _factory.CreateAuthenticatedClientAsync("admin-one");
         var personId = await _factory.CreateBillingWorkflowPersonAsync();
+        int[] blockerFormIds;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var q1 = new ServerForm
+            {
+                PersonId = personId,
+                Type = "Q1R",
+                TargetEffectiveDate = new DateTime(2025, 3, 7),
+                DueDate = new DateTime(2026, 8, 1)
+            };
+            var q2 = new ServerForm
+            {
+                PersonId = personId,
+                Type = "Q2R",
+                TargetEffectiveDate = new DateTime(2025, 3, 7),
+                DueDate = new DateTime(2026, 8, 2)
+            };
+            db.Forms.AddRange(q1, q2);
+            await db.SaveChangesAsync();
+            blockerFormIds = [q1.Id, q2.Id];
+        }
+        var partialNoteId = await _factory.CreateNoteInStatusAsync(Logged, personId);
+        var (_, partialRevision) = await _factory.GetNoteStateAsync(partialNoteId);
+
+        var blockerIds = blockerFormIds.Select(id => $"form:{id}").ToArray();
+        var missingAttestation = await supervisor.PostAsJsonAsync(
+            $"/api/v1/supervisor/notes/{partialNoteId}/approve-override",
+            new SupervisorNoteActionRequest(
+                "Documented supervisory exception.", partialRevision,
+                BlockingObligationIds: blockerIds));
+        Assert.Equal(HttpStatusCode.BadRequest, missingAttestation.StatusCode);
+
+        var partial = await supervisor.PostAsJsonAsync(
+            $"/api/v1/supervisor/notes/{partialNoteId}/approve-override",
+            new SupervisorNoteActionRequest(
+                "Documented supervisory exception.", partialRevision,
+                BlockingObligationIds: [blockerIds[0]],
+                AttestationConfirmed: true));
+        Assert.Equal(HttpStatusCode.OK, partial.StatusCode);
+
+        var partiallyExceptedClaim = await admin.PostAsJsonAsync(
+            "/api/v1/billing/claim-lines",
+            new CreateClaimLineRequest(partialNoteId, false, null));
+        Assert.Equal(HttpStatusCode.BadRequest, partiallyExceptedClaim.StatusCode);
+
         var noteId = await _factory.CreateNoteInStatusAsync(Logged, personId);
         var (_, revision) = await _factory.GetNoteStateAsync(noteId);
 
         var approved = await supervisor.PostAsJsonAsync(
             $"/api/v1/supervisor/notes/{noteId}/approve-override",
-            new SupervisorNoteActionRequest("Documented supervisory exception.", revision));
+            new SupervisorNoteActionRequest(
+                "Documented supervisory exception.", revision,
+                BlockingObligationIds: blockerIds,
+                AttestationConfirmed: true));
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
 
         var claim = await admin.PostAsJsonAsync("/api/v1/billing/claim-lines",

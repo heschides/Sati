@@ -1,5 +1,6 @@
 using Sati.Api.Data;
 using Sati.Contracts.V1;
+using System.Text.Json;
 
 namespace Sati.Api.Infrastructure;
 
@@ -33,12 +34,15 @@ internal static class ContractMapper
         user.SupervisorId,
         user.AgencyId,
         user.Email,
-        user.Phone);
+        user.Phone,
+        user.IsEnabled,
+        user.SecurityVersion);
 
     public static PersonDto ToPerson(
         ServerPerson person,
         IReadOnlyList<ServerForm> forms,
-        IReadOnlyList<ServerNote> notes) => new(
+        IReadOnlyList<ServerNote> notes,
+        IReadOnlyList<ReleaseComplianceFact>? releaseObligations = null) => new(
         person.Id,
         person.UserId,
         person.FirstName,
@@ -91,7 +95,8 @@ internal static class ContractMapper
         NameAt(PersonStatusNames, person.Status, "Active"),
         person.StatusNote,
         person.StatusChangedAtUtc,
-        person.StatusChangedByUserId);
+        person.StatusChangedByUserId,
+        releaseObligations);
 
     public static FormDto ToForm(ServerForm form) => new(
         form.Id,
@@ -100,17 +105,20 @@ internal static class ContractMapper
         form.IsCompliant,
         form.PersonId,
         form.CompletedDate,
-        form.OpenedDate);
+        form.OpenedDate,
+        form.TargetEffectiveDate);
 
     public static NoteSummaryDto ToNoteSummary(ServerNote note) => new(
         NullableNameAt(NoteStatusNames, note.Status),
         note.EventDate,
-        NullableNameAt(NoteTypeNames, note.NoteType));
+        NullableNameAt(NoteTypeNames, note.NoteType),
+        NullableNameAt(FormTypeNames, note.FormType));
 
     public static NoteDto ToNote(
         ServerNote note,
         ServerPerson? person = null,
-        IReadOnlyList<string>? complianceFailureReasons = null) => new(
+        IReadOnlyList<string>? complianceFailureReasons = null,
+        IReadOnlyList<BillingComplianceBlocker>? complianceBlockers = null) => new(
         note.Id,
         note.Narrative,
         note.EventDate,
@@ -134,7 +142,24 @@ internal static class ContractMapper
         note.OverrideApprovedAt,
         note.Revision,
         person is null ? null : new PersonReferenceDto(person.Id, person.UserId, person.FirstName, person.LastName),
-        complianceFailureReasons);
+        complianceFailureReasons,
+        complianceBlockers,
+        ParseStringArray(note.OverrideObligationIdsJson),
+        note.OverrideAttestationConfirmed);
+
+    private static IReadOnlyList<string> ParseStringArray(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return [];
+        try
+        {
+            return JsonSerializer.Deserialize<string[]>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
 
     public static ProviderContactDto ToProviderContact(ServerProviderContact contact) => new(
         contact.Id, contact.ProviderId, contact.Name, contact.Role, contact.Phone,
@@ -142,7 +167,8 @@ internal static class ContractMapper
 
     public static ConsumerProviderDto ToConsumerProvider(ServerPersonProvider link) => new(
         link.Id, link.PersonId, link.ProviderId, link.Role, link.IsPrimaryCare,
-        link.StartDate, link.EndDate, link.HasActiveRelease, link.SortOrder);
+        link.StartDate, link.EndDate, link.HasActiveRelease, link.SortOrder,
+        link.AssignmentKnownOn);
 
     public static PersonContactDto ToPersonContact(ServerPersonContact contact) => new(
         contact.Id,
@@ -319,7 +345,18 @@ internal static class ContractMapper
         s.ReleaseMedicalDaysBeforeAnniversary, s.Revision,
         s.BillingComplianceRequirements,
         s.AllowCredibleProfileUpdates,
-        VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle), s.AnnualPacketOpenDaysBefore);
+        VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle), s.AnnualPacketOpenDaysBefore,
+        s.AllowPastBillingPolicyEffectiveDates);
+
+    public static BillingCompliancePolicyVersionDto ToBillingCompliancePolicyVersion(
+        Sati.Models.BillingCompliancePolicyVersion version) => new(
+        version.Id,
+        version.VersionId,
+        version.EffectiveOn,
+        version.Requirements,
+        version.CreatedByUserId,
+        version.RecordedAtUtc,
+        version.Explanation);
 
     public static bool TryParseNoteStatus(string? value, out int? parsed) =>
         TryParseNullableOrdinal(NoteStatusNames, value, out parsed);

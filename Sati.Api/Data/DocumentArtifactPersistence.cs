@@ -25,7 +25,8 @@ internal static class DocumentArtifactPersistence
         string? templateKey = null,
         int? templateVersion = null,
         int? sourceContentId = null,
-        int? sourceContentVersion = null) =>
+        int? sourceContentVersion = null,
+        long? releaseObligationId = null) =>
         StageReplacementAsync(db, new ServerDocumentArtifact
         {
             PersonId = personId,
@@ -43,6 +44,7 @@ internal static class DocumentArtifactPersistence
             TemplateVersion = templateVersion,
             SourceContentId = sourceContentId,
             SourceContentVersion = sourceContentVersion,
+            ReleaseObligationId = releaseObligationId,
             BlankFieldsJson = JsonSerializer.Serialize(
                 (blankFields ?? []).Where(value => !string.IsNullOrWhiteSpace(value))
                     .Select(value => value.Trim()).Distinct(StringComparer.Ordinal).Order().ToArray())
@@ -57,7 +59,8 @@ internal static class DocumentArtifactPersistence
         DateTime recordedAtUtc,
         int recordedByUserId,
         string note,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? releaseObligationId = null)
     {
         var noteError = AnnualDocumentRules.ValidateExternalNote(note);
         if (noteError is not null)
@@ -72,7 +75,8 @@ internal static class DocumentArtifactPersistence
             GeneratedAtUtc = recordedAtUtc,
             GeneratedByUserId = recordedByUserId,
             BlankFieldsJson = "[]",
-            ExternalNote = note.Trim()
+            ExternalNote = note.Trim(),
+            ReleaseObligationId = releaseObligationId
         }, cancellationToken);
     }
 
@@ -84,7 +88,8 @@ internal static class DocumentArtifactPersistence
         JsonSerializer.Deserialize<string[]>(artifact.BlankFieldsJson) ?? [],
         artifact.ExternalNote,
         artifact.TemplateOwner, artifact.TemplateKey, artifact.TemplateVersion,
-        artifact.SourceContentId, artifact.SourceContentVersion);
+        artifact.SourceContentId, artifact.SourceContentVersion,
+        artifact.ReleaseObligationId);
 
     private static async Task<ServerDocumentArtifact> StageReplacementAsync(
         ApiDbContext db,
@@ -95,6 +100,7 @@ internal static class DocumentArtifactPersistence
             candidate.PersonId == replacement.PersonId &&
             candidate.Kind == replacement.Kind &&
             candidate.CycleStart == replacement.CycleStart &&
+            candidate.ReleaseObligationId == replacement.ReleaseObligationId &&
             candidate.SupersededByArtifactId == null,
             cancellationToken);
         if (prior is not null)

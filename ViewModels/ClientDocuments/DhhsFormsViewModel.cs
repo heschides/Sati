@@ -16,7 +16,9 @@ public partial class DhhsFormsViewModel : ObservableObject
 {
     private readonly IDhhsFormService _formService;
     private readonly IReadOnlyDictionary<DhhsFormDefinition.FormKey, IReadOnlyList<DhhsConsentGroup>> _groups;
+    private readonly List<ReleaseObligationDto> _knownReleaseObligations = [];
     private int? _personId;
+    private DateTime? _personEffectiveDate;
     private int _personVersion;
 
     public DhhsFormsViewModel(IDhhsFormService formService)
@@ -40,12 +42,20 @@ public partial class DhhsFormsViewModel : ObservableObject
     }
 
     public IReadOnlyList<DhhsFormChoice> FormChoices { get; }
+    public ObservableCollection<DhhsReleaseTargetChoice> ReleaseTargetChoices { get; } = [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FormDescription))]
     [NotifyPropertyChangedFor(nameof(IsAuthorizedRepresentativeForm))]
+    [NotifyPropertyChangedFor(nameof(IsDhhsReleaseForm))]
     [NotifyPropertyChangedFor(nameof(ShowSsnPanel))]
+    [NotifyPropertyChangedFor(nameof(ShowReleaseTargetPanel))]
     private DhhsFormChoice selectedFormChoice;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanGenerate))]
+    [NotifyPropertyChangedFor(nameof(ReleaseTargetGuidance))]
+    private DhhsReleaseTargetChoice? selectedReleaseTarget;
 
     [ObservableProperty]
     private IReadOnlyList<DhhsConsentGroup> activeConsentGroups;
@@ -74,11 +84,25 @@ public partial class DhhsFormsViewModel : ObservableObject
     public bool HasPerson => _personId.HasValue;
     public bool IsAuthorizedRepresentativeForm =>
         SelectedFormChoice.Key == DhhsFormDefinition.FormKey.AuthorizedRepresentative;
+    public bool IsDhhsReleaseForm =>
+        SelectedFormChoice.Key == DhhsFormDefinition.FormKey.AuthorizationToRelease;
     public bool ShowSsnPanel => IsAuthorizedRepresentativeForm;
+    public bool ShowReleaseTargetPanel => IsDhhsReleaseForm;
     public bool SupportsSsnStorage => _formService.SupportsSsnStorage;
-    public bool CanGenerate => HasPerson && !IsBusy;
+    public bool CanGenerate => HasPerson && !IsBusy &&
+        (!IsDhhsReleaseForm || SelectedReleaseTarget?.IsAvailable == true);
     public bool CanUpdateSsn => HasPerson && SupportsSsnStorage && !IsBusy;
     public string FormDescription => SelectedFormChoice.Description;
+    public string ReleaseTargetGuidance => SelectedReleaseTarget switch
+    {
+        null => "Set the consumer's annual effective date before preparing this authorization.",
+        { IsAvailable: false } target =>
+            $"This annual authorization becomes available on {target.AvailableOn:MMM d, yyyy}.",
+        { ReleaseObligationId: null } =>
+            "This PDF will keep the selected annual effective date. Sati will link the matching DHHS obligation when one has been reconciled.",
+        { } target =>
+            $"This PDF will be linked only to the DHHS obligation effective {target.TargetEffectiveDate:MMM d, yyyy}."
+    };
     public string SsnStorageExplanation => SupportsSsnStorage
         ? "Demo stores only an encrypted envelope. Sati can display the mask, but never reads the number back to this workstation."
         : "Local Production does not store SSNs. This field stays blank on the generated form for hand-completion.";
@@ -99,6 +123,8 @@ public partial class DhhsFormsViewModel : ObservableObject
         StatusMessage = string.Empty;
         BlankFieldsMessage = string.Empty;
         OnPropertyChanged(nameof(CanGenerate));
+        OnPropertyChanged(nameof(ReleaseTargetGuidance));
+        GenerateCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsBusyChanged(bool value)
@@ -117,6 +143,7 @@ public partial class DhhsFormsViewModel : ObservableObject
     {
         _personVersion++;
         _personId = person?.Id;
+        _personEffectiveDate = person?.EffectiveDate?.Date;
         PersonName = person?.FullName ?? "Select a consumer";
         StatusMessage = string.Empty;
         BlankFieldsMessage = string.Empty;
@@ -127,6 +154,8 @@ public partial class DhhsFormsViewModel : ObservableObject
                 ? "Loading encrypted SSN status..."
                 : "Not stored in local Production.";
         ClearAllSelections();
+        _knownReleaseObligations.Clear();
+        RebuildReleaseTargets();
         OnPropertyChanged(nameof(HasPerson));
         OnPropertyChanged(nameof(CanGenerate));
         OnPropertyChanged(nameof(CanUpdateSsn));
@@ -134,6 +163,26 @@ public partial class DhhsFormsViewModel : ObservableObject
 
         if (person is not null && SupportsSsnStorage)
             _ = LoadSsnStatusAsync(person.Id, _personVersion);
+    }
+
+    /// <summary>
+    /// Supplies the reconciled release rows. The public obligation id, rather than a
+    /// label or due date, is carried into generation so the artifact can satisfy only
+    /// the selected annual DHHS obligation.
+    /// </summary>
+    public void SetReleaseObligations(IEnumerable<ReleaseObligationDto> obligations)
+    {
+        ArgumentNullException.ThrowIfNull(obligations);
+        var personId = _personId;
+        _knownReleaseObligations.Clear();
+        if (personId is not null)
+        {
+            _knownReleaseObligations.AddRange(obligations
+                .Where(item => item.PersonId == personId && item.ObligationId != Guid.Empty)
+                .GroupBy(item => item.ObligationId)
+                .Select(group => group.First()));
+        }
+        RebuildReleaseTargets();
     }
 
     private async Task LoadSsnStatusAsync(int personId, int version)
@@ -235,15 +284,27 @@ public partial class DhhsFormsViewModel : ObservableObject
                 .Where(option => !string.IsNullOrWhiteSpace(option.Value))
                 .ToDictionary(option => option.FieldName, option => option.Value.Trim(), StringComparer.Ordinal);
 
-            var result = await _formService.GenerateAsync(
-                SelectedFormChoice.Key,
-                personId,
-                new DhhsFormDefinition.Selections(checks, text));
+            var selections = new DhhsFormDefinition.Selections(checks, text);
+            var selectedTarget = SelectedReleaseTarget;
+            var result = IsDhhsReleaseForm && selectedTarget is not null
+                ? await _formService.GenerateForAnnualTargetAsync(
+                    SelectedFormChoice.Key,
+                    personId,
+                    selections,
+                    selectedTarget.TargetEffectiveDate,
+                    selectedTarget.ReleaseObligationId)
+                : await _formService.GenerateAsync(
+                    SelectedFormChoice.Key,
+                    personId,
+                    selections);
 
             if (version != _personVersion || _personId != personId)
                 return;
 
-            StatusMessage = "The official PDF is ready to save. Signatures and dates remain blank.";
+            StatusMessage = "The official PDF is ready to save. Signatures and dates remain blank." +
+                (IsDhhsReleaseForm && selectedTarget is not null
+                    ? $" Annual effective date: {selectedTarget.TargetEffectiveDate:MMM d, yyyy}."
+                    : string.Empty);
             BlankFieldsMessage = result.BlankFields.Count == 0
                 ? "All available profile fields were filled."
                 : "Complete these profile fields by hand: " +
@@ -285,6 +346,60 @@ public partial class DhhsFormsViewModel : ObservableObject
             foreach (var option in group.Text)
                 option.Value = string.Empty;
         }
+    }
+
+    private void RebuildReleaseTargets()
+    {
+        var selectedId = SelectedReleaseTarget?.ReleaseObligationId;
+        var selectedTarget = SelectedReleaseTarget?.TargetEffectiveDate;
+        var today = DateTime.Today;
+
+        ReleaseTargetChoices.Clear();
+        foreach (var item in _knownReleaseObligations
+                     .Where(item => string.Equals(
+                         item.Category,
+                         nameof(ReleaseObligationCategory.Dhhs),
+                         StringComparison.OrdinalIgnoreCase))
+                     .Where(item => item.WithdrawnOn is null &&
+                                    (item.RetiredOn is null || item.RetiredOn.Value.Date > today))
+                     .OrderBy(item => item.TargetEffectiveDate))
+        {
+            ReleaseTargetChoices.Add(new DhhsReleaseTargetChoice(
+                item.ObligationId,
+                item.TargetEffectiveDate.Date,
+                item.AvailableOn.Date,
+                item.DueOn.Date,
+                today));
+        }
+
+        if (ReleaseTargetChoices.Count == 0 && _personEffectiveDate is DateTime effective)
+        {
+            var target = AnnualDocumentCycle.SuggestedStart(
+                effective,
+                today,
+                ReleaseObligationRules.AnnualAvailabilityDays);
+            ReleaseTargetChoices.Add(new DhhsReleaseTargetChoice(
+                null,
+                target,
+                target.AddDays(-ReleaseObligationRules.AnnualAvailabilityDays),
+                target,
+                today));
+        }
+
+        SelectedReleaseTarget = selectedId is Guid obligationId
+            ? ReleaseTargetChoices.SingleOrDefault(item =>
+                item.ReleaseObligationId == obligationId)
+            : selectedTarget is DateTime targetDate
+                ? ReleaseTargetChoices.SingleOrDefault(item =>
+                    item.TargetEffectiveDate == targetDate.Date)
+                : null;
+        SelectedReleaseTarget ??= ReleaseTargetChoices
+            .Where(item => item.IsAvailable)
+            .OrderByDescending(item => item.TargetEffectiveDate)
+            .FirstOrDefault() ?? ReleaseTargetChoices.FirstOrDefault();
+        OnPropertyChanged(nameof(ReleaseTargetGuidance));
+        OnPropertyChanged(nameof(CanGenerate));
+        GenerateCommand.NotifyCanExecuteChanged();
     }
 
     private static string FriendlyBlankField(string name) => name switch
@@ -426,6 +541,19 @@ public sealed record DhhsFormChoice(
     DhhsFormDefinition.FormKey Key,
     string DisplayName,
     string Description);
+
+public sealed record DhhsReleaseTargetChoice(
+    Guid? ReleaseObligationId,
+    DateTime TargetEffectiveDate,
+    DateTime AvailableOn,
+    DateTime DueOn,
+    DateTime Today)
+{
+    public bool IsAvailable => Today.Date >= AvailableOn.Date;
+    public string DisplayName =>
+        $"Effective {TargetEffectiveDate:MMM d, yyyy} — due {DueOn:MMM d, yyyy}" +
+        (IsAvailable ? string.Empty : $" (opens {AvailableOn:MMM d, yyyy})");
+}
 
 public sealed record DhhsConsentGroup(
     string Title,

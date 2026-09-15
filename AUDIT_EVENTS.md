@@ -1,6 +1,13 @@
 # Audit events
 
-*Current as of 2026-09-03.*
+*Current as of 2026-09-14.*
+
+Clearinghouse intake adds `billing-response.imported` in the same transaction as its encrypted
+immutable receipt, generation/claim matches and financial observations. Metadata contains receipt
+ID, response kind and counts only; no raw X12, payer/member names, note narratives, file paths or
+credentials. An exact/semantic replay returns the original receipt without another event or
+financial row. The original actor and receive time remain unchanged. Protected raw receipt
+readback is not exposed by this release; adding it requires a separately authorized, audited route.
 
 Sati records a small, append-only event when a protected action succeeds. The event answers
 “who did what, to which record, for which agency, and during which request?” It is not a second
@@ -34,11 +41,15 @@ for content; the audit event is only its activity index.
 - `consumer.archived`, `consumer.unarchived`
 - `legal-hold.placed`, `legal-hold.released`
 - `consumer.deleted-in-window`
-- `settings.updated`
+- `settings.updated`, `settings.compliance-defaults-corrected`,
+  `billing-compliance-policy.appended`
+- `billing-compliance-recovery.recorded`
 - `scratchpad.updated`
 - `billing-claim-line.created`, `billing-period.submitted`, `billing-edi.generated`
 - `at-request.published`, `at-request.reopened`
-- `form.attested`, `form.attestation-revoked`, `form.prerequisite-overridden`
+- `form.opened`, `form.attested`, `form.attestation-revoked`
+- `release-obligations.reconciled`, `release-obligation.attested`,
+  `release-authorization.withdrawn`
 - `document.generated`, `document.recorded-external`
 - `document-template.published`
 - `provider.merged`
@@ -51,20 +62,60 @@ the discarded signer and timestamp in its metadata so the trail does not simply 
 is its own action rather than an implicit consequence of a status change, because a reviewer reading
 the trail should not have to infer that a signature was removed.
 
-The two form actions bracket the live compliance projection. `form.attested` records form type,
-cycle start, the explicitly entered completion date, actor kind, and prerequisite artifact ids;
-`form.attestation-revoked` records form type and actor kind. A revocation's required explanation
-stays on the protected append-only `FormAttestation` row rather than being copied into general
-audit metadata. The ledger row, `Form.CompletedDate` projection, and audit event share one EF Core
-transaction. Existing completions backfilled by migration carry a System attestation reason of
-`pre-attestation record`; the historical completion date itself is not changed.
+The form actions describe separate occurrence and recording facts. `form.opened` records form type,
+target effective date, the explicitly selected opening date, and UTC recording time. It is written
+only through the dedicated opening workflow; generic form update cannot silently revise it.
+`form.attested` records form type, target effective date, explicitly entered completion date, and
+actor kind; `form.attestation-revoked` records form type and actor kind. A Reclassification that
+also establishes a missing same-target CA writes two independent ledger rows and two audit events
+inside the same database transaction. The CA linkage stays in the protected prerequisite-state
+snapshot; there is no artifact prerequisite or Supervisor technical bypass. A revocation's required
+explanation stays on the protected append-only `FormAttestation` row rather than being copied into
+general audit metadata. The ledger row, `Form.CompletedDate` projection, and audit event share one
+EF Core transaction.
 
-`document.generated` records document kind, cycle start, and origin; it never carries PDF bytes,
+`document.generated` records document kind, annual target, and origin; it never carries PDF bytes,
 consumer names, release selections, or other document content. `document.recorded-external`
 records kind and cycle start, while the required verification/location note remains only on the
-protected `DocumentArtifact`. `form.prerequisite-overridden` records form type and the kinds of
-unmet prerequisites. The Supervisor's required technical-problem explanation remains on the
-protected attestation ledger row rather than being copied into broad audit metadata.
+protected `DocumentArtifact`. `form.prerequisite-overridden` is a retained legacy action name from
+the superseded artifact-prerequisite design; current form attestation does not emit it.
+
+`billing-compliance-policy.appended` records the agency-scoped change id, enforcement date, numeric
+requirement mask, and whether the enforcement date is in the past. The explanation and actor-owned
+version record remain authoritative; audit metadata does not copy the explanation. A normal
+`settings.updated` event can record a change to the separate allow-past-dates switch, but ordinary
+Settings save cannot mutate the active policy mask.
+
+`settings.compliance-defaults-corrected` is emitted only by migration
+`CorrectAnnualComplianceAndBillingPolicy` for an agency whose stored value exactly matches at least
+one recognized legacy default. It uses the established migration/system actor 0 and identifies
+which legacy values were recognized without pretending an administrator made the decision. It
+does not contain consumer information or infer form completion.
+
+`note.approval-overridden` records explicit confirmation and the exact compliance-obligation IDs
+the Supervisor excepted. The explanation remains on the protected Note; names and narrative are
+not copied into audit metadata. Billing revalidates those IDs rather than treating the event as a
+blanket consumer-level waiver.
+
+`billing-compliance-recovery.recorded` indexes one immutable Admin decision for a consumer. Its
+minimized metadata identifies the decision, selected note IDs, and each frozen obligation's ID,
+due date, completion date, and evidence ID. The explanation and explicit attestation remain on the
+protected decision rather than being copied into the general audit envelope. The decision, exact
+note/obligation selections, and audit event commit in one serializable transaction; claim creation
+still revalidates the frozen evidence instead of treating this event as a blanket waiver.
+
+`release-obligations.reconciled` records stable keys created or prospectively retired for one
+target effective date. `release-obligation.attested` identifies the exact obligation/stable key,
+category, target, occurrence date, and whether an explanation was supplied.
+`release-authorization.withdrawn` uses the same minimized identity and occurrence-date shape;
+the reason remains on the append-only authorization event. Withdrawal never deletes the earlier
+attestation or rewrites its completion date.
+
+An eligible electronic signature completion is connected to compliance through the immutable
+`SignatureComplianceProjection` ledger, not by inventing a staff audit action. It retains exact
+request, completion, frozen document, artifact, target, signer capacity, `SignedAtUtc`, derived
+agency completion date, projection time, and whether a prior manual completion already satisfied
+the target. The public portal cannot write clinical form or release-obligation tables.
 
 `document-template.published` records the agency, document kind, and newly assigned version.
 Template source and merged consumer values are excluded. Privacy-document generation additionally
@@ -97,8 +148,10 @@ broaden assignment or agency scope.
 
 - Only an Admin can call `GET /api/v1/audit-events`.
 - The API always restricts the query to the actor's agency and limits the date window and row count.
-- Both application database contexts reject tracked updates or deletes of `AuditEvent` and
-  `FormAttestation` rows. The attestation-to-form relationship is restricted rather than cascading.
+- Both application database contexts reject tracked updates or deletes of `AuditEvent`,
+  `FormAttestation`, billing-policy versions, recovery decisions and their frozen selections,
+  release attestations/authorization events, and signature-compliance projections. Form and
+  signature evidence relationships use restricted deletion where erasure would break the trail.
 - Production SQL-principal separation, retention classes, the legal-hold gate, export controls, and
   monitoring expectations are defined in `OPERATIONS.md`. Enforcement remains `PolicyOnly` until
   legal-hold controls exist; application-level append-only enforcement does not make a database

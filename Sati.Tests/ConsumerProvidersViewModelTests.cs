@@ -147,7 +147,7 @@ public sealed class ConsumerProvidersViewModelTests
     }
 
     [Fact]
-    public async Task AWaiverProviderIsNotOfferedOnTheMedicalPicker()
+    public async Task AWaiverProviderIsOfferedAndDoesNotExposeMedicalOnlyFlags()
     {
         var links = new StubLinkService([]);
         var directory = Directory();
@@ -157,7 +157,49 @@ public sealed class ConsumerProvidersViewModelTests
         viewModel.SetPerson(Consumer(40));
         await links.Loaded;
 
-        Assert.DoesNotContain(viewModel.ProviderOptions, option => option.Name == "Spurwink");
+        Assert.Contains(viewModel.ProviderOptions, option => option.Name == "Spurwink");
+        viewModel.NewIsPrimaryCare = true;
+        viewModel.NewHasActiveRelease = true;
+        viewModel.NewProviderId = 7;
+
+        Assert.True(viewModel.SelectedProviderIsService);
+        Assert.False(viewModel.SelectedProviderIsMedical);
+        Assert.False(viewModel.NewIsPrimaryCare);
+        Assert.False(viewModel.NewHasActiveRelease);
+        Assert.Contains("before that service begins", viewModel.AssignmentStartGuidance);
+
+        viewModel.NewRole = "Community support";
+        viewModel.NewStartDate = new DateTime(2026, 9, 15);
+        await viewModel.AddProviderCommand.ExecuteAsync(null);
+        var saved = Assert.Single(links.Saved);
+        Assert.Equal(7, saved.ProviderId);
+        Assert.Equal(new DateTime(2026, 9, 15), saved.StartDate);
+        Assert.False(saved.IsPrimaryCare);
+        Assert.False(saved.HasActiveRelease);
+    }
+
+    [Fact]
+    public async Task AddingAnAssignmentRequiresAndPreservesTheActualStartDate()
+    {
+        var links = new StubLinkService([]);
+        var viewModel = Build(links, Directory());
+        viewModel.SetPerson(Consumer(40));
+        await links.Loaded;
+        viewModel.NewProviderId = 4;
+
+        Assert.False(viewModel.CanAdd);
+        await viewModel.AddProviderCommand.ExecuteAsync(null);
+        Assert.Empty(links.Saved);
+        Assert.Contains("actual provider assignment start date", viewModel.StatusMessage);
+
+        var actualStart = new DateTime(2026, 6, 13);
+        viewModel.NewStartDate = actualStart;
+        Assert.True(viewModel.CanAdd);
+        await viewModel.AddProviderCommand.ExecuteAsync(null);
+
+        var saved = Assert.Single(links.Saved);
+        Assert.Equal(actualStart, saved.StartDate);
+        Assert.Null(saved.AssignmentKnownOn);
     }
 
     [Fact]
@@ -170,12 +212,35 @@ public sealed class ConsumerProvidersViewModelTests
 
         viewModel.NewProviderId = 4;
         viewModel.NewRole = "Neurologist";
+        viewModel.NewStartDate = new DateTime(2026, 1, 5);
         await viewModel.AddProviderCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasStatusMessage);
         Assert.Contains("already the primary care provider", viewModel.StatusMessage);
         Assert.Equal(4, viewModel.NewProviderId);
         Assert.Equal("Neurologist", viewModel.NewRole);
+    }
+
+    [Fact]
+    public async Task ASuccessfulProviderChangeRequestsReleaseObligationReconciliation()
+    {
+        var links = new StubLinkService([]);
+        var viewModel = Build(links, Directory());
+        var refreshes = 0;
+        viewModel.ProviderAssignmentsChangedAsync = () =>
+        {
+            refreshes++;
+            return Task.CompletedTask;
+        };
+        viewModel.SetPerson(Consumer(40));
+        await links.Loaded;
+        viewModel.NewProviderId = 4;
+        viewModel.NewStartDate = new DateTime(2026, 1, 5);
+
+        await viewModel.AddProviderCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, refreshes);
+        Assert.Single(links.Saved);
     }
 
     [Fact]

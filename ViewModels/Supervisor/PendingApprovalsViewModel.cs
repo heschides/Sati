@@ -58,6 +58,8 @@ namespace Sati.ViewModels.Supervisor
         [ObservableProperty] private PendingNoteViewModel? overrideNote;
         [ObservableProperty] private string? overrideReason;
         [ObservableProperty] private bool isOverrideDialogVisible;
+        [ObservableProperty] private bool overrideAttestationConfirmed;
+        public ObservableCollection<ComplianceBlockerSelectionViewModel> OverrideBlockers { get; } = [];
 
         // -------------------------------------------------------------------------
         // Computed properties
@@ -120,6 +122,8 @@ namespace Sati.ViewModels.Supervisor
             IsOverrideDialogVisible = false;
             ReturnReason = null;
             OverrideReason = null;
+            OverrideAttestationConfirmed = false;
+            OverrideBlockers.Clear();
             SelectedCaseManager = null;
             SelectedClient = null;
             FromDate = null;
@@ -363,7 +367,9 @@ namespace Sati.ViewModels.Supervisor
                 var supervisor = _sessionService.CurrentUser!;
                 await _supervisorService.ApproveNoteAsync(note.NoteId, supervisor.Id, note.Revision);
                 PendingNotes.Remove(note);
+                NonCompliantNotes.Remove(note);
                 OnPropertyChanged(nameof(HasPending));
+                OnPropertyChanged(nameof(HasNonCompliant));
             }
             catch (NoteConcurrencyException)
             {
@@ -383,13 +389,22 @@ namespace Sati.ViewModels.Supervisor
         {
             OverrideNote = note;
             OverrideReason = string.Empty;
+            OverrideAttestationConfirmed = false;
+            OverrideBlockers.Clear();
+            foreach (var blocker in note.ComplianceBlockers)
+                OverrideBlockers.Add(new ComplianceBlockerSelectionViewModel(blocker));
             IsOverrideDialogVisible = true;
         }
 
         [RelayCommand]
         private async Task ConfirmOverride()
         {
-            if (OverrideNote is null || string.IsNullOrWhiteSpace(OverrideReason))
+            var selectedBlockers = OverrideBlockers
+                .Where(option => option.IsSelected)
+                .Select(option => option.Blocker.ObligationId)
+                .ToArray();
+            if (OverrideNote is null || string.IsNullOrWhiteSpace(OverrideReason) ||
+                !OverrideAttestationConfirmed || selectedBlockers.Length == 0)
                 return;
 
             try
@@ -399,12 +414,16 @@ namespace Sati.ViewModels.Supervisor
                     OverrideNote.NoteId,
                     supervisor.Id,
                     OverrideReason,
-                    OverrideNote.Revision);
+                    OverrideNote.Revision,
+                    selectedBlockers,
+                    OverrideAttestationConfirmed);
 
                 NonCompliantNotes.Remove(OverrideNote);
                 IsOverrideDialogVisible = false;
                 OverrideNote = null;
                 OverrideReason = string.Empty;
+                OverrideAttestationConfirmed = false;
+                OverrideBlockers.Clear();
                 OnPropertyChanged(nameof(HasNonCompliant));
             }
             catch (NoteConcurrencyException)
@@ -423,6 +442,8 @@ namespace Sati.ViewModels.Supervisor
             IsOverrideDialogVisible = false;
             OverrideNote = null;
             OverrideReason = string.Empty;
+            OverrideAttestationConfirmed = false;
+            OverrideBlockers.Clear();
         }
 
         // -------------------------------------------------------------------------
@@ -510,6 +531,7 @@ namespace Sati.ViewModels.Supervisor
         public decimal? Units { get; }
         public string Narrative { get; }
         public IReadOnlyList<string> ComplianceFailureReasons { get; }
+        public IReadOnlyList<BillingComplianceBlocker> ComplianceBlockers { get; }
         public bool HasComplianceFailures => ComplianceFailureReasons.Count > 0;
         public bool IsComplianceException => false; // set by non-compliant queue context
 
@@ -526,6 +548,15 @@ namespace Sati.ViewModels.Supervisor
             Units = note.Units;
             Narrative = note.Narrative;
             ComplianceFailureReasons = note.ComplianceFailureReasons;
+            ComplianceBlockers = note.ComplianceBlockers;
         }
+    }
+
+    public partial class ComplianceBlockerSelectionViewModel(
+        BillingComplianceBlocker blocker) : ObservableObject
+    {
+        public BillingComplianceBlocker Blocker { get; } = blocker;
+        public string DisplayText => $"{Blocker.Name} — due {Blocker.DueDate:MMM d, yyyy}";
+        [ObservableProperty] private bool isSelected;
     }
 }

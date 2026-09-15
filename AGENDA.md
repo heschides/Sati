@@ -1,5 +1,235 @@
 # Sati — Refactor Agenda
 
+## Unreleased — annual compliance and billing correction (2026-09-14)
+
+This is the active compliance work list. It supersedes the incompatible due-date-inferred cycle,
+born-complete generation, artifact prerequisite, mutable billing-mask, due-day-blocked, and
+signature-never-attests items retained later as history.
+
+- [x] Add `Form.TargetEffectiveDate` as the stable annual identity; keep current and upcoming
+      targets separate, make missing obligations visible, and key new uniqueness by person + type
+      + target rather than by a mutable due date.
+- [x] Make generation create outstanding obligations only. Remove effective-date/`InForceSince`
+      completion inference and keep due-date inference only as a rolling legacy compatibility path.
+- [x] Correct calendar-day defaults: CA available target−120/due target−90; PCP available
+      target−90/due target; Reclass available target−90/due target−30; Safety, Privacy, and annual
+      releases available target−90/due target; reviews due target+90/+180/+270/+360 and available
+      ten days before by default.
+- [x] Give opening a dedicated audited actual-date workflow. Keep `OpenedOn` and `CompletedOn`
+      occurrence dates separate from immutable UTC recording time; reject future and pre-window
+      dates; refuse changes through generic form update.
+- [x] Make attestation sufficient without an artifact. Keep form notes/PDFs/receipts as evidence,
+      and replace the old Supervisor prerequisite bypass with the one semantic rule: Reclass
+      implies a same-target CA on or before it. If CA is missing, capture its actual date and commit
+      two separate attestations atomically. Sati does not store the Evergreen Reclass packet.
+- [x] Make the default billing blockers exactly PCP completion, CA, and all reviews. Add PCP
+      opening as a separate optional gate, with Reclass, Safety, Privacy, Agency release, DHHS
+      release, and Medical release independently selectable.
+- [x] Replace ordinary mutable-mask semantics with append-only effective-dated agency policy.
+      Require an enforcement date for every change; resolve by service date; keep past dates off by
+      default and require an explanation when the separate rare-correction switch permits one; show
+      the affected service-date/draft-versus-finalized impact before apply.
+- [x] Correct the billing interval to start the day after due and end before completion. The due
+      day and completion day are billable; ordinary late completion does not silently release
+      notes inside the historical gap.
+- [x] Narrow a Supervisor exception to one note and the exact current blocker IDs. Require reason,
+      explicit attestation, expected revision, and persisted actor/time; revalidate the same IDs at
+      billing so an unrelated or newly appearing blocker still blocks.
+- [x] Add recipient-specific `ReleaseObligation` rules, persistence, local/cloud services, API
+      routes, billing projection, and artifact identity. Annual DHHS is universal; Medical derives
+      from active healthcare-provider assignments; Agency derives from active service/waiver
+      assignments; a mid-cycle assignment is due the day before service begins; retirement and
+      withdrawal are prospective and historical completion is retained.
+- [x] Enforce guardian-only release signing when a guardian exists, consumer signing otherwise,
+      and never authorized-representative signing. Add the idempotent API-only signature-compliance
+      projection using the agency date of `SignedAtUtc`, without overwriting an earlier manual
+      attestation. This remains synthetic-only; Local Production electronic signing remains off.
+- [x] Keep a non-tab-specific billing status banner above the consumer profile and invalidate its
+      profile/sidebar projections together after a compliance change.
+- [x] Replace the remaining due-date-range PCP/Medical Release lookups in local and API annual
+      packet status/rendering with exact `TargetEffectiveDate` identity plus the bounded legacy
+      fallback. They are the last known live cycle-selection exception found in this review.
+- [x] Add the shared post-compliance recovery planner and immutable decision persistence shape:
+      only resolved obligations and otherwise billing-valid approved, unclaimed, unrecovered notes,
+      all selected by default, with Admin omissions and exact frozen obligation/evidence facts.
+- [x] Add agency-scoped Admin recovery GET/POST paths through the local and cloud service seams,
+      a serializable immutable write, `billing-compliance-recovery.recorded`, and exact-evidence
+      revalidation in candidate and claim-line construction. Focused recovery API and shared-core
+      runs passed 3/3 and 37/37; the complete integrated suites remain below.
+- [x] Add the WPF Admin recovery checklist and its accessibility coverage before describing
+      recovery as an ordinary staff workflow.
+- [x] Add durable append-only unresolved review flags and tenant-scoped Admin/Billing queues for
+      submitted/finalized billing affected by a policy correction. Exact prior/new blocker IDs are
+      retained and no submitted/finalized record is rewritten; an explicit resolution workflow is
+      deferred rather than inferred.
+- [x] Finish the WPF release-obligation workflow so staff can reconcile recipient assignments,
+      select the exact obligation when generating/recording a release artifact, attest/withdraw it,
+      and see missing assignment dates without falling back to the legacy category-wide forms.
+- [x] Generate and inspect controlled migration
+      `20260915004541_CorrectAnnualComplianceAndBillingPolicy` for target identities, policy
+      versions, release obligations, signature projections, exact note exceptions, and recovery
+      records, plus follow-on `20260915013852_AddBillingCompliancePolicyReviewFlags`. The target
+      conversion corrects the legacy annual one-year shift, accepts the documented 120/60-day CA
+      generations, requires a distinguishing post-backfill Q4 witness, aborts on ambiguous source
+      shapes, and audits every assigned target and changed deadline without altering completion,
+      opening, or attestation evidence. Downgrade refuses when that conversion cannot be reversed
+      losslessly. The migrations have not been applied to an operational environment.
+- [ ] Remove the remaining parallel fixed release `Form` generation/presentation for reconciled
+      targets; new consumers and provider assignments must atomically produce only exact recipient
+      obligations, while legacy rows remain historical compatibility records.
+- [ ] Make Safety Plan, DHHS, Annual Documents, and annual-packet artifact workflows select and
+      persist the exact annual target/release obligation instead of defaulting from today's cycle or
+      a separate 30-day packet window.
+- [x] Retire the old Local Production due-date backfill UI/service/DI path. Make current duplicate
+      repair key only on explicit `TargetEffectiveDate`; matching deadlines across distinct targets
+      never merge, and differing deadlines inside one target are left conflicted. Preserve the old
+      due-date key only in a raw, schema-gated startup repair staged immediately before the 2026-09-01
+      legacy unique-index migration, where the target column does not yet exist.
+- [x] Carry exact `FormId` + `TargetEffectiveDate` or `ReleaseObligationId` through upcoming events,
+      the sign-in agenda, dashboard actions, and client-profile preview. Exact navigation fails
+      closed instead of redirecting to today's cycle/category; unfinished explicit historical
+      targets remain visible, and release actions open the exact recipient row.
+- [ ] Replace the remaining matrix/new-client fixed release compatibility projections with 0/N
+      exact recipient obligations after the rollout no longer needs their targetless fallback.
+- [ ] Rehearse migration and reconciliation only on an approved non-production copy, including
+      leap-day targets, historical gaps, duplicate/legacy forms, mid-cycle provider changes, and
+      policies on both sides of an enforcement date. Do not query or alter Production PHI for this
+      development task.
+- [ ] Run the complete focused and full synthetic suites after integration, then complete separate
+      legal/accessibility/operations review and an explicitly authorized release. No source-level
+      result here is a deployment or Production-readiness claim.
+
+## Unreleased — locked client-profile form attestations
+
+- [x] Make the client-profile Forms matrix lock per selected person. Selecting or switching a
+      person always relocks it, and relocking closes any unfinished attestation panel.
+- [x] Refuse the profile form command while locked, even if invoked outside the visual control;
+      the lock icon is the only profile path that enables form editing.
+- [x] Render all twelve form checkboxes as command-only attestation indicators. Activation opens
+      the shared blank-date attestation/revocation workflow without changing the checkmark;
+      `Form.CompletedDate` remains the only source of the checked state.
+- [x] Add view-model, command-only checkbox, and XAML-structure regressions for the lock,
+      client-switch reset, blank-date refusal, and post-attestation checked state.
+
+## Unreleased — exact-date billing compliance and follow-up labels
+
+> Superseded in part on 2026-09-14. The original implementation below blocked the due day because
+> that was the then-recorded assumption. The active rule above begins blocking the following day.
+
+- [x] Name scheduled form follow-up suggestions from their recorded `FormType`; label legacy rows
+      honestly when no type was stored instead of presenting a bare "Form" suggestion.
+- [x] Key note submission, supervisor review/approval, and claim creation to the note's service
+      date only. A later overdue requirement must not retroactively block earlier compliant work.
+- [x] Initial due-day-inclusive interval implemented and tested; superseded by the confirmed
+      day-after-due rule in the active September 14 section.
+- [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
+      the September 4 service / September 6 due-date case and specific scheduled form labels.
+
+## Unreleased — account disablement and session revocation
+
+- [x] Add retained `IsEnabled` and monotonic `SecurityVersion` account state, with an EF
+      concurrency token; share lifecycle policy between API and transitional local services.
+- [x] Require an enabled account and matching positive version for authenticated access and
+      renewal. Password change/reset, explicit session revocation and enabled-state changes
+      invalidate old sign-ins; re-enabling never revives an old credential.
+- [x] Add same-agency administrator controls without deleting users or their records; refuse
+      self-disable and platform-operator management. Keep disabled caseloads reviewable/transferable.
+- [x] Check local template administration and EDI generation/replay before protected reads;
+      EDI additionally requires the independently granted Billing capability.
+- [x] Close the related assigned-privileged-user takeover: supervisor profile changes and
+      password resets require a stored case-management-only target, not merely that capability bit.
+- [x] Require explicit enabled-state JSON; an empty object must not silently mean disable.
+- [x] Pause protected cloud requests while candidate sign-in credentials await workspace
+      acceptance; preserve same-access drafts and require confirmation before changed-access reload.
+- [x] Preserve contact drafts and show inline feedback for expired, denied or unconfirmed saves;
+      discard late completion effects after a person/session change.
+- [x] Verify all five test projects: 2,719 passed, one optional native-AI test skipped; preserve
+      red-before-fix evidence and unchanged-record assertions.
+- [ ] Rehearse the `20260911120000_AddAccountSessionLifecycle` migration and coordinated
+      server/client rollout on an approved non-production copy; do not run it implicitly at startup.
+- [ ] Deploy only with separate authorization, require fresh sign-in after upgrade, and retire
+      old direct-SQL desktop clients. Source-level local checks cannot constrain a database client
+      that bypasses them.
+- [ ] Exercise concurrent account administration and ordinary in-flight clinical writes using
+      SQL Server. SQLite regression coverage is not production-engine concurrency certification.
+- [ ] Define a broader last-administrator recovery/provisioning policy, including legacy
+      permission-demotion paths; self-disable prevention is not complete account-recovery policy.
+
+## Unreleased — consumer-record permission revocation
+
+- [x] Make retained assignments insufficient for own casework after CaseManagement is removed;
+      cover API journals, notes, form opening, consumer status and own-casework reports.
+- [x] Check person/owner agency consistently across accessible records and explicit note agency
+      on reads, transitions, review and billing candidates, using the existing migration invariant.
+- [x] Preserve persisted permissions in local login without copying password verifiers; enforce
+      live actor facts in local consumer, document, review, AT/PCP, Admin and AI-context services.
+- [x] Preserve separately granted Billing, Supervision and Administration; reject forged AT
+      publication identities and ordinary-save attestations; retain published AT requests.
+- [x] Skip own-casework startup/scheduled-work loads for accounts without CaseManagement while
+      preserving their personal scratchpads and existing Billing/Supervision/Admin navigation.
+- [x] Add synthetic red-before-fix regressions with retained assignments, stale/fresh sessions,
+      denied-write state checks and legitimate workflow controls.
+- [x] Implement password-change/session revocation and account disablement/offboarding (B05);
+      see the unreleased lifecycle section above for rollout and remaining limits.
+- [ ] Retire or secure the separately recorded globally scoped local maintenance tools (B04).
+- [ ] Complete local/API AT publication completeness and audit parity, and review billing
+      candidate narrative disclosure against the biller's actual minimum necessary workflow.
+- [ ] Align supervisory target-user SQL bit filters with the full supported-mask rule; the actor
+      already fails closed, but corrupt target-user masks should not appear in reviewer lists.
+- [ ] Prove and harden local detached-graph persistence: a validated Person root must not let
+      caller-supplied nested Forms/Notes bypass their own ownership or workflow rules.
+- [ ] Rehearse deployment and investigate any already-inconsistent tenant markers through approved
+      backup/reconciliation procedures; these source fixes do not deploy or repair real records.
+
+## Unreleased — close standalone form-deletion billing bypass
+
+- [x] Retire destructive standalone form deletion in both the API and transitional local service.
+      Every persisted form is retained, including unattested, future, completed and currently
+      optional forms. Refusal makes no write; mixed batches cannot partially delete.
+- [x] Revalidate current case-management permission and exact tenant/caseload ownership, including
+      empty requests; return a shared retention conflict for authorized nonempty requests.
+- [x] Reproduce the old bypass with failing API and local regressions before changing the guards.
+      Keep stored due/completion dates and billing-window semantics unchanged.
+- [ ] Reconcile already-missing cloud obligations and review any claims created while the bypass
+      existed through a separately authorized evidence-preserving process. This fix does not
+      invent historical completion dates, reconstruct deleted rows, or change existing claims.
+- [ ] Complete authoritative API cycle rollover and pre-EDI compliance revalidation; those are
+      adjacent integrity gaps, not solved by refusing standalone form deletion.
+
+## Unreleased — clearinghouse response intake and launch security review
+
+- [x] Add Billing Submissions file import for a single original 999, 277CA, or 835; match retained
+      outbound evidence automatically within the current agency and test environment.
+- [x] Preserve encrypted immutable raw receipts, generation/claim matches, and atomic financial
+      observations; replay exact or semantically duplicate responses without duplicate effects.
+- [x] Give new submissions generation-specific claim references, validate envelope controls and
+      amounts strictly, and keep late acknowledgments from replacing financial progress.
+- [x] Protect file selection/upload/result publication across account switches; use safe errors
+      and distinguish committed receipts from a subsequent screen-refresh failure.
+- [x] Independently review the implementation and audit repository security with synthetic proofs.
+      See SECURITY_REVIEW_2026-09-10.md; this is not clearance to launch with real consumer data.
+- [ ] Apply AddClearinghouseResponseIntake only through reviewed migration/backup procedures.
+      No deployment or real database migration is authorized by this development work.
+- [ ] Clear the security review's remaining launch blockers: approved session-lifecycle rollout and
+      privileged maintenance boundaries; resolve service-time concurrency with SQL Server tests.
+      Ordinary consumer-record capability checks and local login projection are addressed by the
+      September 11 follow-up above; this is not general launch clearance.
+- [ ] Complete actual clearinghouse sandbox acceptance, supported variant/companion-guide checks,
+      authorized raw receipt readback, rejected/corrected/void claim workflows, bank reconciliation,
+      and approved API-mediated Production activation. Production import remains disabled.
+
+## Unreleased — Overview scratchpad history and Umber Facets
+
+- [x] Replace the scratchpad-history search modal with a History tab beside Today's Work and
+      Tomorrow's Agenda in the Overview's centered Work Agenda.
+- [x] Keep History out of the narrow side dock, preserve one live agenda instance, load history
+      only when selected, and prevent an old account's delayed load from publishing after a switch.
+- [x] Add a short direction-aware sliding transition, preserve reduced-motion behavior, and stack
+      the date picker above results when the centered panel is compact.
+- [x] Remove the obsolete history window, event, factory, and dependency registrations.
+- [x] Add Umber Facets from the supplied brown intersecting-shapes palette as a complete vector
+      theme with frosted work surfaces and measured dark-theme contrast.
+
 ## Unreleased — recoverable productivity forecast
 
 - [x] Stop counting blank past weekdays as future productivity capacity; count only eligible days
@@ -79,10 +309,10 @@ restructure, and all three get harder the longer they wait.
 
 Release 1.3.4 closed the contrast gaps that were visible to review. This work replaces review with
 measurement: `Helpers/ThemeContrast.cs` owns the WCAG arithmetic and `ThemeLegibilityTests` holds
-all twenty-four palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
+all twenty-five palettes to AA, both as token pairs and as rendered views. See `DECISIONS.md`.
 
 - [x] Score every text role against every surface role, and every fill against the ink named for
-      it, in all twenty-four themes. Correct the palettes by luminance only, never by hue.
+      it, in all twenty-five themes. Correct the palettes by luminance only, never by hue.
 - [x] Render every view under every theme and measure the resolved brushes, finding each run's
       background by hit test rather than by ancestor walk.
 - [x] Fail on any theme key a view names that no dictionary defines. `WarningSoftBrush` was
@@ -1162,6 +1392,10 @@ clean.
 
 ## Compliance attestation and annual documents — designed 2026-09-03
 
+> The September 14 active section supersedes the artifact-prerequisite, Supervisor technical
+> override, fixed category-wide release, CA-60-day, due-date-as-cycle-identity, and generic-PUT
+> opening portions below. This section remains the implementation history of the earlier slice.
+
 **Steps 1–9 implemented in source on 2026-09-03; not released or deployed.** Release preparation
 and remaining operational gates are recorded in `ANNUAL_DOCUMENT_RELEASE_READINESS.md`. Full design in
 `NOTE_FORM_ATTESTATION_DESIGN.md`.
@@ -1498,6 +1732,10 @@ that no machine is assumed to have caught up.
 
 ## Duplicate compliance form rows — 2026-09-01
 
+> Historical repair record. The September 14 correction supersedes due date as annual identity,
+> every `InForceSince`/born-complete inference, and the conclusion that the old repair settled
+> operational re-billing. The active section above owns current migration and recovery status.
+
 Implemented and tested; the repair has NOT yet run against a database holding real records.
 Full write-up in `HANDOFF_DUPLICATE_COMPLIANCE_FORMS.md`.
 
@@ -1577,12 +1815,10 @@ each quarter, per client.
 - [ ] Expect open historical documents on any client entered with a backdated effective date.
       That is the honest reading of an unknown, matching the quarterly-review precedent — do not
       bulk-close and do not invent dates. The creation dialog is where those years get recorded.
-- [ ] No in-app control captures an arbitrary completion date for a non-review form. The
-      quarterly attestation control (`ReviewsViewModel`) covers `Q1R`–`Q4R`; `ComplianceFormRow`'s
-      per-row date picker is reachable only from client creation and the add-a-waiver dialog.
-      Everywhere else stamps `DueDate` (Clients/dashboard checkbox) or `DateTime.Today` (task
-      board). So a Comprehensive Assessment completed on a date that is neither cannot be
-      recorded truthfully without a database edit.
+- [x] **Superseded 2026-09-14:** the shared blank-date attestation control now covers every form
+      type, and opening has its own actual-date capture. No ordinary dashboard/profile action
+      stamps `DueDate` or today as completion. The onboarding reconciliation also requires an
+      explicitly entered occurrence date before it can create an initial attestation.
 
 ## Release 1.2.39 — 2026-09-02
 
@@ -4030,6 +4266,9 @@ Before any shared or production release:
 
 ### Comprehensive Assessment — first functional slice shipped 2026-08-07
 
+> Superseded 2026-09-14 where this historical slice sets the CA deadline to 60 days. The current
+> annual default is due 90 days before the target and available 120 days before it.
+
 - [x] Replace the client-workspace placeholder with a desktop-oriented assessment editor.
 - [x] Add eight navigable domains with an initial set of practical questions.
 - [x] Add expandable guidance to every question: why it is asked, what a complete
@@ -4270,6 +4509,10 @@ audit evidence, accessibility, and policy acceptance are the substantive work.
 
 ### Deadlines, reminders, reviews, and billing
 
+> Superseded 2026-09-14 where this list says CA is due 60 days before the PCP, leaves resumption
+> undefined, or treats the due day as unbillable. The active section records the confirmed dates,
+> day-after-due boundary, service-date policy, exact exception, and recovery separation.
+
 - [ ] Reconcile already-generated Comprehensive Assessment `Form.DueDate` values from
   the legacy 120-day offset to the agreed 60-day-before-PCP rule through an inspected
   dry run; the migration changes the setting/default but deliberately does not guess at
@@ -4450,13 +4693,11 @@ for a rewrite.
       the current UI path. Require a trusted authenticated actor/capability and verify
       ownership, assignment, organization, and workflow status before saving. Apply the
       same rule to submission instead of treating a caller-supplied user ID as identity.
-- [ ] **Enforce supervisory authorization inside `SupervisorService`.**
-      `ApproveNoteAsync`, `ApproveWithOverrideAsync`, and `ReturnNoteAsync` trust the
-      supplied `supervisorId`; the queue also accepts an `allSupervisees` switch. Verify
-      the authenticated actor's role/capabilities, agency scope, and actual supervisory
-      relationship before reading or changing a note. Before OADS or other external users
-      enter Sati, place these checks behind a trusted application/API boundary rather than
-      relying on a desktop UI with direct database access.
+- [x] **Enforce supervisory authorization inside `SupervisorService`.** The historical service
+      trusted a supplied supervisor ID and UI scope switch. Current local/API paths derive and
+      revalidate the actor, permission, agency, and supervisory scope. The September 14 follow-up
+      additionally makes an exception note-specific, revision-checked, explicitly attested, and
+      limited to every exact current blocker ID.
 - [x] **Fix the new-account `AssignedAgency` null path.** `NewUserViewModel.CreateUser`
       dereferences `AssignedAgency.Id`, but `AssignedAgency` is never initialized and
       `NewUserWindow` has no agency selector. Add the intended agency source/selection,
@@ -5383,6 +5624,11 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
       regression and deliberately removed-guard evidence in `SIGNATURE_PORTAL_VALIDATION.md`.
 - [x] Plain-language findings and legal/operating outline in `SIGNATURE_PORTAL_REVIEW.md` and
       `SIGNATURE_PORTAL_GUIDE.md`; original proposal labeled as superseded where it conflicts.
+- [x] September 14 source follow-up: API-only, idempotent compliance projection for eligible
+      consumer/guardian completions, linked to an exact form or recipient release obligation and
+      using the agency-local date of the immutable signing instant. This supersedes only the prior
+      “signing never attests completion” rule; it does not enable Production or expand the portal's
+      SQL authority.
 - [ ] Apply a separately authorized controlled migration/deployment. Provision and verify the
       environment marker first. Direct EF migration of a disposable marked database passed all
       96 migrations; this does not repair the older generated-SQL-script Npi batch defect recorded

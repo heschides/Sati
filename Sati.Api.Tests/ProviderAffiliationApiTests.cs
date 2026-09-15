@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Sati.Api.Data;
 using Sati.Contracts.V1;
 using Xunit;
 
@@ -395,9 +398,21 @@ public sealed class ProviderAffiliationApiTests(SatiApiFactory factory)
                 $"/api/v1/providers/{survivor.Id}/contacts");
             Assert.Equal("Referral coordinator", Assert.Single(contacts!).Name);
 
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+                var releases = await db.ReleaseObligations.AsNoTracking().Where(item =>
+                    item.PersonId == 101 &&
+                    item.RecipientDisplayName == "Merge Remove Network").ToListAsync();
+                Assert.NotEmpty(releases);
+                Assert.All(releases, release =>
+                    Assert.Equal(survivor.Id, release.RecipientProviderId));
+            }
+
             var audit = Assert.Single((await factory.GetAuditEventsAsync("provider.merged"))
                 .Where(item => item.ResourceId == survivor.Id.ToString()));
             Assert.Contains($"\"mergedProviderId\":{merged.Id}", audit.MetadataJson);
+            Assert.Contains("\"releaseObligationsMoved\":", audit.MetadataJson);
             Assert.DoesNotContain("Merge Remove Network", audit.MetadataJson);
         }
         finally

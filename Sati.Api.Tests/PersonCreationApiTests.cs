@@ -199,9 +199,30 @@ public sealed class PersonCreationApiTests(SatiApiFactory factory)
     {
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
         var effective = DateTime.Today.AddMonths(-2);
+        var settings = new ComplianceScheduleSettings(
+            ReviewOpenDaysBefore: 10,
+            PcpOpenDaysBefore: 90,
+            ComprehensiveAssessmentOpenDaysBefore: 30,
+            ReclassificationOpenDaysBefore: 60,
+            SafetyPlanOpenDaysBefore: 90,
+            PrivacyPracticesOpenDaysBefore: 90,
+            AgencyReleaseOpenDaysBefore: 90,
+            DhhsReleaseOpenDaysBefore: 90,
+            MedicalReleaseOpenDaysBefore: 90,
+            PcpDueDaysBeforeEffective: 0,
+            ComprehensiveAssessmentDueDaysBeforeEffective: 90,
+            ReclassificationDueDaysBeforeEffective: 30,
+            SafetyPlanDueDaysBeforeEffective: 0,
+            PrivacyPracticesDueDaysBeforeEffective: 0,
+            AgencyReleaseDueDaysBeforeEffective: 0,
+            DhhsReleaseDueDaysBeforeEffective: 0,
+            MedicalReleaseDueDaysBeforeEffective: 0);
         var forms = PersonSaveRules.FormTypes.Select(type =>
-            FormAttestationRules.PrerequisiteFor(type) == PrerequisiteKind.None
-                ? new SavePersonFormRequest(0, type, true, effective, null)
+            ComplianceScheduleRules.AvailableOn(
+                type,
+                ComplianceScheduleRules.DueDate(type, effective, settings),
+                settings) <= DateTime.Today
+                ? new SavePersonFormRequest(0, type, true, DateTime.Today, null)
                 : new SavePersonFormRequest(0, type, false, null, null)).ToList();
 
         var response = await owner.PostAsJsonAsync(
@@ -219,6 +240,11 @@ public sealed class PersonCreationApiTests(SatiApiFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(created);
         Assert.Equal(PersonSaveRules.FormTypes.Count, created.Forms.Count);
+        Assert.DoesNotContain(created.Forms, form => form.Type is
+            "Release_Agency" or "Release_DHHS" or "Release_Medical");
+        Assert.Equal(2, created.ReleaseObligations?.Count);
+        Assert.All(created.ReleaseObligations!, release =>
+            Assert.Equal(ReleaseObligationCategory.Dhhs, release.Category));
         Assert.All(created.Forms.Where(form => form.IsCompliant), form => Assert.NotNull(form.CompletedDate));
         Assert.All(created.Forms.Where(form => !form.IsCompliant), form => Assert.Null(form.CompletedDate));
     }

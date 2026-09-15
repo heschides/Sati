@@ -5,6 +5,57 @@ namespace Sati.Tests;
 
 public sealed class BillingComplianceGateTests
 {
+    [Fact]
+    public void PcpOpeningIsASeparateOptionalHistoricalGate()
+    {
+        var pcp = new ComplianceFormSnapshot(
+            "PCP",
+            new DateTime(2027, 3, 7),
+            CompletedDate: null,
+            OpenedDate: new DateTime(2026, 12, 12));
+        var obligations = BillingComplianceGate.IncludePcpOpeningObligations([pcp]);
+
+        Assert.Empty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations,
+            new DateTime(2026, 12, 8),
+            BillingComplianceGate.DefaultRequirements));
+        Assert.Empty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations,
+            new DateTime(2026, 12, 7),
+            BillingComplianceRequirements.PcpOpening));
+        Assert.NotEmpty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations,
+            new DateTime(2026, 12, 8),
+            BillingComplianceRequirements.PcpOpening));
+        Assert.Empty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations,
+            new DateTime(2026, 12, 12),
+            BillingComplianceRequirements.PcpOpening));
+    }
+
+    [Fact]
+    public void PcpOpeningBillingDeadlineRemainsTheFixedNinetyDayRule()
+    {
+        var obligations = BillingComplianceGate.IncludePcpOpeningObligations(
+            [new ComplianceFormSnapshot("PCP", new DateTime(2027, 3, 7), null)]);
+
+        var opening = Assert.Single(obligations, item =>
+            item.Type == BillingComplianceObligationTypes.PcpOpening);
+        Assert.Equal(new DateTime(2026, 12, 7), opening.DueDate);
+    }
+
+    [Fact]
+    public void OpeningDateMustBeActualAndInsideTheAvailableWindow()
+    {
+        var available = new DateTime(2026, 12, 7);
+        var today = new DateTime(2026, 12, 12);
+
+        Assert.NotNull(FormOpeningRules.Validate(available.AddDays(-1), available, today));
+        Assert.Null(FormOpeningRules.Validate(available, available, today));
+        Assert.Null(FormOpeningRules.Validate(today, available, today));
+        Assert.NotNull(FormOpeningRules.Validate(today.AddDays(1), available, today));
+    }
+
     public static TheoryData<string, BillingComplianceRequirements> EveryRequirement => new()
     {
         { "Q1R", BillingComplianceRequirements.QuarterlyReviews },
@@ -18,8 +69,20 @@ public sealed class BillingComplianceGateTests
         { "PrivacyPractices", BillingComplianceRequirements.PrivacyPractices },
         { "Release_Agency", BillingComplianceRequirements.AgencyRelease },
         { "Release_DHHS", BillingComplianceRequirements.DhhsRelease },
-        { "Release_Medical", BillingComplianceRequirements.MedicalRelease }
+        { "Release_Medical", BillingComplianceRequirements.MedicalRelease },
+        { BillingComplianceObligationTypes.PcpOpening, BillingComplianceRequirements.PcpOpening }
     };
+
+    [Fact]
+    public void DefaultRequirementsContainOnlyTheThreeConfirmedBillingGates()
+    {
+        var expected =
+            BillingComplianceRequirements.QuarterlyReviews |
+            BillingComplianceRequirements.Pcp |
+            BillingComplianceRequirements.ComprehensiveAssessment;
+
+        Assert.Equal(BillingComplianceGate.DefaultRequirements, expected);
+    }
 
     [Theory]
     [MemberData(nameof(EveryRequirement))]
@@ -67,6 +130,20 @@ public sealed class BillingComplianceGateTests
     }
 
     [Fact]
+    public void PcpOpeningIsIndependentFromPcpCompletion()
+    {
+        Assert.True(BillingComplianceGate.IsRequired(
+            BillingComplianceObligationTypes.PcpOpening,
+            BillingComplianceRequirements.PcpOpening));
+        Assert.False(BillingComplianceGate.IsRequired(
+            BillingComplianceObligationTypes.PcpOpening,
+            BillingComplianceRequirements.Pcp));
+        Assert.False(BillingComplianceGate.IsRequired(
+            "PCP",
+            BillingComplianceRequirements.PcpOpening));
+    }
+
+    [Fact]
     public void CompletionRemovesCurrentBlockButDoesNotRetroactivelyCureEarlierServiceDates()
     {
         var completedDate = new DateTime(2026, 8, 10);
@@ -86,6 +163,26 @@ public sealed class BillingComplianceGateTests
             BillingComplianceRequirements.Pcp));
         Assert.False(BillingComplianceGate.IsBillingWindowBlocked(
             form.Type, form.DueDate, form.CompletedDate, completedDate,
+            BillingComplianceRequirements.Pcp));
+    }
+
+    [Fact]
+    public void LaterOverdueDocumentDoesNotReachBackwardBeforeItsDueDate()
+    {
+        var form = new ComplianceFormSnapshot(
+            "PCP", new DateTime(2026, 9, 6), new DateTime(2026, 9, 9));
+
+        Assert.False(BillingComplianceGate.IsBillingWindowBlocked(
+            form.Type, form.DueDate, form.CompletedDate, new DateTime(2026, 9, 4),
+            BillingComplianceRequirements.Pcp));
+        Assert.False(BillingComplianceGate.IsBillingWindowBlocked(
+            form.Type, form.DueDate, form.CompletedDate, new DateTime(2026, 9, 6),
+            BillingComplianceRequirements.Pcp));
+        Assert.True(BillingComplianceGate.IsBillingWindowBlocked(
+            form.Type, form.DueDate, form.CompletedDate, new DateTime(2026, 9, 8),
+            BillingComplianceRequirements.Pcp));
+        Assert.False(BillingComplianceGate.IsBillingWindowBlocked(
+            form.Type, form.DueDate, form.CompletedDate, new DateTime(2026, 9, 9),
             BillingComplianceRequirements.Pcp));
     }
 

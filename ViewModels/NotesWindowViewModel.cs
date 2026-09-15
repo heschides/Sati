@@ -180,23 +180,40 @@ namespace Sati.ViewModels
         {
             if (SelectedNote is null) return;
 
-            var (passed, reasons) = SelectedNote.Person.EvaluateComplianceGate(DateTime.Today,
-                SelectedNote.NoteType == NoteType.Form ? SelectedNote.FormType : null,
-                NoteEntry.ComplianceRequirements);
-
-            // Window check keyed to the note's date — previously missing here,
-            // which let notes inside a missed-form window get Logged from the
-            // context menu when the dashboard would have blocked them. Notes
-            // without an EventDate skip the window check (nothing to key on).
-            var windowReasons = SelectedNote.EventDate is DateTime eventDate
-                ? SelectedNote.Person.EvaluateBillingWindow(
-                    eventDate, NoteEntry.ComplianceRequirements)
-                : [];
-
-            if (!passed || windowReasons.Count > 0)
+            // Billability follows the note's service date. A document that became
+            // overdue later cannot reach backward and block this transition.
+            IReadOnlyList<string> windowReasons;
+            try
             {
-                _dialogIsWindowBlock = windowReasons.Count > 0;
-                ComplianceFailureReasons = reasons.Concat(windowReasons).ToList();
+                if (SelectedNote.EventDate is not DateTime eventDate)
+                {
+                    windowReasons = [];
+                }
+                else
+                {
+                    var requirements = await NoteEntry
+                        .ResolveBillingComplianceRequirementsAsync(eventDate.Date);
+                    windowReasons = SelectedNote.Person.EvaluateBillingWindow(
+                        eventDate,
+                        requirements);
+                }
+            }
+            catch (Exception ex)
+            {
+                var reference = AppErrorLog.Record(
+                    ex, "notes-log.billing-compliance-policy.resolve");
+                HasLoadError = true;
+                LoadErrorMessage =
+                    "Sati could not confirm the billing policy for this note's service date, " +
+                    "so its status was not changed. Try again. " +
+                    $"Support reference: {reference}.";
+                return;
+            }
+
+            if (windowReasons.Count > 0)
+            {
+                _dialogIsWindowBlock = true;
+                ComplianceFailureReasons = windowReasons;
                 PendingJustification = string.Empty;
                 IsComplianceDialogVisible = true;
                 return;

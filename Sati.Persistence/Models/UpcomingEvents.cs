@@ -16,7 +16,14 @@ namespace Sati.Models
         // Form-only context used by the note panel's concise work-status cue.
         // Scheduled visits, contacts, and reminders leave these null.
         public FormType? FormType { get; init; }
+        public int? FormId { get; init; }
+        public DateTime? TargetEffectiveDate { get; init; }
+        public Guid? ReleaseObligationId { get; init; }
         public DateTime? OpenDate { get; init; }
         public DateTime? OpenedDate { get; init; }
+
+        public string ComplianceIdentityText => TargetEffectiveDate is DateTime target
+            ? $"Effective {target:MMM d, yyyy}"
+            : string.Empty;
     }
 }

@@ -3,7 +3,8 @@ using Sati.Models;
 namespace Sati.Data
 {
     /// <summary>
-    /// A consumer's medical provider list. Reads return every link, current and ended —
+    /// A consumer's healthcare and waiver/service provider assignments. Reads return every
+    /// link, current and ended —
     /// the caller decides what to show, and past providers are part of the record rather
     /// than something to hide at the query.
     /// </summary>
@@ -16,7 +17,7 @@ namespace Sati.Data
 
         /// <summary>
         /// Ends a relationship as of <paramref name="endDate"/>. The row is kept: who was
-        /// treating someone in a given year is a question a case record has to answer.
+        /// serving someone in a given year is a question a case record has to answer.
         /// </summary>
         /// <remarks>
         /// The consumer is passed rather than derived from the link, so a link id from

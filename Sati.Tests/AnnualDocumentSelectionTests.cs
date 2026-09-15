@@ -21,6 +21,54 @@ public sealed class AnnualDocumentSelectionTests
     }
 
     [Fact]
+    public void SafetyWorkspaceSelectsTheUpcomingTargetOnceItsWindowOpens()
+    {
+        var service = new SafetyService();
+        var vm = new SafetyPlanViewModel(service, new Session());
+        var effective = DateTime.Today.AddYears(-1).AddDays(30).Date;
+        var person = Person.CreatePerson(
+            12,
+            "Synthetic",
+            "Upcoming",
+            "",
+            DateTime.Today.AddYears(-30),
+            effective,
+            WaiverType.Section21,
+            new Settings());
+
+        vm.SetPerson(person);
+
+        Assert.Equal(effective.AddYears(1), vm.CycleStart);
+    }
+
+    [Fact]
+    public void SafetyWorkspaceHonorsTheConfiguredAvailabilityWindow()
+    {
+        var service = new SafetyService();
+        var configured = new Settings
+        {
+            SafetyPlanOpenDaysBefore = 10,
+            SafetyPlanDaysBeforeAnniversary = 0
+        };
+        var vm = new SafetyPlanViewModel(
+            service, new Session(), new SettingsServiceStub(configured));
+        var effective = DateTime.Today.AddYears(-1).AddDays(30).Date;
+        var person = Person.CreatePerson(
+            12,
+            "Synthetic",
+            "Configured",
+            "",
+            DateTime.Today.AddYears(-30),
+            effective,
+            WaiverType.Section21,
+            new Settings());
+
+        vm.SetPerson(person);
+
+        Assert.Equal(effective, vm.CycleStart);
+    }
+
+    [Fact]
     public void ChangingPacketCycleClearsPriorArtifactsAndReceiptAction()
     {
         var vm = new AnnualDocumentsViewModel(new AnnualService(), null!, new SettingsServiceStub(), new Session());
@@ -37,9 +85,9 @@ public sealed class AnnualDocumentSelectionTests
         public User? CurrentUser { get; private set; } = User.Create(12, "synthetic", "Synthetic Author", "hash", "salt", UserRole.CaseManager, null, 1);
         public void SetUser(User user) => CurrentUser = user;
     }
-    private sealed class SettingsServiceStub : ISettingsService
+    private sealed class SettingsServiceStub(Settings? value = null) : ISettingsService
     {
-        public Task<Settings> LoadAsync() => Task.FromResult(new Settings());
+        public Task<Settings> LoadAsync() => Task.FromResult(value ?? new Settings());
         public Task SaveAsync(Settings settings) => throw new NotSupportedException();
     }
     private sealed class AnnualService : IAnnualDocumentService

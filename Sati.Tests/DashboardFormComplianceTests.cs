@@ -9,6 +9,187 @@ namespace Sati.Tests;
 
 public sealed class DashboardFormComplianceTests
 {
+    [Fact]
+    public void TaskBoardUsesTargetEffectiveDateAndKeepsPredueAnnualWorkInItsCycle()
+    {
+        var today = new DateTime(2026, 4, 1);
+        var currentTarget = new DateTime(2026, 3, 7);
+        var person = Person.CreatePerson(
+            31, "Cycle", "Selection", string.Empty, new DateTime(1990, 1, 1),
+            currentTarget.AddYears(-1), WaiverType.None, new Settings());
+        person.Forms.Clear();
+        var current = new Form(
+            FormType.ComprehensiveAssessment,
+            currentTarget.AddDays(-90),
+            targetEffectiveDate: currentTarget);
+        var next = new Form(
+            FormType.ComprehensiveAssessment,
+            currentTarget.AddYears(1).AddDays(-90),
+            targetEffectiveDate: currentTarget.AddYears(1));
+        var tooFar = new Form(
+            FormType.ComprehensiveAssessment,
+            currentTarget.AddYears(2).AddDays(-90),
+            targetEffectiveDate: currentTarget.AddYears(2));
+        var historical = new Form(
+            FormType.ComprehensiveAssessment,
+            currentTarget.AddYears(-1).AddDays(-90),
+            targetEffectiveDate: currentTarget.AddYears(-1));
+        person.Forms.AddRange([tooFar, next, current, historical]);
+
+        Assert.Same(historical, CaseManagerDashboardViewModel.SelectBoardForm(
+            person, FormType.ComprehensiveAssessment, today));
+
+        historical.SetInitialCompletion(today);
+        Assert.Same(current, CaseManagerDashboardViewModel.SelectBoardForm(
+            person, FormType.ComprehensiveAssessment, today));
+
+        current.SetInitialCompletion(today);
+        Assert.Same(next, CaseManagerDashboardViewModel.SelectBoardForm(
+            person, FormType.ComprehensiveAssessment, today));
+
+        next.SetInitialCompletion(today);
+        Assert.Null(CaseManagerDashboardViewModel.SelectBoardForm(
+            person, FormType.ComprehensiveAssessment, today));
+    }
+
+    [Fact]
+    public void ReleaseBoardUsesExactRecipientObligationsAndSuppressesFixedFormsPerReconciledCycle()
+    {
+        var today = new DateTime(2026, 4, 1);
+        var currentTarget = new DateTime(2026, 3, 7);
+        var nextTarget = currentTarget.AddYears(1);
+        var currentId = Guid.NewGuid();
+        var nextId = Guid.NewGuid();
+        var historicalId = Guid.NewGuid();
+        var person = Person.CreatePerson(
+            31, "Release", "Board", string.Empty, new DateTime(1990, 1, 1),
+            currentTarget.AddYears(-1), WaiverType.None, new Settings());
+        person.Forms.Clear();
+        person.Forms.AddRange(
+        [
+            new Form(FormType.Release_Medical, currentTarget,
+                targetEffectiveDate: currentTarget),
+            new Form(FormType.Release_Agency, nextTarget,
+                targetEffectiveDate: nextTarget)
+        ]);
+        person.ReleaseComplianceSnapshots =
+        [
+            ReleaseFact("historical-dhhs", ReleaseObligationCategory.Dhhs,
+                currentTarget.AddYears(-1), currentTarget.AddYears(-1), historicalId, null),
+            ReleaseFact("current-medical", ReleaseObligationCategory.Medical,
+                currentTarget, currentTarget, currentId, "Dr. Exact"),
+            ReleaseFact("next-agency", ReleaseObligationCategory.Agency,
+                nextTarget, nextTarget, nextId, "Service Exact"),
+            ReleaseFact("too-far", ReleaseObligationCategory.Dhhs,
+                nextTarget.AddYears(1), nextTarget.AddYears(1), Guid.NewGuid(), null)
+        ];
+
+        var rows = CaseManagerDashboardViewModel.BuildReleaseRowsForPerson(
+            person, new Settings(), today);
+
+        Assert.Equal([historicalId, currentId, nextId], rows.Select(row => row.ObligationId));
+        Assert.Contains("Dr. Exact", rows[1].TypeLabel);
+        Assert.Contains("Service Exact", rows[2].TypeLabel);
+        Assert.Contains("days overdue", rows[0].AutomationName);
+        Assert.DoesNotContain(rows, row => row.ObligationKey.StartsWith("legacy-form:"));
+    }
+
+    [Fact]
+    public void AgendaFormResolutionFailsClosedInsteadOfRedirectingToTheCurrentCycle()
+    {
+        var currentTarget = new DateTime(2026, 3, 7);
+        var upcomingTarget = currentTarget.AddYears(1);
+        var person = Person.CreatePerson(
+            31, "Exact", "Routing", string.Empty, new DateTime(1990, 1, 1),
+            currentTarget.AddYears(-1), WaiverType.None, new Settings());
+        person.Forms.Clear();
+        var current = new Form(FormType.PCP, currentTarget,
+            targetEffectiveDate: currentTarget) { Id = 41 };
+        var upcoming = new Form(FormType.PCP, upcomingTarget,
+            targetEffectiveDate: upcomingTarget) { Id = 42 };
+        person.Forms.AddRange([current, upcoming]);
+
+        Assert.Same(upcoming, CaseManagerDashboardViewModel.ResolveAgendaForm(
+            person, FormType.PCP, upcoming.Id, upcomingTarget, currentTarget.AddMonths(6)));
+        Assert.Same(upcoming, CaseManagerDashboardViewModel.ResolveAgendaForm(
+            person, FormType.PCP, null, upcomingTarget, currentTarget.AddMonths(6)));
+        Assert.Null(CaseManagerDashboardViewModel.ResolveAgendaForm(
+            person, FormType.PCP, upcoming.Id, currentTarget, currentTarget.AddMonths(6)));
+        Assert.Null(CaseManagerDashboardViewModel.ResolveAgendaForm(
+            person, FormType.PCP, 9999, upcomingTarget, currentTarget.AddMonths(6)));
+    }
+
+    [Fact]
+    public async Task ClientProfileFormsStayLockedAndChangeOnlyAfterADatedAttestation()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        var (person, form) = harness.AddOverdueQuarterlyReview(FormType.Q3R);
+        var clients = harness.Dashboard.Clients;
+
+        clients.People.Add(person);
+        Assert.True(clients.PeopleView.MoveCurrentTo(person));
+        var peopleView = clients.PeopleView;
+        var currentPerson = clients.PeopleView.CurrentItem;
+        clients.SelectedPerson = person;
+        var revisionBeforeAttestation = clients.CompliancePresentationRevision;
+
+        Assert.False(clients.IsFormsEditingUnlocked);
+        Assert.False(clients.ToggleFormCommand.CanExecute(FormType.Q3R));
+        await clients.ToggleFormCommand.ExecuteAsync(FormType.Q3R);
+        Assert.False(clients.Attestation.IsVisible);
+        Assert.False(clients.Q3RCompliant);
+        Assert.True(clients.HasSelectedPersonComplianceIssues);
+
+        clients.ToggleFormsEditingCommand.Execute(null);
+        Assert.True(clients.IsFormsEditingUnlocked);
+        Assert.True(clients.ToggleFormCommand.CanExecute(FormType.Q3R));
+
+        await clients.ToggleFormCommand.ExecuteAsync(FormType.Q3R);
+        Assert.True(clients.Attestation.IsVisible);
+        Assert.Null(clients.Attestation.CompletionDate);
+        Assert.False(clients.Attestation.CompleteAttestationCommand.CanExecute(null));
+        Assert.False(clients.Q3RCompliant);
+
+        var completedOn = DateTime.Today.AddDays(-2);
+        clients.Attestation.CompletionDate = completedOn;
+        Assert.True(clients.Attestation.CompleteAttestationCommand.CanExecute(null));
+        await clients.Attestation.CompleteAttestationCommand.ExecuteAsync(null);
+
+        Assert.Equal(completedOn, form.CompletedDate);
+        Assert.True(clients.Q3RCompliant);
+        Assert.False(clients.HasSelectedPersonComplianceIssues);
+        Assert.True(clients.CompliancePresentationRevision > revisionBeforeAttestation);
+        Assert.Same(peopleView, clients.PeopleView);
+        Assert.Same(currentPerson, clients.PeopleView.CurrentItem);
+
+        var revisionBeforeRevocation = clients.CompliancePresentationRevision;
+        await clients.ToggleFormForAsync(person, FormType.Q3R);
+        clients.Attestation.RevocationReason = "Recorded against the wrong review.";
+        await clients.Attestation.RevokeAttestationCommand.ExecuteAsync(null);
+
+        Assert.Null(form.CompletedDate);
+        Assert.False(clients.Q3RCompliant);
+        Assert.True(clients.HasSelectedPersonComplianceIssues);
+        Assert.True(clients.CompliancePresentationRevision > revisionBeforeRevocation);
+        Assert.Same(peopleView, clients.PeopleView);
+        Assert.Same(currentPerson, clients.PeopleView.CurrentItem);
+
+        var nextPerson = Person.CreatePerson(
+            fixture.CaseManagerOne.Id,
+            "Next",
+            "Profile",
+            string.Empty,
+            new DateTime(1990, 1, 1),
+            DateTime.Today.AddMonths(-2),
+            WaiverType.Section21,
+            new Settings());
+        clients.SelectedPerson = nextPerson;
+
+        Assert.False(clients.IsFormsEditingUnlocked);
+        Assert.False(clients.ToggleFormCommand.CanExecute(FormType.Q3R));
+    }
+
     [Theory]
     [InlineData(CompletionPath.DashboardToggle)]
     [InlineData(CompletionPath.TaskBoard)]
@@ -149,6 +330,17 @@ public sealed class DashboardFormComplianceTests
                 WaiverType.Section21,
                 settings);
             var form = person.GetCurrentCycleForm(type, DateTime.Today)!;
+            // This fixture exercises one attestation and its presentation refresh.
+            // Keep every other default billing requirement satisfied so the named
+            // review is the only blocker under the corrected whole-cycle gate.
+            foreach (var other in person.Forms.Where(candidate =>
+                         !ReferenceEquals(candidate, form) &&
+                         BillingComplianceGate.IsRequired(
+                             candidate.Type.ToString(),
+                             BillingComplianceGate.DefaultRequirements)))
+            {
+                other.SetInitialCompletion(DateTime.Today.AddDays(-2));
+            }
             form.DueDate = DateTime.Today.AddDays(-1);
             form.SetInitialCompletion(null);
 
@@ -171,6 +363,24 @@ public sealed class DashboardFormComplianceTests
         TaskBoard,
         ClientOverview
     }
+
+    private static ReleaseComplianceFact ReleaseFact(
+        string key,
+        ReleaseObligationCategory category,
+        DateTime dueOn,
+        DateTime target,
+        Guid obligationId,
+        string? recipient) => new(
+        key,
+        category,
+        dueOn,
+        target,
+        null,
+        [],
+        obligationId,
+        target,
+        target.AddDays(-90),
+        recipient);
 
     private sealed class MutablePersonService : IPersonService
     {

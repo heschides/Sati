@@ -109,6 +109,33 @@ public sealed class SignatureCompletion
     public DateTime SignedAtUtc { get; set; }
 }
 
+/// <summary>
+/// Immutable server-side evidence connecting one signing decision to the exact
+/// compliance item it satisfied. The public signing portal does not map this table.
+/// </summary>
+public sealed class SignatureComplianceProjection
+{
+    public long Id { get; set; }
+    public int AgencyId { get; set; }
+    public int CompletionId { get; set; }
+    public int RequestId { get; set; }
+    public int FrozenDocumentId { get; set; }
+    public int DocumentArtifactId { get; set; }
+    public int PersonId { get; set; }
+    public string DocumentKind { get; set; } = string.Empty;
+    public string TargetKind { get; set; } = string.Empty;
+    public long TargetId { get; set; }
+    public long? FormAttestationId { get; set; }
+    public long? ReleaseObligationAttestationId { get; set; }
+    public string Outcome { get; set; } = string.Empty;
+    public DateTime SignedAtUtc { get; set; }
+    public DateTime CompletedOn { get; set; }
+    public DateTime RecordedAtUtc { get; set; }
+    public string SignerCapacity { get; set; } = string.Empty;
+    public int? SignerContactId { get; set; }
+    public DateTime? ExistingCompletedOn { get; set; }
+}
+
 public sealed class SignaturePackage
 {
     public int Id { get; set; }

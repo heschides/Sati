@@ -323,10 +323,6 @@
                                 <MenuItem Header="Mark Completed"
                                           Command="{Binding PlacementTarget.Tag.MarkFormCompletedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                <Separator />
-                                <MenuItem Header="Mark Not Started"
-                                          Command="{Binding PlacementTarget.Tag.MarkFormNotStartedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                             </ContextMenu>
                         </Border.ContextMenu>
                         <Grid>
@@ -377,6 +373,77 @@
                                        Cursor="Help"
                                        ToolTip="{Binding OverdueTooltip}"
                                        Visibility="{Binding IsOverdue, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+
+                <!-- Recipient-specific release row. Open routes to the Releases workspace
+                     with this durable obligation selected; completion still happens there,
+                     never through a category-level Form command. -->
+                <DataTemplate DataType="{x:Type vm:ReleaseTaskRow}">
+                    <Border Margin="0,2"
+                            Padding="6,4"
+                            CornerRadius="3"
+                            BorderThickness="3,0,0,0"
+                            BorderBrush="{DynamicResource InputBorderBrush}"
+                            Background="Transparent"
+                            AutomationProperties.Name="{Binding AutomationName}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="{Binding ClientName}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="13"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="·"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource InputBorderBrush}"
+                                           Margin="7,0"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TypeLabel}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="·"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource InputBorderBrush}"
+                                           Margin="7,0"
+                                           VerticalAlignment="Center" />
+                                <TextBlock FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center">
+                                    <Run Text="Open" />
+                                    <Run Text="{Binding OpenByDate, StringFormat={}{0:MMM d}, Mode=OneWay}" />
+                                    <Run Text="  ·  Due" />
+                                    <Run Text="{Binding DueDate, StringFormat={}{0:MMM d}, Mode=OneWay}" />
+                                    <Run Text="  ·  " />
+                                    <Run Text="{Binding ActionLabel, Mode=OneWay}" />
+                                </TextBlock>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Margin="6,0,2,0">
+                                <TextBlock Text="▲"
+                                           Foreground="{DynamicResource OverdueBrush}"
+                                           FontSize="13"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,7,0"
+                                           Cursor="Help"
+                                           ToolTip="{Binding OverdueTooltip}"
+                                           Visibility="{Binding IsOverdue, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <Button Content="Open"
+                                        Command="{Binding DataContext.OpenReleaseTaskCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        IsEnabled="{Binding CanOpenExact}"
+                                        Padding="9,3"
+                                        AutomationProperties.Name="Open exact release obligation" />
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </DataTemplate>

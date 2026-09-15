@@ -45,11 +45,27 @@ namespace Sati.Models
         public string? OverrideReason { get; set; }
         public int? OverrideApprovedById { get; set; }
         public DateTime? OverrideApprovedAt { get; set; }
+        public bool OverrideAttestationConfirmed { get; set; }
+        public string? OverrideObligationIdsJson { get; set; }
+
+        [NotMapped]
+        public IReadOnlyList<string> OverrideObligationIds
+        {
+            get => string.IsNullOrWhiteSpace(OverrideObligationIdsJson)
+                ? []
+                : JsonSerializer.Deserialize<string[]>(OverrideObligationIdsJson) ?? [];
+            set => OverrideObligationIdsJson = value is null
+                ? null
+                : JsonSerializer.Serialize(value);
+        }
 
         // Calculated queue metadata. The reasons travel with supervisor-review
         // results but are never persisted as part of the clinical note itself.
         [NotMapped]
         public IReadOnlyList<string> ComplianceFailureReasons { get; set; } = [];
+
+        [NotMapped]
+        public IReadOnlyList<Sati.Contracts.V1.BillingComplianceBlocker> ComplianceBlockers { get; set; } = [];
 
         [NotMapped]
         public int? Units => CalculateUnits(Minutes);

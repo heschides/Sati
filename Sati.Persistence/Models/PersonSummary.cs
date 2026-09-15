@@ -1,5 +1,7 @@
 ﻿using Sati.Models;
 
+using Sati.Contracts.V1;
+
 namespace Sati
 {
     // Blob-free, read-only projection of a Person for the supervisor sidebar.
@@ -24,6 +26,9 @@ namespace Sati
         public string FullName => $"{FirstName} {LastName}".Trim();
 
         public List<Form> Forms { get; set; } = [];
+        public List<ReleaseComplianceFact> ReleaseComplianceSnapshots { get; set; } = [];
+        IReadOnlyCollection<ReleaseComplianceFact> IEventSource.ReleaseComplianceFacts =>
+            ReleaseComplianceSnapshots;
 
         // Backing list is NoteSummary; IEventSource.Notes exposes it as INoteInfo.
         public List<NoteSummary> NoteSummaries { get; set; } = [];
@@ -39,5 +44,6 @@ namespace Sati
         public NoteStatus? Status { get; set; }
         public DateTime? EventDate { get; set; }
         public NoteType? NoteType { get; set; }
+        public FormType? FormType { get; set; }
     }
 }

@@ -12,6 +12,60 @@ namespace Sati.Api.Tests;
 public sealed class AnnualPacketApiTests(SatiApiFactory factory)
 {
     [Fact]
+    public async Task ReminderUsesExactAnnualEffectiveDateInsteadOfBorrowingAnotherPcp()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var target = DateTime.Today.AddDays(100);
+        var person = new ServerPerson
+        {
+            UserId = 12,
+            AgencyId = 1,
+            FirstName = "Synthetic",
+            LastName = "Cycle identity",
+            EffectiveDate = target
+        };
+        db.People.Add(person);
+        await db.SaveChangesAsync();
+        db.Forms.Add(new ServerForm
+        {
+            PersonId = person.Id,
+            Type = "PCP",
+            TargetEffectiveDate = target.AddYears(1),
+            DueDate = target.AddYears(1),
+            CompletedDate = DateTime.Today
+        });
+        await db.SaveChangesAsync();
+
+        try
+        {
+            var route = $"/api/v1/people/{person.Id}/annual-documents?cycleStart={target:yyyy-MM-dd}";
+            var wrongCycleOnly = (await owner.GetFromJsonAsync<AnnualDocumentsStatusDto>(route))!;
+            Assert.False(wrongCycleOnly.Window.IsOpen);
+            Assert.Equal(string.Empty, wrongCycleOnly.Reminder);
+
+            db.Forms.Add(new ServerForm
+            {
+                PersonId = person.Id,
+                Type = "PCP",
+                TargetEffectiveDate = target,
+                DueDate = target,
+                CompletedDate = DateTime.Today
+            });
+            await db.SaveChangesAsync();
+
+            var exactCycle = (await owner.GetFromJsonAsync<AnnualDocumentsStatusDto>(route))!;
+            Assert.Contains("Preparation still needed", exactCycle.Reminder);
+        }
+        finally
+        {
+            await db.Forms.Where(x => x.PersonId == person.Id).ExecuteDeleteAsync();
+            await db.People.Where(x => x.Id == person.Id).ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
     public async Task PacketHashesAndArtifactBoundReceiptAreEnforced()
     {
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
@@ -21,7 +75,13 @@ public sealed class AnnualPacketApiTests(SatiApiFactory factory)
         var cycle = DateTime.Today.AddMonths(-2);
         var person = new ServerPerson { UserId = 12, AgencyId = 1, FirstName = "Synthetic", LastName = "Packet", EffectiveDate = cycle };
         db.People.Add(person); await db.SaveChangesAsync();
-        var form = new ServerForm { PersonId = person.Id, Type = "PrivacyPractices", DueDate = cycle.AddYears(1) };
+        var form = new ServerForm
+        {
+            PersonId = person.Id,
+            Type = "PrivacyPractices",
+            TargetEffectiveDate = cycle,
+            DueDate = cycle
+        };
         db.Forms.Add(form); await db.SaveChangesAsync();
         try
         {
@@ -34,6 +94,13 @@ public sealed class AnnualPacketApiTests(SatiApiFactory factory)
             Assert.NotNull(zip.GetEntry("MANIFEST.txt"));
             var status = (await owner.GetFromJsonAsync<AnnualDocumentsStatusDto>($"/api/v1/people/{person.Id}/annual-documents?cycleStart={cycle:yyyy-MM-dd}"))!;
             Assert.Equal(HttpStatusCode.NotFound, (await outsider.GetAsync($"/api/v1/people/{person.Id}/annual-documents?cycleStart={cycle:yyyy-MM-dd}")).StatusCode);
+            var releaseArtifacts = status.Artifacts.Where(x => x.Kind is
+                nameof(AnnualDocumentKind.ReleaseAgency) or
+                nameof(AnnualDocumentKind.ReleaseMedical) or
+                nameof(AnnualDocumentKind.ReleaseDhhs)).ToArray();
+            Assert.NotEmpty(releaseArtifacts);
+            Assert.All(releaseArtifacts, artifact =>
+                Assert.True(artifact.ReleaseObligationRecordId is > 0));
             foreach (var artifact in status.Artifacts)
             {
                 using var bytes = new MemoryStream();
@@ -46,16 +113,19 @@ public sealed class AnnualPacketApiTests(SatiApiFactory factory)
                 Assert.False((await tampered.Content.ReadFromJsonAsync<VerifyDocumentResult>())!.Matches);
             }
             var notice = status.Artifacts.Single(x => x.Kind == "PrivacyPractices");
-            var gate = $"/api/v1/people/{person.Id}/forms/PrivacyPractices/prerequisite?formId={form.Id}";
-            Assert.False((await owner.GetFromJsonAsync<FormPrerequisiteStatusDto>(gate))!.IsSatisfied);
             var receiptRoute = $"/api/v1/people/{person.Id}/documents/privacy-practices/acknowledgment";
             var receipt = new AcknowledgeDocumentRequest(notice.Id, DateTime.Today, null);
             Assert.Equal(HttpStatusCode.NotFound, (await outsider.PostAsJsonAsync(receiptRoute, receipt)).StatusCode);
             Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync(receiptRoute, receipt with { ReceivedOn = null })).StatusCode);
             (await owner.PostAsJsonAsync(receiptRoute, receipt)).EnsureSuccessStatusCode();
-            Assert.True((await owner.GetFromJsonAsync<FormPrerequisiteStatusDto>(gate))!.IsSatisfied);
+            var acknowledgedStatus = (await owner.GetFromJsonAsync<AnnualDocumentsStatusDto>(
+                $"/api/v1/people/{person.Id}/annual-documents?cycleStart={cycle:yyyy-MM-dd}"))!;
+            Assert.Contains(notice.Id, acknowledgedStatus.AcknowledgedArtifactIds);
             (await owner.PostAsJsonAsync($"/api/v1/people/{person.Id}/documents/PrivacyPractices", new RenderAnnualDocumentRequest(cycle))).EnsureSuccessStatusCode();
-            Assert.False((await owner.GetFromJsonAsync<FormPrerequisiteStatusDto>(gate))!.IsSatisfied);
+            var replacedStatus = (await owner.GetFromJsonAsync<AnnualDocumentsStatusDto>(
+                $"/api/v1/people/{person.Id}/annual-documents?cycleStart={cycle:yyyy-MM-dd}"))!;
+            Assert.DoesNotContain(notice.Id, replacedStatus.AcknowledgedArtifactIds);
+            Assert.NotEqual(notice.Id, replacedStatus.Artifacts.Single(x => x.Kind == "PrivacyPractices").Id);
             var savedReceipt = await db.DocumentAcknowledgments.SingleAsync(x => x.DocumentArtifactId == notice.Id);
             savedReceipt.GoodFaithEffortReason = "Attempt to rewrite historical receipt";
             await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());

@@ -68,7 +68,8 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("HorizontalScrollBarVisibility=\"Auto\"", dashboard);
 
         Assert.Contains("Header=\"DHHS Forms\"", clients);
-        Assert.Contains("Header=\"Agency Release\"", clients);
+        Assert.Contains("Header=\"Releases\"", clients);
+        Assert.Contains("ReleaseObligationsWorkspace", clients);
         Assert.Contains("Header=\"AT Requests\"", clients);
         Assert.Contains("Clients.DhhsForms", hub);
         Assert.Contains("Clients.AgencyRelease", hub);
@@ -116,6 +117,33 @@ public sealed class ReleaseUiStructureTests
         Assert.DoesNotContain("HorizontalScrollBarVisibility=\"Disabled\"", assessment);
         Assert.DoesNotContain("HorizontalScrollBarVisibility=\"Disabled\"", dhhs);
         Assert.DoesNotContain("HorizontalScrollBarVisibility=\"Disabled\"", release);
+    }
+
+    [Fact]
+    public void ReleaseWorkspaceExposesAnAccessibleExactObligationLinkInsteadOfGuessingByName()
+    {
+        var editor = File.ReadAllText(Path.Combine(
+            Root, "Views", "ClientDocuments", "AgencyReleaseWorkspace.xaml"));
+        var obligations = File.ReadAllText(Path.Combine(
+            Root, "Views", "ClientDocuments", "ReleaseObligationsWorkspace.xaml"));
+        var clients = File.ReadAllText(Path.Combine(Root, "Views", "ClientsView.xaml"));
+        var app = File.ReadAllText(Path.Combine(Root, "App.xaml.cs"));
+
+        Assert.Contains("ItemsSource=\"{Binding ReleaseObligationChoices}\"", editor);
+        Assert.Contains("SelectedItem=\"{Binding SelectedReleaseObligation}\"", editor);
+        Assert.Contains("AutomationProperties.Name=\"Exact tracked release obligation\"", editor);
+        Assert.Contains("durable identifier, not the recipient's displayed name", editor);
+        Assert.Contains("ClearReleaseObligationLinkCommand", editor);
+        Assert.Contains("AutomationProperties.Name=\"Release attestation completion date\"", obligations);
+        Assert.Contains("AutomationProperties.Name=\"Release withdrawal explanation\"", obligations);
+        Assert.Contains(
+            "services.AddTransient<ViewModels.ClientDocuments.ReleaseObligationsViewModel>();",
+            app);
+
+        var tracker = clients.IndexOf("ReleaseObligationsWorkspace", StringComparison.Ordinal);
+        var generator = clients.IndexOf("AgencyReleaseWorkspace", StringComparison.Ordinal);
+        Assert.True(tracker >= 0 && generator > tracker,
+            "The exact obligation tracker must be presented before the release generator.");
     }
 
     [Fact]
@@ -304,7 +332,7 @@ public sealed class ReleaseUiStructureTests
                  {
                      "PineCoast", "BlueberryMist", "BlueGrayPearl", "CedarGrove", "HarborNight",
                      "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
-                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor"
+                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor", "UmberFacets"
                  })
         {
             var supplied = ResourceKeys(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -326,6 +354,7 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("Deep Current", service);
         Assert.Contains("Redwood Blush", service);
         Assert.Contains("Bodhi Watercolor", service);
+        Assert.Contains("Umber Facets", service);
     }
 
     [Fact]
@@ -333,7 +362,8 @@ public sealed class ReleaseUiStructureTests
     {
         foreach (var name in new[]
                  {
-                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
+                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
+                     "UmberFacets"
                  })
         {
             var document = XDocument.Load(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -355,7 +385,7 @@ public sealed class ReleaseUiStructureTests
     [Fact]
     public void OpenAreasKeepCrispPatternsAndContentSurfacesFrostThem()
     {
-        foreach (var name in new[] { "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean" })
+        foreach (var name in new[] { "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean", "UmberFacets" })
         {
             var document = XDocument.Load(Path.Combine(Root, "Themes", $"{name}.xaml"));
             XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
@@ -398,7 +428,7 @@ public sealed class ReleaseUiStructureTests
                      "ComplianceReviewWindow", "ConfirmationDialogue", "DailyAgendaWindow",
                      "DatabasePatienceWindow", "DataEnvironmentWindow", "FirstRunAdminWindow",
                      "IncorrectPasswordDialog", "LoginWindow", "NewUserWindow", "PromptWindow",
-                     "ScratchpadHistoryWindow", "SettingsWindow", "SplashScreenWindow",
+                     "SettingsWindow", "SplashScreenWindow",
                      "SwitchUserWindow", "TypedConfirmationDialog", "UserMessageDialog"
                  })
         {
@@ -504,16 +534,42 @@ public sealed class ReleaseUiStructureTests
     }
 
     [Fact]
-    public void BillingComplianceChoicesAreAdminOnlyAndExplainTheOverdueBoundary()
+    public void BillingComplianceChoicesAreAdminOnlyAndExplainTheServiceDateBoundary()
     {
         var settings = File.ReadAllText(Path.Combine(Root, "Views", "SettingsWindow.xaml"));
 
         Assert.Contains("BILLING COMPLIANCE REQUIREMENTS", settings);
-        Assert.Contains("blocks billing only when that document is incomplete and its due date has passed", settings);
+        Assert.Contains("blocks billing beginning the day after its due date", settings);
         Assert.Contains("ComplianceQuarterlyReviews", settings);
         Assert.Contains("ComplianceComprehensiveAssessment", settings);
         Assert.Contains("ComplianceAgencyRelease", settings);
+        Assert.Contains("CompliancePcpOpening", settings);
+        Assert.Contains("ApplyBillingCompliancePolicyCommand", settings);
         Assert.Contains("CanManageAgencySettings", settings);
+    }
+
+    [Fact]
+    public void ClientProfileFormsUseAPerPersonLockAndCommandOnlyAttestationCheckboxes()
+    {
+        var clients = File.ReadAllText(Path.Combine(Root, "Views", "ClientsView.xaml"));
+        var viewModel = File.ReadAllText(Path.Combine(Root, "ViewModels", "NewClientViewModel.cs"));
+        var checkBox = File.ReadAllText(Path.Combine(Root, "Views", "AttestationCheckBox.cs"));
+
+        // The three old category-level release checkboxes were removed. Release compliance is
+        // now recipient-specific and is attested in ReleaseObligationsWorkspace.
+        Assert.Equal(9, System.Text.RegularExpressions.Regex.Matches(
+            clients, "<views:AttestationCheckBox ").Count);
+        Assert.Equal(9, System.Text.RegularExpressions.Regex.Matches(
+            clients, "IsEnabled=\"{Binding IsFormsEditingUnlocked}\"").Count);
+        Assert.DoesNotContain("CommandParameter=\"{x:Static local:FormType.Release_", clients);
+        Assert.Contains("ReleaseObligationsWorkspace", clients);
+        Assert.Contains("Command=\"{Binding ToggleFormsEditingCommand}\"", clients);
+        Assert.Contains("Locked — use the lock icon to edit", clients);
+        Assert.DoesNotContain("AllowComplianceOverride", clients);
+        Assert.Contains("LockFormsEditing();", viewModel);
+        Assert.Contains("IsFormsEditingUnlocked && SelectedPerson is not null", viewModel);
+        Assert.Contains("protected override void OnToggle()", checkBox);
+        Assert.DoesNotContain("base.OnToggle()", checkBox);
     }
 
     [Fact]
@@ -679,7 +735,8 @@ public sealed class ReleaseUiStructureTests
     {
         foreach (var name in new[]
                  {
-                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean"
+                     "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
+                     "UmberFacets"
                  })
         {
             var theme = File.ReadAllText(Path.Combine(Root, "Themes", $"{name}.xaml"));

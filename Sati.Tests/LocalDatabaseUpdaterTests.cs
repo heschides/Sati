@@ -54,7 +54,7 @@ public sealed class LocalDatabaseUpdaterTests
         var result = await new LocalDatabaseUpdater(db).UpdateAsync();
 
         Assert.Equal(LocalDatabaseUpdateOutcome.Applied, result.Outcome);
-        Assert.Equal(["backup", "repair", "migrate"], db.Order);
+        Assert.Equal(["backup", "migrate"], db.Order);
         Assert.Equal(FakeMaintenance.BackupFile, result.BackupPath);
     }
 
@@ -142,10 +142,9 @@ public sealed class LocalDatabaseUpdaterTests
     }
 
     /// <summary>
-    /// The duplicate-form repair has to run before the migration chain, because the
-    /// chain contains AddUniqueFormPersonTypeDueDateIndex and that index cannot be
-    /// created while duplicates exist. It also has to run after the backup, so the
-    /// pre-repair rows are recoverable. That leaves exactly one correct position.
+    /// The duplicate-form repair has to run at the exact schema immediately before
+    /// the old due-date index. That avoids materializing the current Form model
+    /// against a database that does not yet have TargetEffectiveDate.
     /// </summary>
     [Fact]
     public async Task DuplicateFormsAreRepairedAfterTheBackupAndBeforeTheMigration()
@@ -160,8 +159,31 @@ public sealed class LocalDatabaseUpdaterTests
         var result = await new LocalDatabaseUpdater(db).UpdateAsync();
 
         Assert.Equal(LocalDatabaseUpdateOutcome.Applied, result.Outcome);
-        Assert.Equal(["backup", "repair", "migrate"], db.Order);
+        Assert.Equal([
+            "backup",
+            $"migrate-through:{FormDuplicateRepair.LegacyRepairPrerequisiteMigration}",
+            "repair",
+            "migrate"
+        ], db.Order);
         Assert.Equal(984, result.DuplicateFormRepair!.RowsRemoved);
+    }
+
+    [Fact]
+    public async Task TargetMigrationDoesNotRunLegacyRepairAgainstItsPreColumnSchema()
+    {
+        var db = new FakeMaintenance
+        {
+            Pending = ["20260915004541_CorrectAnnualComplianceAndBillingPolicy"],
+            HasRecords = true,
+            RepairThrows = new InvalidOperationException(
+                "The current model cannot query a pre-target Forms table.")
+        };
+
+        var result = await new LocalDatabaseUpdater(db).UpdateAsync();
+
+        Assert.Equal(LocalDatabaseUpdateOutcome.Applied, result.Outcome);
+        Assert.Equal(["backup", "migrate"], db.Order);
+        Assert.Null(result.DuplicateFormRepair);
     }
 
     /// <summary>
@@ -184,6 +206,10 @@ public sealed class LocalDatabaseUpdaterTests
         Assert.Equal(LocalDatabaseUpdateOutcome.Failed, result.Outcome);
         Assert.False(db.Migrated);
         Assert.Equal(FakeMaintenance.BackupFile, result.BackupPath);
+        Assert.Equal([
+            "backup",
+            $"migrate-through:{FormDuplicateRepair.LegacyRepairPrerequisiteMigration}"
+        ], db.Order);
     }
 
     [Fact]
@@ -222,7 +248,7 @@ public sealed class LocalDatabaseUpdaterTests
 
         Assert.Equal(LocalDatabaseUpdateOutcome.Applied, result.Outcome);
         Assert.Equal([Drifted], db.Recorded);
-        Assert.Equal(["backup", "repair", "record", "migrate"], db.Order);
+        Assert.Equal(["backup", "record", "migrate"], db.Order);
     }
 
     /// <summary>
@@ -289,7 +315,7 @@ public sealed class LocalDatabaseUpdaterTests
 
         Assert.Equal(LocalDatabaseUpdateOutcome.Applied, result.Outcome);
         Assert.Empty(db.Recorded);
-        Assert.Equal(["backup", "repair", "migrate"], db.Order);
+        Assert.Equal(["backup", "migrate"], db.Order);
     }
 
     /// <summary>
@@ -310,12 +336,12 @@ public sealed class LocalDatabaseUpdaterTests
         var result = await new LocalDatabaseUpdater(db).UpdateAsync();
 
         Assert.Equal(LocalDatabaseUpdateOutcome.Applied, result.Outcome);
-        Assert.Equal(["backup", "repair", "migrate"], db.Order);
+        Assert.Equal(["backup", "migrate"], db.Order);
     }
 
-    /// <summary>A failed repair must not be followed by a migration that will now fail.</summary>
+    /// <summary>A failed history repair must not be followed by a migration.</summary>
     [Fact]
-    public async Task AFailedRepairStopsBeforeMigrating()
+    public async Task AFailedHistoryRepairStopsBeforeMigrating()
     {
         var db = new FakeMaintenance
         {
@@ -343,6 +369,7 @@ public sealed class LocalDatabaseUpdaterTests
         public Exception? MigrateThrows { get; set; }
         public Exception? AnalyzeThrows { get; set; }
         public Exception? RecordThrows { get; set; }
+        public Exception? MigrateThroughThrows { get; set; }
         public IReadOnlyList<MigrationEffectFinding> Findings { get; set; } = [];
 
         public List<string> Order { get; } = [];
@@ -401,6 +428,16 @@ public sealed class LocalDatabaseUpdaterTests
             if (MigrateThrows is not null)
                 return Task.FromException(MigrateThrows);
             Order.Add("migrate");
+            return Task.CompletedTask;
+        }
+
+        public Task MigrateThroughAsync(
+            string targetMigration,
+            CancellationToken cancellationToken = default)
+        {
+            if (MigrateThroughThrows is not null)
+                return Task.FromException(MigrateThroughThrows);
+            Order.Add($"migrate-through:{targetMigration}");
             return Task.CompletedTask;
         }
     }

@@ -136,6 +136,42 @@ public sealed class ConsumerProviderServiceTests
     }
 
     [Fact]
+    public async Task AReconciliationFailureRollsBackTheNewProviderAssignment()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var service = new ConsumerProviderService(fixture.Factory, fixture.Session);
+        var inconsistentProviderId = await fixture.SeedProviderAsync(
+            1, "Future-known provider", MedicalProviderKind.Individual);
+        var attemptedProviderId = await fixture.SeedProviderAsync(
+            1, "Provider that must roll back", MedicalProviderKind.Individual);
+
+        await using (var setup = fixture.Factory.CreateDbContext())
+        {
+            var person = await setup.People.SingleAsync(item => item.Id == fixture.PersonId);
+            person.EffectiveDate = DateTime.Today.AddYears(-1);
+            setup.PersonProviders.Add(new PersonProvider
+            {
+                PersonId = fixture.PersonId,
+                ProviderId = inconsistentProviderId,
+                StartDate = DateTime.Today.AddDays(1),
+                AssignmentKnownOn = DateTime.Today.AddDays(1)
+            });
+            await setup.SaveChangesAsync();
+        }
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(new PersonProvider
+        {
+            PersonId = fixture.PersonId,
+            ProviderId = attemptedProviderId,
+            StartDate = DateTime.Today
+        }));
+
+        await using var verification = fixture.Factory.CreateDbContext();
+        Assert.False(await verification.PersonProviders.AnyAsync(link =>
+            link.PersonId == fixture.PersonId && link.ProviderId == attemptedProviderId));
+    }
+
+    [Fact]
     public async Task EndingARelationshipKeepsTheRow()
     {
         await using var fixture = await Fixture.CreateAsync();

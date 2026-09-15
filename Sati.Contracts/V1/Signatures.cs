@@ -5,6 +5,13 @@ namespace Sati.Contracts.V1;
 public enum SignerCapacity { Consumer, Guardian, AuthorizedRepresentative }
 public enum SignatureMeaning { Authorization, ReceiptAcknowledgment, PlanAgreement, None }
 public enum SignaturePolicyStatus { SyntheticTestingOnly, PendingProgramConfirmation, NotSignable }
+public enum SignatureComplianceProjectionOutcome { Applied, AlreadySatisfied }
+
+public static class SignatureComplianceTargets
+{
+    public const string Form = "Form";
+    public const string ReleaseObligation = "ReleaseObligation";
+}
 
 public sealed record SignatureMeaningEntry(AnnualDocumentKind Kind, string DisplayName,
     SignatureMeaning Meaning, SignaturePolicyStatus PolicyStatus,
@@ -13,20 +20,20 @@ public sealed record SignatureMeaningEntry(AnnualDocumentKind Kind, string Displ
 /// <summary>Meaning and permitted scope are distinct from a legal or agency approval.</summary>
 public static class SignatureMeaningCatalog
 {
-    private static readonly SignerCapacity[] AllCapacities =
-        [SignerCapacity.Consumer, SignerCapacity.Guardian, SignerCapacity.AuthorizedRepresentative];
+    private static readonly SignerCapacity[] ConsumerOrGuardian =
+        [SignerCapacity.Consumer, SignerCapacity.Guardian];
     public static IReadOnlyList<SignatureMeaningEntry> All { get; } =
     [
         new(AnnualDocumentKind.ReleaseAgency, "Agency release", SignatureMeaning.Authorization,
-            SignaturePolicyStatus.SyntheticTestingOnly, AllCapacities,
+            SignaturePolicyStatus.SyntheticTestingOnly, ConsumerOrGuardian,
             "I intend to sign the authorization in this exact document, in the name and capacity shown. My signature applies only to the document's stated choices, recipients, purpose and time period.",
             "Fictional-data testing only. The agency must approve the authorization wording and permitted signing authority before real use."),
         new(AnnualDocumentKind.ReleaseMedical, "Medical release", SignatureMeaning.Authorization,
-            SignaturePolicyStatus.SyntheticTestingOnly, AllCapacities,
+            SignaturePolicyStatus.SyntheticTestingOnly, ConsumerOrGuardian,
             "I intend to sign the medical-information authorization in this exact document, in the name and capacity shown. My signature applies only to the document's stated choices, recipients, purpose and time period.",
             "Fictional-data testing only. Electronic signing does not approve the wording or special-record disclosure rules."),
         new(AnnualDocumentKind.PrivacyPractices, "Notice of Privacy Practices", SignatureMeaning.ReceiptAcknowledgment,
-            SignaturePolicyStatus.SyntheticTestingOnly, AllCapacities,
+            SignaturePolicyStatus.SyntheticTestingOnly, ConsumerOrGuardian,
             "I acknowledge receipt of this exact Notice of Privacy Practices. This acknowledges receipt only. It is not agreement to the notice or authorization to disclose information.",
             "Receipt acknowledgment only. It does not record agreement, permission to disclose, or completion of another form."),
         new(AnnualDocumentKind.SafetyPlan, "Consumer safety plan", SignatureMeaning.PlanAgreement,
@@ -34,7 +41,7 @@ public static class SignatureMeaningCatalog
             "I intend to sign this exact plan in the name and capacity shown.",
             "Signing is unavailable pending written agency/program confirmation of the required meaning, signers and accepted method."),
         new(AnnualDocumentKind.ReleaseDhhs, "DHHS authorization", SignatureMeaning.Authorization,
-            SignaturePolicyStatus.PendingProgramConfirmation, AllCapacities,
+            SignaturePolicyStatus.PendingProgramConfirmation, ConsumerOrGuardian,
             "I intend to sign this exact authorization in the name and capacity shown.",
             "Signing is unavailable pending written confirmation that this state-owned form and evidence method are accepted."),
         new(AnnualDocumentKind.MedicalRecordsRequest, "Medical records request", SignatureMeaning.None,

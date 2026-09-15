@@ -40,10 +40,10 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompleteAttestationCommand))]
-    private string supervisorOverrideReason = string.Empty;
+    private DateTime? comprehensiveAssessmentCompletionDate;
 
     [ObservableProperty]
-    private string externalDocumentNote = string.Empty;
+    private string comprehensiveAssessmentCompletionDateError = string.Empty;
 
     [ObservableProperty]
     private string prerequisiteError = string.Empty;
@@ -65,13 +65,9 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     public string PrerequisiteSummary =>
         _prerequisiteStatus?.Summary ?? "Checking the prerequisite…";
     public bool IsPrerequisiteMissing => _prerequisiteStatus is { IsSatisfied: false };
-    public bool CanSupervisorOverride =>
-        IsPrerequisiteMissing && _prerequisiteStatus?.CanSupervisorOverride == true;
-    public bool CanRecordExternal =>
-        IsPrerequisiteMissing &&
-        _prerequisiteStatus?.Kind is nameof(PrerequisiteKind.DocumentArtifact)
-            or nameof(PrerequisiteKind.SafetyPlan)
-            or nameof(PrerequisiteKind.PrivacyPracticesAcknowledgment);
+    public bool IsReclassification => _form?.Type == FormType.Reclassification;
+    public bool IsAssessmentDateRequired =>
+        IsReclassification && _prerequisiteStatus is { IsSatisfied: false };
 
     public void Begin(
         Form form,
@@ -79,7 +75,11 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         string contextLabel,
         int? evidenceNoteId = null)
     {
-        var cycle = FormAttestationRules.ResolveCycle(effectiveDate, form.DueDate)
+        var cycle = FormAttestationRules.ResolveCycleForForm(
+                effectiveDate,
+                form.Type.ToString(),
+                form.DueDate,
+                form.TargetEffectiveDate == default ? null : form.TargetEffectiveDate)
             ?? throw new InvalidOperationException("The form is not attached to a valid compliance cycle.");
         _form = form;
         _cycleStart = cycle.CycleStart;
@@ -89,23 +89,42 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         ContextLabel = contextLabel;
         CompletionDate = null;
         CompletionDateError = string.Empty;
+        ComprehensiveAssessmentCompletionDate = null;
+        ComprehensiveAssessmentCompletionDateError = string.Empty;
         RevocationReason = string.Empty;
         RevocationReasonError = string.Empty;
-        SupervisorOverrideReason = string.Empty;
-        ExternalDocumentNote = string.Empty;
         PrerequisiteError = string.Empty;
         IsVisible = true;
         NotifyStateChanged();
-        _ = LoadPrerequisiteAsync(form, version);
+        if (form.Type == FormType.Reclassification)
+        {
+            _ = LoadPrerequisiteAsync(form, version);
+        }
+        else
+        {
+            _prerequisiteStatus = new FormPrerequisiteStatusDto(
+                PrerequisiteKind.None.ToString(),
+                true,
+                "Attestation is sufficient; no separate document prerequisite applies.",
+                [],
+                CanSupervisorOverride: false);
+            NotifyStateChanged();
+        }
     }
 
     partial void OnCompletionDateChanged(DateTime? value)
     {
         CompletionDateError = value is DateTime date && _form is not null
-            ? FormAttestationRules.Evaluate(
-                _form.Type.ToString(), date, _cycleStart, DateTime.Today,
-                AttestationActorKind.System, []).DateError ?? string.Empty
+            ? FormAttestationRules.ValidateCompletionDate(
+                date, _cycleStart, DateTime.Today) ?? string.Empty
             : string.Empty;
+        ValidateAssessmentDate();
+    }
+
+    partial void OnComprehensiveAssessmentCompletionDateChanged(DateTime? value)
+    {
+        _ = value;
+        ValidateAssessmentDate();
     }
 
     partial void OnRevocationReasonChanged(string value)
@@ -119,12 +138,24 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
             CompletionDate is not DateTime date)
             return false;
 
-        var dateAccepted = FormAttestationRules.Evaluate(
-            form.Type.ToString(), date, _cycleStart, DateTime.Today,
-            AttestationActorKind.System, []).Accepted;
-        var prerequisiteAccepted = _prerequisiteStatus?.IsSatisfied == true ||
-            (CanSupervisorOverride && !string.IsNullOrWhiteSpace(SupervisorOverrideReason));
-        return dateAccepted && prerequisiteAccepted;
+        var dateAccepted = FormAttestationRules.ValidateCompletionDate(
+            date, _cycleStart, DateTime.Today) is null;
+        if (!dateAccepted)
+            return false;
+
+        if (!IsReclassification)
+            return true;
+        if (_prerequisiteStatus?.IsSatisfied == true)
+            return true;
+        if (!IsAssessmentDateRequired ||
+            ComprehensiveAssessmentCompletionDate is not DateTime assessmentCompletedOn)
+            return false;
+
+        return FormAttestationRules.ValidateAssessmentCompletionDate(
+            assessmentCompletedOn,
+            date,
+            _cycleStart,
+            DateTime.Today) is null;
     }
 
     [RelayCommand(CanExecute = nameof(CanCompleteAttestation))]
@@ -132,54 +163,66 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     {
         if (_form is null || CompletionDate is not DateTime completedOn)
             return;
-        var decision = FormAttestationRules.Evaluate(
-            _form.Type.ToString(), completedOn, _cycleStart, DateTime.Today,
-            AttestationActorKind.System, []);
-        if (!decision.Accepted)
+        var dateError = FormAttestationRules.ValidateCompletionDate(
+            completedOn, _cycleStart, DateTime.Today);
+        if (dateError is not null)
         {
-            CompletionDateError = decision.DateError ?? "The attestation could not be recorded.";
+            CompletionDateError = dateError;
             return;
+        }
+        if (IsAssessmentDateRequired)
+        {
+            if (ComprehensiveAssessmentCompletionDate is not DateTime assessmentCompletedOn)
+            {
+                ComprehensiveAssessmentCompletionDateError =
+                    "Enter the actual Comprehensive Assessment completion date.";
+                return;
+            }
+
+            var assessmentDateError = FormAttestationRules.ValidateAssessmentCompletionDate(
+                assessmentCompletedOn,
+                completedOn,
+                _cycleStart,
+                DateTime.Today);
+            if (assessmentDateError is not null)
+            {
+                ComprehensiveAssessmentCompletionDateError = assessmentDateError;
+                return;
+            }
         }
 
         IsSaving = true;
         try
         {
-            await formService.AttestAsync(
-                _form,
-                completedOn.Date,
-                _evidenceNoteId,
-                CanSupervisorOverride ? SupervisorOverrideReason.Trim() : null);
+            if (IsReclassification)
+            {
+                await formService.AttestReclassificationAsync(
+                    _form,
+                    completedOn.Date,
+                    IsAssessmentDateRequired
+                        ? ComprehensiveAssessmentCompletionDate?.Date
+                        : null,
+                    _evidenceNoteId);
+            }
+            else
+            {
+                await formService.AttestAsync(
+                    _form,
+                    completedOn.Date,
+                    _evidenceNoteId);
+            }
             if (AttestationChangedAsync is not null)
                 await AttestationChangedAsync();
             IsVisible = false;
         }
-        finally
+        catch (ArgumentOutOfRangeException exception)
         {
-            IsSaving = false;
-            NotifyStateChanged();
+            if (exception.ParamName == "comprehensiveAssessmentCompletedOn")
+                ComprehensiveAssessmentCompletionDateError = exception.Message;
+            else
+                CompletionDateError = exception.Message;
         }
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRecordExternalDocument))]
-    private async Task RecordExternalDocument()
-    {
-        if (_form is null)
-            return;
-        if (string.IsNullOrWhiteSpace(ExternalDocumentNote))
-        {
-            PrerequisiteError = "Enter where the external document is held or how it was verified.";
-            return;
-        }
-
-        IsSaving = true;
-        try
-        {
-            await formService.RecordExternalPrerequisiteAsync(_form, ExternalDocumentNote.Trim());
-            _prerequisiteStatus = await formService.GetPrerequisiteStatusAsync(_form);
-            ExternalDocumentNote = string.Empty;
-            PrerequisiteError = string.Empty;
-        }
-        catch (Exception exception)
+        catch (InvalidOperationException exception)
         {
             PrerequisiteError = exception.Message;
         }
@@ -189,8 +232,6 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
             NotifyStateChanged();
         }
     }
-
-    private bool CanRecordExternalDocument() => !IsSaving && CanRecordExternal;
 
     private async Task LoadPrerequisiteAsync(Form form, int version)
     {
@@ -213,6 +254,21 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
             if (version == _loadVersion)
                 NotifyStateChanged();
         }
+    }
+
+    private void ValidateAssessmentDate()
+    {
+        ComprehensiveAssessmentCompletionDateError =
+            IsAssessmentDateRequired &&
+            ComprehensiveAssessmentCompletionDate is DateTime assessmentCompletedOn &&
+            CompletionDate is DateTime reclassificationCompletedOn
+                ? FormAttestationRules.ValidateAssessmentCompletionDate(
+                    assessmentCompletedOn,
+                    reclassificationCompletedOn,
+                    _cycleStart,
+                    DateTime.Today) ?? string.Empty
+                : string.Empty;
+        CompleteAttestationCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanRevokeAttestation() =>
@@ -254,10 +310,10 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(PrerequisiteSummary));
         OnPropertyChanged(nameof(IsPrerequisiteMissing));
-        OnPropertyChanged(nameof(CanSupervisorOverride));
-        OnPropertyChanged(nameof(CanRecordExternal));
+        OnPropertyChanged(nameof(IsReclassification));
+        OnPropertyChanged(nameof(IsAssessmentDateRequired));
+        ValidateAssessmentDate();
         CompleteAttestationCommand.NotifyCanExecuteChanged();
         RevokeAttestationCommand.NotifyCanExecuteChanged();
-        RecordExternalDocumentCommand.NotifyCanExecuteChanged();
     }
 }

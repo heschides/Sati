@@ -24,6 +24,12 @@
     <SolidColorBrush x:Key="InfoBrush"     Color="#184A74" />
     <SolidColorBrush x:Key="InfoFillBrush" Color="#A8C5D6" />
 
+    <!-- Dashboard data series. Kept separate from semantic status colors so charts can
+         feel calm and coordinated without changing overdue/success meaning elsewhere. -->
+    <SolidColorBrush x:Key="ChartBlueBrush" Color="#1769D2" />
+    <SolidColorBrush x:Key="ChartGoldBrush" Color="#E3AD3F" />
+    <SolidColorBrush x:Key="ChartCopperBrush" Color="#D47A24" />
+
     <!-- Additional fixed semantic states used by dashboards and matrix views. -->
     <SolidColorBrush x:Key="SuccessStrongBrush" Color="#3A6B35" />
     <SolidColorBrush x:Key="OnSuccessStrongBrush" Color="#FFFFFF" />

@@ -1,302 +1,421 @@
-using System.Globalization;
+using static Sati.Contracts.V1.X12Document;
 
 namespace Sati.Contracts.V1;
 
-/// <summary>Which kind of response an interchange carries.</summary>
-public enum ClaimResponseKind
+public enum ClaimResponseKind { FunctionalAcknowledgement, ClaimAcknowledgement, RemittanceAdvice, Unrecognised }
+
+/// <summary>ControlNumber is this document's ISA13, never the original 837's control number.</summary>
+public sealed record ClaimResponseEnvelope(ClaimResponseKind Kind, bool IsTestInterchange, string? ControlNumber)
 {
-    /// <summary>999 — the clearinghouse accepted or rejected the file's syntax.</summary>
-    FunctionalAcknowledgement,
-
-    /// <summary>277CA — the payer accepted or rejected the claims themselves.</summary>
-    ClaimAcknowledgement,
-
-    /// <summary>835 — payment and adjustment detail.</summary>
-    RemittanceAdvice,
-
-    /// <summary>Something this reader does not interpret. Never guessed at.</summary>
-    Unrecognised
+    public string SenderQualifier { get; init; } = string.Empty;
+    public string SenderId { get; init; } = string.Empty;
+    public string ReceiverQualifier { get; init; } = string.Empty;
+    public string ReceiverId { get; init; } = string.Empty;
+    public string GroupControlNumber { get; init; } = string.Empty;
+    public string TransactionControlNumber { get; init; } = string.Empty;
+    public string ImplementationVersion { get; init; } = string.Empty;
 }
 
-/// <param name="Kind">What the interchange carries.</param>
-/// <param name="IsTestInterchange">
-/// ISA15, the X12 usage indicator: <c>T</c> for test, <c>P</c> for production. This is
-/// what decides whether the records written from this document are marked synthetic.
-/// The document declares its own status and Sati records that faithfully, rather than
-/// inferring it from which environment happened to be running — an inference that would
-/// be wrong the moment a real response arrived somewhere unexpected.
-/// </param>
-/// <param name="ControlNumber">ISA13, for correlating a response with what was sent.</param>
-public sealed record ClaimResponseEnvelope(
-    ClaimResponseKind Kind,
-    bool IsTestInterchange,
-    string? ControlNumber);
-
-/// <param name="Stage">The submission stage this acknowledgement moves the batch to.</param>
-/// <param name="ResponseCode">The code the payer or clearinghouse gave, when it gave one.</param>
 public sealed record ClaimAcknowledgementResult(
-    ClaimResponseEnvelope Envelope,
-    BillingSubmissionStage Stage,
-    string? ResponseCode,
-    string Explanation);
+    ClaimResponseEnvelope Envelope, BillingSubmissionStage Stage, string? ResponseCode, string Explanation);
 
-/// <summary>One claim's outcome inside an 835.</summary>
 public sealed record RemittanceClaimResult(
-    string ClaimReference,
-    decimal BilledAmount,
-    decimal PaidAmount,
-    decimal AdjustmentAmount,
-    decimal PatientResponsibilityAmount,
-    RemittanceClaimStatus Status,
-    string? GroupCode,
-    string? ReasonCode,
-    string Explanation);
+    string ClaimReference, decimal BilledAmount, decimal PaidAmount, decimal AdjustmentAmount,
+    decimal PatientResponsibilityAmount, RemittanceClaimStatus Status,
+    string? GroupCode, string? ReasonCode, string Explanation)
+{
+    public string ClaimStatusCode { get; init; } = string.Empty;
+    public IReadOnlyList<string> ServiceLineReferences { get; init; } = [];
+}
 
-/// <param name="ClaimPaymentTotal">The sum of what the claims were paid.</param>
-/// <param name="ProviderLevelAdjustment">
-/// PLB — adjustments made against the provider rather than any claim, which is why a
-/// deposit can differ from the claim total without any claim being wrong.
-/// </param>
-/// <param name="RemittancePaymentAmount">BPR02, what the payer says it is sending.</param>
+/// <summary>ProviderLevelAdjustment is the raw signed PLB sum: positive reduces the payment.
+/// Sati's deposit model stores its negation, so claim payments plus that ledger adjustment equals BPR02.</summary>
 public sealed record RemittanceResult(
-    ClaimResponseEnvelope Envelope,
-    string? PaymentReference,
-    string? PayerName,
-    DateTime? PaymentDate,
-    decimal ClaimPaymentTotal,
-    decimal ProviderLevelAdjustment,
-    decimal RemittancePaymentAmount,
-    IReadOnlyList<RemittanceClaimResult> Claims);
+    ClaimResponseEnvelope Envelope, string? PaymentReference, string? PayerName, DateTime? PaymentDate,
+    decimal ClaimPaymentTotal, decimal ProviderLevelAdjustment, decimal RemittancePaymentAmount,
+    IReadOnlyList<RemittanceClaimResult> Claims)
+{
+    public string PaymentDirection { get; init; } = string.Empty;
+    public string PaymentOriginatorId { get; init; } = string.Empty;
+    public string PayeeId { get; init; } = string.Empty;
+    public string PayeeQualifier { get; init; } = string.Empty;
+    public string PayerId { get; init; } = string.Empty;
+    public string PayerQualifier { get; init; } = string.Empty;
+}
 
-/// <summary>
-/// Sole owner of how an inbound 999, 277CA, or 835 is interpreted into the record status
-/// Sati stores.
-/// </summary>
-/// <remarks>
-/// <para>
-/// This is the permanent half of the claim exchange. A mock clearinghouse and a real one
-/// both produce X12; only the transport differs. Keeping interpretation here means the
-/// day Office Ally replaces the simulator, none of this changes — and it means the
-/// desktop and the API cannot reach different conclusions about whether a claim was paid,
-/// which is the failure this project treats as a defect rather than an inconvenience.
-/// </para>
-/// <para>
-/// It reads. It does not fabricate, transmit, or decide who may do either. Anything it
-/// does not recognise is reported as <see cref="ClaimResponseKind.Unrecognised"/> rather
-/// than interpreted optimistically.
-/// </para>
-/// </remarks>
+/// <summary>Shared authoritative reading of bounded 5010 999, 277CA, and 835 documents.
+/// This supported subset is not payer certification or a full X12 conformance validator.</summary>
 public static class ClaimResponseReader
 {
-    /// <summary>Identifies an interchange without interpreting its contents.</summary>
-    public static ClaimResponseEnvelope ReadEnvelope(string x12)
+    public const int MaximumDocumentCharacters = X12Document.MaximumLength;
+    public const int MaximumDocumentLength = MaximumDocumentCharacters;
+
+    public static ClaimResponseEnvelope ReadEnvelope(string x12) => X12Document.Read(x12).Envelope;
+
+    public static ParsedClaimResponse ReadDocument(string x12)
     {
-        ArgumentNullException.ThrowIfNull(x12);
-        var segments = Parse(x12);
-
-        var isa = Find(segments, "ISA");
-        var isTest = isa is { Length: > 15 } && isa[15].Trim() == "T";
-        var controlNumber = isa is { Length: > 13 } ? isa[13].Trim() : null;
-
-        var st = Find(segments, "ST");
-        var kind = st is { Length: > 1 } ? st[1].Trim() switch
+        var document = X12Document.Read(x12);
+        var parsed = document.Type switch
         {
-            "999" or "997" => ClaimResponseKind.FunctionalAcknowledgement,
-            "277" => ClaimResponseKind.ClaimAcknowledgement,
-            "835" => ClaimResponseKind.RemittanceAdvice,
-            _ => ClaimResponseKind.Unrecognised
-        } : ClaimResponseKind.Unrecognised;
-
-        return new ClaimResponseEnvelope(kind, isTest, controlNumber);
+            "999" => new ParsedClaimResponse(document.Envelope, ReadFunctional(document), [], null),
+            "277" => new ParsedClaimResponse(document.Envelope, null, ReadClaimAcknowledgements(document), null),
+            "835" => new ParsedClaimResponse(document.Envelope, null, [], ReadRemittance(document)),
+            _ => throw new FormatException("Only 5010 999, 277CA, and 835 responses are supported. TA1, 997 and other transaction types require separate handling.")
+        };
+        return parsed with { CanonicalTransaction = document.CanonicalTransaction() };
     }
 
-    /// <summary>
-    /// Interprets a 999 or a 277CA. The two are separate stages on purpose: a file can be
-    /// syntactically accepted and still have every claim rejected, and collapsing them
-    /// would lose the distinction between "the clearinghouse could read it" and "the payer
-    /// will pay it".
-    /// </summary>
+    public static ParsedClaimSubmission ReadSubmission(string x12)
+    {
+        var document = X12Document.Read(x12);
+        Require(document.Type == "837", "The retained submission is not a supported 837P.");
+        var provider = ExactlyOne(document.Transaction.Where(s => s[0] == "NM1" && s.Length > 1 && s[1] == "85"));
+        Require(Required(provider, 8) == "XX", "The retained billing provider must identify its NPI.");
+        var npi = Required(provider, 9, 10);
+        Require(npi.Length == 10 && Digits(npi), "The retained billing provider NPI is invalid.");
+        var claims = new List<SubmittedClaimReference>();
+        var references = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < document.Transaction.Count; i++)
+        {
+            var segment = document.Transaction[i];
+            if (segment[0] != "CLM") continue;
+            var reference = Required(segment, 1, 38);
+            Require(references.Add(reference), "The retained submission contains a duplicate claim reference.");
+            var amount = Money(Required(segment, 2, 18));
+            Require(amount > 0m, "The retained claim charge must be positive.");
+            var lines = new List<string>();
+            for (var j = i + 1; j < document.Transaction.Count && document.Transaction[j][0] is not ("CLM" or "HL" or "SE"); j++)
+            {
+                var detail = document.Transaction[j];
+                if (detail[0] == "REF" && detail.Length > 1 && detail[1] == "6R")
+                    AddUnique(lines, Required(detail, 2, 50));
+            }
+            claims.Add(new(reference, amount, lines));
+            Require(claims.Count <= 5000, "The retained submission contains too many claims.");
+        }
+        Require(claims.Count > 0, "The retained submission has no claim references.");
+        return new(document.Envelope, claims, npi);
+    }
+
     public static ClaimAcknowledgementResult ReadAcknowledgement(string x12)
     {
-        var envelope = ReadEnvelope(x12);
-        var segments = Parse(x12);
-
-        if (envelope.Kind == ClaimResponseKind.FunctionalAcknowledgement)
-        {
-            // AK9 carries the functional group's verdict; IK5/AK5 the transaction set's.
-            // A is accepted, E is accepted with errors, everything else is a rejection.
-            var ak9 = Find(segments, "AK9");
-            var ik5 = Find(segments, "IK5") ?? Find(segments, "AK5");
-            var code = (ak9 is { Length: > 1 } ? ak9[1].Trim() : null)
-                       ?? (ik5 is { Length: > 1 } ? ik5[1].Trim() : null);
-
-            return code is "A" or "E"
-                ? new ClaimAcknowledgementResult(envelope, BillingSubmissionStage.FunctionalAccepted, code,
-                    "The clearinghouse accepted the file's syntax.")
-                : new ClaimAcknowledgementResult(envelope, BillingSubmissionStage.FunctionalRejected, code,
-                    "The clearinghouse rejected the file's syntax. No claim in it was forwarded to the payer.");
-        }
-
-        if (envelope.Kind == ClaimResponseKind.ClaimAcknowledgement)
-        {
-            // STC01 is a composite: category:status:entity. The leading category is what
-            // decides the verdict — A* accepted, R* rejected, E* errored.
-            var statuses = segments
-                .Where(segment => segment[0] == "STC" && segment.Length > 1)
-                .Select(segment => segment[1].Split(':')[0].Trim())
-                .Where(value => value.Length > 0)
-                .ToList();
-
-            if (statuses.Count == 0)
-            {
-                return new ClaimAcknowledgementResult(envelope, BillingSubmissionStage.ClaimRejected, null,
-                    "The acknowledgement carried no claim status, so nothing can be treated as accepted.");
-            }
-
-            var accepted = statuses.Count(value => value.StartsWith('A'));
-            var code = string.Join(",", statuses.Distinct());
-
-            if (accepted == statuses.Count)
-            {
-                return new ClaimAcknowledgementResult(envelope, BillingSubmissionStage.ClaimAccepted, code,
-                    "The payer accepted every claim in the batch.");
-            }
-
-            return accepted == 0
-                ? new ClaimAcknowledgementResult(envelope, BillingSubmissionStage.ClaimRejected, code,
-                    "The payer rejected every claim in the batch.")
-                : new ClaimAcknowledgementResult(envelope, BillingSubmissionStage.PartiallyAccepted, code,
-                    $"The payer accepted {accepted} of {statuses.Count} claims. The rest need correction and resubmission.");
-        }
-
-        return new ClaimAcknowledgementResult(envelope, BillingSubmissionStage.TransportFailed, null,
-            "The response was not a recognised acknowledgement, so no status was inferred from it.");
+        var parsed = ReadDocument(x12);
+        if (parsed.FunctionalAcknowledgement is { } functional)
+            return new(parsed.Envelope, functional.Stage, functional.ResponseCode,
+                functional.Stage == BillingSubmissionStage.FunctionalAccepted
+                    ? "The clearinghouse accepted this transaction's syntax; claim adjudication is a separate decision."
+                    : "The clearinghouse rejected this transaction's syntax. Review the retained acknowledgement before correcting it.");
+        Require(parsed.Envelope.Kind == ClaimResponseKind.ClaimAcknowledgement, "The document is not an acknowledgement.");
+        var claims = parsed.ClaimAcknowledgements;
+        // Historic aggregate API has no receipt/unknown stage. Refuse rather than invent a verdict.
+        Require(claims.All(c => c.Disposition is ClaimAcknowledgementDisposition.Accepted or ClaimAcknowledgementDisposition.Rejected),
+            "The acknowledgement includes receipt-only or unresolved statuses requiring review.");
+        var accepted = claims.Count(c => c.Disposition == ClaimAcknowledgementDisposition.Accepted);
+        var stage = accepted == claims.Count ? BillingSubmissionStage.ClaimAccepted
+            : accepted == 0 ? BillingSubmissionStage.ClaimRejected : BillingSubmissionStage.PartiallyAccepted;
+        return new(parsed.Envelope, stage, string.Join(",", claims.Select(c => c.CategoryCode).Distinct()),
+            accepted == claims.Count ? "Every referenced claim was accepted into adjudication; payment has not been determined."
+            : accepted == 0 ? "Every referenced claim was rejected before adjudication."
+            : $"The acknowledgement accepted {accepted} of {claims.Count} referenced claims into adjudication. The rest were rejected.");
     }
 
-    /// <summary>Interprets an 835 into per-claim outcomes and the deposit totals.</summary>
-    public static RemittanceResult ReadRemittance(string x12)
+    public static RemittanceResult ReadRemittance(string x12) =>
+        ReadDocument(x12).Remittance ?? throw new FormatException("The document is not a remittance advice.");
+
+    private static FunctionalAcknowledgementDetail ReadFunctional(X12Document document)
     {
-        var envelope = ReadEnvelope(x12);
-        var segments = Parse(x12);
-
-        var bpr = Find(segments, "BPR");
-        var remittanceAmount = bpr is { Length: > 2 } ? Money(bpr[2]) : 0m;
-        var paymentDate = bpr is { Length: > 16 } ? Date(bpr[16]) : null;
-
-        var trn = Find(segments, "TRN");
-        var paymentReference = trn is { Length: > 2 } ? trn[2].Trim() : null;
-
-        var payer = segments.FirstOrDefault(segment =>
-            segment[0] == "N1" && segment.Length > 2 && segment[1].Trim() == "PR");
-        var payerName = payer is { Length: > 2 } ? payer[2].Trim() : null;
-
-        // PLB is provider-level: it moves money without belonging to any claim, which is
-        // exactly why a deposit can fail to equal the claim total with every claim correct.
-        var providerLevelAdjustment = segments
-            .Where(segment => segment[0] == "PLB")
-            .SelectMany(segment => segment.Skip(3).Where((_, index) => index % 2 == 1))
-            .Sum(Money);
-
-        var claims = ReadClaims(segments);
-
-        return new RemittanceResult(
-            envelope,
-            paymentReference,
-            payerName,
-            paymentDate,
-            claims.Sum(claim => claim.PaidAmount),
-            providerLevelAdjustment,
-            remittanceAmount,
-            claims);
+        var segments = document.Transaction;
+        var ak1 = ExactlyOne(segments.Where(s => s[0] == "AK1"));
+        var ak9 = ExactlyOne(segments.Where(s => s[0] == "AK9"));
+        Require(segments[1] == ak1 && segments[^2] == ak9, "The functional acknowledgement loop order is invalid.");
+        Require(Required(ak1, 1) == "HC", "The acknowledgement does not identify an original healthcare-claim group.");
+        var originalGroup = Required(ak1, 2, 9);
+        Require(Digits(originalGroup), "The original group control number is invalid.");
+        if (ak1.Length > 3) Require(ak1[3] == "005010X222A1", "The acknowledged claim implementation version is unsupported.");
+        // Retained generator emits one ST. Never flatten partial group acceptance into a batch verdict.
+        Require(Count(Required(ak9, 2)) == 1 && Count(Required(ak9, 3)) == 1,
+            "Acknowledgements of multiple or incomplete original transactions require separate handling.");
+        var acceptedCount = Count(Required(ak9, 4));
+        var code = Required(ak9, 1);
+        Require(code is "A" or "E" or "R", "The functional acknowledgement disposition requires separate review.");
+        Require(acceptedCount == (code is "A" or "E" ? 1 : 0), "The acknowledgement disposition conflicts with its accepted count.");
+        var ak2s = segments.Where(s => s[0] == "AK2").ToArray();
+        Require(ak2s.Length <= 1, "The acknowledgement contains multiple original transaction loops.");
+        var originals = new List<string>();
+        if (ak2s.Length == 1)
+        {
+            var ak2 = ak2s[0];
+            Require(Required(ak2, 1) == "837", "The original acknowledged transaction is not an 837.");
+            var transaction = Required(ak2, 2, 9);
+            Require(transaction.Length >= 4 && transaction.All(char.IsAsciiLetterOrDigit), "The acknowledged transaction control number is invalid.");
+            if (ak2.Length > 3) Require(ak2[3] == "005010X222A1", "The original transaction implementation version is unsupported.");
+            originals.Add(transaction);
+            var verdict = ExactlyOne(segments.Where(s => s[0] == "IK5"));
+            var ikCode = Required(verdict, 1);
+            Require(ikCode is "A" or "E" or "R" && ((ikCode is "A" or "E") == (code is "A" or "E")),
+                "The transaction and group acknowledgement dispositions are inconsistent.");
+            Require(Array.IndexOf(segments.ToArray(), ak2) < Array.IndexOf(segments.ToArray(), verdict), "The acknowledgement verdict precedes its transaction.");
+        }
+        else Require(!segments.Any(s => s[0] == "IK5"), "A transaction verdict is missing its original transaction identity.");
+        Require(segments.All(s => s[0] is "ST" or "AK1" or "AK2" or "IK3" or "IK4" or "CTX" or "IK5" or "AK9" or "SE"),
+            "The 999 contains unsupported segments.");
+        return new(originalGroup, originals, code is "A" or "E" ? BillingSubmissionStage.FunctionalAccepted : BillingSubmissionStage.FunctionalRejected, code);
     }
 
-    private static List<RemittanceClaimResult> ReadClaims(IReadOnlyList<string[]> segments)
+    private static IReadOnlyList<ClaimAcknowledgementDetail> ReadClaimAcknowledgements(X12Document document)
     {
-        var claims = new List<RemittanceClaimResult>();
-
-        for (var index = 0; index < segments.Count; index++)
+        var bht = ExactlyOne(document.Transaction.Where(s => s[0] == "BHT"));
+        Require(document.Transaction[1] == bht, "The claim acknowledgement business header is out of order.");
+        Require(Required(bht, 1) == "0085" && Required(bht, 2) == "08", "Only the 277 claim acknowledgement business purpose is supported.");
+        Date(Required(bht, 4));
+        Require(document.Transaction.All(s => s[0] is "ST" or "BHT" or "HL" or "NM1" or "N3" or "N4" or "PER" or "TRN" or "STC" or "REF" or "DTP" or "QTY" or "AMT" or "SVC" or "SE"),
+            "The claim acknowledgement contains unsupported segments.");
+        var hierarchy = new Dictionary<string, string>(StringComparer.Ordinal);
+        var claims = new List<ClaimAcknowledgementDetail>();
+        var traces = new HashSet<string>(StringComparer.Ordinal);
+        string? level = null, reference = null;
+        var statuses = new List<(string Category, string Status, decimal? Billed)>();
+        var lineReferences = new List<string>();
+        var serviceLevel = false;
+        void FinishClaim()
         {
-            var clp = segments[index];
-            if (clp[0] != "CLP" || clp.Length <= 4)
-                continue;
-
-            var reference = clp[1].Trim();
-            var statusCode = clp[2].Trim();
-            var billed = Money(clp[3]);
-            var paid = Money(clp[4]);
-            var patientResponsibility = clp.Length > 5 ? Money(clp[5]) : 0m;
-
-            decimal adjustment = 0m;
-            string? groupCode = null;
-            string? reasonCode = null;
-
-            // Everything up to the next CLP belongs to this claim.
-            for (var detail = index + 1; detail < segments.Count && segments[detail][0] != "CLP"; detail++)
-            {
-                var candidate = segments[detail];
-                if (candidate[0] != "CAS" || candidate.Length <= 3)
-                    continue;
-
-                groupCode ??= candidate[1].Trim();
-                reasonCode ??= candidate[2].Trim();
-                // CAS repeats reason/amount/quantity triplets after the group code.
-                for (var field = 3; field < candidate.Length; field += 3)
-                    adjustment += Money(candidate[field]);
-            }
-
-            var status = InterpretClaimStatus(statusCode, billed, paid);
-            claims.Add(new RemittanceClaimResult(
-                reference, billed, paid, adjustment, patientResponsibility,
-                status, groupCode, reasonCode, ExplainStatus(status, statusCode)));
+            if (reference is null) return;
+            Require(statuses.Count > 0, "A claim trace has no claim-level status.");
+            var dispositions = statuses.Select(s => Disposition(s.Category)).ToArray();
+            var disposition = dispositions.Contains(ClaimAcknowledgementDisposition.Rejected) ? ClaimAcknowledgementDisposition.Rejected
+                : dispositions.Contains(ClaimAcknowledgementDisposition.NeedsReview) ? ClaimAcknowledgementDisposition.NeedsReview
+                : dispositions.All(d => d == ClaimAcknowledgementDisposition.Accepted) ? ClaimAcknowledgementDisposition.Accepted
+                : ClaimAcknowledgementDisposition.Received;
+            var amounts = statuses.Where(s => s.Billed.HasValue).Select(s => s.Billed!.Value).Distinct().ToArray();
+            Require(amounts.Length <= 1, "The claim acknowledgement carries conflicting claim charges.");
+            claims.Add(new(reference, disposition, string.Join(",", statuses.Select(s => s.Category).Distinct()),
+                string.Join(",", statuses.Select(s => s.Status).Distinct()), amounts.Length == 1 ? amounts[0] : null)
+                { ServiceLineReferences = lineReferences.ToArray() });
+            Require(claims.Count <= 5000, "The acknowledgement has too many claims.");
+            reference = null; statuses.Clear(); lineReferences.Clear(); serviceLevel = false;
         }
-
+        foreach (var segment in document.Transaction)
+        {
+            if (segment[0] == "HL")
+            {
+                FinishClaim();
+                var id = Required(segment, 1, 12);
+                var nextLevel = Required(segment, 3, 2);
+                Require(Digits(id) && !hierarchy.ContainsKey(id), "The 277 hierarchy has a duplicate or invalid identifier.");
+                Require(segment.Length == 5 && segment[4] is "0" or "1", "The 277 hierarchy shape is invalid.");
+                var parent = segment[2];
+                Require(nextLevel switch
+                {
+                    "20" => parent.Length == 0 && hierarchy.Count == 0,
+                    "21" => hierarchy.TryGetValue(parent, out var p) && p == "20",
+                    "19" => hierarchy.TryGetValue(parent, out var p) && p == "21",
+                    "PT" => hierarchy.TryGetValue(parent, out var p) && p == "19",
+                    _ => false
+                }, "The 277 claim hierarchy is unsupported or has an invalid parent.");
+                hierarchy.Add(id, nextLevel); level = nextLevel;
+            }
+            else if (segment[0] == "TRN")
+            {
+                Required(segment, 2, 50);
+                if (level == "PT")
+                {
+                    FinishClaim();
+                    Require(Required(segment, 1) == "2", "A claim acknowledgement must use the referenced transaction trace.");
+                    reference = Required(segment, 2, 50);
+                    Require(traces.Add(reference), "The acknowledgement contains a duplicate claim trace.");
+                }
+            }
+            else if (segment[0] == "SVC")
+            {
+                Require(reference is not null && statuses.Count > 0, "A service status is not attached to an identified claim.");
+                serviceLevel = true; Money(Required(segment, 2, 18));
+            }
+            else if (segment[0] == "STC")
+            {
+                var parts = Required(segment, 1, 80).Split(document.ComponentSeparator);
+                Require(parts.Length is 2 or 3 && parts[0].Length <= 4 && Digits(parts[1]), "The claim status composite is invalid.");
+                Date(Required(segment, 2));
+                decimal? amount = segment.Length > 4 && segment[4].Length > 0 ? Money(segment[4]) : null;
+                Require(!amount.HasValue || amount.Value >= 0, "A claim acknowledgement charge cannot be negative.");
+                Require(segment.Length <= 10 || segment.Skip(10).All(string.IsNullOrEmpty), "Additional status composites require separate handling.");
+                if (level == "PT")
+                {
+                    Require(reference is not null, "A patient status is missing its claim trace.");
+                    var disposition = Disposition(parts[0]);
+                    Require(disposition switch
+                    {
+                        ClaimAcknowledgementDisposition.Accepted or ClaimAcknowledgementDisposition.Received => Required(segment, 3) == "WQ",
+                        ClaimAcknowledgementDisposition.Rejected => Required(segment, 3) == "U",
+                        _ => true
+                    }, "The claim status category and action code disagree.");
+                    if (serviceLevel)
+                        Require(Disposition(parts[0]) == ClaimAcknowledgementDisposition.Accepted,
+                            "Service-level rejection or unresolved status requires separate handling.");
+                    else statuses.Add((parts[0], parts[1], amount));
+                }
+                else
+                {
+                    Require(level is not null, "An aggregate status has no hierarchy context.");
+                    Require(Disposition(parts[0]) is ClaimAcknowledgementDisposition.Accepted or ClaimAcknowledgementDisposition.Received,
+                        "Provider/receiver-level rejection or unresolved status requires separate handling.");
+                }
+            }
+            else if (segment[0] == "REF" && segment.Length > 1 && segment[1] is "FJ" or "6R")
+            {
+                Require(reference is not null && serviceLevel, "A line reference has no claim/service context.");
+                AddUnique(lineReferences, Required(segment, 2, 50));
+            }
+            else if (segment[0] == "AMT") Money(Required(segment, 2, 18));
+        }
+        FinishClaim();
+        Require(claims.Count > 0, "The acknowledgement has no patient-level claim trace and status pairs.");
         return claims;
     }
 
-    /// <summary>
-    /// CLP02 is the payer's own verdict and is trusted first. The amounts only decide the
-    /// shade of "processed" — a claim the payer processed but paid nothing on is not the
-    /// same as one it denied, and calling both "denied" would put work in the wrong queue.
-    /// </summary>
-    private static RemittanceClaimStatus InterpretClaimStatus(string statusCode, decimal billed, decimal paid) =>
-        statusCode switch
-        {
-            "4" => RemittanceClaimStatus.Denied,
-            "22" => RemittanceClaimStatus.Reversed,
-            "1" or "2" or "3" or "19" or "20" or "21" => paid <= 0m
-                ? RemittanceClaimStatus.NeedsReview
-                : paid >= billed
-                    ? RemittanceClaimStatus.Paid
-                    : RemittanceClaimStatus.PartiallyPaid,
-            _ => RemittanceClaimStatus.NeedsReview
-        };
-
-    private static string ExplainStatus(RemittanceClaimStatus status, string statusCode) => status switch
+    private static ClaimAcknowledgementDisposition Disposition(string category) => category switch
     {
-        RemittanceClaimStatus.Paid => "Paid in full.",
-        RemittanceClaimStatus.PartiallyPaid => "Paid less than billed. The adjustment reason explains the difference.",
-        RemittanceClaimStatus.Denied => "Denied by the payer. It needs correction before it can be resubmitted.",
-        RemittanceClaimStatus.Reversed => "A previous payment was reversed. The original outcome no longer stands.",
-        _ => $"Processed with claim status {statusCode} and no payment. Needs review before it is worked."
+        "A2" => ClaimAcknowledgementDisposition.Accepted,
+        "A0" or "A1" => ClaimAcknowledgementDisposition.Received,
+        "A3" or "A6" or "A7" or "A8" => ClaimAcknowledgementDisposition.Rejected,
+        _ => ClaimAcknowledgementDisposition.NeedsReview
     };
 
-    private static List<string[]> Parse(string x12) => x12
-        .Split('~', StringSplitOptions.RemoveEmptyEntries)
-        .Select(segment => segment.Trim().Split('*'))
-        .Where(segment => segment.Length > 0 && segment[0].Length > 0)
-        .ToList();
+    private static RemittanceResult ReadRemittance(X12Document document)
+    {
+        var segments = document.Transaction;
+        Require(segments.All(s => s[0] is "ST" or "BPR" or "TRN" or "CUR" or "REF" or "DTM" or "N1" or "N3" or "N4"
+            or "PER" or "RDM" or "LX" or "CLP" or "CAS" or "NM1" or "AMT" or "QTY" or "SVC" or "LQ" or "PLB" or "SE"),
+            "The remittance contains unsupported segments, including supplemental institutional/Medicare financial summaries.");
+        var bpr = ExactlyOne(segments.Where(s => s[0] == "BPR"));
+        Require(segments[1] == bpr && bpr.Length is >= 17 and <= 22, "The remittance financial header is missing, incomplete, or out of order.");
+        Require(Required(bpr, 3) == "C", "Only credit-direction 835 payments are supported; a debit flag requires separate handling.");
+        Require(Required(bpr, 4) is "ACH" or "CHK" or "NON", "The remittance payment method is unsupported.");
+        var payment = Money(Required(bpr, 2, 18));
+        Require(Required(bpr, 1) is "C" or "D" or "H" or "I" or "P" or "U" or "X", "The remittance handling code is invalid.");
+        Require(bpr[4] != "NON" || payment == 0, "A nonpayment remittance cannot contain a payment amount.");
+        Require(payment >= 0, "An 835 total payment cannot be negative; use the payer's balance-forwarding advice.");
+        var paymentDate = Date(Required(bpr, 16));
+        var trn = ExactlyOne(segments.Where(s => s[0] == "TRN"));
+        Require(Required(trn, 1) == "1", "The payment must carry a reassociation trace.");
+        var paymentReference = Required(trn, 2, 50);
+        var originator = Required(trn, 3, 10);
+        Require(originator.Length == 10, "The payment originator identifier is invalid.");
+        var payer = ExactlyOne(segments.Where(s => s[0] == "N1" && s.Length > 1 && s[1] == "PR"));
+        var payee = ExactlyOne(segments.Where(s => s[0] == "N1" && s.Length > 1 && s[1] == "PE"));
+        var payeeQualifier = Required(payee, 3, 2);
+        var payeeId = Required(payee, 4, 80);
+        Require(payeeQualifier == "XX" && payeeId.Length == 10 && Digits(payeeId), "Only remittances identifying the payee by NPI are supported.");
+        Require(!segments.Any(s => s[0] == "CUR" && (s.Length < 3 || s[2] != "USD")), "Non-USD remittances require separate handling.");
+        var claims = new List<RemittanceClaimResult>();
+        var claimReferences = new HashSet<string>(StringComparer.Ordinal);
+        decimal providerAdjustment = 0m;
+        var reachedProviderAdjustments = false;
+        var reachedClaim = false;
+        for (var index = 0; index < segments.Count; index++)
+        {
+            var segment = segments[index];
+            if (segment[0] is "CAS" or "SVC" or "AMT" or "QTY")
+                Require(reachedClaim && !reachedProviderAdjustments, "Claim financial detail has no claim context.");
+            if (segment[0] is "BPR" or "TRN" or "N1")
+                Require(!reachedClaim && !reachedProviderAdjustments, "A remittance header appears after claim detail.");
+            if (segment[0] == "PLB")
+            {
+                reachedProviderAdjustments = true;
+                Require(Required(segment, 1) == payeeId, "A provider adjustment identifies a different payee.");
+                Date(Required(segment, 2));
+                Require(segment.Length is >= 5 and <= 15 && (segment.Length - 3) % 2 == 0, "The provider adjustment pairs are incomplete.");
+                for (var field = 3; field < segment.Length; field += 2)
+                {
+                    Required(segment, field, 80);
+                    providerAdjustment += Money(Required(segment, field + 1, 18));
+                }
+            }
+            if (segment[0] != "CLP") continue;
+            reachedClaim = true;
+            Require(!reachedProviderAdjustments, "A claim appears after provider-level adjustments.");
+            var reference = Required(segment, 1, 38);
+            Require(claimReferences.Add(reference), "Repeated claim references, including reversal/correction pairs, require separate handling.");
+            var code = Required(segment, 2, 2);
+            Require(code is "1" or "2" or "3" or "4" or "19" or "20" or "21" or "22", "The remittance claim status requires separate handling.");
+            var billed = Money(Required(segment, 3, 18));
+            var paid = Money(Required(segment, 4, 18));
+            var patient = segment.Length > 5 && segment[5].Length > 0 ? Money(segment[5]) : 0m;
+            Require(code == "22" ? billed <= 0 && paid <= 0 && patient <= 0 : billed >= 0 && paid >= 0 && patient >= 0,
+                "The claim amounts have signs inconsistent with the payer's disposition.");
+            decimal adjustment = 0m, patientAdjustment = 0m;
+            string? groupCode = null, reasonCode = null;
+            var lineReferences = new List<string>();
+            for (var detail = index + 1; detail < segments.Count && segments[detail][0] is not ("CLP" or "PLB" or "SE"); detail++)
+            {
+                var row = segments[detail];
+                if (row[0] == "CAS")
+                {
+                    var group = Required(row, 1, 2);
+                    Require(group is "CO" or "PR" or "OA" or "PI", "The adjustment group is unsupported.");
+                    Require(row.Length is >= 4 and <= 20, "The adjustment segment is incomplete or too long.");
+                    groupCode ??= group; reasonCode ??= Required(row, 2, 10);
+                    for (var field = 2; field < row.Length; field += 3)
+                    {
+                        if (row.Skip(field).All(string.IsNullOrEmpty)) break;
+                        Required(row, field, 10);
+                        var amount = Money(Required(row, field + 1, 18));
+                        adjustment += amount;
+                        if (group == "PR") patientAdjustment += amount;
+                        if (field + 2 < row.Length && row[field + 2].Length > 0) Money(row[field + 2]);
+                    }
+                }
+                else if (row[0] == "SVC")
+                {
+                    Required(row, 1, 80);
+                    Money(Required(row, 2, 18)); Money(Required(row, 3, 18));
+                }
+                else if (row[0] == "REF" && row.Length > 1 && row[1] == "6R")
+                    AddUnique(lineReferences, Required(row, 2, 50));
+                else if (row[0] is "AMT" or "QTY")
+                    Money(Required(row, 2, 18));
+            }
+            Require(billed - paid == adjustment, "Claim payment and adjustments do not balance to the billed amount.");
+            Require(patient == patientAdjustment, "Patient responsibility does not equal the PR adjustments.");
+            var status = code switch
+            {
+                "4" => RemittanceClaimStatus.Denied,
+                "22" => RemittanceClaimStatus.Reversed,
+                _ => paid == 0 || paid > billed ? RemittanceClaimStatus.NeedsReview
+                    : paid == billed ? RemittanceClaimStatus.Paid : RemittanceClaimStatus.PartiallyPaid
+            };
+            Require(code != "4" || paid == 0, "A denied claim contains a payment requiring review.");
+            claims.Add(new(reference, billed, paid, adjustment, patient, status, groupCode, reasonCode,
+                status switch
+                {
+                    RemittanceClaimStatus.Paid => "Paid in full on this advice.",
+                    RemittanceClaimStatus.PartiallyPaid => "Paid below billed charges; review the retained adjustment detail.",
+                    RemittanceClaimStatus.Denied => "The payer denied the claim; review its reasons before deciding the next action.",
+                    RemittanceClaimStatus.Reversed => "This advice reverses a prior payment; the prior evidence remains retained.",
+                    _ => paid > billed ? "The reported payment exceeds billed charges; review the retained adjustment detail."
+                        : "The payer processed the claim with no payment; review its adjustment detail."
+                }) { ClaimStatusCode = code, ServiceLineReferences = lineReferences });
+            Require(claims.Count <= 5000, "The remittance has too many claims.");
+        }
+        Require(claims.Count > 0, "Provider-only remittances require separate handling because no retained claim can be matched.");
+        var total = claims.Sum(c => c.PaidAmount);
+        Require(total - providerAdjustment == payment, "Claim payments minus provider adjustments do not equal the remittance payment.");
+        return new(document.Envelope, paymentReference, Required(payer, 2, 80), paymentDate, total, providerAdjustment, payment, claims)
+        {
+            PaymentDirection = bpr[3], PaymentOriginatorId = originator, PayeeId = payeeId, PayeeQualifier = payeeQualifier,
+            PayerQualifier = payer.Length > 3 ? payer[3] : string.Empty, PayerId = payer.Length > 4 ? payer[4] : string.Empty
+        };
+    }
 
-    private static string[]? Find(IEnumerable<string[]> segments, string name) =>
-        segments.FirstOrDefault(segment => segment[0] == name);
+    private static string[] ExactlyOne(IEnumerable<string[]> segments)
+    {
+        var rows = segments.Take(2).ToArray();
+        Require(rows.Length == 1, "A required X12 segment is missing or duplicated.");
+        return rows[0];
+    }
 
-    private static decimal Money(string value) =>
-        decimal.TryParse(value?.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed)
-            ? parsed
-            : 0m;
-
-    private static DateTime? Date(string value) =>
-        DateTime.TryParseExact(value?.Trim(), "yyyyMMdd", CultureInfo.InvariantCulture,
-            DateTimeStyles.None, out var parsed)
-            ? parsed
-            : null;
+    private static void AddUnique(List<string> references, string reference)
+    {
+        Require(!references.Contains(reference, StringComparer.Ordinal), "The claim contains a duplicate service-line reference.");
+        references.Add(reference);
+    }
 }

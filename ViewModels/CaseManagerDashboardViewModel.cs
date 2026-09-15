@@ -33,6 +33,7 @@ namespace Sati.ViewModels
         private readonly IUpcomingEventService _upcomingEventService;
         private readonly IFormService _formService;
         private readonly IExemptDateService _exemptDateService;
+        private readonly IFormOpeningPrompt? _formOpeningPrompt;
         private readonly ConsumerPickerSortPreferenceService? _consumerPickerSortPreferences;
         private Settings? _settings;
         private Incentive? _incentive;
@@ -72,7 +73,8 @@ CalendarViewModel calendarViewModel,
             GuidanceViewModel guidance,
             HelperReferenceViewModel reference,
             IAnnualDocumentService? annualDocuments = null,
-            ConsumerPickerSortPreferenceService? consumerPickerSortPreferences = null
+            ConsumerPickerSortPreferenceService? consumerPickerSortPreferences = null,
+            IFormOpeningPrompt? formOpeningPrompt = null
             )
         {
             _personService = personService;
@@ -85,6 +87,7 @@ CalendarViewModel calendarViewModel,
             _exemptDateService = exemptDateService;
             _annualDocuments = annualDocuments;
             _consumerPickerSortPreferences = consumerPickerSortPreferences;
+            _formOpeningPrompt = formOpeningPrompt;
             NoteEntry = noteEntryViewModel; NotesView = CollectionViewSource.GetDefaultView(Notes);
             NotesView.Filter = FilterNotes;
             NotesLog = notesWindowViewModel;
@@ -382,14 +385,15 @@ CalendarViewModel calendarViewModel,
         // Task board
         // -------------------------------------------------------------------------
 
-        // Heterogeneous by design: FormTaskRow for the form tabs, UpcomingEvent for
-        // Appointments, both for All. The XAML picks a template per item type.
+        // Heterogeneous by design: FormTaskRow for ordinary forms, ReleaseTaskRow for
+        // exact recipient obligations, and UpcomingEvent for appointments. The XAML
+        // picks a template per item type.
         private IEnumerable<object> UnfilteredBoardItems() => SelectedTab switch
         {
             BoardTab.CompAssessments => BuildFormRows(FormType.ComprehensiveAssessment),
             BoardTab.Reclasses => BuildFormRows(FormType.Reclassification),
             BoardTab.Pcps => BuildFormRows(FormType.PCP),
-            BoardTab.Releases => BuildFormRows(FormType.Release_Agency, FormType.Release_DHHS, FormType.Release_Medical),
+            BoardTab.Releases => BuildReleaseRows(),
             BoardTab.Reviews => BuildFormRows(FormType.Q1R, FormType.Q2R, FormType.Q3R, FormType.Q4R),
             BoardTab.Appointments => ScheduledEvents(),
             BoardTab.All => AllBoardItems(),
@@ -420,6 +424,7 @@ CalendarViewModel calendarViewModel,
         private static string BoardItemClientName(object item) => item switch
         {
             FormTaskRow row => row.ClientName,
+            ReleaseTaskRow row => row.ClientName,
             UpcomingEvent e => e.ClientName,
             _ => "Other"
         };
@@ -431,6 +436,7 @@ CalendarViewModel calendarViewModel,
         private static DateTime BoardItemDate(object item) => item switch
         {
             FormTaskRow row => row.DueDate,
+            ReleaseTaskRow row => row.DueDate,
             UpcomingEvent e => e.Date,
             _ => DateTime.MaxValue
         };
@@ -480,7 +486,7 @@ CalendarViewModel calendarViewModel,
         public bool IsEffectiveDatesTab => SelectedTab == BoardTab.EffectiveDates;
         public bool IsTaskListTab => SelectedTab != BoardTab.EffectiveDates;
 
-// Per client, per type: the soonest-due incomplete form scoped to the
+        // Per client, per type: the soonest-due incomplete form scoped to the
         // current/next cycle. No lookahead cap — DateFilter owns the forward bound
         // now. One row per client per type is the ceiling, so All stays bounded.
         // Completed forms drop out, so this lands on next-cycle renewals and
@@ -498,22 +504,13 @@ CalendarViewModel calendarViewModel,
                 if (person.EffectiveDate is null)
                     continue;
 
-                var boundaries = person.GetCurrentCycleBoundaries(today);
-                if (boundaries is null)
-                    continue;
-
-                var (cycleStart, _) = boundaries.Value;
-
                 foreach (var type in types)
                 {
-                    var form = person.Forms
-                                            .Where(f => f.Type == type && f.CompletedDate is null && f.DueDate >= cycleStart)
-                                            .OrderBy(f => f.DueDate)
-                                            .FirstOrDefault();
+                    var form = SelectBoardForm(person, type, today);
                     if (form is null)
                         continue;
-                    var openDaysBefore = Person.GetOpenDaysBefore(type, _settings);
-                    var openByDate = form.DueDate.AddDays(-openDaysBefore);
+                    var openByDate = FormDueDateCalculator.ComputeAvailableDateForDueDate(
+                        type, form.DueDate, _settings);
                     rows.Add(new FormTaskRow(form, person.FullName,
                         Person.FormDisplayName(type), openByDate, today));
                 }
@@ -521,6 +518,171 @@ CalendarViewModel calendarViewModel,
 
             return rows.OrderBy(r => r.DueDate);
         }
+
+        /// <summary>
+        /// Selects by explicit annual-effective-date identity. Due dates are not cycle
+        /// identifiers: CA and Reclass are intentionally due before their target date.
+        /// Rows without a target retain the old due-range fallback only for unmigrated data.
+        /// </summary>
+        internal static Form? SelectBoardForm(Person person, FormType type, DateTime today)
+            => SelectBoardForm(person, type, today, excludedTargets: null);
+
+        private static Form? SelectBoardForm(
+            Person person,
+            FormType type,
+            DateTime today,
+            IReadOnlySet<DateTime>? excludedTargets)
+        {
+            if (person.EffectiveDate is not DateTime effectiveDate)
+                return null;
+
+            var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
+                effectiveDate, today);
+            var nextTarget = currentTarget.AddYears(1);
+            var explicitForm = person.Forms
+                .Where(form => form.Type == type &&
+                               !form.IsSatisfiedAsOf(today) &&
+                               form.TargetEffectiveDate != default &&
+                               form.TargetEffectiveDate.Date >= effectiveDate.Date &&
+                               form.TargetEffectiveDate.Date <= nextTarget &&
+                               (excludedTargets is null ||
+                                !excludedTargets.Contains(form.TargetEffectiveDate.Date)))
+                .OrderBy(form => form.DueDate)
+                .FirstOrDefault();
+            if (explicitForm is not null)
+                return explicitForm;
+
+            // A default target means this is a retained legacy row. Its due date is the
+            // only old signal available, so keep the prior lower-bound behavior here only.
+            return person.Forms
+                .Where(form => form.Type == type &&
+                               !form.IsSatisfiedAsOf(today) &&
+                               form.TargetEffectiveDate == default &&
+                               form.DueDate.Date >= currentTarget &&
+                               (excludedTargets is null ||
+                                !excludedTargets.Contains(form.DueDate.Date)))
+                .OrderBy(form => form.DueDate)
+                .FirstOrDefault();
+        }
+
+        private IEnumerable<ReleaseTaskRow> BuildReleaseRows()
+        {
+            if (_settings is null)
+                return [];
+
+            return People
+                .SelectMany(person => BuildReleaseRowsForPerson(person, _settings, DateTime.Today))
+                .OrderBy(row => row.DueDate)
+                .ThenBy(row => row.ClientName, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(row => row.ObligationKey, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        internal static IReadOnlyList<ReleaseTaskRow> BuildReleaseRowsForPerson(
+            Person person,
+            Settings settings,
+            DateTime today)
+        {
+            if (person.EffectiveDate is not DateTime effectiveDate)
+                return [];
+
+            var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
+                effectiveDate, today);
+            var nextTarget = currentTarget.AddYears(1);
+            var facts = ((IEventSource)person).ReleaseComplianceFacts.ToArray();
+            var reconciledTargets = facts
+                .Where(item => item.TargetEffectiveDate is DateTime target &&
+                               target.Date >= effectiveDate.Date &&
+                               target.Date <= nextTarget)
+                .Select(item => item.TargetEffectiveDate!.Value.Date)
+                .ToHashSet();
+            var rows = facts
+                .Where(item => item.TargetEffectiveDate is DateTime target &&
+                               target.Date >= effectiveDate.Date &&
+                               target.Date <= nextTarget)
+                .Where(item => item.RetiredOn is null || today.Date < item.RetiredOn.Value.Date)
+                .Where(item => ReleaseAttestationRules.CompletedOn(
+                    item.StableKey, item.Attestations) is not DateTime completedOn ||
+                    completedOn.Date > today.Date)
+                .Select(item => new ReleaseTaskRow(
+                    item.StableKey,
+                    item.ObligationId,
+                    person.FullName,
+                    ReleaseTaskLabel(item),
+                    item.TargetEffectiveDate!.Value,
+                    item.AvailableOn ?? ComplianceScheduleRules.AvailableOn(
+                        ReleaseBillingRules.FormTypeFor(item.Category),
+                        item.DueOn,
+                        ScheduleSettings(settings)),
+                    item.DueOn,
+                    today))
+                .ToList();
+
+            // During rollout, retain a fixed-form fallback only for a cycle that has no
+            // durable release reconciliation marker. Never show both models for one cycle.
+            foreach (var type in new[]
+                     {
+                         FormType.Release_Agency,
+                         FormType.Release_DHHS,
+                         FormType.Release_Medical
+                     })
+            {
+                var form = SelectBoardForm(person, type, today, reconciledTargets);
+                if (form is null)
+                    continue;
+                var target = (form.TargetEffectiveDate == default
+                    ? form.DueDate
+                    : form.TargetEffectiveDate).Date;
+                rows.Add(new ReleaseTaskRow(
+                    $"legacy-form:{form.Id}:{type}:{target:yyyy-MM-dd}",
+                    null,
+                    person.FullName,
+                    Person.FormDisplayName(type),
+                    target,
+                    FormDueDateCalculator.ComputeAvailableDateForDueDate(
+                        type, form.DueDate, settings),
+                    form.DueDate,
+                    today));
+            }
+
+            return rows
+                .OrderBy(row => row.DueDate)
+                .ThenBy(row => row.ObligationKey, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static string ReleaseTaskLabel(ReleaseComplianceFact item)
+        {
+            var category = item.Category switch
+            {
+                ReleaseObligationCategory.Agency => "Agency release",
+                ReleaseObligationCategory.Medical => "Medical release",
+                ReleaseObligationCategory.Dhhs => "DHHS release",
+                _ => "Release"
+            };
+            return string.IsNullOrWhiteSpace(item.RecipientDisplayName)
+                ? category
+                : $"{category} — {item.RecipientDisplayName.Trim()}";
+        }
+
+        private static ComplianceScheduleSettings ScheduleSettings(Settings settings) => new(
+            settings.ReviewOpenDaysBefore,
+            settings.PcpOpenDaysBefore,
+            settings.CompAssessmentOpenDaysBefore,
+            settings.ReclassificationOpenDaysBefore,
+            settings.SafetyPlanOpenDaysBefore,
+            settings.PrivacyPracticesOpenDaysBefore,
+            settings.ReleaseAgencyOpenDaysBefore,
+            settings.ReleaseDhhsOpenDaysBefore,
+            settings.ReleaseMedicalOpenDaysBefore,
+            settings.PcpDaysBeforeAnniversary,
+            settings.CompAssessmentDaysBeforeAnniversary,
+            settings.ReclassificationDaysBeforeAnniversary,
+            settings.SafetyPlanDaysBeforeAnniversary,
+            settings.PrivacyPracticesDaysBeforeAnniversary,
+            settings.ReleaseAgencyDaysBeforeAnniversary,
+            settings.ReleaseDhhsDaysBeforeAnniversary,
+            settings.ReleaseMedicalDaysBeforeAnniversary);
 
         private IEnumerable<UpcomingEvent> ScheduledEvents() =>
             UpcomingEvents
@@ -535,11 +697,15 @@ CalendarViewModel calendarViewModel,
 
         private IEnumerable<object> AllBoardItems()
         {
-            var formRows = BuildFormRows(Enum.GetValues<FormType>());
+            var formRows = BuildFormRows(Enum.GetValues<FormType>()
+                .Where(type => type is not (FormType.Release_Agency or
+                    FormType.Release_DHHS or FormType.Release_Medical))
+                .ToArray());
             return formRows
                 .Cast<object>()
+                .Concat(BuildReleaseRows().Cast<object>())
                 .Concat(ScheduledEvents().Cast<object>())
-                .OrderBy(item => item is FormTaskRow row ? row.DueDate : ((UpcomingEvent)item).Date);
+                .OrderBy(BoardItemDate);
         }
         public int Threshold
         {
@@ -636,9 +802,28 @@ CalendarViewModel calendarViewModel,
         public bool ReclassificationCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.IsCompliant ?? false;
         public bool SafetyPlanCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.IsCompliant ?? false;
         public bool PrivacyPracticesCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.IsCompliant ?? false;
-        public bool ReleaseAgencyCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Agency)?.IsCompliant ?? false;
-        public bool ReleaseDhhsCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_DHHS)?.IsCompliant ?? false;
-        public bool ReleaseMedicalCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Medical)?.IsCompliant ?? false;
+        public bool ReleaseAgencyCompliant =>
+            IsReleaseCategoryCompliant(ReleaseObligationCategory.Agency, DateTime.Today);
+        public bool ReleaseDhhsCompliant =>
+            IsReleaseCategoryCompliant(ReleaseObligationCategory.Dhhs, DateTime.Today);
+        public bool ReleaseMedicalCompliant =>
+            IsReleaseCategoryCompliant(ReleaseObligationCategory.Medical, DateTime.Today);
+
+        internal bool IsReleaseCategoryCompliant(
+            ReleaseObligationCategory category,
+            DateTime asOfDate)
+        {
+            if (SelectedPerson?.EffectiveDate is not DateTime effectiveDate)
+                return false;
+
+            var target = ComplianceScheduleRules.CurrentTargetEffectiveDate(
+                effectiveDate, asOfDate);
+            return ReleaseComplianceRules.IsCategoryCompliant(
+                category,
+                target,
+                asOfDate,
+                ((IEventSource)SelectedPerson).ReleaseComplianceFacts);
+        }
 
         // -------------------------------------------------------------------------
         // Commands
@@ -783,7 +968,9 @@ CalendarViewModel calendarViewModel,
                 return;
             }
 
-            await _formService.OpenFormAsync(row.Form);
+            if (!TrySelectOpeningDate(row.Form, out var openedOn))
+                return;
+            await _formService.OpenFormAsync(row.Form, openedOn);
             await AfterRowStatusChangeAsync(row);
         }
 
@@ -798,20 +985,30 @@ CalendarViewModel calendarViewModel,
         }
 
         [RelayCommand]
-        private async Task MarkFormNotStarted(FormTaskRow? row)
+        private async Task OpenReleaseTask(ReleaseTaskRow? row)
         {
-            if (row is null)
+            if (row?.ObligationId is not Guid obligationId)
                 return;
 
-            if (row.Form.IsCompliant)
+            var person = People.FirstOrDefault(candidate =>
+                ((IEventSource)candidate).ReleaseComplianceFacts.Any(item =>
+                    item.ObligationId == obligationId &&
+                    item.TargetEffectiveDate?.Date == row.TargetEffectiveDate));
+            if (person is null)
             {
-                BeginAttestation(row.Form, PersonFor(row.Form));
+                BoardStateMessage = "That exact release obligation is no longer in the loaded caseload. Refresh the dashboard before continuing.";
+                IsBoardStateVisible = true;
                 return;
             }
 
-            row.Form.OpenedDate = null;
-            await _formService.UpdateFormAsync(row.Form);
-            await AfterRowStatusChangeAsync(row);
+            SelectedPerson = person;
+            NoteEntry.SelectedPerson = person;
+            Clients.SelectedPerson = Clients.People.FirstOrDefault(candidate =>
+                candidate.Id == person.Id) ?? person;
+            CurrentSubViewModel = Clients;
+            await Clients.OpenReleaseObligationAsync(
+                obligationId,
+                row.TargetEffectiveDate);
         }
 
         // Updates the touched row in place rather than rebuilding the list, so the row
@@ -1126,17 +1323,94 @@ CalendarViewModel calendarViewModel,
             IsBoardStateVisible = message is not null;
         }
 
-        public async Task OpenFormAsync(FormType formType)
+        public Task OpenFormAsync(FormType formType) =>
+            OpenFormAsync(formType, formId: null, targetEffectiveDate: null);
+
+        public async Task OpenFormAsync(
+            FormType formType,
+            int? formId,
+            DateTime? targetEffectiveDate)
         {
             if (SelectedPerson is null)
                 return;
 
-            var form = SelectedPerson.GetCurrentCycleForm(formType);
+            var form = ResolveAgendaForm(
+                SelectedPerson,
+                formType,
+                formId,
+                targetEffectiveDate,
+                DateTime.Today);
             if (form is null)
+            {
+                BoardStateMessage = targetEffectiveDate is DateTime target
+                    ? $"The exact {Person.FormDisplayName(formType)} for the {target:MMM d, yyyy} annual cycle is no longer available. Refresh the dashboard before continuing."
+                    : $"The selected {Person.FormDisplayName(formType)} is no longer available. Refresh the dashboard before continuing.";
+                IsBoardStateVisible = true;
                 return;
+            }
 
-            await _formService.OpenFormAsync(form);
+            if (!TrySelectOpeningDate(form, out var openedOn))
+                return;
+            await _formService.OpenFormAsync(form, openedOn);
             Matrix?.Rebuild(People, DateTime.Today);
+        }
+
+        internal static Form? ResolveAgendaForm(
+            Person person,
+            FormType formType,
+            int? formId,
+            DateTime? targetEffectiveDate,
+            DateTime asOfDate)
+        {
+            var target = targetEffectiveDate?.Date;
+            if (formId is int exactId)
+            {
+                return person.Forms.SingleOrDefault(candidate =>
+                    candidate.Id == exactId &&
+                    candidate.Type == formType &&
+                    (target is null ||
+                     candidate.TargetEffectiveDate.Date == target.Value));
+            }
+
+            if (target is DateTime exactTarget)
+            {
+                return Person.FindFormForTargetEffectiveDate(
+                    person.Forms,
+                    formType,
+                    exactTarget);
+            }
+
+            // Compatibility for non-compliance callers that predate exact agenda
+            // identity. Any item carrying an ID or target has already failed closed
+            // above and can never redirect to today's cycle.
+            return person.GetCurrentCycleForm(formType, asOfDate);
+        }
+
+        private bool TrySelectOpeningDate(Form form, out DateTime openedOn)
+        {
+            openedOn = default;
+            if (_formOpeningPrompt is null || _settings is null)
+                return false;
+
+            var availableOn = FormDueDateCalculator.ComputeAvailableDateForDueDate(
+                form.Type,
+                form.DueDate,
+                _settings);
+            if (availableOn.Date > DateTime.Today)
+            {
+                BoardStateMessage = $"{Person.FormDisplayName(form.Type)} becomes available on {availableOn:MMM d, yyyy}.";
+                IsBoardStateVisible = true;
+                return false;
+            }
+            var selected = _formOpeningPrompt.SelectActualOpeningDate(
+                Person.FormDisplayName(form.Type),
+                availableOn,
+                DateTime.Today);
+            if (selected is not DateTime actual)
+                return false;
+
+            openedOn = actual.Date;
+            return true;
         }
 
         [RelayCommand]
@@ -1187,7 +1461,8 @@ CalendarViewModel calendarViewModel,
                 person.Id,
                 form.Type.ToString(),
                 form.DueDate,
-                form.CompletedDate)).ToList();
+                form.CompletedDate,
+                form.TargetEffectiveDate)).ToList();
             foreach (var pending in FormAttestationRules.PendingAttestations(
                          noteFacts, formFacts, effectiveDate, DateTime.Today))
             {

@@ -41,8 +41,8 @@ public partial class AgencyReleaseWorkspace : UserControl
     private bool ConfirmAttestation(AgencyReleaseAttestationEventArgs e) =>
         MessageBox.Show(
             Window.GetWindow(this),
-            $"{e.Statement}\n\n{e.ScopeNotice}\n\nGenerate the release with this staff attestation?",
-            "Confirm Staff Attestation",
+            $"{e.Statement}\n\n{e.ScopeNotice}\n\nGenerate the release with this staff generation confirmation?",
+            "Confirm Staff Generation",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question,
             MessageBoxResult.No) == MessageBoxResult.Yes;

@@ -149,7 +149,7 @@ public sealed class SessionKeepAlive : IDisposable
             {
                 var decision = Decide(
                     _api.AccessTokenExpiresAtUtc,
-                    _api.HasSessionEnded,
+                    _api.HasSessionEnded || _api.IsAccessSuspended,
                     _utcNow(),
                     LastActivityUtc,
                     _idleGrace);

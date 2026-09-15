@@ -20,11 +20,19 @@ public static class ProductReleaseNotes
                 "Older settings responses with an absent or invalid documentation window safely use the seven-day policy instead of breaking the productivity panel."
             ]),
         new(
-            "Four richer light themes reduce the yellow cast",
+            "Richer color includes a new geometric dark theme",
             [
                 "Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor add deeper brown, blue, muted red, turquoise, and violet choices while retaining dark text on light surfaces.",
                 "Bodhi Watercolor follows the turquoise, blue, violet, and restrained coral sequence of the Sati leaf.",
-                "All four palettes pass the same measured WCAG AA token and rendered-view checks as the established themes."
+                "Umber Facets layers intersecting espresso, chestnut, caramel, ochre, and tan planes across a dark shell while keeping working surfaces quiet.",
+                "All twenty-five palettes pass the same measured WCAG AA token and rendered-view checks."
+            ]),
+        new(
+            "Scratchpad history joins the Overview Work Agenda",
+            [
+                "History is now a third tab beside Today's Work and Tomorrow's Agenda when Work Agenda is centered on Overview.",
+                "The former history window, search icon, and startup registrations are removed; the same date-range browser and locked retrospective comments now stay in the main workspace.",
+                "A short directional slide connects the three views, and the History tab stays out of the narrow side dock on other pages."
             ]),
         new(
             "Crash recovery carries safe Windows diagnostics into Admin",
@@ -59,7 +67,7 @@ public static class ProductReleaseNotes
         new(
             "Themes are measured, not only inspected",
             [
-                "All twenty themes are checked against WCAG AA color contrast across their named text and surface roles and across rendered application views.",
+                "All twenty-five themes are checked against WCAG AA color contrast across their named text and surface roles and across rendered application views.",
                 "Interactive tiles and navigation surfaces now receive keyboard operation, visible focus, and meaningful screen-reader names through one shared behavior.",
                 "Profile and password settings now live in the main Settings window, and the greeting badge is the single keyboard-accessible way into it."
             ]),

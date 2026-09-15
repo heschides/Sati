@@ -25,13 +25,13 @@ public sealed class SafetyPlanRulesTests
     }
 
     [Fact]
-    public void Only_non_draft_safety_plan_artifact_satisfies_attestation()
+    public void Attestation_is_sufficient_even_when_the_safety_plan_artifact_is_draft()
     {
         var date = new DateTime(2026, 1, 1);
         var draft = new ArtifactFact(1, 1, "SafetyPlan", date, true);
         var final = new ArtifactFact(2, 1, "SafetyPlan", date, false);
 
-        Assert.False(FormAttestationRules.Evaluate("SafetyPlan", date, date, date, AttestationActorKind.CaseManager, [draft]).Accepted);
+        Assert.True(FormAttestationRules.Evaluate("SafetyPlan", date, date, date, AttestationActorKind.CaseManager, [draft]).Accepted);
         Assert.True(FormAttestationRules.Evaluate("SafetyPlan", date, date, date, AttestationActorKind.CaseManager, [final]).Accepted);
     }
 }

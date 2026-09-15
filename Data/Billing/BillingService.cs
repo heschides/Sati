@@ -13,12 +13,17 @@ namespace Sati.Services.Billing
     {
         public bool SupportsMockClearinghouse => false;
         private readonly IDbContextFactory<SatiContext> _contextFactory;
-        private BillingComplianceRequirements _complianceRequirements =
-            BillingComplianceGate.DefaultRequirements;
+        private readonly ISessionService? _sessionService;
+        private BillingCompliancePolicyContext _complianceContext =
+            BillingCompliancePolicyContext.Default();
+        private IReadOnlyDictionary<int, IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>>
+            _recoveryDecisionsByNoteId =
+                new Dictionary<int, IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>>();
 
-        public BillingService(IDbContextFactory<SatiContext> contextFactory)
+        public BillingService(IDbContextFactory<SatiContext> contextFactory, ISessionService? sessionService = null)
         {
             _contextFactory = contextFactory;
+            _sessionService = sessionService;
         }
 
         public async Task<BillingPeriod> GetOrCreateBillingPeriodAsync(AgencyActor suppliedActor, int userId, int month, int year)
@@ -113,6 +118,10 @@ namespace Sati.Services.Billing
                     .ThenInclude(p => p.Agency)
                 .Include(n => n.Person)
                     .ThenInclude(p => p.Forms)
+                        .ThenInclude(form => form.Attestations)
+                .Include(n => n.Person)
+                    .ThenInclude(p => p.ReleaseObligations)
+                        .ThenInclude(obligation => obligation.Attestations)
                 .FirstOrDefaultAsync(n => n.Id == noteId && n.Person.AgencyId == actor.AgencyId)
                 ?? throw new InvalidOperationException($"Note {noteId} was not found in your agency.");
 
@@ -122,9 +131,11 @@ namespace Sati.Services.Billing
             if (note.Status != NoteStatus.Approved)
                 throw new InvalidOperationException("Only an approved service note can become a claim line.");
 
-            _complianceRequirements = await LoadComplianceRequirementsAsync(
+            var complianceContext = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, actor.AgencyId);
-            var validation = ValidateNoteForBilling(note);
+            var recoveryDecisions = await LoadRecoveryDecisionsForNoteAsync(
+                context, actor.AgencyId, note.PersonId, note.Id);
+            var validation = ValidateNoteForBilling(note, complianceContext, recoveryDecisions);
             if (!validation.IsValid)
                 throw new InvalidOperationException(
                     $"Note {noteId} is not ready for billing: {string.Join("; ", validation.Errors)}");
@@ -221,6 +232,8 @@ namespace Sati.Services.Billing
         {
             await using var context = _contextFactory.CreateDbContext();
             var actor = await ValidateBillingActorAsync(context, suppliedActor);
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable);
             var period = await context.BillingPeriods.Include(candidate => candidate.Lines)
                 .SingleOrDefaultAsync(candidate => candidate.Id == billingPeriodId &&
                     context.Users.Any(user => user.Id == candidate.UserId && user.AgencyId == actor.AgencyId))
@@ -233,6 +246,8 @@ namespace Sati.Services.Billing
                 throw new InvalidOperationException("Only draft billing periods can be submitted.");
             if (period.Lines.Count == 0)
                 throw new InvalidOperationException("A billing period with no claim lines cannot be submitted.");
+
+            await RevalidateDraftPeriodComplianceAsync(context, actor.AgencyId, period);
 
             try
             {
@@ -251,6 +266,7 @@ namespace Sati.Services.Billing
             try
             {
                 await context.SaveChangesAsync();
+                await transaction.CommitAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -264,72 +280,158 @@ namespace Sati.Services.Billing
             }
         }
 
+        private static async Task RevalidateDraftPeriodComplianceAsync(
+            SatiContext context,
+            int agencyId,
+            BillingPeriod period)
+        {
+            var noteIds = period.Lines.Select(line => line.NoteId).Distinct().ToArray();
+            var notes = await context.Notes
+                .Include(note => note.Person)
+                    .ThenInclude(person => person.Agency)
+                .Include(note => note.Person)
+                    .ThenInclude(person => person.Forms)
+                        .ThenInclude(form => form.Attestations)
+                .Include(note => note.Person)
+                    .ThenInclude(person => person.ReleaseObligations)
+                        .ThenInclude(obligation => obligation.Attestations)
+                .Where(note => noteIds.Contains(note.Id) &&
+                               note.Person.AgencyId == agencyId)
+                .AsSplitQuery()
+                .ToListAsync();
+            if (notes.Count != noteIds.Length)
+                throw new InvalidOperationException(
+                    "A draft claim line no longer has an accessible source note.");
+
+            var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
+                context, agencyId);
+            var decisions = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
+                .Include(item => item.Obligations)
+                .Include(item => item.Notes)
+                .Where(item => item.AgencyId == agencyId &&
+                               item.Notes.Any(note => noteIds.Contains(note.NoteId)))
+                .ToListAsync();
+            var decisionsByNote = decisions
+                .Select(item => item.ToContract())
+                .SelectMany(decision => decision.NoteIds.Select(noteId => (noteId, decision)))
+                .ToLookup(item => item.noteId, item => item.decision);
+            var notesById = notes.ToDictionary(note => note.Id);
+
+            foreach (var line in period.Lines)
+            {
+                var note = notesById[line.NoteId];
+                if (note.EventDate?.Date != line.DateOfService.Date)
+                    throw new InvalidOperationException(
+                        $"Draft claim line {line.Id} no longer matches its source note's service date.");
+                var validation = ValidateNoteForBilling(
+                    note,
+                    policy,
+                    decisionsByNote[note.Id].ToArray());
+                if (!validation.IsValid)
+                {
+                    throw new InvalidOperationException(
+                        $"Draft claim line {line.Id} is no longer eligible for submission: " +
+                        string.Join("; ", validation.Errors));
+                }
+            }
+        }
+
         public async Task<IEnumerable<Note>> GetApprovedUnbilledNotesAsync(AgencyActor suppliedActor)
         {
             await using var context = _contextFactory.CreateDbContext();
             var actor = await ValidateBillingActorAsync(context, suppliedActor);
-            _complianceRequirements = await LoadComplianceRequirementsAsync(
+            _complianceContext = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, actor.AgencyId);
-            return await context.Notes
+            var notes = await context.Notes
                 .Include(n => n.Person)
                     .ThenInclude(p => p.Agency)
                 .Include(n => n.Person)
                     .ThenInclude(p => p.Forms)
+                        .ThenInclude(form => form.Attestations)
+                .Include(n => n.Person)
+                    .ThenInclude(p => p.ReleaseObligations)
+                        .ThenInclude(obligation => obligation.Attestations)
                 .Where(n => n.Status == NoteStatus.Approved
                          && n.Person.AgencyId == actor.AgencyId
                          && !context.ClaimLines.Any(c => c.NoteId == n.Id))
                 .OrderBy(n => n.EventDate)
                 .ToListAsync();
+
+            var noteIds = notes.Select(note => note.Id).ToArray();
+            var decisions = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
+                .Include(item => item.Obligations)
+                .Include(item => item.Notes)
+                .Where(item => item.AgencyId == actor.AgencyId &&
+                               item.Notes.Any(note => noteIds.Contains((int)note.NoteId)))
+                .ToListAsync();
+            _recoveryDecisionsByNoteId = noteIds.ToDictionary(
+                noteId => noteId,
+                noteId => (IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>)decisions
+                    .Where(item => item.Notes.Any(note => note.NoteId == noteId))
+                    .Select(item => item.ToContract())
+                    .ToArray());
+            return notes;
         }
 
         public BillingValidationResult ValidateNoteForBilling(Note note)
+            => ValidateNoteForBilling(
+                note,
+                _complianceContext,
+                _recoveryDecisionsByNoteId.GetValueOrDefault(note.Id) ?? []);
+
+        private static BillingValidationResult ValidateNoteForBilling(
+            Note note,
+            BillingCompliancePolicyContext complianceContext,
+            IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null)
         {
-            var errors = new List<string>();
-
-            if (note.Status != NoteStatus.Approved)
-                errors.Add("Service note is not approved.");
-
-            if (note.EventDate is null)
-                errors.Add("No service date.");
-
-            if (BillingRules.CalculateSection13Units(note.Minutes) < 1)
-                errors.Add("Units must be at least 1 (minimum billable unit for Section 13 TCM).");
-
-            if (string.IsNullOrWhiteSpace(note.Person?.MaineCareId))
-                errors.Add("Consumer has no MaineCare ID.");
-
-            if (!BillingRules.IsValidDiagnosisCode(note.Person?.DiagnosisCode))
-                errors.Add("Consumer diagnosis code is missing or invalid.");
-
-            if (note.Person?.PlaceOfService is null)
-                errors.Add("Consumer has no place of service.");
-
-            if (!HasValidSubscriberClaimIdentity(note.Person))
-                errors.Add("Consumer claim name, birth date, or structured claim address is incomplete or invalid.");
-
-            if (!BillingRules.IsValidNpi(note.Person?.Agency?.Npi))
-                errors.Add("Agency NPI is missing or invalid.");
-
-            if (note.Person?.Agency is Agency agency)
-                errors.AddRange(ValidateBillingConfiguration(agency));
+            var errors = ValidateNonComplianceBillingRequirements(note).ToList();
 
             if (note.Person is not null && note.EventDate is not null)
             {
-                if (note.ComplianceOverride)
+                // Claim eligibility is historical: later noncompliance cannot
+                // make an earlier service date non-billable. A supervisor
+                // exception releases only the exact blockers recorded in the
+                // immutable approval decision.
+                var serviceDate = note.EventDate.Value;
+                var compliance = note.Person.EvaluateBillingWindowDetailed(
+                    serviceDate,
+                    complianceContext.Resolve(serviceDate),
+                    complianceContext.Schedule);
+                if (compliance.Passed)
                 {
-                    if (string.IsNullOrWhiteSpace(note.OverrideReason) ||
-                        note.OverrideApprovedById is null || note.OverrideApprovedAt is null)
-                        errors.Add("Compliance override is incomplete.");
+                    // No exception is needed for this service date.
+                }
+                else if (IsReleasedByRecovery(
+                             note,
+                             complianceContext,
+                             recoveryDecisions ?? []))
+                {
+                    // An immutable Admin recovery decision releases this exact note
+                    // and only the exact completed blocker facts it recorded.
+                }
+                else if (note.ComplianceOverride)
+                {
+                    var exception = BillingComplianceExceptionRules.Validate(
+                        compliance.Blockers ?? [],
+                        note.OverrideObligationIds,
+                        note.OverrideReason,
+                        note.OverrideAttestationConfirmed &&
+                        note.OverrideApprovedById is not null &&
+                        note.OverrideApprovedAt is not null);
+                    errors.AddRange(exception.Errors.Select(error => $"Compliance exception: {error}"));
+                    if (exception.Accepted)
+                    {
+                        errors.AddRange(BillingComplianceExceptionRules.RemainingBlockers(
+                                compliance.Blockers ?? [],
+                                exception.SelectedObligationIds)
+                            .Select(blocker =>
+                                $"{blocker.Name} was due {blocker.DueDate:MMM d, yyyy} " +
+                                "and was not completed as of this service date."));
+                    }
                 }
                 else
                 {
-                    var (passed, complianceReasons) = note.Person.EvaluateComplianceGate(
-                        BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow),
-                        requirements: _complianceRequirements);
-                    if (!passed)
-                        errors.AddRange(complianceReasons);
-                    errors.AddRange(note.Person.EvaluateBillingWindow(
-                        note.EventDate.Value, _complianceRequirements));
+                    errors.AddRange(compliance.Reasons);
                 }
             }
 
@@ -337,6 +439,272 @@ namespace Sati.Services.Billing
                 IsValid: errors.Count == 0,
                 Note: note,
                 Errors: errors);
+        }
+
+        public async Task<BillingComplianceRecoveryPlan> PrepareComplianceRecoveryAsync(
+            AgencyActor suppliedActor,
+            int personId,
+            CancellationToken cancellationToken = default)
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            var actor = await ValidateAdminActorAsync(context, suppliedActor, cancellationToken);
+            var (person, notes, policy) = await LoadRecoveryInputsAsync(
+                context, actor.AgencyId, personId, cancellationToken);
+            return PrepareRecoveryPlan(person, notes, policy,
+                BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow));
+        }
+
+        public async Task<Sati.Contracts.V1.BillingComplianceRecoveryDecision> RecordComplianceRecoveryAsync(
+            AgencyActor suppliedActor,
+            int personId,
+            CreateBillingComplianceRecoveryRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            await using var context = _contextFactory.CreateDbContext();
+            var actor = await ValidateAdminActorAsync(context, suppliedActor, cancellationToken);
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var (person, notes, policy) = await LoadRecoveryInputsAsync(
+                context, actor.AgencyId, personId, cancellationToken);
+            var recordedAtUtc = DateTime.UtcNow;
+            var plan = PrepareRecoveryPlan(
+                person, notes, policy, BillingRules.MaineBusinessDate(recordedAtUtc));
+            var result = BillingComplianceRecoveryRules.CreateDecision(
+                plan,
+                request.SelectedNoteIds ?? [],
+                actor.Id,
+                DateTime.SpecifyKind(recordedAtUtc, DateTimeKind.Utc),
+                request.Explanation,
+                request.AttestationConfirmed);
+            if (!result.Accepted || result.Decision is null)
+                throw new ArgumentException(string.Join(" ", result.Errors), nameof(request));
+
+            context.BillingComplianceRecoveryDecisions.Add(
+                Sati.Models.BillingComplianceRecoveryDecision.FromContract(result.Decision));
+            LocalAuditTrail.Record(
+                context,
+                actor,
+                LocalAuditActions.BillingComplianceRecoveryRecorded,
+                "Person",
+                personId,
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    result.Decision.DecisionId,
+                    result.Decision.PersonId,
+                    result.Decision.NoteIds,
+                    obligations = result.Decision.Obligations.Select(item => new
+                    {
+                        item.ObligationId,
+                        item.DueDate,
+                        item.CompletedDate,
+                        item.EvidenceId
+                    })
+                }));
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw new InvalidOperationException(
+                    "A selected note was already recovered by another administrator. Refresh the checklist.",
+                    exception);
+            }
+
+            return result.Decision;
+        }
+
+        private static IReadOnlyList<string> ValidateNonComplianceBillingRequirements(Note note)
+        {
+            var errors = new List<string>();
+            if (note.Status != NoteStatus.Approved)
+                errors.Add("Service note is not approved.");
+            if (note.EventDate is null)
+                errors.Add("No service date.");
+            if (BillingRules.CalculateSection13Units(note.Minutes) < 1)
+                errors.Add("Units must be at least 1 (minimum billable unit for Section 13 TCM).");
+            if (string.IsNullOrWhiteSpace(note.Person?.MaineCareId))
+                errors.Add("Consumer has no MaineCare ID.");
+            if (!BillingRules.IsValidDiagnosisCode(note.Person?.DiagnosisCode))
+                errors.Add("Consumer diagnosis code is missing or invalid.");
+            if (note.Person?.PlaceOfService is null)
+                errors.Add("Consumer has no place of service.");
+            if (!HasValidSubscriberClaimIdentity(note.Person))
+                errors.Add("Consumer claim name, birth date, or structured claim address is incomplete or invalid.");
+            if (!BillingRules.IsValidNpi(note.Person?.Agency?.Npi))
+                errors.Add("Agency NPI is missing or invalid.");
+            if (note.Person?.Agency is Agency agency)
+                errors.AddRange(ValidateBillingConfiguration(agency));
+            return errors;
+        }
+
+        private static bool IsReleasedByRecovery(
+            Note note,
+            BillingCompliancePolicyContext policy,
+            IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision> decisions)
+        {
+            if (note.Person is null || note.EventDate is not DateTime serviceDate ||
+                decisions.Count == 0)
+                return false;
+
+            var noteSnapshot = new BillingRecoveryNoteSnapshot(
+                note.Id, note.PersonId, serviceDate, IsSubmittedOrBilled: false);
+            var obligations = BuildRecoveryObligations(
+                note.Person, policy.Schedule, serviceDate);
+            var version = policy.ResolveSnapshot(serviceDate);
+            return decisions.Any(decision => BillingComplianceRecoveryRules.IsReleased(
+                noteSnapshot, obligations, version, decision));
+        }
+
+        private static BillingComplianceRecoveryPlan PrepareRecoveryPlan(
+            Person person,
+            IReadOnlyList<Note> notes,
+            BillingCompliancePolicyContext policy,
+            DateTime agencyToday)
+        {
+            var eligible = notes
+                .Where(note => ValidateNonComplianceBillingRequirements(note).Count == 0)
+                .Select(note => new BillingRecoveryNoteSnapshot(
+                    note.Id,
+                    person.Id,
+                    note.EventDate!.Value.Date,
+                    IsSubmittedOrBilled: false))
+                .ToArray();
+            return BillingComplianceRecoveryRules.Prepare(
+                policy.AgencyId,
+                person.Id,
+                policy.RecoveryVersions,
+                BuildRecoveryObligations(person, policy.Schedule, agencyToday),
+                eligible,
+                agencyToday);
+        }
+
+        internal static IReadOnlyList<BillingComplianceObligationSnapshot> BuildRecoveryObligations(
+            Person person,
+            ComplianceScheduleSettings schedule,
+            DateTime asOfDate)
+        {
+            var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingDhhs(
+                person.EffectiveDate,
+                person.ReleaseObligations.Select(item => item.ToComplianceFact()),
+                asOfDate);
+            var reconciledReleaseCycles = releaseFacts
+                .Where(item => item.TargetEffectiveDate is not null)
+                .Select(item => item.TargetEffectiveDate!.Value.Date)
+                .ToHashSet();
+            var formSnapshots = person.Forms
+                .Where(form => form.Type is not (FormType.Release_Agency or
+                    FormType.Release_DHHS or FormType.Release_Medical) ||
+                    !reconciledReleaseCycles.Contains(
+                        (form.TargetEffectiveDate == default
+                            ? form.DueDate
+                            : form.TargetEffectiveDate).Date))
+                .Select(form =>
+                {
+                    var attestation = form.CompletedDate is DateTime completedOn
+                        ? form.Attestations
+                            .Where(item => item.Kind == FormAttestationKind.Attested &&
+                                           item.CompletedOn?.Date == completedOn.Date)
+                            .OrderBy(item => item.RecordedAtUtc)
+                            .ThenBy(item => item.Id)
+                            .FirstOrDefault()
+                        : null;
+                    var completionEvidence = attestation is { Id: > 0 }
+                        ? $"form-attestation:{attestation.Id}"
+                        : form.CompletedDate is DateTime completed
+                            ? $"form-completion:{form.Id}:{completed:yyyy-MM-dd}"
+                            : null;
+                    var openingEvidence = form.OpenedDate is DateTime opened
+                        ? $"form-opened:{form.Id}:{opened:yyyy-MM-dd}"
+                        : null;
+                    return new ComplianceFormSnapshot(
+                        form.Type.ToString(),
+                        form.DueDate,
+                        form.CompletedDate,
+                        form.OpenedDate,
+                        form.Id > 0 ? $"form:{form.Id}" : null,
+                        completionEvidence,
+                        openingEvidence,
+                        form.TargetEffectiveDate == default
+                            ? null
+                            : form.TargetEffectiveDate);
+                });
+            var withExpectedForms = ExpectedBillingComplianceObligations.IncludeMissingForms(
+                person.EffectiveDate,
+                formSnapshots,
+                asOfDate,
+                schedule);
+            var formsAndOpening = BillingComplianceGate.IncludePcpOpeningObligations(
+                withExpectedForms);
+            return BillingComplianceRecoveryRules.FromComplianceSnapshots(
+                    person.Id, formsAndOpening)
+                .Concat(ReleaseBillingRules.BuildRecoveryObligations(
+                    person.Id,
+                    releaseFacts))
+                .ToArray();
+        }
+
+        private async Task<(Person Person, IReadOnlyList<Note> Notes, BillingCompliancePolicyContext Policy)>
+            LoadRecoveryInputsAsync(
+                SatiContext context,
+                int agencyId,
+                int personId,
+                CancellationToken cancellationToken)
+        {
+            var person = await context.People
+                .Include(item => item.Agency)
+                .Include(item => item.Forms)
+                    .ThenInclude(form => form.Attestations)
+                .Include(item => item.ReleaseObligations)
+                    .ThenInclude(obligation => obligation.Attestations)
+                .SingleOrDefaultAsync(item =>
+                    item.Id == personId && item.AgencyId == agencyId,
+                    cancellationToken)
+                ?? throw new InvalidOperationException("The consumer was not found in your agency.");
+
+            var notes = await context.Notes
+                .Where(note => note.PersonId == personId &&
+                               note.Status == NoteStatus.Approved &&
+                               !context.ClaimLines.Any(line => line.NoteId == note.Id))
+                .OrderBy(note => note.EventDate)
+                .ThenBy(note => note.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var note in notes)
+                note.Person = person;
+
+            var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
+                context, agencyId, cancellationToken);
+            var decisions = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
+                .Include(item => item.Obligations)
+                .Include(item => item.Notes)
+                .Where(item => item.AgencyId == agencyId && item.PersonId == personId)
+                .ToListAsync(cancellationToken);
+            var contracts = decisions.Select(item => item.ToContract()).ToArray();
+            notes = notes.Where(note => !IsReleasedByRecovery(
+                    note,
+                    policy,
+                    contracts.Where(decision => decision.NoteIds.Contains(note.Id)).ToArray()))
+                .ToList();
+            return (person, notes, policy);
+        }
+
+        private static async Task<IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>>
+            LoadRecoveryDecisionsForNoteAsync(
+                SatiContext context,
+                int agencyId,
+                int personId,
+                int noteId)
+        {
+            var rows = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
+                .Include(item => item.Obligations)
+                .Include(item => item.Notes)
+                .Where(item => item.AgencyId == agencyId && item.PersonId == personId &&
+                               item.Notes.Any(note => note.NoteId == noteId))
+                .ToListAsync();
+            return rows.Select(item => item.ToContract()).ToArray();
         }
 
         public async Task<BillingConfiguration> GetBillingConfigurationAsync(AgencyActor suppliedActor)
@@ -347,14 +715,6 @@ namespace Sati.Services.Billing
                 .SingleAsync(candidate => candidate.Id == actor.AgencyId);
             return ToBillingConfiguration(agency);
         }
-
-        private static async Task<BillingComplianceRequirements> LoadComplianceRequirementsAsync(
-            SatiContext context,
-            int agencyId) =>
-            await context.Settings.AsNoTracking()
-                .Where(settings => settings.AgencyId == agencyId)
-                .Select(settings => (BillingComplianceRequirements?)settings.BillingComplianceRequirements)
-                .SingleOrDefaultAsync() ?? BillingComplianceGate.DefaultRequirements;
 
         public async Task SaveBillingConfigurationAsync(AgencyActor suppliedActor, BillingConfiguration configuration)
         {
@@ -393,6 +753,20 @@ namespace Sati.Services.Billing
                               period.Lines.Count, item.OccurredAtUtc, item.Stage.ToString(),
                               item.Reference, item.ResponseType, item.ResponseCode,
                               item.Explanation, item.IsSynthetic)).ToListAsync();
+        }
+
+        public async Task<IReadOnlyList<BillingCompliancePolicyReviewFlagDto>>
+            GetBillingCompliancePolicyReviewFlagsAsync(AgencyActor suppliedActor)
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            var actor = await ValidateBillingActorAsync(context, suppliedActor);
+            var flags = await context.BillingCompliancePolicyReviewFlags.AsNoTracking()
+                .Include(flag => flag.PolicyVersion)
+                .Where(flag => flag.AgencyId == actor.AgencyId)
+                .OrderByDescending(flag => flag.CreatedAtUtc)
+                .ThenByDescending(flag => flag.Id)
+                .ToListAsync();
+            return flags.Select(flag => flag.ToContract()).ToArray();
         }
 
         public async Task ReturnBillingPeriodToDraftAsync(AgencyActor suppliedActor, int billingPeriodId)
@@ -595,7 +969,7 @@ namespace Sati.Services.Billing
             line.PlaceOfService,
             line.ClaimSnapshotJson);
 
-        private static async Task<User> ValidateBillingActorAsync(
+        private async Task<User> ValidateBillingActorAsync(
             SatiContext context,
             AgencyActor suppliedActor)
         {
@@ -603,12 +977,66 @@ namespace Sati.Services.Billing
                 !UserPermissionRules.HasBillingPermissions(suppliedActor.Permissions))
                 throw new UnauthorizedAccessException("Billing permission is required.");
 
-            return await context.Users.SingleOrDefaultAsync(user =>
-                       user.Id == suppliedActor.UserId &&
-                       user.AgencyId == suppliedActor.AgencyId &&
-                       user.Permissions == suppliedActor.Permissions)
+            var actor = await context.Users.SingleOrDefaultAsync(user =>
+                       user.Id == suppliedActor.UserId)
                    ?? throw new UnauthorizedAccessException(
                        "The billing actor no longer matches the current user record.");
+            if (!AccountSessionRules.IsCurrentSession(actor.IsEnabled, actor.SecurityVersion, suppliedActor.SecurityVersion))
+            {
+                if (_sessionService?.CurrentUser is User current && current.Id == suppliedActor.UserId &&
+                    current.SecurityVersion == suppliedActor.SecurityVersion)
+                    _sessionService.Invalidate(current);
+                throw new SessionExpiredException(new UnauthorizedAccessException(AccountSessionRules.SessionExpired));
+            }
+            if (actor.AgencyId != suppliedActor.AgencyId || actor.Permissions != suppliedActor.Permissions)
+                throw new UnauthorizedAccessException("The billing actor no longer matches the current user record.");
+            if (_sessionService is not null)
+            {
+                var signedIn = await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+                if (signedIn.Id != suppliedActor.UserId || signedIn.SecurityVersion != suppliedActor.SecurityVersion)
+                    throw new UnauthorizedAccessException("The billing actor does not match the signed-in account.");
+            }
+            return actor;
+        }
+
+        private async Task<User> ValidateAdminActorAsync(
+            SatiContext context,
+            AgencyActor suppliedActor,
+            CancellationToken cancellationToken)
+        {
+            if (!UserPermissionRules.IsSupported(suppliedActor.Permissions) ||
+                !UserPermissionRules.HasAdminPermissions(suppliedActor.Permissions))
+                throw new UnauthorizedAccessException("Administration permission is required.");
+
+            var actor = await context.Users.SingleOrDefaultAsync(
+                    user => user.Id == suppliedActor.UserId,
+                    cancellationToken)
+                ?? throw new UnauthorizedAccessException(
+                    "The administrator no longer matches the current user record.");
+            if (!AccountSessionRules.IsCurrentSession(
+                    actor.IsEnabled, actor.SecurityVersion, suppliedActor.SecurityVersion))
+            {
+                if (_sessionService?.CurrentUser is User current &&
+                    current.Id == suppliedActor.UserId &&
+                    current.SecurityVersion == suppliedActor.SecurityVersion)
+                    _sessionService.Invalidate(current);
+                throw new SessionExpiredException(new UnauthorizedAccessException(
+                    AccountSessionRules.SessionExpired));
+            }
+            if (actor.AgencyId != suppliedActor.AgencyId ||
+                actor.Permissions != suppliedActor.Permissions)
+                throw new UnauthorizedAccessException(
+                    "The administrator no longer matches the current user record.");
+            if (_sessionService is not null)
+            {
+                var signedIn = await LocalTenantAccess.EnsureSessionAsync(
+                    context, _sessionService);
+                if (signedIn.Id != suppliedActor.UserId ||
+                    signedIn.SecurityVersion != suppliedActor.SecurityVersion)
+                    throw new UnauthorizedAccessException(
+                        "The administrator does not match the signed-in account.");
+            }
+            return actor;
         }
     }
 }

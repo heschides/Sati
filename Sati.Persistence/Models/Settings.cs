@@ -27,6 +27,11 @@ namespace Sati.Models
         public Contracts.V1.BillingComplianceRequirements BillingComplianceRequirements { get; set; } =
             Contracts.V1.BillingComplianceGate.DefaultRequirements;
 
+        // Emergency correction switch for billing-policy enforcement dates. It is
+        // deliberately separate from the policy itself and starts off: when enabled,
+        // every past-dated append still requires its own explanation and audit row.
+        public bool AllowPastBillingPolicyEffectiveDates { get; set; }
+
         // Abandonment
         public int AbandonedAfterDays { get; set; } = 7;
 
@@ -122,7 +127,7 @@ namespace Sati.Models
         // EVENT DATE SETTINGS
 
         // Reviews (shared across Q1R–Q4R)
-        public int ReviewOpenDaysBefore { get; set; }
+        public int ReviewOpenDaysBefore { get; set; } = 10;
         public int ReviewDaysAfterDue { get; set; }
 
         // PCP
@@ -130,29 +135,29 @@ namespace Sati.Models
         public int PcpDaysAfterDue { get; set; }
 
         // Comprehensive Assessment
-        public int CompAssessmentOpenDaysBefore { get; set; }
+        public int CompAssessmentOpenDaysBefore { get; set; } = 30;
         public int CompAssessmentDaysAfterDue { get; set; }
 
         // Reclassification
-        public int ReclassificationOpenDaysBefore { get; set; }
+        public int ReclassificationOpenDaysBefore { get; set; } = 60;
         public int ReclassificationDaysAfterDue { get; set; }
 
         // Safety Plan
-        public int SafetyPlanOpenDaysBefore { get; set; }
+        public int SafetyPlanOpenDaysBefore { get; set; } = 90;
         public int SafetyPlanDaysAfterDue { get; set; }
 
         // Privacy Practices
-        public int PrivacyPracticesOpenDaysBefore { get; set; }
+        public int PrivacyPracticesOpenDaysBefore { get; set; } = 90;
         public int PrivacyPracticesDaysAfterDue { get; set; }
 
         // Releases
-        public int ReleaseAgencyOpenDaysBefore { get; set; }
+        public int ReleaseAgencyOpenDaysBefore { get; set; } = 90;
         public int ReleaseAgencyDaysAfterDue { get; set; }
 
-        public int ReleaseDhhsOpenDaysBefore { get; set; }
+        public int ReleaseDhhsOpenDaysBefore { get; set; } = 90;
         public int ReleaseDhhsDaysAfterDue { get; set; }
 
-        public int ReleaseMedicalOpenDaysBefore { get; set; }
+        public int ReleaseMedicalOpenDaysBefore { get; set; } = 90;
         public int ReleaseMedicalDaysAfterDue { get; set; }
 
         // EVENT DATE OFFSETS (anniversary − N days = due date)
@@ -167,8 +172,8 @@ namespace Sati.Models
         public int Q4RDaysBeforeAnniversary { get; set; }
 
         public int PcpDaysBeforeAnniversary { get; set; }
-        public int CompAssessmentDaysBeforeAnniversary { get; set; }
-        public int ReclassificationDaysBeforeAnniversary { get; set; }
+        public int CompAssessmentDaysBeforeAnniversary { get; set; } = 90;
+        public int ReclassificationDaysBeforeAnniversary { get; set; } = 30;
         public int SafetyPlanDaysBeforeAnniversary { get; set; }
         public int PrivacyPracticesDaysBeforeAnniversary { get; set; }
         public int ReleaseAgencyDaysBeforeAnniversary { get; set; }

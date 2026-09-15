@@ -22,6 +22,19 @@ namespace Sati.ViewModels.Supervisor
             UpcomingEvents = upcomingEvents;
 
             OverdueCount = upcomingEvents.Count(e => e.Kind == UpcomingEventKind.LateReview);
+            ClientsWithOverdueItems = upcomingEvents
+                .Where(e => e.Kind == UpcomingEventKind.LateReview)
+                .Select(e => e.PersonId)
+                .Distinct()
+                .Count();
+            ClientsClearOfOverdueItems = Math.Max(0, ClientCount - ClientsWithOverdueItems);
+            CompliancePercent = ClientCount == 0
+                ? 0
+                : 100m * ClientsClearOfOverdueItems / ClientCount;
+            ComplianceStatusLevel = ClientsWithOverdueItems == 0 ? "Ok" : "Danger";
+            ComplianceStatusLabel = ClientCount == 0
+                ? "No clients"
+                : ClientsWithOverdueItems == 0 ? "Clear" : "Review";
             HasOverdue = OverdueCount > 0;
             DetailHeading = $"{DisplayName} — upcoming items";
 
@@ -40,6 +53,11 @@ namespace Sati.ViewModels.Supervisor
         public int NotesThisMonth { get; }
         public decimal UnitsThisMonth { get; }
         public int OverdueCount { get; }
+        public int ClientsWithOverdueItems { get; }
+        public int ClientsClearOfOverdueItems { get; }
+        public decimal CompliancePercent { get; }
+        public string ComplianceStatusLevel { get; }
+        public string ComplianceStatusLabel { get; }
         public bool HasOverdue { get; }
         public string DetailHeading { get; }
         public List<UpcomingEvent> UpcomingEvents { get; }

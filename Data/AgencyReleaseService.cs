@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Forms;
+using Sati.Models;
 using System.Text.Json;
 
 namespace Sati.Data;
@@ -25,33 +26,74 @@ public sealed class AgencyReleaseService(
         AgencyReleaseRequest request,
         CancellationToken cancellationToken = default)
     {
-        return await GenerateAsync(personId, request, AnnualDocumentKind.ReleaseAgency, cancellationToken);
+        return await GenerateAsync(
+            personId, request, AnnualDocumentKind.ReleaseAgency, null, cancellationToken);
     }
 
     public Task<AgencyReleaseResult> GenerateMedicalAsync(
         int personId,
         AgencyReleaseRequest request,
         CancellationToken cancellationToken = default) =>
-        GenerateAsync(personId, request, AnnualDocumentKind.ReleaseMedical, cancellationToken);
+        GenerateAsync(personId, request, AnnualDocumentKind.ReleaseMedical, null, cancellationToken);
+
+    public Task<AgencyReleaseResult> GenerateForObligationAsync(
+        int personId,
+        AgencyReleaseRequest request,
+        Guid releaseObligationId,
+        CancellationToken cancellationToken = default) =>
+        GenerateAsync(
+            personId,
+            request,
+            AnnualDocumentKind.ReleaseAgency,
+            RequiredObligationId(releaseObligationId),
+            cancellationToken);
+
+    public Task<AgencyReleaseResult> GenerateMedicalForObligationAsync(
+        int personId,
+        AgencyReleaseRequest request,
+        Guid releaseObligationId,
+        CancellationToken cancellationToken = default) =>
+        GenerateAsync(
+            personId,
+            request,
+            AnnualDocumentKind.ReleaseMedical,
+            RequiredObligationId(releaseObligationId),
+            cancellationToken);
 
     private async Task<AgencyReleaseResult> GenerateAsync(
         int personId,
         AgencyReleaseRequest request,
         AnnualDocumentKind kind,
+        Guid? releaseObligationId,
         CancellationToken cancellationToken)
     {
         AgencyReleaseRules.EnsureValid(request);
+        if (request.IsRevocation && releaseObligationId is not null)
+            throw new InvalidOperationException(
+                "A revocation cannot replace the document linked to a release obligation. Record the withdrawal separately so the historical authorization is preserved.");
         var actor = sessionService.CurrentUser
             ?? throw new InvalidOperationException("An agency release cannot be generated without a signed-in user.");
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await LocalTenantAccess.EnsureCurrentActorAsync(context, actor, cancellationToken);
+        if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, personId, cancellationToken))
+            throw new InvalidOperationException("That consumer is not on your current caseload.");
         var person = await context.People.AsNoTracking().SingleOrDefaultAsync(
             candidate => candidate.Id == personId &&
                          candidate.UserId == actor.Id &&
                          candidate.AgencyId == actor.AgencyId,
             cancellationToken)
             ?? throw new InvalidOperationException("That consumer is not on your caseload.");
+        var releaseObligation = await ResolveReleaseObligationAsync(
+            context,
+            personId,
+            actor.AgencyId,
+            kind,
+            releaseObligationId,
+            DateTime.Today,
+            cancellationToken);
         var agency = await context.Agencies.AsNoTracking().SingleAsync(
             candidate => candidate.Id == actor.AgencyId,
             cancellationToken);
@@ -72,9 +114,10 @@ public sealed class AgencyReleaseService(
             : generator.Generate(subject, request, generatedAtUtc);
         var fileName = SuggestedFileName(
             person.Id, person.LastName, person.FirstName, request.IsRevocation, kind, request.IsDraft);
-        var cycleStart = AnnualDocumentCycle.CurrentStart(
-            person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
-            generatedAtUtc.ToLocalTime());
+        var cycleStart = releaseObligation?.TargetEffectiveDate.Date ??
+            AnnualDocumentCycle.CurrentStart(
+                person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
+                generatedAtUtc.ToLocalTime());
         await DocumentArtifactStore.StageGeneratedAsync(
             context,
             person.Id,
@@ -87,7 +130,8 @@ public sealed class AgencyReleaseService(
             pdf,
             fileName,
             request.IsDraft ? DraftBlankFields(request) : [],
-            cancellationToken);
+            cancellationToken,
+            releaseObligationId: releaseObligation?.Id);
 
         LocalAuditTrail.Record(
             context,
@@ -100,6 +144,8 @@ public sealed class AgencyReleaseService(
                 Scope = request.Scope,
                 StaffAttestation = request.ConfirmedObtainedRoi,
                 Revocation = request.IsRevocation,
+                ReleaseObligationId = releaseObligation?.ObligationId,
+                ReleaseObligationKey = releaseObligation?.StableKey,
             }));
         LocalAuditTrail.Record(
             context,
@@ -113,7 +159,9 @@ public sealed class AgencyReleaseService(
                 cycleStart = cycleStart.ToString("yyyy-MM-dd"),
                 origin = request.IsDraft
                     ? DocumentArtifactOrigin.Draft.ToString()
-                    : DocumentArtifactOrigin.GeneratedInSati.ToString()
+                    : DocumentArtifactOrigin.GeneratedInSati.ToString(),
+                releaseObligationId = releaseObligation?.ObligationId,
+                releaseObligationKey = releaseObligation?.StableKey
             }));
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -121,6 +169,55 @@ public sealed class AgencyReleaseService(
         return new AgencyReleaseResult(
             pdf,
             fileName);
+    }
+
+    private static async Task<ReleaseObligation?> ResolveReleaseObligationAsync(
+        SatiContext context,
+        int personId,
+        int agencyId,
+        AnnualDocumentKind kind,
+        Guid? obligationId,
+        DateTime today,
+        CancellationToken cancellationToken)
+    {
+        if (obligationId is null)
+            return null;
+
+        var expectedCategory = kind switch
+        {
+            AnnualDocumentKind.ReleaseAgency => ReleaseObligationCategory.Agency,
+            AnnualDocumentKind.ReleaseMedical => ReleaseObligationCategory.Medical,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+        var obligation = await context.ReleaseObligations.AsNoTracking()
+            .Include(item => item.AuthorizationEvents)
+            .SingleOrDefaultAsync(item =>
+                    item.ObligationId == obligationId.Value &&
+                    item.PersonId == personId &&
+                    item.AgencyId == agencyId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "That release obligation no longer exists for this consumer.");
+        if (obligation.Category != expectedCategory)
+            throw new InvalidOperationException(
+                $"The selected obligation requires a {obligation.Category} release, not a {expectedCategory} release.");
+        if (today.Date < obligation.AvailableOn.Date)
+            throw new InvalidOperationException(
+                $"This release obligation becomes available on {obligation.AvailableOn:yyyy-MM-dd}.");
+        if (obligation.RetiredOn is DateTime retiredOn && today.Date >= retiredOn.Date)
+            throw new InvalidOperationException(
+                "This release obligation has been retired and cannot receive a new document.");
+        if (obligation.WithdrawnOn is not null)
+            throw new InvalidOperationException(
+                "This release authorization was withdrawn and cannot receive a replacement document.");
+        return obligation;
+    }
+
+    private static Guid RequiredObligationId(Guid value)
+    {
+        if (value == Guid.Empty)
+            throw new ArgumentException("A release obligation is required.", nameof(value));
+        return value;
     }
 
     internal static string SuggestedFileName(

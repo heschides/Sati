@@ -13,8 +13,8 @@ public sealed class DocumentTemplateService(
 {
     public async Task<IReadOnlyList<DocumentTemplateDto>> GetVersionsAsync(AnnualDocumentKind kind)
     {
-        var actor = RequireAdmin();
         await using var db = await contextFactory.CreateDbContextAsync();
+        var actor = await RequireAdminAsync(db);
         var templates = await db.DocumentTemplates.AsNoTracking()
             .Where(template => template.Kind == kind &&
                 (template.AgencyId == actor.AgencyId || template.AgencyId == null))
@@ -24,8 +24,8 @@ public sealed class DocumentTemplateService(
 
     public async Task<DocumentTemplateDto> PublishAsync(AnnualDocumentKind kind, string body)
     {
-        var actor = RequireAdmin();
         await using var db = await contextFactory.CreateDbContextAsync();
+        var actor = await RequireAdminAsync(db);
         var version = (await db.DocumentTemplates
             .Where(template => template.AgencyId == actor.AgencyId && template.Kind == kind)
             .MaxAsync(template => (int?)template.Version) ?? 0) + 1;
@@ -39,8 +39,8 @@ public sealed class DocumentTemplateService(
 
     public async Task<AgencyReleaseResult> GeneratePrivacyPracticesAsync(int personId, DateTime? cycleStart = null)
     {
-        var actor = session.CurrentUser ?? throw new InvalidOperationException("Sign in before generating a document.");
         await using var db = await contextFactory.CreateDbContextAsync();
+        var actor = await LocalTenantAccess.EnsureSessionAsync(db, session);
         if (!await LocalTenantAccess.CanAccessPersonAsync(db, actor, personId))
             throw new InvalidOperationException("The consumer is not in your accessible caseload.");
         var person = await db.People.AsNoTracking().SingleAsync(candidate => candidate.Id == personId);
@@ -82,9 +82,9 @@ public sealed class DocumentTemplateService(
         return new AgencyReleaseResult(rendered.Pdf, fileName);
     }
 
-    private User RequireAdmin()
+    private async Task<User> RequireAdminAsync(SatiContext db)
     {
-        var actor = session.CurrentUser ?? throw new InvalidOperationException("Sign in before managing templates.");
+        var actor = await LocalTenantAccess.EnsureSessionAsync(db, session);
         if (!actor.HasAdminPermissions)
             throw new UnauthorizedAccessException("Administration permission is required to manage templates.");
         return actor;

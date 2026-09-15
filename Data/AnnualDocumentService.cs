@@ -17,6 +17,7 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
     public async Task<AnnualDocumentsStatusDto> GetStatusAsync(int personId, DateTime cycleStart)
     {
         var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         var person = await RequirePerson(db, actor, personId);
         return await GetStatusCoreAsync(db, actor, person, cycleStart);
     }
@@ -29,12 +30,30 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
             .Select(DocumentArtifactStore.ToDto).ToList();
         var ids = artifacts.Select(x => x.Id).ToArray();
         var acknowledged = await db.DocumentAcknowledgments.Where(x => ids.Contains(x.DocumentArtifactId)).Select(x => x.DocumentArtifactId).Distinct().ToListAsync();
-        var pcp = await db.Forms.AnyAsync(x => x.PersonId == personId && x.Type == FormType.PCP && x.CompletedDate != null && x.DueDate > cycleStart && x.DueDate <= window.EndsOn.AddDays(1));
-        return new(window, artifacts, acknowledged, AnnualDocumentReminder.Describe(window.IsOpen, pcp, artifacts));
+        var target = cycleStart.Date;
+        var completedTypes = await db.Forms
+            .Where(x => x.PersonId == personId && x.TargetEffectiveDate == target &&
+                        x.CompletedDate != null &&
+                        (x.Type == FormType.PCP || x.Type == FormType.SafetyPlan ||
+                         x.Type == FormType.PrivacyPractices))
+            .Select(x => x.Type)
+            .ToListAsync();
+        var releases = await db.ReleaseObligations.AsNoTracking()
+            .Include(x => x.Attestations)
+            .Where(x => x.PersonId == personId && x.TargetEffectiveDate == target)
+            .ToListAsync();
+        return new(window, artifacts, acknowledged, AnnualDocumentReminder.Describe(
+            window.IsOpen,
+            completedTypes.Contains(FormType.PCP),
+            artifacts,
+            releases.Select(x => x.ToComplianceFact()),
+            completedTypes.Contains(FormType.SafetyPlan),
+            completedTypes.Contains(FormType.PrivacyPractices)));
     }
     public async Task<DocumentAcknowledgmentDto> AcknowledgeAsync(int personId, AcknowledgeDocumentRequest request)
     {
         var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await RequirePerson(db, actor, personId);
         var artifact = await db.DocumentArtifacts.SingleOrDefaultAsync(x => x.Id == request.DocumentArtifactId && x.PersonId == personId &&
             x.AgencyId == actor.AgencyId && x.Kind == AnnualDocumentKind.PrivacyPractices && x.Origin == DocumentArtifactOrigin.GeneratedInSati && x.SupersededByArtifactId == null)
@@ -51,6 +70,7 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
     public async Task<VerifyDocumentResult> VerifyAsync(int personId, VerifyDocumentRequest request)
     {
         var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await RequirePerson(db, actor, personId);
         var artifact = await db.DocumentArtifacts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DocumentArtifactId &&
             x.PersonId == personId && x.AgencyId == actor.AgencyId) ?? throw new UnauthorizedAccessException();
@@ -62,11 +82,42 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
     public async Task<AgencyReleaseResult> SavePacketAsync(int personId, DateTime cycleStart)
     {
         var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var person = await RequirePerson(db, actor, personId);
         if (!SafetyPlanRules.CanAuthor(actor.Id, actor.Permissions, person.UserId)) throw new UnauthorizedAccessException();
         var status = await GetStatusCoreAsync(db, actor, person, cycleStart);
         if (!status.Window.IsOpen) throw new InvalidOperationException($"The packet opens on {status.Window.OpensOn:d}.");
+        var target = cycleStart.Date;
+        var today = DateTime.Today;
+        var releaseResolution = await ReleaseObligationService.ResolveAssignmentsAsync(
+            db, person, target, today, CancellationToken.None);
+        var releaseRows = await db.ReleaseObligations
+            .Include(x => x.Attestations)
+            .Include(x => x.AuthorizationEvents)
+            .Where(x => x.PersonId == personId && x.TargetEffectiveDate == target)
+            .ToListAsync();
+        var releaseChanges = ReleaseObligationService.ReconcileRows(
+            db, person, target, releaseResolution, releaseRows, today, DateTime.UtcNow);
+        if (releaseChanges.CreatedKeys.Count != 0 || releaseChanges.RetiredKeys.Count != 0)
+        {
+            LocalAuditTrail.Record(
+                db,
+                actor,
+                LocalAuditActions.ReleaseObligationsReconciled,
+                "Person",
+                personId,
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    targetEffectiveDate = target.ToString("yyyy-MM-dd"),
+                    created = releaseChanges.CreatedKeys,
+                    retired = releaseChanges.RetiredKeys,
+                    source = "annual-packet"
+                }));
+            // Assign the durable row ids before artifact rows take their FKs. This
+            // flush remains inside the packet transaction.
+            await db.SaveChangesAsync();
+        }
         var agency = await db.Agencies.AsNoTracking().SingleAsync(x => x.Id == actor.AgencyId);
         var candidates = await db.DocumentTemplates.AsNoTracking().Where(x => x.AgencyId == actor.AgencyId || x.AgencyId == null).ToListAsync();
         var selected = new List<DocumentTemplateDto>();
@@ -81,22 +132,57 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
         }
         var linked = await db.PersonProviders.Where(x => x.PersonId == personId && x.IsPrimaryCare && x.EndDate == null).Select(x => (int?)x.ProviderId).SingleOrDefaultAsync();
         var directory = await db.Providers.AsNoTracking().Where(x => x.AgencyId == actor.AgencyId).ToListAsync();
-        var recipient = RecordsRecipient.Resolve(linked, directory.Select(x => new RecordsProviderFact(x.Id, x.ParentProviderId, x.Name,
-            AgencyReleaseService.ComposeAddress(x.Street, x.City, x.State, x.Zip), x.Phone)).ToList());
+        var recipientDirectory = directory.Select(x => new RecordsProviderFact(
+            x.Id,
+            x.ParentProviderId,
+            x.Name,
+            AgencyReleaseService.ComposeAddress(x.Street, x.City, x.State, x.Zip),
+            x.Phone)).ToList();
+        var recipient = RecordsRecipient.Resolve(linked, recipientDirectory);
         var safety = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycleStart.Date).OrderByDescending(x => x.Version).FirstOrDefaultAsync();
         SafetyPlanDto? plan = safety is null ? null : new(safety.Id, safety.PersonId, safety.AuthorUserId, safety.CycleStart, safety.Status, safety.Version, safety.Revision,
             safety.CreatedAtUtc, safety.UpdatedAtUtc, safety.SubmittedAtUtc, safety.ApprovedAtUtc, safety.ApprovedByUserId, safety.ReturnReason, safety.DocumentJson);
-        var medical = await db.Forms.AnyAsync(x => x.PersonId == personId && x.Type == FormType.Release_Medical && x.CompletedDate != null &&
-            x.DueDate > cycleStart && x.DueDate <= status.Window.EndsOn.AddDays(1));
+        var hasRecipientObligations = await db.ReleaseObligations.AnyAsync(x =>
+            x.PersonId == personId && x.TargetEffectiveDate == target);
+        var medical = hasRecipientObligations
+            ? linked is int providerId && await db.ReleaseObligations.AnyAsync(x =>
+                x.PersonId == personId &&
+                x.TargetEffectiveDate == target &&
+                x.Category == ReleaseObligationCategory.Medical &&
+                x.RecipientProviderId == providerId &&
+                x.Attestations.Any() &&
+                !x.AuthorizationEvents.Any(change =>
+                    change.Kind == ReleaseAuthorizationEventKind.Withdrawn &&
+                    change.OccurredOn <= DateTime.Today))
+            : await db.Forms.AnyAsync(x => x.PersonId == personId &&
+                x.Type == FormType.Release_Medical &&
+                x.TargetEffectiveDate == target && x.CompletedDate != null);
+        var packetReleases = releaseRows
+            .Where(x => x.RetiredOn is null || today < x.RetiredOn.Value.Date)
+            .Select(x =>
+            {
+                var details = RecordsRecipient.Resolve(x.RecipientProviderId, recipientDirectory);
+                return new PacketReleaseInput(
+                    x.Id,
+                    x.ObligationId,
+                    x.Category,
+                    x.CompletedOn,
+                    x.RecipientDisplayName ?? details?.Name,
+                    details?.Address,
+                    details?.Phone);
+            })
+            .ToList();
         var input = new PacketRenderInput(new(personId, person.FullName, person.BirthDate, person.GuardianName, agency.Name,
             AgencyReleaseService.ComposeAddress(agency.Street, agency.City, agency.State, agency.Zip), agency.EdiContactPhone, actor.DisplayName, actor.Role.ToString()),
-            cycleStart.Date, status.Window.EndsOn, DateTime.UtcNow, actor.Id, status.Artifacts, plan, selected, medical, recipient?.Name, recipient?.Address, recipient?.Phone);
+            cycleStart.Date, status.Window.EndsOn, DateTime.UtcNow, actor.Id, status.Artifacts, plan, selected, medical,
+            recipient?.Name, recipient?.Address, recipient?.Phone, packetReleases);
         var rendered = composer.Render(input);
         var recorded = new List<DocumentArtifactDto>();
         foreach (var file in rendered.Documents)
             recorded.Add(DocumentArtifactStore.ToDto(await DocumentArtifactStore.StageGeneratedAsync(db, personId, actor.AgencyId, file.Kind, cycleStart,
                 file.Origin, input.GeneratedAtUtc, actor.Id, file.Pdf, file.FileName, file.BlankFields, default, file.TemplateOwner, file.TemplateKey,
-                file.TemplateVersion, file.SourceContentId, file.SourceContentVersion)));
+                file.TemplateVersion, file.SourceContentId, file.SourceContentVersion,
+                file.ReleaseObligationRecordId)));
         var zip = AnnualPacketComposer.Zip(input, rendered, recorded);
         LocalAuditTrail.Record(db, actor, "annual-packet.saved", "Person", personId);
         await db.SaveChangesAsync(); await transaction.CommitAsync();

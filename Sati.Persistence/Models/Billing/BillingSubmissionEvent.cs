@@ -14,6 +14,9 @@ public sealed class BillingSubmissionEvent
     public string? ResponseCode { get; set; }
     public string? Explanation { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
+    public long? EdiGenerationId { get; set; }
+    public EdiGeneration? EdiGeneration { get; set; }
 
     public BillingPeriod BillingPeriod { get; set; } = null!;
 }

@@ -88,7 +88,52 @@ public sealed class DocumentArtifactApiTests(SatiApiFactory factory)
     }
 
     [Fact]
-    public async Task MedicalDraftDoesNotSatisfyPrerequisiteButFinishedGeneratorOutputDoes()
+    public async Task DhhsReleaseArtifactLinksTheRequestedAnnualObligation()
+    {
+        const int personId = 101;
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var person = (await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload"))!
+            .Single(candidate => candidate.Id == personId);
+        var target = AnnualDocumentCycle.CurrentStart(
+            person.EffectiveDate!.Value, DateTime.Today);
+        var reconciled = await owner.PostAsJsonAsync(
+            $"/api/v1/people/{personId}/release-obligations/reconcile",
+            new ReconcileReleaseObligationsRequest(target));
+        reconciled.EnsureSuccessStatusCode();
+        var status = (await reconciled.Content.ReadFromJsonAsync<ReleaseObligationStatusDto>())!;
+        var obligation = Assert.Single(status.Obligations, item =>
+            item.Category == nameof(ReleaseObligationCategory.Dhhs));
+        await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.ReleaseDhhs);
+
+        try
+        {
+            var generated = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms.pdf",
+                new DhhsFormRequest(
+                    nameof(DhhsFormDefinition.FormKey.AuthorizationToRelease),
+                    new Dictionary<string, bool>
+                    {
+                        ["ReleaseSend my information to"] = true
+                    },
+                    TargetEffectiveDate: target,
+                    ReleaseObligationId: obligation.ObligationId));
+            generated.EnsureSuccessStatusCode();
+
+            var artifacts = await owner.GetFromJsonAsync<List<DocumentArtifactDto>>(
+                $"/api/v1/people/{personId}/documents?cycleStart={target:yyyy-MM-dd}");
+            var artifact = Assert.Single(artifacts!, item =>
+                item.Kind == AnnualDocumentKind.ReleaseDhhs.ToString());
+            Assert.Equal(obligation.Id, artifact.ReleaseObligationRecordId);
+        }
+        finally
+        {
+            await factory.DeleteDocumentArtifactsAsync(
+                personId, AnnualDocumentKind.ReleaseDhhs);
+        }
+    }
+
+    [Fact]
+    public async Task MedicalReleaseAttestationIsIndependentOfArtifactState()
     {
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
         const int personId = 101;
@@ -100,13 +145,6 @@ public sealed class DocumentArtifactApiTests(SatiApiFactory factory)
         {
             var draft = ValidRelease() with { IsDraft = true, ConfirmedObtainedRoi = false };
             (await owner.PostAsJsonAsync(route, new RenderAnnualDocumentRequest(Release: draft)))
-                .EnsureSuccessStatusCode();
-            var rejected = await owner.PostAsJsonAsync(
-                $"/api/v1/people/{personId}/forms/Release_Medical/attestation",
-                new AttestFormRequest(formId, DateTime.Today));
-            Assert.Equal(HttpStatusCode.UnprocessableEntity, rejected.StatusCode);
-
-            (await owner.PostAsJsonAsync(route, new RenderAnnualDocumentRequest(Release: ValidRelease())))
                 .EnsureSuccessStatusCode();
             var accepted = await owner.PostAsJsonAsync(
                 $"/api/v1/people/{personId}/forms/Release_Medical/attestation",
@@ -125,7 +163,7 @@ public sealed class DocumentArtifactApiTests(SatiApiFactory factory)
     }
 
     [Fact]
-    public async Task SupervisorMayOverrideMissingPrerequisiteWithTechnicalReason()
+    public async Task FormPrerequisiteOverrideIsRejectedBecauseAttestationIsSufficient()
     {
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
         using var supervisor = await factory.CreateAuthenticatedClientAsync("supervisor-one");
@@ -141,14 +179,15 @@ public sealed class DocumentArtifactApiTests(SatiApiFactory factory)
                 new AttestFormRequest(
                     formId, DateTime.Today, SupervisorOverrideReason: "PDF generation service was unavailable."));
 
-            response.EnsureSuccessStatusCode();
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
             var after = await factory.GetAuditEventsAsync("form.prerequisite-overridden");
-            Assert.Equal(before.Count + 1, after.Count);
-            Assert.Contains(nameof(PrerequisiteKind.DocumentArtifact), after[^1].MetadataJson);
-            Assert.DoesNotContain("PDF generation service was unavailable", after[^1].MetadataJson);
-            Assert.Equal(
-                "PDF generation service was unavailable.",
-                await factory.GetLatestFormAttestationReasonAsync(formId));
+            Assert.Equal(before.Count, after.Count);
+            Assert.Null(await factory.GetLatestFormAttestationReasonAsync(formId));
+
+            var accepted = await supervisor.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/Release_Medical/attestation",
+                new AttestFormRequest(formId, DateTime.Today));
+            accepted.EnsureSuccessStatusCode();
         }
         finally
         {

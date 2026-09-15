@@ -29,6 +29,43 @@ public sealed class DailyAgendaBuilderTests
     }
 
     [Fact]
+    public void AgendaCarriesTheExactFormAndAnnualTargetInsteadOfOnlyItsType()
+    {
+        var target = new DateTime(2026, 3, 7);
+        var overdue = new Form(
+            FormType.PCP,
+            Today.AddDays(-2),
+            targetEffectiveDate: target)
+        {
+            Id = 704
+        };
+        var person = PersonWithForms("Alex", overdue);
+        var upcomingTarget = target.AddYears(1);
+        var upcoming = new UpcomingEvent
+        {
+            PersonId = person.Id,
+            ClientName = person.FullName,
+            Title = "PCP — Alex",
+            Date = upcomingTarget,
+            Kind = UpcomingEventKind.OpenReview,
+            FormType = FormType.PCP,
+            FormId = 811,
+            TargetEffectiveDate = upcomingTarget
+        };
+
+        var result = new DailyAgendaBuilder(new StubUpcomingEventService(upcoming))
+            .Build([person], new Settings(), Today);
+
+        var overdueItem = Assert.Single(result.OverdueItems);
+        Assert.Equal(704, overdueItem.FormId);
+        Assert.Equal(target, overdueItem.TargetEffectiveDate);
+        var upcomingItem = Assert.Single(result.UpcomingItems);
+        Assert.Equal(811, upcomingItem.FormId);
+        Assert.Equal(upcomingTarget, upcomingItem.TargetEffectiveDate);
+        Assert.Equal($"form:{person.Id}:811", upcomingItem.Key);
+    }
+
+    [Fact]
     public void LookbackIncludesNonBillingFormsAndLabelsTheirBillingImpactAccurately()
     {
         var person = PersonWithForms(
@@ -137,6 +174,72 @@ public sealed class DailyAgendaBuilderTests
         Assert.Equal(FormType.Q2R, item.FormType);
     }
 
+    [Fact]
+    public void ExactReleaseRecipientsReplaceTheLegacyCategoryRowInTheAgenda()
+    {
+        var target = new DateTime(2026, 1, 1);
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var legacy = new Form(
+            FormType.Release_Medical,
+            Today.AddDays(-3),
+            completedOn: null,
+            targetEffectiveDate: target);
+        var person = PersonWithForms("Alex Person", legacy);
+        person.ReleaseComplianceSnapshots =
+        [
+            ReleaseFact("medical-one", "Medical One", target, Today.AddDays(-3), firstId),
+            ReleaseFact("medical-two", "Medical Two", target, Today.AddDays(-2), secondId)
+        ];
+        var settings = new Settings
+        {
+            BillingComplianceRequirements = BillingComplianceGate.DefaultRequirements |
+                                            BillingComplianceRequirements.MedicalRelease
+        };
+
+        var result = new DailyAgendaBuilder(new StubUpcomingEventService())
+            .Build([person], settings, Today);
+
+        Assert.Equal(2, result.OverdueTotal);
+        Assert.Contains(result.OverdueItems, item =>
+            item.Title.Contains("Medical One", StringComparison.Ordinal) &&
+            item.BlocksBilling &&
+            item.ReleaseObligationId == firstId &&
+            item.TargetEffectiveDate == target);
+        Assert.Contains(result.OverdueItems, item =>
+            item.Title.Contains("Medical Two", StringComparison.Ordinal) &&
+            item.BlocksBilling &&
+            item.ReleaseObligationId == secondId &&
+            item.TargetEffectiveDate == target);
+    }
+
+    [Fact]
+    public void ReleaseMatrixCellAggregatesEveryRecipientWithoutCollapsingThem()
+    {
+        var target = new DateTime(2026, 1, 1);
+        var person = PersonWithForms("Alex Person");
+        var completed = ReleaseFact("medical-one", "Medical One", target, Today.AddDays(-3)) with
+        {
+            Attestations =
+            [
+                new("medical-one", Today.AddDays(-4),
+                    new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc))
+            ]
+        };
+        person.ReleaseComplianceSnapshots =
+        [
+            completed,
+            ReleaseFact("medical-two", "Medical Two", target, Today.AddDays(-2))
+        ];
+
+        var cell = new Sati.ViewModels.ReleaseCellViewModel(
+            person, ReleaseObligationCategory.Medical, Today);
+
+        Assert.Equal(FormCellStatus.Overdue, cell.Status);
+        Assert.Contains("1/2", cell.CellText, StringComparison.Ordinal);
+        Assert.Equal(Today.AddDays(-2), cell.DueDate);
+    }
+
     private static Person PersonWithForms(string fullName, params Form[] forms)
     {
         var parts = fullName.Split(' ', 2);
@@ -165,6 +268,24 @@ public sealed class DailyAgendaBuilderTests
         Kind = kind,
         FormType = formType
     };
+
+    private static ReleaseComplianceFact ReleaseFact(
+        string key,
+        string recipient,
+        DateTime target,
+        DateTime due,
+        Guid? obligationId = null) =>
+        new(
+            key,
+            ReleaseObligationCategory.Medical,
+            due,
+            target,
+            RetiredOn: null,
+            Attestations: [],
+            obligationId ?? Guid.NewGuid(),
+            target,
+            target.AddDays(-90),
+            recipient);
 
     private sealed class StubUpcomingEventService(params UpcomingEvent[] events)
         : IUpcomingEventService

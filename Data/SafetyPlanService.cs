@@ -14,6 +14,7 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
     {
         var actor = Actor;
         await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         await RequirePerson(db, actor, personId, cycleStart);
         var plan = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycleStart.Date)
             .OrderByDescending(x => x.Version).FirstOrDefaultAsync();
@@ -23,7 +24,9 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
     {
         var actor = Actor;
         await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         var person = await RequirePerson(db, actor, personId, cycleStart);
+        await RequireAvailableAsync(db, actor.AgencyId, cycleStart);
         if (!SafetyPlanRules.CanAuthor(actor.Id, actor.Permissions, person.UserId)) throw new UnauthorizedAccessException();
         var prior = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycleStart.Date)
             .OrderByDescending(x => x.Version).FirstOrDefaultAsync();
@@ -42,6 +45,7 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
     {
         var actor = Actor;
         await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         var plan = await db.SafetyPlans.SingleOrDefaultAsync(x => x.Id == requested.Id) ?? throw new UnauthorizedAccessException();
         var person = await RequirePerson(db, actor, plan.PersonId, plan.CycleStart);
         if (action is not ("approve" or "return") && !SafetyPlanRules.CanAuthor(actor.Id, actor.Permissions, person.UserId))
@@ -59,7 +63,9 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
     {
         var actor = Actor;
         await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
         var person = await RequirePerson(db, actor, personId, cycleStart);
+        await RequireAvailableAsync(db, actor.AgencyId, cycleStart);
         var plan = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycleStart.Date)
             .OrderByDescending(x => x.Version).FirstOrDefaultAsync() ?? throw new InvalidOperationException("Start the safety plan first.");
         var errors = SafetyPlanRules.Validate(plan.DocumentJson, plan.Status == "Approved");
@@ -85,6 +91,25 @@ public sealed class SafetyPlanService(IDbContextFactory<SatiContext> factory, IS
             cycle.Date < effective.Date || AnnualDocumentCycle.CurrentStart(effective, cycle) != cycle.Date)
             throw new ArgumentException("Choose an effective-date anniversary on or after enrollment.");
         return person;
+    }
+    private static async Task RequireAvailableAsync(SatiContext db, int agencyId, DateTime cycle)
+    {
+        var timing = await db.Settings.AsNoTracking()
+            .Where(x => x.AgencyId == agencyId)
+            .Select(x => new
+            {
+                x.SafetyPlanOpenDaysBefore,
+                x.SafetyPlanDaysBeforeAnniversary
+            })
+            .SingleOrDefaultAsync();
+        var openDays = Math.Max(0, timing?.SafetyPlanOpenDaysBefore ?? 90);
+        var dueDays = Math.Max(0, timing?.SafetyPlanDaysBeforeAnniversary ?? 0);
+        if (!AnnualDocumentCycle.IsAvailable(cycle, DateTime.Today, openDays, dueDays))
+        {
+            var availableOn = cycle.Date.AddDays(-dueDays).AddDays(-openDays);
+            throw new InvalidOperationException(
+                $"This safety plan becomes available on {availableOn:yyyy-MM-dd}.");
+        }
     }
     private static SafetyPlanDto ToDto(SafetyPlan plan) => new(plan.Id, plan.PersonId, plan.AuthorUserId, plan.CycleStart,
         plan.Status, plan.Version, plan.Revision, plan.CreatedAtUtc, plan.UpdatedAtUtc, plan.SubmittedAtUtc,

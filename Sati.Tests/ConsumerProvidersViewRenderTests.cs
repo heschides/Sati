@@ -31,7 +31,7 @@ public sealed class ConsumerProvidersViewRenderTests
 
         RenderProfile(panel, view =>
         {
-            var list = WpfUiHarness.FindByAutomationName<ItemsControl>(view, "Current medical providers");
+            var list = WpfUiHarness.FindByAutomationName<ItemsControl>(view, "Current provider assignments");
             var buttons = WpfUiHarness.Descendants(list).OfType<Button>().ToList();
             var end = buttons.Single(button => Equals(button.Content, "End"));
             var remove = buttons.Single(button => Equals(button.Content, "Remove"));
@@ -50,21 +50,51 @@ public sealed class ConsumerProvidersViewRenderTests
     }
 
     [Fact]
-    public async Task TheAddButtonIsInertUntilAProviderIsChosen()
+    public async Task TheAddButtonRequiresAProviderAndAnExplicitStartDate()
     {
         var panel = await LoadedPanelAsync();
 
         RenderProfile(panel, view =>
         {
             var add = WpfUiHarness.FindByAutomationName<Button>(
-                view, "Add this provider to the consumer");
+                view, "Add this effective-dated provider assignment to the consumer");
+            var start = WpfUiHarness.FindByAutomationName<DatePicker>(
+                view, "Provider assignment actual start date");
 
             Assert.False(add.IsEnabled);
+            Assert.Null(start.SelectedDate);
 
             panel.NewProviderId = 4;
             WpfUiHarness.Realize(view);
+            Assert.False(add.IsEnabled);
+
+            panel.NewStartDate = new DateTime(2026, 6, 13);
+            WpfUiHarness.Realize(view);
 
             Assert.True(add.IsEnabled);
+        });
+    }
+
+    [Fact]
+    public async Task WaiverSelectionIsNamedAndHidesMedicalOnlyControls()
+    {
+        var panel = await LoadedPanelAsync();
+
+        RenderProfile(panel, view =>
+        {
+            var primaryCare = WpfUiHarness.FindByAutomationName<CheckBox>(
+                view, "This is the primary care provider");
+            var legacyRelease = WpfUiHarness.FindByAutomationName<CheckBox>(
+                view, "Legacy medical release on file indicator");
+            var kind = WpfUiHarness.FindByAutomationName<TextBlock>(
+                view, "Selected provider assignment type");
+
+            panel.NewProviderId = 7;
+            WpfUiHarness.Realize(view);
+
+            Assert.Equal("Waiver / service provider assignment", kind.Text);
+            AssertHiddenByCollapsedAncestor(primaryCare);
+            AssertHiddenByCollapsedAncestor(legacyRelease);
         });
     }
 
@@ -75,7 +105,7 @@ public sealed class ConsumerProvidersViewRenderTests
 
         RenderProfile(panel, view =>
         {
-            var list = WpfUiHarness.FindByAutomationName<ItemsControl>(view, "Current medical providers");
+            var list = WpfUiHarness.FindByAutomationName<ItemsControl>(view, "Current provider assignments");
             var texts = WpfUiHarness.Descendants(list).OfType<TextBlock>()
                 .Select(block => block.Text).ToList();
 
@@ -182,12 +212,23 @@ public sealed class ConsumerProvidersViewRenderTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    private static void AssertHiddenByCollapsedAncestor(FrameworkElement control)
+    {
+        for (DependencyObject? current = control; current is not null;
+             current = System.Windows.Media.VisualTreeHelper.GetParent(current))
+        {
+            if (current is FrameworkElement { Visibility: Visibility.Collapsed })
+                return;
+        }
+
+        Assert.Fail($"{AutomationProperties.GetName(control)} has no collapsed ancestor.");
+    }
+
     /// <summary>
     /// Loads the panel on its own, on the shared UI thread. Its own control is what makes this
     /// <para>
     /// possible: rendering it inside the whole consumer profile would need the rest of that
     /// screen's view model and services standing up, and the panel does not depend on any of it.
-
     /// </para>
     /// </summary>
     private static void RenderProfile(ConsumerProvidersViewModel panel, Action<ConsumerProvidersView> assert)
@@ -225,7 +266,8 @@ public sealed class ConsumerProvidersViewRenderTests
     [
         Medical(1, "MaineHealth", MedicalProviderKind.Network),
         Medical(3, "Coastal Women's Healthcare", MedicalProviderKind.Practice, 1),
-        Medical(4, "Dr. Reed", MedicalProviderKind.Individual, 3)
+        Medical(4, "Dr. Reed", MedicalProviderKind.Individual, 3),
+        new Provider { Id = 7, Type = ProviderType.Waiver, Name = "Spurwink" }
     ];
 
     private static Provider Medical(

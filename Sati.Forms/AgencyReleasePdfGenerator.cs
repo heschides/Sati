@@ -348,7 +348,7 @@ public sealed class AgencyReleasePdfGenerator
             attestation.Format.LeftIndent = Unit.FromPoint(9);
             attestation.Format.RightIndent = Unit.FromPoint(9);
             attestation.Format.SpaceBefore = Unit.FromPoint(8);
-            attestation.AddFormattedText("STAFF ATTESTATION\n", TextFormat.Bold);
+            attestation.AddFormattedText("STAFF GENERATION CONFIRMATION\n", TextFormat.Bold);
             attestation.AddText(AgencyReleaseRules.StaffAttestation);
             attestation.AddLineBreak();
             attestation.AddFormattedText(
@@ -366,7 +366,7 @@ public sealed class AgencyReleasePdfGenerator
             draft.Format.RightIndent = Unit.FromPoint(9);
             draft.Format.SpaceBefore = Unit.FromPoint(8);
             draft.AddFormattedText("Prepared draft. ", TextFormat.Bold);
-            draft.AddText("No staff attestation that the authorization was obtained is attached to this copy.");
+            draft.AddText("No staff generation confirmation is attached to this copy. This draft does not record completion of a tracked release obligation.");
         }
     }
 

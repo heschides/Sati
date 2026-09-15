@@ -143,6 +143,86 @@ public sealed class SignatureApiTests(SatiApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GuardianStatusDeterminesTheOnlyPermittedSignerCapacity()
+    {
+        var source = await Source();
+        int guardianId;
+        int representativeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var guardian = new ServerPersonContact
+            {
+                PersonId = source.PersonId,
+                Kind = "Guardian",
+                FirstName = "Synthetic",
+                LastName = "Guardian",
+                Email = "guardian@example.test"
+            };
+            var representative = new ServerPersonContact
+            {
+                PersonId = source.PersonId,
+                Kind = "AuthorizedRepresentative",
+                FirstName = "Synthetic",
+                LastName = "Representative",
+                Email = "representative@example.test"
+            };
+            db.PersonContacts.AddRange(guardian, representative);
+            await db.SaveChangesAsync();
+            guardianId = guardian.Id;
+            representativeId = representative.Id;
+        }
+
+        using var staff = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var consumerOnly = (await staff.GetFromJsonAsync<List<SignatureSignerDto>>(
+            $"/api/v1/people/{source.PersonId}/signature-signers"))!;
+        Assert.Collection(consumerOnly,
+            signer => Assert.Equal(SignerCapacity.Consumer, signer.Capacity));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var person = await db.People.SingleAsync(x => x.Id == source.PersonId);
+            person.HasGuardian = true;
+            await db.SaveChangesAsync();
+        }
+
+        var guardianOnly = (await staff.GetFromJsonAsync<List<SignatureSignerDto>>(
+            $"/api/v1/people/{source.PersonId}/signature-signers"))!;
+        Assert.Collection(guardianOnly, signer =>
+        {
+            Assert.Equal(SignerCapacity.Guardian, signer.Capacity);
+            Assert.Equal(guardianId, signer.ContactId);
+        });
+
+        (await Freeze(staff, source)).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await staff.PostAsJsonAsync("/api/v1/signature-requests",
+                Create(source.PersonId, source.Id))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await staff.PostAsJsonAsync("/api/v1/signature-requests",
+                Create(source.PersonId, source.Id) with
+                {
+                    SignerCapacity = SignerCapacity.AuthorizedRepresentative,
+                    SignerContactId = representativeId,
+                    AuthorityEvidence = "Synthetic authority reference",
+                    ExpectedSignerName = "Synthetic Representative",
+                    ExpectedDeliveryEmail = "representative@example.test"
+                })).StatusCode);
+
+        var accepted = await staff.PostAsJsonAsync("/api/v1/signature-requests",
+            Create(source.PersonId, source.Id) with
+            {
+                SignerCapacity = SignerCapacity.Guardian,
+                SignerContactId = guardianId,
+                AuthorityEvidence = "Synthetic guardianship reference",
+                ExpectedSignerName = "Synthetic Guardian",
+                ExpectedDeliveryEmail = "guardian@example.test"
+            });
+        accepted.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
     public async Task StaffDocumentBytesAreReleasedOnlyAfterDurableReadAudit()
     {
         var source = await Source(); using var staff = await factory.CreateAuthenticatedClientAsync("case-manager-one");
@@ -262,6 +342,13 @@ public sealed class SignatureApiTests(SatiApiFactory factory) : IAsyncLifetime
     public async Task GuardianChangesRevokeOpenRequestsOnlyWhenSigningIdentityChanges(string change)
     {
         var source = await Source(); using var staff = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        using (var personScope = factory.Services.CreateScope())
+        {
+            var personDb = personScope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var person = await personDb.People.SingleAsync(x => x.Id == source.PersonId);
+            person.HasGuardian = true;
+            await personDb.SaveChangesAsync();
+        }
         var contactInput = new SavePersonContactRequest("Synthetic", "Guardian", "Guardian", null, null, null, "guardian@example.test", false, false);
         var contactResponse = await staff.PostAsJsonAsync($"/api/v1/people/{source.PersonId}/contacts", contactInput); contactResponse.EnsureSuccessStatusCode();
         var contact = (await contactResponse.Content.ReadFromJsonAsync<PersonContactDto>())!;

@@ -43,13 +43,14 @@ namespace Sati.ViewModels.Children
             _scratchpadService = scratchpadService;
             _sessionService = sessionService;
             _workAgendaService = workAgendaService;
+            History = new ScratchpadHistoryViewModel(scratchpadService, sessionService);
         }
 
         // -------------------------------------------------------------------------
-        // Events
+        // Child state and host callbacks
         // -------------------------------------------------------------------------
 
-        public event EventHandler? OpenScratchpadHistoryRequested;
+        public ScratchpadHistoryViewModel History { get; }
 
         // The shell supplies the host action so this child never reaches into a
         // parent ViewModel or creates a View. Awaiting it through an async command
@@ -77,6 +78,7 @@ namespace Sati.ViewModels.Children
         [ObservableProperty] private bool hasScheduledWorkLoadError;
         [ObservableProperty] private string scheduledWorkLoadErrorMessage = string.Empty;
         [ObservableProperty] private bool isScheduledWorkBusy;
+        [ObservableProperty] private int selectedAgendaTabIndex;
 
         public ObservableCollection<WorkAgendaItem> PaperworkItems { get; } = [];
         public ObservableCollection<WorkAgendaItem> VisitItems { get; } = [];
@@ -127,12 +129,11 @@ namespace Sati.ViewModels.Children
         }
 
         [RelayCommand] private void DecreaseScratchpadFont() => ScratchpadFontSize = Math.Max(ScratchpadFontSize - 2, 10);
-        [RelayCommand] private void OpenScratchpadHistory() => OpenScratchpadHistoryRequested?.Invoke(this, EventArgs.Empty);
-
         [RelayCommand]
         private async Task OpenScheduledWork(WorkAgendaItem? item)
         {
-            if (item is not null && ScheduledWorkOpeningAsync is not null)
+            if (_sessionService.CurrentUser?.HasCaseManagerPermissions == true &&
+                item is not null && ScheduledWorkOpeningAsync is not null)
                 await ScheduledWorkOpeningAsync(item);
         }
 
@@ -268,6 +269,8 @@ namespace Sati.ViewModels.Children
         {
             if (_workAgendaService is null || _sessionService.CurrentUser is not { } user)
                 throw new InvalidOperationException("The structured Work Agenda is unavailable.");
+            if (!user.HasCaseManagerPermissions)
+                throw new UnauthorizedAccessException("Case-management access is required for structured work.");
 
             try
             {
@@ -296,9 +299,10 @@ namespace Sati.ViewModels.Children
         private async Task<bool> RefreshScheduledWorkAsync(int userId)
         {
             var request = _scheduledWorkLoads.Begin();
-            if (_workAgendaService is null)
+            var user = _sessionService.CurrentUser;
+            if (_workAgendaService is null || user is not { HasCaseManagerPermissions: true } || user.Id != userId)
             {
-                ReplaceScheduledWork([]);
+                ClearScheduledWork();
                 return true;
             }
 
@@ -307,8 +311,9 @@ namespace Sati.ViewModels.Children
             {
                 var items = await _workAgendaService.LoadAsync(userId, DateTime.Today);
                 if (!_scheduledWorkLoads.IsCurrent(request) ||
-                    _sessionService.CurrentUser?.Id != userId)
+                    !ReferenceEquals(_sessionService.CurrentUser, user) || !user.HasCaseManagerPermissions)
                 {
+                    if (_scheduledWorkLoads.IsCurrent(request)) ClearScheduledWork();
                     return false;
                 }
 
@@ -321,8 +326,9 @@ namespace Sati.ViewModels.Children
             {
                 Debug.WriteLine($"Scheduled Work load failed: {ex.Message}");
                 if (!_scheduledWorkLoads.IsCurrent(request) ||
-                    _sessionService.CurrentUser?.Id != userId)
+                    !ReferenceEquals(_sessionService.CurrentUser, user) || !user.HasCaseManagerPermissions)
                 {
+                    if (_scheduledWorkLoads.IsCurrent(request)) ClearScheduledWork();
                     return false;
                 }
 
@@ -338,6 +344,14 @@ namespace Sati.ViewModels.Children
                 if (_scheduledWorkLoads.IsCurrent(request))
                     IsScheduledWorkBusy = false;
             }
+        }
+
+        private void ClearScheduledWork()
+        {
+            ReplaceScheduledWork([]);
+            HasScheduledWorkLoadError = false;
+            ScheduledWorkLoadErrorMessage = string.Empty;
+            IsScheduledWorkBusy = false;
         }
 
         private void ReplaceScheduledWork(IEnumerable<WorkAgendaItem> items)
@@ -474,6 +488,8 @@ namespace Sati.ViewModels.Children
             HasScheduledWorkLoadError = false;
             ScheduledWorkLoadErrorMessage = string.Empty;
             IsScheduledWorkBusy = false;
+            SelectedAgendaTabIndex = 0;
+            History.Clear();
         }
 
         private async Task<bool> SaveTodayCoreAsync()
@@ -574,7 +590,7 @@ namespace Sati.ViewModels.Children
             _sessionExpiredDuringSave = true;
             HasScratchpadSessionExpired = true;
             ScratchpadSessionExpiredMessage =
-                "Your Demo session expired. Your unsaved agenda text remains here. " +
+                "Your session ended. Your unsaved agenda text remains here. " +
                 "Sign in again when prompted and it will save.";
         }
 
@@ -591,6 +607,13 @@ namespace Sati.ViewModels.Children
         {
             ClearExpiredSessionWarning();
             StartScratchpadTimer();
+        }
+
+        public void SuspendForReauthentication()
+        {
+            _scratchpadTimer?.Stop();
+            _sessionExpiredDuringSave = true;
+            _scheduledWorkLoads.Invalidate();
         }
 
         private void ClearExpiredSessionWarning()

@@ -22,6 +22,8 @@ internal static class CloudContractMapper
         user.Permissions = dto.Permissions;
         user.Email = dto.Email;
         user.Phone = dto.Phone;
+        user.IsEnabled = dto.IsEnabled;
+        user.SecurityVersion = dto.SecurityVersion;
         return user;
     }
 
@@ -78,6 +80,7 @@ internal static class CloudContractMapper
         person.Revision = dto.Revision;
         person.Forms = dto.Forms.Select(ToForm).ToList();
         person.Notes = dto.Notes.Select(ToNoteSummary).ToList();
+        person.ReleaseComplianceSnapshots = dto.ReleaseObligations?.ToList() ?? [];
         return person;
     }
 
@@ -87,7 +90,11 @@ internal static class CloudContractMapper
         // CompletedDate too, so it carries no information the date does not, and
         // trusting it over the date is how a client could reconstruct the very
         // disagreement this model removed.
-        var form = new Form(Parse<FormType>(dto.Type), dto.DueDate, dto.CompletedDate)
+        var form = new Form(
+            Parse<FormType>(dto.Type),
+            dto.DueDate,
+            dto.CompletedDate,
+            dto.TargetEffectiveDate)
         {
             Id = dto.Id,
             PersonId = dto.PersonId,
@@ -119,8 +126,11 @@ internal static class CloudContractMapper
         note.OverrideReason = dto.OverrideReason;
         note.OverrideApprovedById = dto.OverrideApprovedById;
         note.OverrideApprovedAt = dto.OverrideApprovedAt;
+        note.OverrideAttestationConfirmed = dto.OverrideAttestationConfirmed;
+        note.OverrideObligationIds = dto.OverrideObligationIds ?? [];
         note.Revision = dto.Revision;
         note.ComplianceFailureReasons = dto.ComplianceFailureReasons ?? [];
+        note.ComplianceBlockers = dto.ComplianceBlockers ?? [];
         if (dto.Person is not null)
         {
             note.Person = Person.Rehydrate(dto.Person.Id, dto.Person.UserId);
@@ -193,7 +203,8 @@ internal static class CloudContractMapper
         ReleaseAgencyDaysBeforeAnniversary = s.ReleaseAgencyDaysBeforeAnniversary,
         ReleaseDhhsDaysBeforeAnniversary = s.ReleaseDhhsDaysBeforeAnniversary,
         ReleaseMedicalDaysBeforeAnniversary = s.ReleaseMedicalDaysBeforeAnniversary,
-        Revision = s.Revision
+        Revision = s.Revision,
+        AllowPastBillingPolicyEffectiveDates = s.AllowPastBillingPolicyEffectiveDates
     };
 
     public static SettingsDto ToSettingsDto(Settings s) => new(
@@ -216,7 +227,8 @@ internal static class CloudContractMapper
         s.ReleaseMedicalDaysBeforeAnniversary, s.Revision,
         s.BillingComplianceRequirements,
         s.AllowCredibleProfileUpdates,
-        VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle), s.AnnualPacketOpenDaysBefore);
+        VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle), s.AnnualPacketOpenDaysBefore,
+        s.AllowPastBillingPolicyEffectiveDates);
 
     public static Scratchpad ToScratchpad(ScratchpadDto dto) => new()
     {
@@ -350,7 +362,8 @@ internal static class CloudContractMapper
         LastName = dto.LastName,
         EffectiveDate = dto.EffectiveDate,
         Forms = dto.Forms.Select(ToForm).ToList(),
-        NoteSummaries = dto.Notes.Select(ToNoteSummaryValue).ToList()
+        NoteSummaries = dto.Notes.Select(ToNoteSummaryValue).ToList(),
+        ReleaseComplianceSnapshots = dto.ReleaseObligations?.ToList() ?? []
     };
 
     public static ReviewItem ToReviewItem(ReviewItemDto dto)
@@ -394,6 +407,7 @@ internal static class CloudContractMapper
         link.EndDate = dto.EndDate;
         link.HasActiveRelease = dto.HasActiveRelease;
         link.SortOrder = dto.SortOrder;
+        link.AssignmentKnownOn = dto.AssignmentKnownOn;
         return link;
     }
 
@@ -481,6 +495,7 @@ internal static class CloudContractMapper
         note.Status = ParseNullable<NoteStatus>(dto.Status);
         note.EventDate = dto.EventDate;
         note.NoteType = ParseNullable<NoteType>(dto.NoteType);
+        note.FormType = ParseNullable<FormType>(dto.FormType);
         return note;
     }
 
@@ -488,7 +503,8 @@ internal static class CloudContractMapper
     {
         Status = ParseNullable<NoteStatus>(dto.Status),
         EventDate = dto.EventDate,
-        NoteType = ParseNullable<NoteType>(dto.NoteType)
+        NoteType = ParseNullable<NoteType>(dto.NoteType),
+        FormType = ParseNullable<FormType>(dto.FormType)
     };
 
     private static T Parse<T>(string value) where T : struct, Enum =>

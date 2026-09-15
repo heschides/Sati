@@ -54,6 +54,8 @@ internal static class LocalAuditActions
     public const string IncidentStatusUpdated = "incident-status.updated";
     public const string BillingEdiGenerated = "billing-edi.generated";
     public const string BillingConfigurationUpdated = "billing-configuration.updated";
+    public const string BillingCompliancePolicyAppended = "billing-compliance-policy.appended";
+    public const string BillingComplianceRecoveryRecorded = "billing-compliance-recovery.recorded";
     // Mirrors AuditActions.PersonReassigned on the API side.
     public const string PersonReassigned = "person.reassigned";
     public const string PersonSsnUpdated = "person.ssn-updated";
@@ -71,8 +73,13 @@ internal static class LocalAuditActions
     // deletion is automated and no one is signed in when it runs.
     public const string FormDuplicateRemoved = "form.duplicate-removed";
     public const string FormAttested = "form.attested";
+    public const string FormOpened = "form.opened";
+    public const string ComplianceObligationsGenerated = "compliance-obligations.generated";
     public const string FormAttestationRevoked = "form.attestation-revoked";
     public const string FormPrerequisiteOverridden = "form.prerequisite-overridden";
+    public const string ReleaseObligationsReconciled = "release-obligations.reconciled";
+    public const string ReleaseObligationAttested = "release-obligation.attested";
+    public const string ReleaseAuthorizationWithdrawn = "release-authorization.withdrawn";
     public const string DocumentGenerated = "document.generated";
     public const string DocumentRecordedExternal = "document.recorded-external";
     public const string DocumentTemplatePublished = "document-template.published";

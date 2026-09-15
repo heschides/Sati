@@ -34,8 +34,9 @@ namespace Sati.Data
 
         /// <summary>
         /// Admin only: folds one directory entry into another and removes it. Affiliated entries,
-        /// consumer links, and contacts move to the survivor. Documents that already named the
-        /// merged entry are deliberately left alone — they froze it on purpose.
+        /// consumer links, release-obligation directory pointers, and contacts move to the
+        /// survivor. Release recipient snapshots and documents that already named the merged
+        /// entry remain unchanged because they froze that historical name on purpose.
         /// </summary>
         Task<string> MergeAsync(int survivingProviderId, int mergedProviderId);
     }

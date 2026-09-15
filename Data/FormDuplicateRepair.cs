@@ -1,78 +1,68 @@
+using System.Data;
+using System.Data.Common;
+using System.Globalization;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sati.Models;
 
 namespace Sati.Data;
 
 /// <summary>
-/// Collapses duplicate <see cref="Form"/> rows — same person, same type, same due
-/// date — down to one, merging the state the copies carry.
+/// Collapses duplicate compliance-form rows without guessing which annual
+/// obligation a row represents.
 ///
-/// WHY THEY EXIST. Before 57af6fa, PersonService.GetAllPeopleAsync ran
-/// EnsureCurrentCycleForms + SaveChangesAsync on every caseload load, each call on
-/// its own DbContext. Person.AddMissingFormsForCycle decides whether to insert by
-/// reading the person's own Forms collection, which is a check-then-insert with
-/// nothing holding the gap, and dbo.Forms had no unique constraint. Startup issued
-/// those loads concurrently, so three loaders each passed the check and each
-/// inserted a full set. 57af6fa closed the mechanism; the rows it had already
-/// written stayed.
+/// The current identity is (PersonId, Type, TargetEffectiveDate). DueDate is a
+/// mutable deadline and is never an identity once TargetEffectiveDate exists. A
+/// narrowly isolated legacy path still groups targetless rows by the old
+/// (PersonId, Type, DueDate) key, but it can run only at the migration immediately
+/// before that old unique index was introduced.
 ///
-/// WHY THEY MATTER. Duplicates are invisible until one ages past its due date.
-/// Person.GetCurrentCycleForm returns a single row — OrderByDescending(DueDate)
-/// .FirstOrDefault() over a tie — so the checkbox, the matrix and the task board
-/// read one copy, while Person.EvaluateComplianceGate projects every row in
-/// Person.Forms and sees the copies nobody can reach. A completed form therefore
-/// keeps blocking billing, and completing it again rewrites the reachable copy and
-/// changes nothing the gate reads.
-///
-/// WHY THIS RUNS WITHOUT A CONFIRMATION LATCH, unlike FormBulkCompletion and
-/// FormDueDateBackfill. Those two INVENT data — a completion date the record never
-/// held — which is why they demand a dry run and a typed-back count. This one
-/// invents nothing. It merges the union of what the copies already assert and
-/// deletes rows that assert nothing the survivor does not. A group where the copies
-/// genuinely disagree is not merged at all; see IsConflicted. That difference is
-/// what makes it safe to run unattended, and it is the only reason it is.
-///
-/// ORDERING. This must run BEFORE the migration that adds
-/// IX_Forms_PersonId_Type_DueDate, because that index cannot be created while
-/// duplicates exist. LocalDatabaseUpdater calls it between the pre-migration backup
-/// and MigrateAsync for exactly that reason. It is idempotent and costs one grouped
-/// read once the data is clean.
+/// A merge is mechanical only when the copies contain at most one completion date
+/// and, for target-based rows, one deadline. Different completion dates or
+/// different deadlines would require choosing a billing fact, so those groups are
+/// reported and left untouched.
 /// </summary>
 public static class FormDuplicateRepair
 {
-    // No one is signed in when this runs at startup — it happens before the login
-    // window — so the audit events carry the same "no actor" sentinel
-    // PersonLifecycleLedger already uses. AdminService left-joins the actor, so an
-    // unmatched id renders as "User 0" rather than dropping the row.
     public const int SystemActorUserId = 0;
 
-    /// <summary>One duplicated (PersonId, Type, DueDate) group.</summary>
+    internal const string LegacyRepairPrerequisiteMigration =
+        "20260830231500_SeparateAgencyWideSupervision";
+
+    internal const string LegacyUniqueIndexMigration =
+        "20260901150802_AddUniqueFormPersonTypeDueDateIndex";
+
+    /// <summary>One duplicated annual obligation.</summary>
     public sealed record DuplicateGroup(
         int PersonId,
         FormType Type,
-        DateTime DueDate,
+        DateTime? TargetEffectiveDate,
+        DateTime? LegacyDueDate,
         IReadOnlyList<int> FormIds,
+        IReadOnlyList<DateTime> DistinctDueDates,
         IReadOnlyList<DateTime> DistinctCompletedDates)
     {
         /// <summary>
-        /// The copies hold two or more DIFFERENT completion dates, so merging would
-        /// have to pick one, and CompletedDate is date-keyed into
-        /// BillingComplianceGate.IsBillingWindowBlocked — the choice decides whether
-        /// past service dates were billable. That is a billing decision, so these
-        /// groups are reported and left exactly as they are.
-        ///
-        /// Note what is NOT a conflict: some copies holding a date and the rest
-        /// holding none. That is the ordinary shape — one copy was edited and the
-        /// others are untouched generation defaults — and the union has exactly one
-        /// completion fact in it, so there is nothing to choose.
+        /// True only for the bounded pre-TargetEffectiveDate migration path. A
+        /// target-based group never falls back to deadline identity.
         /// </summary>
-        public bool IsConflicted => DistinctCompletedDates.Count > 1;
+        public bool UsesLegacyDueDateIdentity => TargetEffectiveDate is null;
+
+        public bool HasConflictingDeadlines =>
+            !UsesLegacyDueDateIdentity && DistinctDueDates.Count > 1;
+
+        public bool HasConflictingCompletions => DistinctCompletedDates.Count > 1;
+
+        public bool IsConflicted =>
+            HasConflictingDeadlines || HasConflictingCompletions;
 
         public int SurplusRows => FormIds.Count - 1;
+
+        internal DateTime SortDate =>
+            TargetEffectiveDate ?? LegacyDueDate ?? DateTime.MaxValue;
     }
 
-    public sealed record RepairPlan(
-        IReadOnlyList<DuplicateGroup> Groups)
+    public sealed record RepairPlan(IReadOnlyList<DuplicateGroup> Groups)
     {
         public IReadOnlyList<DuplicateGroup> Mergeable =>
             Groups.Where(group => !group.IsConflicted).ToList();
@@ -84,10 +74,6 @@ public static class FormDuplicateRepair
 
         public bool HasWork => Mergeable.Count > 0;
 
-        /// <summary>
-        /// True when duplicates would survive this repair. The unique-index migration
-        /// cannot be applied while this is true.
-        /// </summary>
         public bool LeavesDuplicates => Conflicted.Count > 0;
     }
 
@@ -97,38 +83,50 @@ public static class FormDuplicateRepair
         int GroupsLeftConflicted,
         IReadOnlyList<DuplicateGroup> Conflicts);
 
+    private sealed record Candidate(
+        int Id,
+        int PersonId,
+        FormType Type,
+        DateTime? TargetEffectiveDate,
+        DateTime DueDate,
+        DateTime? CompletedDate,
+        DateTime? OpenedDate,
+        bool IsCompliant,
+        int AgencyId);
+
+    private readonly record struct Identity(
+        int PersonId,
+        FormType Type,
+        DateTime? TargetEffectiveDate,
+        DateTime? LegacyDueDate);
+
     /// <summary>
-    /// Read-only. Returns every duplicated group and how it classifies. Writes
-    /// nothing, so it is safe to call for reporting alone.
+    /// Read-only current-schema plan. Refuses targetless rows rather than quietly
+    /// reviving the retired deadline-as-identity rule.
     /// </summary>
     public static async Task<RepairPlan> PlanAsync(
-        SatiContext context, CancellationToken cancellationToken = default)
+        SatiContext context,
+        CancellationToken cancellationToken = default)
     {
         var forms = await context.Forms.AsNoTracking().ToListAsync(cancellationToken);
         return Plan(forms);
     }
 
     /// <summary>
-    /// Merges every non-conflicted duplicate group and deletes the surplus rows, in
-    /// one transaction, recording an audit event per removed row. Conflicted groups
-    /// are left untouched and returned so the caller can surface them.
-    ///
-    /// Idempotent: a second call against clean data finds no groups and writes
-    /// nothing.
+    /// Merges current-schema duplicates by explicit target identity. This method is
+    /// not used to prepare the old due-date unique-index migration; that path cannot
+    /// materialize the current EF model and is isolated below.
     /// </summary>
     public static async Task<RepairResult> ApplyAsync(
-        SatiContext context, CancellationToken cancellationToken = default)
+        SatiContext context,
+        CancellationToken cancellationToken = default)
     {
         var forms = await context.Forms.ToListAsync(cancellationToken);
         var plan = Plan(forms);
 
         if (!plan.HasWork)
-        {
             return new RepairResult(0, 0, plan.Conflicted.Count, plan.Conflicted);
-        }
 
-        // AgencyId is needed for the audit event and lives on the Person, not the
-        // Form. One lookup keyed by person, rather than a join per removed row.
         var personIds = plan.Mergeable.Select(group => group.PersonId).Distinct().ToList();
         var agencyByPerson = await context.People
             .Where(person => personIds.Contains(person.Id))
@@ -143,17 +141,9 @@ public static class FormDuplicateRepair
             var copies = group.FormIds.Select(id => byId[id]).ToList();
             var survivor = ChooseSurvivor(copies);
 
-            // Merge the union onto the survivor. Choosing the survivor by how much
-            // state it already carries means the forbidden "compliant with no date"
-            // shape is never CONSTRUCTED here — at most it is preserved on a row that
-            // already held it, which is the documented generation exception in
-            // Form.cs and a separate defect from this one.
             if (group.DistinctCompletedDates.Count == 1 &&
                 survivor.CompletedDate?.Date != group.DistinctCompletedDates[0])
             {
-                // This repair runs before the FormAttestations migration creates its
-                // table. Set the legacy projection through EF; the migration then
-                // backfills the corresponding System attestation in the same startup.
                 context.Entry(survivor)
                     .Property(form => form.CompletedDate)
                     .CurrentValue = group.DistinctCompletedDates[0];
@@ -161,11 +151,11 @@ public static class FormDuplicateRepair
 
             var earliestOpened = copies
                 .Where(copy => copy.OpenedDate.HasValue)
-                .Select(copy => copy.OpenedDate!.Value)
+                .Select(copy => copy.OpenedDate!.Value.Date)
                 .DefaultIfEmpty()
                 .Min();
             if (earliestOpened != default &&
-                (survivor.OpenedDate is null || earliestOpened < survivor.OpenedDate))
+                (survivor.OpenedDate is null || earliestOpened < survivor.OpenedDate.Value.Date))
             {
                 survivor.OpenedDate = earliestOpened;
             }
@@ -177,17 +167,15 @@ public static class FormDuplicateRepair
 
                 context.AuditEvents.Add(new AuditEvent
                 {
-                    // Person.AgencyId is nullable for records that predate agency
-                    // scoping; 0 reads as "unattributed" the same way the actor does.
                     AgencyId = agencyByPerson.TryGetValue(group.PersonId, out var agencyId)
                         ? agencyId ?? 0
                         : 0,
                     ActorUserId = SystemActorUserId,
                     Action = LocalAuditActions.FormDuplicateRemoved,
                     ResourceType = "Form",
-                    ResourceId = duplicate.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ResourceId = duplicate.Id.ToString(CultureInfo.InvariantCulture),
                     CorrelationId = $"desktop-form-dedup-{Guid.NewGuid():N}",
-                    MetadataJson = DescribeRemoval(group, duplicate, survivor)
+                    MetadataJson = DescribeCurrentRemoval(group, duplicate, survivor)
                 });
             }
         }
@@ -195,60 +183,419 @@ public static class FormDuplicateRepair
         await context.SaveChangesAsync(cancellationToken);
 
         return new RepairResult(
-            plan.Mergeable.Count, rowsRemoved, plan.Conflicted.Count, plan.Conflicted);
+            plan.Mergeable.Count,
+            rowsRemoved,
+            plan.Conflicted.Count,
+            plan.Conflicted);
     }
 
     /// <summary>
-    /// The copy that already carries the most state, so merging never has to
-    /// manufacture a state no row held: a copy with a completion date first, then one
-    /// asserting compliance, then the lowest Id for a stable, repeatable answer.
-    /// </summary>
-    private static Form ChooseSurvivor(IReadOnlyList<Form> copies) =>
-        copies
-            .OrderByDescending(copy => copy.CompletedDate.HasValue)
-            .ThenByDescending(copy => copy.IsCompliant)
-            .ThenBy(copy => copy.Id)
-            .First();
-
-    /// <summary>
-    /// The classifier, as a pure function over forms, so the merge rules can be
-    /// tested without a database.
+    /// Current-schema classifier. Every row must carry the explicit target written
+    /// by CorrectAnnualComplianceAndBillingPolicy. There is intentionally no runtime
+    /// fallback to DueDate.
     /// </summary>
     public static RepairPlan Plan(IReadOnlyList<Form> forms)
     {
-        var groups = forms
-            .GroupBy(form => (form.PersonId, form.Type, DueDate: form.DueDate.Date))
+        ArgumentNullException.ThrowIfNull(forms);
+
+        if (forms.Any(form => form.TargetEffectiveDate == default))
+        {
+            throw new InvalidOperationException(
+                "Target-based duplicate repair refuses forms without TargetEffectiveDate. " +
+                "The deadline-based fallback is restricted to the pre-target migration stage.");
+        }
+
+        return BuildPlan(
+            forms.Select(form => new Candidate(
+                form.Id,
+                form.PersonId,
+                form.Type,
+                form.TargetEffectiveDate.Date,
+                form.DueDate.Date,
+                form.CompletedDate?.Date,
+                form.OpenedDate?.Date,
+                form.IsCompliant,
+                0)),
+            useLegacyDueDateIdentity: false);
+    }
+
+    /// <summary>
+    /// Pure test seam for the one historical stage where forms had no target. It is
+    /// internal so application callers cannot opt back into deadline identity.
+    /// </summary>
+    internal static RepairPlan PlanLegacyTargetlessRowsForMigration(
+        IReadOnlyList<Form> forms)
+    {
+        ArgumentNullException.ThrowIfNull(forms);
+        if (forms.Any(form => form.TargetEffectiveDate != default))
+        {
+            throw new InvalidOperationException(
+                "Legacy duplicate repair accepts targetless pre-migration rows only.");
+        }
+
+        return BuildPlan(
+            forms.Select(form => new Candidate(
+                form.Id,
+                form.PersonId,
+                form.Type,
+                null,
+                form.DueDate.Date,
+                form.CompletedDate?.Date,
+                form.OpenedDate?.Date,
+                form.IsCompliant,
+                0)),
+            useLegacyDueDateIdentity: true);
+    }
+
+    /// <summary>
+    /// Prepares only migration 20260901150802. The current EF Form mapping cannot
+    /// query that schema because TargetEffectiveDate does not exist yet, so this
+    /// method uses a deliberately small raw projection. Its schema/history guard
+    /// makes it impossible to invoke after the legacy stage or against a current
+    /// target-based database.
+    /// </summary>
+    internal static async Task<RepairResult> ApplyLegacyPreTargetMigrationAsync(
+        SatiContext context,
+        CancellationToken cancellationToken = default)
+    {
+        if (!context.Database.IsSqlServer())
+        {
+            throw new NotSupportedException(
+                "Legacy duplicate repair is supported only for the local SQL Server migration stage.");
+        }
+
+        var connection = context.Database.GetDbConnection();
+        var openedHere = connection.State != ConnectionState.Open;
+        if (openedHere)
+            await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            await using var transaction = await connection.BeginTransactionAsync(
+                IsolationLevel.Serializable,
+                cancellationToken);
+
+            await ValidateLegacyStageAsync(connection, transaction, cancellationToken);
+            var candidates = await LoadLegacyCandidatesAsync(
+                connection,
+                transaction,
+                cancellationToken);
+            var plan = BuildPlan(candidates, useLegacyDueDateIdentity: true);
+
+            if (!plan.HasWork)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return new RepairResult(0, 0, plan.Conflicted.Count, plan.Conflicted);
+            }
+
+            var byId = candidates.ToDictionary(candidate => candidate.Id);
+            var rowsRemoved = 0;
+
+            foreach (var group in plan.Mergeable)
+            {
+                var copies = group.FormIds.Select(id => byId[id]).ToList();
+                var survivor = copies
+                    .OrderByDescending(copy => copy.CompletedDate.HasValue)
+                    .ThenByDescending(copy => copy.IsCompliant)
+                    .ThenBy(copy => copy.Id)
+                    .First();
+
+                var completion = group.DistinctCompletedDates.SingleOrDefault();
+                var earliestOpened = copies
+                    .Where(copy => copy.OpenedDate.HasValue)
+                    .Select(copy => copy.OpenedDate!.Value.Date)
+                    .DefaultIfEmpty()
+                    .Min();
+                var isCompliant = copies.Any(copy => copy.IsCompliant);
+
+                await UpdateLegacySurvivorAsync(
+                    connection,
+                    transaction,
+                    survivor.Id,
+                    completion == default ? null : completion,
+                    earliestOpened == default ? null : earliestOpened,
+                    isCompliant,
+                    cancellationToken);
+
+                var projectedSurvivor = survivor with
+                {
+                    CompletedDate = completion == default ? null : completion,
+                    OpenedDate = earliestOpened == default ? null : earliestOpened,
+                    IsCompliant = isCompliant
+                };
+
+                foreach (var duplicate in copies.Where(copy => copy.Id != survivor.Id))
+                {
+                    await DeleteLegacyDuplicateAsync(
+                        connection,
+                        transaction,
+                        duplicate.Id,
+                        cancellationToken);
+                    await InsertLegacyRemovalAuditAsync(
+                        connection,
+                        transaction,
+                        group,
+                        duplicate,
+                        projectedSurvivor,
+                        cancellationToken);
+                    rowsRemoved++;
+                }
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return new RepairResult(
+                plan.Mergeable.Count,
+                rowsRemoved,
+                plan.Conflicted.Count,
+                plan.Conflicted);
+        }
+        finally
+        {
+            if (openedHere)
+                await connection.CloseAsync();
+        }
+    }
+
+    private static RepairPlan BuildPlan(
+        IEnumerable<Candidate> source,
+        bool useLegacyDueDateIdentity)
+    {
+        var candidates = source.ToList();
+        if (useLegacyDueDateIdentity && candidates.Any(candidate => candidate.TargetEffectiveDate is not null))
+        {
+            throw new InvalidOperationException(
+                "Legacy duplicate repair cannot mix explicit target identities with targetless rows.");
+        }
+        if (!useLegacyDueDateIdentity && candidates.Any(candidate => candidate.TargetEffectiveDate is null))
+        {
+            throw new InvalidOperationException(
+                "Target-based duplicate repair cannot classify a targetless row.");
+        }
+
+        var groups = candidates
+            .GroupBy(candidate => new Identity(
+                candidate.PersonId,
+                candidate.Type,
+                useLegacyDueDateIdentity ? null : candidate.TargetEffectiveDate,
+                useLegacyDueDateIdentity ? candidate.DueDate.Date : null))
             .Where(group => group.Count() > 1)
             .Select(group => new DuplicateGroup(
                 group.Key.PersonId,
                 group.Key.Type,
-                group.Key.DueDate,
-                group.Select(form => form.Id).OrderBy(id => id).ToList(),
-                group
-                    .Where(form => form.CompletedDate.HasValue)
-                    .Select(form => form.CompletedDate!.Value.Date)
+                group.Key.TargetEffectiveDate,
+                group.Key.LegacyDueDate,
+                group.Select(candidate => candidate.Id).OrderBy(id => id).ToList(),
+                group.Select(candidate => candidate.DueDate.Date)
+                    .Distinct()
+                    .OrderBy(date => date)
+                    .ToList(),
+                group.Where(candidate => candidate.CompletedDate.HasValue)
+                    .Select(candidate => candidate.CompletedDate!.Value.Date)
                     .Distinct()
                     .OrderBy(date => date)
                     .ToList()))
             .OrderBy(group => group.PersonId)
-            .ThenBy(group => group.DueDate)
+            .ThenBy(group => group.SortDate)
             .ThenBy(group => group.Type)
             .ToList();
 
         return new RepairPlan(groups);
     }
 
-    private static string DescribeRemoval(DuplicateGroup group, Form removed, Form survivor) =>
-        System.Text.Json.JsonSerializer.Serialize(new
+    private static Form ChooseSurvivor(IReadOnlyList<Form> copies) =>
+        copies
+            .OrderByDescending(copy => copy.CompletedDate.HasValue)
+            .ThenBy(copy => copy.Id)
+            .First();
+
+    private static async Task ValidateLegacyStageAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"""
+            IF OBJECT_ID(N'dbo.Forms', N'U') IS NULL
+               OR OBJECT_ID(N'dbo.People', N'U') IS NULL
+               OR OBJECT_ID(N'dbo.AuditEvents', N'U') IS NULL
+               OR OBJECT_ID(N'dbo.__EFMigrationsHistory', N'U') IS NULL
+                THROW 50000, 'Legacy duplicate repair prerequisite schema is missing.', 1;
+
+            IF COL_LENGTH(N'dbo.Forms', N'TargetEffectiveDate') IS NOT NULL
+                THROW 50000, 'Legacy duplicate repair refuses a target-based Forms schema.', 1;
+
+            IF COL_LENGTH(N'dbo.Forms', N'Id') IS NULL
+               OR COL_LENGTH(N'dbo.Forms', N'PersonId') IS NULL
+               OR COL_LENGTH(N'dbo.Forms', N'Type') IS NULL
+               OR COL_LENGTH(N'dbo.Forms', N'DueDate') IS NULL
+               OR COL_LENGTH(N'dbo.Forms', N'CompletedDate') IS NULL
+               OR COL_LENGTH(N'dbo.Forms', N'OpenedDate') IS NULL
+               OR COL_LENGTH(N'dbo.Forms', N'IsCompliant') IS NULL
+               OR COL_LENGTH(N'dbo.People', N'AgencyId') IS NULL
+                THROW 50000, 'Legacy duplicate repair found an unsupported pre-target schema.', 1;
+
+            IF (SELECT MAX(MigrationId) FROM dbo.__EFMigrationsHistory) <> N'{LegacyRepairPrerequisiteMigration}'
+                THROW 50000, 'Legacy duplicate repair may run only at its exact pre-index migration stage.', 1;
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<List<Candidate>> LoadLegacyCandidatesAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT f.Id, f.PersonId, f.[Type], f.DueDate, f.CompletedDate,
+                   f.OpenedDate, f.IsCompliant, ISNULL(p.AgencyId, 0)
+            FROM dbo.Forms AS f WITH (UPDLOCK, HOLDLOCK)
+            LEFT JOIN dbo.People AS p ON p.Id = f.PersonId
+            ORDER BY f.PersonId, f.[Type], f.DueDate, f.Id;
+            """;
+
+        var candidates = new List<Candidate>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var storedType = reader.GetString(2);
+            if (!Enum.TryParse<FormType>(storedType, ignoreCase: false, out var type) ||
+                !Enum.IsDefined(type))
+            {
+                throw new InvalidOperationException(
+                    $"Legacy duplicate repair found unsupported form type '{storedType}'.");
+            }
+
+            candidates.Add(new Candidate(
+                reader.GetInt32(0),
+                reader.GetInt32(1),
+                type,
+                null,
+                reader.GetDateTime(3).Date,
+                reader.IsDBNull(4) ? null : reader.GetDateTime(4).Date,
+                reader.IsDBNull(5) ? null : reader.GetDateTime(5).Date,
+                reader.GetBoolean(6),
+                reader.GetInt32(7)));
+        }
+
+        return candidates;
+    }
+
+    private static async Task UpdateLegacySurvivorAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        int formId,
+        DateTime? completedDate,
+        DateTime? openedDate,
+        bool isCompliant,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE dbo.Forms
+               SET CompletedDate = @completedDate,
+                   OpenedDate = @openedDate,
+                   IsCompliant = @isCompliant
+             WHERE Id = @formId;
+            """;
+        AddParameter(command, "@completedDate", completedDate);
+        AddParameter(command, "@openedDate", openedDate);
+        AddParameter(command, "@isCompliant", isCompliant);
+        AddParameter(command, "@formId", formId);
+
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new InvalidOperationException("The legacy duplicate survivor changed during repair.");
+    }
+
+    private static async Task DeleteLegacyDuplicateAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        int formId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "DELETE FROM dbo.Forms WHERE Id = @formId;";
+        AddParameter(command, "@formId", formId);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new InvalidOperationException("A legacy duplicate changed during repair.");
+    }
+
+    private static async Task InsertLegacyRemovalAuditAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        DuplicateGroup group,
+        Candidate removed,
+        Candidate survivor,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO dbo.AuditEvents
+                (EventId, AgencyId, ActorUserId, [Action], ResourceType, ResourceId,
+                 OccurredAtUtc, CorrelationId, MetadataJson)
+            VALUES
+                (@eventId, @agencyId, @actorUserId, @action, N'Form', @resourceId,
+                 @occurredAtUtc, @correlationId, @metadataJson);
+            """;
+        AddParameter(command, "@eventId", Guid.NewGuid());
+        AddParameter(command, "@agencyId", removed.AgencyId);
+        AddParameter(command, "@actorUserId", SystemActorUserId);
+        AddParameter(command, "@action", LocalAuditActions.FormDuplicateRemoved);
+        AddParameter(command, "@resourceId", removed.Id.ToString(CultureInfo.InvariantCulture));
+        AddParameter(command, "@occurredAtUtc", DateTime.UtcNow);
+        AddParameter(command, "@correlationId", $"desktop-form-dedup-{Guid.NewGuid():N}");
+        AddParameter(command, "@metadataJson", DescribeLegacyRemoval(group, removed, survivor));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static void AddParameter(DbCommand command, string name, object? value)
+    {
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.Value = value ?? DBNull.Value;
+        command.Parameters.Add(parameter);
+    }
+
+    private static string DescribeCurrentRemoval(
+        DuplicateGroup group,
+        Form removed,
+        Form survivor) =>
+        JsonSerializer.Serialize(new
         {
             reason = "duplicate-compliance-form",
+            identityMode = "target-effective-date",
             personId = group.PersonId,
             type = group.Type.ToString(),
-            dueDate = group.DueDate.ToString("yyyy-MM-dd"),
+            targetEffectiveDate = group.TargetEffectiveDate?.ToString("yyyy-MM-dd"),
+            removedFormId = removed.Id,
+            removedDueDate = removed.DueDate.ToString("yyyy-MM-dd"),
+            removedCompletedDate = removed.CompletedDate?.ToString("yyyy-MM-dd"),
+            survivingFormId = survivor.Id,
+            survivingDueDate = survivor.DueDate.ToString("yyyy-MM-dd"),
+            survivingCompletedDate = survivor.CompletedDate?.ToString("yyyy-MM-dd")
+        });
+
+    private static string DescribeLegacyRemoval(
+        DuplicateGroup group,
+        Candidate removed,
+        Candidate survivor) =>
+        JsonSerializer.Serialize(new
+        {
+            reason = "duplicate-compliance-form",
+            identityMode = "legacy-due-date-pre-target-migration",
+            personId = group.PersonId,
+            type = group.Type.ToString(),
+            dueDate = group.LegacyDueDate?.ToString("yyyy-MM-dd"),
             removedFormId = removed.Id,
             removedCompletedDate = removed.CompletedDate?.ToString("yyyy-MM-dd"),
             removedIsCompliant = removed.IsCompliant,
             survivingFormId = survivor.Id,
-            survivingCompletedDate = survivor.CompletedDate?.ToString("yyyy-MM-dd")
+            survivingCompletedDate = survivor.CompletedDate?.ToString("yyyy-MM-dd"),
+            survivingIsCompliant = survivor.IsCompliant
         });
 }

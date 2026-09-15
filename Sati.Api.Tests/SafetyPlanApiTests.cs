@@ -36,6 +36,82 @@ public sealed class SafetyPlanApiTests(SatiApiFactory factory)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task LatestWithoutACycleSelectsTheUpcomingTargetOnceItsWindowOpens()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var effective = DateTime.Today.AddYears(-1).AddDays(30).Date;
+        var upcomingTarget = effective.AddYears(1).Date;
+        var person = new ServerPerson
+        {
+            UserId = 12,
+            AgencyId = 1,
+            FirstName = "Synthetic",
+            LastName = "Upcoming Safety",
+            EffectiveDate = effective
+        };
+        db.People.Add(person);
+        await db.SaveChangesAsync();
+        var plan = new ServerSafetyPlan
+        {
+            PersonId = person.Id,
+            AuthorUserId = 12,
+            CycleStart = upcomingTarget,
+            Status = "Draft",
+            DocumentJson = SafetyPlanRules.EmptyDocumentJson()
+        };
+        db.SafetyPlans.Add(plan);
+        await db.SaveChangesAsync();
+
+        try
+        {
+            var selected = await owner.GetFromJsonAsync<SafetyPlanDto>(
+                $"/api/v1/people/{person.Id}/safety-plans/latest");
+
+            Assert.NotNull(selected);
+            Assert.Equal(upcomingTarget, selected!.CycleStart);
+        }
+        finally
+        {
+            await db.SafetyPlans.Where(item => item.PersonId == person.Id).ExecuteDeleteAsync();
+            await db.People.Where(item => item.Id == person.Id).ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DraftCannotStartBeforeTheConfiguredAvailabilityWindow()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var target = DateTime.Today.AddDays(200).Date;
+        var person = new ServerPerson
+        {
+            UserId = 12,
+            AgencyId = 1,
+            FirstName = "Synthetic",
+            LastName = "Early Safety",
+            EffectiveDate = target
+        };
+        db.People.Add(person);
+        await db.SaveChangesAsync();
+
+        try
+        {
+            var response = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{person.Id}/safety-plans/draft?authorUserId=12&cycleStart={target:yyyy-MM-dd}",
+                new { });
+
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        }
+        finally
+        {
+            await db.People.Where(item => item.Id == person.Id).ExecuteDeleteAsync();
+        }
+    }
+
     internal static string CompleteDocument() => JsonSerializer.Serialize(new SafetyPlanDocument(1,
         SafetyPlanRules.SectionIds.Select(id => new SafetyPlanSection(id, "Synthetic test content.")).ToList()));
 

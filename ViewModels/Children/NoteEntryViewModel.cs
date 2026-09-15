@@ -46,6 +46,11 @@ namespace Sati.ViewModels.Children
         private Settings? _settings;
         public BillingComplianceRequirements ComplianceRequirements =>
             _settings?.BillingComplianceRequirements ?? BillingComplianceGate.DefaultRequirements;
+        public int PcpOpenDaysBefore => _settings?.PcpOpenDaysBefore ?? 90;
+
+        internal Task<BillingComplianceRequirements>
+            ResolveBillingComplianceRequirementsAsync(DateTime serviceDate) =>
+            _settingsService.ResolveBillingComplianceRequirementsAsync(serviceDate.Date);
         private Note? _editingNote;
         private string? _aiSourceNarrative;
         private string? _aiSourceFingerprint;
@@ -1916,19 +1921,22 @@ namespace Sati.ViewModels.Children
             {
                 if (Status == NoteStatus.Logged)
                 {
-                    var (passed, reasons) = SelectedPerson!.EvaluateComplianceGate(DateTime.Today,
-                        SelectedNoteType == NoteType.Form ? SelectedFormType : null,
-                        ComplianceRequirements);
-
-                    // Window check is keyed to the NOTE's date, not today.
-                    // EventDate is non-null here — validated above.
+                    // A later paperwork deadline cannot reach backward and make an
+                    // earlier service non-billable. Resolve the append-only policy
+                    // for this exact service date; the settings screen's current
+                    // projection is only presentation and cannot interpret history.
+                    // EventDate is non-null here.
+                    var serviceDate = EventDate!.Value.Date;
+                    var requirements = await ResolveBillingComplianceRequirementsAsync(
+                        serviceDate);
                     var windowReasons = SelectedPerson!.EvaluateBillingWindow(
-                        EventDate!.Value, ComplianceRequirements);
+                        serviceDate,
+                        requirements);
 
-                    if (!passed || windowReasons.Count > 0)
+                    if (windowReasons.Count > 0)
                     {
-                        _dialogIsWindowBlock = windowReasons.Count > 0;
-                        ComplianceFailureReasons = reasons.Concat(windowReasons).ToList();
+                        _dialogIsWindowBlock = true;
+                        ComplianceFailureReasons = windowReasons;
                         PendingJustification = string.Empty;
                         IsComplianceDialogVisible = true;
                         return;

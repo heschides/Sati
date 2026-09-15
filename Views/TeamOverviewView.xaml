@@ -3,249 +3,288 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:oxy="http://oxyplot.org/wpf"
              Background="{DynamicResource WindowBackgroundBrush}">
+    <UserControl.Resources>
+        <Style x:Key="OverviewCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#44000000" BlurRadius="16"
+                                      ShadowDepth="3" Direction="270" Opacity="0.14" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="OverviewMetric" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Inter" />
+            <Setter Property="FontSize" Value="32" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        </Style>
+        <Style x:Key="OverviewLabel" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Inter" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+            <Setter Property="Margin" Value="0,3,0,0" />
+        </Style>
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24,20,24,32">
-
-            <!-- ── Summary cards ── -->
-            <UniformGrid Columns="4"
-                         Margin="0,0,0,24">
-                <Border Margin="0,0,6,0"
-                        Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource HoverBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="16,14">
-                    <StackPanel>
-                        <TextBlock Text="{Binding TotalClients}"
-                                   FontFamily="Inter"
-                                   FontSize="36"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Total Clients"
-                                   FontFamily="Inter"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource TextMutedBrush}"
-                                   Margin="0,2,0,0" />
-                    </StackPanel>
+            <TextBlock Text="TEAM COMPLIANCE PULSE"
+                       FontFamily="Inter" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,8" />
+            <UniformGrid Columns="4" Margin="0,0,0,18">
+                <Border Style="{StaticResource OverviewCard}" Margin="0,0,6,0"
+                        AutomationProperties.Name="Total clients">
+                    <Grid>
+                        <Border Height="3" Margin="-16,-14,-16,0" VerticalAlignment="Top"
+                                CornerRadius="8,8,0,0" Background="{DynamicResource InfoBrush}" />
+                        <StackPanel Margin="0,5,0,0">
+                            <TextBlock Text="{Binding TotalClients}" Style="{StaticResource OverviewMetric}" />
+                            <TextBlock Text="TOTAL CLIENTS" Style="{StaticResource OverviewLabel}" />
+                        </StackPanel>
+                    </Grid>
                 </Border>
-                <Border Margin="6,0"
-                        Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource HoverBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="16,14">
-                    <StackPanel>
-                        <TextBlock Text="{Binding TotalOverdue}"
-                                   FontFamily="Inter"
-                                   FontSize="36"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource WorkflowPurpleBrush}" />
-                        <TextBlock Text="Overdue Items"
-                                   FontFamily="Inter"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource TextMutedBrush}"
-                                   Margin="0,2,0,0" />
-                    </StackPanel>
+                <Border Style="{StaticResource OverviewCard}" Margin="6,0"
+                        AutomationProperties.Name="Clients clear of overdue required forms">
+                    <Grid>
+                        <Border Height="3" Margin="-16,-14,-16,0" VerticalAlignment="Top"
+                                CornerRadius="8,8,0,0" Background="{DynamicResource ChartBlueBrush}" />
+                        <StackPanel Margin="0,5,0,0">
+                            <TextBlock Text="{Binding ClientsClear}" Style="{StaticResource OverviewMetric}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="CLIENTS CLEAR" Style="{StaticResource OverviewLabel}" />
+                        </StackPanel>
+                    </Grid>
                 </Border>
-                <Border Margin="6,0"
-                        Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource HoverBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="16,14">
-                    <StackPanel>
-                        <TextBlock Text="{Binding TotalNotesThisMonth}"
-                                   FontFamily="Inter"
-                                   FontSize="36"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Notes This Month"
-                                   FontFamily="Inter"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource TextMutedBrush}"
-                                   Margin="0,2,0,0" />
-                    </StackPanel>
+                <Border Style="{StaticResource OverviewCard}" Margin="6,0"
+                        AutomationProperties.Name="Overdue required form items">
+                    <Grid>
+                        <Border Height="3" Margin="-16,-14,-16,0" VerticalAlignment="Top"
+                                CornerRadius="8,8,0,0" Background="{DynamicResource ChartCopperBrush}" />
+                        <StackPanel Margin="0,5,0,0">
+                            <TextBlock Text="{Binding TotalOverdue}" Style="{StaticResource OverviewMetric}"
+                                       Foreground="{DynamicResource WorkflowPurpleBrush}" />
+                            <TextBlock Text="OVERDUE ITEMS" Style="{StaticResource OverviewLabel}" />
+                        </StackPanel>
+                    </Grid>
                 </Border>
-                <Border Margin="6,0,0,0"
-                        Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource HoverBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="16,14">
-                    <StackPanel>
-                        <TextBlock Text="{Binding AvgComplianceLabel}"
-                                   FontFamily="Inter"
-                                   FontSize="36"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource CompliantBrush}" />
-                        <TextBlock Text="Avg Compliance"
-                                   FontFamily="Inter"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource TextMutedBrush}"
-                                   Margin="0,2,0,0" />
-                    </StackPanel>
+                <Border Style="{StaticResource OverviewCard}" Margin="6,0,0,0"
+                        AutomationProperties.Name="Current team compliance">
+                    <Grid>
+                        <Border Height="3" Margin="-16,-14,-16,0" VerticalAlignment="Top"
+                                CornerRadius="8,8,0,0" Background="{DynamicResource ChartBlueBrush}" />
+                        <StackPanel Margin="0,5,0,0">
+                            <TextBlock Text="{Binding AvgComplianceLabel}" Style="{StaticResource OverviewMetric}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="CURRENT COMPLIANCE" Style="{StaticResource OverviewLabel}" />
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </UniformGrid>
 
-            <!-- ── Case manager table ── -->
-            <TextBlock Text="CASE MANAGERS"
-                       FontFamily="Inter"
-                       FontSize="11"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextMutedBrush}"
-                       Margin="0,0,0,8" />
-            <DataGrid AutomationProperties.Name="Case managers" ItemsSource="{Binding CaseManagers}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      CanUserAddRows="False"
-                      CanUserDeleteRows="False"
-                      CanUserReorderColumns="False"
-                      CanUserResizeRows="False"
-                      HeadersVisibility="Column"
-                      GridLinesVisibility="Horizontal"
-                      SelectionUnit="FullRow"
-                      SelectionMode="Single"
-                      Background="Transparent"
-                      BorderThickness="0"
+            <Grid Margin="0,0,0,26">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource OverviewCard}" Padding="18,14"
+                        ClipToBounds="True">
+                    <Grid>
+                        <Ellipse Width="520" Height="310" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                 Margin="0,0,-165,-165" Fill="{DynamicResource ChartBlueBrush}"
+                                 Opacity="0.11" IsHitTestVisible="False">
+                            <Ellipse.OpacityMask>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#E6000000" Offset="0" />
+                                    <GradientStop Color="#00000000" Offset="1" />
+                                </RadialGradientBrush>
+                            </Ellipse.OpacityMask>
+                        </Ellipse>
+                    <StackPanel>
+                        <TextBlock Text="COMPLIANCE BY CASE MANAGER"
+                                   FontFamily="Inter" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
+                        <TextBlock Text="Share of each caseload with no overdue required forms"
+                                   FontFamily="Inter" FontSize="11" Margin="0,4,0,2"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <Grid Height="310">
+                            <oxy:PlotView Name="ComplianceChart"
+                                          Model="{Binding ComplianceChartModel}"
+                                          Background="Transparent"
+                                          AutomationProperties.Name="Compliance percentage by case manager" />
+                            <TextBlock Text="Compliance by case manager will appear when caseloads are assigned."
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       Visibility="{Binding HasComplianceData, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                        </Grid>
+                    </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource OverviewCard}" Padding="18,14"
+                        ClipToBounds="True">
+                    <Grid>
+                        <Ellipse Width="320" Height="320" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                 Margin="0,-150,-125,0" Fill="{DynamicResource AccentBrush}"
+                                 Opacity="0.11" IsHitTestVisible="False">
+                            <Ellipse.OpacityMask>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#E6000000" Offset="0" />
+                                    <GradientStop Color="#00000000" Offset="1" />
+                                </RadialGradientBrush>
+                            </Ellipse.OpacityMask>
+                        </Ellipse>
+                    <StackPanel>
+                        <TextBlock Text="TEAM COVERAGE"
+                                   FontFamily="Inter" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
+                        <TextBlock Text="{Binding ComplianceSummary}"
+                                   FontFamily="Inter" FontSize="11" Margin="0,4,0,0"
+                                   TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <Grid Height="210">
+                            <Ellipse Width="170" Height="170" Fill="{DynamicResource SurfaceBrush}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     IsHitTestVisible="False">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect Color="#55000000" BlurRadius="18"
+                                                      ShadowDepth="5" Direction="270" Opacity="0.24" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <oxy:PlotView x:Name="TeamComplianceChart"
+                                          Model="{Binding TeamComplianceChartModel}"
+                                          Background="Transparent"
+                                          AutomationProperties.Name="Team compliance coverage chart" />
+                            <Ellipse Width="116" Height="116" Fill="{DynamicResource SurfaceRaisedBrush}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     IsHitTestVisible="False">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect Color="#30000000" BlurRadius="8"
+                                                      ShadowDepth="1" Direction="270" Opacity="0.18" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        IsHitTestVisible="False">
+                                <TextBlock Text="{Binding AvgComplianceLabel}" FontFamily="Inter"
+                                           FontSize="30" FontWeight="SemiBold" TextAlignment="Center"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="clear" FontFamily="Inter" FontSize="10" TextAlignment="Center"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                            </StackPanel>
+                        </Grid>
+                        <UniformGrid Columns="2" Margin="2,0">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Ellipse Width="8" Height="8" Fill="{DynamicResource ChartBlueBrush}" />
+                                <TextBlock FontFamily="Inter" FontSize="10" Margin="0,4,0,0"
+                                           Foreground="{DynamicResource TextSecondaryBrush}">
+                                    <Run Text="{Binding ClientsClear, Mode=OneWay}" /><Run Text=" clear" />
+                                </TextBlock>
+                            </StackPanel>
+                            <StackPanel HorizontalAlignment="Center">
+                                <Ellipse Width="8" Height="8" Fill="{DynamicResource ChartCopperBrush}" />
+                                <TextBlock FontFamily="Inter" FontSize="10" Margin="0,4,0,0"
+                                           Foreground="{DynamicResource TextSecondaryBrush}">
+                                    <Run Text="{Binding ClientsNeedingAttention, Mode=OneWay}" /><Run Text=" need review" />
+                                </TextBlock>
+                            </StackPanel>
+                        </UniformGrid>
+                    </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <TextBlock Text="CASE MANAGER DETAIL"
+                       FontFamily="Inter" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,8" />
+            <DataGrid AutomationProperties.Name="Case manager compliance details"
+                      ItemsSource="{Binding CaseManagers}"
+                      AutoGenerateColumns="False" IsReadOnly="True"
+                      CanUserAddRows="False" CanUserDeleteRows="False"
+                      CanUserReorderColumns="False" CanUserResizeRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      SelectionUnit="FullRow" SelectionMode="Single"
+                      Background="Transparent" BorderThickness="0"
                       RowBackground="Transparent"
                       AlternatingRowBackground="{DynamicResource SurfaceRaisedBrush}"
-                      HorizontalGridLinesBrush="{DynamicResource HoverBrush}"
-                      Margin="0,0,0,28">
+                      HorizontalGridLinesBrush="{DynamicResource HoverBrush}">
                 <DataGrid.ColumnHeaderStyle>
                     <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background"
-                                Value="Transparent" />
-                        <Setter Property="Foreground"
-                                Value="{DynamicResource TextMutedBrush}" />
-                        <Setter Property="FontFamily"
-                                Value="Inter" />
-                        <Setter Property="FontSize"
-                                Value="11" />
-                        <Setter Property="FontWeight"
-                                Value="SemiBold" />
-                        <Setter Property="Padding"
-                                Value="8,8" />
-                        <Setter Property="BorderThickness"
-                                Value="0,0,0,1" />
-                        <Setter Property="BorderBrush"
-                                Value="{DynamicResource HoverBrush}" />
-                        <Setter Property="SeparatorVisibility"
-                                Value="Collapsed" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                        <Setter Property="FontFamily" Value="Inter" />
+                        <Setter Property="FontSize" Value="11" />
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                        <Setter Property="Padding" Value="8,8" />
+                        <Setter Property="BorderThickness" Value="0,0,0,1" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource HoverBrush}" />
+                        <Setter Property="SeparatorVisibility" Value="Collapsed" />
                     </Style>
                 </DataGrid.ColumnHeaderStyle>
                 <DataGrid.CellStyle>
                     <Style TargetType="DataGridCell">
-                        <Setter Property="BorderThickness"
-                                Value="0" />
-                        <Setter Property="Padding"
-                                Value="8,6" />
-                        <Setter Property="Foreground"
-                                Value="{DynamicResource TextPrimaryBrush}" />
-                        <Setter Property="FontFamily"
-                                Value="Inter" />
-                        <Setter Property="Background"
-                                Value="Transparent" />
-                        <Setter Property="FocusVisualStyle"
-                                Value="{x:Null}" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Padding" Value="8,6" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                        <Setter Property="FontFamily" Value="Inter" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                         <Style.Triggers>
-                            <Trigger Property="IsSelected"
-                                     Value="True">
-                                <Setter Property="Background"
-                                        Value="{DynamicResource HoverBrush}" />
-                                <Setter Property="Foreground"
-                                        Value="{DynamicResource TextPrimaryBrush}" />
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                             </Trigger>
                         </Style.Triggers>
                     </Style>
                 </DataGrid.CellStyle>
-                <DataGrid.RowStyle>
-                    <Style TargetType="DataGridRow">
-                        <Setter Property="BorderThickness"
-                                Value="0" />
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected"
-                                     Value="True">
-                                <Setter Property="Background"
-                                        Value="{DynamicResource HoverBrush}" />
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.RowStyle>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name"
-                                        Binding="{Binding DisplayName}"
-                                        Width="*" />
-                    <DataGridTextColumn Header="Clients"
-                                        Binding="{Binding ClientCount}"
-                                        Width="70" />
-                    <DataGridTextColumn Header="Overdue"
-                                        Binding="{Binding OverdueCount}"
-                                        Width="70" />
-                    <DataGridTextColumn Header="Notes"
-                                        Binding="{Binding NotesThisMonth}"
-                                        Width="70" />
-                    <DataGridTemplateColumn Header="Progress"
-                                            Width="140">
+                    <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="*" />
+                    <DataGridTextColumn Header="Clients" Binding="{Binding ClientCount}" Width="70" />
+                    <DataGridTextColumn Header="Clear" Binding="{Binding ClientsClearOfOverdueItems}" Width="70" />
+                    <DataGridTextColumn Header="Overdue items" Binding="{Binding OverdueCount}" Width="95" />
+                    <DataGridTemplateColumn Header="Compliance" Width="190">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}"
-                                             Maximum="100"
-                                             Height="8"
-                                             Margin="8,6"
-                                             BorderThickness="0">
-                                    <ProgressBar.Style>
-                                        <Style TargetType="ProgressBar">
-                                            <Setter Property="Foreground"
-                                                    Value="{DynamicResource AccentBrush}" />
-                                            <Setter Property="Background"
-                                                    Value="{DynamicResource HoverBrush}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding StatusLevel}"
-                                                             Value="Ok">
-                                                    <Setter Property="Foreground"
-                                                            Value="{DynamicResource CompliantBrush}" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding StatusLevel}"
-                                                             Value="Danger">
-                                                    <Setter Property="Foreground"
-                                                            Value="{DynamicResource WorkflowPurpleBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </ProgressBar.Style>
-                                </ProgressBar>
+                                <Grid Margin="6,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="44" />
+                                    </Grid.ColumnDefinitions>
+                                    <ProgressBar Value="{Binding CompliancePercent, Mode=OneWay}"
+                                                 Maximum="100" Height="8" VerticalAlignment="Center"
+                                                 BorderThickness="0" Foreground="{DynamicResource ChartBlueBrush}"
+                                                 Background="{DynamicResource HoverBrush}" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding CompliancePercent, StringFormat={}{0:0}%}"
+                                               FontFamily="Inter" FontSize="11" TextAlignment="Right"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                </Grid>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Status"
-                                            Width="90">
+                    <DataGridTemplateColumn Header="Status" Width="92">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Border CornerRadius="3"
-                                        Padding="6,2"
-                                        HorizontalAlignment="Left"
-                                        Margin="6,3">
+                                <Border CornerRadius="4" Padding="7,2" HorizontalAlignment="Left" Margin="5,3">
                                     <Border.Style>
                                         <Style TargetType="Border">
-                                            <Setter Property="Background"
-                                                    Value="{DynamicResource HoverBrush}" />
+                                            <Setter Property="Background" Value="{DynamicResource DangerSoftBrush}" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding StatusLevel}"
-                                                             Value="Ok">
-                                                    <Setter Property="Background"
-                                                            Value="{DynamicResource CompliantFillBrush}" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding StatusLevel}"
-                                                             Value="Danger">
-                                                    <Setter Property="Background"
-                                                            Value="{DynamicResource DangerSoftBrush}" />
+                                                <DataTrigger Binding="{Binding ComplianceStatusLevel}" Value="Ok">
+                                                    <Setter Property="Background" Value="{DynamicResource CompliantFillBrush}" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
-                                    <TextBlock Text="{Binding StatusLabel}"
-                                               FontFamily="Inter"
-                                               FontSize="11"
+                                    <TextBlock Text="{Binding ComplianceStatusLabel}"
+                                               FontFamily="Inter" FontSize="11"
                                                Foreground="{DynamicResource TextPrimaryBrush}" />
                                 </Border>
                             </DataTemplate>
@@ -253,25 +292,6 @@
                     </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
-
-            <!-- ── Compliance chart ── -->
-            <TextBlock Text="COMPLIANCE BY CASE MANAGER"
-                       FontFamily="Inter"
-                       FontSize="11"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextMutedBrush}"
-                       Margin="0,0,0,8" />
-            <Border Background="{DynamicResource SurfaceBrush}"
-                    BorderBrush="{DynamicResource HoverBrush}"
-                    BorderThickness="1"
-                    CornerRadius="6"
-                    Padding="12">
-                <oxy:PlotView Name="ComplianceChart"
-                    Model="{Binding ComplianceChartModel}"
-                              Height="300"
-                              Background="Transparent" />
-            </Border>
-
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -24,6 +24,8 @@ public sealed class LocalDhhsFormServiceTests
 {
     private const DhhsFormDefinition.FormKey Appointment =
         DhhsFormDefinition.FormKey.AuthorizedRepresentative;
+    private const DhhsFormDefinition.FormKey AuthorizationToRelease =
+        DhhsFormDefinition.FormKey.AuthorizationToRelease;
 
     /// <summary>
     /// A consumer with no number on file still produces a correct form — the box is
@@ -242,6 +244,43 @@ public sealed class LocalDhhsFormServiceTests
         Assert.Contains(
             db.AuditEvents.ToList(),
             row => row.Action == LocalAuditActions.DhhsFormGenerated);
+    }
+
+    [Fact]
+    public async Task GeneratedReleaseArtifactKeepsTheExactAnnualObligationIdentity()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        DateTime target;
+        Guid obligationId;
+        long obligationRecordId;
+        await using (var setup = fixture.Factory.CreateDbContext())
+        {
+            target = (await setup.People.SingleAsync(item =>
+                item.Id == fixture.PersonId)).EffectiveDate!.Value.AddYears(1).Date;
+            var plan = Assert.Single(ReleaseObligationRules.GenerateCycle(target, []));
+            var obligation = ReleaseObligation.Create(
+                401, fixture.PersonId, plan, DateTime.UtcNow);
+            setup.ReleaseObligations.Add(obligation);
+            await setup.SaveChangesAsync();
+            obligationId = obligation.ObligationId;
+            obligationRecordId = obligation.Id;
+        }
+
+        var service = new DhhsFormService(
+            fixture.Factory, fixture.Session, fixture.SsnStore);
+        await service.GenerateForAnnualTargetAsync(
+            AuthorizationToRelease,
+            fixture.PersonId,
+            DhhsFormDefinition.Selections.None,
+            target,
+            obligationId);
+
+        await using var db = fixture.Factory.CreateDbContext();
+        var artifact = await db.DocumentArtifacts.SingleAsync(item =>
+            item.PersonId == fixture.PersonId &&
+            item.Kind == AnnualDocumentKind.ReleaseDhhs);
+        Assert.Equal(target, artifact.CycleStart);
+        Assert.Equal(obligationRecordId, artifact.ReleaseObligationId);
     }
 
     private sealed class StubSession(User user) : ISessionService

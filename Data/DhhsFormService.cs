@@ -50,6 +50,7 @@ public sealed class DhhsFormService(
         CancellationToken cancellationToken = default)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var person = await LoadOwnPersonAsync(context, personId, cancellationToken);
 
         return new SsnStatusDto(
@@ -66,6 +67,7 @@ public sealed class DhhsFormService(
             ?? throw new InvalidOperationException("An SSN cannot be stored without a signed-in user.");
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var person = await LoadOwnPersonAsync(context, personId, cancellationToken);
 
         var normalized = SsnMask.Normalize(socialSecurityNumber);
@@ -102,6 +104,7 @@ public sealed class DhhsFormService(
             ?? throw new InvalidOperationException("An SSN cannot be read without a signed-in user.");
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var person = await LoadOwnPersonAsync(context, personId, cancellationToken);
 
         var ssn = await ssnStore.RevealAsync(context, person, cancellationToken);
@@ -130,6 +133,10 @@ public sealed class DhhsFormService(
         var actor = sessionService.CurrentUser
             ?? throw new InvalidOperationException("No user is signed in.");
 
+        await LocalTenantAccess.EnsureCurrentActorAsync(context, actor, cancellationToken);
+        if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, personId, cancellationToken))
+            throw new InvalidOperationException("That consumer is not on your current caseload.");
+
         return await context.People.SingleOrDefaultAsync(
             candidate => candidate.Id == personId &&
                          candidate.UserId == actor.Id &&
@@ -142,14 +149,41 @@ public sealed class DhhsFormService(
         DhhsFormDefinition.FormKey form,
         int personId,
         DhhsFormDefinition.Selections selections,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await GenerateCoreAsync(
+            form, personId, selections, targetEffectiveDate: null,
+            releaseObligationId: null, cancellationToken);
+
+    public async Task<DhhsFormResult> GenerateForAnnualTargetAsync(
+        DhhsFormDefinition.FormKey form,
+        int personId,
+        DhhsFormDefinition.Selections selections,
+        DateTime targetEffectiveDate,
+        Guid? releaseObligationId,
+        CancellationToken cancellationToken = default) =>
+        await GenerateCoreAsync(
+            form, personId, selections, targetEffectiveDate.Date,
+            releaseObligationId, cancellationToken);
+
+    private async Task<DhhsFormResult> GenerateCoreAsync(
+        DhhsFormDefinition.FormKey form,
+        int personId,
+        DhhsFormDefinition.Selections selections,
+        DateTime? targetEffectiveDate,
+        Guid? releaseObligationId,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selections);
+        if (form != DhhsFormDefinition.FormKey.AuthorizationToRelease &&
+            (targetEffectiveDate is not null || releaseObligationId is not null))
+            throw new ArgumentException(
+                "Annual target identity applies only to the DHHS authorization-to-release form.");
 
         var actor = sessionService.CurrentUser
             ?? throw new InvalidOperationException("A form cannot be filled without a signed-in user.");
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var agencyId = actor.AgencyId;
 
@@ -159,13 +193,12 @@ public sealed class DhhsFormService(
         // Tracked, not AsNoTracking: the encrypted SSN lives in shadow properties, and
         // shadow values are held by the change tracker. An untracked entity has none,
         // so the number would silently read as absent and the box would print blank.
-        var person = await context.People
-            .SingleOrDefaultAsync(
-                candidate => candidate.Id == personId &&
-                             candidate.UserId == actor.Id &&
-                             candidate.AgencyId == actor.AgencyId,
-                cancellationToken)
-            ?? throw new InvalidOperationException("That consumer is not on your caseload.");
+        var person = await LoadOwnPersonAsync(context, personId, cancellationToken);
+        var releaseTarget = form == DhhsFormDefinition.FormKey.AuthorizationToRelease
+            ? await ResolveDhhsReleaseTargetAsync(
+                context, person, actor.AgencyId, targetEffectiveDate,
+                releaseObligationId, cancellationToken)
+            : null;
 
         var agency = await context.Agencies.AsNoTracking()
             .SingleOrDefaultAsync(candidate => candidate.Id == actor.AgencyId, cancellationToken);
@@ -209,9 +242,7 @@ public sealed class DhhsFormService(
             if (isDraft)
                 blankFields.Add("Consumer authorization choices");
             var fileName = SuggestedFileName(form, person.LastName, person.FirstName, personId);
-            var cycleStart = AnnualDocumentCycle.CurrentStart(
-                person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
-                DateTime.Today);
+            var cycleStart = releaseTarget!.TargetEffectiveDate;
             await DocumentArtifactStore.StageGeneratedAsync(
                 context,
                 personId,
@@ -224,7 +255,8 @@ public sealed class DhhsFormService(
                 pdf,
                 fileName,
                 blankFields,
-                cancellationToken);
+                cancellationToken,
+                releaseObligationId: releaseTarget.Obligation?.Id);
             LocalAuditTrail.Record(
                 context,
                 actor,
@@ -235,6 +267,8 @@ public sealed class DhhsFormService(
                 {
                     kind = AnnualDocumentKind.ReleaseDhhs.ToString(),
                     cycleStart = cycleStart.ToString("yyyy-MM-dd"),
+                    releaseObligationId = releaseTarget.Obligation?.ObligationId,
+                    releaseObligationKey = releaseTarget.Obligation?.StableKey,
                     origin = isDraft ? DocumentArtifactOrigin.Draft.ToString() : DocumentArtifactOrigin.GeneratedInSati.ToString()
                 }));
         }
@@ -256,6 +290,86 @@ public sealed class DhhsFormService(
             SuggestedFileName(form, person.LastName, person.FirstName, personId),
             blankFields);
     }
+
+    private static async Task<DhhsReleaseTarget> ResolveDhhsReleaseTargetAsync(
+        SatiContext context,
+        Person person,
+        int agencyId,
+        DateTime? requestedTargetEffectiveDate,
+        Guid? requestedObligationId,
+        CancellationToken cancellationToken)
+    {
+        var effective = person.EffectiveDate ??
+            throw new InvalidOperationException("The consumer has no effective date.");
+        ReleaseObligation? obligation = null;
+        if (requestedObligationId is Guid obligationId)
+        {
+            obligation = await context.ReleaseObligations.AsNoTracking()
+                .Include(item => item.AuthorizationEvents)
+                .SingleOrDefaultAsync(item =>
+                    item.ObligationId == obligationId &&
+                    item.AgencyId == agencyId &&
+                    item.PersonId == person.Id,
+                    cancellationToken)
+                ?? throw new InvalidOperationException(
+                    "The selected DHHS release obligation was not found for this consumer.");
+            if (obligation.Category != ReleaseObligationCategory.Dhhs)
+                throw new InvalidOperationException(
+                    "The selected obligation does not belong to a DHHS release.");
+        }
+
+        var timing = await context.Settings.AsNoTracking()
+            .Where(item => item.AgencyId == agencyId)
+            .Select(item => new
+            {
+                item.ReleaseDhhsOpenDaysBefore,
+                item.ReleaseDhhsDaysBeforeAnniversary
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        var openDays = Math.Max(0, timing?.ReleaseDhhsOpenDaysBefore ?? 90);
+        var dueDays = Math.Max(0, timing?.ReleaseDhhsDaysBeforeAnniversary ?? 0);
+        var target = obligation?.TargetEffectiveDate.Date ??
+            requestedTargetEffectiveDate?.Date ??
+            AnnualDocumentCycle.SuggestedStart(
+                effective, DateTime.Today, openDays, dueDays);
+
+        if (requestedTargetEffectiveDate is DateTime requested &&
+            requested.Date != target)
+            throw new InvalidOperationException(
+                "The selected DHHS obligation belongs to a different annual effective-date cycle.");
+        if (target < effective.Date ||
+            AnnualDocumentCycle.CurrentStart(effective, target) != target)
+            throw new ArgumentException(
+                "Choose an effective-date anniversary on or after enrollment.",
+                nameof(requestedTargetEffectiveDate));
+
+        obligation ??= await context.ReleaseObligations.AsNoTracking()
+            .Include(item => item.AuthorizationEvents)
+            .SingleOrDefaultAsync(item =>
+                item.AgencyId == agencyId &&
+                item.PersonId == person.Id &&
+                item.Category == ReleaseObligationCategory.Dhhs &&
+                item.TargetEffectiveDate == target,
+                cancellationToken);
+
+        var availableOn = obligation?.AvailableOn.Date ??
+            target.AddDays(-dueDays).AddDays(-openDays);
+        if (DateTime.Today < availableOn)
+            throw new InvalidOperationException(
+                $"This DHHS release becomes available on {availableOn:yyyy-MM-dd}.");
+        if (obligation?.RetiredOn is DateTime retiredOn && DateTime.Today >= retiredOn.Date)
+            throw new InvalidOperationException(
+                "This DHHS release obligation has been retired.");
+        if (obligation?.WithdrawnOn is not null)
+            throw new InvalidOperationException(
+                "This DHHS release authorization was withdrawn and cannot receive a replacement document.");
+
+        return new DhhsReleaseTarget(target, obligation);
+    }
+
+    private sealed record DhhsReleaseTarget(
+        DateTime TargetEffectiveDate,
+        ReleaseObligation? Obligation);
 
     internal static string SuggestedFileName(
         DhhsFormDefinition.FormKey form,

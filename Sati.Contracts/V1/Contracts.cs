@@ -20,7 +20,9 @@ public sealed record UserProfileDto(
     int? SupervisorId,
     int AgencyId,
     string? Email,
-    string? Phone);
+    string? Phone,
+    bool IsEnabled = true,
+    long SecurityVersion = 1);
 
 public sealed record CreateUserRequest(
     string Username, string DisplayName, UserPermissions Permissions, int? SupervisorId,
@@ -34,6 +36,9 @@ public sealed record ResetPasswordRequest(string NewPassword);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
+public sealed record SetUserEnabledRequest(
+    [property: System.Text.Json.Serialization.JsonRequired] bool IsEnabled);
+
 public sealed record FormDto(
     int Id,
     string Type,
@@ -41,12 +46,14 @@ public sealed record FormDto(
     bool IsCompliant,
     int PersonId,
     DateTime? CompletedDate,
-    DateTime? OpenedDate);
+    DateTime? OpenedDate,
+    DateTime? TargetEffectiveDate = null);
 
 public sealed record NoteSummaryDto(
     string? Status,
     DateTime? EventDate,
-    string? NoteType);
+    string? NoteType,
+    string? FormType = null);
 
 public sealed record PersonDto(
     int Id,
@@ -101,14 +108,16 @@ public sealed record PersonDto(
     string Status = "Active",
     string? StatusNote = null,
     DateTime? StatusChangedAtUtc = null,
-    int? StatusChangedByUserId = null);
+    int? StatusChangedByUserId = null,
+    IReadOnlyList<ReleaseComplianceFact>? ReleaseObligations = null);
 
 public sealed record SavePersonFormRequest(
     int Id,
     string Type,
     bool IsCompliant,
     DateTime? CompletedDate,
-    DateTime? OpenedDate);
+    DateTime? OpenedDate,
+    DateTime? TargetEffectiveDate = null);
 
 public sealed record SavePersonRequest(
     string FirstName,
@@ -271,7 +280,8 @@ public sealed record ConsumerProviderDto(
     DateTime? StartDate,
     DateTime? EndDate,
     bool HasActiveRelease,
-    int SortOrder);
+    int SortOrder,
+    DateTime? AssignmentKnownOn = null);
 
 public sealed record SaveConsumerProviderRequest(
     int ProviderId,
@@ -306,7 +316,10 @@ public sealed record NoteDto(
     DateTime? OverrideApprovedAt,
     int Revision,
     PersonReferenceDto? Person,
-    IReadOnlyList<string>? ComplianceFailureReasons = null);
+    IReadOnlyList<string>? ComplianceFailureReasons = null,
+    IReadOnlyList<BillingComplianceBlocker>? ComplianceBlockers = null,
+    IReadOnlyList<string>? OverrideObligationIds = null,
+    bool OverrideAttestationConfirmed = false);
 
 public sealed record SaveNoteRequest(
     string Narrative,
@@ -323,7 +336,12 @@ public sealed record SaveNoteRequest(
 
 public sealed record PersonReferenceDto(int Id, int UserId, string? FirstName, string? LastName);
 
-public sealed record SupervisorNoteActionRequest(string? Reason, int ExpectedRevision = 0, int? MaximumUnits = null);
+public sealed record SupervisorNoteActionRequest(
+    string? Reason,
+    int ExpectedRevision = 0,
+    int? MaximumUnits = null,
+    IReadOnlyList<string>? BlockingObligationIds = null,
+    bool AttestationConfirmed = false);
 
 public sealed record SettingsDto(
     int Id,
@@ -387,7 +405,32 @@ public sealed record SettingsDto(
         BillingComplianceGate.DefaultRequirements,
     bool AllowCredibleProfileUpdates = false,
     string VrAssistantTitle = VocationalRehabilitationProfile.DefaultAssistantTitle,
-    int AnnualPacketOpenDaysBefore = AnnualPacketWindow.DefaultOpenDays);
+    int AnnualPacketOpenDaysBefore = AnnualPacketWindow.DefaultOpenDays,
+    bool AllowPastBillingPolicyEffectiveDates = false);
+
+/// <summary>
+/// One immutable agency billing-compliance policy version. The numeric id is the
+/// final tie-breaker when an administrator records a correction with the same
+/// enforcement date as an earlier version.
+/// </summary>
+public sealed record BillingCompliancePolicyVersionDto(
+    long Id,
+    Guid ChangeId,
+    DateTime EffectiveOn,
+    BillingComplianceRequirements Requirements,
+    int CreatedByUserId,
+    DateTime RecordedAtUtc,
+    string? Explanation);
+
+/// <summary>
+/// Appends a policy version. ChangeId makes a retry idempotent; it never authorizes
+/// changing an existing version.
+/// </summary>
+public sealed record AppendBillingCompliancePolicyRequest(
+    Guid ChangeId,
+    DateTime? EffectiveOn,
+    BillingComplianceRequirements Requirements,
+    string? Explanation = null);
 
 public sealed record ScratchpadDto(
     int Id,
@@ -813,11 +856,13 @@ public sealed record ClientAiContextDto(
     IReadOnlyList<ClientAiContextSourceDto> Sources);
 
 public sealed record UpdateFormRequest(DateTime? CompletedDate, DateTime? OpenedDate);
+public sealed record OpenFormRequest(DateTime OpenedOn);
 public sealed record AttestFormRequest(
     int FormId,
     DateTime CompletedOn,
     int? EvidenceNoteId = null,
-    string? SupervisorOverrideReason = null);
+    string? SupervisorOverrideReason = null,
+    DateTime? ComprehensiveAssessmentCompletedOn = null);
 public sealed record RevokeFormAttestationRequest(int FormId, string Reason);
 public sealed record PendingAttestationDto(
     int FormId,

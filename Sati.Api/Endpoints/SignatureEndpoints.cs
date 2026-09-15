@@ -54,10 +54,25 @@ internal static partial class ApiEndpoints
     {
         var actor = Actor.From(principal);
         if (await AccessibleSigningPerson(db, actor, personId, ct) is not { } person) return Results.NotFound();
-        var contacts = await db.PersonContacts.AsNoTracking().Where(x => x.PersonId == personId && x.IsActive &&
-            (x.Kind == "Guardian" || x.Kind == "AuthorizedRepresentative")).OrderBy(x => x.LastName).ThenBy(x => x.FirstName).ToListAsync(ct);
-        var signers = new List<SignatureSignerDto> { new(SignerCapacity.Consumer, null, SigningName(person.FirstName, person.LastName), person.Email?.Trim()) };
-        signers.AddRange(contacts.Select(x => new SignatureSignerDto(Enum.Parse<SignerCapacity>(x.Kind), x.Id, SigningName(x.FirstName, x.LastName), x.Email?.Trim())));
+        List<SignatureSignerDto> signers;
+        if (person.HasGuardian)
+        {
+            var guardians = await db.PersonContacts.AsNoTracking()
+                .Where(x => x.PersonId == personId && x.IsActive && x.Kind == "Guardian")
+                .OrderBy(x => x.LastName).ThenBy(x => x.FirstName).ToListAsync(ct);
+            signers = guardians.Select(x => new SignatureSignerDto(
+                SignerCapacity.Guardian, x.Id,
+                SigningName(x.FirstName, x.LastName), x.Email?.Trim())).ToList();
+        }
+        else
+        {
+            signers =
+            [
+                new SignatureSignerDto(
+                    SignerCapacity.Consumer, null,
+                    SigningName(person.FirstName, person.LastName), person.Email?.Trim())
+            ];
+        }
         audit.Record(actor, "signature.staff-signers-released", "Person", personId, JsonSerializer.Serialize(new { count = signers.Count }));
         return Results.Ok(signers);
     }, ct);
@@ -156,6 +171,8 @@ internal static partial class ApiEndpoints
     private static async Task<VerifiedSignatureSigner> ResolveSignatureSigner(ApiDbContext db, ServerPerson person,
         SignerCapacity capacity, int? contactId, CancellationToken ct)
     {
+        if (!ReleaseSigningRules.CanSign(person.HasGuardian, capacity))
+            throw InvalidSignatureSigner(person.HasGuardian);
         string name; string? email; DateTime? birthDate = null;
         if (capacity == SignerCapacity.Consumer && contactId is null)
         { name = SigningName(person.FirstName, person.LastName); email = person.Email; birthDate = person.BirthDate; }
@@ -163,14 +180,14 @@ internal static partial class ApiEndpoints
         {
             var contact = await db.PersonContacts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == contactId && x.PersonId == person.Id &&
                 x.IsActive && x.Kind == capacity.ToString(), ct);
-            if (contact is null) throw InvalidSignatureSigner();
+            if (contact is null) throw InvalidSignatureSigner(person.HasGuardian);
             name = SigningName(contact.FirstName, contact.LastName); email = contact.Email;
         }
-        else throw InvalidSignatureSigner();
+        else throw InvalidSignatureSigner(person.HasGuardian);
         email = email?.Trim();
         if (name.Length is < 1 or > 120 || email is null || email.Length > 254 || !MailAddress.TryCreate(email, out var address) ||
-            !string.Equals(address.Address, email, StringComparison.OrdinalIgnoreCase)) throw InvalidSignatureSigner();
-        return new(name, email, birthDate);
+            !string.Equals(address.Address, email, StringComparison.OrdinalIgnoreCase)) throw InvalidSignatureSigner(person.HasGuardian);
+        return new(name, email, birthDate, person.HasGuardian);
     }
     private static string SigningName(string? first, string? last) => $"{first?.Trim()} {last?.Trim()}".Trim();
     private static void ConfirmSignatureSnapshot(VerifiedSignatureSigner current, string? expectedName, string? expectedEmail)
@@ -180,6 +197,8 @@ internal static partial class ApiEndpoints
             throw new SignatureWorkflowException("signature_signer_changed",
                 "The signer's name or preferred email changed. Reload, choose the intended signer, and confirm their current details before continuing.", 409);
     }
-    private static SignatureWorkflowException InvalidSignatureSigner() => new("signature_signer_invalid",
-        "Choose an active guardian or representative from this consumer's contacts, or the consumer. Correct the name and preferred email in that record before continuing.");
+    private static SignatureWorkflowException InvalidSignatureSigner(bool hasGuardian) => new("signature_signer_invalid",
+        hasGuardian
+            ? "Guardian signature only. Choose an active guardian from this consumer's contacts and confirm the guardian's current name and preferred email."
+            : "This consumer must sign. Correct the consumer's name and preferred email before continuing.");
 }

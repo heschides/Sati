@@ -31,12 +31,22 @@ namespace Sati.Data
         public DbSet<DocumentTemplate> DocumentTemplates { get; set; }
         public DbSet<Note> Notes { get; set; }
         public DbSet<Settings> Settings { get; set; }
+        public DbSet<BillingCompliancePolicyVersion> BillingCompliancePolicyVersions { get; set; }
+        public DbSet<Sati.Models.BillingComplianceRecoveryDecision> BillingComplianceRecoveryDecisions { get; set; }
+        public DbSet<BillingComplianceRecoveryObligation> BillingComplianceRecoveryObligations { get; set; }
+        public DbSet<BillingComplianceRecoveryNote> BillingComplianceRecoveryNotes { get; set; }
+        public DbSet<BillingCompliancePolicyReviewFlag> BillingCompliancePolicyReviewFlags { get; set; }
+        public DbSet<ReleaseObligation> ReleaseObligations { get; set; }
+        public DbSet<ReleaseObligationAttestation> ReleaseObligationAttestations { get; set; }
+        public DbSet<ReleaseAuthorizationEvent> ReleaseAuthorizationEvents { get; set; }
         public DbSet<Scratchpad> Scratchpad { get; set; }
         public DbSet<ScratchpadComment> ScratchpadComments { get; set; }
         public DbSet<Incentive> Incentives { get; set; }
         public DbSet<BillingPeriod> BillingPeriods { get; set; }
         public DbSet<ClaimLine> ClaimLines { get; set; }
         public DbSet<EdiGeneration> EdiGenerations { get; set; }
+        public DbSet<ClearinghouseResponseReceipt> ClearinghouseResponseReceipts => Set<ClearinghouseResponseReceipt>();
+        public DbSet<ClearinghouseResponseMatch> ClearinghouseResponseMatches => Set<ClearinghouseResponseMatch>();
         public DbSet<BillingSubmissionEvent> BillingSubmissionEvents { get; set; }
         public DbSet<RemittanceClaimOutcome> RemittanceClaimOutcomes { get; set; }
         public DbSet<RemittanceDeposit> RemittanceDeposits { get; set; }
@@ -84,6 +94,22 @@ namespace Sati.Data
 
         private void EnsureAuditEventsAreAppendOnly()
         {
+            ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
+            ReleaseObligationPersistenceModel.ProtectWrites(ChangeTracker);
+            BillingComplianceRecoveryPersistenceModel.ProtectWrites(ChangeTracker);
+            BillingCompliancePolicyReviewPersistenceModel.ProtectWrites(ChangeTracker);
+            if (ChangeTracker.Entries<Note>().Any(entry =>
+                    entry.State == EntityState.Modified &&
+                    entry.OriginalValues.GetValue<bool>(nameof(Note.ComplianceOverride)) &&
+                    (entry.Property(note => note.ComplianceOverride).IsModified ||
+                     entry.Property(note => note.OverrideReason).IsModified ||
+                     entry.Property(note => note.OverrideApprovedById).IsModified ||
+                     entry.Property(note => note.OverrideApprovedAt).IsModified ||
+                     entry.Property(note => note.OverrideAttestationConfirmed).IsModified ||
+                     entry.Property(note => note.OverrideObligationIdsJson).IsModified)))
+                throw new InvalidOperationException("Recorded note compliance exceptions are immutable.");
+            if (ChangeTracker.Entries<EdiGeneration>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+                throw new InvalidOperationException("Generated EDI records are immutable.");
             SignaturePersistenceModel.ProtectWrites(ChangeTracker);
             SignaturePersistenceModel.ProtectDocumentArtifacts<DocumentArtifact>(ChangeTracker);
             ChatPersistenceModel.ProtectWrites<ChatRoom, ChatRoomMember, ChatMessage, ChatChange, ChatReadMarker>(ChangeTracker);
@@ -97,6 +123,8 @@ namespace Sati.Data
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
                 ChangeTracker.Entries<FormAttestation>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+                ChangeTracker.Entries<BillingCompliancePolicyVersion>()
+                    .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
                 ChangeTracker.Entries<DocumentTemplate>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
                 ChangeTracker.Entries<DocumentAcknowledgment>()
@@ -108,17 +136,26 @@ namespace Sati.Data
                 ChangeTracker.Entries<RemittanceDeposit>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             {
-                throw new InvalidOperationException("Audit, form-attestation, document-template, Person history, and billing exchange records are append-only.");
+                throw new InvalidOperationException("Audit, billing-policy, form-attestation, document-template, Person history, and billing exchange records are append-only.");
             }
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            ClearinghousePersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration>(modelBuilder);
             SignaturePersistenceModel.Configure(modelBuilder);
-            SignaturePersistenceModel.ConfigureClinicalRelationships<DocumentArtifact, Agency, User, Person, PersonContact>(modelBuilder);
+            SignaturePersistenceModel.ConfigureClinicalRelationships<DocumentArtifact, Agency, User, Person, PersonContact, FormAttestation>(modelBuilder);
             ChatPersistenceModel.Configure<ChatRoom, ChatRoomMember, ChatMessage, ChatChange, ChatReadMarker,
                 Agency, User, Person>(modelBuilder);
+            ReleaseObligationPersistenceModel.Configure<Agency, User, Person, Provider, DocumentArtifact>(modelBuilder);
+            BillingComplianceRecoveryPersistenceModel.Configure<Agency, User, Person, Note>(modelBuilder);
+            BillingCompliancePolicyReviewPersistenceModel.Configure<Agency, Person, Note, ClaimLine>(modelBuilder);
+            modelBuilder.Entity<Person>()
+                .HasMany(person => person.ReleaseObligations)
+                .WithOne()
+                .HasForeignKey(item => item.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Agency>(entity =>
             {
@@ -299,6 +336,10 @@ namespace Sati.Data
                       .HasConversion<string>();
                 entity.Property(u => u.Permissions)
                       .HasConversion<int>();
+                entity.Property(u => u.IsEnabled).HasDefaultValue(true);
+                entity.Property(u => u.SecurityVersion)
+                      .HasDefaultValue(1L)
+                      .IsConcurrencyToken();
                 entity.HasOne(u => u.Supervisor)
                       .WithMany(u => u.Supervisees)
                       .HasForeignKey(u => u.SupervisorId)
@@ -402,6 +443,7 @@ namespace Sati.Data
             {
                 entity.HasKey(link => link.Id);
                 entity.Property(link => link.Role).HasMaxLength(ConsumerProviderRules.MaxRoleLength);
+                entity.Property(link => link.AssignmentKnownOn).HasColumnType("date");
                 entity.HasIndex(link => new { link.PersonId, link.EndDate });
 
                 // Cascade from the person, Restrict from the provider. A consumer's records
@@ -438,6 +480,8 @@ namespace Sati.Data
                 entity.Property(n => n.Narrative)
                       .IsRequired();
                 entity.Property(n => n.VisitDocumentationJson);
+                entity.Property(n => n.OverrideReason).HasMaxLength(4_000);
+                entity.Property(n => n.OverrideObligationIdsJson).HasMaxLength(4_000);
                 entity.HasOne(n => n.Person)
                       .WithMany(p => p.Notes)
                       .HasForeignKey(n => n.PersonId)
@@ -450,6 +494,10 @@ namespace Sati.Data
 
             modelBuilder.Entity<Form>(entity =>
             {
+                entity.ToTable("Forms", table =>
+                    table.HasCheckConstraint(
+                        "CK_Forms_TargetEffectiveDate_Valid",
+                        "[TargetEffectiveDate] >= '1900-01-01'"));
                 entity.HasKey(f => f.Id);
                 // Compliance is derived from CompletedDate, not stored. The column it
                 // used to occupy was dropped in AddDerivedFormCompliance; two stored
@@ -466,8 +514,8 @@ namespace Sati.Data
                 // Using the existing projection as the concurrency token adds no
                 // schema column and makes the update conditional on what was read.
                 entity.Property(f => f.CompletedDate).IsConcurrencyToken();
-                // A person has exactly one form of a given type for a given due
-                // date. AddMissingFormsForCycle decides whether to insert by reading
+                // A person has exactly one form of a given type for each annual
+                // effective date. AddMissingFormsForCycle decides whether to insert by reading
                 // the person's own Forms collection first, which is a check-then-
                 // insert with nothing holding the gap: before 57af6fa, concurrent
                 // caseload loads each passed that check and each inserted a full
@@ -475,13 +523,12 @@ namespace Sati.Data
                 // that window, so the invariant lives here rather than in the code
                 // that happens to insert.
                 //
-                // Duplicates are also silently unreachable: GetCurrentCycleForm
-                // returns one row on a due-date tie while EvaluateComplianceGate
-                // reads every row, so a completed form can still block billing with
-                // no screen able to show why.
-                entity.HasIndex(f => new { f.PersonId, f.Type, f.DueDate })
+                // Due dates are deadlines, not identity: CA and Reclass intentionally
+                // fall before the effective date while reviews fall after it.
+                entity.Property(f => f.TargetEffectiveDate).HasColumnType("date");
+                entity.HasIndex(f => new { f.PersonId, f.Type, f.TargetEffectiveDate })
                       .IsUnique()
-                      .HasDatabaseName("IX_Forms_PersonId_Type_DueDate");
+                      .HasDatabaseName("IX_Forms_PersonId_Type_TargetEffectiveDate");
                 entity.HasOne(f => f.Person)
                       .WithMany(p => p.Forms)
                       .HasForeignKey(f => f.PersonId)
@@ -532,8 +579,12 @@ namespace Sati.Data
                 entity.Property(artifact => artifact.ExternalNote).HasMaxLength(1_000);
                 entity.HasIndex(artifact => new { artifact.PersonId, artifact.Kind, artifact.CycleStart })
                     .IsUnique()
-                    .HasFilter("[SupersededByArtifactId] IS NULL")
+                    .HasFilter("[ReleaseObligationId] IS NULL AND [SupersededByArtifactId] IS NULL")
                     .HasDatabaseName("IX_DocumentArtifacts_OneLivePerCycle");
+                entity.HasIndex(artifact => new { artifact.ReleaseObligationId, artifact.Kind })
+                    .IsUnique()
+                    .HasFilter("[ReleaseObligationId] IS NOT NULL AND [SupersededByArtifactId] IS NULL")
+                    .HasDatabaseName("IX_DocumentArtifacts_OneLivePerReleaseObligation");
                 entity.HasOne(artifact => artifact.Person)
                     .WithMany()
                     .HasForeignKey(artifact => artifact.PersonId)
@@ -745,6 +796,28 @@ namespace Sati.Data
                       .OnDelete(DeleteBehavior.SetNull);
             });
 
+            modelBuilder.Entity<BillingCompliancePolicyVersion>(entity =>
+            {
+                entity.ToTable("BillingCompliancePolicyVersions");
+                entity.HasKey(version => version.Id);
+                entity.Property(version => version.VersionId).IsRequired();
+                entity.Property(version => version.EffectiveOn).HasColumnType("date");
+                entity.Property(version => version.Requirements).HasConversion<int>();
+                entity.Property(version => version.Explanation)
+                      .HasMaxLength(BillingCompliancePolicyRules.ExplanationMaxLength);
+                entity.HasIndex(version => version.VersionId).IsUnique();
+                // Same-day corrections are separate rows; the higher durable Id wins.
+                entity.HasIndex(version => new { version.AgencyId, version.EffectiveOn, version.Id });
+                entity.HasOne<Agency>()
+                      .WithMany()
+                      .HasForeignKey(version => version.AgencyId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<User>()
+                      .WithMany()
+                      .HasForeignKey(version => version.CreatedByUserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<Incentive>(entity =>
             {
                 entity.HasKey(i => i.Id);
@@ -810,6 +883,8 @@ namespace Sati.Data
 
             modelBuilder.Entity<EdiGeneration>(entity =>
             {
+                entity.Property(x => x.ControlNumber).HasMaxLength(9);
+                entity.HasIndex(x => new { x.AgencyId, x.IsTest, x.ControlNumber }).IsUnique().HasFilter("[ControlNumber] IS NOT NULL");
                 entity.HasKey(generation => generation.Id);
                 entity.HasIndex(generation => new
                     { generation.AgencyId, generation.ActorUserId, generation.IdempotencyKey })
@@ -829,6 +904,8 @@ namespace Sati.Data
 
             modelBuilder.Entity<BillingSubmissionEvent>(entity =>
             {
+                entity.HasOne(item => item.EdiGeneration).WithMany().HasForeignKey(item => item.EdiGenerationId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasKey(item => item.Id);
                 entity.HasIndex(item => new { item.AgencyId, item.OccurredAtUtc });
                 entity.Property(item => item.Reference).HasMaxLength(80);
@@ -843,6 +920,8 @@ namespace Sati.Data
 
             modelBuilder.Entity<RemittanceClaimOutcome>(entity =>
             {
+                entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<EdiGeneration>().WithMany().HasForeignKey(item => item.EdiGenerationId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasKey(item => item.Id);
                 entity.HasIndex(item => new { item.AgencyId, item.ReceivedAtUtc });
                 entity.Property(item => item.ClaimReference).IsRequired().HasMaxLength(80);
@@ -863,6 +942,7 @@ namespace Sati.Data
 
             modelBuilder.Entity<RemittanceDeposit>(entity =>
             {
+                entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasKey(item => item.Id);
                 entity.HasIndex(item => new { item.AgencyId, item.ReceivedAtUtc });
                 entity.Property(item => item.PaymentReference).IsRequired().HasMaxLength(80);

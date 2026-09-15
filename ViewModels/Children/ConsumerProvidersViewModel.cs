@@ -14,12 +14,11 @@ using Sati.Services;
 namespace Sati.ViewModels.Children;
 
 /// <summary>
-/// One consumer's medical provider list.
+/// One consumer's healthcare and waiver/service provider assignments.
 /// <para>
-/// The practice and the network are never stored on a row here. They are resolved from the
-/// agency directory every time the list is built, so correcting a directory entry corrects
-/// every consumer who names it. That is the whole reason this panel loads the directory
-/// alongside the links.
+/// Medical practice and network are never stored on a row here. They are resolved from the
+/// agency directory every time the list is built. Waiver providers remain ordinary direct
+/// assignments and do not inherit medical-only labels or controls.
 /// </para>
 /// <para>
 /// Tidiness comes from state rather than a cap: current providers are listed, ended ones sit
@@ -44,6 +43,12 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     // somebody actually entered.
     private string? _legacyPrimaryCare;
     private string? _legacyHealthcareSystem;
+
+    /// <summary>
+    /// Called after a provider assignment has been durably changed and the provider list has
+    /// reloaded. The profile host uses it to reconcile recipient-specific release obligations.
+    /// </summary>
+    public Func<Task>? ProviderAssignmentsChangedAsync { get; set; }
 
     public ConsumerProvidersViewModel(
         IConsumerProviderService linkService,
@@ -84,6 +89,7 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     private int? newProviderId;
 
     [ObservableProperty] private string newRole = string.Empty;
+    [ObservableProperty] private DateTime? newStartDate;
     [ObservableProperty] private bool newIsPrimaryCare;
     [ObservableProperty] private bool newHasActiveRelease;
     [ObservableProperty] private bool showPast;
@@ -91,7 +97,25 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     public bool HasStatusMessage => StatusMessage.Length > 0;
     public bool HasCurrent => Current.Count > 0;
     public bool HasPast => Past.Count > 0;
-    public bool CanAdd => HasLoadedPerson && NewProviderId is > 0 && !IsBusy;
+    public bool CanAdd =>
+        HasLoadedPerson && NewProviderId is > 0 && NewStartDate is not null && !IsBusy;
+    public bool HasSelectedProvider => SelectedProvider is not null;
+    public bool SelectedProviderIsMedical => SelectedProvider?.Type == ProviderType.Healthcare;
+    public bool SelectedProviderIsService => SelectedProvider?.Type == ProviderType.Waiver;
+    public string SelectedProviderKindLabel => SelectedProvider?.Type switch
+    {
+        ProviderType.Healthcare => "Medical provider assignment",
+        ProviderType.Waiver => "Waiver / service provider assignment",
+        _ => string.Empty
+    };
+    public string AssignmentStartGuidance => SelectedProvider?.Type switch
+    {
+        ProviderType.Waiver =>
+            "Enter the actual first day this provider is assigned to deliver the service. The related Agency release is due before that service begins.",
+        ProviderType.Healthcare =>
+            "Enter the actual date this healthcare relationship began or is scheduled to begin.",
+        _ => "Choose a provider, then enter the actual assignment start date."
+    };
 
     public string PastDisclosureLabel => Past.Count == 1
         ? "1 past provider"
@@ -102,12 +126,31 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     /// manager can see they picked the right clinician before committing.
     /// </summary>
     public string SelectedProviderAffiliation => NewProviderId is { } id
+        && SelectedProviderIsMedical
         ? ProviderAffiliation.DescribeAffiliation(id, _nodes)
         : string.Empty;
 
     public bool HasSelectedProviderAffiliation => SelectedProviderAffiliation.Length > 0;
 
-    partial void OnNewProviderIdChanged(int? value) => OnPropertyChanged(nameof(CanAdd));
+    private Provider? SelectedProvider => NewProviderId is int id
+        ? _directory.FirstOrDefault(item => item.Id == id)
+        : null;
+
+    partial void OnNewProviderIdChanged(int? value)
+    {
+        if (!SelectedProviderIsMedical)
+        {
+            NewIsPrimaryCare = false;
+            NewHasActiveRelease = false;
+        }
+        OnPropertyChanged(nameof(CanAdd));
+        OnPropertyChanged(nameof(HasSelectedProvider));
+        OnPropertyChanged(nameof(SelectedProviderIsMedical));
+        OnPropertyChanged(nameof(SelectedProviderIsService));
+        OnPropertyChanged(nameof(SelectedProviderKindLabel));
+        OnPropertyChanged(nameof(AssignmentStartGuidance));
+    }
+    partial void OnNewStartDateChanged(DateTime? value) => OnPropertyChanged(nameof(CanAdd));
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(CanAdd));
@@ -165,16 +208,20 @@ public partial class ConsumerProvidersViewModel : ObservableObject
             _nodes = directory.ToAffiliationNodes();
 
             ProviderOptions.Clear();
-            // Individuals first: a consumer's provider is normally a named clinician, and
-            // the practice is what you pick when there is no named one.
+            // Keep medical entries together (individuals first), followed by waiver/service
+            // agencies. "Other" directory contacts do not create release obligations and are
+            // deliberately outside this assignment workflow.
             foreach (var provider in directory
-                         .Where(candidate => candidate.Type == ProviderType.Healthcare)
-                         .OrderBy(candidate => candidate.MedicalKind switch
+                         .Where(candidate => candidate.Type is ProviderType.Healthcare or ProviderType.Waiver)
+                         .OrderBy(candidate => candidate.Type == ProviderType.Healthcare ? 0 : 1)
+                         .ThenBy(candidate => candidate.Type == ProviderType.Healthcare
+                             ? candidate.MedicalKind switch
                          {
                              MedicalProviderKind.Individual => 0,
                              MedicalProviderKind.Practice => 1,
                              _ => 2
-                         })
+                         }
+                             : 0)
                          .ThenBy(candidate => candidate.Name, StringComparer.CurrentCultureIgnoreCase))
             {
                 ProviderOptions.Add(provider);
@@ -184,7 +231,9 @@ public partial class ConsumerProvidersViewModel : ObservableObject
         }
         catch (Exception exception) when (exception is InvalidOperationException
                                               or UnauthorizedAccessException
-                                              or CloudApiException)
+                                              or CloudApiException
+                                              or CloudConnectivityException
+                                              or SessionExpiredException)
         {
             if (_loads.IsCurrent(request) && _personId == personId)
                 StatusMessage = exception.Message;
@@ -221,16 +270,22 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     private ConsumerProviderRowViewModel BuildRow(PersonProvider link)
     {
         var provider = _directory.FirstOrDefault(candidate => candidate.Id == link.ProviderId);
-        var practice = ProviderAffiliation.NearestAncestorOfKind(
-            link.ProviderId, MedicalProviderKind.Practice, _nodes);
-        var network = ProviderAffiliation.NearestAncestorOfKind(
-            link.ProviderId, MedicalProviderKind.Network, _nodes);
+        var isMedical = provider?.Type == ProviderType.Healthcare;
+        var practice = isMedical
+            ? ProviderAffiliation.NearestAncestorOfKind(
+                link.ProviderId, MedicalProviderKind.Practice, _nodes)
+            : null;
+        var network = isMedical
+            ? ProviderAffiliation.NearestAncestorOfKind(
+                link.ProviderId, MedicalProviderKind.Network, _nodes)
+            : null;
 
         return new ConsumerProviderRowViewModel(
             link,
             // A directory entry the case manager cannot see is named rather than blank, so a
             // profile row never renders as an unexplained empty line.
             provider?.Name ?? "Provider no longer in the directory",
+            provider?.Type,
             practice?.Name ?? string.Empty,
             network?.Name ?? string.Empty);
     }
@@ -240,15 +295,22 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     {
         if (_personId is not { } personId || NewProviderId is not { } providerId)
             return;
+        if (NewStartDate is not DateTime startDate)
+        {
+            StatusMessage =
+                "Enter the actual provider assignment start date before adding this assignment.";
+            return;
+        }
 
+        var isMedical = SelectedProviderIsMedical;
         var link = new PersonProvider
         {
             PersonId = personId,
             ProviderId = providerId,
             Role = string.IsNullOrWhiteSpace(NewRole) ? null : NewRole.Trim(),
-            IsPrimaryCare = NewIsPrimaryCare,
-            HasActiveRelease = NewHasActiveRelease,
-            StartDate = _today(),
+            IsPrimaryCare = isMedical && NewIsPrimaryCare,
+            HasActiveRelease = isMedical && NewHasActiveRelease,
+            StartDate = startDate.Date,
             SortOrder = Current.Count
         };
 
@@ -288,7 +350,9 @@ public partial class ConsumerProvidersViewModel : ObservableObject
         }
         catch (Exception exception) when (exception is InvalidOperationException
                                               or UnauthorizedAccessException
-                                              or CloudApiException)
+                                              or CloudApiException
+                                              or CloudConnectivityException
+                                              or SessionExpiredException)
         {
             // The rules reject an edit rather than correcting it, so the entered values stay
             // on screen with the reason beside them.
@@ -301,6 +365,8 @@ public partial class ConsumerProvidersViewModel : ObservableObject
         }
 
         await RefreshAsync();
+        if (ProviderAssignmentsChangedAsync is not null)
+            await ProviderAssignmentsChangedAsync();
         return true;
     }
 
@@ -308,6 +374,7 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     {
         NewProviderId = null;
         NewRole = string.Empty;
+        NewStartDate = null;
         NewIsPrimaryCare = false;
         NewHasActiveRelease = false;
     }
@@ -393,34 +460,77 @@ public partial class ConsumerProvidersViewModel : ObservableObject
 /// One row of the list. The practice and network are passed in already resolved — the row
 /// holds no directory of its own, so it cannot resolve them a second, different way.
 /// </summary>
-public sealed class ConsumerProviderRowViewModel(
-    PersonProvider link, string providerName, string practiceName, string networkName)
+public sealed class ConsumerProviderRowViewModel
 {
-    public int Id { get; } = link.Id;
-    public int ProviderId { get; } = link.ProviderId;
-    public string ProviderName { get; } = providerName;
-    public string PracticeName { get; } = practiceName;
-    public string NetworkName { get; } = networkName;
-    public string? Role { get; } = link.Role;
-    public bool IsPrimaryCare { get; } = link.IsPrimaryCare;
-    public bool HasActiveRelease { get; } = link.HasActiveRelease;
-    public int SortOrder { get; } = link.SortOrder;
-    public DateTime? StartDate { get; } = link.StartDate;
-    public DateTime? EndDate { get; } = link.EndDate;
-    public bool IsCurrent { get; } = link.IsActive;
+    public ConsumerProviderRowViewModel(
+        PersonProvider link,
+        string providerName,
+        ProviderType? providerType,
+        string practiceName,
+        string networkName)
+    {
+        Id = link.Id;
+        ProviderId = link.ProviderId;
+        ProviderName = providerName;
+        ProviderType = providerType;
+        PracticeName = practiceName;
+        NetworkName = networkName;
+        Role = link.Role;
+        IsPrimaryCare = link.IsPrimaryCare;
+        HasActiveRelease = link.HasActiveRelease;
+        SortOrder = link.SortOrder;
+        StartDate = link.StartDate;
+        EndDate = link.EndDate;
+        IsCurrent = link.IsActive;
+        Affiliation = string.Join(
+            " · ", new[] { practiceName, networkName }.Where(part => part.Length > 0));
+    }
+
+    public int Id { get; }
+    public int ProviderId { get; }
+    public string ProviderName { get; }
+    public ProviderType? ProviderType { get; }
+    public string PracticeName { get; }
+    public string NetworkName { get; }
+    public string? Role { get; }
+    public bool IsPrimaryCare { get; }
+    public bool HasActiveRelease { get; }
+    public int SortOrder { get; }
+    public DateTime? StartDate { get; }
+    public DateTime? EndDate { get; }
+    public bool IsCurrent { get; }
+    public bool IsMedicalProvider => ProviderType == global::Sati.ProviderType.Healthcare;
+    public string ProviderKindLabel => ProviderType switch
+    {
+        global::Sati.ProviderType.Healthcare => "Medical provider",
+        global::Sati.ProviderType.Waiver => "Waiver / service provider",
+        global::Sati.ProviderType.Other => "Other provider",
+        _ => "Provider type unavailable"
+    };
 
     /// <summary>
     /// "Coastal Women's Healthcare · MaineHealth", or empty when the provider stands alone.
     /// Read-only in the interface: an editable derived value is a stored copy in disguise.
     /// </summary>
-    public string Affiliation { get; } = string.Join(
-        " · ", new[] { practiceName, networkName }.Where(part => part.Length > 0));
+    public string Affiliation { get; }
 
     public bool HasAffiliation => Affiliation.Length > 0;
 
     public string RoleLabel => string.IsNullOrWhiteSpace(Role)
-        ? (IsPrimaryCare ? "Primary care" : "Role not recorded")
+        ? (IsPrimaryCare
+            ? "Primary care"
+            : ProviderType == global::Sati.ProviderType.Waiver
+                ? "Service / role not recorded"
+                : "Role not recorded")
         : Role;
+
+    public string DateRangeLabel => StartDate is DateTime started
+        ? EndDate is DateTime ended
+            ? $"{started:d MMM yyyy} – {ended:d MMM yyyy}"
+            : $"Started {started:d MMM yyyy}"
+        : EndDate is DateTime endedWithoutStart
+            ? $"Start date not recorded · ended {endedWithoutStart:d MMM yyyy}"
+            : "Start date not recorded";
 
     /// <summary>
     /// The status a screen reader announces and a non-colour cue for sighted users, so
@@ -431,6 +541,9 @@ public sealed class ConsumerProviderRowViewModel(
         : EndDate is { } ended ? $"Ended {ended:d MMM yyyy}" : "Ended";
 
     public string AutomationName =>
-        $"{ProviderName}, {RoleLabel}, {StatusLabel}" +
+        $"{ProviderName}, {ProviderKindLabel}, {RoleLabel}, {DateRangeLabel}, {StatusLabel}" +
         (HasAffiliation ? $", {Affiliation}" : string.Empty);
+    public string EndAutomationName => $"End the provider assignment for {ProviderName}";
+    public string RemoveAutomationName =>
+        $"Remove the incorrectly entered provider assignment for {ProviderName}";
 }

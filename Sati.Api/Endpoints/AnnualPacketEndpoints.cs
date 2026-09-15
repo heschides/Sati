@@ -5,6 +5,7 @@ using Sati.Api.Data;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Forms;
+using Sati.Models;
 
 namespace Sati.Api.Endpoints;
 
@@ -67,6 +68,38 @@ internal static partial class ApiEndpoints
             catch (ArgumentException) { return InvalidSafetyCycle(); }
             if (!status.Window.IsOpen) return Results.ValidationProblem(
                 new Dictionary<string, string[]> { ["packet"] = [$"The packet opens on {status.Window.OpensOn:yyyy-MM-dd}."] });
+            var cycle = request.CycleStart.Date;
+            var today = DateTime.Today;
+            var releaseResolution = await ResolveReleaseAssignmentsAsync(
+                db, person, actor.AgencyId, cycle, today, ct);
+            var releaseRows = await LoadReleaseRowsAsync(db, personId, cycle, ct);
+            var releaseChanges = await ReconcileReleaseRowsAsync(
+                db,
+                person,
+                actor.AgencyId,
+                cycle,
+                releaseResolution,
+                releaseRows,
+                DateTime.UtcNow,
+                ct);
+            if (releaseChanges.CreatedKeys.Count != 0 || releaseChanges.RetiredKeys.Count != 0)
+            {
+                audit.Record(
+                    actor,
+                    AuditActions.ReleaseObligationsReconciled,
+                    "Person",
+                    personId,
+                    JsonSerializer.Serialize(new
+                    {
+                        targetEffectiveDate = cycle.ToString("yyyy-MM-dd"),
+                        created = releaseChanges.CreatedKeys,
+                        retired = releaseChanges.RetiredKeys,
+                        source = "annual-packet"
+                    }));
+                // Assign exact obligation ids before artifact rows take their FKs.
+                // This flush remains inside the packet transaction.
+                await db.SaveChangesAsync(ct);
+            }
             var agency = await db.Agencies.AsNoTracking().SingleAsync(x => x.Id == actor.AgencyId, ct);
             var candidates = await db.DocumentTemplates.AsNoTracking().Where(x => x.AgencyId == actor.AgencyId || x.AgencyId == null).ToListAsync(ct);
             var selected = new List<DocumentTemplateDto>();
@@ -79,23 +112,57 @@ internal static partial class ApiEndpoints
             var linked = await db.PersonProviders.Where(x => x.PersonId == personId && x.IsPrimaryCare && x.EndDate == null)
                 .Select(x => (int?)x.ProviderId).SingleOrDefaultAsync(ct);
             var directory = await db.Providers.AsNoTracking().Where(x => x.AgencyId == actor.AgencyId).ToListAsync(ct);
-            var recipient = RecordsRecipient.Resolve(linked, directory.Select(x => new RecordsProviderFact(x.Id, x.ParentProviderId, x.Name,
-                ComposeAddress(x.Street, x.City, x.State, x.Zip), x.Phone)).ToList());
-            var cycle = request.CycleStart.Date;
+            var recipientDirectory = directory.Select(x => new RecordsProviderFact(
+                x.Id,
+                x.ParentProviderId,
+                x.Name,
+                ComposeAddress(x.Street, x.City, x.State, x.Zip),
+                x.Phone)).ToList();
+            var recipient = RecordsRecipient.Resolve(linked, recipientDirectory);
             var plan = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycle)
                 .OrderByDescending(x => x.Version).FirstOrDefaultAsync(ct);
-            var medical = await db.Forms.AnyAsync(x => x.PersonId == personId && x.Type == "Release_Medical" && x.CompletedDate != null &&
-                x.DueDate > cycle && x.DueDate <= status.Window.EndsOn.AddDays(1), ct);
+            var hasRecipientObligations = await db.ReleaseObligations.AnyAsync(x =>
+                x.PersonId == personId && x.TargetEffectiveDate == cycle, ct);
+            var medical = hasRecipientObligations
+                ? linked is int providerId && await db.ReleaseObligations.AnyAsync(x =>
+                    x.PersonId == personId &&
+                    x.TargetEffectiveDate == cycle &&
+                    x.Category == ReleaseObligationCategory.Medical &&
+                    x.RecipientProviderId == providerId &&
+                    x.Attestations.Any() &&
+                    !x.AuthorizationEvents.Any(change =>
+                        change.Kind == ReleaseAuthorizationEventKind.Withdrawn &&
+                        change.OccurredOn <= DateTime.Today), ct)
+                : await db.Forms.AnyAsync(x => x.PersonId == personId &&
+                    x.Type == "Release_Medical" &&
+                    x.TargetEffectiveDate == cycle && x.CompletedDate != null, ct);
+            var packetReleases = releaseRows
+                .Where(x => x.RetiredOn is null || today < x.RetiredOn.Value.Date)
+                .Select(x =>
+                {
+                    var details = RecordsRecipient.Resolve(x.RecipientProviderId, recipientDirectory);
+                    return new PacketReleaseInput(
+                        x.Id,
+                        x.ObligationId,
+                        x.Category,
+                        x.CompletedOn,
+                        x.RecipientDisplayName ?? details?.Name,
+                        details?.Address,
+                        details?.Phone);
+                })
+                .ToList();
             var input = new PacketRenderInput(new(personId, $"{person.FirstName} {person.LastName}".Trim(), person.BirthDate,
                 person.GuardianName, agency.Name, ComposeAddress(agency.Street, agency.City, agency.State, agency.Zip),
                 agency.EdiContactPhone, actor.DisplayName, actor.Role), cycle, status.Window.EndsOn, DateTime.UtcNow, actor.UserId,
-                status.Artifacts, plan is null ? null : ToSafetyPlan(plan), selected, medical, recipient?.Name, recipient?.Address, recipient?.Phone);
+                status.Artifacts, plan is null ? null : ToSafetyPlan(plan), selected, medical,
+                recipient?.Name, recipient?.Address, recipient?.Phone, packetReleases);
             var rendered = composer.Render(input);
             var recorded = new List<DocumentArtifactDto>();
             foreach (var file in rendered.Documents)
                 recorded.Add(DocumentArtifactPersistence.ToDto(await DocumentArtifactPersistence.StageGeneratedAsync(db, personId, actor.AgencyId,
                     file.Kind, cycle, file.Origin, input.GeneratedAtUtc, actor.UserId, file.Pdf, file.FileName, file.BlankFields,
-                    ct, file.TemplateOwner, file.TemplateKey, file.TemplateVersion, file.SourceContentId, file.SourceContentVersion)));
+                    ct, file.TemplateOwner, file.TemplateKey, file.TemplateVersion, file.SourceContentId,
+                    file.SourceContentVersion, file.ReleaseObligationRecordId)));
             var zip = AnnualPacketComposer.Zip(input, rendered, recorded);
             audit.Record(actor, "annual-packet.saved", "Person", personId);
             await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
@@ -112,8 +179,23 @@ internal static partial class ApiEndpoints
             x.SupersededByArtifactId == null).ToListAsync(ct)).Select(DocumentArtifactPersistence.ToDto).ToList();
         var ids = artifacts.Select(x => x.Id).ToArray();
         var acknowledged = await db.DocumentAcknowledgments.Where(x => ids.Contains(x.DocumentArtifactId)).Select(x => x.DocumentArtifactId).Distinct().ToListAsync(ct);
-        var pcp = await db.Forms.AnyAsync(x => x.PersonId == person.Id && x.Type == "PCP" && x.CompletedDate != null &&
-            x.DueDate > cycle && x.DueDate <= window.EndsOn.AddDays(1), ct);
-        return new(window, artifacts, acknowledged, AnnualDocumentReminder.Describe(window.IsOpen, pcp, artifacts));
+        var completedTypes = await db.Forms
+            .Where(x => x.PersonId == person.Id && x.TargetEffectiveDate == cycle.Date &&
+                        x.CompletedDate != null &&
+                        (x.Type == "PCP" || x.Type == "SafetyPlan" ||
+                         x.Type == "PrivacyPractices"))
+            .Select(x => x.Type)
+            .ToListAsync(ct);
+        var releases = await db.ReleaseObligations.AsNoTracking()
+            .Include(x => x.Attestations)
+            .Where(x => x.PersonId == person.Id && x.TargetEffectiveDate == cycle.Date)
+            .ToListAsync(ct);
+        return new(window, artifacts, acknowledged, AnnualDocumentReminder.Describe(
+            window.IsOpen,
+            completedTypes.Contains("PCP", StringComparer.Ordinal),
+            artifacts,
+            releases.Select(x => x.ToComplianceFact()),
+            completedTypes.Contains("SafetyPlan", StringComparer.Ordinal),
+            completedTypes.Contains("PrivacyPractices", StringComparer.Ordinal)));
     }
 }

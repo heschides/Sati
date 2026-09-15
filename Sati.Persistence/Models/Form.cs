@@ -4,6 +4,12 @@ namespace Sati.Models
     {
         public int Id { get; set; }
         public FormType Type { get; set; }
+        /// <summary>
+        /// The annual effective date this obligation belongs to. This is the stable
+        /// cycle identity; <see cref="DueDate"/> is only a deadline and may fall
+        /// before or after this date depending on the form type.
+        /// </summary>
+        public DateTime TargetEffectiveDate { get; set; }
         public DateTime DueDate { get; set; }
         public Person Person { get; set; } = null!;
         public int PersonId { get; set; }
@@ -47,20 +53,25 @@ namespace Sati.Models
         protected Form() { }
 
         /// <summary>
-        /// Creates a form. <paramref name="completedOn"/> is the completion date if
-        /// this document is already satisfied at creation — an annual document in
-        /// force when its cycle began — and null if it is outstanding.
+        /// Creates a form. <paramref name="completedOn"/> is the completion date when
+        /// the caller already holds real completion evidence, and null when the
+        /// obligation is outstanding. Generation always supplies null.
         ///
         /// It takes a date rather than a bool precisely because the bool was the
         /// defect: "compliant, date unknown" was expressible, and it is the one state
-        /// the gate cannot act on. A caller that believes a document is in force must
-        /// now say since when.
+        /// the gate cannot act on. A caller recording completion must say when it
+        /// actually occurred.
         /// </summary>
-        public Form(FormType type, DateTime dueDate, DateTime? completedOn = null)
+        public Form(
+            FormType type,
+            DateTime dueDate,
+            DateTime? completedOn = null,
+            DateTime? targetEffectiveDate = null)
         {
             Type = type;
-            DueDate = dueDate;
-            CompletedDate = completedOn;
+            DueDate = dueDate.Date;
+            CompletedDate = completedOn?.Date;
+            TargetEffectiveDate = targetEffectiveDate?.Date ?? default;
         }
 
         // The named doors for changing completion state. CompletedDate has a private

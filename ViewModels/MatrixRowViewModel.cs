@@ -4,7 +4,8 @@ namespace Sati.ViewModels
 {
     /// <summary>
     /// One row of the caseload matrix: the person, plus a FormCellViewModel
-    /// for each form type. Twelve named cell properties (rather than a
+    /// for each annual form plus three recipient-obligation summaries. Named
+    /// cell properties (rather than a
     /// dictionary or list) so the XAML can bind directly:
     ///
     ///     <DataGridTemplateColumn Header="PCP">
@@ -29,9 +30,9 @@ namespace Sati.ViewModels
         public FormCellViewModel Reclassification { get; }
         public FormCellViewModel SafetyPlan { get; }
         public FormCellViewModel PrivacyPractices { get; }
-        public FormCellViewModel ReleaseAgency { get; }
-        public FormCellViewModel ReleaseDhhs { get; }
-        public FormCellViewModel ReleaseMedical { get; }
+        public ReleaseCellViewModel ReleaseAgency { get; }
+        public ReleaseCellViewModel ReleaseDhhs { get; }
+        public ReleaseCellViewModel ReleaseMedical { get; }
 
         public MatrixRowViewModel(Person person, DateTime today)
         {
@@ -47,9 +48,12 @@ namespace Sati.ViewModels
             Reclassification = new FormCellViewModel(person, FormType.Reclassification, today);
             SafetyPlan = new FormCellViewModel(person, FormType.SafetyPlan, today);
             PrivacyPractices = new FormCellViewModel(person, FormType.PrivacyPractices, today);
-            ReleaseAgency = new FormCellViewModel(person, FormType.Release_Agency, today);
-            ReleaseDhhs = new FormCellViewModel(person, FormType.Release_DHHS, today);
-            ReleaseMedical = new FormCellViewModel(person, FormType.Release_Medical, today);
+            ReleaseAgency = new ReleaseCellViewModel(
+                person, Contracts.V1.ReleaseObligationCategory.Agency, today);
+            ReleaseDhhs = new ReleaseCellViewModel(
+                person, Contracts.V1.ReleaseObligationCategory.Dhhs, today);
+            ReleaseMedical = new ReleaseCellViewModel(
+                person, Contracts.V1.ReleaseObligationCategory.Medical, today);
         }
     }
 }

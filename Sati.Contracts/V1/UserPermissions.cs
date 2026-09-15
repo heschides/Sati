@@ -33,7 +33,8 @@ public enum UserPermissions
 public readonly record struct AgencyActor(
     int UserId,
     int AgencyId,
-    UserPermissions Permissions);
+    UserPermissions Permissions,
+    long SecurityVersion = 1);
 
 /// <summary>Sole owner of permission interpretation for the desktop and API.</summary>
 public static class UserPermissionRules

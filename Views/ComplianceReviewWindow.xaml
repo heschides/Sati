@@ -77,7 +77,7 @@
                 <Run Text="{Binding ClientName, Mode=OneWay}"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource TextPrimaryBrush}" />
-                <Run Text="'s effective date, the following forms are assumed compliant. Uncheck any that are not current." />
+                <Run Text="'s effective date creates the obligations below. Nothing is completed automatically. Check a new obligation only when you can enter the date the work actually occurred. Existing records are changed through their individual attestation controls." />
             </TextBlock>
 
             <Border Background="{DynamicResource SurfaceBrush}"
@@ -106,6 +106,7 @@
                                               Grid.Row="0"
                                               Grid.Column="0"
                                               IsChecked="{Binding IsCompliant, Mode=TwoWay}"
+                                              IsEnabled="{Binding IsEditable}"
                                               AutomationProperties.Name="{Binding Type, Converter={StaticResource EnumDescriptionConverter}}"
                                               VerticalAlignment="Center"
                                               Margin="0,0,10,0" />
@@ -126,12 +127,8 @@
                                                FontSize="12"
                                                VerticalAlignment="Center" />
 
-                                    <!-- Completion date: visible only when the row is checked.
-                                         Bound to the row's CompletedDate, which the wrapper has
-                                         already defaulted to the due date and will keep non-null
-                                         while checked. Not clamped — a later date is the valid
-                                         late-completion case. Sits under the form name, indented
-                                         to the checkbox column gutter. -->
+                                    <!-- The worker supplies the actual occurrence date. No
+                                         due date or current timestamp is inferred. -->
                                     <StackPanel Grid.Row="1"
                                                 Grid.Column="1"
                                                 Grid.ColumnSpan="2"
@@ -143,6 +140,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0" />
                                         <DatePicker AutomationProperties.Name="Completion date" SelectedDate="{Binding CompletedDate, Mode=TwoWay}"
+                                                    IsEnabled="{Binding IsEditable}"
                                                     Width="140" />
                                     </StackPanel>
                                 </Grid>
@@ -151,6 +149,13 @@
                     </ItemsControl>
                 </ScrollViewer>
             </Border>
+
+            <TextBlock Text="{Binding ValidationMessage}"
+                       Visibility="{Binding ValidationMessage, Converter={StaticResource NullToVisibilityConverter}}"
+                       Foreground="{DynamicResource DangerDarkBrush}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Assertive"
+                       Margin="0,0,0,12" />
 
             <Button Content="Confirm"
                     Style="{StaticResource PrimaryButton}"

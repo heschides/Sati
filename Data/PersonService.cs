@@ -34,6 +34,8 @@ namespace Sati.Data
 
             person.AgencyId = actor.AgencyId;
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
             if (person.IsTestData)
             {
                 var actorIsCurrentAdmin = await context.Users.AsNoTracking().AnyAsync(candidate =>
@@ -50,16 +52,58 @@ namespace Sati.Data
 
             ValidatePerson(person, requireNewForms: person.EffectiveDate.HasValue);
             person.Revision = 1;
-            AddInitialFormAttestations(context, actor, person, person.Forms);
+            var settings = await _settingsService.LoadAsync();
+            await using var createTransaction = await context.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable);
+            AddInitialFormAttestations(context, actor, person, person.Forms, settings);
             context.People.Add(person);
             PersonLifecycleLedger.RecordCreated(context, actor, person);
             LocalAuditTrail.Record(context, actor, LocalAuditActions.PersonCreated, "Person");
             try
             {
-                // One SaveChanges call makes the client, generated forms, lifecycle
-                // version, and audit event one transaction. A rejection rolls back
-                // the whole graph; there is no partially-created client to repair.
+                // The first flush assigns the consumer id required by recipient-specific
+                // release rows. Both flushes are enclosed by the same transaction, so a
+                // rejection still leaves no partially-created consumer or compliance graph.
                 await context.SaveChangesAsync();
+
+                if (person.EffectiveDate is DateTime effectiveDate)
+                {
+                    var today = DateTime.Today;
+                    var nowUtc = DateTime.UtcNow;
+                    var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
+                        effectiveDate, today);
+                    foreach (var target in new[] { currentTarget, currentTarget.AddYears(1) })
+                    {
+                        var resolution = await ReleaseObligationService.ResolveAssignmentsAsync(
+                            context, person, target, today, CancellationToken.None);
+                        var rows = person.ReleaseObligations
+                            .Where(item => item.TargetEffectiveDate.Date == target.Date)
+                            .ToList();
+                        var changes = ReleaseObligationService.ReconcileRows(
+                            context, person, target, resolution, rows, today, nowUtc);
+                        if (changes.CreatedKeys.Count == 0 && changes.RetiredKeys.Count == 0)
+                            continue;
+
+                        LocalAuditTrail.Record(
+                            context,
+                            actor,
+                            LocalAuditActions.ReleaseObligationsReconciled,
+                            "Person",
+                            person.Id,
+                            JsonSerializer.Serialize(new
+                            {
+                                targetEffectiveDate = target.ToString("yyyy-MM-dd"),
+                                created = changes.CreatedKeys,
+                                retired = changes.RetiredKeys,
+                                source = "person-create"
+                            }));
+                    }
+
+                    if (context.ChangeTracker.HasChanges())
+                        await context.SaveChangesAsync();
+                }
+
+                await createTransaction.CommitAsync();
             }
             catch (DbUpdateException exception)
             {
@@ -75,6 +119,7 @@ namespace Sati.Data
             var actor = CurrentActor();
             ValidatePerson(person, requireNewForms: person.Forms.Any(form => form.Id == 0));
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await using var signatureChangeTransaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, person.Id))
                 throw new InvalidOperationException("This consumer is not available in your current caseload.");
@@ -99,11 +144,13 @@ namespace Sati.Data
 
             var before = PersonLifecycleLedger.Capture(stored);
             await PersonLifecycleLedger.EnsureBaselineAsync(context, stored);
+            var settings = await _settingsService.LoadAsync();
             AddInitialFormAttestations(
                 context,
                 actor,
                 person,
-                person.Forms.Where(form => form.Id == 0));
+                person.Forms.Where(form => form.Id == 0),
+                settings);
             context.People.Update(person);
             context.Entry(person).Property(candidate => candidate.Revision).OriginalValue = stored.Revision;
             // CreatedAtUtc has no public setter, so an edit-built Person can only ever carry the
@@ -124,7 +171,8 @@ namespace Sati.Data
             SatiContext context,
             User actor,
             Person person,
-            IEnumerable<Form> forms)
+            IEnumerable<Form> forms,
+            Settings settings)
         {
             if (person.EffectiveDate is not DateTime effectiveDate)
                 return;
@@ -133,7 +181,14 @@ namespace Sati.Data
                          candidate.CompletedDate is not null && candidate.Attestations.Count == 0))
             {
                 var completedOn = form.CompletedDate!.Value.Date;
-                var cycle = FormAttestationRules.ResolveCycle(effectiveDate, form.DueDate)
+                var targetEffectiveDate = form.TargetEffectiveDate == default
+                    ? (DateTime?)null
+                    : form.TargetEffectiveDate;
+                var cycle = FormAttestationRules.ResolveCycleForForm(
+                        effectiveDate,
+                        form.Type.ToString(),
+                        form.DueDate,
+                        targetEffectiveDate)
                     ?? throw new PersonValidationException(new Dictionary<string, string[]>
                     {
                         ["forms"] = ["A completed form is not attached to a valid compliance cycle."]
@@ -143,7 +198,11 @@ namespace Sati.Data
                     AttestationActorKind.CaseManager, [],
                     person.Forms.Select(candidate => new FormFact(
                         candidate.Id, person.Id, candidate.Type.ToString(),
-                        candidate.DueDate, candidate.CompletedDate)).ToList());
+                        candidate.DueDate, candidate.CompletedDate,
+                        candidate.TargetEffectiveDate)).ToList(),
+                    targetEffectiveDate: targetEffectiveDate,
+                    availableOn: FormDueDateCalculator.ComputeAvailableDateForDueDate(
+                        form.Type, form.DueDate, settings));
                 if (!decision.Accepted)
                 {
                     throw new PersonValidationException(new Dictionary<string, string[]>
@@ -194,6 +253,8 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
 
             var person = await context.People.SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
@@ -211,7 +272,7 @@ namespace Sati.Data
             }
 
             var denial = CaseloadTransferRules.Evaluate(
-                new AgencyActor(actor.Id, actor.AgencyId, actor.Permissions),
+                actor.ToAgencyActor(),
                 currentOwner.Value,
                 target.Value);
             if (denial is not CaseloadTransferDenial.None)
@@ -272,14 +333,18 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
 
             var person = await context.People.SingleOrDefaultAsync(candidate =>
-                candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
+                candidate.Id == personId && candidate.AgencyId == actor.AgencyId &&
+                context.Users.Any(owner => owner.Id == candidate.UserId && owner.AgencyId == actor.AgencyId));
             if (person is null)
                 throw new InvalidOperationException("This Person was not found in your agency.");
 
-            var actorIsAdmin = (actor.Permissions & UserPermissions.Administration) != 0;
-            var refusal = PersonStatusRules.Describe(actorIsAdmin, person.UserId == actor.Id, status);
+            var actorIsAdmin = actor.HasAdminPermissions;
+            var ownsPerson = await LocalTenantAccess.OwnsPersonAsync(context, actor, person.Id);
+            var refusal = PersonStatusRules.Describe(actorIsAdmin, ownsPerson, status);
             if (refusal is not null)
             {
                 throw new PersonValidationException(new Dictionary<string, string[]>
@@ -357,7 +422,9 @@ namespace Sati.Data
                 return CredibleMatchLookupResult.Empty;
 
             await using var context = _contextFactory.CreateDbContext();
-            var agencyActor = new AgencyActor(actor.Id, actor.AgencyId, actor.Permissions);
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
+            var agencyActor = actor.ToAgencyActor();
 
             var credibleMatches = new List<CredibleClientOwnerRow>();
             if (ids.Count > 0)
@@ -365,7 +432,7 @@ namespace Sati.Data
                 credibleMatches = await (
                     from person in context.People.AsNoTracking()
                     join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
-                    where person.AgencyId == actor.AgencyId &&
+                    where person.AgencyId == actor.AgencyId && owner.AgencyId == actor.AgencyId &&
                           person.CredibleClientId != null &&
                           ids.Contains(person.CredibleClientId)
                     select new CredibleClientOwnerRow(
@@ -379,7 +446,7 @@ namespace Sati.Data
                 maineCareMatches = await (
                     from person in context.People.AsNoTracking()
                     join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
-                    where person.AgencyId == actor.AgencyId &&
+                    where person.AgencyId == actor.AgencyId && owner.AgencyId == actor.AgencyId &&
                           person.MaineCareId != null &&
                           mcIds.Contains(person.MaineCareId)
                     select new MaineCareOwnerRow(
@@ -396,7 +463,7 @@ namespace Sati.Data
                 nameMatches = await (
                     from person in context.People.AsNoTracking()
                     join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
-                    where person.AgencyId == actor.AgencyId &&
+                    where person.AgencyId == actor.AgencyId && owner.AgencyId == actor.AgencyId &&
                           person.LastName != null && person.FirstName != null
                     select new NameBirthDateOwnerRow(
                         person.LastName!, person.FirstName!, person.BirthDate,
@@ -485,7 +552,10 @@ namespace Sati.Data
         // empty journal; the caller treats both as "nothing to show."
         public async Task<string?> GetJournalAsync(int personId)
         {
+            var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await EnsureOwnPersonAsync(context, actor, personId);
             return await context.People
                 .Where(p => p.Id == personId)
                 .Select(p => p.Journal)
@@ -500,6 +570,8 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await EnsureOwnPersonAsync(context, actor, personId);
             var person = await context.People.SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
             if (person is null)
@@ -528,6 +600,8 @@ namespace Sati.Data
         {
             var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await EnsureOwnPersonAsync(context, actor, personId);
             var person = await context.People.SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId);
             if (person is null)
@@ -551,6 +625,18 @@ namespace Sati.Data
         private User CurrentActor() => _sessionService.CurrentUser
             ?? throw new InvalidOperationException("A signed-in user is required for this operation.");
 
+        private static async Task EnsureOwnPersonAsync(SatiContext context, User actor, int personId)
+        {
+            if (!await LocalTenantAccess.OwnsPersonAsync(context, actor, personId))
+                throw new UnauthorizedAccessException("This consumer is not available in your current caseload.");
+        }
+
+        private static async Task EnsureUserInScopeAsync(SatiContext context, User actor, int userId)
+        {
+            if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
+                throw new UnauthorizedAccessException("This caseload is not available with your current access.");
+        }
+
         // Only a collision on the forms this call was inserting is a lost race worth
         // swallowing. Any other constraint failure is a real error and must surface.
         private static bool IsDuplicateFormViolation(SatiContext context) =>
@@ -572,11 +658,16 @@ namespace Sati.Data
 
         public async Task<List<Person>> GetAllPeopleAsync(int userId)
         {
+            var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await EnsureUserInScopeAsync(context, actor, userId);
             var people = await context.People
-                .Where(p => p.UserId == userId && p.Status == PersonStatus.Active)
-                .Include(p => p.Notes)
+                .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
+                .Include(p => p.Notes.Where(note => note.AgencyId == actor.AgencyId))
                 .Include(p => p.Forms)
+                .Include(p => p.ReleaseObligations)
+                    .ThenInclude(obligation => obligation.Attestations)
                 .OrderBy(p => p.LastName)
                 .AsSplitQuery()
                 .ToListAsync();
@@ -598,6 +689,45 @@ namespace Sati.Data
                 {
                     if (person.EnsureCurrentCycleForms(today, settings))
                         anyChanges = true;
+
+                    if (person.EffectiveDate is not DateTime effectiveDate)
+                        continue;
+
+                    var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
+                        effectiveDate, today);
+                    foreach (var target in new[] { currentTarget, currentTarget.AddYears(1) })
+                    {
+                        var resolution = await ReleaseObligationService.ResolveAssignmentsAsync(
+                            context, person, target, today, CancellationToken.None);
+                        var rows = person.ReleaseObligations
+                            .Where(item => item.TargetEffectiveDate.Date == target.Date)
+                            .ToList();
+                        var changes = ReleaseObligationService.ReconcileRows(
+                            context,
+                            person,
+                            target,
+                            resolution,
+                            rows,
+                            today,
+                            DateTime.UtcNow);
+                        if (changes.CreatedKeys.Count == 0 && changes.RetiredKeys.Count == 0)
+                            continue;
+
+                        anyChanges = true;
+                        LocalAuditTrail.Record(
+                            context,
+                            actor,
+                            LocalAuditActions.ReleaseObligationsReconciled,
+                            "Person",
+                            person.Id,
+                            System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                targetEffectiveDate = target.ToString("yyyy-MM-dd"),
+                                created = changes.CreatedKeys,
+                                retired = changes.RetiredKeys,
+                                source = "caseload-load"
+                            }));
+                    }
                 }
 
                 if (anyChanges)
@@ -626,10 +756,14 @@ namespace Sati.Data
                         }
 
                         await using var reread = _contextFactory.CreateDbContext();
+                        await LocalTenantAccess.EnsureSessionAsync(reread, _sessionService);
+                        await EnsureUserInScopeAsync(reread, actor, userId);
                         return await reread.People
-                            .Where(p => p.UserId == userId && p.Status == PersonStatus.Active)
-                            .Include(p => p.Notes)
+                            .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
+                            .Include(p => p.Notes.Where(note => note.AgencyId == actor.AgencyId))
                             .Include(p => p.Forms)
+                            .Include(p => p.ReleaseObligations)
+                                .ThenInclude(obligation => obligation.Attestations)
                             .OrderBy(p => p.LastName)
                             .AsSplitQuery()
                             .ToListAsync();
@@ -647,7 +781,10 @@ namespace Sati.Data
         // EnsureCurrentCycleForms — this is a read path, not the write-bearing full load.
         public async Task<List<PersonSummary>> GetPeopleForSummaryAsync(int userId)
         {
+            var actor = CurrentActor();
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await EnsureUserInScopeAsync(context, actor, userId);
 
             // Two flat queries stitched in memory, NOT one query joining both Forms and
             // Notes. A single query with both collections produces a Forms×Notes Cartesian
@@ -658,7 +795,7 @@ namespace Sati.Data
             // Query 1: people + their forms (one-to-many, no second collection = no product).
             var summaries = await context.People
                 .AsNoTracking()
-                .Where(p => p.UserId == userId && p.Status == PersonStatus.Active)
+                .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
                 .OrderBy(p => p.LastName)
                 .Select(p => new PersonSummary
                 {
@@ -676,8 +813,8 @@ namespace Sati.Data
             var personIds = summaries.Select(s => s.Id).ToList();
             var notesByPerson = (await context.Notes
                     .AsNoTracking()
-                    .Where(n => personIds.Contains(n.PersonId))
-                    .Select(n => new { n.PersonId, n.Status, n.EventDate, n.NoteType })
+                    .Where(n => personIds.Contains(n.PersonId) && n.AgencyId == actor.AgencyId)
+                    .Select(n => new { n.PersonId, n.Status, n.EventDate, n.NoteType, n.FormType })
                     .ToListAsync())
                 .GroupBy(n => n.PersonId)
                 .ToDictionary(
@@ -686,14 +823,35 @@ namespace Sati.Data
                     {
                         Status = n.Status,
                         EventDate = n.EventDate,
-                        NoteType = n.NoteType
+                        NoteType = n.NoteType,
+                        FormType = n.FormType
                     }).ToList());
+
+            // Release obligations are separate rows because a single consumer can
+            // have several recipient-specific authorizations. Loading them beside,
+            // rather than joined through, Forms and Notes avoids another Cartesian
+            // product while still giving deadline generation the exact obligations.
+            var releasesByPerson = (await context.ReleaseObligations
+                    .AsNoTracking()
+                    .Include(item => item.Attestations)
+                    .Where(item => personIds.Contains(item.PersonId))
+                    .ToListAsync())
+                .GroupBy(item => item.PersonId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(item => item.ToComplianceFact()).ToList());
 
             // Stitch: attach each person's notes; empty list if none.
             foreach (var summary in summaries)
+            {
                 summary.NoteSummaries = notesByPerson.TryGetValue(summary.Id, out var notes)
                     ? notes
                     : [];
+                summary.ReleaseComplianceSnapshots =
+                    releasesByPerson.TryGetValue(summary.Id, out var releases)
+                        ? releases
+                        : [];
+            }
 
             return summaries;
         }

@@ -11,7 +11,11 @@ public enum BillingSubmissionStage
     ClaimRejected,
     PartiallyAccepted,
     Paid,
-    Reconciled
+    Reconciled,
+    RemittanceReceived,
+    RemittanceNeedsReview,
+    ClaimReceived,
+    ClaimNeedsReview
 }
 
 public enum RemittanceClaimStatus
@@ -45,7 +49,39 @@ public sealed record BillingSubmissionHistoryDto(
     string? ResponseType,
     string? ResponseCode,
     string? Explanation,
-    bool IsSynthetic);
+    bool IsSynthetic)
+{
+    public long? EdiGenerationId { get; init; }
+    public Guid? ResponseId { get; init; }
+}
+
+/// <summary>Preserves financial progress when earlier acknowledgements arrive late.</summary>
+public static partial class BillingSubmissionProgressRules
+{
+    public static BillingSubmissionHistoryDto? Current(IEnumerable<BillingSubmissionHistoryDto> history)
+    {
+        var rows = history.ToList();
+        var generation = rows.Where(row => row.EdiGenerationId.HasValue)
+            .MaxBy(row => row.EdiGenerationId)?.EdiGenerationId;
+        var candidates = generation.HasValue ? rows.Where(row => row.EdiGenerationId == generation) : rows;
+        return candidates.OrderByDescending(row => Rank(row.Stage))
+            .ThenByDescending(row => row.OccurredAtUtc).ThenByDescending(row => row.Id).FirstOrDefault();
+    }
+
+    public static int Rank(string stage) => Enum.TryParse<BillingSubmissionStage>(stage, out var parsed) ? Rank(parsed) : -1;
+
+    public static int Rank(BillingSubmissionStage stage) => stage switch
+    {
+        BillingSubmissionStage.Generated => 0,
+        BillingSubmissionStage.Transmitted or BillingSubmissionStage.TransportFailed => 1,
+        BillingSubmissionStage.FunctionalAccepted or BillingSubmissionStage.FunctionalRejected => 2,
+        BillingSubmissionStage.ClaimReceived or BillingSubmissionStage.ClaimNeedsReview or BillingSubmissionStage.ClaimAccepted or BillingSubmissionStage.ClaimRejected or BillingSubmissionStage.PartiallyAccepted => 3,
+        BillingSubmissionStage.RemittanceReceived or BillingSubmissionStage.Paid => 4,
+        BillingSubmissionStage.RemittanceNeedsReview => 5,
+        BillingSubmissionStage.Reconciled => 6,
+        _ => -1
+    };
+}
 
 public sealed record RemittanceClaimOutcomeDto(
     long Id,

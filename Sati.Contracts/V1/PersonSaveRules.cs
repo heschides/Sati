@@ -28,6 +28,12 @@ public static class PersonSaveRules
     // so a dedupe index on (AgencyId, CredibleClientId) stays a one-step change.
     public const int CredibleClientIdMaxLength = 32;
 
+    /// <summary>
+    /// Annual form rows created for a consumer. Releases are deliberately absent:
+    /// each recipient now has its own <c>ReleaseObligation</c>, so a single generic
+    /// Agency/Medical/DHHS form would collapse several independent attestations.
+    /// The legacy release enum values remain readable for historical rows only.
+    /// </summary>
     public static IReadOnlyList<string> FormTypes { get; } =
     [
         "Q1R",
@@ -38,10 +44,7 @@ public static class PersonSaveRules
         "ComprehensiveAssessment",
         "Reclassification",
         "SafetyPlan",
-        "PrivacyPractices",
-        "Release_Agency",
-        "Release_DHHS",
-        "Release_Medical"
+        "PrivacyPractices"
     ];
 
     private static readonly HashSet<string> ValidGenders =
@@ -161,30 +164,36 @@ public static class PersonSaveRules
             return;
         }
 
-        if (request.EffectiveDate is DateTime effectiveDate &&
-            newForms.Any(form => form.CompletedDate?.Date < effectiveDate.Date))
+        if (request.EffectiveDate is DateTime effectiveDate && newForms.Any(form =>
+                form.TargetEffectiveDate is DateTime target &&
+                target.Date != effectiveDate.Date))
+        {
+            errors["forms"] =
+                ["Every initial compliance form must use the consumer's effective date as its annual identity."];
+            return;
+        }
+
+        if (request.EffectiveDate is DateTime initialEffectiveDate && newForms.Any(form =>
+                form.CompletedDate is DateTime completedOn &&
+                (FormAttestationRules.ResolveCycleForForm(
+                     initialEffectiveDate,
+                     form.Type,
+                     form.TargetEffectiveDate ?? initialEffectiveDate,
+                     form.TargetEffectiveDate ?? initialEffectiveDate) is not { } cycle ||
+                 completedOn.Date < cycle.CycleStart.Date)))
         {
             errors["forms"] = [FormAttestationRules.BeforeCycleMessage];
             return;
         }
 
-        if (newForms.Any(form => form.CompletedDate is not null &&
-                FormAttestationRules.PrerequisiteFor(form.Type) is
-                    PrerequisiteKind.DocumentArtifact or
-                    PrerequisiteKind.SafetyPlan or
-                    PrerequisiteKind.PrivacyPracticesAcknowledgment))
-        {
-            errors["forms"] =
-                ["A document-backed form must be created outstanding, then completed through its prerequisite and attestation workflow."];
-            return;
-        }
-
         var reclassification = newForms.Single(form => form.Type == "Reclassification");
         var assessment = newForms.Single(form => form.Type == "ComprehensiveAssessment");
-        if (reclassification.CompletedDate is not null && assessment.CompletedDate is null)
+        if (reclassification.CompletedDate is DateTime reclassificationCompleted &&
+            (assessment.CompletedDate is not DateTime assessmentCompleted ||
+             assessmentCompleted.Date > reclassificationCompleted.Date))
         {
             errors["forms"] =
-                ["The Comprehensive Assessment must be completed before Reclassification."];
+                ["The Comprehensive Assessment must be completed on or before Reclassification."];
             return;
         }
 

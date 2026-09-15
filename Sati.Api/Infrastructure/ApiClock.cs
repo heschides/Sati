@@ -15,4 +15,10 @@ internal sealed class ApiClock(IOptions<SatiApiOptions> options)
     public DateTime Now => TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _timeZone).DateTime;
 
     public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+
+    public DateTime ToAgencyDate(DateTime utcInstant)
+    {
+        var utc = DateTime.SpecifyKind(utcInstant, DateTimeKind.Utc);
+        return TimeZoneInfo.ConvertTime(new DateTimeOffset(utc), _timeZone).Date;
+    }
 }

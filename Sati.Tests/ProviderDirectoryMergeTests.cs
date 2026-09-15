@@ -26,6 +26,9 @@ public sealed class ProviderDirectoryMergeTests
             (await db.Providers.SingleAsync(provider => provider.Id == graph.ChildId)).ParentProviderId);
         Assert.Equal(graph.SurvivorId,
             (await db.PersonProviders.SingleAsync()).ProviderId);
+        var release = await db.ReleaseObligations.SingleAsync();
+        Assert.Equal(graph.SurvivorId, release.RecipientProviderId);
+        Assert.Equal("Duplicate network", release.RecipientDisplayName);
         var contact = await db.ProviderContacts.SingleAsync();
         Assert.Equal(graph.SurvivorId, contact.ProviderId);
         Assert.False(contact.IsPrimary);
@@ -38,6 +41,7 @@ public sealed class ProviderDirectoryMergeTests
             candidate.Action == "provider.merged");
         Assert.Equal(graph.SurvivorId.ToString(), audit.ResourceId);
         Assert.Contains($"\"mergedProviderId\":{graph.MergedId}", audit.MetadataJson);
+        Assert.Contains("\"releaseObligationsMoved\":1", audit.MetadataJson);
         Assert.DoesNotContain("Duplicate network", audit.MetadataJson);
         Assert.Contains("Moved 1 affiliated entry", summary);
         Assert.Contains("1 consumer link", summary);
@@ -254,6 +258,23 @@ public sealed class ProviderDirectoryMergeTests
                 AuthorUserId = _caseManager.Id,
                 DocumentJson = documentJson
             });
+            var target = DateTime.Today.AddYears(1).Date;
+            var releasePlan = ReleaseObligationRules.GenerateCycle(target,
+            [
+                new ReleaseAssignmentFact(
+                    "provider-merge-test",
+                    ReleaseAssignmentKind.MedicalProvider,
+                    target.AddYears(-1),
+                    null,
+                    target.AddYears(-1))
+            ]).Single(plan => plan.Category == ReleaseObligationCategory.Medical);
+            db.ReleaseObligations.Add(ReleaseObligation.Create(
+                AgencyId,
+                person.Id,
+                releasePlan,
+                new DateTime(2026, 9, 14, 12, 0, 0, DateTimeKind.Utc),
+                merged.Id,
+                merged.Name));
             await db.SaveChangesAsync();
             return new MergeGraph(survivor.Id, merged.Id, child.Id, documentJson);
         }

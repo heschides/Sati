@@ -24,6 +24,8 @@ namespace Sati.Data
         private async Task<Scratchpad> LoadForDateAsync(int userId, DateTime date)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            EnsureOwnUser(userId);
             var scratchpad = await context.Scratchpad
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.Date == date);
 
@@ -40,6 +42,8 @@ namespace Sati.Data
         public async Task<List<Scratchpad>> GetHistoryAsync(int userId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            EnsureOwnUser(userId);
             var today = DateTime.Today;
             return await context.Scratchpad
                 .AsNoTracking()
@@ -60,6 +64,8 @@ namespace Sati.Data
                 throw new ArgumentException("A retrospective comment cannot be empty.", nameof(content));
 
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            EnsureOwnUser(userId);
             var scratchpadExists = await context.Scratchpad.AnyAsync(s =>
                 s.Id == scratchpadId &&
                 s.UserId == userId &&
@@ -72,9 +78,7 @@ namespace Sati.Data
             {
                 ScratchpadId = scratchpadId,
                 AuthorUserId = userId,
-                AuthorDisplayName = string.IsNullOrWhiteSpace(authorDisplayName)
-                    ? "Unknown user"
-                    : authorDisplayName.Trim(),
+                AuthorDisplayName = _sessionService.CurrentUser!.DisplayName,
                 CreatedAtUtc = DateTime.UtcNow,
                 Content = normalizedContent
             };
@@ -87,6 +91,7 @@ namespace Sati.Data
         public async Task SaveAsync(Scratchpad scratchpad)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var userId = CurrentUserId();
             var tracked = await context.Scratchpad.SingleOrDefaultAsync(
                 candidate => candidate.Id == scratchpad.Id && candidate.UserId == userId)
@@ -113,5 +118,11 @@ namespace Sati.Data
 
         private int CurrentUserId() => _sessionService.CurrentUser?.Id
             ?? throw new InvalidOperationException("A signed-in user is required to access the scratchpad.");
+
+        private void EnsureOwnUser(int userId)
+        {
+            if (userId != CurrentUserId())
+                throw new UnauthorizedAccessException("You may access only your own scratchpad.");
+        }
     }
 }

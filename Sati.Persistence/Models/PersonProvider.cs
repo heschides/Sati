@@ -46,6 +46,14 @@ namespace Sati.Models
         public DateTime? StartDate { get; set; }
 
         /// <summary>
+        /// The agency-local date on which Sati first retained enough linkage to create a
+        /// recipient-specific obligation. Services stamp this on insert; callers do not choose it.
+        /// Legacy nulls remain explicit because inventing a discovery date could rewrite a billing
+        /// window.
+        /// </summary>
+        public DateTime? AssignmentKnownOn { get; set; }
+
+        /// <summary>
         /// The single fact that says whether this relationship is current. There is no
         /// separate active flag: two columns meaning the same thing drift, and "who was
         /// treating her in 2024" is a question a case record has to be able to answer, so

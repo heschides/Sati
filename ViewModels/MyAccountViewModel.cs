@@ -15,22 +15,19 @@ namespace Sati.ViewModels
     // Editable: Email, Phone. Read-only-for-context: DisplayName, Username, Role,
     // Agency — identity/permission fields that must not be self-edited.
     //
-    // Password change verifies the current password via AuthenticateAsync (the
-    // identity gate) before calling UserService.ChangePasswordAsync. Every crypto
-    // step routes through existing sanctioned methods; nothing is reinvented here.
+    // The password-change service verifies the current password atomically with the
+    // update. A separate login would replace the transport session as a side effect.
     public partial class MyAccountViewModel : ObservableObject
     {
         private const int MinPasswordLength = 8;
 
         private readonly ISessionService _sessionService;
         private readonly IUserService _userService;
-        private readonly IAuthService _authService;
 
         public MyAccountViewModel(ISessionService sessionService, IUserService userService, IAuthService authService)
         {
             _sessionService = sessionService;
             _userService = userService;
-            _authService = authService;
             LoadFromSession();
         }
 
@@ -182,8 +179,8 @@ namespace Sati.ViewModels
         private async Task ChangePassword()
         {
             PasswordMessage = string.Empty;
-
-            if (CurrentUser is null)
+            var account = CurrentUser;
+            if (account is null)
                 return;
 
             if (CurrentPassword is null || CurrentPassword.Length == 0)
@@ -206,21 +203,14 @@ namespace Sati.ViewModels
 
             try
             {
-                // Identity gate: verify the CURRENT password before allowing change.
-                var verified = await _authService.AuthenticateAsync(CurrentUser.Username, CurrentPassword);
-                if (verified is null)
-                {
-                    PasswordMessage = "Current password is incorrect.";
-                    return;
-                }
-
-                await _userService.ChangePasswordAsync(CurrentUser, CurrentPassword, NewPassword);
+                await _userService.ChangePasswordAsync(account, CurrentPassword, NewPassword);
+                if (!ReferenceEquals(account, CurrentUser)) return;
 
                 // Clear the secure inputs, then signal the view to clear the boxes.
                 CurrentPassword = null;
                 NewPassword = null;
                 ConfirmPassword = null;
-                PasswordMessage = "Password changed.";
+                PasswordMessage = "Password changed. Sign in again to continue.";
                 PasswordChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)

@@ -1316,7 +1316,8 @@
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
-                        <Button Content="Hold for Now"
+                        <Button Content="Save as Nonbillable"
+                                AutomationProperties.Name="Save this note as nonbillable"
                                 Padding="14,6"
                                 FontSize="12"
                                 Cursor="Hand"
@@ -1361,19 +1362,23 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel>
 
-                            <TextBlock Text="CLIENT NOT BILLING COMPLIANT"
+                            <TextBlock Text="SERVICE DATE NOT BILLABLE"
                                        FontSize="11"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource DangerStrongBrush}"
                                        Margin="0,0,0,8" />
 
-                            <TextBlock TextWrapping="Wrap"
+                            <TextBlock Text="This note's service date falls inside a billing-compliance gap. The note can still be saved as nonbillable, or sent to a supervisor with a written justification. Completing the missing form later does not make this service date billable."
+                                       TextWrapping="Wrap"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextPrimaryBrush}"
-                                       Margin="0,0,0,12">
-                                <Run Text="{Binding SelectedPerson.FullName, FallbackValue='This client', Mode=OneWay}" />
-                                <Run Text="does not currently meet billing compliance requirements. You may hold this note in your queue until compliance is resolved, or send it to your supervisor with a written justification." />
-                            </TextBlock>
+                                       Margin="0,0,0,8" />
+
+                            <TextBlock Text="For a form note, the note records the work; the separate completion attestation records when the form was completed."
+                                       TextWrapping="Wrap"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,0,12" />
 
                             <Border Background="{DynamicResource SurfaceRaisedBrush}"
                             BorderBrush="{DynamicResource OverdueBorderBrush}"
@@ -1401,7 +1406,7 @@
                                FontSize="10"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,0,0,4" />
-                        <TextBlock Text="Required if sending to supervisor. Ignored if holding."
+                        <TextBlock Text="Required only when sending to a supervisor."
                                    FontSize="10"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="0,0,0,6" />

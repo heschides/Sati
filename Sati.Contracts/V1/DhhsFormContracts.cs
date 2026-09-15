@@ -15,7 +15,9 @@ namespace Sati.Contracts.V1;
 public sealed record DhhsFormRequest(
     string Form,
     IReadOnlyDictionary<string, bool>? Checks = null,
-    IReadOnlyDictionary<string, string>? Text = null);
+    IReadOnlyDictionary<string, string>? Text = null,
+    DateTime? TargetEffectiveDate = null,
+    Guid? ReleaseObligationId = null);
 
 /// <summary>
 /// What a client is told about a stored SSN: the mask and nothing else.

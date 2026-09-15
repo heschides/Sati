@@ -25,6 +25,13 @@ public sealed class CloudApiClient
     private string? _accessToken;
     private DateTimeOffset? _accessTokenExpiresAtUtc;
     private int _sessionEnded;
+    private long _sessionGeneration;
+    private bool _accessSuspended;
+    internal long SessionGeneration { get { lock (_tokenLock) return _sessionGeneration; } }
+    internal bool IsAccessSuspended { get { lock (_tokenLock) return _accessSuspended; } }
+
+    internal void SuspendAccess() { lock (_tokenLock) _accessSuspended = true; }
+    internal void ResumeAccess() { lock (_tokenLock) _accessSuspended = false; }
 
     /// <summary>
     /// How long before expiry a token is replaced. Public because the keep-alive
@@ -78,11 +85,12 @@ public sealed class CloudApiClient
         {
             _accessToken = accessToken;
             _accessTokenExpiresAtUtc = expiresAtUtc;
+            _sessionGeneration++;
+            Volatile.Write(ref _sessionEnded, 0);
         }
 
         // A fresh credential revives the client. Without this an ended session would
         // stay latched shut after the user signed back in.
-        Volatile.Write(ref _sessionEnded, 0);
         AccessTokenChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -115,9 +123,12 @@ public sealed class CloudApiClient
     // owns background renewal; deliberate user writes retain the normal path.
     internal async Task<TResponse> GetWithoutRenewalAsync<TResponse>(string path, CancellationToken cancellationToken = default)
     {
+        var generation = SessionGeneration;
         using var response = await SendHttpAsync(HttpMethod.Get, path, null, authenticated: true,
-            cancellationToken: cancellationToken, renewSession: false);
-        return await ReadAsync<TResponse>(response, cancellationToken);
+            cancellationToken: cancellationToken, renewSession: false, expectedGeneration: generation);
+        var result = await ReadAsync<TResponse>(response, cancellationToken);
+        EnsureCurrentSession(generation);
+        return result;
     }
 
     /// <summary>
@@ -132,11 +143,13 @@ public sealed class CloudApiClient
         string path,
         CancellationToken cancellationToken = default)
     {
+        var generation = SessionGeneration;
         using var response = await SendHttpAsync(
-            HttpMethod.Get, path, null, authenticated: true, cancellationToken);
+            HttpMethod.Get, path, null, authenticated: true, cancellationToken, expectedGeneration: generation);
         await EnsureSuccessAsync(response, cancellationToken);
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        EnsureCurrentSession(generation);
         return string.IsNullOrWhiteSpace(body)
             ? null
             : JsonSerializer.Deserialize<string>(body, JsonOptions);
@@ -144,6 +157,23 @@ public sealed class CloudApiClient
 
     public Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest request, CancellationToken cancellationToken = default) =>
         SendAsync<TResponse>(HttpMethod.Post, path, request, cancellationToken);
+
+    /// <summary>
+    /// Captures the authorizing session before the first await. A file chosen by one
+    /// account must never be posted with credentials installed during session renewal.
+    /// An expired token is refused; the biller may safely re-import after signing in.
+    /// </summary>
+    internal async Task<TResponse> PostWithCapturedSessionAsync<TRequest, TResponse>(
+        string path, TRequest body, CancellationToken cancellationToken = default)
+    {
+        var generation = SessionGeneration;
+        using var request = CreateRequest(HttpMethod.Post, path, body, expectedGeneration: generation);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        ValidateResponseSession(response, generation);
+        var result = await ReadAsync<TResponse>(response, cancellationToken);
+        EnsureCurrentSession(generation);
+        return result;
+    }
 
     public Task<TResponse> PutAsync<TRequest, TResponse>(string path, TRequest request, CancellationToken cancellationToken = default) =>
         SendAsync<TResponse>(HttpMethod.Put, path, request, cancellationToken);
@@ -166,6 +196,7 @@ public sealed class CloudApiClient
 
     internal async Task<ClientWebSocket> OpenChatSocketAsync(CancellationToken cancellationToken)
     {
+        var generation = SessionGeneration;
         if (HasSessionEnded) throw new CloudSessionEndedException();
         var address = ChatSocketAddress(_httpClient.BaseAddress);
         var socket = new ClientWebSocket();
@@ -173,11 +204,13 @@ public sealed class CloudApiClient
         {
             lock (_tokenLock)
             {
+                EnsureCurrentSession(generation);
                 if (string.IsNullOrWhiteSpace(_accessToken))
                     throw new InvalidOperationException("Sign in to use team chat.");
                 socket.Options.SetRequestHeader("Authorization", $"Bearer {_accessToken}");
             }
             await socket.ConnectAsync(address, cancellationToken);
+            EnsureCurrentSession(generation);
             return socket;
         }
         catch
@@ -189,10 +222,13 @@ public sealed class CloudApiClient
 
     public async Task<byte[]> GetBytesAsync(string path, CancellationToken cancellationToken = default)
     {
+        var generation = SessionGeneration;
         using var response = await SendHttpAsync(
-            HttpMethod.Get, path, null, authenticated: true, cancellationToken);
+            HttpMethod.Get, path, null, authenticated: true, cancellationToken, expectedGeneration: generation);
         await EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        EnsureCurrentSession(generation);
+        return bytes;
     }
 
     public async Task<byte[]> PostBytesAsync<TRequest>(
@@ -200,10 +236,13 @@ public sealed class CloudApiClient
         TRequest body,
         CancellationToken cancellationToken = default)
     {
+        var generation = SessionGeneration;
         using var response = await SendHttpAsync(
-            HttpMethod.Post, path, body, authenticated: true, cancellationToken);
+            HttpMethod.Post, path, body, authenticated: true, cancellationToken, expectedGeneration: generation);
         await EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        EnsureCurrentSession(generation);
+        return bytes;
     }
 
     /// <summary>
@@ -220,13 +259,16 @@ public sealed class CloudApiClient
         string headerName,
         CancellationToken cancellationToken = default)
     {
+        var generation = SessionGeneration;
         using var response = await SendHttpAsync(
-            HttpMethod.Post, path, body, authenticated: true, cancellationToken);
+            HttpMethod.Post, path, body, authenticated: true, cancellationToken, expectedGeneration: generation);
         await EnsureSuccessAsync(response, cancellationToken);
         var values = response.Headers.TryGetValues(headerName, out var found)
             ? found.ToList()
             : response.Content.Headers.TryGetValues(headerName, out var contentHeaders) ? contentHeaders.ToList() : [];
-        return (await response.Content.ReadAsByteArrayAsync(cancellationToken), values);
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        EnsureCurrentSession(generation);
+        return (bytes, values);
     }
 
     private async Task<TResponse> SendAsync<TResponse>(
@@ -235,9 +277,12 @@ public sealed class CloudApiClient
         object? body,
         CancellationToken cancellationToken)
     {
+        var generation = SessionGeneration;
         using var response = await SendHttpAsync(
-            method, path, body, authenticated: true, cancellationToken);
-        return await ReadAsync<TResponse>(response, cancellationToken);
+            method, path, body, authenticated: true, cancellationToken, expectedGeneration: generation);
+        var result = await ReadAsync<TResponse>(response, cancellationToken);
+        EnsureCurrentSession(generation);
+        return result;
     }
 
     private async Task SendWithoutResponseAsync(
@@ -246,9 +291,11 @@ public sealed class CloudApiClient
         object? body,
         CancellationToken cancellationToken)
     {
+        var generation = SessionGeneration;
         using var response = await SendHttpAsync(
-            method, path, body, authenticated: true, cancellationToken);
+            method, path, body, authenticated: true, cancellationToken, expectedGeneration: generation);
         await EnsureSuccessAsync(response, cancellationToken);
+        EnsureCurrentSession(generation);
     }
 
     private async Task<HttpResponseMessage> SendHttpAsync(
@@ -257,29 +304,30 @@ public sealed class CloudApiClient
         object? body,
         bool authenticated,
         CancellationToken cancellationToken,
-        bool renewSession = true)
+        bool renewSession = true,
+        long? expectedGeneration = null)
     {
         // Renewal needs a token the server still accepts, so once it has been refused
         // the session cannot be recovered by trying again. Failing here stops one dead
         // session from turning every later screen into its own rejected round trip.
-        if (authenticated && HasSessionEnded)
-            throw new CloudSessionEndedException();
+        var generation = expectedGeneration ?? SessionGeneration;
+        if (authenticated) EnsureCurrentSession(generation);
 
         if (authenticated && renewSession)
             await RenewSessionIfNeededAsync(cancellationToken);
 
         for (var attempt = 0; ; attempt++)
         {
-            using var request = CreateRequest(method, path, body, authenticated);
+            using var request = CreateRequest(method, path, body, authenticated, generation);
             try
             {
                 var response = await _httpClient.SendAsync(request, cancellationToken);
-                if (authenticated && response.StatusCode == HttpStatusCode.Unauthorized)
+                try
                 {
-                    response.Dispose();
-                    throw MarkSessionEnded();
+                    if (authenticated) ValidateResponseSession(response, generation);
+                    return response;
                 }
-                return response;
+                catch { response.Dispose(); throw; }
             }
             catch (Exception ex) when (
                 !cancellationToken.IsCancellationRequested &&
@@ -304,12 +352,15 @@ public sealed class CloudApiClient
 
     private async Task RenewSessionIfNeededAsync(CancellationToken cancellationToken)
     {
+        var generation = SessionGeneration;
+        EnsureCurrentSession(generation);
         if (!NeedsSessionRenewal())
             return;
 
         await _sessionRenewalGate.WaitAsync(cancellationToken);
         try
         {
+            EnsureCurrentSession(generation);
             if (!NeedsSessionRenewal())
                 return;
 
@@ -319,17 +370,26 @@ public sealed class CloudApiClient
                 body: null,
                 authenticated: true,
                 cancellationToken: cancellationToken,
-                renewSession: false);
+                renewSession: false,
+                expectedGeneration: generation);
 
             // A refused renewal is terminal, not transient: either the token was already
             // too old to authenticate the renewal itself, or the twelve-hour cap from
             // credential entry has passed. Only a new sign-in restores the session, and
             // the caller has to be told that rather than shown an empty screen.
             if (response.StatusCode == HttpStatusCode.Unauthorized)
-                throw MarkSessionEnded();
+                throw MarkSessionEnded(generation);
 
             var renewal = await ReadAsync<SessionRenewalResponse>(response, cancellationToken);
-            SetAccessToken(renewal.AccessToken, renewal.ExpiresAtUtc);
+            // Renewal stays within the original credential session. A later sign-in
+            // or revocation must never be overwritten by this older response.
+            lock (_tokenLock)
+            {
+                EnsureCurrentSession(generation);
+                _accessToken = renewal.AccessToken;
+                _accessTokenExpiresAtUtc = renewal.ExpiresAtUtc;
+            }
+            AccessTokenChanged?.Invoke(this, EventArgs.Empty);
         }
         finally
         {
@@ -337,14 +397,36 @@ public sealed class CloudApiClient
         }
     }
 
-    private CloudSessionEndedException MarkSessionEnded()
+    private CloudSessionEndedException MarkSessionEnded(long? expectedGeneration = null)
     {
-        if (Interlocked.Exchange(ref _sessionEnded, 1) == 0)
+        bool notify;
+        lock (_tokenLock)
+        {
+            if (expectedGeneration.HasValue && expectedGeneration != _sessionGeneration)
+                return new CloudSessionEndedException();
+            notify = Interlocked.Exchange(ref _sessionEnded, 1) == 0;
+        }
+        if (notify)
             SessionEnded?.Invoke(this, EventArgs.Empty);
         return new CloudSessionEndedException();
     }
 
     internal void InvalidateCurrentSession() => MarkSessionEnded();
+    internal void InvalidateCurrentSession(long generation) => MarkSessionEnded(generation);
+
+    private void EnsureCurrentSession(long generation)
+    {
+        lock (_tokenLock)
+            if (_sessionGeneration != generation || HasSessionEnded || _accessSuspended)
+                throw new CloudSessionEndedException();
+    }
+
+    private void ValidateResponseSession(HttpResponseMessage response, long generation)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            throw MarkSessionEnded(generation);
+        EnsureCurrentSession(generation);
+    }
 
     private bool NeedsSessionRenewal() =>
         AccessTokenExpiresAtUtc is DateTimeOffset expiresAt &&
@@ -376,7 +458,8 @@ public sealed class CloudApiClient
         HttpMethod method,
         string path,
         object? body,
-        bool authenticated = true)
+        bool authenticated = true,
+        long? expectedGeneration = null)
     {
         bool hasToken;
         lock (_tokenLock) hasToken = !string.IsNullOrWhiteSpace(_accessToken);
@@ -387,7 +470,11 @@ public sealed class CloudApiClient
         if (authenticated)
         {
             string? token;
-            lock (_tokenLock) token = _accessToken;
+            lock (_tokenLock)
+            {
+                EnsureCurrentSession(expectedGeneration ?? _sessionGeneration);
+                token = _accessToken;
+            }
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         if (body is not null)
@@ -494,7 +581,7 @@ public class CloudApiException(
 public sealed class CloudSessionEndedException()
     : CloudApiException(
         HttpStatusCode.Unauthorized,
-        "Your Demo session has expired. Sign in again to continue.",
+        "Your session has ended. Sign in again to continue.",
         correlationId: null)
 {
 }

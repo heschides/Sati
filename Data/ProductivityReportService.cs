@@ -22,6 +22,9 @@ public sealed class ProductivityReportService(
         var actor = sessionService.CurrentUser
             ?? throw new UnauthorizedAccessException("A signed-in user is required.");
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, actor.Id))
+            throw new UnauthorizedAccessException("Current case-management permission is required.");
 
         var endExclusive = end.AddDays(1);
         var rows = await context.Notes

@@ -17,10 +17,12 @@ namespace Sati.Data
         ];
 
         private readonly IDbContextFactory<SatiContext> _contextFactory;
+        private readonly ISessionService _sessionService;
 
-        public ConsumerBillingLossReportService(IDbContextFactory<SatiContext> contextFactory)
+        public ConsumerBillingLossReportService(IDbContextFactory<SatiContext> contextFactory, ISessionService sessionService)
         {
             _contextFactory = contextFactory;
+            _sessionService = sessionService;
         }
 
         public async Task<ConsumerBillingLossReport> GetAsync(
@@ -34,20 +36,20 @@ namespace Sati.Data
                 throw new ArgumentException("The report window end must not precede its start.");
 
             await using var context = _contextFactory.CreateDbContext();
-            var agencyId = await context.Users.AsNoTracking()
-                .Where(user => user.Id == userId)
-                .Select(user => user.AgencyId)
-                .SingleAsync();
-            var requirements = await context.Settings.AsNoTracking()
-                .Where(settings => settings.AgencyId == agencyId)
-                .Select(settings => (BillingComplianceRequirements?)settings.BillingComplianceRequirements)
-                .SingleOrDefaultAsync() ?? BillingComplianceGate.DefaultRequirements;
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            var actor = _sessionService.CurrentUser
+                ?? throw new UnauthorizedAccessException("A signed-in user is required.");
+            if (actor.Id != userId || !await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
+                throw new UnauthorizedAccessException("This report requires current access to your own caseload.");
+            var agencyId = actor.AgencyId;
+            var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
+                context, agencyId);
 
             // Keep this reporting read free of Person.Bio/Journal and Note.Narrative.
             // Those unbounded columns are not needed to classify days or total units.
             var people = await context.People
                 .AsNoTracking()
-                .Where(p => p.UserId == userId)
+                .Where(p => p.UserId == userId && p.AgencyId == agencyId)
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .Select(p => new PersonReportItem(
@@ -62,19 +64,26 @@ namespace Sati.Data
 
             var forms = await context.Forms
                 .AsNoTracking()
-                .Where(f => personIds.Contains(f.PersonId)
-                         && f.DueDate < end
-                         && (f.CompletedDate == null || f.CompletedDate > start))
+                .Where(f => personIds.Contains(f.PersonId))
                 .Select(f => new FormReportItem(
+                    f.Id,
                     f.PersonId,
                     f.Type,
                     f.DueDate,
-                    f.CompletedDate))
+                    f.CompletedDate,
+                    f.OpenedDate,
+                    f.TargetEffectiveDate))
+                .ToListAsync();
+            var releaseObligations = await context.ReleaseObligations
+                .AsNoTracking()
+                .Include(item => item.Attestations)
+                .Where(item => personIds.Contains(item.PersonId))
                 .ToListAsync();
 
             var notes = await context.Notes
                 .AsNoTracking()
                 .Where(n => personIds.Contains(n.PersonId)
+                         && n.AgencyId == agencyId
                          && n.EventDate.HasValue
                          && n.EventDate.Value >= start
                          && n.EventDate.Value < end.AddDays(1)
@@ -89,6 +98,9 @@ namespace Sati.Data
             var formsByPerson = forms
                 .GroupBy(f => f.PersonId)
                 .ToDictionary(g => g.Key, g => g.ToList());
+            var releasesByPerson = releaseObligations
+                .GroupBy(item => item.PersonId)
+                .ToDictionary(group => group.Key, group => group.ToList());
             var notesByPerson = notes
                 .GroupBy(n => n.PersonId)
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -105,13 +117,35 @@ namespace Sati.Data
                     : 0;
 
                 var blockedDates = new HashSet<DateTime>();
-                if (totalDays > 0 && formsByPerson.TryGetValue(person.Id, out var personForms))
+                if (totalDays > 0)
                 {
+                    var personForms = formsByPerson.GetValueOrDefault(person.Id) ?? [];
+                    var personReleases = releasesByPerson.GetValueOrDefault(person.Id) ?? [];
+                    var reconciledCycles = personReleases
+                        .Select(item => item.TargetEffectiveDate.Date)
+                        .ToHashSet();
+                    var formObligations = BillingComplianceGate.IncludePcpOpeningObligations(
+                        personForms
+                            .Where(form => !IsLegacyReleaseForm(form.Type) ||
+                                !reconciledCycles.Contains(
+                                    (form.TargetEffectiveDate == default
+                                        ? form.DueDate
+                                        : form.TargetEffectiveDate).Date))
+                            .Select(form => new ComplianceFormSnapshot(
+                                form.Type.ToString(),
+                                form.DueDate,
+                                form.CompletedDate,
+                                form.OpenedDate,
+                                $"form:{form.Id}")));
                     for (var date = activeStart; date <= end; date = date.AddDays(1))
                     {
-                        if (personForms.Any(f => BillingComplianceGate.IsBillingWindowBlocked(
-                                f.Type.ToString(), f.DueDate, f.CompletedDate, date,
-                                requirements)))
+                        if (BillingComplianceGate.EvaluateBillingWindow(
+                                formObligations.Concat(
+                                    ReleaseBillingRules.BuildComplianceSnapshots(
+                                        personReleases.Select(item => item.ToComplianceFact()),
+                                        date)),
+                                date,
+                                policy.Resolve(date)).Count > 0)
                         {
                             blockedDates.Add(date);
                         }
@@ -163,12 +197,18 @@ namespace Sati.Data
         private static DateTime Max(DateTime left, DateTime right) =>
             left >= right ? left : right;
 
+        private static bool IsLegacyReleaseForm(FormType type) => type is
+            FormType.Release_Agency or FormType.Release_DHHS or FormType.Release_Medical;
+
         private sealed record PersonReportItem(int Id, string Name, DateTime? EffectiveDate);
         private sealed record FormReportItem(
+            int Id,
             int PersonId,
             FormType Type,
             DateTime DueDate,
-            DateTime? CompletedDate);
+            DateTime? CompletedDate,
+            DateTime? OpenedDate,
+            DateTime TargetEffectiveDate);
         private sealed record NoteReportItem(int PersonId, DateTime EventDate, int? Minutes);
     }
 }

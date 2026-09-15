@@ -1,5 +1,7 @@
 ﻿using Sati.Models;
 
+using Sati.Contracts.V1;
+
 namespace Sati
 {
     // Read-surface UpcomingEventService.GenerateEvents needs from a "person-like"
@@ -16,6 +18,7 @@ namespace Sati
         DateTime? EffectiveDate { get; }
         string FullName { get; }
         List<Form> Forms { get; }
+        IReadOnlyCollection<ReleaseComplianceFact> ReleaseComplianceFacts { get; }
         IEnumerable<INoteInfo> Notes { get; }
         Form? GetCurrentCycleForm(FormType type, DateTime? asOf = null);
     }

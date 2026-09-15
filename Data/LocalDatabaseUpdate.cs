@@ -138,10 +138,19 @@ public interface ILocalDatabaseMaintenance
     Task MigrateAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Collapses duplicate compliance form rows left behind by the pre-57af6fa
-    /// concurrent-load race. Runs before <see cref="MigrateAsync"/> because
-    /// IX_Forms_PersonId_Type_DueDate cannot be created while duplicates exist.
-    /// Idempotent, and a no-op once the data is clean.
+    /// Applies the migration chain only through an exact target. Used to bring a
+    /// very old local database to the schema on which the one legacy duplicate
+    /// repair is defined, without asking the current EF entity model to materialize
+    /// columns that do not exist yet.
+    /// </summary>
+    Task MigrateThroughAsync(
+        string targetMigration,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Collapses targetless duplicate compliance forms only at the exact legacy
+    /// stage immediately before IX_Forms_PersonId_Type_DueDate. Current target-based
+    /// schemas never use this fallback.
     /// </summary>
     Task<FormDuplicateRepair.RepairResult> RepairDuplicateFormsAsync(
         CancellationToken cancellationToken = default);
@@ -248,28 +257,21 @@ public sealed class LocalDatabaseUpdater(ILocalDatabaseMaintenance maintenance)
                 LocalDatabaseUpdateOutcome.Failed, pending, null, failure);
         }
 
-        // Collapse duplicate compliance form rows before migrating. This is ordered
-        // here for a hard reason, not a stylistic one: the pending chain includes the
-        // migration that adds IX_Forms_PersonId_Type_DueDate, and that index cannot
-        // be created while duplicates exist. Running after the backup means the
-        // pre-repair state is recoverable; running before MigrateAsync means the
-        // index has clean data to bind to on the same launch.
+        // The old duplicate repair is needed only when its 2026-09-01 due-date index
+        // is genuinely pending. Do not run it before ordinary later migrations: the
+        // current EF Form model contains TargetEffectiveDate, while the immediately
+        // pre-2026-09-15 database does not, so materializing the current model before
+        // that migration is itself a schema mismatch.
         //
-        // A group whose copies hold conflicting completion dates is deliberately NOT
-        // merged — see FormDuplicateRepair.DuplicateGroup.IsConflicted. Those rows
-        // survive, the index migration then refuses with a message naming them, and
-        // startup stops. That is the correct outcome: the alternative is guessing at
-        // a completion date that decides whether past service dates were billable.
+        // For a database old enough still to need the legacy index, first migrate to
+        // the exact preceding schema, run the raw targetless repair there, and only
+        // then let the index bind. This keeps the historical upgrade path working
+        // without allowing DueDate to remain a runtime identity fallback.
         FormDuplicateRepair.RepairResult? repair = null;
-        try
-        {
-            repair = await maintenance.RepairDuplicateFormsAsync(cancellationToken);
-        }
-        catch (Exception failure)
-        {
-            return new LocalDatabaseUpdateResult(
-                LocalDatabaseUpdateOutcome.Failed, pending, backupPath, failure, findings);
-        }
+        var needsLegacyDuplicateRepair = pending.Contains(
+            FormDuplicateRepair.LegacyUniqueIndexMigration,
+            StringComparer.Ordinal) &&
+            !repairable.Contains(FormDuplicateRepair.LegacyUniqueIndexMigration, StringComparer.Ordinal);
 
         // Record the migrations whose every declared effect was found, so EF stops
         // trying to apply changes the database already has. This writes history rows
@@ -277,14 +279,42 @@ public sealed class LocalDatabaseUpdater(ILocalDatabaseMaintenance maintenance)
         // defensible thing to do without asking. The backup above was taken first
         // regardless, because a database that holds records gets backed up before Sati
         // writes to it at all, not merely before it writes something risky.
+        var preLegacyRepairable = needsLegacyDuplicateRepair
+            ? repairable.Where(migrationId => string.CompareOrdinal(
+                    migrationId,
+                    FormDuplicateRepair.LegacyUniqueIndexMigration) < 0)
+                .ToList()
+            : repairable;
+
         try
         {
-            await maintenance.RecordMigrationsAsync(repairable, cancellationToken);
+            await maintenance.RecordMigrationsAsync(preLegacyRepairable, cancellationToken);
         }
         catch (Exception failure)
         {
             return new LocalDatabaseUpdateResult(
                 LocalDatabaseUpdateOutcome.Failed, pending, backupPath, failure, findings);
+        }
+
+        if (needsLegacyDuplicateRepair)
+        {
+            try
+            {
+                await maintenance.MigrateThroughAsync(
+                    FormDuplicateRepair.LegacyRepairPrerequisiteMigration,
+                    cancellationToken);
+                repair = await maintenance.RepairDuplicateFormsAsync(cancellationToken);
+
+                var postLegacyRepairable = repairable
+                    .Except(preLegacyRepairable, StringComparer.Ordinal)
+                    .ToList();
+                await maintenance.RecordMigrationsAsync(postLegacyRepairable, cancellationToken);
+            }
+            catch (Exception failure)
+            {
+                return new LocalDatabaseUpdateResult(
+                    LocalDatabaseUpdateOutcome.Failed, pending, backupPath, failure, findings);
+            }
         }
 
         try

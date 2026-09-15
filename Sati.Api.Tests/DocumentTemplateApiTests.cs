@@ -92,7 +92,7 @@ public sealed class DocumentTemplateApiTests(SatiApiFactory factory)
     }
 
     [Fact]
-    public async Task GeneratedPrivacyNoticeDoesNotInventAcknowledgment()
+    public async Task PrivacyAttestationIsSufficientWithoutASeparateAcknowledgment()
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
         var formId = await factory.CreateOutstandingFormAsync(101, "PrivacyPractices");
@@ -103,10 +103,15 @@ public sealed class DocumentTemplateApiTests(SatiApiFactory factory)
                 new RenderAnnualDocumentRequest())).EnsureSuccessStatusCode();
             var response = await client.PostAsJsonAsync("/api/v1/people/101/forms/PrivacyPractices/attestation",
                 new AttestFormRequest(formId, DateTime.Today));
-            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+            response.EnsureSuccessStatusCode();
         }
         finally
         {
+            var revoke = await client.PostAsJsonAsync(
+                "/api/v1/people/101/forms/PrivacyPractices/attestation/revoke",
+                new RevokeFormAttestationRequest(formId, "Privacy attestation test cleanup."));
+            if (revoke.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.Conflict))
+                revoke.EnsureSuccessStatusCode();
             await factory.DeleteDocumentArtifactsAsync(101, AnnualDocumentKind.PrivacyPractices);
         }
     }

@@ -37,7 +37,8 @@ public sealed record FormFact(
     int PersonId,
     string FormType,
     DateTime DueDate,
-    DateTime? CompletedDate);
+    DateTime? CompletedDate,
+    DateTime? TargetEffectiveDate = null);
 
 public sealed record UnmetPrerequisite(PrerequisiteKind Kind, string Message);
 
@@ -75,29 +76,28 @@ public static class FormAttestationRules
         AttestationActorKind actor,
         IReadOnlyCollection<ArtifactFact> artifactsForCycle,
         IReadOnlyCollection<FormFact>? formsForCycle = null,
-        string? supervisorOverrideReason = null)
+        string? supervisorOverrideReason = null,
+        DateTime? targetEffectiveDate = null,
+        DateTime? availableOn = null)
     {
-        var dateError = FormCompletionRules.Validate(completedOn, today);
-        if (dateError is null && completedOn.Date < cycleStart.Date)
-            dateError = BeforeCycleMessage;
+        _ = actor;
+        _ = artifactsForCycle;
+        _ = supervisorOverrideReason;
+
+        var dateError = ValidateCompletionDate(completedOn, cycleStart, today, availableOn);
 
         var unmet = EvaluatePrerequisites(
             formType,
+            completedOn,
             cycleStart,
-            artifactsForCycle,
-            formsForCycle ?? []);
-        var supervisorOverrideAccepted =
-            unmet.Count > 0 &&
-            actor == AttestationActorKind.Supervisor &&
-            !string.IsNullOrWhiteSpace(supervisorOverrideReason);
-        var prerequisitesAccepted =
-            unmet.Count == 0 || actor == AttestationActorKind.System || supervisorOverrideAccepted;
+            formsForCycle ?? [],
+            targetEffectiveDate);
 
         return new AttestationDecision(
-            dateError is null && prerequisitesAccepted,
+            dateError is null && unmet.Count == 0,
             dateError,
             unmet,
-            supervisorOverrideAccepted);
+            SupervisorOverrideAccepted: false);
     }
 
     public static IReadOnlyList<PendingAttestation> PendingAttestations(
@@ -125,7 +125,11 @@ public static class FormAttestationRules
                 .Select(candidate => new
                 {
                     Form = candidate,
-                    Cycle = ResolveCycle(effectiveDate.Value, candidate.DueDate)
+                    Cycle = ResolveCycleForForm(
+                        effectiveDate.Value,
+                        candidate.FormType,
+                        candidate.DueDate,
+                        candidate.TargetEffectiveDate)
                 })
                 .Where(candidate => candidate.Cycle is not null &&
                     candidate.Cycle.Value.CycleStart.Date <= note.EventDate.Date &&
@@ -153,9 +157,6 @@ public static class FormAttestationRules
     public static PrerequisiteKind PrerequisiteFor(string formType) => formType switch
     {
         "Reclassification" => PrerequisiteKind.ComprehensiveAssessment,
-        "SafetyPlan" => PrerequisiteKind.SafetyPlan,
-        "PrivacyPractices" => PrerequisiteKind.PrivacyPracticesAcknowledgment,
-        "Release_Agency" or "Release_DHHS" or "Release_Medical" => PrerequisiteKind.DocumentArtifact,
         _ => PrerequisiteKind.None
     };
 
@@ -164,17 +165,76 @@ public static class FormAttestationRules
         IEnumerable<int> artifactIds,
         string? supervisorOverrideReason = null)
     {
-        var ids = artifactIds.Distinct().Order().ToArray();
-        if (ids.Length == 0 && !decision.SupervisorOverrideAccepted)
-            return NoPrerequisitesStateJson;
-        return System.Text.Json.JsonSerializer.Serialize(new
+        _ = decision;
+        _ = artifactIds;
+        _ = supervisorOverrideReason;
+
+        // Completion is established by the attestation itself. Artifacts are useful
+        // documents, but they are not a second compliance gate and a supervisor
+        // cannot bypass the one remaining semantic rule (Reclass implies CA).
+        return NoPrerequisitesStateJson;
+    }
+
+    public static string AssessmentPrerequisiteStateJson(int assessmentFormId) =>
+        System.Text.Json.JsonSerializer.Serialize(new
         {
-            prerequisiteArtifactIds = ids,
-            supervisorOverride = decision.SupervisorOverrideAccepted,
-            supervisorOverrideReason = decision.SupervisorOverrideAccepted
-                ? supervisorOverrideReason?.Trim()
-                : null
+            comprehensiveAssessmentFormId = assessmentFormId
         });
+
+    /// <summary>
+    /// Resolves a form's work cycle from its stable annual identity. Due-date
+    /// inference remains only for rows created before TargetEffectiveDate existed.
+    /// </summary>
+    public static (DateTime CycleStart, DateTime CycleEnd)? ResolveCycleForForm(
+        DateTime initialEffectiveDate,
+        string formType,
+        DateTime formDueDate,
+        DateTime? targetEffectiveDate)
+    {
+        if (targetEffectiveDate is DateTime target && target != default)
+        {
+            target = target.Date;
+            return IsReview(formType)
+                ? (target, target.AddYears(1))
+                : (target.AddYears(-1), target);
+        }
+
+        return ResolveCycle(initialEffectiveDate, formDueDate);
+    }
+
+    public static string? ValidateAssessmentCompletionDate(
+        DateTime assessmentCompletedOn,
+        DateTime reclassificationCompletedOn,
+        DateTime cycleStart,
+        DateTime today,
+        DateTime? assessmentAvailableOn = null)
+    {
+        var dateError = FormCompletionRules.Validate(assessmentCompletedOn, today);
+        if (dateError is not null)
+            return dateError;
+        if (assessmentCompletedOn.Date < cycleStart.Date)
+            return BeforeCycleMessage;
+        if (assessmentAvailableOn is DateTime available &&
+            assessmentCompletedOn.Date < available.Date)
+            return $"This form was not available for completion before {available:MMM d, yyyy}.";
+        return assessmentCompletedOn.Date > reclassificationCompletedOn.Date
+            ? "The Comprehensive Assessment completion date cannot be after the Reclassification completion date."
+            : null;
+    }
+
+    public static string? ValidateCompletionDate(
+        DateTime completedOn,
+        DateTime cycleStart,
+        DateTime today,
+        DateTime? availableOn = null)
+    {
+        var dateError = FormCompletionRules.Validate(completedOn, today);
+        if (dateError is null && completedOn.Date < cycleStart.Date)
+            dateError = BeforeCycleMessage;
+        if (dateError is null && availableOn is DateTime available &&
+            completedOn.Date < available.Date)
+            dateError = $"This form was not available for completion before {available:MMM d, yyyy}.";
+        return dateError;
     }
 
     public static (DateTime CycleStart, DateTime CycleEnd)? ResolveCycle(
@@ -200,9 +260,10 @@ public static class FormAttestationRules
 
     private static IReadOnlyList<UnmetPrerequisite> EvaluatePrerequisites(
         string formType,
+        DateTime completedOn,
         DateTime cycleStart,
-        IReadOnlyCollection<ArtifactFact> artifactsForCycle,
-        IReadOnlyCollection<FormFact> formsForCycle)
+        IReadOnlyCollection<FormFact> formsForCycle,
+        DateTime? targetEffectiveDate)
     {
         var prerequisite = PrerequisiteFor(formType);
         if (prerequisite == PrerequisiteKind.None)
@@ -213,36 +274,39 @@ public static class FormAttestationRules
             var cycleEnd = cycleStart.AddYears(1);
             var completed = formsForCycle.Any(form =>
                 form.FormType.Equals("ComprehensiveAssessment", StringComparison.OrdinalIgnoreCase) &&
-                form.DueDate.Date > cycleStart.Date &&
-                form.DueDate.Date <= cycleEnd.Date &&
-                form.CompletedDate is not null);
+                BelongsToSameAnnualObligation(form, cycleStart, cycleEnd, targetEffectiveDate) &&
+                form.CompletedDate is DateTime assessmentCompletedOn &&
+                assessmentCompletedOn.Date <= completedOn.Date);
             return completed
                 ? []
-                : [new(prerequisite, "A Comprehensive Assessment for this compliance cycle must be attested first.")];
+                : [new(prerequisite,
+                    "A Comprehensive Assessment for this annual effective date must be attested on or before the Reclassification completion date.")];
         }
 
-        var catalogEntry = AnnualDocumentCatalog.ForFormType(formType);
-        if (catalogEntry is null)
-            return [new(prerequisite, "The required supporting document is not available.")];
-
-        var matching = artifactsForCycle.Where(artifact =>
-            artifact.CycleStart.Date == cycleStart.Date &&
-            artifact.Kind.Equals(catalogEntry.Kind.ToString(), StringComparison.OrdinalIgnoreCase));
-
-        var satisfied = prerequisite switch
-        {
-            PrerequisiteKind.DocumentArtifact => matching.Any(artifact => !artifact.IsDraft),
-            // A generated safety plan is evidence only after its supervisor approval.
-            // The rendering endpoint records unapproved plans as Draft artifacts.
-            PrerequisiteKind.SafetyPlan => matching.Any(artifact => !artifact.IsDraft),
-            // Privacy acknowledgement remains external until its dedicated acknowledgement step.
-            PrerequisiteKind.PrivacyPracticesAcknowledgment =>
-                matching.Any(artifact => !artifact.IsDraft && (artifact.IsExternal || artifact.IsAcknowledged)),
-            _ => false
-        };
-
-        return satisfied
-            ? []
-            : [new(prerequisite, $"{catalogEntry.DisplayName} must be prepared or recorded as external before attestation.")];
+        return [];
     }
+
+    private static bool BelongsToSameAnnualObligation(
+        FormFact form,
+        DateTime cycleStart,
+        DateTime cycleEnd,
+        DateTime? targetEffectiveDate)
+    {
+        if (targetEffectiveDate is DateTime target && target != default)
+        {
+            if (form.TargetEffectiveDate is DateTime candidateTarget && candidateTarget != default)
+                return candidateTarget.Date == target.Date;
+
+            // Transitional compatibility for a CA row not yet backfilled.
+            return form.DueDate.Date > cycleStart.Date && form.DueDate.Date <= cycleEnd.Date;
+        }
+
+        return form.DueDate.Date > cycleStart.Date && form.DueDate.Date <= cycleEnd.Date;
+    }
+
+    private static bool IsReview(string formType) =>
+        formType.Equals("Q1R", StringComparison.OrdinalIgnoreCase) ||
+        formType.Equals("Q2R", StringComparison.OrdinalIgnoreCase) ||
+        formType.Equals("Q3R", StringComparison.OrdinalIgnoreCase) ||
+        formType.Equals("Q4R", StringComparison.OrdinalIgnoreCase);
 }

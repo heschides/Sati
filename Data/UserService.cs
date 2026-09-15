@@ -9,11 +9,14 @@ namespace Sati.Data
     {
         private readonly IDbContextFactory<SatiContext> _contextFactory;
         private readonly IPasswordHasher _hasher;
+        private readonly ISessionService? _sessionService;
 
-        public UserService(IDbContextFactory<SatiContext> contextFactory, IPasswordHasher hasher)
+        public UserService(IDbContextFactory<SatiContext> contextFactory, IPasswordHasher hasher,
+            ISessionService? sessionService = null)
         {
             _contextFactory = contextFactory;
             _hasher = hasher;
+            _sessionService = sessionService;
         }
 
         // Authorization lives here, in the write, not in the view model that opened the
@@ -44,6 +47,8 @@ namespace Sati.Data
 
             var (hash, salt) = _hasher.HashPassword(initialPassword);
             user.SetPassword(hash, salt);
+            user.IsEnabled = true;
+            user.SecurityVersion = 1;
             context.Users.Add(user);
             await context.SaveChangesAsync();
             return user;
@@ -88,6 +93,8 @@ namespace Sati.Data
             // that state intact with the window still open.
             user.Role = UserRole.Admin;
             user.Permissions = UserPermissions.AllAgencyPermissions;
+            user.IsEnabled = true;
+            user.SecurityVersion = 1;
             context.Users.Add(user);
             await context.SaveChangesAsync();
             return user;
@@ -143,10 +150,12 @@ namespace Sati.Data
         public async Task<List<User>> GetAllAsync()
         {
             await using var context = _contextFactory.CreateDbContext();
-            return await context.Users
-                .Where(user => user.Role != UserRole.PlatformOperator)
-                .Include(u => u.Supervisees)
-                .ToListAsync();
+            var actor = await RequireSessionAsync(context);
+            var users = await LoadSafeUsersAsync(context, context.Users.AsNoTracking()
+                .Where(user => user.AgencyId == actor.AgencyId && user.Role != UserRole.PlatformOperator));
+            foreach (var user in users)
+                user.Supervisees = users.Where(candidate => candidate.SupervisorId == user.Id).ToList();
+            return users;
         }
 
         public async Task UpdateAsync(AgencyActor suppliedActor, User user)
@@ -154,6 +163,7 @@ namespace Sati.Data
             ArgumentNullException.ThrowIfNull(user);
 
             await using var context = _contextFactory.CreateDbContext();
+            await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var actor = await ValidateActorAsync(context, suppliedActor);
 
             var tracked = await context.Users.FindAsync(user.Id);
@@ -169,11 +179,17 @@ namespace Sati.Data
             user.AgencyId = tracked.AgencyId;
             user.Role = Enum.Parse<UserRole>(UserPermissionRules.LegacyLabel(user.Permissions));
 
-            // CurrentValues.SetValues copies scalar + FK properties only,
-            // never navigations — so a stale self-referencing Supervisor nav
-            // can't override the new SupervisorId during fixup.
-            context.Entry(tracked).CurrentValues.SetValues(user);
-            await context.SaveChangesAsync();
+            // Account state and credentials are never accepted through an ordinary
+            // profile save, including an old profile opened before a revocation.
+            context.Entry(tracked).Property(item => item.Username).CurrentValue = user.Username;
+            context.Entry(tracked).Property(item => item.DisplayName).CurrentValue = user.DisplayName;
+            tracked.Permissions = user.Permissions;
+            tracked.Role = user.Role;
+            tracked.SupervisorId = user.SupervisorId;
+            tracked.Email = user.Email;
+            tracked.Phone = user.Phone;
+            await SaveAccountChangesAsync(context);
+            await transaction.CommitAsync();
         }
 
         // Self-service profile edit. Deliberately not UpdateAsync with a relaxed rule: this
@@ -192,18 +208,25 @@ namespace Sati.Data
             await using var context = _contextFactory.CreateDbContext();
             // Not ValidateActorAsync: editing your own contact details is not a user-management
             // action and must not require supervision or administration.
+            if (_sessionService is not null)
+            {
+                var signedIn = await RequireSessionAsync(context);
+                if (signedIn.Id != suppliedActor.UserId || signedIn.SecurityVersion != suppliedActor.SecurityVersion)
+                    throw new UnauthorizedAccessException("The actor does not match the signed-in account.");
+            }
             var tracked = await context.Users.SingleOrDefaultAsync(candidate =>
-                              candidate.Id == suppliedActor.UserId &&
-                              candidate.AgencyId == suppliedActor.AgencyId &&
-                              candidate.Permissions == suppliedActor.Permissions)
+                              candidate.Id == suppliedActor.UserId)
                           ?? throw new UnauthorizedAccessException(
                               "The actor no longer matches the current user record.");
+            EnsureLiveActor(tracked, suppliedActor);
+            if (tracked.AgencyId != suppliedActor.AgencyId || tracked.Permissions != suppliedActor.Permissions)
+                throw new UnauthorizedAccessException("The actor no longer matches the current user record.");
 
             // Only these two fields are copied. Permissions, Role, SupervisorId, and AgencyId
             // on the incoming object are ignored rather than trusted.
             tracked.Email = user.Email;
             tracked.Phone = user.Phone;
-            await context.SaveChangesAsync();
+            await SaveAccountChangesAsync(context);
         }
 
         public async Task ResetPasswordAsync(AgencyActor suppliedActor, User user, SecureString newPassword)
@@ -211,6 +234,7 @@ namespace Sati.Data
             ArgumentNullException.ThrowIfNull(user);
 
             await using var context = _contextFactory.CreateDbContext();
+            await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var actor = await ValidateActorAsync(context, suppliedActor);
 
             var tracked = await context.Users.FindAsync(user.Id)
@@ -218,9 +242,13 @@ namespace Sati.Data
             RequireManageable(actor, tracked);
 
             var (hash, salt) = _hasher.HashPassword(newPassword);
+            var previousSecurityVersion = tracked.SecurityVersion;
             tracked.SetPassword(hash, salt);
-            user.SetPassword(hash, salt);
-            await context.SaveChangesAsync();
+            tracked.SecurityVersion = AccountSessionRules.NextSecurityVersion(tracked.SecurityVersion);
+            LocalAuditTrail.Record(context, actor, "user.password-reset", "User", tracked.Id);
+            await SaveAccountChangesAsync(context);
+            await transaction.CommitAsync();
+            InvalidateMatchingSession(user.Id, previousSecurityVersion);
         }
 
         /// <summary>
@@ -228,18 +256,26 @@ namespace Sati.Data
         /// <c>ValidateBillingActorAsync</c> and the API's <c>ValidatedActorFilter</c>: a
         /// supplied permission set is never trusted, only matched.
         /// </summary>
-        private static async Task<User> ValidateActorAsync(SatiContext context, AgencyActor suppliedActor)
+        private async Task<User> ValidateActorAsync(SatiContext context, AgencyActor suppliedActor)
         {
+            if (_sessionService is not null)
+            {
+                var signedIn = await RequireSessionAsync(context);
+                if (signedIn.Id != suppliedActor.UserId || signedIn.SecurityVersion != suppliedActor.SecurityVersion)
+                    throw new UnauthorizedAccessException("The actor does not match the signed-in account.");
+            }
             if (!UserPermissionRules.IsSupported(suppliedActor.Permissions) ||
                 !UserManagementRules.CanManageUsers(suppliedActor.Permissions))
                 throw new UnauthorizedAccessException(UserManagementRules.RequiresUserManagement);
 
-            return await context.Users.SingleOrDefaultAsync(candidate =>
-                       candidate.Id == suppliedActor.UserId &&
-                       candidate.AgencyId == suppliedActor.AgencyId &&
-                       candidate.Permissions == suppliedActor.Permissions)
+            var actor = await context.Users.SingleOrDefaultAsync(candidate =>
+                       candidate.Id == suppliedActor.UserId)
                    ?? throw new UnauthorizedAccessException(
                        "The actor no longer matches the current user record.");
+            EnsureLiveActor(actor, suppliedActor);
+            if (actor.AgencyId != suppliedActor.AgencyId || actor.Permissions != suppliedActor.Permissions)
+                throw new UnauthorizedAccessException("The actor no longer matches the current user record.");
+            return actor;
         }
 
         // What the actor may act ON, as opposed to what they may grant. Mirrors the
@@ -247,14 +283,8 @@ namespace Sati.Data
         // PUT /api/v1/users/{userId}.
         private static void RequireManageable(User actor, User target)
         {
-            if (target.AgencyId != actor.AgencyId)
-                throw new UnauthorizedAccessException(UserManagementRules.ForeignAgency);
-            if (target.Role == UserRole.PlatformOperator)
-                throw new UnauthorizedAccessException(UserManagementRules.PlatformOperatorNotManageable);
-            if (!actor.HasAdminPermissions &&
-                (!UserPermissionRules.HasCaseManagerPermissions(target.Permissions) ||
-                 target.SupervisorId != actor.Id))
-                throw new UnauthorizedAccessException(UserManagementRules.SupervisorScope);
+            Refuse(UserManagementRules.DescribeTargetRefusal(actor.ToAgencyActor(), target.Permissions,
+                target.SupervisorId, target.AgencyId, target.Role.ToString()));
         }
 
         private static async Task RequireValidSupervisorAsync(SatiContext context, User actor, int? supervisorId)
@@ -273,31 +303,126 @@ namespace Sati.Data
                 throw new UnauthorizedAccessException(refusal.Message);
         }
 
-        // Self-service change. Mirrors ResetPasswordAsync's persistence exactly,
-        // but hashes a SecureString via the secure HashPassword overload — a
-        // user's chosen password is a secret worth protecting in transit, unlike
-        // the reset's known literal. Assumes the caller has already verified
-        // identity (via AuthenticateAsync); this only hashes and saves.
+        // Verify the current live sign-in and password here, then atomically save
+        // the replacement verifier, advance the session version, and record the
+        // security event. Never refresh the caller's old session stamp in place.
         public async Task ChangePasswordAsync(User user, SecureString currentPassword, SecureString newPassword)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            if (_sessionService is not null)
+            {
+                var captured = await RequireSessionAsync(context);
+                if (captured.Id != user.Id || captured.SecurityVersion != user.SecurityVersion)
+                    throw new UnauthorizedAccessException("Only the signed-in user may change this password.");
+            }
             var tracked = await context.Users.FindAsync(user.Id)
                 ?? throw new InvalidOperationException("The current user no longer exists.");
+            EnsureLiveActor(tracked, user.ToAgencyActor());
             if (!_hasher.Verify(currentPassword, tracked.PasswordHash, tracked.Salt))
                 throw new UnauthorizedAccessException("The current password is incorrect.");
             var (hash, salt) = _hasher.HashPassword(newPassword);
             tracked.SetPassword(hash, salt);
-            user.SetPassword(hash, salt);
-            await context.SaveChangesAsync();
+            tracked.SecurityVersion = AccountSessionRules.NextSecurityVersion(tracked.SecurityVersion);
+            LocalAuditTrail.Record(context, tracked, "user.password-changed", "User", tracked.Id);
+            await SaveAccountChangesAsync(context);
+            await transaction.CommitAsync();
+            InvalidateMatchingSession(user.Id, user.SecurityVersion);
         }
 
         public async Task<List<User>> GetSuperviseesAsync(int supervisorId)
         {
             await using var context = _contextFactory.CreateDbContext();
-            return await context.Users
-                .Where(u => u.SupervisorId == supervisorId &&
-                    (u.Permissions & UserPermissions.CaseManagement) != 0)
-                .ToListAsync();
+            var actor = await RequireSessionAsync(context);
+            if (actor.Id != supervisorId || !actor.HasSupervisorPermissions)
+                throw new UnauthorizedAccessException("Only the signed-in supervisor may read this team.");
+            return await LoadSafeUsersAsync(context, context.Users.AsNoTracking()
+                .Where(u => u.AgencyId == actor.AgencyId && u.SupervisorId == supervisorId &&
+                    u.Role != UserRole.PlatformOperator && (u.Permissions & UserPermissions.CaseManagement) != 0));
+        }
+
+        public Task SetEnabledAsync(AgencyActor actor, User user, bool isEnabled) =>
+            ChangeAccessAsync(actor, user, isEnabled);
+
+        public Task RevokeSessionsAsync(AgencyActor actor, User user) =>
+            ChangeAccessAsync(actor, user, requestedEnabled: null);
+
+        private async Task ChangeAccessAsync(AgencyActor suppliedActor, User user, bool? requestedEnabled)
+        {
+            ArgumentNullException.ThrowIfNull(user);
+            await using var context = _contextFactory.CreateDbContext();
+            await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            var actor = await ValidateActorAsync(context, suppliedActor);
+            var target = await context.Users.SingleOrDefaultAsync(item => item.Id == user.Id)
+                ?? throw new InvalidOperationException("The user no longer exists.");
+            Refuse(AccountSessionRules.DescribeManagementRefusal(actor.ToAgencyActor(), target.Id,
+                target.AgencyId, target.Role.ToString(), requestedEnabled));
+            if (requestedEnabled == target.IsEnabled)
+                return;
+            if (target.SecurityVersion != user.SecurityVersion)
+                throw new InvalidOperationException("This account changed after it was opened. Reload it and try again.");
+            if (requestedEnabled is bool enabled)
+                target.IsEnabled = enabled;
+            target.SecurityVersion = AccountSessionRules.NextSecurityVersion(target.SecurityVersion);
+            var action = requestedEnabled is null ? "user.sessions-revoked" : target.IsEnabled ? "user.enabled" : "user.disabled";
+            LocalAuditTrail.Record(context, actor, action, "User", target.Id);
+            await SaveAccountChangesAsync(context);
+            await transaction.CommitAsync();
+            InvalidateMatchingSession(user.Id, user.SecurityVersion);
+            // Updating a management row is safe; updating the current session's
+            // security stamp would silently mint a replacement sign-in.
+            if (!ReferenceEquals(_sessionService?.CurrentUser, user))
+            {
+                user.IsEnabled = target.IsEnabled;
+                user.SecurityVersion = target.SecurityVersion;
+            }
+        }
+
+        private async Task<User> RequireSessionAsync(SatiContext context) =>
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService
+                ?? throw new UnauthorizedAccessException("A signed-in session is required."));
+
+        private void EnsureLiveActor(User stored, AgencyActor captured)
+        {
+            if (AccountSessionRules.IsCurrentSession(stored.IsEnabled, stored.SecurityVersion, captured.SecurityVersion))
+                return;
+            InvalidateMatchingSession(captured.UserId, captured.SecurityVersion);
+            throw new SessionExpiredException(new UnauthorizedAccessException(AccountSessionRules.SessionExpired));
+        }
+
+        private void InvalidateMatchingSession(int userId, long securityVersion)
+        {
+            if (_sessionService?.CurrentUser is User current && current.Id == userId && current.SecurityVersion == securityVersion)
+                _sessionService.Invalidate(current);
+        }
+
+        private static async Task SaveAccountChangesAsync(SatiContext context)
+        {
+            try { await context.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new InvalidOperationException("This account changed during the request. Reload it and try again.", exception);
+            }
+        }
+
+        private static async Task<List<User>> LoadSafeUsersAsync(SatiContext context, IQueryable<User> query)
+        {
+            var profiles = await query.Select(user => new
+            {
+                user.Id, user.Username, user.DisplayName, user.Role, user.SupervisorId, user.AgencyId,
+                user.Permissions, user.Email, user.Phone, user.IsEnabled, user.SecurityVersion
+            }).ToListAsync();
+            return profiles.Select(profile =>
+            {
+                var user = User.Create(profile.Id, profile.Username, profile.DisplayName, string.Empty, string.Empty,
+                    profile.Role, profile.SupervisorId, profile.AgencyId);
+                user.Permissions = profile.Permissions;
+                user.Email = profile.Email;
+                user.Phone = profile.Phone;
+                user.IsEnabled = profile.IsEnabled;
+                user.SecurityVersion = profile.SecurityVersion;
+                return user;
+            }).ToList();
         }
     }
 }

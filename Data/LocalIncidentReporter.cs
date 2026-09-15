@@ -60,6 +60,7 @@ public sealed class LocalIncidentReporter(
             try
             {
                 await using var context = contextFactory.CreateDbContext();
+                await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
                 await using var transaction = await context.Database.BeginTransactionAsync(
                     IsolationLevel.Serializable,
                     cancellationToken);

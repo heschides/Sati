@@ -303,6 +303,12 @@ public sealed class NewClientCreationTests
         Assert.Equal(fixture.Actor.Id, stored.UserId);
         Assert.Equal(fixture.Actor.AgencyId, stored.AgencyId);
         Assert.Equal(PersonSaveRules.FormTypes.Count, await db.Forms.CountAsync());
+        Assert.DoesNotContain(await db.Forms.AsNoTracking().ToListAsync(), form => form.Type is
+            FormType.Release_Agency or FormType.Release_DHHS or FormType.Release_Medical);
+        var releases = await db.ReleaseObligations.AsNoTracking().ToListAsync();
+        Assert.Equal(2, releases.Count);
+        Assert.All(releases, release =>
+            Assert.Equal(ReleaseObligationCategory.Dhhs, release.Category));
         Assert.Single(await db.PersonVersions.AsNoTracking().ToListAsync());
         var attestations = await db.FormAttestations.AsNoTracking().ToListAsync();
         var auditEvents = await db.AuditEvents.AsNoTracking().ToListAsync();
@@ -617,10 +623,17 @@ public sealed class NewClientCreationTests
     [Fact]
     public async Task DatabaseRejectionLeavesNoPartialClientGraph()
     {
-        // The signed-in actor intentionally is not seeded as a User. SQLite's
-        // foreign-key rejection happens during SaveChanges after EF has staged the
-        // Person, forms, lifecycle version, and audit event.
-        await using var fixture = await LocalPersonFixture.CreateAsync(seedActor: false);
+        // Keep identity valid so this tests transaction rollback, not the live
+        // authorization guard. A synthetic SQLite constraint rejects a form insert
+        // after EF has staged the consumer's complete creation graph.
+        await using var fixture = await LocalPersonFixture.CreateAsync(seedActor: true);
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            await db.Database.ExecuteSqlRawAsync("""
+                CREATE TRIGGER RejectSyntheticFormInsert BEFORE INSERT ON Forms
+                BEGIN SELECT RAISE(ABORT, 'Synthetic form write failure'); END;
+                """);
+        }
         var person = Person.CreatePerson(
             fixture.Actor.Id,
             "Jamie",
@@ -634,6 +647,17 @@ public sealed class NewClientCreationTests
         await Assert.ThrowsAsync<PersonPersistenceException>(
             () => fixture.Service.AddPersonAsync(person));
 
+        await fixture.AssertCreationTablesEmptyAsync();
+    }
+
+    [Fact]
+    public async Task ASessionWhoseAccountNoLongerExistsCannotCreateAConsumer()
+    {
+        await using var fixture = await LocalPersonFixture.CreateAsync(seedActor: false);
+        var person = Person.CreatePerson(fixture.Actor.Id, "Missing", "Actor", "Synthetic authorization test",
+            new DateTime(1990, 4, 3), null, WaiverType.None, new Settings());
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => fixture.Service.AddPersonAsync(person));
         await fixture.AssertCreationTablesEmptyAsync();
     }
 

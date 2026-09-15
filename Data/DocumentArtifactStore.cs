@@ -24,12 +24,14 @@ internal static class DocumentArtifactStore
         string? templateKey = null,
         int? templateVersion = null,
         int? sourceContentId = null,
-        int? sourceContentVersion = null)
+        int? sourceContentVersion = null,
+        long? releaseObligationId = null)
     {
         var artifact = DocumentArtifact.Generated(
             personId, agencyId, kind, cycleStart, origin, generatedAtUtc,
             generatedByUserId, content, suggestedFileName, blankFields,
-            templateOwner, templateKey, templateVersion, sourceContentId, sourceContentVersion);
+            templateOwner, templateKey, templateVersion, sourceContentId, sourceContentVersion,
+            releaseObligationId);
         return await StageReplacementAsync(context, artifact, personId, kind, cycleStart, cancellationToken);
     }
 
@@ -42,10 +44,12 @@ internal static class DocumentArtifactStore
         DateTime recordedAtUtc,
         int recordedByUserId,
         string note,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? releaseObligationId = null)
     {
         var artifact = DocumentArtifact.External(
-            personId, agencyId, kind, cycleStart, recordedAtUtc, recordedByUserId, note);
+            personId, agencyId, kind, cycleStart, recordedAtUtc, recordedByUserId, note,
+            releaseObligationId);
         return await StageReplacementAsync(context, artifact, personId, kind, cycleStart, cancellationToken);
     }
 
@@ -67,7 +71,8 @@ internal static class DocumentArtifactStore
         artifact.TemplateKey,
         artifact.TemplateVersion,
         artifact.SourceContentId,
-        artifact.SourceContentVersion);
+        artifact.SourceContentVersion,
+        artifact.ReleaseObligationId);
 
     private static async Task<DocumentArtifact> StageReplacementAsync(
         SatiContext context,
@@ -79,7 +84,9 @@ internal static class DocumentArtifactStore
     {
         var prior = await context.DocumentArtifacts.SingleOrDefaultAsync(candidate =>
             candidate.PersonId == personId && candidate.Kind == kind &&
-            candidate.CycleStart == cycleStart.Date && candidate.SupersededByArtifactId == null,
+            candidate.CycleStart == cycleStart.Date &&
+            candidate.ReleaseObligationId == replacement.ReleaseObligationId &&
+            candidate.SupersededByArtifactId == null,
             cancellationToken);
 
         if (prior is not null)

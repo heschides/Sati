@@ -154,7 +154,13 @@ public sealed class PendingApprovalsPagingTests
         { Approved.Add((noteId, maximumUnits)); return Task.CompletedTask; }
         public Task<IEnumerable<Note>> GetPendingNotesAsync(int supervisorId, bool allSupervisees = false) => throw new NotSupportedException();
         public Task<IEnumerable<Note>> GetNonCompliantNotesAsync(int supervisorId, bool allSupervisees = false) => throw new NotSupportedException();
-        public Task ApproveWithOverrideAsync(int noteId, int supervisorId, string overrideReason, int expectedRevision) => throw new NotSupportedException();
+        public Task ApproveWithOverrideAsync(
+            int noteId,
+            int supervisorId,
+            string overrideReason,
+            int expectedRevision,
+            IReadOnlyList<string>? blockingObligationIds = null,
+            bool attestationConfirmed = false) => throw new NotSupportedException();
         public Task ReturnNoteAsync(int noteId, int supervisorId, string reason, int expectedRevision) => throw new NotSupportedException();
     }
 }

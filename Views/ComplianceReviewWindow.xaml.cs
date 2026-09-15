@@ -13,6 +13,10 @@ namespace Sati.Views
 
         private void Confirm_Click(object sender, RoutedEventArgs e)
         {
+            if (DataContext is not ComplianceReviewViewModel viewModel ||
+                !viewModel.Validate(DateTime.Today))
+                return;
+
             DialogResult = true;
             Close();
         }

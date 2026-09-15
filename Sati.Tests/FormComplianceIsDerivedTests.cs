@@ -80,7 +80,14 @@ public sealed class FormComplianceIsDerivedTests
         int id;
         await using (var db = fixture.Factory.CreateDbContext())
         {
-            var form = new Form(FormType.Q1R, Due, Due) { PersonId = fixture.PersonOneId };
+            var form = new Form(
+                FormType.Q1R,
+                Due,
+                completedOn: Due,
+                targetEffectiveDate: Due)
+            {
+                PersonId = fixture.PersonOneId
+            };
             db.Forms.Add(form);
             await db.SaveChangesAsync();
             id = form.Id;
@@ -151,36 +158,36 @@ public sealed class FormComplianceIsDerivedTests
 
         Assert.NotEmpty(forms);
         Assert.All(forms, form =>
-            Assert.Equal(form.IsCompliant, form.CompletedDate.HasValue));
+        {
+            Assert.False(form.IsCompliant);
+            Assert.Null(form.CompletedDate);
+        });
     }
 
     [Fact]
-    public void CycleGenerationDatesAnnualDocumentsFromTheCycleStartAndLeavesReviewsOpen()
+    public void CycleGenerationCreatesIdentifiedObligationsWithoutInventingCompletion()
     {
         var cycleStart = new DateTime(2026, 5, 30);
         var person = PersonWithNoForms(cycleStart);
 
         Assert.True(person.EnsureCurrentCycleForms(Today, new Settings()));
 
-        // This is the call site that produced the 147 rows. Every annual document it
-        // creates for a cycle already under way now carries the date that put it in
-        // force; nothing it creates is compliant without one.
-        Assert.All(person.Forms, form =>
-            Assert.Equal(form.IsCompliant, form.CompletedDate.HasValue));
+        // Generation only creates obligations. A current annual record is no more
+        // evidence of completion than a current quarterly-review record.
+        Assert.All(person.Forms, form => Assert.Null(form.CompletedDate));
 
         var pcp = person.GetCurrentCycleForm(FormType.PCP, Today)!;
-        Assert.Equal(cycleStart, pcp.CompletedDate);
+        Assert.Equal(cycleStart, pcp.TargetEffectiveDate);
+        Assert.Equal(cycleStart, pcp.DueDate);
+        Assert.Null(pcp.CompletedDate);
 
-        // A review is an attestation that work happened. No date can be inferred for
-        // work nobody recorded, so it stays open.
         Assert.Null(person.GetCurrentCycleForm(FormType.Q1R, Today)!.CompletedDate);
 
-        // Next cycle assumes nothing: it has not started, so nothing is in force yet,
-        // and a cycle that rolls over with these still open flags the missed renewal.
-        var nextCyclePcp = person.Forms
-            .Where(form => form.Type == FormType.PCP)
-            .OrderByDescending(form => form.DueDate)
-            .First();
+        var nextCyclePcp = Person.FindFormForTargetEffectiveDate(
+            person.Forms,
+            FormType.PCP,
+            cycleStart.AddYears(1));
+        Assert.NotNull(nextCyclePcp);
         Assert.Null(nextCyclePcp.CompletedDate);
     }
 
@@ -207,9 +214,9 @@ public sealed class FormComplianceIsDerivedTests
         {
             var pcp = person.Forms.SingleOrDefault(form =>
                 form.Type == FormType.PCP &&
-                form.DueDate > start &&
-                form.DueDate <= start.AddYears(1));
+                form.TargetEffectiveDate == start);
             Assert.NotNull(pcp);
+            Assert.Equal(start, pcp.DueDate);
         }
     }
 
@@ -224,28 +231,29 @@ public sealed class FormComplianceIsDerivedTests
         person.EnsureCurrentCycleForms(Today, new Settings());
 
         var closedCyclePcp = person.Forms.Single(form =>
-            form.Type == FormType.PCP && form.DueDate == new DateTime(2024, 5, 30));
+            form.Type == FormType.PCP &&
+            form.TargetEffectiveDate == new DateTime(2023, 5, 30));
         Assert.Null(closedCyclePcp.CompletedDate);
 
-        // Only the cycle we are in now carries the in-force assumption.
+        // A generated current cycle is also unknown until somebody attests it.
         var currentPcp = person.GetCurrentCycleForm(FormType.PCP, Today)!;
-        Assert.Equal(new DateTime(2026, 5, 30), currentPcp.CompletedDate);
+        Assert.Equal(new DateTime(2026, 5, 30), currentPcp.TargetEffectiveDate);
+        Assert.Null(currentPcp.CompletedDate);
     }
 
     [Fact]
-    public void AnImplausibleEffectiveDateStopsAtTheOldestEndAndStillCoversTodayAndNext()
+    public void AnImplausibleEffectiveDateFailsInsteadOfSilentlyDroppingOldCycles()
     {
-        // A mistyped effective date decades back would otherwise generate hundreds of
-        // forms per client. What is dropped is the oldest end, so the cycles that can
-        // actually be worked on are always present.
-        var person = PersonWithNoForms(new DateTime(1925, 5, 30));
+        // Silently keeping only the newest cycles would make omitted historical
+        // obligations look satisfied to billing. An obviously mistyped date instead
+        // stops the save and asks the user to correct the source fact.
+        var person = PersonWithNoForms(new DateTime(1800, 5, 30));
 
-        person.EnsureCurrentCycleForms(Today, new Settings());
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            person.EnsureCurrentCycleForms(Today, new Settings()));
 
-        Assert.NotNull(person.GetCurrentCycleForm(FormType.PCP, Today));
-        Assert.Contains(person.Forms, form =>
-            form.Type == FormType.PCP && form.DueDate == new DateTime(2028, 5, 30));
-        Assert.DoesNotContain(person.Forms, form => form.DueDate.Year < 2001);
+        Assert.Contains("supported maximum", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(person.Forms);
     }
 
     [Fact]

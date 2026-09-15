@@ -8,11 +8,8 @@ namespace Sati.ViewModels
     // entity until Confirm. The entity stays untouched so a cancelled dialog leaves
     // no trace; Commit() is the single write-back point.
     //
-    // The invariant the whole windowed-gate redesign depends on lives in OnIsCompliantChanged:
-    // compliant implies a date, not-compliant implies none. You cannot, through this
-    // row, reach "compliant with no date" — checking the box defaults the date if the
-    // user hasn't set one; unchecking clears it. That guarantee is the reason this
-    // class exists rather than binding the checkbox straight to Form.IsCompliant.
+    // Completion is evidence, not an assumption. The worker must explicitly choose
+    // the actual occurrence date before a new obligation can be completed.
     public partial class ComplianceFormRow : ObservableObject
     {
         private readonly Form _form;
@@ -20,39 +17,50 @@ namespace Sati.ViewModels
         public ComplianceFormRow(Form form)
         {
             _form = form;
-            // Seed the row from the entity's current state. A form arriving already
-            // compliant (the dialog's default for in-force docs) shows checked with
-            // its completion date, defaulting to the due date if none was stored.
             isCompliant = form.IsCompliant;
-            completedDate = form.CompletedDate ?? form.DueDate;
+            completedDate = form.CompletedDate;
         }
 
         public FormType Type => _form.Type;
         public DateTime DueDate => _form.DueDate;
+        public bool IsEditable => _form.Id == 0;
 
-        // The checkbox. When the [ObservableProperty] generator raises the change,
-        // OnIsCompliantChanged enforces the date invariant — this is the one place
-        // the check↔date rule is expressed.
         [ObservableProperty] private bool isCompliant;
 
-        // The per-row date picker's value. Defaulted to the due date (the on-time
-        // answer) and overridable later — the April-13 late case — so it is NOT
-        // clamped to the due date. A null here while IsCompliant is true would be the
-        // forbidden state, which is why the partial below refuses to leave it null.
+        // Past dates are normal. Future dates are invalid. DueDate is deliberately
+        // never copied into this property.
         [ObservableProperty] private DateTime? completedDate;
 
         partial void OnIsCompliantChanged(bool value)
         {
-            if (value)
-                CompletedDate ??= DueDate;   // checking with no date yet → default on-time
-            else
-                CompletedDate = null;        // unchecking → genuinely outstanding, no date
+            if (!value)
+                CompletedDate = null;
+        }
+
+        public string? ValidationError(DateTime today)
+        {
+            if (!IsEditable)
+                return null;
+            if (IsCompliant && CompletedDate is null)
+                return $"Enter the actual completion date for {Type}.";
+            if (CompletedDate is DateTime completed && completed.Date > today.Date)
+                return $"The completion date for {Type} cannot be in the future.";
+            return null;
         }
 
         // Writes the reconciled row state back onto the entity through the only
         // sanctioned door. Called once, on Confirm, for every row.
         public void Commit()
         {
+            // Persisted obligations change through their individual append-only
+            // attestation controls, never through this onboarding/bulk dialog.
+            if (!IsEditable)
+                return;
+
+            var validationError = ValidationError(DateTime.Today);
+            if (validationError is not null)
+                throw new InvalidOperationException(validationError);
+
             if (IsCompliant && CompletedDate is DateTime date)
                 _form.SetInitialCompletion(date);
             else

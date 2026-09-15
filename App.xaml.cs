@@ -120,6 +120,8 @@ namespace Sati
                         services.AddSingleton<ConsumerPickerSortPreferenceService>();
                         services.AddSingleton<IOutlookCalendarService, OutlookCalendarService>();
                         services.AddSingleton<IOutlookCalendarFilePicker, Sati.Views.OutlookCalendarFilePicker>();
+                        services.AddSingleton<IClearinghouseResponseFilePicker, Sati.Views.Billing.ClearinghouseResponseFilePicker>();
+                        services.AddSingleton<IFormOpeningPrompt, Sati.Views.FormOpeningPrompt>();
                         services.AddSingleton<TextShortcutHook>();
                         services.AddSingleton<ICaseNoteFormatter, FoundryLocalCaseNoteFormatter>();
 
@@ -151,6 +153,7 @@ namespace Sati
                         services.AddSingleton<ProvidersViewModel>();
                         services.AddSingleton<ReviewsViewModel>();
                         services.AddSingleton<SupervisorDashboardViewModel>();
+                        services.AddSingleton<BillingComplianceRecoveryViewModel>();
                         services.AddSingleton<AdminDashboardViewModel>();
                         services.AddSingleton<PlatformHealthViewModel>();
                         services.AddTransient<UserManagementViewModel>();
@@ -174,8 +177,6 @@ namespace Sati
                         services.AddSingleton<NotesWindowViewModel>();
                         services.AddTransient<ComplianceReviewViewModel>();
                         services.AddTransient<ComplianceReviewWindow>();
-                        services.AddTransient<ScratchpadHistoryViewModel>();
-                        services.AddTransient<ScratchpadHistoryWindow>();
                         services.AddTransient<SwitchUserViewModel>();
                         services.AddTransient<SwitchUserWindow>();
                         services.AddTransient<MyAccountViewModel>();
@@ -186,6 +187,7 @@ namespace Sati
                         services.AddTransient<NewClientViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.DhhsFormsViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.AgencyReleaseViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.ReleaseObligationsViewModel>();
                         services.AddSingleton<Sati.Forms.DocumentTemplatePdfComposer>();
                         services.AddSingleton<Sati.Forms.SafetyPlanPdfGenerator>();
                         services.AddSingleton<Sati.Forms.DhhsFormFiller>();
@@ -225,7 +227,6 @@ namespace Sati
                         services.AddTransient<Func<DailyAgendaWindow>>(sp => () => sp.GetRequiredService<DailyAgendaWindow>());
                         services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
                         services.AddTransient<Func<FirstRunAdminWindow>>(sp => () => sp.GetRequiredService<FirstRunAdminWindow>());
-                        services.AddTransient<Func<ScratchpadHistoryWindow>>(sp => () => sp.GetRequiredService<ScratchpadHistoryWindow>());
                         services.AddTransient<Func<SwitchUserWindow>>(sp => () => sp.GetRequiredService<SwitchUserWindow>());
                         services.AddTransient<Func<LoginWindow>>(sp => () => sp.GetRequiredService<LoginWindow>());
                         services.AddTransient<Func<DatabasePatienceWindow>>(sp =>
@@ -462,15 +463,15 @@ namespace Sati
             services.AddSingleton<PersonAuditPdfExporter>();
             services.AddTransient<IPersonContactService, PersonContactService>();
             services.AddTransient<IConsumerProviderService, ConsumerProviderService>();
+            services.AddTransient<IReleaseObligationService, ReleaseObligationService>();
             services.AddTransient<INoteService, NoteService>();
             services.AddTransient<IAuthService, AuthService>();
             services.AddTransient<IUserService, UserService>();
-            services.AddSingleton<ISessionLifetime, NeverEndingSessionLifetime>();
+            services.AddSingleton<ISessionLifetime>(sp => (ISessionLifetime)sp.GetRequiredService<ISessionService>());
             services.AddTransient<IScratchpadService, ScratchpadService>();
             services.AddSingleton<IChatService, ChatUnavailableService>();
             services.AddTransient<IIncentiveService, IncentiveService>();
             services.AddTransient<ISettingsService, SettingsService>();
-            services.AddTransient<FormDueDateBackfill>();
             services.AddTransient<FormBulkCompletion>();
             services.AddTransient<IFormService, FormService>();
             services.AddTransient<ISupervisorService, SupervisorService>();
@@ -537,6 +538,7 @@ namespace Sati
             services.AddTransient<IUserService, CloudUserService>();
             services.AddTransient<IPersonContactService, CloudPersonContactService>();
             services.AddTransient<IConsumerProviderService, CloudConsumerProviderService>();
+            services.AddTransient<IReleaseObligationService, CloudReleaseObligationService>();
             services.AddTransient<ISupervisorService, CloudSupervisorService>();
             services.AddTransient<IReviewItemService, CloudReviewItemService>();
             services.AddTransient<IATRequestService, CloudAtRequestService>();

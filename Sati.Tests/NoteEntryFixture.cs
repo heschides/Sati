@@ -70,10 +70,11 @@ internal sealed class NoteEntryFixture : IAsyncDisposable
         bool? discardAnswer = null,
         IPersonContactService? contacts = null,
         INoteService? notes = null,
-        IUpcomingEventService? upcomingEvents = null) => new(
+        IUpcomingEventService? upcomingEvents = null,
+        ISettingsService? settings = null) => new(
         notes ?? new NoteService(Factory, SessionFor(CaseManagerOne)),
         people ?? PeopleAs(CaseManagerOne),
-        new StubSettingsService(),
+        settings ?? new StubSettingsService(),
         upcomingEvents ?? new UpcomingEventService(),
         SessionFor(CaseManagerOne),
         contacts ?? new StubPersonContactService(),
@@ -83,11 +84,13 @@ internal sealed class NoteEntryFixture : IAsyncDisposable
         (_, _) => discardAnswer
             ?? throw new NotSupportedException("No discard prompt is expected in this test."));
 
-    public NotesWindowViewModel NotesWindow(bool? discardAnswer = null) => new(
+    public NotesWindowViewModel NotesWindow(
+        bool? discardAnswer = null,
+        ISettingsService? settings = null) => new(
         PeopleAs(CaseManagerOne),
         SessionFor(CaseManagerOne),
         new NoteService(Factory, SessionFor(CaseManagerOne)),
-        NoteEntry(discardAnswer: discardAnswer));
+        NoteEntry(discardAnswer: discardAnswer, settings: settings));
 
     /// <summary>
     /// A second note service on the same database as Case Manager One — stands in

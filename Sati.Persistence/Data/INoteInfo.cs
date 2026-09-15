@@ -9,5 +9,6 @@
         NoteStatus? Status { get; }
         DateTime? EventDate { get; }
         NoteType? NoteType { get; }
+        FormType? FormType { get; }
     }
 }

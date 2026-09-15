@@ -55,12 +55,76 @@ public sealed class UserManagementPasswordResetTests
         Assert.Equal("Password reset for Amber Example.", viewModel.StatusMessage);
     }
 
-    private static (UserManagementViewModel ViewModel, CapturingUserService Service) CreateViewModel()
+    [Fact]
+    public async Task AdministratorCanDisableEnableAndRevokeWithoutRemovingTheAccount()
+    {
+        var (viewModel, service) = CreateViewModel();
+        await viewModel.InitializeAsync();
+        viewModel.SelectedUser = viewModel.Users.Single(user => user.Id == 2);
+        await viewModel.DisableAccountCommand.ExecuteAsync(null);
+        Assert.False(viewModel.SelectedUser!.IsEnabled);
+        Assert.Contains(viewModel.Users, user => user.Id == 2);
+        Assert.Contains("disabled", viewModel.StatusMessage);
+        Assert.False(viewModel.DisableAccountCommand.CanExecute(null));
+        Assert.True(viewModel.EnableAccountCommand.CanExecute(null));
+        await viewModel.EnableAccountCommand.ExecuteAsync(null);
+        Assert.True(viewModel.SelectedUser!.IsEnabled);
+        await viewModel.RevokeSessionsCommand.ExecuteAsync(null);
+        Assert.Equal(2, service.EnableCalls);
+        Assert.Equal(1, service.RevokeCalls);
+        Assert.Contains("All sessions signed out", viewModel.StatusMessage);
+        await viewModel.DisableAccountCommand.ExecuteAsync(null);
+        Assert.Equal(3, service.EnableCalls);
+
+        // Bind only after the command assertions finish. Bound WPF commands notify
+        // dispatcher-owned buttons, so later test-thread commands would cross threads.
+        WpfUiHarness.Run(() =>
+        {
+            var view = new UserManagementView { DataContext = viewModel };
+            WpfUiHarness.Realize(view, 1000, 1100);
+            Assert.Contains(WpfUiHarness.Descendants(view).OfType<TextBlock>(),
+                block => block.Visibility == Visibility.Visible && block.Text == "Disabled — sign-in blocked");
+            var enable = WpfUiHarness.Descendants(view).OfType<Button>()
+                .Single(button => AutomationProperties.GetName(button) == "Enable account");
+            Assert.Equal(Visibility.Visible, enable.Visibility);
+            Assert.True(enable.IsEnabled);
+        });
+    }
+
+    [Fact]
+    public async Task SupervisorCannotInvokeLifecycleEvenDirectlyThroughTheCommand()
+    {
+        var (viewModel, service) = CreateViewModel(administrator: false);
+        await viewModel.InitializeAsync();
+        viewModel.SelectedUser = viewModel.Users.Single();
+        Assert.False(viewModel.CanManageAccountLifecycle);
+        Assert.False(viewModel.DisableAccountCommand.CanExecute(null));
+        await viewModel.DisableAccountCommand.ExecuteAsync(null);
+        await viewModel.RevokeSessionsCommand.ExecuteAsync(null);
+        Assert.Equal(0, service.EnableCalls);
+        Assert.Equal(0, service.RevokeCalls);
+    }
+
+    [Fact]
+    public async Task AdministratorCannotDisableOwnAccountButCanRevokeOwnSessions()
+    {
+        var (viewModel, service) = CreateViewModel();
+        await viewModel.InitializeAsync();
+        viewModel.SelectedUser = viewModel.Users.Single(user => user.Id == 1);
+        Assert.False(viewModel.DisableAccountCommand.CanExecute(null));
+        await viewModel.DisableAccountCommand.ExecuteAsync(null);
+        Assert.Equal(0, service.EnableCalls);
+        await viewModel.RevokeSessionsCommand.ExecuteAsync(null);
+        Assert.Equal(1, service.RevokeCalls);
+    }
+
+    private static (UserManagementViewModel ViewModel, CapturingUserService Service) CreateViewModel(bool administrator = true)
     {
         var admin = User.Create(1, "longchenpa", "Longchenpa", string.Empty, string.Empty,
             UserRole.Admin, null, 1);
         var amber = User.Create(2, "amber", "Amber Example", string.Empty, string.Empty,
-            UserRole.CaseManager, null, 1);
+            UserRole.CaseManager, 1, 1);
+        if (!administrator) admin.Permissions = UserPermissions.Supervision;
         var session = new SessionService();
         session.SetUser(admin);
         var service = new CapturingUserService([admin, amber]);
@@ -81,6 +145,19 @@ public sealed class UserManagementPasswordResetTests
     {
         public User? ResetTarget { get; private set; }
         public string? ResetPassword { get; private set; }
+        public int EnableCalls { get; private set; }
+        public int RevokeCalls { get; private set; }
+        public Task SetEnabledAsync(AgencyActor actor, User user, bool enabled)
+        {
+            EnableCalls++;
+            user.IsEnabled = enabled;
+            return Task.CompletedTask;
+        }
+        public Task RevokeSessionsAsync(AgencyActor actor, User user)
+        {
+            RevokeCalls++;
+            return Task.CompletedTask;
+        }
 
         public Task<List<User>> GetAllAsync() => Task.FromResult(users);
         public Task<User> CreateAsync(AgencyActor actor, User user, SecureString initialPassword) =>

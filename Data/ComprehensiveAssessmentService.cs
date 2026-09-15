@@ -20,9 +20,8 @@ public sealed class ComprehensiveAssessmentService(
             throw new UnauthorizedAccessException("A case manager account is required.");
 
         await using var db = await contextFactory.CreateDbContextAsync();
-        var ownsPerson = await db.People.AsNoTracking().AnyAsync(person =>
-            person.Id == personId && person.UserId == actor.Id &&
-            person.AgencyId == actor.AgencyId);
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        var ownsPerson = await LocalTenantAccess.OwnsPersonAsync(db, actor, personId);
         if (!ownsPerson)
             throw new UnauthorizedAccessException("Only the assigned case manager may read this assessment.");
 
@@ -37,9 +36,8 @@ public sealed class ComprehensiveAssessmentService(
     {
         var actor = CurrentAuthor(authorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
-        var canAuthor = await db.People.AsNoTracking().AnyAsync(person =>
-            person.Id == personId && person.UserId == actor.Id &&
-            person.AgencyId == actor.AgencyId);
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        var canAuthor = await LocalTenantAccess.OwnsPersonAsync(db, actor, personId);
         if (!canAuthor)
             throw new UnauthorizedAccessException("Only the assigned case manager may author this assessment.");
         var editableAssessment = await db.ComprehensiveAssessments
@@ -123,10 +121,12 @@ public sealed class ComprehensiveAssessmentService(
     {
         var actor = CurrentAuthor(assessment.AuthorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        await LocalTenantAccess.EnsureCurrentActorAsync(db, actor);
         var stored = await db.ComprehensiveAssessments
             .Include(candidate => candidate.Person)
             .SingleAsync(candidate => candidate.Id == assessment.Id);
-        EnsureCanAuthor(actor, stored);
+        await EnsureCanAuthorAsync(db, actor, stored);
         if (stored.Revision != assessment.Revision)
             throw new DbUpdateConcurrencyException("This assessment was changed by someone else. Reload it before saving.");
         if (stored.Status is AssessmentStatus.Approved or AssessmentStatus.Superseded)
@@ -146,10 +146,12 @@ public sealed class ComprehensiveAssessmentService(
     {
         var actor = CurrentAuthor(assessment.AuthorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        await LocalTenantAccess.EnsureCurrentActorAsync(db, actor);
         var stored = await db.ComprehensiveAssessments
             .Include(candidate => candidate.Person)
             .SingleAsync(candidate => candidate.Id == assessment.Id);
-        EnsureCanAuthor(actor, stored);
+        await EnsureCanAuthorAsync(db, actor, stored);
         if (stored.Revision != assessment.Revision)
             throw new DbUpdateConcurrencyException("This assessment was changed by someone else. Reload it before submitting.");
         if (stored.Status is not (AssessmentStatus.Draft or AssessmentStatus.Returned))
@@ -176,11 +178,10 @@ public sealed class ComprehensiveAssessmentService(
         return actor;
     }
 
-    private static void EnsureCanAuthor(User actor, ComprehensiveAssessment assessment)
+    private static async Task EnsureCanAuthorAsync(SatiContext db, User actor, ComprehensiveAssessment assessment)
     {
         if (assessment.AuthorUserId != actor.Id ||
-            assessment.Person.UserId != actor.Id ||
-            assessment.Person.AgencyId != actor.AgencyId)
+            !await LocalTenantAccess.OwnsPersonAsync(db, actor, assessment.PersonId))
         {
             throw new UnauthorizedAccessException("Only the assigned case manager may change this assessment.");
         }

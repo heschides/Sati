@@ -25,9 +25,9 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
 {
     private const string TestPassword = "Correct-Horse-42!";
     private const string TestSigningKey = "integration-test-signing-key-that-is-at-least-32-characters";
-    private const string TestDatabaseConnection =
-        "Data Source=SatiApiTests;Mode=Memory;Cache=Shared;Default Timeout=30";
-    private readonly SqliteConnection _connection = new(TestDatabaseConnection);
+    private readonly string _testDatabaseConnection =
+        $"Data Source=SatiApiTests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Default Timeout=30";
+    private readonly SqliteConnection _connection;
     private readonly SemaphoreSlim _seedLock = new(1, 1);
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
     private readonly SemaphoreSlim _testDataLock = new(1, 1);
@@ -42,6 +42,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
 
     public SatiApiFactory()
     {
+        _connection = new SqliteConnection(_testDatabaseConnection);
         _connection.Open();
         // Minimal-host startup reads these before WebApplicationFactory applies
         // ConfigureWebHost. They exist only in this test process; the production
@@ -91,7 +92,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IDbContextOptionsConfiguration<ApiDbContext>>();
             services.RemoveAll<IDatabaseProvider>();
             services.AddDbContextFactory<ApiDbContext>(options =>
-                options.UseSqlite(TestDatabaseConnection)
+                options.UseSqlite(_testDatabaseConnection)
                     .ReplaceService<IExecutionStrategyFactory, TestRetryingExecutionStrategyFactory>());
             services.AddScoped(provider =>
                 provider.GetRequiredService<IDbContextFactory<ApiDbContext>>().CreateDbContext());
@@ -148,7 +149,20 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         try
         {
             if (_tokens.TryGetValue(username, out var cached))
-                return cached;
+            {
+                // A newly requested test client is a new sign-in, not an old
+                // session resurrected after another test resets its credential.
+                // Existing HttpClient headers remain unchanged for revocation proofs.
+                await using var scope = Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+                var version = await db.Users.Where(x => x.Username == username && x.IsEnabled)
+                    .Select(x => (long?)x.SecurityVersion).SingleOrDefaultAsync();
+                var claim = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(cached)
+                    .Claims.SingleOrDefault(x => x.Type == TokenIssuer.SecurityVersionClaim)?.Value;
+                if (long.TryParse(claim, out var tokenVersion) && version == tokenVersion)
+                    return cached;
+                _tokens.Remove(username);
+            }
 
             using var client = CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -981,6 +995,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                 PersonId = person.Id,
                 Type = "PCP",
                 DueDate = DateTime.Today.AddDays(30),
+                TargetEffectiveDate = DateTime.Today.AddDays(30),
                 CompletedDate = DateTime.Today
             };
             form.Attestations.Add(new ServerFormAttestation
@@ -1256,6 +1271,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                 PersonId = 102,
                 Type = "PCP",
                 DueDate = overduePcp,
+                TargetEffectiveDate = overduePcp,
                 // Outstanding. There is no longer a flag that could claim otherwise —
                 // ServerForm.IsCompliant is derived from this date.
                 CompletedDate = null
@@ -1267,6 +1283,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                 PersonId = 102,
                 Type = "ComprehensiveAssessment",
                 DueDate = overdueAssessment,
+                TargetEffectiveDate = overdueAssessment.AddDays(90),
                 CompletedDate = null,
             });
         db.Notes.Add(new ServerNote
@@ -1275,7 +1292,8 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
             PersonId = 102,
             AgencyId = 1,
             Narrative = "Non-compliant review explanation test",
-            EventDate = new DateTime(2026, 8, 12),
+            // Keep the service inside both overdue forms' historical windows.
+            EventDate = DateTime.Today,
             Minutes = 30,
             Status = 2
         });
@@ -1341,8 +1359,10 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
         var person = await db.People.SingleAsync(candidate => candidate.Id == personId);
         person.EffectiveDate ??= DateTime.Today.AddMonths(-1);
-        var cycleStart = AnnualDocumentCycle.CurrentStart(person.EffectiveDate.Value, DateTime.Today);
-        var dueDate = cycleStart.AddMonths(6);
+        // Keep this synthetic obligation inside every default availability
+        // window so tests exercise attestation semantics rather than being
+        // rejected for attempting work before it opens.
+        var dueDate = DateTime.Today;
         var existing = await db.Forms.SingleOrDefaultAsync(form =>
             form.PersonId == personId && form.Type == type && form.DueDate == dueDate);
         if (existing is not null)
@@ -1356,6 +1376,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
             PersonId = personId,
             Type = type,
             DueDate = dueDate,
+            TargetEffectiveDate = dueDate,
             CompletedDate = null
         };
         db.Forms.Add(form);
@@ -1411,13 +1432,25 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
     /// </remarks>
     private static DateTime CycleStart => DateTime.Today.AddMonths(-1);
 
-    private static ServerForm CompliantForm(int personId, string type) => new()
+    private static ServerForm CompliantForm(int personId, string type)
     {
-        PersonId = personId,
-        Type = type,
-        DueDate = CycleStart.AddMonths(6),
-        CompletedDate = CycleStart.AddDays(1)
-    };
+        var targetEffectiveDate = CycleStart;
+        var schedule = new ComplianceScheduleSettings();
+        var dueDate = ComplianceScheduleRules.DueDate(
+            type, targetEffectiveDate, schedule);
+
+        return new ServerForm
+        {
+            PersonId = personId,
+            Type = type,
+            TargetEffectiveDate = targetEffectiveDate,
+            DueDate = dueDate,
+            // Synthetic evidence exists from the first legitimate work date. This
+            // keeps the fixture compliant for historical service dates without
+            // inventing a second annual-cycle identity when /caseload reconciles.
+            CompletedDate = ComplianceScheduleRules.AvailableOn(type, dueDate, schedule)
+        };
+    }
 
     private static ServerForm FutureIncompleteForm(
         int personId,
@@ -1427,6 +1460,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         PersonId = personId,
         Type = type,
         DueDate = dueDate,
+        TargetEffectiveDate = dueDate,
         CompletedDate = null
     };
 

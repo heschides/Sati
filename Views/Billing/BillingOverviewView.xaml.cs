@@ -21,6 +21,11 @@ namespace Sati.Views.Billing
         public BillingOverviewView()
         {
             InitializeComponent();
+            Unloaded += (_, _) =>
+            {
+                RevenueTrendChart.Model = null;
+                ClaimOutcomeChart.Model = null;
+            };
         }
     }
 }

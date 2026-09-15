@@ -23,6 +23,10 @@ public sealed class ClientAiContextService(
             ?? throw new InvalidOperationException("A signed-in user is required to validate the selected client.");
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        if (!await LocalTenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
+            throw new UnauthorizedAccessException(
+                "Current case-management access is required before releasing client information to the AI assistant.");
         var selected = await db.People
             .AsNoTracking()
             .Where(person => person.Id == personId &&

@@ -1,6 +1,7 @@
 <UserControl x:Class="Sati.Views.AdminDashboardView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:billingViews="clr-namespace:Sati.Views.Billing"
              Background="{DynamicResource WindowBackgroundBrush}"
              TextElement.FontFamily="{StaticResource AppFont}">
     <UserControl.Resources>
@@ -20,6 +21,11 @@
         </Style>
     </UserControl.Resources>
 
+    <TabControl AutomationProperties.Name="Admin workspaces"
+                Background="{DynamicResource WindowBackgroundBrush}"
+                BorderThickness="0">
+        <TabItem Header="Operations"
+                 AutomationProperties.Name="Admin operations">
     <Grid Margin="18,14,18,18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -666,4 +672,12 @@
             </Grid>
         </Grid>
     </Grid>
+        </TabItem>
+        <TabItem Header="Compliance recovery"
+                 AutomationProperties.Name="Compliance recovery">
+            <billingViews:ComplianceRecoveryWorkspace
+                DataContext="{Binding ComplianceRecovery}"
+                Margin="18,14,18,18" />
+        </TabItem>
+    </TabControl>
 </UserControl>

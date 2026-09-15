@@ -8,11 +8,22 @@ namespace Sati.Forms;
 
 public sealed record PacketDocument(AnnualDocumentKind Kind, byte[] Pdf, string FileName, DocumentArtifactOrigin Origin,
     IReadOnlyList<string> BlankFields, string? TemplateOwner = null, string? TemplateKey = null,
-    int? TemplateVersion = null, int? SourceContentId = null, int? SourceContentVersion = null);
+    int? TemplateVersion = null, int? SourceContentId = null, int? SourceContentVersion = null,
+    long? ReleaseObligationRecordId = null, Guid? ReleaseObligationId = null,
+    string? ReleaseRecipient = null);
+public sealed record PacketReleaseInput(
+    long RecordId,
+    Guid ObligationId,
+    ReleaseObligationCategory Category,
+    DateTime? CompletedOn,
+    string? RecipientName,
+    string? RecipientAddress,
+    string? RecipientPhone);
 public sealed record PacketRenderInput(AgencyReleaseSubject Subject, DateTime CycleStart, DateTime CycleEnd,
     DateTime GeneratedAtUtc, int ActorId, IReadOnlyList<DocumentArtifactDto> LiveArtifacts,
     SafetyPlanDto? SafetyPlan, IReadOnlyList<DocumentTemplateDto> Templates, bool MedicalReleaseAttested,
-    string? ProviderName, string? ProviderAddress, string? ProviderPhone);
+    string? ProviderName, string? ProviderAddress, string? ProviderPhone,
+    IReadOnlyList<PacketReleaseInput>? ReleaseObligations = null);
 public sealed record PacketRenderResult(IReadOnlyList<PacketDocument> Documents, IReadOnlyList<string> Omitted);
 
 /// <summary>Pure rendering: callers supply already-authorized snapshots and record all artifacts atomically.</summary>
@@ -49,10 +60,36 @@ public sealed class AnnualPacketComposer(AgencyReleasePdfGenerator release, Dhhs
             $"Safety-Plan-{(origin == DocumentArtifactOrigin.Draft ? "DRAFT-" : "")}{input.Subject.PersonId}.pdf", origin,
             content.Sections.Where(x => string.IsNullOrWhiteSpace(x.Text)).Select(x => x.Id).ToArray(),
             SourceContentId: plan?.Id, SourceContentVersion: plan?.Version));
-        foreach (var kind in new[] { AnnualDocumentKind.ReleaseAgency, AnnualDocumentKind.ReleaseMedical, AnnualDocumentKind.ReleaseDhhs })
+        var releaseObligations = input.ReleaseObligations ?? [];
+        if (releaseObligations.Count == 0)
+            omitted.Add("Release drafts omitted: exact recipient obligations have not been reconciled.");
+        foreach (var obligation in releaseObligations
+                     .OrderBy(item => item.Category)
+                     .ThenBy(item => item.RecipientName, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(item => item.ObligationId))
         {
-            if (input.LiveArtifacts.Any(x => x.Kind == kind.ToString() && x.Origin != "Draft"))
-            { omitted.Add($"{AnnualDocumentCatalog.ForKind(kind).DisplayName}: a completed or external copy is already recorded. Retrieve that exact saved/signed copy; it is not reconstructed from metadata."); continue; }
+            var kind = obligation.Category switch
+            {
+                ReleaseObligationCategory.Agency => AnnualDocumentKind.ReleaseAgency,
+                ReleaseObligationCategory.Medical => AnnualDocumentKind.ReleaseMedical,
+                ReleaseObligationCategory.Dhhs => AnnualDocumentKind.ReleaseDhhs,
+                _ => throw new ArgumentOutOfRangeException(nameof(obligation.Category))
+            };
+            var label = string.IsNullOrWhiteSpace(obligation.RecipientName)
+                ? AnnualDocumentCatalog.ForKind(kind).DisplayName
+                : $"{AnnualDocumentCatalog.ForKind(kind).DisplayName} — {obligation.RecipientName.Trim()}";
+            if (obligation.CompletedOn is not null)
+            {
+                omitted.Add($"{label}: this exact obligation is already attested. Sati does not reconstruct completed evidence from metadata.");
+                continue;
+            }
+            if (input.LiveArtifacts.Any(x =>
+                    x.ReleaseObligationRecordId == obligation.RecordId &&
+                    x.Kind == kind.ToString() && x.Origin != "Draft"))
+            {
+                omitted.Add($"{label}: a completed or external copy is already recorded. Retrieve that exact saved/signed copy; it is not reconstructed from metadata.");
+                continue;
+            }
             byte[] pdf;
             if (kind == AnnualDocumentKind.ReleaseDhhs)
                 pdf = dhhs.Fill(DhhsFormDefinition.FormKey.AuthorizationToRelease,
@@ -60,13 +97,36 @@ public sealed class AnnualPacketComposer(AgencyReleasePdfGenerator release, Dhhs
                     DhhsFormDefinition.Selections.None);
             else
             {
-                var choices = new AgencyReleaseRequest(null, null, null, null, null, null, null, null, null, null,
+                var choices = new AgencyReleaseRequest(
+                    null,
+                    obligation.Category == ReleaseObligationCategory.Medical
+                        ? "Healthcare provider"
+                        : "Service or waiver provider",
+                    obligation.RecipientName,
+                    null,
+                    obligation.RecipientAddress,
+                    null,
+                    null,
+                    null,
+                    obligation.RecipientPhone,
+                    null,
                     null, null, null, null, null, null, null, null, null, IsDraft: true);
                 pdf = kind == AnnualDocumentKind.ReleaseAgency ? release.Generate(input.Subject, choices, input.GeneratedAtUtc)
                     : release.GenerateMedical(input.Subject, choices, input.GeneratedAtUtc);
             }
-            files.Add(new(kind, pdf, $"{kind}-DRAFT-{input.Subject.PersonId}.pdf", DocumentArtifactOrigin.Draft,
-                ["Recipient", "Disclosure choices", "Authorization", "Signatures"]));
+            var blanks = new List<string> { "Disclosure choices", "Authorization", "Signatures" };
+            if (string.IsNullOrWhiteSpace(obligation.RecipientName) &&
+                obligation.Category != ReleaseObligationCategory.Dhhs)
+                blanks.Insert(0, "Recipient");
+            files.Add(new(
+                kind,
+                pdf,
+                $"{kind}-DRAFT-{input.Subject.PersonId}-{obligation.ObligationId:N}.pdf",
+                DocumentArtifactOrigin.Draft,
+                blanks,
+                ReleaseObligationRecordId: obligation.RecordId,
+                ReleaseObligationId: obligation.ObligationId,
+                ReleaseRecipient: obligation.RecipientName));
         }
         return new(files, omitted);
     }
@@ -87,13 +147,18 @@ public sealed class AnnualPacketComposer(AgencyReleasePdfGenerator release, Dhhs
             foreach (var file in rendered.Documents)
             {
                 using (var target = zip.CreateEntry(file.FileName).Open()) target.Write(file.Pdf);
-                var artifact = recorded.Single(x => x.Kind == file.Kind.ToString());
+                var artifact = recorded.Single(x =>
+                    x.Kind == file.Kind.ToString() &&
+                    x.ReleaseObligationRecordId == file.ReleaseObligationRecordId);
                 var actual = Convert.ToHexString(SHA256.HashData(file.Pdf));
                 if (!DocumentVerification.Matches(artifact.ContentSha256, artifact.ByteCount, new(artifact.Id, actual, file.Pdf.LongLength)))
                     throw new InvalidOperationException("The generated document did not match its recorded hash.");
                 manifest.AppendLine($"{AnnualDocumentCatalog.ForKind(file.Kind).DisplayName}: {file.Origin}")
                     .AppendLine($"File: {file.FileName}; artifact: {artifact.Id}; SHA-256: {actual}")
                     .AppendLine($"Template: {file.TemplateOwner}/{file.TemplateKey}/{file.TemplateVersion}; content: {file.SourceContentId}/{file.SourceContentVersion}")
+                    .AppendLine(file.ReleaseObligationId is Guid releaseId
+                        ? $"Release obligation: {releaseId:D}; recipient: {file.ReleaseRecipient ?? "DHHS"}"
+                        : "Release obligation: n/a")
                     .AppendLine("Blank fields: " + string.Join(", ", file.BlankFields)).AppendLine();
             }
             foreach (var reason in rendered.Omitted) manifest.AppendLine(reason);

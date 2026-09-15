@@ -9,6 +9,54 @@ namespace Sati.Api.Tests;
 public sealed class FormCompletionApiTests(SatiApiFactory factory)
 {
     [Fact]
+    public async Task ReclassificationAtomicallyRecordsItsImpliedAssessmentWithSeparateDates()
+    {
+        const int personId = 102;
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var assessmentId = await factory.CreateOutstandingFormAsync(
+            personId, "ComprehensiveAssessment");
+        var reclassificationId = await factory.CreateOutstandingFormAsync(
+            personId, "Reclassification");
+        var reclassificationOn = DateTime.Today.AddDays(-2);
+        var assessmentOn = reclassificationOn.AddDays(-3);
+
+        try
+        {
+            var response = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/Reclassification/attestation",
+                new AttestFormRequest(
+                    reclassificationId,
+                    reclassificationOn,
+                    ComprehensiveAssessmentCompletedOn: assessmentOn));
+
+            response.EnsureSuccessStatusCode();
+            var people = await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload");
+            var forms = people!.Single(person => person.Id == personId).Forms;
+            Assert.Equal(
+                reclassificationOn,
+                forms.Single(form => form.Id == reclassificationId).CompletedDate);
+            Assert.Equal(
+                assessmentOn,
+                forms.Single(form => form.Id == assessmentId).CompletedDate);
+        }
+        finally
+        {
+            foreach (var (type, id) in new[]
+                     {
+                         ("Reclassification", reclassificationId),
+                         ("ComprehensiveAssessment", assessmentId)
+                     })
+            {
+                var revoke = await owner.PostAsJsonAsync(
+                    $"/api/v1/people/{personId}/forms/{type}/attestation/revoke",
+                    new RevokeFormAttestationRequest(id, "Atomic attestation test cleanup."));
+                if (revoke.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.Conflict))
+                    revoke.EnsureSuccessStatusCode();
+            }
+        }
+    }
+
+    [Fact]
     public async Task AttestationStoresTheEnteredDateInsteadOfSynthesizingTodayOrDueDate()
     {
         _ = await factory.CreateNonCompliantReviewNoteAsync();

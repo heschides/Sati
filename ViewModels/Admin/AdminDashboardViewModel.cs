@@ -5,6 +5,7 @@ using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
 using Sati.Services;
+using Sati.ViewModels.Billing;
 
 namespace Sati.ViewModels.Admin;
 
@@ -12,7 +13,8 @@ public partial class AdminDashboardViewModel(
     IAdminService adminService,
     ISessionService sessionService,
     IPersonService? personService = null,
-    DataEnvironmentInfo? environmentInfo = null) : ObservableObject
+    DataEnvironmentInfo? environmentInfo = null,
+    BillingComplianceRecoveryViewModel? complianceRecovery = null) : ObservableObject
 {
     private CancellationTokenSource? _historyCancellation;
     private readonly LatestRequestTracker _accountLoads = new();
@@ -22,6 +24,7 @@ public partial class AdminDashboardViewModel(
     public ObservableCollection<PersonVersionDto> PersonHistory { get; } = [];
     public ObservableCollection<IncidentGroupDto> Incidents { get; } = [];
     public ObservableCollection<IncidentGroupDto> FilteredIncidents { get; } = [];
+    public BillingComplianceRecoveryViewModel? ComplianceRecovery { get; } = complianceRecovery;
     public IReadOnlyList<string> IncidentStatusFilters { get; } = ["All statuses", "Open", "Reopened", "Investigating", "Resolved"];
     public IReadOnlyList<string> IncidentSeverityFilters { get; } = ["All severities", "Critical", "Error", "Warning"];
     public IReadOnlyList<string> IncidentStatuses { get; } = ["Open", "Investigating", "Resolved"];
@@ -151,6 +154,7 @@ public partial class AdminDashboardViewModel(
     {
         if (sessionService.CurrentUser?.HasAdminPermissions != true)
         {
+            ComplianceRecovery?.ClearForAccountSwitch();
             StatusMessage = "Only an Admin can open this dashboard.";
             return;
         }
@@ -177,7 +181,11 @@ public partial class AdminDashboardViewModel(
             var activityTask = adminService.GetActivityAsync(30, 150);
             var operationsTask = adminService.GetOperationsAsync();
             var incidentsTask = adminService.GetIncidentsAsync();
-            await Task.WhenAll(overviewTask, peopleTask, activityTask, operationsTask, incidentsTask);
+            var recoveryTask = ComplianceRecovery is null
+                ? Task.CompletedTask
+                : LoadComplianceRecoveryAsync(peopleTask);
+            await Task.WhenAll(
+                overviewTask, peopleTask, activityTask, operationsTask, incidentsTask, recoveryTask);
             if (!_accountLoads.IsCurrent(request) || !ReferenceEquals(sessionService.CurrentUser, account))
                 return;
 
@@ -187,7 +195,8 @@ public partial class AdminDashboardViewModel(
             Health = incidentDashboard.Health;
             Replace(Incidents, incidentDashboard.Incidents);
             ApplyIncidentFilter();
-            Replace(People, await peopleTask);
+            var people = await peopleTask;
+            Replace(People, people);
             Replace(RecentActivity, (await activityTask).Select(item => new AdminActivityRow(item)));
             LastRefreshedAt = DateTime.Now;
 
@@ -207,9 +216,23 @@ public partial class AdminDashboardViewModel(
         }
     }
 
+    private async Task LoadComplianceRecoveryAsync(Task<List<AdminPersonListItemDto>> peopleTask)
+    {
+        try
+        {
+            await ComplianceRecovery!.LoadPeopleAsync(await peopleTask);
+        }
+        catch
+        {
+            ComplianceRecovery!.ClearForAccountSwitch();
+            throw;
+        }
+    }
+
     public void ClearForAccountSwitch()
     {
         _accountLoads.Invalidate();
+        ComplianceRecovery?.ClearForAccountSwitch();
         _historyCancellation?.Cancel();
         _historyCancellation?.Dispose();
         _historyCancellation = null;

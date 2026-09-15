@@ -19,6 +19,19 @@ public sealed class AgencyReleaseTests
     }
 
     [Fact]
+    public void Staff_generation_confirmation_explicitly_has_no_compliance_effect()
+    {
+        Assert.Contains(
+            "document preparation only",
+            AgencyReleaseRules.StaffAttestation,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "does not complete a tracked release obligation",
+            AgencyReleaseRules.AttestationScopeNotice,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void One_time_release_cannot_exceed_ninety_days()
     {
         var request = ValidRequest() with { ExpirationDate = new DateOnly(2026, 12, 2) };
@@ -140,7 +153,67 @@ public sealed class AgencyReleaseTests
     }
 
     [Fact]
-    public async Task Staff_attestation_requires_confirmation_before_generation()
+    public async Task LocalGenerationLinksTheArtifactToTheExactSelectedRecipientObligation()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var target = DateTime.Today;
+        Guid obligationId;
+        long obligationRecordId;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var person = await db.People.SingleAsync(candidate => candidate.Id == fixture.PersonOneId);
+            person.EffectiveDate = target.AddYears(-1);
+            var provider = new Provider
+            {
+                Id = 99101,
+                AgencyId = fixture.CaseManagerOne.AgencyId,
+                Type = ProviderType.Healthcare,
+                MedicalKind = MedicalProviderKind.Individual,
+                Name = "Exact Medical Recipient"
+            };
+            db.Providers.Add(provider);
+            var plan = ReleaseObligationRules.GenerateCycle(target,
+            [
+                new ReleaseAssignmentFact(
+                    "person-provider:99102",
+                    ReleaseAssignmentKind.MedicalProvider,
+                    target.AddYears(-1),
+                    null,
+                    target.AddYears(-1))
+            ]).Single(item => item.Category == ReleaseObligationCategory.Medical);
+            var obligation = ReleaseObligation.Create(
+                fixture.CaseManagerOne.AgencyId,
+                person.Id,
+                plan,
+                DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Utc),
+                provider.Id,
+                provider.Name);
+            db.ReleaseObligations.Add(obligation);
+            await db.SaveChangesAsync();
+            obligationId = obligation.ObligationId;
+            obligationRecordId = obligation.Id;
+        }
+
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var shared = new AgencyReleasePdfGenerator();
+        var service = new AgencyReleaseService(
+            fixture.Factory, session, shared, new MedicalReleasePdfGenerator(shared));
+
+        await service.GenerateMedicalForObligationAsync(
+            fixture.PersonOneId, ValidRequest(), obligationId);
+
+        await using var verification = fixture.Factory.CreateDbContext();
+        var artifact = await verification.DocumentArtifacts.AsNoTracking()
+            .SingleAsync(item => item.PersonId == fixture.PersonOneId &&
+                                 item.Kind == AnnualDocumentKind.ReleaseMedical &&
+                                 item.SupersededByArtifactId == null);
+        Assert.Equal(obligationRecordId, artifact.ReleaseObligationId);
+        Assert.Equal(target, artifact.CycleStart);
+    }
+
+    [Fact]
+    public async Task Staff_generation_confirmation_requires_confirmation_before_generation()
     {
         var service = new RecordingAgencyReleaseService();
         var viewModel = ReadyViewModel(service);
@@ -167,6 +240,71 @@ public sealed class AgencyReleaseTests
         Assert.All(viewModel.InformationCategories, option => Assert.False(option.IsSelected));
         Assert.False(viewModel.DidObtainRoi);
         Assert.Null(viewModel.AuthorizationChoice);
+    }
+
+    [Fact]
+    public async Task ReleaseEditorSendsTheExactSelectedObligationAndFiltersByDocumentKind()
+    {
+        var service = new RecordingAgencyReleaseService();
+        var viewModel = ReadyViewModel(service);
+        var agencyId = Guid.NewGuid();
+        var medicalId = Guid.NewGuid();
+        viewModel.SetReleaseObligations(
+        [
+            Obligation(31, agencyId, ReleaseObligationCategory.Agency, "Service Provider"),
+            Obligation(31, medicalId, ReleaseObligationCategory.Medical, "Medical Provider")
+        ]);
+
+        var agencyChoice = Assert.Single(viewModel.ReleaseObligationChoices);
+        Assert.Equal(agencyId, agencyChoice.ObligationId);
+        viewModel.SelectedReleaseObligation = agencyChoice;
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        Assert.Equal(agencyId, service.LastObligationId);
+        Assert.Equal(AnnualDocumentKind.ReleaseAgency, service.LastKind);
+
+        viewModel.SelectedReleaseKind = viewModel.ReleaseKindChoices.Single(
+            item => item.Kind == AnnualDocumentKind.ReleaseMedical);
+        var medicalChoice = Assert.Single(viewModel.ReleaseObligationChoices);
+        Assert.Equal(medicalId, medicalChoice.ObligationId);
+        Assert.Null(viewModel.SelectedReleaseObligation);
+        viewModel.SelectedReleaseObligation = medicalChoice;
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        Assert.Equal(medicalId, service.LastObligationId);
+        Assert.Equal(AnnualDocumentKind.ReleaseMedical, service.LastKind);
+    }
+
+    [Fact]
+    public void ReleaseEditorDisambiguatesDuplicateRecipientNamesWithDirectoryIdentity()
+    {
+        var viewModel = ReadyViewModel(new RecordingAgencyReleaseService());
+        viewModel.SetReleaseObligations(
+        [
+            Obligation(31, Guid.NewGuid(), ReleaseObligationCategory.Agency,
+                "Same Provider", recipientProviderId: 77),
+            Obligation(31, Guid.NewGuid(), ReleaseObligationCategory.Agency,
+                "Same Provider", recipientProviderId: 78)
+        ]);
+
+        Assert.Equal(2, viewModel.ReleaseObligationChoices.Count);
+        Assert.Contains("directory #77", viewModel.ReleaseObligationChoices[0].DisplayName);
+        Assert.Contains("directory #78", viewModel.ReleaseObligationChoices[1].DisplayName);
+        Assert.NotEqual(
+            viewModel.ReleaseObligationChoices[0].DisplayName,
+            viewModel.ReleaseObligationChoices[1].DisplayName);
+    }
+
+    [Fact]
+    public void ReleaseTrackerNamesTheDirectoryIdentityForDuplicateSafeAccessibility()
+    {
+        var item = new ReleaseObligationItemViewModel(
+            Obligation(31, Guid.NewGuid(), ReleaseObligationCategory.Medical,
+                "Same Provider", recipientProviderId: 78),
+            DateTime.Today);
+
+        Assert.Contains("Same Provider (directory #78)", item.Name);
+        Assert.Contains("Same Provider (directory #78)", item.AutomationName);
     }
 
     private static AgencyReleaseViewModel ReadyViewModel(IAgencyReleaseService service)
@@ -209,6 +347,30 @@ public sealed class AgencyReleaseTests
         false,
         false);
 
+    private static ReleaseObligationDto Obligation(
+        int personId,
+        Guid obligationId,
+        ReleaseObligationCategory category,
+        string recipient,
+        int recipientProviderId = 77) => new(
+        42,
+        obligationId,
+        personId,
+        $"synthetic:{obligationId:D}",
+        category.ToString(),
+        ReleaseObligationTrigger.AnnualRenewal.ToString(),
+        DateTime.Today,
+        recipientProviderId,
+        recipient,
+        DateTime.Today.AddDays(-1),
+        DateTime.Today,
+        DateTime.Today,
+        null,
+        null,
+        null,
+        false,
+        []);
+
     private static Person PersonFor(int id, string lastName)
     {
         var person = Person.CreatePerson(
@@ -228,6 +390,8 @@ public sealed class AgencyReleaseTests
     private sealed class RecordingAgencyReleaseService : IAgencyReleaseService
     {
         public int GenerationCount { get; private set; }
+        public Guid? LastObligationId { get; private set; }
+        public AnnualDocumentKind? LastKind { get; private set; }
 
         public Task<AgencyReleaseResult> GenerateAsync(
             int personId,
@@ -236,6 +400,30 @@ public sealed class AgencyReleaseTests
         {
             GenerationCount++;
             return Task.FromResult(new AgencyReleaseResult([1, 2, 3], "agency-release.pdf"));
+        }
+
+        public Task<AgencyReleaseResult> GenerateForObligationAsync(
+            int personId,
+            AgencyReleaseRequest request,
+            Guid releaseObligationId,
+            CancellationToken cancellationToken = default)
+        {
+            GenerationCount++;
+            LastObligationId = releaseObligationId;
+            LastKind = AnnualDocumentKind.ReleaseAgency;
+            return Task.FromResult(new AgencyReleaseResult([1, 2, 3], "agency-release.pdf"));
+        }
+
+        public Task<AgencyReleaseResult> GenerateMedicalForObligationAsync(
+            int personId,
+            AgencyReleaseRequest request,
+            Guid releaseObligationId,
+            CancellationToken cancellationToken = default)
+        {
+            GenerationCount++;
+            LastObligationId = releaseObligationId;
+            LastKind = AnnualDocumentKind.ReleaseMedical;
+            return Task.FromResult(new AgencyReleaseResult([1, 2, 3], "medical-release.pdf"));
         }
     }
 }

@@ -42,7 +42,8 @@ namespace Sati.Services
             new("Walnut Linen", "WalnutLinen"),
             new("Deep Current", "DeepCurrent"),
             new("Redwood Blush", "RedwoodBlush"),
-            new("Bodhi Watercolor", "BodhiWatercolor")
+            new("Bodhi Watercolor", "BodhiWatercolor"),
+            new("Umber Facets", "UmberFacets")
         ];
 
         public ThemeOption CurrentTheme { get; private set; }

@@ -7,7 +7,8 @@ namespace Sati.Api.Infrastructure;
 
 /// <summary>Server-only recovery loop. No public-portal credentials can resolve these workers.</summary>
 internal sealed class SignatureProcessingService(IDbContextFactory<ApiDbContext> factory, SignatureFeature feature,
-    SignatureOptions options, SignatureCompletionWorker packages, SignatureMailWorker mail,
+    SignatureOptions options, SignatureComplianceProjectionService compliance,
+    SignatureCompletionWorker packages, SignatureMailWorker mail,
     ILogger<SignatureProcessingService> logger) : BackgroundService
 {
     private int lastCompletion;
@@ -17,6 +18,9 @@ internal sealed class SignatureProcessingService(IDbContextFactory<ApiDbContext>
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             if (!feature.Enabled || !options.WorkersEnabled) continue;
+            try { await ProjectCompliance(stoppingToken); }
+            catch (Exception error) when (error is not OperationCanceledException)
+            { logger.LogWarning("Signature compliance projection failed ({FailureType}). Review signing service health.", error.GetType().Name); }
             try { await PreparePackages(stoppingToken); }
             catch (Exception error) when (error is not OperationCanceledException)
             { logger.LogWarning("Signature package scan failed ({FailureType}). Review signing service health.", error.GetType().Name); }
@@ -32,6 +36,17 @@ internal sealed class SignatureProcessingService(IDbContextFactory<ApiDbContext>
             }
         }
     }
+    private async Task ProjectCompliance(CancellationToken ct)
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            await using var db = await factory.CreateDbContextAsync(ct);
+            if (!await new SignatureStaffSingleAttempt(db).ExecuteAsync(
+                    () => compliance.ProcessNextAsync(db, ct)))
+                break;
+        }
+    }
+
     private async Task PreparePackages(CancellationToken ct)
     {
         int[] candidates;

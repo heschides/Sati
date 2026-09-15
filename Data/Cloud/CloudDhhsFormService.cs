@@ -58,11 +58,35 @@ public sealed class CloudDhhsFormService(CloudApiClient client) : IDhhsFormServi
         DhhsFormDefinition.FormKey form,
         int personId,
         DhhsFormDefinition.Selections selections,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await GenerateCoreAsync(
+            form, personId, selections, targetEffectiveDate: null,
+            releaseObligationId: null, cancellationToken);
+
+    public async Task<DhhsFormResult> GenerateForAnnualTargetAsync(
+        DhhsFormDefinition.FormKey form,
+        int personId,
+        DhhsFormDefinition.Selections selections,
+        DateTime targetEffectiveDate,
+        Guid? releaseObligationId,
+        CancellationToken cancellationToken = default) =>
+        await GenerateCoreAsync(
+            form, personId, selections, targetEffectiveDate.Date,
+            releaseObligationId, cancellationToken);
+
+    private async Task<DhhsFormResult> GenerateCoreAsync(
+        DhhsFormDefinition.FormKey form,
+        int personId,
+        DhhsFormDefinition.Selections selections,
+        DateTime? targetEffectiveDate,
+        Guid? releaseObligationId,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selections);
 
-        var request = new DhhsFormRequest(form.ToString(), selections.Checks, selections.Text);
+        var request = new DhhsFormRequest(
+            form.ToString(), selections.Checks, selections.Text,
+            targetEffectiveDate, releaseObligationId);
         var (pdf, headers) = await client.PostBytesWithHeaderAsync(
             $"/api/v1/people/{personId}/forms.pdf",
             request,

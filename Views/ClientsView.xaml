@@ -811,6 +811,10 @@
                                                              <Binding />
                                                              <Binding Path="DataContext.BillingComplianceRequirements"
                                                                       RelativeSource="{RelativeSource AncestorType=ListBox}" />
+                                                             <Binding Path="DataContext.PcpOpenDaysBefore"
+                                                                      RelativeSource="{RelativeSource AncestorType=ListBox}" />
+                                                             <Binding Path="DataContext.CompliancePresentationRevision"
+                                                                      RelativeSource="{RelativeSource AncestorType=ListBox}" />
                                                          </MultiBinding>
                                                      </DataTrigger.Binding>
                                                      <Setter TargetName="ClientCard" Property="Background" Value="{DynamicResource OverdueFillBrush}" />
@@ -853,11 +857,15 @@
                                                     <Style.Triggers>
                                                         <DataTrigger Value="False">
                                                             <DataTrigger.Binding>
-                                                                <MultiBinding Converter="{StaticResource PersonBillingComplianceConverter}">
-                                                                    <Binding />
-                                                                    <Binding Path="DataContext.BillingComplianceRequirements"
-                                                                             RelativeSource="{RelativeSource AncestorType=ListBox}" />
-                                                                </MultiBinding>
+                                                                 <MultiBinding Converter="{StaticResource PersonBillingComplianceConverter}">
+                                                                     <Binding />
+                                                                     <Binding Path="DataContext.BillingComplianceRequirements"
+                                                                              RelativeSource="{RelativeSource AncestorType=ListBox}" />
+                                                                     <Binding Path="DataContext.PcpOpenDaysBefore"
+                                                                              RelativeSource="{RelativeSource AncestorType=ListBox}" />
+                                                                     <Binding Path="DataContext.CompliancePresentationRevision"
+                                                                              RelativeSource="{RelativeSource AncestorType=ListBox}" />
+                                                                 </MultiBinding>
                                                             </DataTrigger.Binding>
                                                             <Setter Property="Visibility" Value="Visible" />
                                                         </DataTrigger>
@@ -948,6 +956,10 @@
                                         <TextBlock Text="{Binding Date, StringFormat={}{0:MMM d}}"
                                                    FontSize="10"
                                                    Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <TextBlock Text="{Binding ComplianceIdentityText}"
+                                                   FontSize="10"
+                                                   Foreground="{DynamicResource TextMutedBrush}"
+                                                   AutomationProperties.Name="Compliance annual identity" />
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
@@ -1128,9 +1140,47 @@
                     </StackPanel>
                     </ScrollViewer>
 
+                    <!-- This warning belongs to the selected consumer, not to one tab.
+                         Keeping it outside the TabControl also makes it visible while
+                         staff work in Notes, Plans, Releases, or any other section. -->
+                    <Border Grid.Column="2"
+                            Grid.Row="0"
+                            Background="{DynamicResource DangerSoftBrush}"
+                            BorderBrush="{DynamicResource OverdueBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,9"
+                            Visibility="{Binding HasSelectedPersonComplianceIssues,
+                                Converter={StaticResource BoolToVisibilityConverter}}"
+                            AutomationProperties.Name="Selected client billing compliance alert">
+                        <StackPanel>
+                            <TextBlock Text="BILLING COMPLIANCE ATTENTION"
+                                       FontSize="11"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource DangerStrongBrush}" />
+                            <TextBlock Text="Resolve the following before this client can move through ordinary billing approval:"
+                                       Margin="0,3,0,3"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource DangerStrongBrush}"
+                                       TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding SelectedPersonComplianceReasons}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Margin="8,1,0,0"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource DangerStrongBrush}"
+                                                   TextWrapping="Wrap">
+                                            <Run Text="• " />
+                                            <Run Text="{Binding Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
                     <TabControl Grid.Column="2"
-                                Grid.Row="0"
-                                Grid.RowSpan="3"
+                                Grid.Row="2"
                                 SelectedIndex="{Binding ClientWorkspaceTabIndex}"
                                 Style="{StaticResource ClientWorkspaceTabControlStyle}"
                                 AutomationProperties.Name="Consumer record sections">
@@ -1140,45 +1190,10 @@
                                           HorizontalScrollBarVisibility="Disabled"
                                           AutomationProperties.Name="Consumer overview">
                             <DockPanel LastChildFill="True">
-                                <TextBlock DockPanel.Dock="Top" Text="{Binding AnnualDocuments.Reminder}"
-                                           TextWrapping="Wrap" Margin="0,0,0,10"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           AutomationProperties.Name="Annual document preparation reminder" />
-                                <Border DockPanel.Dock="Top"
-                                        Background="{DynamicResource DangerSoftBrush}"
-                                        BorderBrush="{DynamicResource OverdueBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Padding="12,9"
-                                        Margin="0,0,0,12"
-                                        Visibility="{Binding HasSelectedPersonComplianceIssues,
-                                            Converter={StaticResource BoolToVisibilityConverter}}"
-                                        AutomationProperties.Name="Selected client billing compliance alert">
-                                    <StackPanel>
-                                        <TextBlock Text="BILLING COMPLIANCE ATTENTION"
-                                                   FontSize="11"
-                                                   FontWeight="Bold"
-                                                   Foreground="{DynamicResource DangerStrongBrush}" />
-                                        <TextBlock Text="Resolve the following before this client can move through ordinary billing approval:"
-                                                   Margin="0,3,0,3"
-                                                   FontSize="11"
-                                                   Foreground="{DynamicResource DangerStrongBrush}"
-                                                   TextWrapping="Wrap" />
-                                        <ItemsControl ItemsSource="{Binding SelectedPersonComplianceReasons}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Margin="8,1,0,0"
-                                                               FontSize="11"
-                                                               Foreground="{DynamicResource DangerStrongBrush}"
-                                                               TextWrapping="Wrap">
-                                                        <Run Text="• " />
-                                                        <Run Text="{Binding Mode=OneWay}" />
-                                                    </TextBlock>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
+                                 <TextBlock DockPanel.Dock="Top" Text="{Binding AnnualDocuments.Reminder}"
+                                            TextWrapping="Wrap" Margin="0,0,0,10"
+                                            Foreground="{DynamicResource TextPrimaryBrush}"
+                                            AutomationProperties.Name="Annual document preparation reminder" />
                                 <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -2108,7 +2123,7 @@
                             <!-- The shared checkbox style leaves generous breathing room
                                  elsewhere. Forms is a dense status matrix, so one pixel is
                                  enough separation and avoids manufacturing another scrollbar. -->
-                            <Style TargetType="CheckBox"
+                            <Style TargetType="{x:Type views:AttestationCheckBox}"
                                    BasedOn="{StaticResource {x:Type CheckBox}}">
                                 <Setter Property="Margin" Value="0,0,0,1" />
                             </Style>
@@ -2127,9 +2142,9 @@
                                        Margin="0,0,12,0"
                                        VerticalAlignment="Center" />
                         <Button Style="{StaticResource IconButton}"
-                                AutomationProperties.Name="Toggle compliance editing"
-                                    Command="{Binding ToggleComplianceOverrideCommand}"
-                                    ToolTip="Toggle compliance editing">
+                                AutomationProperties.Name="Toggle form attestation editing lock"
+                                Command="{Binding ToggleFormsEditingCommand}"
+                                ToolTip="Unlock or lock form attestation editing">
                                 <TextBlock FontFamily="Segoe MDL2 Assets"
                                            FontSize="14"
                                            Foreground="{DynamicResource TextSecondaryBrush}">
@@ -2138,7 +2153,7 @@
                                             <Setter Property="Text"
                                                     Value="&#xE72E;" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding AllowComplianceOverride}"
+                                                <DataTrigger Binding="{Binding IsFormsEditingUnlocked}"
                                                              Value="True">
                                                     <Setter Property="Text"
                                                             Value="&#xE785;" />
@@ -2148,6 +2163,21 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                             </Button>
+                            <TextBlock Margin="8,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="11">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="Locked — use the lock icon to edit" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsFormsEditingUnlocked}" Value="True">
+                                                <Setter Property="Text" Value="Unlocked — choose a form to attest or revoke" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
 
                             <Grid Grid.Row="1">
@@ -2176,9 +2206,9 @@
                                            Margin="0,0,0,2" />
                                 <StackPanel Grid.Row="1"
                                             Grid.Column="0">
-                                    <CheckBox Content="Quarter 1"
+                                    <views:AttestationCheckBox Content="Quarter 1"
                                               IsChecked="{Binding Q1RCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.Q1R}" />
                                     <TextBlock Text="{Binding Q1RDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2188,9 +2218,9 @@
                                 </StackPanel>
                                 <StackPanel Grid.Row="2"
                                             Grid.Column="0">
-                                    <CheckBox Content="Quarter 2"
+                                    <views:AttestationCheckBox Content="Quarter 2"
                                               IsChecked="{Binding Q2RCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.Q2R}" />
                                     <TextBlock Text="{Binding Q2RDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2200,9 +2230,9 @@
                                 </StackPanel>
                                 <StackPanel Grid.Row="3"
                                             Grid.Column="0">
-                                    <CheckBox Content="Quarter 3"
+                                    <views:AttestationCheckBox Content="Quarter 3"
                                               IsChecked="{Binding Q3RCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.Q3R}" />
                                     <TextBlock Text="{Binding Q3RDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2212,9 +2242,9 @@
                                 </StackPanel>
                                 <StackPanel Grid.Row="4"
                                             Grid.Column="0">
-                                    <CheckBox Content="Quarter 4"
+                                    <views:AttestationCheckBox Content="Quarter 4"
                                               IsChecked="{Binding Q4RCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.Q4R}" />
                                     <TextBlock Text="{Binding Q4RDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2230,9 +2260,9 @@
                                            Margin="0,0,0,2" />
                                 <StackPanel Grid.Row="1"
                                             Grid.Column="2">
-                                    <CheckBox Content="PCP"
+                                    <views:AttestationCheckBox Content="PCP"
                                               IsChecked="{Binding PcpCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.PCP}" />
                                     <TextBlock Text="{Binding PcpDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2242,9 +2272,9 @@
                                 </StackPanel>
                                 <StackPanel Grid.Row="2"
                                             Grid.Column="2">
-                                    <CheckBox Content="Comp Assessment"
+                                    <views:AttestationCheckBox Content="Comp Assessment"
                                               IsChecked="{Binding CompAssessmentCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.ComprehensiveAssessment}" />
                                     <TextBlock Text="{Binding CompAssessmentDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2254,9 +2284,9 @@
                                 </StackPanel>
                                 <StackPanel Grid.Row="3"
                                             Grid.Column="2">
-                                    <CheckBox Content="Reclassification"
+                                    <views:AttestationCheckBox Content="Reclassification"
                                               IsChecked="{Binding ReclassificationCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.Reclassification}" />
                                     <TextBlock Text="{Binding ReclassificationDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2266,9 +2296,9 @@
                                 </StackPanel>
                                 <StackPanel Grid.Row="4"
                                             Grid.Column="2">
-                                    <CheckBox Content="Safety Plan"
+                                    <views:AttestationCheckBox Content="Safety Plan"
                                               IsChecked="{Binding SafetyPlanCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.SafetyPlan}" />
                                     <TextBlock Text="{Binding SafetyPlanDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2278,9 +2308,9 @@
                                 </StackPanel>
                                 <StackPanel Grid.Row="5"
                                             Grid.Column="2">
-                                    <CheckBox Content="Privacy Practices"
+                                    <views:AttestationCheckBox Content="Privacy Practices"
                                               IsChecked="{Binding PrivacyPracticesCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
+                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
                                               Command="{Binding ToggleFormCommand}"
                                               CommandParameter="{x:Static local:FormType.PrivacyPractices}" />
                                     <TextBlock Text="{Binding PrivacyPracticesDueDate, StringFormat={}{0:MM/dd/yy}}"
@@ -2294,42 +2324,15 @@
                                            Text="Releases"
                                            Style="{StaticResource SectionHeader}"
                                            Margin="0,0,0,2" />
-                                <StackPanel Grid.Row="1"
-                                            Grid.Column="4">
-                                    <CheckBox Content="DHHS"
-                                              IsChecked="{Binding ReleaseDhhsCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
-                                              Command="{Binding ToggleFormCommand}"
-                                              CommandParameter="{x:Static local:FormType.Release_DHHS}" />
-                                    <TextBlock Text="{Binding ReleaseDhhsDueDate, StringFormat={}{0:MM/dd/yy}}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontSize="11"
-                                               Margin="20,0,0,1" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="2"
-                                            Grid.Column="4">
-                                    <CheckBox Content="Agency"
-                                              IsChecked="{Binding ReleaseAgencyCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
-                                              Command="{Binding ToggleFormCommand}"
-                                              CommandParameter="{x:Static local:FormType.Release_Agency}" />
-                                    <TextBlock Text="{Binding ReleaseAgencyDueDate, StringFormat={}{0:MM/dd/yy}}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontSize="11"
-                                               Margin="20,0,0,1" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="3"
-                                            Grid.Column="4">
-                                    <CheckBox Content="Medical"
-                                              IsChecked="{Binding ReleaseMedicalCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding AllowComplianceOverride}"
-                                              Command="{Binding ToggleFormCommand}"
-                                              CommandParameter="{x:Static local:FormType.Release_Medical}" />
-                                    <TextBlock Text="{Binding ReleaseMedicalDueDate, StringFormat={}{0:MM/dd/yy}}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontSize="11"
-                                               Margin="20,0,0,1" />
-                                </StackPanel>
+                                <TextBlock Grid.Row="1"
+                                           Grid.RowSpan="3"
+                                           Grid.Column="4"
+                                           Text="Tracked separately for DHHS and each assigned medical or service provider. Open the Releases tab to attest the exact authorization."
+                                           TextWrapping="Wrap"
+                                           MaxWidth="210"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="11"
+                                           AutomationProperties.Name="Recipient-specific release guidance" />
 
                                 <!-- Appointments: latest doctor/dentist for the
                                      selected client. Date uses OverdueBrush when >365 days
@@ -2525,9 +2528,17 @@
                             <clientDocuments:DhhsFormsWorkspace DataContext="{Binding DhhsForms}" />
                         </TabItem>
 
-                        <TabItem Header="Agency Release"
+                        <TabItem Header="Releases"
                                  Style="{StaticResource ClientWorkspaceTabItemStyle}">
-                            <clientDocuments:AgencyReleaseWorkspace DataContext="{Binding AgencyRelease}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="16">
+                                    <clientDocuments:ReleaseObligationsWorkspace
+                                        DataContext="{Binding ReleaseObligations}" />
+                                    <Separator Margin="0,12" />
+                                    <clientDocuments:AgencyReleaseWorkspace
+                                        DataContext="{Binding AgencyRelease}" />
+                                </StackPanel>
+                            </ScrollViewer>
                         </TabItem>
 
                         <TabItem Header="Safety Plan" Style="{StaticResource ClientWorkspaceTabItemStyle}">

@@ -292,14 +292,28 @@
                        Margin="0,3,0,0" />
         </StackPanel>
 
+        <StackPanel Grid.Row="5">
+            <StackPanel Visibility="{Binding ShowsResponseImport, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Margin="0,0,0,16">
+                <TextBlock Text="CLEARINGHOUSE RESPONSES" Style="{StaticResource LabelStyle}" />
+                <TextBlock Text="Import one original 999, 277CA, or 835 file. Sati matches its claims automatically and prevents duplicate imports. Demo accepts synthetic test responses only."
+                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                           TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left" Margin="0,0,0,8" />
+                <Button Content="Import Clearinghouse Response"
+                        Command="{Binding ImportResponseCommand}"
+                        IsEnabled="{Binding CanImportResponse}"
+                        AutomationProperties.Name="Import clearinghouse response file"
+                        Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" />
+            </StackPanel>
         <!-- Status message -->
-        <TextBlock Grid.Row="5"
+        <TextBlock
                    Text="{Binding StatusMessage}"
                    AutomationProperties.LiveSetting="Polite"
                    FontSize="12"
                    Foreground="{DynamicResource TextPrimaryBrush}"
                    TextWrapping="Wrap"
                    Margin="0,0,0,18" />
+        </StackPanel>
 
         <StackPanel Grid.Row="6" Margin="0,0,0,8">
             <TextBlock Text="SUBMISSION HOME" Style="{StaticResource SectionHeader}" />
@@ -371,7 +385,7 @@
                 </DataGridTextColumn>
                 <!-- Age is what makes a stuck batch visible; the timestamp alone does not. -->
                 <DataGridTextColumn Header="DAYS" Binding="{Binding DaysSinceActivity}" Width="55" />
-                <DataGridTextColumn Header="STATUS" Binding="{Binding CurrentStatus}" Width="120" />
+                <DataGridTextColumn Header="STATUS" Binding="{Binding CurrentStatusDisplay}" Width="180" />
                 <DataGridTextColumn Header="RESPONSE" Binding="{Binding ResponseType}" Width="70" />
                 <DataGridTextColumn Header="DETAIL" Binding="{Binding Explanation}" Width="2*" />
                 <DataGridCheckBoxColumn Header="SYNTHETIC" Binding="{Binding IsSynthetic}" Width="75" />

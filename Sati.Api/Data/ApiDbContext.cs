@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
+using Sati.Models.Billing;
 
 namespace Sati.Api.Data;
 
@@ -26,6 +27,14 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerDocumentTemplate> DocumentTemplates => Set<ServerDocumentTemplate>();
     public DbSet<ServerNote> Notes => Set<ServerNote>();
     public DbSet<ServerSettings> Settings => Set<ServerSettings>();
+    public DbSet<BillingCompliancePolicyVersion> BillingCompliancePolicyVersions => Set<BillingCompliancePolicyVersion>();
+    public DbSet<Sati.Models.BillingComplianceRecoveryDecision> BillingComplianceRecoveryDecisions => Set<Sati.Models.BillingComplianceRecoveryDecision>();
+    public DbSet<BillingComplianceRecoveryObligation> BillingComplianceRecoveryObligations => Set<BillingComplianceRecoveryObligation>();
+    public DbSet<BillingComplianceRecoveryNote> BillingComplianceRecoveryNotes => Set<BillingComplianceRecoveryNote>();
+    public DbSet<BillingCompliancePolicyReviewFlag> BillingCompliancePolicyReviewFlags => Set<BillingCompliancePolicyReviewFlag>();
+    public DbSet<ReleaseObligation> ReleaseObligations => Set<ReleaseObligation>();
+    public DbSet<ReleaseObligationAttestation> ReleaseObligationAttestations => Set<ReleaseObligationAttestation>();
+    public DbSet<ReleaseAuthorizationEvent> ReleaseAuthorizationEvents => Set<ReleaseAuthorizationEvent>();
     public DbSet<ServerScratchpad> Scratchpads => Set<ServerScratchpad>();
     public DbSet<ServerScratchpadComment> ScratchpadComments => Set<ServerScratchpadComment>();
     public DbSet<ServerExemptDate> ExemptDates => Set<ServerExemptDate>();
@@ -37,6 +46,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerBillingPeriod> BillingPeriods => Set<ServerBillingPeriod>();
     public DbSet<ServerClaimLine> ClaimLines => Set<ServerClaimLine>();
     public DbSet<ServerEdiGeneration> EdiGenerations => Set<ServerEdiGeneration>();
+    public DbSet<ClearinghouseResponseReceipt> ClearinghouseResponseReceipts => Set<ClearinghouseResponseReceipt>();
+    public DbSet<ClearinghouseResponseMatch> ClearinghouseResponseMatches => Set<ClearinghouseResponseMatch>();
     public DbSet<ServerBillingSubmissionEvent> BillingSubmissionEvents => Set<ServerBillingSubmissionEvent>();
     public DbSet<ServerRemittanceClaimOutcome> RemittanceClaimOutcomes => Set<ServerRemittanceClaimOutcome>();
     public DbSet<ServerRemittanceDeposit> RemittanceDeposits => Set<ServerRemittanceDeposit>();
@@ -61,6 +72,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        ClearinghousePersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration>(modelBuilder);
         modelBuilder.Entity<ServerDatabaseIdentity>(entity =>
         {
             entity.ToTable("SatiDatabaseIdentity");
@@ -68,9 +80,12 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.EnvironmentName).HasMaxLength(20);
         });
         SignaturePersistenceModel.Configure(modelBuilder);
-        SignaturePersistenceModel.ConfigureClinicalRelationships<ServerDocumentArtifact, ServerAgency, ServerUser, ServerPerson, ServerPersonContact>(modelBuilder);
+        SignaturePersistenceModel.ConfigureClinicalRelationships<ServerDocumentArtifact, ServerAgency, ServerUser, ServerPerson, ServerPersonContact, ServerFormAttestation>(modelBuilder);
         ChatPersistenceModel.Configure<ServerChatRoom, ServerChatRoomMember, ServerChatMessage, ServerChatChange,
             ServerChatReadMarker, ServerAgency, ServerUser, ServerPerson>(modelBuilder);
+        ReleaseObligationPersistenceModel.Configure<ServerAgency, ServerUser, ServerPerson, ServerProvider, ServerDocumentArtifact>(modelBuilder);
+        BillingComplianceRecoveryPersistenceModel.Configure<ServerAgency, ServerUser, ServerPerson, ServerNote>(modelBuilder);
+        BillingCompliancePolicyReviewPersistenceModel.Configure<ServerAgency, ServerPerson, ServerNote, ServerClaimLine>(modelBuilder);
         modelBuilder.Entity<ServerUser>(entity =>
         {
             entity.ToTable("Users");
@@ -78,6 +93,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.Username).HasMaxLength(50);
             entity.Property(x => x.Role).HasMaxLength(50);
             entity.Property(x => x.Permissions).HasConversion<int>();
+            entity.Property(x => x.IsEnabled).HasDefaultValue(true);
+            entity.Property(x => x.SecurityVersion).HasDefaultValue(1L).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<ServerPerson>(entity =>
@@ -119,7 +136,10 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
         modelBuilder.Entity<ServerForm>(entity =>
         {
-            entity.ToTable("Forms");
+            entity.ToTable("Forms", table =>
+                table.HasCheckConstraint(
+                    "CK_Forms_TargetEffectiveDate_Valid",
+                    "[TargetEffectiveDate] >= '1900-01-01'"));
             entity.HasKey(x => x.Id);
             entity.Ignore(x => x.IsCompliant);
             // 40 to match SatiContext.FormTypeMaxLength — the two models describe the
@@ -128,13 +148,12 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             // column cannot hold.
             entity.Property(x => x.Type).HasMaxLength(40);
             entity.Property(x => x.CompletedDate).IsConcurrencyToken();
-            // Mirrors IX_Forms_PersonId_Type_DueDate from the Sati.Persistence chain,
-            // which owns the migration that creates it. Declared here so the server's
-            // model matches the database it writes to: a person has exactly one form
-            // of a given type for a given due date.
-            entity.HasIndex(x => new { x.PersonId, x.Type, x.DueDate })
+            // The annual effective date is identity; DueDate is only a deadline and
+            // legitimately differs by document type within one annual cycle.
+            entity.Property(x => x.TargetEffectiveDate).HasColumnType("date");
+            entity.HasIndex(x => new { x.PersonId, x.Type, x.TargetEffectiveDate })
                   .IsUnique()
-                  .HasDatabaseName("IX_Forms_PersonId_Type_DueDate");
+                  .HasDatabaseName("IX_Forms_PersonId_Type_TargetEffectiveDate");
         });
 
         modelBuilder.Entity<ServerFormAttestation>(entity =>
@@ -172,8 +191,12 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.ExternalNote).HasMaxLength(1_000);
             entity.HasIndex(x => new { x.PersonId, x.Kind, x.CycleStart })
                 .IsUnique()
-                .HasFilter("[SupersededByArtifactId] IS NULL")
+                .HasFilter("[ReleaseObligationId] IS NULL AND [SupersededByArtifactId] IS NULL")
                 .HasDatabaseName("IX_DocumentArtifacts_OneLivePerCycle");
+            entity.HasIndex(x => new { x.ReleaseObligationId, x.Kind })
+                .IsUnique()
+                .HasFilter("[ReleaseObligationId] IS NOT NULL AND [SupersededByArtifactId] IS NULL")
+                .HasDatabaseName("IX_DocumentArtifacts_OneLivePerReleaseObligation");
             entity.HasOne<ServerPerson>()
                 .WithMany()
                 .HasForeignKey(x => x.PersonId)
@@ -223,6 +246,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.ToTable("Notes");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.OverrideReason).HasMaxLength(4_000);
+            entity.Property(x => x.OverrideObligationIdsJson).HasMaxLength(4_000);
         });
 
         modelBuilder.Entity<ServerSettings>(entity =>
@@ -240,6 +265,28 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.VrAssistantTitle)
                 .HasMaxLength(VocationalRehabilitationProfile.AssistantTitleMaxLength)
                 .HasDefaultValue(VocationalRehabilitationProfile.DefaultAssistantTitle);
+        });
+
+        modelBuilder.Entity<BillingCompliancePolicyVersion>(entity =>
+        {
+            entity.ToTable("BillingCompliancePolicyVersions");
+            entity.HasKey(version => version.Id);
+            entity.Property(version => version.VersionId).IsRequired();
+            entity.Property(version => version.EffectiveOn).HasColumnType("date");
+            entity.Property(version => version.Requirements).HasConversion<int>();
+            entity.Property(version => version.Explanation)
+                .HasMaxLength(BillingCompliancePolicyRules.ExplanationMaxLength);
+            entity.HasIndex(version => version.VersionId).IsUnique();
+            // Same-day corrections are retained; the resolver chooses the greater Id.
+            entity.HasIndex(version => new { version.AgencyId, version.EffectiveOn, version.Id });
+            entity.HasOne<ServerAgency>()
+                .WithMany()
+                .HasForeignKey(version => version.AgencyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerUser>()
+                .WithMany()
+                .HasForeignKey(version => version.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ServerScratchpad>(entity =>
@@ -307,6 +354,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.ToTable("PersonProviders");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Role).HasMaxLength(ConsumerProviderRules.MaxRoleLength);
+            entity.Property(x => x.AssignmentKnownOn).HasColumnType("date");
             entity.HasIndex(x => new { x.PersonId, x.EndDate });
             // Mirrors the desktop context: both rules are enforced by the database as well
             // as by the routes, and both filters key on EndDate IS NULL because an ended
@@ -354,6 +402,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.ToTable("EdiGenerations");
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.AgencyId, x.ActorUserId, x.IdempotencyKey }).IsUnique();
+            entity.Property(x => x.ControlNumber).HasMaxLength(9);
+            entity.HasIndex(x => new { x.AgencyId, x.IsTest, x.ControlNumber }).IsUnique().HasFilter("[ControlNumber] IS NOT NULL");
             entity.Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(32);
             entity.Property(x => x.FileName).IsRequired().HasMaxLength(260);
             entity.Property(x => x.Content).IsRequired();
@@ -372,6 +422,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(item => item.ResponseType).HasMaxLength(20);
             entity.Property(item => item.ResponseCode).HasMaxLength(30);
             entity.Property(item => item.Explanation).HasMaxLength(500);
+            entity.HasOne(item => item.EdiGeneration).WithMany().HasForeignKey(item => item.EdiGenerationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ServerBillingPeriod>()
                 .WithMany()
                 .HasForeignKey(item => item.BillingPeriodId)
@@ -380,6 +432,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
         modelBuilder.Entity<ServerRemittanceClaimOutcome>(entity =>
         {
+            entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerEdiGeneration>().WithMany().HasForeignKey(item => item.EdiGenerationId).OnDelete(DeleteBehavior.Restrict);
             entity.ToTable("RemittanceClaimOutcomes");
             entity.HasKey(item => item.Id);
             entity.HasIndex(item => new { item.AgencyId, item.ReceivedAtUtc });
@@ -401,6 +455,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
         modelBuilder.Entity<ServerRemittanceDeposit>(entity =>
         {
+            entity.HasOne<ClearinghouseResponseReceipt>().WithMany().HasForeignKey(item => item.ResponseId).OnDelete(DeleteBehavior.Restrict);
             entity.ToTable("RemittanceDeposits");
             entity.HasKey(item => item.Id);
             entity.HasIndex(item => new { item.AgencyId, item.ReceivedAtUtc });
@@ -617,6 +672,22 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
     private void EnsureAuditEventsAreAppendOnly()
     {
+        ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
+        ReleaseObligationPersistenceModel.ProtectWrites(ChangeTracker);
+        BillingComplianceRecoveryPersistenceModel.ProtectWrites(ChangeTracker);
+        BillingCompliancePolicyReviewPersistenceModel.ProtectWrites(ChangeTracker);
+        if (ChangeTracker.Entries<ServerNote>().Any(entry =>
+                entry.State == EntityState.Modified &&
+                entry.OriginalValues.GetValue<bool>(nameof(ServerNote.ComplianceOverride)) &&
+                (entry.Property(note => note.ComplianceOverride).IsModified ||
+                 entry.Property(note => note.OverrideReason).IsModified ||
+                 entry.Property(note => note.OverrideApprovedById).IsModified ||
+                 entry.Property(note => note.OverrideApprovedAt).IsModified ||
+                 entry.Property(note => note.OverrideAttestationConfirmed).IsModified ||
+                 entry.Property(note => note.OverrideObligationIdsJson).IsModified)))
+            throw new InvalidOperationException("Recorded note compliance exceptions are immutable.");
+        if (ChangeTracker.Entries<ServerEdiGeneration>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Generated EDI records are immutable.");
         SignaturePersistenceModel.ProtectWrites(ChangeTracker);
         SignaturePersistenceModel.ProtectDocumentArtifacts<ServerDocumentArtifact>(ChangeTracker);
         ChatPersistenceModel.ProtectWrites<ServerChatRoom, ServerChatRoomMember, ServerChatMessage, ServerChatChange,
@@ -631,6 +702,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<ServerFormAttestation>()
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+            ChangeTracker.Entries<BillingCompliancePolicyVersion>()
+                .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<ServerDocumentTemplate>()
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<ServerDocumentAcknowledgment>()
@@ -642,7 +715,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             ChangeTracker.Entries<ServerRemittanceDeposit>()
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
         {
-            throw new InvalidOperationException("Audit, form-attestation, document-template, Person history, and billing exchange records are append-only.");
+            throw new InvalidOperationException("Audit, billing-policy, form-attestation, document-template, Person history, and billing exchange records are append-only.");
         }
     }
 }
@@ -657,6 +730,8 @@ internal sealed class ServerDatabaseIdentity
 
 internal sealed class ServerUser
 {
+    public bool IsEnabled { get; set; } = true;
+    public long SecurityVersion { get; set; } = 1;
     public int Id { get; set; }
     public string Username { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
@@ -749,6 +824,7 @@ internal sealed class ServerForm
     public int Id { get; set; }
     public string Type { get; set; } = string.Empty;
     public DateTime DueDate { get; set; }
+    public DateTime TargetEffectiveDate { get; set; }
     public int PersonId { get; set; }
     public DateTime? CompletedDate { get; set; }
     public DateTime? OpenedDate { get; set; }
@@ -799,6 +875,7 @@ internal sealed class ServerDocumentArtifact
     public string BlankFieldsJson { get; set; } = "[]";
     public string? ExternalNote { get; set; }
     public int? SupersededByArtifactId { get; set; }
+    public long? ReleaseObligationId { get; set; }
 }
 
 internal sealed class ServerDocumentTemplate
@@ -837,6 +914,8 @@ internal sealed class ServerNote
     public string? OverrideReason { get; set; }
     public int? OverrideApprovedById { get; set; }
     public DateTime? OverrideApprovedAt { get; set; }
+    public bool OverrideAttestationConfirmed { get; set; }
+    public string? OverrideObligationIdsJson { get; set; }
 }
 
 internal sealed class ServerSettings
@@ -850,6 +929,7 @@ internal sealed class ServerSettings
         VocationalRehabilitationProfile.DefaultAssistantTitle;
     public BillingComplianceRequirements BillingComplianceRequirements { get; set; } =
         BillingComplianceGate.DefaultRequirements;
+    public bool AllowPastBillingPolicyEffectiveDates { get; set; }
     public int AbandonedAfterDays { get; set; } = 7;
     public int ProductivityThreshold { get; set; } = 100;
     public decimal BaseIncentive { get; set; }
@@ -884,21 +964,21 @@ internal sealed class ServerSettings
     public int PcpDaysAfterDue { get; set; } = 30;
     public int CompAssessmentOpenDaysBefore { get; set; } = 30;
     public int CompAssessmentDaysAfterDue { get; set; } = 30;
-    public int ReclassificationOpenDaysBefore { get; set; } = 15;
+    public int ReclassificationOpenDaysBefore { get; set; } = 60;
     public int ReclassificationDaysAfterDue { get; set; }
-    public int SafetyPlanOpenDaysBefore { get; set; } = 60;
+    public int SafetyPlanOpenDaysBefore { get; set; } = 90;
     public int SafetyPlanDaysAfterDue { get; set; } = 30;
-    public int PrivacyPracticesOpenDaysBefore { get; set; } = 30;
+    public int PrivacyPracticesOpenDaysBefore { get; set; } = 90;
     public int PrivacyPracticesDaysAfterDue { get; set; } = 30;
-    public int ReleaseAgencyOpenDaysBefore { get; set; } = 30;
+    public int ReleaseAgencyOpenDaysBefore { get; set; } = 90;
     public int ReleaseAgencyDaysAfterDue { get; set; } = 30;
-    public int ReleaseDhhsOpenDaysBefore { get; set; } = 30;
+    public int ReleaseDhhsOpenDaysBefore { get; set; } = 90;
     public int ReleaseDhhsDaysAfterDue { get; set; } = 30;
-    public int ReleaseMedicalOpenDaysBefore { get; set; } = 30;
+    public int ReleaseMedicalOpenDaysBefore { get; set; } = 90;
     public int ReleaseMedicalDaysAfterDue { get; set; } = 30;
     public int Q4RDaysBeforeAnniversary { get; set; } = 5;
     public int PcpDaysBeforeAnniversary { get; set; }
-    public int CompAssessmentDaysBeforeAnniversary { get; set; } = 60;
+    public int CompAssessmentDaysBeforeAnniversary { get; set; } = 90;
     public int ReclassificationDaysBeforeAnniversary { get; set; } = 30;
     public int SafetyPlanDaysBeforeAnniversary { get; set; }
     public int PrivacyPracticesDaysBeforeAnniversary { get; set; }
@@ -986,6 +1066,7 @@ internal sealed class ServerPersonProvider
     public string? Role { get; set; }
     public bool IsPrimaryCare { get; set; }
     public DateTime? StartDate { get; set; }
+    public DateTime? AssignmentKnownOn { get; set; }
     // EndDate alone says whether the link is current; there is deliberately no active flag.
     public DateTime? EndDate { get; set; }
     public bool HasActiveRelease { get; set; }
@@ -1050,6 +1131,7 @@ internal sealed class ServerEdiGeneration
     public int BillingPeriodId { get; set; }
     public string IdempotencyKey { get; set; } = string.Empty;
     public bool IsTest { get; set; }
+    public string? ControlNumber { get; set; }
     public string FileName { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
@@ -1067,6 +1149,9 @@ internal sealed class ServerBillingSubmissionEvent
     public string? ResponseCode { get; set; }
     public string? Explanation { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
+    public long? EdiGenerationId { get; set; }
+    public ServerEdiGeneration? EdiGeneration { get; set; }
 }
 
 internal sealed class ServerRemittanceClaimOutcome
@@ -1088,6 +1173,8 @@ internal sealed class ServerRemittanceClaimOutcome
     public string? Explanation { get; set; }
     public string? PaymentReference { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
+    public long? EdiGenerationId { get; set; }
 }
 
 internal sealed class ServerRemittanceDeposit
@@ -1104,6 +1191,7 @@ internal sealed class ServerRemittanceDeposit
     public decimal RemittancePaymentAmount { get; set; }
     public decimal? EftDepositAmount { get; set; }
     public bool IsSynthetic { get; set; }
+    public Guid? ResponseId { get; set; }
 }
 
 internal sealed class ServerReviewItem

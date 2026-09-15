@@ -13,6 +13,7 @@ internal static class TenantAccess
         CancellationToken cancellationToken) =>
         db.Users.AsNoTracking().AnyAsync(
             user => user.Id == actor.UserId &&
+                    user.IsEnabled && user.SecurityVersion == actor.SecurityVersion && actor.SecurityVersion > 0 &&
                     user.AgencyId == actor.AgencyId &&
                     user.Role == actor.Role &&
                     user.Permissions == actor.Permissions,
@@ -59,21 +60,34 @@ internal static class TenantAccess
         return rows.Count == 1 ? rows[0] : null;
     }
 
+    public static async Task<bool> CanAccessPersonAsync(
+        ApiDbContext db, Actor actor, ServerPerson person, CancellationToken cancellationToken) =>
+        person.AgencyId == actor.AgencyId &&
+        await CanAccessUserAsync(db, actor, person.UserId, cancellationToken);
+
     public static Task<bool> OwnsPersonAsync(
         ApiDbContext db,
         Actor actor,
         int personId,
         CancellationToken cancellationToken) =>
-        (from person in db.People.AsNoTracking()
-         join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
-         where person.Id == personId &&
-               actor.HasCaseManagerPermissions &&
+        OwnedPeople(db, actor).AsNoTracking().AnyAsync(person => person.Id == personId, cancellationToken);
+
+    /// <summary>
+    /// Own casework requires a current capability as well as an assignment. Keep the
+    /// person and persisted owner's tenant markers in the query, including for writes.
+    /// This is not the authorization scope for separately permitted billing or review.
+    /// </summary>
+    public static IQueryable<ServerPerson> OwnedPeople(ApiDbContext db, Actor actor) =>
+        from person in db.People
+         join owner in db.Users on person.UserId equals owner.Id
+         where actor.HasCaseManagerPermissions &&
                owner.Id == actor.UserId &&
+               owner.IsEnabled && owner.SecurityVersion == actor.SecurityVersion && actor.SecurityVersion > 0 &&
                owner.AgencyId == actor.AgencyId &&
                owner.Role == actor.Role &&
                owner.Permissions == actor.Permissions &&
                person.AgencyId == actor.AgencyId
-         select person.Id).AnyAsync(cancellationToken);
+         select person;
 
     public static async Task<bool> CanAuthorAssessmentAsync(
         ApiDbContext db,
@@ -90,7 +104,9 @@ internal sealed class ValidatedActorFilter(IDbContextFactory<ApiDbContext> facto
         EndpointFilterInvocationContext context,
         EndpointFilterDelegate next)
     {
-        var claimedActor = Actor.FromUnvalidatedClaims(context.HttpContext.User);
+        Actor claimedActor;
+        try { claimedActor = Actor.FromUnvalidatedClaims(context.HttpContext.User); }
+        catch (UnauthorizedAccessException) { return Results.Unauthorized(); }
         ServerUser? user;
         // A WebSocket keeps the request alive. Finish and dispose authentication's
         // database context before entering that long-lived endpoint.
@@ -98,6 +114,7 @@ internal sealed class ValidatedActorFilter(IDbContextFactory<ApiDbContext> facto
         {
             user = await db.Users.AsNoTracking().SingleOrDefaultAsync(candidate =>
                     candidate.Id == claimedActor.UserId &&
+                    candidate.IsEnabled && candidate.SecurityVersion == claimedActor.SecurityVersion &&
                     candidate.AgencyId == claimedActor.AgencyId &&
                     candidate.Role == claimedActor.Role,
                 context.HttpContext.RequestAborted);
@@ -116,6 +133,11 @@ internal sealed class ValidatedActorFilter(IDbContextFactory<ApiDbContext> facto
         var identity = context.HttpContext.User.Identity as ClaimsIdentity;
         if (identity is null)
             return Results.Unauthorized();
+        // This namespace is server-owned. A signed input claim must never shadow
+        // the current permissions loaded above.
+        foreach (var claim in context.HttpContext.User.FindAll(Actor.ValidatedPermissionsClaim).ToArray())
+            foreach (var claimedIdentity in context.HttpContext.User.Identities)
+                claimedIdentity.TryRemoveClaim(claim);
         identity.AddClaim(new Claim(
             Actor.ValidatedPermissionsClaim,
             ((int)user.Permissions).ToString(System.Globalization.CultureInfo.InvariantCulture)));

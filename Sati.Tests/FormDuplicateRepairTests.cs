@@ -11,15 +11,15 @@ namespace Sati.Tests;
 /// person holds three Q1R rows at the same due date and the two readers reach
 /// different ones.
 ///
-/// The DB-level tests drop IX_Forms_PersonId_Type_DueDate before seeding, because the
-/// index is exactly what makes the bad shape unreachable now — which is the point,
-/// and is asserted directly in TheUniqueIndexRefusesASecondCopy. Dropping it
-/// reproduces the state a real database was already in when the index shipped.
+/// The DB-level tests drop IX_Forms_PersonId_Type_TargetEffectiveDate before seeding,
+/// because the index is exactly what makes the bad shape unreachable now. DueDate is
+/// deliberately not identity in these tests.
 /// </summary>
 public sealed class FormDuplicateRepairTests
 {
     private static readonly DateTime DueDate = new(2026, 8, 28);
     private static readonly DateTime Completed = new(2026, 8, 28);
+    private static readonly DateTime TargetEffectiveDate = new(2026, 5, 30);
 
     // ------------------------------------------------------------------
     // The reported bug, as a single assertion.
@@ -100,15 +100,57 @@ public sealed class FormDuplicateRepairTests
     }
 
     [Fact]
-    public void FormsOfTheSameTypeOnDifferentDueDatesAreNotDuplicates()
+    public void SameDueDateWithDifferentTargetsIsNeverMerged()
     {
-        // Consecutive cycles produce a Q1R per year. Those are distinct records.
+        // A deadline can change or coincide. The explicit annual target is the
+        // identity, so matching deadlines never collapse distinct obligations.
         var plan = FormDuplicateRepair.Plan([
-            Form(1, FormType.Q1R, new DateTime(2026, 8, 28)),
-            Form(2, FormType.Q1R, new DateTime(2027, 8, 28))
+            Form(1, FormType.PCP, DueDate, targetEffectiveDate: new DateTime(2025, 5, 30)),
+            Form(2, FormType.PCP, DueDate, targetEffectiveDate: new DateTime(2026, 5, 30))
         ]);
 
         Assert.Empty(plan.Groups);
+    }
+
+    [Fact]
+    public void SameTargetWithDifferentDueDatesIsReportedRatherThanChosen()
+    {
+        var plan = FormDuplicateRepair.Plan([
+            Form(1, FormType.PCP, new DateTime(2026, 5, 30)),
+            Form(2, FormType.PCP, new DateTime(2026, 6, 1))
+        ]);
+
+        var conflict = Assert.Single(plan.Conflicted);
+        Assert.Equal(TargetEffectiveDate, conflict.TargetEffectiveDate);
+        Assert.True(conflict.HasConflictingDeadlines);
+        Assert.False(plan.HasWork);
+    }
+
+    [Fact]
+    public void CurrentPlanRefusesTargetlessRowsInsteadOfFallingBackToDueDate()
+    {
+        var targetless = new Form(FormType.PCP, DueDate) { Id = 1, PersonId = 1 };
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            FormDuplicateRepair.Plan([targetless]));
+
+        Assert.Contains("pre-target migration stage", error.Message);
+    }
+
+    [Fact]
+    public void LegacyFallbackGroupsOnlyTargetlessRowsByTheirExactDueDate()
+    {
+        var first = new Form(FormType.Q1R, DueDate) { Id = 1, PersonId = 1 };
+        var second = new Form(FormType.Q1R, DueDate) { Id = 2, PersonId = 1 };
+        var anotherDeadline = new Form(FormType.Q1R, DueDate.AddDays(1)) { Id = 3, PersonId = 1 };
+
+        var plan = FormDuplicateRepair.PlanLegacyTargetlessRowsForMigration(
+            [first, second, anotherDeadline]);
+
+        var group = Assert.Single(plan.Groups);
+        Assert.True(group.UsesLegacyDueDateIdentity);
+        Assert.Equal(DueDate, group.LegacyDueDate);
+        Assert.Equal([1, 2], group.FormIds);
     }
 
     // ------------------------------------------------------------------
@@ -235,15 +277,18 @@ public sealed class FormDuplicateRepairTests
     public async Task TheUniqueIndexRefusesASecondCopy()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
+        var targetEffectiveDate = new DateTime(2026, 5, 30);
 
         await using (var db = fixture.Factory.CreateDbContext())
         {
-            db.Forms.Add(Form(0, FormType.Q1R, DueDate, null, fixture.PersonOneId));
+            db.Forms.Add(Form(
+                0, FormType.Q1R, DueDate, null, fixture.PersonOneId, targetEffectiveDate));
             await db.SaveChangesAsync();
         }
 
         await using var second = fixture.Factory.CreateDbContext();
-        second.Forms.Add(Form(0, FormType.Q1R, DueDate, null, fixture.PersonOneId));
+        second.Forms.Add(Form(
+            0, FormType.Q1R, DueDate, null, fixture.PersonOneId, targetEffectiveDate));
 
         await Assert.ThrowsAnyAsync<DbUpdateException>(() => second.SaveChangesAsync());
     }
@@ -251,9 +296,9 @@ public sealed class FormDuplicateRepairTests
     [Fact]
     public async Task TheUniqueIndexCanBeCreatedOnceTheRepairHasRun()
     {
-        // The whole startup sequence in one test: duplicates present, index absent,
-        // repair, then the index binds. This is the ordering LocalDatabaseUpdater
-        // depends on and the migration's guard enforces.
+        // Current-schema invariant: target-duplicate rows can be classified and
+        // repaired without treating their deadline as their identity; the target
+        // index then binds.
         await using var fixture = await NoteEntryFixture.CreateAsync();
         await DropUniqueFormIndexAsync(fixture);
         await SeedTripledQ1RAsync(fixture);
@@ -315,9 +360,18 @@ public sealed class FormDuplicateRepairTests
     private static DateTime Today => new(2026, 9, 1);
 
     private static Form Form(
-        int id, FormType type, DateTime dueDate, DateTime? completed = null, int personId = 1)
+        int id,
+        FormType type,
+        DateTime dueDate,
+        DateTime? completed = null,
+        int personId = 1,
+        DateTime? targetEffectiveDate = null)
     {
-        var form = new Form(type, dueDate, completed) { PersonId = personId };
+        var form = new Form(
+            type,
+            dueDate,
+            completed,
+            targetEffectiveDate ?? TargetEffectiveDate) { PersonId = personId };
         if (id > 0)
             form.Id = id;
         return form;
@@ -379,11 +433,11 @@ public sealed class FormDuplicateRepairTests
     {
         await using var db = fixture.Factory.CreateDbContext();
         await db.Database.ExecuteSqlRawAsync(
-            "DROP INDEX IF EXISTS \"IX_Forms_PersonId_Type_DueDate\";");
+            "DROP INDEX IF EXISTS \"IX_Forms_PersonId_Type_TargetEffectiveDate\";");
     }
 
     private static Task CreateUniqueFormIndexAsync(SatiContext db) =>
         db.Database.ExecuteSqlRawAsync(
-            "CREATE UNIQUE INDEX \"IX_Forms_PersonId_Type_DueDate\" " +
-            "ON \"Forms\" (\"PersonId\", \"Type\", \"DueDate\");");
+            "CREATE UNIQUE INDEX \"IX_Forms_PersonId_Type_TargetEffectiveDate\" " +
+            "ON \"Forms\" (\"PersonId\", \"Type\", \"TargetEffectiveDate\");");
 }

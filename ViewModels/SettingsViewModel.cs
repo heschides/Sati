@@ -18,7 +18,6 @@ namespace Sati.ViewModels
     {
         private readonly ISettingsService _settingsService;
         private readonly IProviderService _providerService;
-        private readonly FormDueDateBackfill? _backfill;
         private readonly FormBulkCompletion? _bulkCompletion;
         private readonly ThemeService _themeService;
         private readonly ISessionService _sessionService;
@@ -37,6 +36,7 @@ namespace Sati.ViewModels
         private int _savedIdleMinutes = IdleLockPreferenceService.DefaultMinutes;
         private bool _loadingConsumerPickerSortPreference;
         private bool _savedSortConsumerPickersByLastName;
+        private BillingCompliancePolicyImpactPreviewDto? _lastBillingPolicyImpactPreview;
 
         public SettingsViewModel(
             ISettingsService settingsService,
@@ -51,14 +51,12 @@ namespace Sati.ViewModels
             IdleLockPreferenceService idlePreferences,
             ConsumerPickerSortPreferenceService consumerPickerSortPreferences,
             MyAccountViewModel account,
-            FormDueDateBackfill? backfill = null,
             FormBulkCompletion? bulkCompletion = null)
         {
             Account = account;
             _ = Account.InitializeAsync();
             _settingsService = settingsService;
             _providerService = providerService;
-            _backfill = backfill;
             _bulkCompletion = bulkCompletion;
             _themeService = themeService;
             _sessionService = sessionService;
@@ -73,7 +71,9 @@ namespace Sati.ViewModels
             TextShortcuts = new ObservableCollection<TextShortcutEditorViewModel>(
                 Enumerable.Range(1, 9)
                     .Append(0)
-                    .Select(digit => new TextShortcutEditorViewModel(digit)));
+                .Select(digit => new TextShortcutEditorViewModel(digit)));
+            BillingPolicyHistory = new ObservableCollection<BillingCompliancePolicyHistoryItem>();
+            BillingPolicyReviewFlags = new ObservableCollection<BillingCompliancePolicyReviewFlagItem>();
             _ = LoadTextShortcutsAsync();
             _ = LoadDailyAgendaPreferenceAsync();
             _ = LoadEasyEyesPreferenceAsync();
@@ -107,6 +107,8 @@ namespace Sati.ViewModels
         public string ReleaseDate => ProductReleaseNotes.ReleaseDate;
         public IReadOnlyList<ReleaseNoteSection> ReleaseNoteSections => ProductReleaseNotes.Sections;
         public ObservableCollection<TextShortcutEditorViewModel> TextShortcuts { get; }
+        public ObservableCollection<BillingCompliancePolicyHistoryItem> BillingPolicyHistory { get; }
+        public ObservableCollection<BillingCompliancePolicyReviewFlagItem> BillingPolicyReviewFlags { get; }
 
         [ObservableProperty]
         private ThemeOption? selectedTheme;
@@ -517,89 +519,6 @@ namespace Sati.ViewModels
         [ObservableProperty] private int? defaultPassthroughProviderId;
 
         // ====================================================================
-        // TEMPORARY MAINTENANCE — DUE-DATE BACKFILL
-        // Remove this whole region (and the three controls in SettingsWindow.xaml
-        // marked with the same banner) once the backfill has been run.
-        //
-        // The other half of that condition is already met: the
-        // EnableEnsureCycleFormsOnLoad guard is gone, since the unique index on
-        // dbo.Forms now decides the race it was suppressing.
-        // ====================================================================
-
-        // What the last dry run reported it would change. You type this exact
-        // number into BackfillConfirmCount to authorize the commit; the service
-        // refuses any other value. Starts -1 so "no dry run yet" can't coincide
-        // with a real count.
-        [ObservableProperty] private int backfillDryRunChangeCount = -1;
-
-        // The number you type to confirm. Bound to the textbox next to Commit.
-        [ObservableProperty] private string backfillConfirmCount = string.Empty;
-
-        // Human-readable outcome of the last action, shown beneath the buttons.
-        // The detailed report is always the .txt file on the Desktop; this is
-        // just the at-a-glance summary plus that file's path.
-        [ObservableProperty] private string backfillStatus = string.Empty;
-
-        [RelayCommand]
-        private async Task BackfillDryRunAsync()
-        {
-            if (_backfill is null)
-            {
-                BackfillStatus = "This LocalDB maintenance tool is not available in the Azure Demo.";
-                return;
-            }
-
-            try
-            {
-                var report = await _backfill.DryRunAsync();
-                BackfillDryRunChangeCount = report.FormsChanged;
-                BackfillStatus =
-                    $"Dry run complete. {report.FormsChanged} forms would change, "
-                    + $"{report.FormsUnchanged} unchanged, {report.FormsAnomalous} anomalies, "
-                    + $"{report.DuplicateCells} duplicate cells. "
-                    + $"To commit, type {report.FormsChanged} in the box and press Commit.\n"
-                    + $"Full report: {report.ReportFilePath}";
-            }
-            catch (Exception ex)
-            {
-                BackfillStatus = $"Dry run failed: {ex.Message}";
-            }
-        }
-
-        [RelayCommand]
-        private async Task BackfillCommitAsync()
-        {
-            if (_backfill is null)
-            {
-                BackfillStatus = "This LocalDB maintenance tool is not available in the Azure Demo.";
-                return;
-            }
-
-            if (!int.TryParse(BackfillConfirmCount, out var typed))
-            {
-                BackfillStatus = "Enter the exact change count from the dry run to commit.";
-                return;
-            }
-
-            try
-            {
-                var report = await _backfill.CommitAsync(typed);
-                BackfillStatus =
-                    $"COMMITTED. {report.FormsChanged} forms updated. "
-                    + $"Report: {report.ReportFilePath}";
-                BackfillConfirmCount = string.Empty;
-                BackfillDryRunChangeCount = -1;
-            }
-            catch (Exception ex)
-            {
-                // The service throws if no dry run ran this session or the number
-                // doesn't match. Surface that message verbatim — it's written to
-                // be read by exactly this caller.
-                BackfillStatus = $"Commit refused: {ex.Message}";
-            }
-        }
-
-        // ====================================================================
         // TEMPORARY MAINTENANCE — BULK FORM COMPLETION
         // One-time: mark every form due on/before the cutoff with no completion
         // date as complete, using one explicitly entered completion date. Remove this region and
@@ -699,6 +618,7 @@ namespace Sati.ViewModels
         [ObservableProperty] private decimal perUnitIncentive;
         [ObservableProperty] private bool complianceQuarterlyReviews;
         [ObservableProperty] private bool compliancePcp;
+        [ObservableProperty] private bool compliancePcpOpening;
         [ObservableProperty] private bool complianceComprehensiveAssessment;
         [ObservableProperty] private bool complianceReclassification;
         [ObservableProperty] private bool complianceSafetyPlan;
@@ -706,6 +626,41 @@ namespace Sati.ViewModels
         [ObservableProperty] private bool complianceAgencyRelease;
         [ObservableProperty] private bool complianceDhhsRelease;
         [ObservableProperty] private bool complianceMedicalRelease;
+        [ObservableProperty] private bool allowPastBillingPolicyEffectiveDates;
+        [ObservableProperty] private DateTime? billingPolicyEffectiveOn;
+        [ObservableProperty] private string billingPolicyExplanation = string.Empty;
+        [ObservableProperty] private string billingPolicyStatus =
+            "Choose the documents, enter an enforcement date, then apply the policy.";
+        [ObservableProperty] private string billingPolicyReviewStatus =
+            "No unresolved billing-policy review flags are loaded.";
+        [ObservableProperty] private string billingPolicyImpactPreview =
+            "No change is scheduled. An enforcement date is required for every policy version.";
+
+        partial void OnBillingPolicyEffectiveOnChanged(DateTime? value) =>
+            InvalidateBillingPolicyImpactPreview();
+
+        partial void OnComplianceQuarterlyReviewsChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnCompliancePcpChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnCompliancePcpOpeningChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnComplianceComprehensiveAssessmentChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnComplianceReclassificationChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnComplianceSafetyPlanChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnCompliancePrivacyPracticesChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnComplianceAgencyReleaseChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnComplianceDhhsReleaseChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnComplianceMedicalReleaseChanged(bool value) => BillingPolicyDraftChanged();
+
+        private void BillingPolicyDraftChanged()
+        {
+            InvalidateBillingPolicyImpactPreview();
+            if (_settings is not null &&
+                BuildBillingComplianceRequirements() != _settings.BillingComplianceRequirements &&
+                BillingPolicyEffectiveOn is null)
+            {
+                BillingPolicyStatus =
+                    "Billing-policy selections changed. Choose an enforcement date before applying them.";
+            }
+        }
         [ObservableProperty] private string visitTemplate = string.Empty;
         [ObservableProperty] private string contactTemplate = string.Empty;
         [ObservableProperty] private string documentationTemplate = string.Empty;
@@ -781,6 +736,7 @@ namespace Sati.ViewModels
 
             SalesTaxRate = _settings.SalesTaxRate;
             AllowCredibleProfileUpdates = _settings.AllowCredibleProfileUpdates;
+            AllowPastBillingPolicyEffectiveDates = _settings.AllowPastBillingPolicyEffectiveDates;
             AnnualPacketOpenDaysBefore = _settings.AnnualPacketOpenDaysBefore;
             VrAssistantTitle = VocationalRehabilitationProfile.NormalizeAssistantTitle(
                 _settings.VrAssistantTitle);
@@ -805,6 +761,7 @@ namespace Sati.ViewModels
             var compliance = _settings.BillingComplianceRequirements;
             ComplianceQuarterlyReviews = compliance.HasFlag(BillingComplianceRequirements.QuarterlyReviews);
             CompliancePcp = compliance.HasFlag(BillingComplianceRequirements.Pcp);
+            CompliancePcpOpening = compliance.HasFlag(BillingComplianceRequirements.PcpOpening);
             ComplianceComprehensiveAssessment = compliance.HasFlag(BillingComplianceRequirements.ComprehensiveAssessment);
             ComplianceReclassification = compliance.HasFlag(BillingComplianceRequirements.Reclassification);
             ComplianceSafetyPlan = compliance.HasFlag(BillingComplianceRequirements.SafetyPlan);
@@ -857,6 +814,9 @@ namespace Sati.ViewModels
             // Normalize on load so a hand-edited or legacy JSON value still arrives
             // de-duplicated, sorted, and with the "Other" floor present.
             SetHealthcareSystems(HealthcareSystemOptions.Normalize(_settings.HealthcareSystems));
+
+            await LoadBillingPolicyHistoryAsync();
+            await LoadBillingPolicyReviewFlagsAsync();
         }
 
         [RelayCommand]
@@ -881,22 +841,13 @@ namespace Sati.ViewModels
             _settings.AbandonedAfterDays = AbandonedAfterDays;
             _settings.SalesTaxRate = SalesTaxRate;
             _settings.AllowCredibleProfileUpdates = AllowCredibleProfileUpdates;
+            _settings.AllowPastBillingPolicyEffectiveDates = AllowPastBillingPolicyEffectiveDates;
             _settings.VrAssistantTitle = VrAssistantTitle;
             _settings.AnnualPacketOpenDaysBefore = AnnualPacketOpenDaysBefore;
             _settings.DefaultPassthroughProviderId = DefaultPassthroughProviderId;
             _settings.ProductivityThreshold = ProductivityThreshold;
             _settings.BaseIncentive = BaseIncentive;
             _settings.PerUnitIncentive = PerUnitIncentive;
-            _settings.BillingComplianceRequirements =
-                (ComplianceQuarterlyReviews ? BillingComplianceRequirements.QuarterlyReviews : 0) |
-                (CompliancePcp ? BillingComplianceRequirements.Pcp : 0) |
-                (ComplianceComprehensiveAssessment ? BillingComplianceRequirements.ComprehensiveAssessment : 0) |
-                (ComplianceReclassification ? BillingComplianceRequirements.Reclassification : 0) |
-                (ComplianceSafetyPlan ? BillingComplianceRequirements.SafetyPlan : 0) |
-                (CompliancePrivacyPractices ? BillingComplianceRequirements.PrivacyPractices : 0) |
-                (ComplianceAgencyRelease ? BillingComplianceRequirements.AgencyRelease : 0) |
-                (ComplianceDhhsRelease ? BillingComplianceRequirements.DhhsRelease : 0) |
-                (ComplianceMedicalRelease ? BillingComplianceRequirements.MedicalRelease : 0);
             _settings.VisitTemplate = VisitTemplate;
             _settings.ContactTemplate = ContactTemplate;
             _settings.DocumentationTemplate = DocumentationTemplate;
@@ -948,7 +899,9 @@ namespace Sati.ViewModels
             try
             {
                 await _settingsService.SaveAsync(_settings);
-                SaveStatus = "Settings saved.";
+                SaveStatus = BuildBillingComplianceRequirements() == _settings.BillingComplianceRequirements
+                    ? "Settings saved."
+                    : "Settings saved. Billing-policy selections are still a draft; enter an enforcement date and use Apply billing policy.";
                 return true;
             }
             catch (SettingsConcurrencyException ex)
@@ -961,6 +914,264 @@ namespace Sati.ViewModels
                 SaveStatus = $"Settings were not saved. {ex.Message}";
                 return false;
             }
+        }
+
+        [RelayCommand]
+        private async Task PreviewBillingCompliancePolicyImpactAsync()
+        {
+            if (!CanManageAgencySettings || _settings is null)
+            {
+                BillingPolicyStatus = "Only an agency administrator can preview billing policy.";
+                return;
+            }
+            if (BillingPolicyEffectiveOn is not DateTime effectiveOn)
+            {
+                BillingPolicyStatus = "Choose an enforcement date before previewing the impact.";
+                return;
+            }
+
+            var requirements = BuildBillingComplianceRequirements();
+            BillingPolicyImpactPreview = "Calculating the billing-policy impact...";
+            try
+            {
+                var preview = await _settingsService.PreviewBillingCompliancePolicyAsync(
+                    new PreviewBillingCompliancePolicyRequest(effectiveOn, requirements));
+                if (BillingPolicyEffectiveOn?.Date != effectiveOn.Date ||
+                    BuildBillingComplianceRequirements() != requirements)
+                {
+                    InvalidateBillingPolicyImpactPreview();
+                    return;
+                }
+
+                SetBillingPolicyImpactPreview(preview);
+                BillingPolicyStatus =
+                    "Impact preview is current. Review it, then apply the policy if it is correct.";
+            }
+            catch (SettingsSaveException ex)
+            {
+                _lastBillingPolicyImpactPreview = null;
+                BillingPolicyImpactPreview = $"Impact could not be calculated. {ex.Message}";
+            }
+            catch (NotSupportedException ex)
+            {
+                _lastBillingPolicyImpactPreview = null;
+                BillingPolicyImpactPreview = $"Impact preview is unavailable. {ex.Message}";
+            }
+        }
+
+        [RelayCommand]
+        private async Task ApplyBillingCompliancePolicyAsync()
+        {
+            if (!CanManageAgencySettings || _settings is null)
+            {
+                BillingPolicyStatus = "Only an agency administrator can change billing policy.";
+                return;
+            }
+
+            if (BillingPolicyEffectiveOn is null)
+            {
+                BillingPolicyStatus = "Choose an enforcement date before applying the billing policy.";
+                return;
+            }
+
+            if (_settings.AllowPastBillingPolicyEffectiveDates != AllowPastBillingPolicyEffectiveDates)
+            {
+                BillingPolicyStatus =
+                    "Save agency settings first so the past-date correction switch is recorded before applying this policy.";
+                return;
+            }
+
+            var requirements = BuildBillingComplianceRequirements();
+            var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+            var validation = BillingCompliancePolicyRules.ValidateChange(
+                requirements,
+                BillingPolicyEffectiveOn,
+                today,
+                new BillingCompliancePolicyOptions(AllowPastBillingPolicyEffectiveDates),
+                BillingPolicyExplanation);
+            if (!validation.Accepted)
+            {
+                BillingPolicyStatus = string.Join(" ", validation.Errors);
+                return;
+            }
+
+            if (_lastBillingPolicyImpactPreview is null ||
+                _lastBillingPolicyImpactPreview.EffectiveOn.Date !=
+                    BillingPolicyEffectiveOn.Value.Date ||
+                _lastBillingPolicyImpactPreview.Requirements != requirements)
+            {
+                BillingPolicyStatus =
+                    "Preview this exact enforcement date and document selection before applying the policy.";
+                return;
+            }
+
+            BillingPolicyStatus = "Confirming that the impact preview is still current...";
+            try
+            {
+                var refreshedPreview = await _settingsService.PreviewBillingCompliancePolicyAsync(
+                    new PreviewBillingCompliancePolicyRequest(
+                        BillingPolicyEffectiveOn, requirements));
+                if (refreshedPreview != _lastBillingPolicyImpactPreview)
+                {
+                    SetBillingPolicyImpactPreview(refreshedPreview);
+                    BillingPolicyStatus =
+                        "The affected records changed since the preview. Review the refreshed impact, then apply again.";
+                    return;
+                }
+            }
+            catch (SettingsSaveException ex)
+            {
+                BillingPolicyStatus = $"The impact could not be confirmed. {ex.Message}";
+                return;
+            }
+
+            BillingPolicyStatus = "Applying the effective-dated billing policy...";
+            try
+            {
+                var saved = await _settingsService.AppendBillingCompliancePolicyAsync(
+                    new AppendBillingCompliancePolicyRequest(
+                        Guid.NewGuid(),
+                        BillingPolicyEffectiveOn,
+                        requirements,
+                        BillingPolicyExplanation));
+                await LoadBillingPolicyHistoryAsync();
+                await LoadBillingPolicyReviewFlagsAsync();
+
+                if (saved.EffectiveOn.Date <= today)
+                {
+                    var active = BillingCompliancePolicyRules.ResolveForServiceDate(
+                        BillingPolicyHistory.Select(item => new BillingCompliancePolicyVersionSnapshot(
+                            item.Version.Id,
+                            _sessionService.CurrentUser!.AgencyId,
+                            item.Version.EffectiveOn,
+                            item.Version.Requirements)),
+                        _sessionService.CurrentUser!.AgencyId,
+                        today);
+                    if (active is not null)
+                        _settings.BillingComplianceRequirements = active.Requirements;
+                }
+
+                BillingPolicyEffectiveOn = null;
+                BillingPolicyExplanation = string.Empty;
+                _lastBillingPolicyImpactPreview = null;
+                BillingPolicyStatus =
+                    $"Billing policy recorded for service dates on and after {saved.EffectiveOn:MMM d, yyyy}.";
+            }
+            catch (SettingsSaveException ex)
+            {
+                BillingPolicyStatus = $"Billing policy was not applied. {ex.Message}";
+            }
+        }
+
+        private void InvalidateBillingPolicyImpactPreview()
+        {
+            _lastBillingPolicyImpactPreview = null;
+            BillingPolicyImpactPreview = BillingPolicyEffectiveOn is null
+                ? "No change is scheduled. An enforcement date is required for every policy version."
+                : "Preview required. Sati will compare this proposed policy with the policy that applied on each existing service date.";
+        }
+
+        private void SetBillingPolicyImpactPreview(
+            BillingCompliancePolicyImpactPreviewDto preview)
+        {
+            _lastBillingPolicyImpactPreview = preview;
+            BillingPolicyImpactPreview =
+                $"Impact for {preview.EffectiveOn:MMM d, yyyy} (read-only; " +
+                $"{preview.NotesEvaluated:N0} notes and {preview.ClaimRecordsEvaluated:N0} claim records evaluated). " +
+                $"Draft/unsubmitted notes: {DescribeImpact(preview.DraftOrUnsubmittedNotes)}. " +
+                $"Submitted/finalized notes: {DescribeImpact(preview.SubmittedOrFinalizedNotes)}. " +
+                $"Draft claim records: {DescribeImpact(preview.DraftClaimRecords)}. " +
+                $"Submitted/finalized claim records: {DescribeImpact(preview.SubmittedOrFinalizedClaimRecords)}. " +
+                "Applying the policy will create unresolved review flags for affected submitted/finalized records; neither the preview nor the policy silently rewrites them.";
+        }
+
+        private static string DescribeImpact(BillingCompliancePolicyImpactBucket bucket) =>
+            $"{bucket.NewlyBlocked:N0} newly blocked, " +
+            $"{bucket.NewlyUnblocked:N0} newly unblocked, and " +
+            $"{bucket.ChangedWhileBlocked:N0} still blocked by a different set of requirements";
+
+        private async Task LoadBillingPolicyHistoryAsync()
+        {
+            try
+            {
+                var history = await _settingsService.LoadBillingCompliancePolicyHistoryAsync();
+                BillingPolicyHistory.Clear();
+                foreach (var version in history
+                             .OrderByDescending(item => item.EffectiveOn)
+                             .ThenByDescending(item => item.Id))
+                {
+                    BillingPolicyHistory.Add(new BillingCompliancePolicyHistoryItem(
+                        version,
+                        DescribeBillingRequirements(version.Requirements)));
+                }
+
+                if (BillingPolicyHistory.Count == 0)
+                {
+                    BillingPolicyStatus =
+                        "The default policy is active. The first adjustment will create policy history and requires an enforcement date.";
+                }
+            }
+            catch (NotSupportedException)
+            {
+                BillingPolicyStatus = "Effective-dated billing policy is not available in this environment.";
+            }
+            catch (SettingsSaveException ex)
+            {
+                BillingPolicyStatus = $"Billing-policy history could not be loaded. {ex.Message}";
+            }
+        }
+
+        private async Task LoadBillingPolicyReviewFlagsAsync()
+        {
+            try
+            {
+                var flags = await _settingsService.LoadBillingCompliancePolicyReviewFlagsAsync();
+                BillingPolicyReviewFlags.Clear();
+                foreach (var flag in flags)
+                    BillingPolicyReviewFlags.Add(new BillingCompliancePolicyReviewFlagItem(flag));
+                BillingPolicyReviewStatus = flags.Count == 0
+                    ? "No unresolved billing-policy review flags."
+                    : $"{flags.Count:N0} unresolved billing-policy review " +
+                      $"{(flags.Count == 1 ? "flag" : "flags")}. These records have not been rewritten.";
+            }
+            catch (NotSupportedException)
+            {
+                BillingPolicyReviewStatus =
+                    "Billing-policy review flags are unavailable in this environment.";
+            }
+            catch (SettingsSaveException ex)
+            {
+                BillingPolicyReviewStatus =
+                    $"Billing-policy review flags could not be loaded. {ex.Message}";
+            }
+        }
+
+        private BillingComplianceRequirements BuildBillingComplianceRequirements() =>
+            (ComplianceQuarterlyReviews ? BillingComplianceRequirements.QuarterlyReviews : 0) |
+            (CompliancePcp ? BillingComplianceRequirements.Pcp : 0) |
+            (CompliancePcpOpening ? BillingComplianceRequirements.PcpOpening : 0) |
+            (ComplianceComprehensiveAssessment ? BillingComplianceRequirements.ComprehensiveAssessment : 0) |
+            (ComplianceReclassification ? BillingComplianceRequirements.Reclassification : 0) |
+            (ComplianceSafetyPlan ? BillingComplianceRequirements.SafetyPlan : 0) |
+            (CompliancePrivacyPractices ? BillingComplianceRequirements.PrivacyPractices : 0) |
+            (ComplianceAgencyRelease ? BillingComplianceRequirements.AgencyRelease : 0) |
+            (ComplianceDhhsRelease ? BillingComplianceRequirements.DhhsRelease : 0) |
+            (ComplianceMedicalRelease ? BillingComplianceRequirements.MedicalRelease : 0);
+
+        private static string DescribeBillingRequirements(BillingComplianceRequirements requirements)
+        {
+            var labels = new List<string>();
+            if (requirements.HasFlag(BillingComplianceRequirements.QuarterlyReviews)) labels.Add("90-day reviews");
+            if (requirements.HasFlag(BillingComplianceRequirements.Pcp)) labels.Add("PCP completion");
+            if (requirements.HasFlag(BillingComplianceRequirements.PcpOpening)) labels.Add("PCP opening");
+            if (requirements.HasFlag(BillingComplianceRequirements.ComprehensiveAssessment)) labels.Add("Comprehensive Assessment");
+            if (requirements.HasFlag(BillingComplianceRequirements.Reclassification)) labels.Add("Reclassification");
+            if (requirements.HasFlag(BillingComplianceRequirements.SafetyPlan)) labels.Add("Safety Plan");
+            if (requirements.HasFlag(BillingComplianceRequirements.PrivacyPractices)) labels.Add("Privacy Practices");
+            if (requirements.HasFlag(BillingComplianceRequirements.AgencyRelease)) labels.Add("Agency releases");
+            if (requirements.HasFlag(BillingComplianceRequirements.DhhsRelease)) labels.Add("DHHS releases");
+            if (requirements.HasFlag(BillingComplianceRequirements.MedicalRelease)) labels.Add("Medical releases");
+            return labels.Count == 0 ? "No document gates" : string.Join(", ", labels);
         }
 
         // Rebuilds the bound collection in place from a source list. Snapshots the
@@ -1010,6 +1221,40 @@ namespace Sati.ViewModels
             SetHealthcareSystems(
                 HealthcareSystemOptions.MergeDefaults(HealthcareSystems, HealthcareSystemOptions.Maine));
         }
+    }
+
+    public sealed record BillingCompliancePolicyHistoryItem(
+        BillingCompliancePolicyVersionDto Version,
+        string RequirementsLabel)
+    {
+        public string EffectiveLabel => $"Effective {Version.EffectiveOn:MMM d, yyyy}";
+        public string RecordedLabel => $"Recorded {Version.RecordedAtUtc.ToLocalTime():g}";
+        public string ExplanationLabel => string.IsNullOrWhiteSpace(Version.Explanation)
+            ? "No correction explanation"
+            : Version.Explanation;
+    }
+
+    public sealed record BillingCompliancePolicyReviewFlagItem(
+        BillingCompliancePolicyReviewFlagDto Flag)
+    {
+        public string RecordLabel => Flag.ClaimRecordId is int claimId
+            ? $"Claim record {claimId:N0} (note {Flag.NoteId:N0})"
+            : $"Note {Flag.NoteId:N0}";
+        public string ChangeLabel => Flag.ChangeKind switch
+        {
+            BillingCompliancePolicyImpactChangeKind.NewlyBlocked => "Newly blocked",
+            BillingCompliancePolicyImpactChangeKind.NewlyUnblocked => "Newly unblocked",
+            _ => "Blocked by different requirements"
+        };
+        public string DateLabel =>
+            $"Service {Flag.ServiceDate:MMM d, yyyy}; policy effective {Flag.PolicyEffectiveOn:MMM d, yyyy}";
+        public string BlockerLabel =>
+            $"Before: {Describe(Flag.PreviousBlockingObligationIds)}. " +
+            $"After: {Describe(Flag.NewBlockingObligationIds)}.";
+        public string StatusLabel => $"{Flag.Status} · created {Flag.CreatedAtUtc.ToLocalTime():g}";
+
+        private static string Describe(IReadOnlyList<string> ids) =>
+            ids.Count == 0 ? "none" : string.Join(", ", ids);
     }
 
     /// <summary>One offered inactivity delay. Minutes of zero means never.</summary>

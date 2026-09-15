@@ -125,6 +125,82 @@ public sealed class PersonSaveRulesTests
     }
 
     [Theory]
+    [InlineData("ComprehensiveAssessment")]
+    [InlineData("Reclassification")]
+    [InlineData("SafetyPlan")]
+    [InlineData("PrivacyPractices")]
+    public void ExplicitPreEffectiveAttestationIsNotRejectedByTheOldArtifactRule(
+        string completedType)
+    {
+        var effective = Today.AddDays(30);
+        var completedOn = Today.AddDays(-1);
+        var forms = InitialForms()
+            .Select(form => form.Type == completedType ||
+                            completedType == "Reclassification" &&
+                            form.Type == "ComprehensiveAssessment"
+                ? form with { IsCompliant = true, CompletedDate = completedOn }
+                : form)
+            .ToList();
+        var request = ValidRequest() with
+        {
+            EffectiveDate = effective,
+            Forms = forms
+        };
+
+        var errors = PersonSaveRules.Validate(request, Today, requireNewForms: true);
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void GenericReleaseRowsAreRejectedFromANewAnnualGraph()
+    {
+        var forms = InitialForms().Append(
+            new SavePersonFormRequest(0, "Release_DHHS", false, null, null)).ToList();
+
+        var errors = PersonSaveRules.Validate(
+            ValidRequest() with
+            {
+                EffectiveDate = Today.AddMonths(-2),
+                Forms = forms
+            },
+            Today,
+            requireNewForms: true);
+
+        Assert.Contains("forms", errors.Keys);
+    }
+
+    [Fact]
+    public void ReclassificationCannotPrecedeItsSameTargetAssessment()
+    {
+        var forms = InitialForms()
+            .Select(form => form.Type switch
+            {
+                "ComprehensiveAssessment" => form with
+                {
+                    IsCompliant = true,
+                    CompletedDate = Today.AddDays(-1)
+                },
+                "Reclassification" => form with
+                {
+                    IsCompliant = true,
+                    CompletedDate = Today.AddDays(-2)
+                },
+                _ => form
+            })
+            .ToList();
+
+        var errors = PersonSaveRules.Validate(
+            ValidRequest() with { EffectiveDate = Today.AddDays(30), Forms = forms },
+            Today,
+            requireNewForms: true);
+
+        Assert.Contains("forms", errors.Keys);
+        Assert.Contains("on or before", errors["forms"].Single(),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
     [InlineData("missing")]
     [InlineData("duplicate")]
     [InlineData("unknown")]

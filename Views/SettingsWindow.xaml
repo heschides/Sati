@@ -761,7 +761,7 @@
                            Style="{StaticResource SectionHeader}"
                            Margin="0,8,0,8" />
                 <Separator />
-                <TextBlock Text="An enabled requirement blocks billing only when that document is incomplete and its due date has passed. Changes apply to the whole agency."
+                <TextBlock Text="An enabled requirement blocks billing beginning the day after its due date and ends the block on its attested completion date. The due date and completion date themselves remain billable. Every adjustment is a new, effective-dated agency policy version."
                            TextWrapping="Wrap"
                            MaxWidth="620"
                            HorizontalAlignment="Left"
@@ -773,8 +773,12 @@
                               IsChecked="{Binding ComplianceQuarterlyReviews}"
                               Margin="0,0,22,10" />
                     <CheckBox Content="PCPs"
-                              AutomationProperties.Name="Count PCPs for billing compliance"
+                              AutomationProperties.Name="Count PCP completion for billing compliance"
                               IsChecked="{Binding CompliancePcp}"
+                              Margin="0,0,22,10" />
+                    <CheckBox Content="PCP opening"
+                              AutomationProperties.Name="Count PCP opening for billing compliance"
+                              IsChecked="{Binding CompliancePcpOpening}"
                               Margin="0,0,22,10" />
                     <CheckBox Content="Comprehensive assessments"
                               AutomationProperties.Name="Count comprehensive assessments for billing compliance"
@@ -805,6 +809,146 @@
                               IsChecked="{Binding ComplianceMedicalRelease}"
                               Margin="0,0,22,10" />
                 </WrapPanel>
+
+                <CheckBox Content="Allow past enforcement dates for rare corrections"
+                          AutomationProperties.Name="Allow past billing policy enforcement dates"
+                          AutomationProperties.HelpText="Off by default. Save this setting before recording a past-dated correction; each correction still requires an explanation."
+                          IsChecked="{Binding AllowPastBillingPolicyEffectiveDates}"
+                          Margin="0,0,0,4" />
+                <TextBlock Text="Off by default. Turn this on only to correct an error, save Settings, then record the correction below with an explanation. Existing submitted billing is flagged for review rather than silently changed."
+                           TextWrapping="Wrap"
+                           MaxWidth="620"
+                           HorizontalAlignment="Left"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="22,0,0,12" />
+
+                <TextBlock Text="ENFORCEMENT DATE"
+                           Style="{StaticResource LabelStyle}" />
+                <DatePicker SelectedDate="{Binding BillingPolicyEffectiveOn, UpdateSourceTrigger=PropertyChanged}"
+                            AutomationProperties.Name="Billing policy enforcement date"
+                            Width="180"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,0,10" />
+
+                <TextBlock Text="CORRECTION EXPLANATION (required for a past date)"
+                           Style="{StaticResource LabelStyle}" />
+                <TextBox Text="{Binding BillingPolicyExplanation, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="Billing policy correction explanation"
+                         MaxLength="1000"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         MinHeight="58"
+                         Width="620"
+                         HorizontalAlignment="Left"
+                         Margin="0,0,0,8" />
+
+                <TextBlock Text="{Binding BillingPolicyImpactPreview}"
+                           AutomationProperties.Name="Billing policy impact preview"
+                           TextWrapping="Wrap"
+                           MaxWidth="620"
+                           HorizontalAlignment="Left"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="0,0,0,10" />
+
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Left">
+                    <Button Content="Preview billing impact"
+                            AutomationProperties.Name="Preview billing policy impact"
+                            AutomationProperties.HelpText="Performs a read-only comparison of existing notes and claim records."
+                            Style="{StaticResource ButtonBaseStyle}"
+                            Command="{Binding PreviewBillingCompliancePolicyImpactCommand}"
+                            Width="210"
+                            Height="36"
+                            Margin="0,0,8,0" />
+                    <Button Content="Apply billing policy"
+                            AutomationProperties.Name="Apply effective-dated billing policy"
+                            AutomationProperties.HelpText="Requires a current impact preview, then creates an immutable policy version without overwriting history."
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding ApplyBillingCompliancePolicyCommand}"
+                            Width="210" />
+                </StackPanel>
+                <TextBlock Text="{Binding BillingPolicyStatus}"
+                           AutomationProperties.LiveSetting="Assertive"
+                           TextWrapping="Wrap"
+                           MaxWidth="620"
+                           HorizontalAlignment="Left"
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           Margin="0,8,0,12" />
+
+                <TextBlock Text="UNRESOLVED POLICY REVIEW FLAGS"
+                           Style="{StaticResource LabelStyle}" />
+                <TextBlock Text="{Binding BillingPolicyReviewStatus}"
+                           AutomationProperties.Name="Billing policy review flag status"
+                           AutomationProperties.LiveSetting="Polite"
+                           TextWrapping="Wrap"
+                           MaxWidth="620"
+                           HorizontalAlignment="Left"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="0,0,0,8" />
+                <ItemsControl ItemsSource="{Binding BillingPolicyReviewFlags}"
+                              AutomationProperties.Name="Unresolved billing policy review flags"
+                              Margin="0,0,0,12">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="10"
+                                    Margin="0,0,0,6"
+                                    MaxWidth="620"
+                                    HorizontalAlignment="Left">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding RecordLabel}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding ChangeLabel}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding DateLabel}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding BlockerLabel}"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding StatusLabel}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="POLICY HISTORY"
+                           Style="{StaticResource LabelStyle}" />
+                <ItemsControl ItemsSource="{Binding BillingPolicyHistory}"
+                              AutomationProperties.Name="Billing compliance policy history"
+                              Margin="0,0,0,12">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="10"
+                                    Margin="0,0,0,6"
+                                    MaxWidth="620"
+                                    HorizontalAlignment="Left">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding EffectiveLabel}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding RequirementsLabel}"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding RecordedLabel}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBlock Text="{Binding ExplanationLabel}"
+                                               TextWrapping="Wrap"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
                 <!-- CREDIBLE IMPORT -->
                 <TextBlock Text="CREDIBLE IMPORT"
@@ -1281,48 +1425,6 @@
                     <StackPanel Margin="36,30">
 
                 <!-- ============================================================ -->
-                <!-- TEMPORARY MAINTENANCE — DUE-DATE BACKFILL                    -->
-                <!-- Remove this whole block (and the matching region in          -->
-                <!-- SettingsViewModel.cs) once the backfill has been run.        -->
-                <!-- ============================================================ -->
-                <TextBlock Text="MAINTENANCE — DUE-DATE BACKFILL"
-                           Style="{StaticResource SectionHeader}"
-                           Margin="0,32,0,8" />
-                <Separator />
-
-                <TextBlock Text="Run the dry run first. It writes a full report to your Desktop and changes nothing. Read it, then type the exact 'forms changed' count below and press Commit to apply."
-                           TextWrapping="Wrap"
-                           FontSize="11"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           Margin="0,0,0,12" />
-
-                <Button Content="Dry Run (safe — writes report only)"
-                        Style="{StaticResource PrimaryButton}"
-                        Command="{Binding BackfillDryRunCommand}"
-                        HorizontalAlignment="Left"
-                        Width="300"
-                        Margin="0,0,0,12" />
-
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,0,0,12">
-                    <TextBox AutomationProperties.Name="Backfill confirmation count" Text="{Binding BackfillConfirmCount, UpdateSourceTrigger=PropertyChanged}"
-                             Width="120"
-                             VerticalAlignment="Center"
-                             Margin="0,0,8,0" />
-                    <Button Content="Commit Backfill"
-                            Style="{StaticResource PrimaryButton}"
-                            Command="{Binding BackfillCommitCommand}"
-                            Width="160" />
-                </StackPanel>
-
-                <TextBlock Text="{Binding BackfillStatus}"
-                           AutomationProperties.LiveSetting="Assertive"
-                           TextWrapping="Wrap"
-                           FontSize="11"
-                           Foreground="{DynamicResource TextPrimaryBrush}"
-                           Margin="0,0,0,8" />
-
-                <!-- ============================================================ -->
                 <!-- TEMPORARY MAINTENANCE — BULK FORM COMPLETION                 -->
                 <!-- Remove this whole block (and the matching region in          -->
                 <!-- SettingsViewModel.cs) once completion has been run.          -->
@@ -1425,7 +1527,7 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="11"
                                Margin="0,0,18,0" />
-                    <TextBlock Text="Operational changes are applied together when you save."
+                    <TextBlock Text="Ordinary agency settings save here; billing policy uses its separate dated Apply action."
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource TextMutedBrush}"
                                FontSize="11"

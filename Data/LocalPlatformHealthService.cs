@@ -18,6 +18,7 @@ public sealed class LocalPlatformHealthService(
             throw new ArgumentOutOfRangeException(nameof(days));
 
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var observedAt = DateTime.UtcNow;
         var start = observedAt.AddDays(-days);
         var incidentRows = await context.IncidentGroups.AsNoTracking()

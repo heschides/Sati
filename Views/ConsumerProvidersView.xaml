@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              TextElement.FontFamily="{StaticResource AppFont}">
 
-    <!-- The consumer's medical provider list.
+    <!-- The consumer's healthcare and waiver/service provider assignments.
 
          Its own control rather than markup inside ClientsView, because the panel is
          self-contained: it binds only to ConsumerProvidersViewModel, and a control that
@@ -12,10 +12,9 @@
          it is wrong, so being able to render this in isolation is what makes that
          provable rather than assumed.
 
-         The practice and network on each row are derived from the agency directory every
-         time the list is built and are read-only here: an editable derived value is a
-         stored copy in disguise, and the whole point is that correcting a directory entry
-         corrects every consumer who names it.
+         Medical practice and network on each healthcare row are derived from the agency
+         directory every time the list is built and are read-only here. Waiver/service
+         providers remain direct assignments and never inherit medical-only controls.
 
          There is no cap on the list. Ended relationships keep their rows and collapse
          behind the disclosure, which is what keeps it tidy. -->
@@ -25,15 +24,15 @@
         BorderThickness="1"
         CornerRadius="7"
         Padding="12"
-        AutomationProperties.Name="Consumer medical providers">
+        AutomationProperties.Name="Consumer provider assignments">
     <Expander IsExpanded="True">
         <Expander.Header>
             <StackPanel>
-                <TextBlock Text="MEDICAL PROVIDERS"
+                <TextBlock Text="PROVIDER ASSIGNMENTS"
                            Style="{StaticResource SectionHeader}"
                            Margin="0"
                            AutomationProperties.HeadingLevel="Level2" />
-                <TextBlock Text="Choose the clinician. Their practice and network fill in from the provider directory and update whenever the directory does."
+                <TextBlock Text="Choose a healthcare or waiver/service provider from the agency directory. Each assignment keeps its actual start date; medical affiliations continue to update from the directory."
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            FontSize="11"
                            TextWrapping="Wrap" />
@@ -89,21 +88,44 @@
 
             <!-- Add row -->
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="2*" />
                     <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="2*" />
                     <ColumnDefinition Width="8" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
+                <StackPanel Grid.Row="0" Grid.Column="0">
                     <TextBlock Text="Provider" Style="{StaticResource LabelStyle}" />
-                    <ComboBox AutomationProperties.Name="Medical provider"
+                    <ComboBox AutomationProperties.Name="Healthcare or waiver service provider"
+                              AutomationProperties.HelpText="Choose an existing directory provider. Healthcare providers create Medical release obligations; Waiver providers create Agency release obligations."
                               ItemsSource="{Binding ProviderOptions}"
-                              DisplayMemberPath="Name"
                               SelectedValuePath="Id"
                               SelectedValue="{Binding NewProviderId, Mode=TwoWay}"
-                              IsEnabled="{Binding HasLoadedPerson}" />
+                              IsEnabled="{Binding HasLoadedPerson}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Text="{Binding Type}"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Text="{Binding SelectedProviderKindLabel}"
+                               AutomationProperties.Name="Selected provider assignment type"
+                               AutomationProperties.LiveSetting="Polite"
+                               FontSize="11"
+                               Margin="0,3,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Visibility="{Binding HasSelectedProvider,
+                                   Converter={StaticResource BoolToVisibilityConverter}}" />
                     <TextBlock Text="{Binding SelectedProviderAffiliation}"
                                AutomationProperties.Name="Selected provider affiliation"
                                FontSize="11"
@@ -113,30 +135,57 @@
                                Visibility="{Binding HasSelectedProviderAffiliation,
                                    Converter={StaticResource BoolToVisibilityConverter}}" />
                 </StackPanel>
-                <StackPanel Grid.Column="2">
-                    <TextBlock Text="Role" Style="{StaticResource LabelStyle}" />
-                    <TextBox AutomationProperties.Name="Provider role"
-                             ToolTip="Neurologist, dentist, psychiatrist, and so on."
+                <StackPanel Grid.Row="0" Grid.Column="2">
+                    <TextBlock Text="Role / service" Style="{StaticResource LabelStyle}" />
+                    <TextBox AutomationProperties.Name="Provider role or service"
+                             ToolTip="For example: neurologist, dentist, shared living, or community support."
                              MaxLength="80"
                              Text="{Binding NewRole, UpdateSourceTrigger=PropertyChanged}"
                              IsEnabled="{Binding HasLoadedPerson}" />
                 </StackPanel>
-                <StackPanel Grid.Column="4" VerticalAlignment="Bottom">
+
+                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,9,0,0">
+                    <TextBlock Text="ACTUAL ASSIGNMENT START DATE"
+                               Style="{StaticResource LabelStyle}" />
+                    <DatePicker SelectedDate="{Binding NewStartDate, UpdateSourceTrigger=PropertyChanged}"
+                                IsEnabled="{Binding HasLoadedPerson}"
+                                AutomationProperties.Name="Provider assignment actual start date"
+                                AutomationProperties.HelpText="Required. Enter the actual date the relationship began or is scheduled to begin; Sati does not assume today." />
+                    <TextBlock Text="{Binding AssignmentStartGuidance}"
+                               AutomationProperties.Name="Provider assignment start-date guidance"
+                               AutomationProperties.LiveSetting="Polite"
+                               FontSize="11"
+                               Margin="0,3,0,0"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
+
+                <!-- These flags describe medical relationships only. They disappear for a
+                     waiver/service assignment, and the view model also forces them false. -->
+                <StackPanel Grid.Row="1" Grid.Column="2"
+                            Margin="0,9,0,0"
+                            VerticalAlignment="Bottom"
+                            Visibility="{Binding SelectedProviderIsMedical,
+                                Converter={StaticResource BoolToVisibilityConverter}}">
                     <CheckBox Content="Primary care"
                               AutomationProperties.Name="This is the primary care provider"
                               IsChecked="{Binding NewIsPrimaryCare}"
                               Margin="0,0,0,4" />
-                    <CheckBox Content="Release on file"
-                              AutomationProperties.Name="An information release covers this provider"
+                    <CheckBox Content="Legacy release-on-file indicator"
+                              AutomationProperties.Name="Legacy medical release on file indicator"
+                              ToolTip="This older indicator does not complete the recipient-specific annual release attestation."
                               IsChecked="{Binding NewHasActiveRelease}"
                               Margin="0,0,0,6" />
-                    <Button Content="Add Provider"
-                            Style="{StaticResource PrimaryButton}"
-                            Padding="14,5"
-                            Command="{Binding AddProviderCommand}"
-                            IsEnabled="{Binding CanAdd}"
-                            AutomationProperties.Name="Add this provider to the consumer" />
                 </StackPanel>
+                <Button Grid.Row="1" Grid.Column="4"
+                        Content="Add assignment"
+                        Style="{StaticResource PrimaryButton}"
+                        Padding="14,5"
+                        Margin="0,9,0,0"
+                        VerticalAlignment="Bottom"
+                        Command="{Binding AddProviderCommand}"
+                        IsEnabled="{Binding CanAdd}"
+                        AutomationProperties.Name="Add this effective-dated provider assignment to the consumer" />
             </Grid>
 
             <TextBlock Text="{Binding StatusMessage}"
@@ -159,7 +208,7 @@
                           Margin="0,8,0,0"
                           VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Current}"
-                              AutomationProperties.Name="Current medical providers">
+                              AutomationProperties.Name="Current provider assignments">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Margin="0,0,0,6"
@@ -185,6 +234,9 @@
                                                    Foreground="{DynamicResource TextSecondaryBrush}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                        <TextBlock Text="{Binding ProviderKindLabel}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
                                         <!-- Derived, never stored. Read-only for that reason. -->
                                         <TextBlock Text="{Binding Affiliation}"
                                                    TextTrimming="CharacterEllipsis"
@@ -192,6 +244,9 @@
                                                    Visibility="{Binding HasAffiliation,
                                                        Converter={StaticResource BoolToVisibilityConverter}}" />
                                         <TextBlock Text="{Binding StatusLabel}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <TextBlock Text="{Binding DateRangeLabel}"
                                                    FontSize="11"
                                                    Foreground="{DynamicResource TextSecondaryBrush}" />
                                     </StackPanel>
@@ -205,14 +260,16 @@
                                                 ToolTip="Record that this relationship has ended. The entry is kept."
                                                 Command="{Binding DataContext.EndProviderCommand,
                                                     RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                CommandParameter="{Binding}" />
+                                                CommandParameter="{Binding}"
+                                                AutomationProperties.Name="{Binding EndAutomationName}" />
                                         <Button Content="Remove"
                                                 Style="{StaticResource SmallButton}"
                                                 Padding="12,4"
                                                 ToolTip="Delete this entry. Use only when it was recorded against the wrong consumer."
                                                 Command="{Binding DataContext.RemoveProviderCommand,
                                                     RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                CommandParameter="{Binding}" />
+                                                CommandParameter="{Binding}"
+                                                AutomationProperties.Name="{Binding RemoveAutomationName}" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -232,7 +289,7 @@
                           Converter={StaticResource BoolToVisibilityConverter}}">
                 <ItemsControl ItemsSource="{Binding Past}"
                               Margin="0,6,0,0"
-                              AutomationProperties.Name="Past medical providers">
+                              AutomationProperties.Name="Past provider assignments">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="0,0,0,4">
@@ -240,15 +297,23 @@
                                     <ColumnDefinition Width="2*" />
                                     <ColumnDefinition Width="3*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding ProviderName}"
-                                           TextTrimming="CharacterEllipsis"
-                                           AutomationProperties.Name="{Binding AutomationName}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" />
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding StatusLabel}"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <StackPanel Grid.Column="0"
+                                            AutomationProperties.Name="{Binding AutomationName}">
+                                    <TextBlock Text="{Binding ProviderName}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding ProviderKindLabel}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding StatusLabel}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <TextBlock Text="{Binding DateRangeLabel}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                </StackPanel>
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

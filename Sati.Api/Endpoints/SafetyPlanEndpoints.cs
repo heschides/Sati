@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
+using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 
@@ -11,12 +12,17 @@ internal static partial class ApiEndpoints
     private static void MapSafetyPlans(RouteGroupBuilder api)
     {
         api.MapGet("/people/{personId:int}/safety-plans/latest", async Task<IResult> (
-            int personId, DateTime? cycleStart, ClaimsPrincipal principal, ApiDbContext db, CancellationToken ct) =>
+            int personId, DateTime? cycleStart, ClaimsPrincipal principal, ApiDbContext db,
+            ApiClock clock, CancellationToken ct) =>
         {
             var actor = Actor.From(principal);
             var person = await AccessibleSafetyPerson(db, actor, personId, ct);
             if (person is null) return Results.NotFound();
-            if (!TrySafetyCycle(person.EffectiveDate, cycleStart, out var cycle)) return InvalidSafetyCycle();
+            if (person.EffectiveDate is not DateTime effective) return InvalidSafetyCycle();
+            var timing = await GetSafetyTimingAsync(db, actor.AgencyId, ct);
+            var requestedCycle = cycleStart ?? AnnualDocumentCycle.SuggestedStart(
+                effective, clock.Today, timing.OpenDaysBefore, timing.DueDaysBeforeEffective);
+            if (!TrySafetyCycle(effective, requestedCycle, out var cycle)) return InvalidSafetyCycle();
             var plan = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycle)
                 .OrderByDescending(x => x.Version).FirstOrDefaultAsync(ct);
             return Results.Json(plan is null ? null : ToSafetyPlan(plan));
@@ -24,12 +30,16 @@ internal static partial class ApiEndpoints
 
         api.MapPost("/people/{personId:int}/safety-plans/draft", async Task<IResult> (
             int personId, int authorUserId, DateTime cycleStart, ClaimsPrincipal principal,
-            ApiDbContext db, AuditTrail audit, CancellationToken ct) =>
+            ApiDbContext db, AuditTrail audit, ApiClock clock, CancellationToken ct) =>
         {
             var actor = Actor.From(principal);
             if (authorUserId != actor.UserId || !await TenantAccess.OwnsPersonAsync(db, actor, personId, ct)) return Results.NotFound();
             var person = await db.People.AsNoTracking().SingleAsync(x => x.Id == personId, ct);
             if (!TrySafetyCycle(person.EffectiveDate, cycleStart, out var cycle)) return InvalidSafetyCycle();
+            var timing = await GetSafetyTimingAsync(db, actor.AgencyId, ct);
+            if (!AnnualDocumentCycle.IsAvailable(
+                    cycle, clock.Today, timing.OpenDaysBefore, timing.DueDaysBeforeEffective))
+                return SafetyCycleNotAvailable(cycle, timing);
             var prior = await db.SafetyPlans.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycle)
                 .OrderByDescending(x => x.Version).FirstOrDefaultAsync(ct);
             if (prior?.Status is "Draft" or "ReadyForReview")
@@ -117,10 +127,38 @@ internal static partial class ApiEndpoints
     {
         cycle = default;
         if (effective is null || effective.Value.Year is < 2 or > 9997) return false;
-        cycle = requested?.Date ?? AnnualDocumentCycle.CurrentStart(effective.Value, DateTime.Today);
+        if (requested is null) return false;
+        cycle = requested.Value.Date;
         return cycle.Year is > 1 and < 9998 && cycle >= effective.Value.Date &&
             AnnualDocumentCycle.CurrentStart(effective.Value, cycle) == cycle;
     }
+    private static async Task<SafetyCycleTiming> GetSafetyTimingAsync(
+        ApiDbContext db, int agencyId, CancellationToken ct)
+    {
+        var timing = await db.Settings.AsNoTracking()
+            .Where(x => x.AgencyId == agencyId)
+            .Select(x => new SafetyCycleTiming(
+                x.SafetyPlanOpenDaysBefore,
+                x.SafetyPlanDaysBeforeAnniversary))
+            .SingleOrDefaultAsync(ct);
+        return timing is null
+            ? new SafetyCycleTiming(90, 0)
+            : new SafetyCycleTiming(
+                Math.Max(0, timing.OpenDaysBefore),
+                Math.Max(0, timing.DueDaysBeforeEffective));
+    }
+    private static IResult SafetyCycleNotAvailable(DateTime cycle, SafetyCycleTiming timing)
+    {
+        var availableOn = cycle.Date
+            .AddDays(-timing.DueDaysBeforeEffective)
+            .AddDays(-timing.OpenDaysBefore);
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["cycleStart"] =
+                [$"This safety plan becomes available on {availableOn:yyyy-MM-dd}."]
+        }, statusCode: StatusCodes.Status422UnprocessableEntity);
+    }
+    private sealed record SafetyCycleTiming(int OpenDaysBefore, int DueDaysBeforeEffective);
     private static IResult InvalidSafetyCycle() => Results.ValidationProblem(
         new Dictionary<string, string[]> { ["cycleStart"] = ["Choose an effective-date anniversary on or after enrollment."] });
     private static IResult SafetyConflict() => Results.Conflict(new ApiErrorDto(

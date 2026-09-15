@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Sati.Contracts.V1;
 using Sati.Data;
+using Sati.Data.Cloud;
 using Sati.Helpers;
 using Sati.Models;
 using Sati.Reporting;
@@ -22,6 +23,8 @@ namespace Sati.ViewModels
 {
     public partial class NewClientViewModel : ObservableValidator
     {
+        internal const int ReleasesWorkspaceTabIndex = 5;
+
         // -------------------------------------------------------------------------
         // Services
         // -------------------------------------------------------------------------
@@ -37,6 +40,15 @@ namespace Sati.ViewModels
         private readonly IIncidentReporter _incidentReporter;
         public BillingComplianceRequirements BillingComplianceRequirements { get; private set; } =
             BillingComplianceGate.DefaultRequirements;
+        public int PcpOpenDaysBefore { get; private set; } = 90;
+        private int _compliancePresentationRevision;
+
+        /// <summary>
+        /// Changes whenever a form mutation can change the billing-compliance presentation.
+        /// Roster bindings observe this value because <see cref="Person"/> is a domain model,
+        /// not an observable presentation row.
+        /// </summary>
+        public int CompliancePresentationRevision => _compliancePresentationRevision;
         private readonly ATRequestPdfExporter _atRequestPdfExporter;
 
         public DhhsFormsViewModel DhhsForms { get; }
@@ -59,6 +71,7 @@ namespace Sati.ViewModels
         public SafetyPlanViewModel? SafetyPlan { get; }
         public AnnualDocumentsViewModel? AnnualDocuments { get; }
         public CheckRequestsViewModel? CheckRequests { get; }
+        public ReleaseObligationsViewModel? ReleaseObligations { get; }
         public FormAttestationViewModel Attestation { get; }
 
         // Per-consumer journal state. The timer debounces saves to 2s after the last
@@ -152,6 +165,16 @@ namespace Sati.ViewModels
         [NotifyPropertyChangedFor(nameof(CanImportCredibleIntoCurrentForm))]
         [NotifyPropertyChangedFor(nameof(CredibleImportActionLabel))]
         private bool isEditMode;
+        private bool _isFormsEditingUnlocked;
+        public bool IsFormsEditingUnlocked
+        {
+            get => _isFormsEditingUnlocked;
+            private set
+            {
+                if (SetProperty(ref _isFormsEditingUnlocked, value))
+                    ToggleFormCommand.NotifyCanExecuteChanged();
+            }
+        }
         [ObservableProperty]
         private bool isClientEditorOpen;
         [ObservableProperty]
@@ -323,13 +346,15 @@ namespace Sati.ViewModels
 
         partial void OnSelectedPersonChanged(Person? value)
         {
-            Attestation?.CancelCommand.Execute(null);
+            // Form editing is a deliberate, per-profile action. Never carry an
+            // unlocked state or an open attestation into another person's record.
+            LockFormsEditing();
+            ToggleFormsEditingCommand.NotifyCanExecuteChanged();
+            ToggleFormCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(HasSelectedPerson));
             OnPropertyChanged(nameof(ShowClientWorkspace));
             OnPropertyChanged(nameof(SelectedPersonServices));
             OnPropertyChanged(nameof(HasSelectedPersonServices));
-            OnPropertyChanged(nameof(SelectedPersonComplianceReasons));
-            OnPropertyChanged(nameof(HasSelectedPersonComplianceIssues));
             OnPropertyChanged(nameof(ShowsEmploymentTracking));
             OnPropertyChanged(nameof(Q1RDueDate));
             OnPropertyChanged(nameof(Q2RDueDate));
@@ -344,10 +369,11 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(ReleaseDhhsDueDate));
             RefreshComplianceFlags();
             _ = LoadSelectedPersonWorkspaceSafelyAsync(value, _workspaceLoads.Begin());
-            SsnPanel.SetPerson(value?.Id);
-            ConsumerProviders.SetPerson(value);
-            DhhsForms.SetPerson(value);
-            AgencyRelease.SetPerson(value);
+            SsnPanel?.SetPerson(value?.Id);
+            ConsumerProviders?.SetPerson(value);
+            DhhsForms?.SetPerson(value);
+            AgencyRelease?.SetPerson(value);
+            ReleaseObligations?.SetPerson(value);
             CheckRequests?.SetPerson(value);
             SafetyPlan?.SetPerson(value);
             AnnualDocuments?.SetPerson(value);
@@ -487,22 +513,26 @@ namespace Sati.ViewModels
         }
 
         public bool HasSelectedPersonServices => SelectedPersonServices.Length > 0;
+        private IReadOnlyList<string> _selectedPersonComplianceReasons = [];
         public IReadOnlyList<string> SelectedPersonComplianceReasons =>
-            GetComplianceReasons(
-                SelectedPerson, DateTime.Today, BillingComplianceRequirements);
-        public bool HasSelectedPersonComplianceIssues => SelectedPersonComplianceReasons.Count > 0;
+            _selectedPersonComplianceReasons;
+        public bool HasSelectedPersonComplianceIssues =>
+            _selectedPersonComplianceReasons.Count > 0;
 
         internal static IReadOnlyList<string> GetComplianceReasons(
             Person? person,
             DateTime today,
             BillingComplianceRequirements requirements =
-                BillingComplianceGate.DefaultRequirements) =>
-            person?.EvaluateComplianceGate(today, requirements: requirements).Reasons ?? [];
+                BillingComplianceGate.DefaultRequirements,
+            int pcpOpenDaysBefore = 90) =>
+            person?.EvaluateComplianceGate(
+                today,
+                requirements: requirements,
+                pcpOpenDaysBefore: pcpOpenDaysBefore).Reasons ?? [];
 
         // Employed and receiving no employment supports from any funding stream —
         // the population whose employment parameters must be tracked quarterly.
         public bool ShowsEmploymentTracking => SelectedPerson?.RequiresEmploymentTracking ?? false;
-        public bool AllowComplianceOverride => _sessionService.AllowComplianceOverride;
         public bool HasWaiver => Waiver != WaiverType.None;
         public string SubmitButtonLabel => IsEditMode ? "Save Changes" : "Add Client";
         public string EntryPanelHeader => IsEditMode ? "EDIT CLIENT" : "ADD CLIENT"; public Array Waivers => Enum.GetValues(typeof(WaiverType));
@@ -590,9 +620,28 @@ namespace Sati.ViewModels
         public bool ReclassificationCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.IsCompliant ?? false;
         public bool SafetyPlanCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.IsCompliant ?? false;
         public bool PrivacyPracticesCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.IsCompliant ?? false;
-        public bool ReleaseAgencyCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Agency)?.IsCompliant ?? false;
-        public bool ReleaseDhhsCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_DHHS)?.IsCompliant ?? false;
-        public bool ReleaseMedicalCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Medical)?.IsCompliant ?? false;
+        public bool ReleaseAgencyCompliant =>
+            IsReleaseCategoryCompliant(ReleaseObligationCategory.Agency, DateTime.Today);
+        public bool ReleaseDhhsCompliant =>
+            IsReleaseCategoryCompliant(ReleaseObligationCategory.Dhhs, DateTime.Today);
+        public bool ReleaseMedicalCompliant =>
+            IsReleaseCategoryCompliant(ReleaseObligationCategory.Medical, DateTime.Today);
+
+        internal bool IsReleaseCategoryCompliant(
+            ReleaseObligationCategory category,
+            DateTime asOfDate)
+        {
+            if (SelectedPerson?.EffectiveDate is not DateTime effectiveDate)
+                return false;
+
+            var target = ComplianceScheduleRules.CurrentTargetEffectiveDate(
+                effectiveDate, asOfDate);
+            return ReleaseComplianceRules.IsCategoryCompliant(
+                category,
+                target,
+                asOfDate,
+                ((IEventSource)SelectedPerson).ReleaseComplianceFacts);
+        }
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -612,7 +661,8 @@ namespace Sati.ViewModels
                            ConsumerImportViewModel consumerImport,
                            SafetyPlanViewModel? safetyPlan = null,
                            AnnualDocumentsViewModel? annualDocuments = null,
-                           CheckRequestsViewModel? checkRequests = null)
+                           CheckRequestsViewModel? checkRequests = null,
+                           ReleaseObligationsViewModel? releaseObligations = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -630,12 +680,21 @@ namespace Sati.ViewModels
             SafetyPlan = safetyPlan;
             AnnualDocuments = annualDocuments;
             CheckRequests = checkRequests;
+            ReleaseObligations = releaseObligations;
             ConsumerProviders = consumerProviders;
             ConsumerImport = consumerImport;
             Attestation = new FormAttestationViewModel(formService)
             {
                 AttestationChangedAsync = AfterAttestationChangedAsync
             };
+            if (ReleaseObligations is not null)
+            {
+                ReleaseObligations.ComplianceChangedAsync = AfterAttestationChangedAsync;
+                ReleaseObligations.ObligationsChanged += AgencyRelease.SetReleaseObligations;
+                ReleaseObligations.ObligationsChanged += DhhsForms.SetReleaseObligations;
+                ConsumerProviders.ProviderAssignmentsChangedAsync =
+                    ReleaseObligations.RefreshAsync;
+            }
 
             // The review panel hands over accepted values and nothing else; filling the form is
             // this class's business, and saving stays with Submit.
@@ -733,7 +792,18 @@ namespace Sati.ViewModels
             // The dashboard intentionally shows only items inside its configured
             // action window. This compact preview serves a different purpose: show
             // the selected person's next work even when it has not opened yet.
+            var releaseFacts = ((IEventSource)person).ReleaseComplianceFacts;
+            var reconciledReleaseTargets = releaseFacts
+                .Where(item => item.TargetEffectiveDate is not null)
+                .Select(item => item.TargetEffectiveDate!.Value.Date)
+                .ToHashSet();
             var formItems = person.Forms
+                .Where(form => form.Type is not (FormType.Release_Agency or
+                        FormType.Release_DHHS or FormType.Release_Medical) ||
+                    !reconciledReleaseTargets.Contains(
+                        (form.TargetEffectiveDate == default
+                            ? form.DueDate
+                            : form.TargetEffectiveDate).Date))
                 .Where(form => !form.IsCompliant)
                 .Select(form => new UpcomingEvent
                 {
@@ -743,7 +813,36 @@ namespace Sati.ViewModels
                     Date = form.DueDate,
                     Kind = form.DueDate.Date < DateTime.Today
                         ? UpcomingEventKind.LateReview
-                        : UpcomingEventKind.OpenReview
+                        : UpcomingEventKind.OpenReview,
+                    FormType = form.Type,
+                    FormId = form.Id > 0 ? form.Id : null,
+                    TargetEffectiveDate = form.TargetEffectiveDate == default
+                        ? null
+                        : form.TargetEffectiveDate.Date
+                });
+
+            var releaseItems = releaseFacts
+                .Where(item => item.RetiredOn is null || DateTime.Today < item.RetiredOn.Value.Date)
+                .Where(item => ReleaseAttestationRules.CompletedOn(
+                    item.StableKey, item.Attestations) is not DateTime completed ||
+                    completed.Date > DateTime.Today)
+                .Select(item => new UpcomingEvent
+                {
+                    PersonId = person.Id,
+                    ClientName = person.FullName,
+                    Title = string.IsNullOrWhiteSpace(item.RecipientDisplayName)
+                        ? BillingComplianceGate.DisplayName(
+                            ReleaseBillingRules.FormTypeFor(item.Category))
+                        : $"{BillingComplianceGate.DisplayName(ReleaseBillingRules.FormTypeFor(item.Category))} — {item.RecipientDisplayName.Trim()}",
+                    Date = item.DueOn,
+                    Kind = item.DueOn.Date < DateTime.Today
+                        ? UpcomingEventKind.LateReview
+                        : UpcomingEventKind.OpenReview,
+                    FormType = Enum.Parse<FormType>(
+                        ReleaseBillingRules.FormTypeFor(item.Category)),
+                    TargetEffectiveDate = item.TargetEffectiveDate?.Date,
+                    ReleaseObligationId = item.ObligationId,
+                    OpenDate = item.AvailableOn
                 });
 
             var scheduledItems = SelectedPersonNotes
@@ -777,7 +876,7 @@ namespace Sati.ViewModels
                     }
                 });
 
-            var items = formItems.Concat(scheduledItems)
+            var items = formItems.Concat(releaseItems).Concat(scheduledItems)
                 .OrderBy(item => item.Date)
                 .Take(4)
                 .ToList();
@@ -785,6 +884,24 @@ namespace Sati.ViewModels
             foreach (var item in items)
                 SelectedPersonUpcomingItems.Add(item);
             OnPropertyChanged(nameof(HasSelectedPersonUpcomingItems));
+        }
+
+        /// <summary>
+        /// Opens the recipient-specific release workspace and selects only the
+        /// obligation named by the caller. A missing or mismatched identity fails
+        /// visibly; it never falls back to another recipient or annual target.
+        /// </summary>
+        public async Task<bool> OpenReleaseObligationAsync(
+            Guid obligationId,
+            DateTime? targetEffectiveDate = null)
+        {
+            ClientWorkspaceTabIndex = ReleasesWorkspaceTabIndex;
+            if (ReleaseObligations is null)
+                return false;
+
+            return await ReleaseObligations.OpenForAttestationAsync(
+                obligationId,
+                targetEffectiveDate);
         }
 
         // -------------------------------------------------------------------------
@@ -978,7 +1095,9 @@ namespace Sati.ViewModels
         [RelayCommand]
         private async Task SaveContact()
         {
-            if (SelectedPerson is null)
+            var person = SelectedPerson;
+            var account = _sessionService.CurrentUser;
+            if (person is null || account is null)
                 return;
 
             if (string.IsNullOrWhiteSpace(ContactFirstName) ||
@@ -990,7 +1109,7 @@ namespace Sati.ViewModels
 
             var contact = IsEditingContact && SelectedContact is not null
                 ? SelectedContact
-                : new PersonContact { PersonId = SelectedPerson.Id };
+                : new PersonContact { PersonId = person.Id };
 
             contact.FirstName = ContactFirstName;
             contact.LastName = ContactLastName;
@@ -1002,13 +1121,40 @@ namespace Sati.ViewModels
             contact.IsEmergencyContact = ContactIsEmergencyContact;
             contact.HasActiveRelease = ContactHasActiveRelease;
 
-            await _personContactService.SaveAsync(contact);
-            await LoadContactsAsync(SelectedPerson);
-
-            IsContactEditorOpen = false;
-            IsEditingContact = false;
-            SelectedContact = null;
-            ClearContactEditor();
+            bool stillCurrent() => ReferenceEquals(SelectedPerson, person) &&
+                ReferenceEquals(_sessionService.CurrentUser, account);
+            var saved = false;
+            try
+            {
+                await _personContactService.SaveAsync(contact);
+                saved = true;
+                if (!stillCurrent()) return;
+                // Refresh without closing the editor first. A refused refresh must
+                // not erase a draft or misreport a confirmed save as a failed write.
+                var contacts = await _personContactService.GetActiveByPersonAsync(person.Id);
+                if (!stillCurrent()) return;
+                Contacts.Clear();
+                foreach (var item in contacts) Contacts.Add(item);
+                IsContactEditorOpen = false;
+                IsEditingContact = false;
+                SelectedContact = null;
+                ClearContactEditor();
+            }
+            catch (Exception ex) when (ex is SessionExpiredException or CloudApiException or
+                UnauthorizedAccessException or CloudConnectivityException or InvalidOperationException)
+            {
+                if (!stillCurrent()) return;
+                ContactStatusMessage = saved
+                    ? "The contact was saved, but the list could not refresh. Do not repeat the save; sign in again if prompted, then refresh the contact list."
+                    : ex switch
+                    {
+                        SessionExpiredException or CloudSessionEndedException =>
+                            "Your session ended. Your draft is still here. Sign in again and refresh the contact list before retrying the save.",
+                        UnauthorizedAccessException =>
+                            "The contact was not saved because this account no longer has permission. Your draft is still here.",
+                        _ => "Sati could not confirm the contact save. Your draft is still here; refresh the contact list before retrying."
+                    };
+            }
         }
 
         [RelayCommand]
@@ -1180,18 +1326,35 @@ namespace Sati.ViewModels
             }
         }
 
-        [RelayCommand]
-        private void ToggleComplianceOverride()
+        private bool CanToggleFormsEditing() => SelectedPerson is not null;
+
+        [RelayCommand(CanExecute = nameof(CanToggleFormsEditing))]
+        private void ToggleFormsEditing()
         {
-            _sessionService.AllowComplianceOverride = !_sessionService.AllowComplianceOverride;
-            OnPropertyChanged(nameof(AllowComplianceOverride));
+            if (SelectedPerson is null)
+                return;
+
+            IsFormsEditingUnlocked = !IsFormsEditingUnlocked;
+            if (!IsFormsEditingUnlocked)
+                Attestation.CancelCommand.Execute(null);
         }
 
-        [RelayCommand]
+        private bool CanToggleForm(FormType type) =>
+            IsFormsEditingUnlocked && SelectedPerson is not null;
+
+        [RelayCommand(CanExecute = nameof(CanToggleForm))]
         private async Task ToggleForm(FormType type)
         {
-            if (SelectedPerson is null) return;
-            await ToggleFormForAsync(SelectedPerson, type);
+            var person = SelectedPerson;
+            if (!CanToggleForm(type) || person is null)
+                return;
+            await ToggleFormForAsync(person, type);
+        }
+
+        private void LockFormsEditing()
+        {
+            IsFormsEditingUnlocked = false;
+            Attestation?.CancelCommand.Execute(null);
         }
 
         internal async Task ToggleFormForAsync(Person person, FormType type)
@@ -1714,6 +1877,8 @@ namespace Sati.ViewModels
                 settings.VrAssistantTitle);
             BillingComplianceRequirements = settings.BillingComplianceRequirements;
             OnPropertyChanged(nameof(BillingComplianceRequirements));
+            PcpOpenDaysBefore = settings.PcpOpenDaysBefore;
+            OnPropertyChanged(nameof(PcpOpenDaysBefore));
             RefreshComplianceFlags();
             HealthcareSystems.Clear();
             foreach (var name in HealthcareSystemOptions.Normalize(settings.HealthcareSystems))
@@ -1722,6 +1887,16 @@ namespace Sati.ViewModels
 
         private void RefreshComplianceFlags()
         {
+            _selectedPersonComplianceReasons = GetComplianceReasons(
+                SelectedPerson,
+                DateTime.Today,
+                BillingComplianceRequirements,
+                PcpOpenDaysBefore);
+            unchecked
+            {
+                _compliancePresentationRevision++;
+            }
+            OnPropertyChanged(nameof(CompliancePresentationRevision));
             OnPropertyChanged(nameof(Q1RCompliant));
             OnPropertyChanged(nameof(Q2RCompliant));
             OnPropertyChanged(nameof(Q3RCompliant));
@@ -1736,10 +1911,6 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(ReleaseMedicalCompliant));
             OnPropertyChanged(nameof(SelectedPersonComplianceReasons));
             OnPropertyChanged(nameof(HasSelectedPersonComplianceIssues));
-            // Person is a domain object rather than an observable row VM. Raising
-            // People refreshes the roster bindings after a form toggle so its
-            // compliance tint changes immediately.
-            OnPropertyChanged(nameof(People));
         }
 
         private bool MatchesConsumerFilter(object item) => item is Person person && SelectedConsumerFilter switch

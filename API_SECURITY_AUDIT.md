@@ -1,4 +1,4 @@
-# API security audit — 2026-08-14, 2026-08-15, 2026-08-30, 2026-08-31, 2026-09-05, 2026-09-10
+# API security audit — 2026-08-14, 2026-08-15, 2026-08-30, 2026-08-31, 2026-09-05, 2026-09-10, 2026-09-11, 2026-09-14
 
 Scope: the authorization surface of `Sati.Api`, the sensitive-data boundary between the server and
 distributed clients, and the artifacts the platform hands to a reviewer. Driven by the two risks
@@ -8,9 +8,135 @@ the server.
 This is a point-in-time review of the code as of this date, not a certification. It does not
 substitute for an independent assessment, and it does not establish HIPAA compliance.
 
+The broader post-intake September 10 repository review is in `SECURITY_REVIEW_2026-09-10.md`.
+It includes synthetic reproductions of permission revocation, bearer-session, required-form
+deletion and pre-supervisory compliance defects. The follow-up form-deletion closure is described
+below, followed by the September 11 ordinary consumer permission closure. Remaining findings are
+tracked explicitly in that review. Older “fixed” statements in this
+file apply only to their named paths; they must not be interpreted as launch clearance. The new
+response importer remains synthetic-only while real clearinghouse and operational gates are open.
+
 ---
 
 ## Fixed
+
+### Follow-up 2026-09-14 — annual identity and billing-decision integrity
+
+The previous model used `DueDate` to infer annual identity even though annual deadlines fall before
+the target and reviews fall after it. That could select an upcoming PCP as the current obligation.
+Generation also treated a reached effective date as evidence of completion, and billing read a
+single mutable Settings mask, so a later configuration change could reinterpret older service.
+The Supervisor override then bypassed compliance as a boolean without freezing which blockers were
+actually excepted. These were decision-integrity defects even when tenant authorization was sound.
+
+The corrected source gives every form an explicit `TargetEffectiveDate`, creates generated rows
+outstanding, and keeps current/upcoming targets separate. Completion and opening take selected
+occurrence dates through named routes while the server records actor and UTC receipt time
+separately. Generic form update cannot change either projection. Form attestation needs no caller-
+asserted artifact; Reclassification's only dependency is a same-target CA, with two attestations in
+one transaction when the CA date must be supplied. A Supervisor cannot bypass that implication.
+
+Billing policies are append-only, agency-owned, and selected by service date. Changes require an
+enforcement date; past dates are denied by default and require both a separately enabled agency
+setting and an explanation. The shared gate now treats the due day and completion day as billable.
+The default mask is reviews + PCP completion + CA, with PCP opening and every other supported type
+independently configurable. Supervisor exception requests require expected revision, explanation,
+confirmation, and exact current blocker IDs; the API derives actor/time and claim creation
+revalidates the selection so unrelated or newly appearing blockers still fail closed.
+The desktop note-entry and notes-log pre-gates obtain the mask for the note's exact service date
+through a tenant-scoped resolver. Its API response exposes only that date and resolved mask, never
+the policy history, explanation, or recording administrator; the server-side approval and billing
+checks remain authoritative and independently resolve the same service-date policy.
+
+Post-compliance recovery is a separate Administration-permission, agency-scoped path. Its read
+model offers only otherwise billing-valid approved notes with no claim line and no prior recovery,
+and only after each service-date blocker has verifiable satisfaction evidence. The serializable write
+rebuilds that plan server-side, requires an explanation and explicit attestation, and freezes the
+selected note IDs plus exact obligation ID, due date, completion date, and evidence ID. Candidate
+and claim-line validation recheck those facts; a changed or newly applicable blocker fails closed.
+The decision does not rewrite submitted/finalized financial records. Focused recovery API tests
+cover permission/tenant refusal, incomplete and unselected rejection, exact evidence, selected-only
+claim release, and unchanged source notes (3/3); the shared release/recovery core run passed 37/37.
+
+Billing-policy changes have a separate tenant-scoped impact path. Preview is Administration-only
+and read-only. Apply writes the policy version, audit event, and append-only unresolved flags for
+affected submitted notes/finalized claim lines in one save; exact idempotent replay cannot duplicate
+them. The review queue permits Administration or Billing and filters directly by the validated
+actor's agency. It never updates the flagged Note, ClaimLine, or BillingPeriod.
+
+Recipient-specific release rows replace category-wide authority for reconciled cycles. The API
+derives Medical/Agency recipients only from same-agency provider assignments, always creates the
+annual DHHS obligation, refuses invalid target/recipient combinations, and retains attestation,
+retirement, and withdrawal history. Guardian presence requires guardian capacity; otherwise the
+consumer is required, and authorized representatives are rejected. The staff API alone may
+idempotently project eligible immutable signature completion evidence onto the exact target; the
+public portal receives no clinical write authority.
+
+The scaffolded migration stages and validates annual targets before making them required, refuses
+legacy blanket note overrides rather than inventing blocker evidence, and corrects only exact
+recognized Settings defaults with a system/migration audit record. Its five synthetic migration
+tests and script-generation check pass. It has not been applied to an environment or rehearsed
+against an approved data copy.
+
+This closure is source- and synthetic-test-scoped. The signature bridge remains gated to synthetic
+use and Local Production remains disabled. Controlled schema-migration application/backfill
+rehearsal, ambiguous legacy-row reconciliation, SQL Server concurrency rehearsal,
+regulatory/accessibility review, and environment deployment remain separate gates until their
+completed evidence is recorded. No Production data was queried or changed and no deployment was
+performed for this correction.
+
+### Follow-up 2026-09-11 — retained account state invalidates old sign-ins
+
+Accounts now have enabled state and a monotonic security version. The API rejects disabled,
+missing-version and stale-version identities before protected routes, including renewal; chat
+leases recheck account validity. Password change/reset and administrator revocation advance the
+version. Disable/re-enable preserves records and cannot revive old tokens. The local services
+mirror these checks, including personal data, template administration and EDI generation/replay.
+Cloud response/renewal generation guards prevent an older sign-in from replacing a newer one.
+
+The password-reset review additionally exposed an assigned-user takeover: testing only the
+target's CaseManagement bit let a supervisor reset a user who also held stronger permissions.
+`UserManagementRules.DescribeTargetRefusal` now owns the stored-target check for profile changes
+and resets. Non-administrators may manage only assigned, case-management-only users.
+
+Synthetic tests demonstrate the earlier password/token, client-response, template and target-user
+failures before correction, plus positive workflows and concurrency conflict handling. The
+handoff records final runner totals separately. Migration and rollout have not been performed.
+Global local-maintenance helpers, direct-SQL clients, data already delivered, ordinary authorized
+work already in flight, MFA and the other launch findings are not closed by this change.
+
+### Follow-up 2026-09-11 — retained assignments are not continuing casework authority
+
+Owned API queries require current CaseManagement and exact person/owner agency; accessible
+consumer routes include person agency and shared supervisory reach. Journals, note editing,
+deletion, annual reads, abandonment, form opening, own-casework reports and owner status no longer
+accept assignment alone. Note markers are checked, including mapped person-response notes and
+supervisor/billing candidates. Billing-only claims and supervision-only review remain authorized.
+
+Local login retains persisted permissions and no password verifier. Consumer services recheck
+current database actor facts; previously actor-free review, AT and PCP services require the
+session. Supervisor/Admin records, AI context and SSN/document preparation are included. Local AT
+also rejects caller-supplied publication identity/attestations and published deletion. Evidence
+includes failures before repairs, denied-write state checks and positive persisted-write controls;
+see SECURITY_REVIEW_2026-09-10.md and the permission-revocation handoff.
+
+Closure is limited to ordinary application boundaries. B04 global maintenance, B05 bearer session
+lifecycle, direct SQL, cached content, unsupported target-mask review edges and remaining launch/AT
+parity findings are not certified safe by it. No production change was made.
+
+### Follow-up 2026-09-10 — standalone form-deletion billing bypass
+
+The API and local service formerly permitted deletion of an owned form with no attestation.
+That removed the row supplying a current or historical billing block. New synthetic regressions
+failed against both original implementations. Every authorized nonempty standalone request now
+returns the shared retention refusal without writing. The API additionally enforces current
+case-management permission and exact person/owner tenant scope before returning that conflict.
+Future, optional and completed forms are retained too. Attestation/revocation, audited duplicate
+repair and separately controlled whole-consumer deletion remain distinct workflows.
+
+This closes the exposed standalone deletion path, not previously missing obligations or claims
+created while the bypass existed. No historical date reconstruction, real-data cleanup, migration
+or deployment was performed. API rollover and pre-EDI revalidation remain explicit follow-ups.
 
 ### 0. Unauthenticated account creation on the sign-in screen — added 2026-08-15
 

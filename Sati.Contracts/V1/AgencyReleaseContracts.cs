@@ -93,10 +93,10 @@ public static class AgencyReleaseRules
     public const int MaxTextLength = 300;
 
     public const string StaffAttestation =
-        "I attest that I obtained the consumer's authorization represented by these selections and that I am preparing this release at the consumer's direction.";
+        "I confirm that I prepared this release from the authorization choices provided by the consumer or guardian. This confirmation records document preparation only.";
 
     public const string AttestationScopeNotice =
-        "This records the authenticated Sati user and generation time. It is not the consumer's electronic signature and does not replace any signature required by agency policy or law.";
+        "This records the authenticated Sati user and generation time. It is not the consumer's or guardian's signature, does not replace any signature required by agency policy or law, and does not complete a tracked release obligation. Record the actual consumer or guardian completion date separately in Recipient-specific releases, or use a supported electronic signature.";
 
     public static IReadOnlyDictionary<string, string[]> Validate(AgencyReleaseRequest request)
     {
@@ -239,7 +239,7 @@ public static class AgencyReleaseRules
         if (request.IncludeDrugAlcohol == true || request.IncludeMentalHealth == true || request.IncludeHivAids == true)
             Add("SensitiveConsent", "A draft cannot record sensitive-information consent.");
         if (request.ConfirmedObtainedRoi)
-            Add(nameof(request.ConfirmedObtainedRoi), "A draft cannot include a staff attestation that authorization was obtained.");
+            Add(nameof(request.ConfirmedObtainedRoi), "A draft cannot include a staff generation confirmation.");
 
         return errors.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.Ordinal);
     }

@@ -187,8 +187,13 @@ public static class SignaturePersistenceModel
     }
 
     /// <summary>Clinical principals belong only to the full migration/API model, never the portal.</summary>
-    public static void ConfigureClinicalRelationships<TArtifact, TAgency, TUser, TPerson, TContact>(ModelBuilder builder)
-        where TArtifact : class where TAgency : class where TUser : class where TPerson : class where TContact : class
+    public static void ConfigureClinicalRelationships<TArtifact, TAgency, TUser, TPerson, TContact, TFormAttestation>(ModelBuilder builder)
+        where TArtifact : class
+        where TAgency : class
+        where TUser : class
+        where TPerson : class
+        where TContact : class
+        where TFormAttestation : class
     {
         builder.Entity<TArtifact>().HasAlternateKey("AgencyId", "PersonId", "Id");
         builder.Entity<TContact>().HasAlternateKey("PersonId", "Id");
@@ -202,10 +207,69 @@ public static class SignaturePersistenceModel
         builder.Entity<SignatureRequest>().HasOne<TContact>().WithMany().HasForeignKey(x => new { x.PersonId, x.SignerContactId })
             .HasPrincipalKey("PersonId", "Id").OnDelete(DeleteBehavior.Restrict);
         builder.Entity<SignatureEvent>().HasOne<TUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SignatureComplianceProjection>(e =>
+        {
+            e.ToTable("SignatureComplianceProjections", table =>
+            {
+                table.HasCheckConstraint("CK_SignatureComplianceProjections_Outcome",
+                    "[Outcome] IN ('Applied','AlreadySatisfied')");
+                table.HasCheckConstraint("CK_SignatureComplianceProjections_Target",
+                    "[TargetKind] IN ('Form','ReleaseObligation') AND [TargetId] > 0");
+                table.HasCheckConstraint("CK_SignatureComplianceProjections_Signer",
+                    "[SignerCapacity] IN ('Consumer','Guardian')");
+                table.HasCheckConstraint("CK_SignatureComplianceProjections_Result",
+                    "([Outcome] = 'Applied' AND [ExistingCompletedOn] IS NULL AND " +
+                    "(([TargetKind] = 'Form' AND [FormAttestationId] IS NOT NULL AND [ReleaseObligationAttestationId] IS NULL) OR " +
+                    "([TargetKind] = 'ReleaseObligation' AND [ReleaseObligationAttestationId] IS NOT NULL AND [FormAttestationId] IS NULL))) OR " +
+                    "([Outcome] = 'AlreadySatisfied' AND [FormAttestationId] IS NULL AND [ReleaseObligationAttestationId] IS NULL AND [ExistingCompletedOn] IS NOT NULL)");
+                table.HasCheckConstraint("CK_SignatureComplianceProjections_Time",
+                    "[RecordedAtUtc] >= [SignedAtUtc]");
+            });
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.CompletionId).IsUnique();
+            e.HasIndex(x => x.FormAttestationId).IsUnique()
+                .HasFilter("[FormAttestationId] IS NOT NULL");
+            e.HasIndex(x => x.ReleaseObligationAttestationId).IsUnique()
+                .HasFilter("[ReleaseObligationAttestationId] IS NOT NULL");
+            e.HasIndex(x => new { x.AgencyId, x.PersonId, x.TargetKind, x.TargetId });
+            e.Property(x => x.DocumentKind).IsRequired().HasMaxLength(40);
+            e.Property(x => x.TargetKind).IsRequired().HasMaxLength(32);
+            e.Property(x => x.Outcome).IsRequired().HasMaxLength(32);
+            e.Property(x => x.SignerCapacity).IsRequired().HasMaxLength(32);
+            e.Property(x => x.CompletedOn).HasColumnType("date");
+            e.Property(x => x.ExistingCompletedOn).HasColumnType("date");
+
+            var utc = new ValueConverter<DateTime, DateTime>(
+                value => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+                value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
+            e.Property(x => x.SignedAtUtc).HasConversion(utc);
+            e.Property(x => x.RecordedAtUtc).HasConversion(utc);
+
+            e.HasOne<SignatureCompletion>().WithMany()
+                .HasForeignKey(x => new { x.AgencyId, x.RequestId, x.CompletionId })
+                .HasPrincipalKey(x => new { x.AgencyId, x.RequestId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<TArtifact>().WithMany()
+                .HasForeignKey(x => new { x.AgencyId, x.PersonId, x.DocumentArtifactId })
+                .HasPrincipalKey("AgencyId", "PersonId", "Id")
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<TFormAttestation>().WithMany()
+                .HasForeignKey(x => x.FormAttestationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ReleaseObligationAttestation>().WithMany()
+                .HasForeignKey(x => x.ReleaseObligationAttestationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     public static void ProtectDocumentArtifacts<TArtifact>(ChangeTracker tracker) where TArtifact : class
     {
+        if (tracker.Entries<SignatureComplianceProjection>()
+            .Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException(
+                "Electronic-signature compliance projections are immutable.");
+
         foreach (var e in tracker.Entries<TArtifact>())
         {
             if (e.State != EntityState.Modified) continue;

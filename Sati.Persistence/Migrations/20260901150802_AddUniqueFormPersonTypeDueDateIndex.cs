@@ -16,15 +16,16 @@ namespace Sati.Migrations
             // operator gets the actual instruction instead.
             //
             // The duplicates are real data with real completion dates on them; the
-            // repair merges rather than deletes arbitrarily, which is why it is a
-            // reviewed maintenance action and not a step inside this migration.
+            // startup repair merges rather than deletes arbitrarily. The updater
+            // stages the database at the immediately preceding migration and runs
+            // that bounded legacy repair before allowing this index to bind.
             migrationBuilder.Sql("""
                 IF EXISTS (
                     SELECT 1 FROM dbo.Forms
                     GROUP BY PersonId, Type, DueDate
                     HAVING COUNT(*) > 1
                 )
-                    THROW 50000, 'dbo.Forms still contains duplicate (PersonId, Type, DueDate) rows. Run the duplicate compliance form repair (Settings -> Maintenance) and re-apply this migration. See HANDOFF_DUPLICATE_COMPLIANCE_FORMS.md.', 1;
+                    THROW 50000, 'dbo.Forms still contains duplicate legacy (PersonId, Type, DueDate) rows with conflicting evidence. Startup left them unchanged rather than choose a billing fact. Restore/review the pre-migration backup and resolve the reported conflicts before retrying. See HANDOFF_DUPLICATE_COMPLIANCE_FORMS.md.', 1;
                 """);
 
             migrationBuilder.DropIndex(

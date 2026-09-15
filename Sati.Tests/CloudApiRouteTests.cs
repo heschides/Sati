@@ -67,6 +67,25 @@ public sealed class CloudApiRouteTests
     }
 
     [Fact]
+    public async Task GeneratingATrackedDhhsReleaseSendsItsTargetAndObligationIdentity()
+    {
+        var recorder = new UriRecorder(new ByteArrayContent([1, 2, 3]));
+        var service = new CloudDhhsFormService(ClientFor(recorder));
+        var target = new DateTime(2027, 3, 7);
+        var obligationId = Guid.NewGuid();
+
+        await service.GenerateForAnnualTargetAsync(
+            DhhsFormDefinition.FormKey.AuthorizationToRelease,
+            PersonId,
+            DhhsFormDefinition.Selections.None,
+            target,
+            obligationId);
+
+        Assert.Contains($"\"targetEffectiveDate\":\"{target:yyyy-MM-dd}", recorder.LastBody);
+        Assert.Contains($"\"releaseObligationId\":\"{obligationId:D}\"", recorder.LastBody);
+    }
+
+    [Fact]
     public async Task ReadingTheSsnStatusRequestsTheVersionedRoute()
     {
         var recorder = new UriRecorder(JsonBody("""{"masked":"***-**-6789","isOnFile":true}"""));
@@ -122,6 +141,22 @@ public sealed class CloudApiRouteTests
             recorder.LastUri?.ToString());
     }
 
+    [Fact]
+    public async Task GeneratingATrackedReleaseSendsTheExactObligationIdentifier()
+    {
+        var recorder = new UriRecorder(new ByteArrayContent([1, 2, 3]));
+        var service = new CloudAgencyReleaseService(ClientFor(recorder));
+        var obligationId = Guid.NewGuid();
+
+        await service.GenerateMedicalForObligationAsync(
+            PersonId, ValidReleaseRequest(), obligationId);
+
+        Assert.Equal(
+            $"https://api.invalid/api/v1/people/{PersonId}/documents/{AnnualDocumentKind.ReleaseMedical}",
+            recorder.LastUri?.ToString());
+        Assert.Contains($"\"releaseObligationId\":\"{obligationId:D}\"", recorder.LastBody);
+    }
+
     /// <summary>
     /// Validation runs before the request goes out, so an invalid release never
     /// reaches the network at all.
@@ -139,11 +174,12 @@ public sealed class CloudApiRouteTests
     }
 
     [Fact]
-    public async Task OpeningAFormWritesTodaysOpenedDateToTheVersionedRoute()
+    public async Task OpeningAFormSendsTheSelectedActualDateToTheDedicatedRoute()
     {
         var today = DateTime.Today;
+        var openedOn = today.AddDays(-2);
         var responseJson = $$"""
-            {"id":44,"type":"Q1R","dueDate":"{{today.AddDays(10):yyyy-MM-dd}}","isCompliant":false,"personId":{{PersonId}},"completedDate":null,"openedDate":"{{today:yyyy-MM-dd}}"}
+            {"id":44,"type":"Q1R","dueDate":"{{today.AddDays(10):yyyy-MM-dd}}","isCompliant":false,"personId":{{PersonId}},"completedDate":null,"openedDate":"{{openedOn:yyyy-MM-dd}}"}
             """;
         var recorder = new UriRecorder(JsonBody(responseJson));
         var service = new CloudFormService(ClientFor(recorder));
@@ -153,12 +189,31 @@ public sealed class CloudApiRouteTests
             PersonId = PersonId
         };
 
-        await service.OpenFormAsync(form);
+        await service.OpenFormAsync(form, openedOn);
 
-        Assert.Equal($"https://api.invalid/api/v1/forms/{form.Id}", recorder.LastUri?.ToString());
-        Assert.Equal(HttpMethod.Put, recorder.LastMethod);
-        Assert.Contains($"\"openedDate\":\"{today:yyyy-MM-dd}", recorder.LastBody);
-        Assert.Equal(today, form.OpenedDate);
+        Assert.Equal($"https://api.invalid/api/v1/forms/{form.Id}/open", recorder.LastUri?.ToString());
+        Assert.Equal(HttpMethod.Post, recorder.LastMethod);
+        Assert.Contains($"\"openedOn\":\"{openedOn:yyyy-MM-dd}", recorder.LastBody);
+        Assert.Equal(openedOn, form.OpenedDate);
+    }
+
+    [Fact]
+    public async Task BillingComplianceResolutionSendsTheExactServiceDate()
+    {
+        var serviceDate = new DateTime(2026, 8, 10);
+        var recorder = new UriRecorder(JsonBody($$"""
+            {"serviceDate":"{{serviceDate:yyyy-MM-dd}}","requirements":{{(int)BillingComplianceRequirements.Pcp}}}
+            """));
+        var service = new CloudSettingsService(ClientFor(recorder));
+
+        var requirements = await service.ResolveBillingComplianceRequirementsAsync(serviceDate);
+
+        Assert.Equal(BillingComplianceRequirements.Pcp, requirements);
+        Assert.Equal(
+            "/api/v1/settings/billing-compliance-requirements",
+            recorder.LastUri?.AbsolutePath);
+        Assert.Equal("?serviceDate=2026-08-10", recorder.LastUri?.Query);
+        Assert.Equal(HttpMethod.Get, recorder.LastMethod);
     }
 
     [Fact]

@@ -10,8 +10,14 @@ public sealed class PersonBillingComplianceConverter : IMultiValueConverter
         var requirements = values.Length > 1 && values[1] is Contracts.V1.BillingComplianceRequirements configured
             ? configured
             : Contracts.V1.BillingComplianceGate.DefaultRequirements;
+        var pcpOpenDaysBefore = values.Length > 2 && values[2] is int configuredOpenDays
+            ? configuredOpenDays
+            : 90;
         return values.Length > 0 && values[0] is Person person &&
-               person.EvaluateComplianceGate(DateTime.Today, requirements: requirements).Passed;
+               person.EvaluateComplianceGate(
+                   DateTime.Today,
+                   requirements: requirements,
+                   pcpOpenDaysBefore: pcpOpenDaysBefore).Passed;
     }
 
     public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) =>

@@ -14,6 +14,7 @@ using Sati.Api.Security;
 using Sati;
 using Sati.Contracts.V1;
 using Sati.Forms;
+using Sati.Models;
 
 namespace Sati.Api.Endpoints;
 
@@ -30,6 +31,7 @@ internal static partial class ApiEndpoints
         MapAudit(api);
         MapAdmin(api);
         MapUsers(api);
+        MapAccountLifecycle(api);
         MapSupervisor(api);
         MapCaseload(api);
         MapPeople(api);
@@ -38,6 +40,7 @@ internal static partial class ApiEndpoints
         MapSafetyPlans(api);
         MapChat(api);
         MapAnnualPackets(api);
+        MapReleaseObligations(api);
         MapSignatures(api);
         MapProviders(api);
         MapAtRequests(api);
@@ -1240,7 +1243,13 @@ internal static partial class ApiEndpoints
             // VerifyMissingUser never returns true, so a null user cannot reach
             // past here; the explicit null check states that for the compiler and
             // fails closed if that ever changes.
-            if (!authenticated || user is null)
+            if (!authenticated || user is null || !user.IsEnabled || user.SecurityVersion <= 0 ||
+                !UserPermissionRules.IsSupported(user.Permissions) ||
+                !await db.Users.AsNoTracking().AnyAsync(current => current.Id == user.Id &&
+                    current.IsEnabled && current.SecurityVersion == user.SecurityVersion &&
+                    current.PasswordHash == user.PasswordHash && current.Salt == user.Salt &&
+                    current.AgencyId == user.AgencyId && current.Role == user.Role &&
+                    current.Permissions == user.Permissions, cancellationToken))
             {
                 logger.LogWarning("Sati authentication failed from {RemoteAddress}.", context.Connection.RemoteIpAddress);
                 return TypedResults.Unauthorized();
@@ -1248,7 +1257,7 @@ internal static partial class ApiEndpoints
 
             attemptGuard.Reset(username);
             var actor = new Actor(
-                user.Id, user.AgencyId, user.Role, user.DisplayName, user.Permissions);
+                user.Id, user.AgencyId, user.Role, user.DisplayName, user.Permissions, user.SecurityVersion);
             auditTrail.Record(actor, AuditActions.AuthenticationSucceeded, "User", user.Id);
             await db.SaveChangesAsync(cancellationToken);
             var instanceId = await db.DatabaseIdentities.AsNoTracking()
@@ -1277,7 +1286,9 @@ internal static partial class ApiEndpoints
             if (!long.TryParse(authenticatedAtValue, out var authenticatedAtSeconds))
                 return TypedResults.Unauthorized();
 
-            var authenticatedAt = DateTimeOffset.FromUnixTimeSeconds(authenticatedAtSeconds);
+            DateTimeOffset authenticatedAt;
+            try { authenticatedAt = DateTimeOffset.FromUnixTimeSeconds(authenticatedAtSeconds); }
+            catch (ArgumentOutOfRangeException) { return TypedResults.Unauthorized(); }
             var now = DateTimeOffset.UtcNow;
             if (authenticatedAt > now.AddSeconds(30) ||
                 now - authenticatedAt > TimeSpan.FromMinutes(authenticationOptions.Value.MaxSessionMinutes))
@@ -1286,7 +1297,8 @@ internal static partial class ApiEndpoints
             }
 
             var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(
-                x => x.Id == actor.UserId && x.AgencyId == actor.AgencyId,
+                x => x.Id == actor.UserId && x.AgencyId == actor.AgencyId &&
+                    x.Role == actor.Role && x.IsEnabled && x.SecurityVersion == actor.SecurityVersion,
                 cancellationToken);
             if (user is null)
                 return TypedResults.Unauthorized();
@@ -1363,12 +1375,13 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             if (!actor.HasSupervisorPermissions && !actor.HasAdminPermissions) return Results.Forbid();
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var user = await db.Users.SingleOrDefaultAsync(x => x.Id == userId && x.AgencyId == actor.AgencyId, cancellationToken);
             if (user is null) return Results.NotFound();
             if (user.Role == "PlatformOperator") return Results.NotFound();
-            if (!actor.HasAdminPermissions &&
-                (!UserPermissionRules.HasCaseManagerPermissions(user.Permissions) ||
-                 user.SupervisorId != actor.UserId)) return Results.Forbid();
+            if (UserManagementRules.DescribeTargetRefusal(actor.ToAgencyActor(), user.Permissions,
+                user.SupervisorId, user.AgencyId, user.Role) is not null) return Results.Forbid();
             var errors = await ValidateUserRequestAsync(db, actor, request, userId, cancellationToken);
             if (errors.Count > 0) return Results.ValidationProblem(errors);
             user.Username = request.Username.Trim();
@@ -1379,7 +1392,12 @@ internal static partial class ApiEndpoints
             user.Email = Normalize(request.Email);
             user.Phone = Normalize(request.Phone);
             auditTrail.Record(actor, AuditActions.UserUpdated, "User", userId);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) { return AccountStateConflict(); }
             return Results.Ok(ContractMapper.ToProfile(user));
         });
 
@@ -1391,17 +1409,24 @@ internal static partial class ApiEndpoints
             if (!actor.HasSupervisorPermissions && !actor.HasAdminPermissions) return Results.Forbid();
             if (!ValidPassword(request.NewPassword)) return Results.ValidationProblem(
                 new Dictionary<string, string[]> { ["password"] = ["The new password must be between 8 and 128 characters."] });
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var user = await db.Users.SingleOrDefaultAsync(x => x.Id == userId && x.AgencyId == actor.AgencyId, cancellationToken);
             if (user is null) return Results.NotFound();
             if (user.Role == "PlatformOperator") return Results.NotFound();
-            if (!actor.HasAdminPermissions &&
-                (!UserPermissionRules.HasCaseManagerPermissions(user.Permissions) ||
-                 user.SupervisorId != actor.UserId)) return Results.Forbid();
+            if (UserManagementRules.DescribeTargetRefusal(actor.ToAgencyActor(), user.Permissions,
+                user.SupervisorId, user.AgencyId, user.Role) is not null) return Results.Forbid();
             var credential = passwordVerifier.Hash(request.NewPassword);
+            if (!TryAdvanceSecurityVersion(user)) return AccountStateConflict();
             user.PasswordHash = credential.Hash;
             user.Salt = credential.Salt;
             auditTrail.Record(actor, AuditActions.UserPasswordReset, "User", userId);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) { return AccountStateConflict(); }
             return Results.NoContent();
         });
 
@@ -1412,16 +1437,25 @@ internal static partial class ApiEndpoints
             if (!ValidPassword(request.NewPassword)) return Results.ValidationProblem(
                 new Dictionary<string, string[]> { ["password"] = ["The new password must be between 8 and 128 characters."] });
             var actor = Actor.From(principal);
-            var user = await db.Users.SingleOrDefaultAsync(x => x.Id == actor.UserId && x.AgencyId == actor.AgencyId, cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
+            var user = await db.Users.SingleOrDefaultAsync(x => x.Id == actor.UserId && x.AgencyId == actor.AgencyId &&
+                x.IsEnabled && x.SecurityVersion == actor.SecurityVersion, cancellationToken);
             if (user is null) return Results.NotFound();
             if (!passwordVerifier.Verify(request.CurrentPassword, user.PasswordHash, user.Salt))
                 return Results.BadRequest(new ApiErrorDto(
                     "invalid_current_password", "The current password is incorrect.", string.Empty));
             var credential = passwordVerifier.Hash(request.NewPassword);
+            if (!TryAdvanceSecurityVersion(user)) return AccountStateConflict();
             user.PasswordHash = credential.Hash;
             user.Salt = credential.Salt;
             auditTrail.Record(actor, AuditActions.UserPasswordChanged, "User", actor.UserId);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) { return AccountStateConflict(); }
             return Results.NoContent();
         });
     }
@@ -1495,6 +1529,7 @@ internal static partial class ApiEndpoints
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
                               where note.Status == NoteWorkflow.Logged &&
+                                    note.AgencyId == actor.AgencyId &&
                                     person.AgencyId == actor.AgencyId &&
                                     caseManagerIds.Contains(person.UserId) &&
                                     (!userId.HasValue || person.UserId == userId.Value) &&
@@ -1516,32 +1551,32 @@ internal static partial class ApiEndpoints
             rows = rows.Take(NoteReviewRules.PageSize).ToList();
             var personIds = rows.Select(row => row.Person.Id).Distinct().ToList();
             var formsByPerson = (await db.Forms.AsNoTracking()
+                    .Include(form => form.Attestations)
                     .Where(form => personIds.Contains(form.PersonId))
                     .ToListAsync(cancellationToken))
                 .GroupBy(form => form.PersonId)
                 .ToDictionary(group => group.Key, group => (IReadOnlyList<ServerForm>)group.ToList());
+            var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
+                db, personIds, cancellationToken);
 
-            // The agency's own date, not the host's. On a UTC server the small
-            // hours of the morning are still the previous day in Maine, and a
-            // compliance cycle that turns over a day early here would disagree
-            // with the billing gate, which has always used the Maine date.
-            var today = clock.Today;
-            var complianceRequirements = (await GetOrCreateSettingsAsync(
-                db, actor.AgencyId, cancellationToken)).BillingComplianceRequirements;
+            var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
+                db, actor.AgencyId, cancellationToken);
             var result = rows
                 .Select(row => new
                 {
                     Row = row,
-                    Compliance = EvaluatePersonCompliance(
+                    Compliance = EvaluateNoteCompliance(
+                        row.Note,
                         row.Person,
                         formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
-                        today,
-                        complianceRequirements)
+                        releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
+                        compliancePolicy)
                 })
                 .Select(row => ContractMapper.ToNote(
                     row.Row.Note,
                     row.Row.Person,
-                    row.Compliance.Reasons))
+                    row.Compliance.Reasons,
+                    row.Compliance.Blockers))
                 .ToList();
             return Results.Ok(new NoteReviewPage<NoteDto>(result, more ? rows[^1].Note.Id : null, ceiling));
         });
@@ -1603,39 +1638,40 @@ internal static partial class ApiEndpoints
             var rows = await (from note in db.Notes.AsNoTracking()
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               where note.Status == NoteWorkflow.Logged &&
+                                    note.AgencyId == actor.AgencyId &&
                                     person.AgencyId == actor.AgencyId &&
                                     caseManagerIds.Contains(person.UserId)
                               orderby note.EventDate
                               select new ReviewableNote(note, person)).ToListAsync(cancellationToken);
             var personIds = rows.Select(row => row.Person.Id).Distinct().ToList();
             var formsByPerson = (await db.Forms.AsNoTracking()
+                    .Include(form => form.Attestations)
                     .Where(form => personIds.Contains(form.PersonId))
                     .ToListAsync(cancellationToken))
                 .GroupBy(form => form.PersonId)
                 .ToDictionary(group => group.Key, group => (IReadOnlyList<ServerForm>)group.ToList());
+            var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
+                db, personIds, cancellationToken);
 
-            // The agency's own date, not the host's. On a UTC server the small
-            // hours of the morning are still the previous day in Maine, and a
-            // compliance cycle that turns over a day early here would disagree
-            // with the billing gate, which has always used the Maine date.
-            var today = clock.Today;
-            var complianceRequirements = (await GetOrCreateSettingsAsync(
-                db, actor.AgencyId, cancellationToken)).BillingComplianceRequirements;
+            var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
+                db, actor.AgencyId, cancellationToken);
             var result = rows
                 .Select(row => new
                 {
                     Row = row,
-                    Compliance = EvaluatePersonCompliance(
+                    Compliance = EvaluateNoteCompliance(
+                        row.Note,
                         row.Person,
                         formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
-                        today,
-                        complianceRequirements)
+                        releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
+                        compliancePolicy)
                 })
                 .Where(row => row.Compliance.Passed == compliant)
                 .Select(row => ContractMapper.ToNote(
                     row.Row.Note,
                     row.Row.Person,
-                    row.Compliance.Reasons))
+                    row.Compliance.Reasons,
+                    row.Compliance.Blockers))
                 .ToList();
             return Results.Ok(result);
         });
@@ -1658,20 +1694,6 @@ internal static partial class ApiEndpoints
             if (!NoteWorkflow.CanSupervisorTransition(row.Note.Status, NoteWorkflow.Approved))
                 return Results.Conflict(new ApiErrorDto("invalid_note_status", "Only logged notes can be approved.", string.Empty));
 
-            var forms = await db.Forms.AsNoTracking()
-                .Where(form => form.PersonId == row.Person.Id)
-                .ToListAsync(cancellationToken);
-            var complianceRequirements = (await GetOrCreateSettingsAsync(
-                db, actor.AgencyId, cancellationToken)).BillingComplianceRequirements;
-            if (!EvaluatePersonCompliance(
-                    row.Person, forms, clock.Today, complianceRequirements).Passed)
-            {
-                return Results.Conflict(new ApiErrorDto(
-                    "compliance_required",
-                    "This client does not meet the compliance requirements. Use the documented override workflow if approval is warranted.",
-                    string.Empty));
-            }
-
             if (request.MaximumUnits is int limit)
             {
                 if (!NoteReviewRules.Eligible(limit, row.Note.Status,
@@ -1683,7 +1705,7 @@ internal static partial class ApiEndpoints
                     row.Note.Minutes, "Logged");
                 if (candidate is not null && row.Note.EventDate is DateTime date)
                 {
-                    var day = await LoadDayNotesAsync(db, row.Person.UserId, date, cancellationToken);
+                    var day = await LoadDayNotesAsync(db, row.Person.UserId, actor.AgencyId, date, cancellationToken);
                     var blocks = day.Select(item => ServiceTimeline.TryCreateBlock(item.Note.Id,
                         item.Note.StartTime, item.Note.Minutes, ContractMapper.NoteStatusName(item.Note.Status)))
                         .OfType<ServiceBlock>();
@@ -1716,17 +1738,9 @@ internal static partial class ApiEndpoints
             ClaimsPrincipal principal,
             ApiDbContext db,
             AuditTrail auditTrail,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
-            var reason = request.Reason?.Trim() ?? string.Empty;
-            if (reason.Length is < 1 or > 4_000)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["reason"] = ["An override reason is required and must not exceed 4,000 characters."]
-                });
-            }
-
             var actor = Actor.From(principal);
             var row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
             if (row is null)
@@ -1736,16 +1750,47 @@ internal static partial class ApiEndpoints
             if (!NoteWorkflow.CanSupervisorTransition(row.Note.Status, NoteWorkflow.Approved))
                 return Results.Conflict(new ApiErrorDto("invalid_note_status", "Only logged notes can be approved.", string.Empty));
 
-            var now = DateTime.UtcNow;
+            var forms = await db.Forms.AsNoTracking()
+                .Where(form => form.PersonId == row.Person.Id)
+                .ToListAsync(cancellationToken);
+            var releaseRows = (await LoadReleaseBillingRowsByPersonAsync(
+                db, [row.Person.Id], cancellationToken))
+                .GetValueOrDefault(row.Person.Id) ?? [];
+            var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
+                db, actor.AgencyId, cancellationToken);
+            var compliance = EvaluateNoteCompliance(
+                row.Note, row.Person, forms, releaseRows, compliancePolicy);
+            var decision = BillingComplianceExceptionRules.Validate(
+                compliance.Blockers ?? [],
+                request.BlockingObligationIds,
+                request.Reason,
+                request.AttestationConfirmed);
+            if (!decision.Accepted)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["complianceException"] = decision.Errors.ToArray()
+                });
+            }
+
+            var now = clock.UtcNow.UtcDateTime;
             row.Note.Status = 6;
             row.Note.ApprovedById = actor.UserId;
             row.Note.ApprovedAt = now;
             row.Note.ComplianceOverride = true;
-            row.Note.OverrideReason = reason;
+            row.Note.OverrideReason = request.Reason!.Trim();
             row.Note.OverrideApprovedById = actor.UserId;
             row.Note.OverrideApprovedAt = now;
+            row.Note.OverrideAttestationConfirmed = true;
+            row.Note.OverrideObligationIdsJson = JsonSerializer.Serialize(
+                decision.SelectedObligationIds);
             row.Note.Revision++;
-            auditTrail.Record(actor, AuditActions.NoteApprovalOverridden, "Note", noteId);
+            auditTrail.Record(actor, AuditActions.NoteApprovalOverridden, "Note", noteId,
+                JsonSerializer.Serialize(new
+                {
+                    attestationConfirmed = true,
+                    obligationIds = decision.SelectedObligationIds
+                }));
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
@@ -1807,6 +1852,8 @@ internal static partial class ApiEndpoints
             int? userId,
             ClaimsPrincipal principal,
             ApiDbContext db,
+            AuditTrail audit,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -1817,20 +1864,95 @@ internal static partial class ApiEndpoints
             var people = await db.People.AsNoTracking()
                 // 0 == Sati.PersonStatus.Active. Archived people are excluded from the caseload
                 // load path entirely — see HANDOFF_CLIENT_DELETION_POLICY.md's archive semantics.
-                .Where(x => x.UserId == targetUserId && x.Status == 0)
+                .Where(x => x.UserId == targetUserId && x.AgencyId == actor.AgencyId && x.Status == 0)
                 .OrderBy(x => x.LastName)
                 .ThenBy(x => x.FirstName)
                 .ToListAsync(cancellationToken);
             var ids = people.Select(x => x.Id).ToList();
+            var settings = await GetOrCreateSettingsAsync(
+                db, actor.AgencyId, cancellationToken);
+
+            // The API is the authoritative writer for distributed clients. Keep
+            // current and next annual obligations supplied here just as the
+            // transitional Local Production service does, but under a serializable
+            // transaction and the database uniqueness constraints so concurrent
+            // caseload loads converge rather than duplicating a cycle.
+            var generationStrategy = db.Database.CreateExecutionStrategy();
+            await generationStrategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await db.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable, cancellationToken);
+                var trackedForms = await db.Forms
+                    .Where(x => ids.Contains(x.PersonId))
+                    .ToListAsync(cancellationToken);
+                var formsByIdentity = trackedForms
+                    .Select(form => (form.PersonId, form.Type, Target: form.TargetEffectiveDate.Date))
+                    .ToHashSet();
+                var generatedByPerson = new Dictionary<int, List<string>>();
+
+                foreach (var person in people.Where(person => person.EffectiveDate is not null))
+                {
+                    foreach (var target in ComplianceScheduleRules.TargetEffectiveDatesThroughNext(
+                                 person.EffectiveDate!.Value, clock.Today))
+                    {
+                        foreach (var typeName in PersonSaveRules.FormTypes)
+                        {
+                            if (!formsByIdentity.Add((person.Id, typeName, target.Date)))
+                                continue;
+
+                            db.Forms.Add(new ServerForm
+                            {
+                                PersonId = person.Id,
+                                Type = typeName,
+                                TargetEffectiveDate = target.Date,
+                                DueDate = ComplianceScheduleRules.DueDate(
+                                    typeName, target, ToComplianceSchedule(settings))
+                            });
+                            if (!generatedByPerson.TryGetValue(person.Id, out var generated))
+                            {
+                                generated = [];
+                                generatedByPerson.Add(person.Id, generated);
+                            }
+                            generated.Add($"{typeName}:{target:yyyy-MM-dd}");
+                        }
+                    }
+
+                    await ReconcileCurrentReleaseCyclesAsync(
+                        db, audit, actor, person, clock, "caseload-load", cancellationToken);
+                }
+
+                foreach (var pair in generatedByPerson)
+                {
+                    audit.Record(
+                        actor,
+                        AuditActions.ComplianceObligationsGenerated,
+                        "Person",
+                        pair.Key,
+                        JsonSerializer.Serialize(new
+                        {
+                            obligations = pair.Value.Order(StringComparer.Ordinal).ToArray(),
+                            source = "caseload-load"
+                        }));
+                }
+
+                if (db.ChangeTracker.HasChanges())
+                    await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            });
+
             var forms = await db.Forms.AsNoTracking().Where(x => ids.Contains(x.PersonId)).ToListAsync(cancellationToken);
-            var notes = await db.Notes.AsNoTracking().Where(x => ids.Contains(x.PersonId)).ToListAsync(cancellationToken);
+            var notes = await db.Notes.AsNoTracking().Where(x => ids.Contains(x.PersonId) && x.AgencyId == actor.AgencyId).ToListAsync(cancellationToken);
+            var releases = await LoadReleaseBillingRowsByPersonAsync(
+                db, ids, cancellationToken);
             var formsByPerson = forms.GroupBy(x => x.PersonId).ToDictionary(x => x.Key, x => (IReadOnlyList<ServerForm>)x.ToList());
             var notesByPerson = notes.GroupBy(x => x.PersonId).ToDictionary(x => x.Key, x => (IReadOnlyList<ServerNote>)x.ToList());
 
             return Results.Ok(people.Select(person => ContractMapper.ToPerson(
                 person,
                 formsByPerson.GetValueOrDefault(person.Id) ?? [],
-                notesByPerson.GetValueOrDefault(person.Id) ?? [])).ToList());
+                notesByPerson.GetValueOrDefault(person.Id) ?? [],
+                releases.GetValueOrDefault(person.Id)?.Select(item => item.ToComplianceFact()).ToArray()
+                    ?? [])).ToList());
         });
 
         api.MapGet("/people/{personId:int}/journal", async Task<Results<Ok<string?>, NotFound>> (
@@ -1840,8 +1962,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            var journal = await db.People.AsNoTracking()
-                .Where(x => x.Id == personId && x.UserId == actor.UserId)
+            var journal = await TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+                .Where(x => x.Id == personId)
                 .Select(x => new { x.Journal })
                 .SingleOrDefaultAsync(cancellationToken);
             return journal is null ? TypedResults.NotFound() : TypedResults.Ok<string?>(journal.Journal);
@@ -1854,11 +1976,12 @@ internal static partial class ApiEndpoints
             ApiDbContext db,
             PersonLifecycle lifecycle,
             AuditTrail auditTrail,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            var person = await db.People.SingleOrDefaultAsync(
-                x => x.Id == personId && x.UserId == actor.UserId && x.AgencyId == actor.AgencyId,
+            var person = await TenantAccess.OwnedPeople(db, actor).SingleOrDefaultAsync(
+                x => x.Id == personId,
                 cancellationToken);
             if (person is null)
                 return Results.NotFound();
@@ -1913,8 +2036,8 @@ internal static partial class ApiEndpoints
             // Same scope gate as the journal PUT: the person must be on this
             // caller's caseload AND in this caller's agency.
             var actor = Actor.From(principal);
-            var person = await db.People.SingleOrDefaultAsync(
-                x => x.Id == personId && x.UserId == actor.UserId && x.AgencyId == actor.AgencyId,
+            var person = await TenantAccess.OwnedPeople(db, actor).SingleOrDefaultAsync(
+                x => x.Id == personId,
                 cancellationToken);
             if (person is null)
                 return Results.NotFound();
@@ -1947,6 +2070,7 @@ internal static partial class ApiEndpoints
             ApiDbContext db,
             PersonLifecycle lifecycle,
             AuditTrail auditTrail,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var validation = ValidatePerson(request, requireNewForms: request.EffectiveDate.HasValue);
@@ -1978,17 +2102,32 @@ internal static partial class ApiEndpoints
             {
                 var settings = await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken);
                 person.Forms = BuildInitialForms(request.Forms, effectiveDate, settings);
-                AddInitialFormAttestations(db, auditTrail, actor, effectiveDate, person.Forms);
+                AddInitialFormAttestations(
+                    db, auditTrail, actor, effectiveDate, settings,
+                    person.Forms, person.Forms);
             }
 
+            await using var createTransaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
             db.People.Add(person);
             lifecycle.RecordCreated(actor, person);
             auditTrail.Record(actor, AuditActions.PersonCreated, "Person");
             await db.SaveChangesAsync(cancellationToken);
-            // Everything needed for the response is already tracked. Avoid a second
-            // database read after the transaction commits: if that read failed, the
-            // caller would be told creation failed even though the client existed.
-            return Results.Ok(ContractMapper.ToPerson(person, person.Forms, []));
+
+            if (person.EffectiveDate is not null)
+            {
+                await ReconcileCurrentReleaseCyclesAsync(
+                    db, auditTrail, actor, person, clock, "person-create", cancellationToken);
+                if (db.ChangeTracker.HasChanges())
+                    await db.SaveChangesAsync(cancellationToken);
+            }
+
+            var releases = (await LoadReleaseBillingRowsByPersonAsync(
+                    db, [person.Id], cancellationToken))
+                .GetValueOrDefault(person.Id) ?? [];
+            await createTransaction.CommitAsync(cancellationToken);
+            return Results.Ok(ContractMapper.ToPerson(
+                person, person.Forms, [], releases.Select(item => item.ToComplianceFact()).ToArray()));
         });
 
         api.MapPut("/people/{personId:int}", async Task<IResult> (
@@ -2041,12 +2180,19 @@ internal static partial class ApiEndpoints
                     });
 
                 var settings = await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken);
-                foreach (var form in BuildInitialForms(newForms, effectiveDate, settings))
+                var addedForms = BuildInitialForms(newForms, effectiveDate, settings);
+                foreach (var form in addedForms)
                 {
                     form.PersonId = person.Id;
                     db.Forms.Add(form);
-                    AddInitialFormAttestations(db, auditTrail, actor, effectiveDate, [form]);
                 }
+                var allForms = await db.Forms
+                    .Where(form => form.PersonId == person.Id)
+                    .ToListAsync(cancellationToken);
+                allForms.AddRange(addedForms);
+                AddInitialFormAttestations(
+                    db, auditTrail, actor, effectiveDate, settings,
+                    addedForms, allForms);
                 additionalChanges.Add(new PersonFieldChangeDto(
                     "forms",
                     "Generated compliance forms",
@@ -2164,11 +2310,13 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            var person = await db.People.SingleOrDefaultAsync(
-                candidate => candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
-                cancellationToken);
+            var person = await LoadAuditablePersonAsync(db, actor, personId, cancellationToken);
             if (person is null)
                 return Results.NotFound();
+
+            if (!actor.HasAdminPermissions &&
+                !await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
 
             var refusal = PersonStatusRules.Describe(
                 actor.HasAdminPermissions, person.UserId == actor.UserId, request.Status);
@@ -2512,6 +2660,7 @@ internal static partial class ApiEndpoints
             EnvelopeProtector protector,
             DhhsFormFiller filler,
             AuditTrail auditTrail,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             if (!Enum.TryParse<DhhsFormDefinition.FormKey>(request.Form, out var form))
@@ -2530,6 +2679,80 @@ internal static partial class ApiEndpoints
                 candidate => candidate.Id == personId, cancellationToken);
             if (person is null)
                 return Results.NotFound();
+
+            if (form != DhhsFormDefinition.FormKey.AuthorizationToRelease &&
+                (request.TargetEffectiveDate is not null || request.ReleaseObligationId is not null))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["targetEffectiveDate"] =
+                        ["Annual target identity applies only to the DHHS authorization-to-release form."]
+                }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
+            DateTime? dhhsTargetEffectiveDate = null;
+            DocumentReleaseLinkResolution? dhhsReleaseLink = null;
+            if (form == DhhsFormDefinition.FormKey.AuthorizationToRelease)
+            {
+                if (person.EffectiveDate is not DateTime effectiveDate)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["person"] = ["The consumer has no effective date."]
+                    }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+
+                var timing = await GetDhhsReleaseTimingAsync(
+                    db, actor.AgencyId, cancellationToken);
+                var requestedTarget = request.TargetEffectiveDate?.Date ??
+                    (request.ReleaseObligationId is null
+                        ? AnnualDocumentCycle.SuggestedStart(
+                            effectiveDate,
+                            clock.Today,
+                            timing.OpenDaysBefore,
+                            timing.DueDaysBeforeEffective)
+                        : null);
+                dhhsReleaseLink = await ResolveDocumentReleaseObligationAsync(
+                    db,
+                    actor,
+                    personId,
+                    AnnualDocumentKind.ReleaseDhhs,
+                    requestedTarget,
+                    request.ReleaseObligationId,
+                    clock.Today,
+                    cancellationToken);
+                if (dhhsReleaseLink.Error is not null)
+                    return dhhsReleaseLink.Error;
+
+                dhhsTargetEffectiveDate = dhhsReleaseLink.Obligation?.TargetEffectiveDate.Date ??
+                    requestedTarget;
+                if (dhhsTargetEffectiveDate is not DateTime target ||
+                    target < effectiveDate.Date ||
+                    AnnualDocumentCycle.CurrentStart(effectiveDate, target) != target)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["targetEffectiveDate"] =
+                            ["Choose an effective-date anniversary on or after enrollment."]
+                    }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+                if (dhhsReleaseLink.Obligation is null &&
+                    !AnnualDocumentCycle.IsAvailable(
+                        target,
+                        clock.Today,
+                        timing.OpenDaysBefore,
+                        timing.DueDaysBeforeEffective))
+                {
+                    var availableOn = target.Date
+                        .AddDays(-timing.DueDaysBeforeEffective)
+                        .AddDays(-timing.OpenDaysBefore);
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["targetEffectiveDate"] =
+                            [$"This DHHS release becomes available on {availableOn:yyyy-MM-dd}."]
+                    }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+            }
 
             var caseManager = await db.Users.AsNoTracking().SingleAsync(
                 user => user.Id == actor.UserId, cancellationToken);
@@ -2590,7 +2813,7 @@ internal static partial class ApiEndpoints
             }
 
             var unfilled = DhhsFormDefinition.UnfilledFields(form, subject).ToList();
-            var generatedAtUtc = DateTime.UtcNow;
+            var generatedAtUtc = clock.UtcNow.UtcDateTime;
             await using var documentTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
             if (form == DhhsFormDefinition.FormKey.AuthorizationToRelease)
             {
@@ -2598,19 +2821,20 @@ internal static partial class ApiEndpoints
                     (request.Text is null || request.Text.Count == 0);
                 if (isDraft)
                     unfilled.Add("Consumer authorization choices");
-                var cycleStart = AnnualDocumentCycle.CurrentStart(
-                    person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
-                    generatedAtUtc.ToLocalTime());
+                var cycleStart = dhhsTargetEffectiveDate!.Value;
                 var artifactFileName = $"{form}-{personId}-{SafeFileName($"{person.LastName}-{person.FirstName}")}.pdf";
                 await DocumentArtifactPersistence.StageGeneratedAsync(
                     db, personId, actor.AgencyId, AnnualDocumentKind.ReleaseDhhs, cycleStart,
                     isDraft ? DocumentArtifactOrigin.Draft : DocumentArtifactOrigin.GeneratedInSati,
-                    generatedAtUtc, actor.UserId, pdf, artifactFileName, unfilled, cancellationToken);
+                    generatedAtUtc, actor.UserId, pdf, artifactFileName, unfilled, cancellationToken,
+                    releaseObligationId: dhhsReleaseLink?.Obligation?.Id);
                 auditTrail.Record(actor, AuditActions.DocumentGenerated, "Person", personId,
                     JsonSerializer.Serialize(new
                     {
                         kind = AnnualDocumentKind.ReleaseDhhs.ToString(),
                         cycleStart = cycleStart.ToString("yyyy-MM-dd"),
+                        releaseObligationId = dhhsReleaseLink?.Obligation?.ObligationId,
+                        releaseObligationKey = dhhsReleaseLink?.Obligation?.StableKey,
                         origin = isDraft ? DocumentArtifactOrigin.Draft.ToString() : DocumentArtifactOrigin.GeneratedInSati.ToString()
                     }));
             }
@@ -2842,7 +3066,8 @@ internal static partial class ApiEndpoints
 
         api.MapPost("/people/{personId:int}/providers", async Task<IResult> (
             int personId, SaveConsumerProviderRequest request, ClaimsPrincipal principal,
-            ApiDbContext db, CancellationToken cancellationToken) =>
+            ApiDbContext db, AuditTrail audit, ApiClock clock,
+            CancellationToken cancellationToken) =>
         {
             var errors = ConsumerProviderRules.Validate(request);
             if (errors.Count > 0) return Results.ValidationProblem(errors);
@@ -2855,16 +3080,31 @@ internal static partial class ApiEndpoints
                 db, actor.AgencyId, personId, request, editingLinkId: 0, cancellationToken);
             if (conflict is not null) return conflict;
 
-            var link = new ServerPersonProvider { PersonId = personId };
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var link = new ServerPersonProvider
+            {
+                PersonId = personId,
+                AssignmentKnownOn = clock.Today
+            };
             ApplyConsumerProvider(link, request);
             db.PersonProviders.Add(link);
             await db.SaveChangesAsync(cancellationToken);
+            var person = await LoadReleasePersonAsync(
+                db, actor, personId, cancellationToken);
+            if (person is null)
+                return Results.NotFound();
+            await ReconcileCurrentReleaseCyclesAsync(
+                db, audit, actor, person, clock, "provider-created", cancellationToken);
+            if (db.ChangeTracker.HasChanges())
+                await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return Results.Ok(ContractMapper.ToConsumerProvider(link));
         });
 
         api.MapPut("/people/{personId:int}/providers/{linkId:int}", async Task<IResult> (
             int personId, int linkId, SaveConsumerProviderRequest request, ClaimsPrincipal principal,
-            ApiDbContext db, CancellationToken cancellationToken) =>
+            ApiDbContext db, AuditTrail audit, ApiClock clock, CancellationToken cancellationToken) =>
         {
             var errors = ConsumerProviderRules.Validate(request);
             if (errors.Count > 0) return Results.ValidationProblem(errors);
@@ -2873,6 +3113,8 @@ internal static partial class ApiEndpoints
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
 
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
             var link = await db.PersonProviders.SingleOrDefaultAsync(
                 candidate => candidate.Id == linkId && candidate.PersonId == personId, cancellationToken);
             if (link is null) return Results.NotFound();
@@ -2881,8 +3123,44 @@ internal static partial class ApiEndpoints
                 db, actor.AgencyId, personId, request, linkId, cancellationToken);
             if (conflict is not null) return conflict;
 
+            var priorEndDate = link.EndDate;
             ApplyConsumerProvider(link, request);
+            if (request.EndDate is DateTime retiredOn &&
+                priorEndDate?.Date != retiredOn.Date)
+            {
+                var assignmentKey = ReleaseAssignmentResolution.AssignmentKey(link.Id);
+                var releaseRows = await db.ReleaseObligations
+                    .Where(item => item.PersonId == personId &&
+                                   item.AssignmentKey == assignmentKey &&
+                                   item.RetiredOn == null)
+                    .ToListAsync(cancellationToken);
+                foreach (var row in releaseRows)
+                    row.Retire(retiredOn, clock.UtcNow.UtcDateTime);
+                if (releaseRows.Count != 0)
+                {
+                    audit.Record(
+                        actor,
+                        AuditActions.ReleaseObligationsReconciled,
+                        "Person",
+                        personId,
+                        JsonSerializer.Serialize(new
+                        {
+                            retired = releaseRows.Select(item => item.StableKey)
+                                .OrderBy(item => item).ToArray(),
+                            retiredOn = retiredOn.Date.ToString("yyyy-MM-dd")
+                        }));
+                }
+            }
             await db.SaveChangesAsync(cancellationToken);
+            var person = await LoadReleasePersonAsync(
+                db, actor, personId, cancellationToken);
+            if (person is null)
+                return Results.NotFound();
+            await ReconcileCurrentReleaseCyclesAsync(
+                db, audit, actor, person, clock, "provider-updated", cancellationToken);
+            if (db.ChangeTracker.HasChanges())
+                await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return Results.Ok(ContractMapper.ToConsumerProvider(link));
         });
 
@@ -2890,7 +3168,8 @@ internal static partial class ApiEndpoints
         // relationship is a PUT that sets EndDate, which keeps the row.
         api.MapDelete("/people/{personId:int}/providers/{linkId:int}", async Task<IResult> (
             int personId, int linkId, ClaimsPrincipal principal,
-            ApiDbContext db, CancellationToken cancellationToken) =>
+            ApiDbContext db, AuditTrail audit, ApiClock clock,
+            CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
@@ -2900,8 +3179,34 @@ internal static partial class ApiEndpoints
                 candidate => candidate.Id == linkId && candidate.PersonId == personId, cancellationToken);
             if (link is null) return Results.NotFound();
 
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var assignmentKey = ReleaseAssignmentResolution.AssignmentKey(link.Id);
+            var releaseRows = await db.ReleaseObligations
+                .Where(item => item.PersonId == personId &&
+                               item.AssignmentKey == assignmentKey &&
+                               item.RetiredOn == null)
+                .ToListAsync(cancellationToken);
+            foreach (var row in releaseRows)
+                row.Retire(clock.Today, clock.UtcNow.UtcDateTime);
+            if (releaseRows.Count != 0)
+            {
+                audit.Record(
+                    actor,
+                    AuditActions.ReleaseObligationsReconciled,
+                    "Person",
+                    personId,
+                    JsonSerializer.Serialize(new
+                    {
+                        retired = releaseRows.Select(item => item.StableKey)
+                            .Order(StringComparer.Ordinal).ToArray(),
+                        retiredOn = clock.Today.ToString("yyyy-MM-dd"),
+                        source = "provider-link-corrected"
+                    }));
+            }
             db.PersonProviders.Remove(link);
             await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return Results.NoContent();
         });
     }
@@ -2987,7 +3292,7 @@ internal static partial class ApiEndpoints
             if (!await TenantAccess.CanAccessUserAsync(db, actor, userId, cancellationToken)) return Results.Forbid();
             var items = await (from review in db.ReviewItems.AsNoTracking().Include(x => x.Appointment)
                                join person in db.People on review.PersonId equals person.Id
-                               where person.UserId == userId
+                               where person.UserId == userId && person.AgencyId == actor.AgencyId
                                select review)
                 .OrderBy(x => x.PersonId).ThenBy(x => x.CycleAnchor).ThenBy(x => x.Quarter)
                 .ThenBy(x => x.Category).ThenBy(x => x.SlotIndex).ToListAsync(cancellationToken);
@@ -3000,7 +3305,7 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == personId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) return Results.NotFound();
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) return Results.NotFound();
             var items = await db.ReviewItems.AsNoTracking().Include(x => x.Appointment)
                 .Where(x => x.PersonId == personId).OrderBy(x => x.CycleAnchor).ThenBy(x => x.Quarter)
                 .ThenBy(x => x.Category).ThenBy(x => x.SlotIndex).ToListAsync(cancellationToken);
@@ -3011,12 +3316,15 @@ internal static partial class ApiEndpoints
             EnsureReviewItemsRequest request, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if ((!actor.HasCaseManagerPermissions && !actor.HasSupervisorPermissions) ||
+                !await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                return Results.Forbid();
             var ids = request.PersonIds.Where(x => x > 0).Distinct().Take(500).ToList();
-            var people = await db.People.Where(x => ids.Contains(x.Id)).ToListAsync(cancellationToken);
+            var people = await db.People.Where(x => ids.Contains(x.Id) && x.AgencyId == actor.AgencyId).ToListAsync(cancellationToken);
             var created = 0;
             foreach (var person in people)
             {
-                if (!await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) continue;
+                if (!await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) continue;
                 var anchor = CurrentCycleAnchor(person.EffectiveDate, request.Today);
                 if (anchor is null) continue;
                 var existing = await db.ReviewItems.Where(x => x.PersonId == person.Id && x.CycleAnchor == anchor.Value)
@@ -3083,7 +3391,7 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == personId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) return Results.NotFound();
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) return Results.NotFound();
             var medical = await LatestAppointmentAsync(db, personId, "Medical", cancellationToken);
             var dental = await LatestAppointmentAsync(db, personId, "Dental", cancellationToken);
             return Results.Ok(new LatestAppointmentsDto(medical is null ? null : ContractMapper.ToAppointment(medical),
@@ -3211,7 +3519,7 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == personId, cancellationToken);
             if (person is null || person.UserId != preferredAuthorUserId ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) return Results.NotFound();
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) return Results.NotFound();
             var assessment = await db.ComprehensiveAssessments.AsNoTracking()
                 .Where(x => x.PersonId == personId && x.Status == "Approved")
                 .OrderByDescending(x => x.Version).FirstOrDefaultAsync(cancellationToken);
@@ -3450,6 +3758,15 @@ internal static partial class ApiEndpoints
             var consumerLinksMoved = await db.PersonProviders
                 .Where(link => link.ProviderId == merged.Id)
                 .ExecuteUpdateAsync(u => u.SetProperty(link => link.ProviderId, surviving.Id), cancellationToken);
+            // Release obligations retain their recipient-name snapshot and stable
+            // assignment identity, but their directory pointer must follow the same
+            // canonical-provider merge. Otherwise the restricted foreign key makes
+            // the merge fail after an exact recipient obligation has been created.
+            var releaseObligationsMoved = await db.ReleaseObligations
+                .Where(obligation => obligation.AgencyId == actor.AgencyId &&
+                                     obligation.RecipientProviderId == merged.Id)
+                .ExecuteUpdateAsync(u => u.SetProperty(
+                    obligation => obligation.RecipientProviderId, surviving.Id), cancellationToken);
             var contactsMoved = await db.ProviderContacts
                 .Where(contact => contact.ProviderId == merged.Id)
                 .ExecuteUpdateAsync(u => u
@@ -3476,6 +3793,7 @@ internal static partial class ApiEndpoints
                     mergedProviderId = merged.Id,
                     affiliatedMoved,
                     consumerLinksMoved,
+                    releaseObligationsMoved,
                     contactsMoved
                 }));
             await db.SaveChangesAsync(cancellationToken);
@@ -3530,7 +3848,7 @@ internal static partial class ApiEndpoints
             var rate = (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).PassthroughRate;
             var requests = await (from request in db.AtRequests.AsNoTracking()
                                   join person in db.People on request.PersonId equals person.Id
-                                  where person.UserId == userId
+                                  where person.UserId == userId && person.AgencyId == actor.AgencyId
                                   select new AtRequestRow
                                   {
                                       Id = request.Id, ClientName = request.ClientName, Status = request.Status,
@@ -3552,7 +3870,7 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Id == personId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
             var rate = (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).PassthroughRate;
@@ -3585,7 +3903,7 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.PersonId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)) return Results.NotFound();
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)) return Results.NotFound();
             var owner = await db.Users.AsNoTracking().SingleAsync(x => x.Id == person.UserId, cancellationToken);
             var agency = await db.Agencies.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actor.AgencyId, cancellationToken);
             var errors = ValidateAtRequest(input); if (errors.Count > 0) return Results.ValidationProblem(errors);
@@ -3742,7 +4060,7 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == personId, cancellationToken);
-            if (person is null || !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
             var rows = await db.CheckRequests.AsNoTracking()
@@ -3761,9 +4079,8 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             var request = await db.CheckRequests.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
             if (request is null) return Results.NotFound();
-            var ownerId = await db.People.AsNoTracking().Where(x => x.Id == request.PersonId)
-                .Select(x => (int?)x.UserId).SingleOrDefaultAsync(cancellationToken);
-            if (ownerId is null || !await TenantAccess.CanAccessUserAsync(db, actor, ownerId.Value, cancellationToken))
+            var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.PersonId, cancellationToken);
+            if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             return Results.Ok(ContractMapper.ToCheckRequest(request));
         });
@@ -3943,7 +4260,7 @@ internal static partial class ApiEndpoints
             if (validation is not null)
                 return Results.ValidationProblem(validation);
             var row = await (from note in db.Notes
-                             join person in db.People on note.PersonId equals person.Id
+                             join person in TenantAccess.OwnedPeople(db, actor) on note.PersonId equals person.Id
                              where person.UserId == actor.UserId &&
                                    person.AgencyId == actor.AgencyId &&
                                    note.AgencyId == actor.AgencyId &&
@@ -3970,7 +4287,7 @@ internal static partial class ApiEndpoints
             var responsePerson = row.Person;
             if (request.PersonId != previousPersonId)
             {
-                responsePerson = await db.People.SingleOrDefaultAsync(person =>
+                responsePerson = await TenantAccess.OwnedPeople(db, actor).SingleOrDefaultAsync(person =>
                     person.Id == request.PersonId &&
                     person.UserId == actor.UserId &&
                     person.AgencyId == actor.AgencyId,
@@ -4030,8 +4347,8 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             var note = await (from candidate in db.Notes
-                              join person in db.People on candidate.PersonId equals person.Id
-                              where candidate.Id == id && person.UserId == actor.UserId
+                              join person in TenantAccess.OwnedPeople(db, actor) on candidate.PersonId equals person.Id
+                              where candidate.Id == id && candidate.AgencyId == actor.AgencyId
                               select candidate).SingleOrDefaultAsync(cancellationToken);
             if (note is null)
                 return Results.NotFound();
@@ -4064,7 +4381,7 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return TypedResults.NotFound();
-            var notes = await db.Notes.AsNoTracking().Where(x => x.PersonId == personId).ToListAsync(cancellationToken);
+            var notes = await db.Notes.AsNoTracking().Where(x => x.PersonId == personId && x.AgencyId == actor.AgencyId).ToListAsync(cancellationToken);
             return TypedResults.Ok(notes.Select(x => ContractMapper.ToNote(x)).ToList());
         });
 
@@ -4085,6 +4402,7 @@ internal static partial class ApiEndpoints
             var rows = await (from note in db.Notes.AsNoTracking()
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               where person.UserId == targetUserId &&
+                                    person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId &&
                                     note.EventDate >= first && note.EventDate < end
                               select new { Note = note, Person = person })
                 .ToListAsync(cancellationToken);
@@ -4106,7 +4424,7 @@ internal static partial class ApiEndpoints
             if (!await TenantAccess.CanAccessUserAsync(db, actor, targetUserId, cancellationToken))
                 return Results.Forbid();
 
-            var rows = await LoadDayNotesAsync(db, targetUserId, date, cancellationToken);
+            var rows = await LoadDayNotesAsync(db, targetUserId, actor.AgencyId, date, cancellationToken);
             return Results.Ok(rows.Select(x => ContractMapper.ToNote(x.Note, x.Person)).ToList());
         });
 
@@ -4119,11 +4437,13 @@ internal static partial class ApiEndpoints
             if (year is < 2000 or > 2200)
                 return Results.BadRequest();
             var actor = Actor.From(principal);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
             var first = new DateTime(year, 1, 1);
             var end = first.AddYears(1);
             var rows = await (from note in db.Notes.AsNoTracking()
-                              join person in db.People.AsNoTracking() on note.PersonId equals person.Id
-                              where person.UserId == actor.UserId &&
+                              join person in TenantAccess.OwnedPeople(db, actor).AsNoTracking() on note.PersonId equals person.Id
+                              where note.AgencyId == actor.AgencyId &&
                                     note.EventDate >= first && note.EventDate < end
                               select new { Note = note, Person = person })
                 .ToListAsync(cancellationToken);
@@ -4137,12 +4457,15 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            // Permission is checked before even lazily creating agency settings.
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
             var abandonedAfterDays = ProductivityForecast.NormalizeDocumentationWindowDays(
                 (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).AbandonedAfterDays);
             var threshold = clock.Today.AddDays(-abandonedAfterDays);
-            var personIds = db.People.Where(x => x.UserId == actor.UserId).Select(x => x.Id);
+            var personIds = TenantAccess.OwnedPeople(db, actor).Select(x => x.Id);
             var count = await db.Notes
-                .Where(x => personIds.Contains(x.PersonId) && x.Status == 1 && x.EventDate < threshold)
+                .Where(x => x.AgencyId == actor.AgencyId && personIds.Contains(x.PersonId) && x.Status == 1 && x.EventDate < threshold)
                 .ExecuteUpdateAsync(x => x
                     .SetProperty(n => n.Status, 8)
                     .SetProperty(n => n.Revision, n => n.Revision + 1), cancellationToken);
@@ -4152,15 +4475,209 @@ internal static partial class ApiEndpoints
 
     private static void MapSettings(RouteGroupBuilder api)
     {
-        api.MapGet("/settings", async (ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        api.MapGet("/settings", async (
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            ApiClock clock,
+            CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            return ContractMapper.ToSettings(await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken));
+            var settings = await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken);
+            var activeRequirements = await ResolveBillingComplianceRequirementsAsync(
+                db, actor.AgencyId, clock.Today, settings.BillingComplianceRequirements, cancellationToken);
+            return ContractMapper.ToSettings(settings) with
+            {
+                BillingComplianceRequirements = activeRequirements
+            };
+        });
+
+        api.MapGet("/settings/billing-compliance-requirements", async (
+            DateTime serviceDate,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            var fallbackRequirements = await db.Settings.AsNoTracking()
+                .Where(settings => settings.AgencyId == actor.AgencyId)
+                .Select(settings =>
+                    (BillingComplianceRequirements?)settings.BillingComplianceRequirements)
+                .SingleOrDefaultAsync(cancellationToken)
+                ?? BillingComplianceGate.DefaultRequirements;
+            var requirements = await ResolveBillingComplianceRequirementsAsync(
+                db,
+                actor.AgencyId,
+                serviceDate.Date,
+                fallbackRequirements,
+                cancellationToken);
+            return Results.Ok(new BillingComplianceRequirementsAtDateDto(
+                serviceDate.Date,
+                requirements));
+        });
+
+        api.MapGet("/settings/billing-compliance-policies", async Task<IResult> (
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasAdminPermissions)
+                return Results.Forbid();
+
+            var rows = await db.BillingCompliancePolicyVersions.AsNoTracking()
+                .Where(version => version.AgencyId == actor.AgencyId)
+                .OrderByDescending(version => version.EffectiveOn)
+                .ThenByDescending(version => version.Id)
+                .ToListAsync(cancellationToken);
+            return Results.Ok(rows.Select(ContractMapper.ToBillingCompliancePolicyVersion).ToList());
+        });
+
+        api.MapPost("/settings/billing-compliance-policies/preview", async Task<IResult> (
+            PreviewBillingCompliancePolicyRequest request,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasAdminPermissions)
+                return Results.Forbid();
+            if (request.EffectiveOn is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["effectiveOn"] = ["An enforcement date is required before impact can be previewed."]
+                });
+            }
+            if (!BillingComplianceGate.IsSupported(request.Requirements))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["requirements"] = ["The billing-compliance policy contains unsupported requirements."]
+                });
+            }
+
+            var evaluation = await BuildBillingCompliancePolicyImpactPreviewAsync(
+                db,
+                actor.AgencyId,
+                request.EffectiveOn.Value,
+                request.Requirements,
+                cancellationToken);
+            return Results.Ok(evaluation.Preview);
+        });
+
+        api.MapGet("/billing/compliance-policy-review-flags", async Task<IResult> (
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasAdminPermissions && !actor.HasBillingPermissions)
+                return Results.Forbid();
+
+            var flags = await db.BillingCompliancePolicyReviewFlags.AsNoTracking()
+                .Include(flag => flag.PolicyVersion)
+                .Where(flag => flag.AgencyId == actor.AgencyId)
+                .OrderByDescending(flag => flag.CreatedAtUtc)
+                .ThenByDescending(flag => flag.Id)
+                .ToListAsync(cancellationToken);
+            return Results.Ok(flags.Select(flag => flag.ToContract()).ToArray());
+        });
+
+        api.MapPost("/settings/billing-compliance-policies", async Task<IResult> (
+            AppendBillingCompliancePolicyRequest request,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            ApiClock clock,
+            AuditTrail auditTrail,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasAdminPermissions)
+                return Results.Forbid();
+            if (request.ChangeId == Guid.Empty)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["changeId"] = ["A policy change id is required."]
+                });
+            }
+
+            var settings = await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken);
+            var existing = await db.BillingCompliancePolicyVersions.AsNoTracking()
+                .SingleOrDefaultAsync(version => version.VersionId == request.ChangeId, cancellationToken);
+            if (existing is not null)
+            {
+                var normalizedExplanation = string.IsNullOrWhiteSpace(request.Explanation)
+                    ? null
+                    : request.Explanation.Trim();
+                if (existing.AgencyId == actor.AgencyId &&
+                    existing.EffectiveOn.Date == request.EffectiveOn?.Date &&
+                    existing.Requirements == request.Requirements &&
+                    string.Equals(existing.Explanation, normalizedExplanation, StringComparison.Ordinal))
+                {
+                    return Results.Ok(ContractMapper.ToBillingCompliancePolicyVersion(existing));
+                }
+
+                return Results.Conflict(new ApiErrorDto(
+                    "billing_policy_change_id_reused",
+                    "That billing-policy change id was already used for different values.",
+                    string.Empty));
+            }
+
+            var decision = BillingCompliancePolicyRules.ValidateChange(
+                request.Requirements,
+                request.EffectiveOn,
+                clock.Today,
+                new BillingCompliancePolicyOptions(settings.AllowPastBillingPolicyEffectiveDates),
+                request.Explanation);
+            if (!decision.Accepted)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["billingCompliancePolicy"] = decision.Errors.ToArray()
+                });
+            }
+
+            var impact = await BuildBillingCompliancePolicyImpactPreviewAsync(
+                db,
+                actor.AgencyId,
+                request.EffectiveOn!.Value,
+                request.Requirements,
+                cancellationToken);
+            var recordedAtUtc = clock.UtcNow.UtcDateTime;
+            var version = BillingCompliancePolicyVersion.Create(
+                actor.AgencyId,
+                request.Requirements,
+                request.EffectiveOn!.Value,
+                clock.Today,
+                actor.UserId,
+                recordedAtUtc,
+                settings.AllowPastBillingPolicyEffectiveDates,
+                request.Explanation,
+                request.ChangeId);
+            db.BillingCompliancePolicyVersions.Add(version);
+            var reviewFlags = CreateBillingCompliancePolicyReviewFlags(
+                version, impact.Impacts, recordedAtUtc);
+            db.BillingCompliancePolicyReviewFlags.AddRange(reviewFlags);
+            auditTrail.Record(
+                actor,
+                AuditActions.BillingCompliancePolicyAppended,
+                "BillingCompliancePolicyVersion",
+                metadataJson: JsonSerializer.Serialize(new
+                {
+                    changeId = version.VersionId,
+                    effectiveOn = version.EffectiveOn.ToString("yyyy-MM-dd"),
+                    requirements = (int)version.Requirements,
+                    isPastCorrection = version.EffectiveOn.Date < clock.Today,
+                    unresolvedReviewFlags = reviewFlags.Count
+                }));
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(ContractMapper.ToBillingCompliancePolicyVersion(version));
         });
 
         api.MapPut("/settings", async Task<IResult> (
             SettingsDto request, ClaimsPrincipal principal, ApiDbContext db,
-            AuditTrail auditTrail, CancellationToken cancellationToken) =>
+            ApiClock clock, AuditTrail auditTrail, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
             if (!actor.HasAdminPermissions) return Results.Forbid();
@@ -4184,11 +4701,24 @@ internal static partial class ApiEndpoints
             if (request.Revision != settings.Revision)
                 return StaleSettingsConflict();
 
+            var activeRequirements = await ResolveBillingComplianceRequirementsAsync(
+                db, actor.AgencyId, clock.Today, settings.BillingComplianceRequirements, cancellationToken);
+            if (request.BillingComplianceRequirements != activeRequirements)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["billingComplianceRequirements"] =
+                        ["Billing-compliance checkboxes are applied separately and require an enforcement date."]
+                });
+            }
+
             var id = settings.Id;
             var agencyId = settings.AgencyId;
+            var storedFallbackRequirements = settings.BillingComplianceRequirements;
             db.Entry(settings).CurrentValues.SetValues(request);
             settings.Id = id;
             settings.AgencyId = agencyId;
+            settings.BillingComplianceRequirements = storedFallbackRequirements;
             settings.VrAssistantTitle = VocationalRehabilitationProfile.NormalizeAssistantTitle(
                 request.VrAssistantTitle);
             settings.Revision++;
@@ -4201,7 +4731,10 @@ internal static partial class ApiEndpoints
             {
                 return StaleSettingsConflict();
             }
-            return Results.Ok(ContractMapper.ToSettings(settings));
+            return Results.Ok(ContractMapper.ToSettings(settings) with
+            {
+                BillingComplianceRequirements = activeRequirements
+            });
         });
     }
 
@@ -4520,8 +5053,10 @@ internal static partial class ApiEndpoints
 
             var actor = Actor.From(principal);
             var endExclusive = end.AddDays(1);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
             var rows = await (from note in db.Notes.AsNoTracking()
-                              join person in db.People.AsNoTracking()
+                              join person in TenantAccess.OwnedPeople(db, actor).AsNoTracking()
                                   on note.PersonId equals person.Id
                               where person.UserId == actor.UserId &&
                                     person.AgencyId == actor.AgencyId &&
@@ -4568,10 +5103,11 @@ internal static partial class ApiEndpoints
             }
 
             var actor = Actor.From(principal);
-            var complianceRequirements = (await GetOrCreateSettingsAsync(
-                db, actor.AgencyId, cancellationToken)).BillingComplianceRequirements;
-            var people = await db.People.AsNoTracking()
-                .Where(x => x.UserId == actor.UserId)
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
+            var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
+                db, actor.AgencyId, cancellationToken);
+            var people = await TenantAccess.OwnedPeople(db, actor).AsNoTracking()
                 .OrderBy(x => x.LastName)
                 .ThenBy(x => x.FirstName)
                 .Select(x => new BillingLossPersonRow(x.Id, x.FirstName, x.LastName, x.EffectiveDate))
@@ -4581,14 +5117,21 @@ internal static partial class ApiEndpoints
                 return Results.Ok(new ConsumerBillingLossReportDto([], 0, 0, null));
 
             var forms = await db.Forms.AsNoTracking()
-                .Where(x => personIds.Contains(x.PersonId) &&
-                            x.DueDate < end &&
-                            (x.CompletedDate == null || x.CompletedDate > start))
-                .Select(x => new BillingLossFormRow(x.PersonId, x.Type, x.DueDate, x.CompletedDate))
+                .Where(x => personIds.Contains(x.PersonId))
+                .Select(x => new BillingLossFormRow(
+                    x.Id,
+                    x.PersonId,
+                    x.Type,
+                    x.DueDate,
+                    x.CompletedDate,
+                    x.OpenedDate,
+                    x.TargetEffectiveDate))
                 .ToListAsync(cancellationToken);
+            var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
+                db, personIds, cancellationToken);
             var endExclusive = end.AddDays(1);
             var notes = await db.Notes.AsNoTracking()
-                .Where(x => personIds.Contains(x.PersonId) &&
+                .Where(x => personIds.Contains(x.PersonId) && x.AgencyId == actor.AgencyId &&
                             x.EventDate.HasValue &&
                             x.EventDate.Value >= start &&
                             x.EventDate.Value < endExclusive &&
@@ -4607,13 +5150,35 @@ internal static partial class ApiEndpoints
                     : start;
                 var totalDays = activeStart <= end ? (end - activeStart).Days + 1 : 0;
                 var blockedDates = new HashSet<DateTime>();
-                if (totalDays > 0 && formsByPerson.TryGetValue(person.Id, out var personForms))
+                if (totalDays > 0)
                 {
+                    var personForms = formsByPerson.GetValueOrDefault(person.Id) ?? [];
+                    var personReleases = releasesByPerson.GetValueOrDefault(person.Id) ?? [];
+                    var reconciledCycles = personReleases
+                        .Select(item => item.TargetEffectiveDate.Date)
+                        .ToHashSet();
+                    var formObligations = BillingComplianceGate.IncludePcpOpeningObligations(
+                        personForms
+                            .Where(form => !IsLegacyReleaseFormType(form.Type) ||
+                                !reconciledCycles.Contains(
+                                    (form.TargetEffectiveDate == default
+                                        ? form.DueDate
+                                        : form.TargetEffectiveDate).Date))
+                            .Select(form => new ComplianceFormSnapshot(
+                                form.Type,
+                                form.DueDate,
+                                form.CompletedDate,
+                                form.OpenedDate,
+                                $"form:{form.Id}")));
                     for (var date = activeStart; date <= end; date = date.AddDays(1))
                     {
-                        if (personForms.Any(form => BillingComplianceGate.IsBillingWindowBlocked(
-                                form.Type, form.DueDate, form.CompletedDate, date,
-                                complianceRequirements)))
+                        if (BillingComplianceGate.EvaluateBillingWindow(
+                                formObligations.Concat(
+                                    ReleaseBillingRules.BuildComplianceSnapshots(
+                                        personReleases.Select(item => item.ToComplianceFact()),
+                                        date)),
+                                date,
+                                compliancePolicy.Resolve(date)).Count > 0)
                             blockedDates.Add(date);
                     }
                 }
@@ -4799,7 +5364,8 @@ internal static partial class ApiEndpoints
                                   item.Id, period.Id, period.Year, period.Month, owner.DisplayName,
                                   period.Lines.Count, item.OccurredAtUtc, item.Stage.ToString(),
                                   item.Reference, item.ResponseType, item.ResponseCode,
-                                  item.Explanation, item.IsSynthetic)).ToListAsync(cancellationToken);
+                                  item.Explanation, item.IsSynthetic)
+                              { EdiGenerationId = item.EdiGenerationId, ResponseId = item.ResponseId }).ToListAsync(cancellationToken);
             return Results.Ok(rows);
         });
 
@@ -4854,72 +5420,7 @@ internal static partial class ApiEndpoints
             }).ToList());
         });
 
-        // Ingest a clearinghouse or payer response. This is the permanent path and it
-        // takes documents, so a real Office Ally response and a simulated one arrive the
-        // same way. It is not environment-gated: ingesting a genuine remittance is the
-        // actual feature, and whether the resulting rows are synthetic is decided by the
-        // document's own ISA15 usage indicator rather than by where the code is running.
-        api.MapPost("/billing/periods/{periodId:int}/responses", async Task<IResult> (
-            int periodId,
-            ClaimResponseIngestRequest request,
-            ClaimsPrincipal principal,
-            ApiDbContext db,
-            AuditTrail auditTrail,
-            CancellationToken cancellationToken) =>
-        {
-            var actor = Actor.From(principal);
-            if (!actor.HasBillingPermissions)
-                return Results.Forbid();
-            if (string.IsNullOrWhiteSpace(request.Document))
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["document"] = ["A response document is required."]
-                });
-            }
-
-            // The period is resolved through its owning user's agency, so a caller cannot
-            // attach a response to another tenant's billing history by guessing an id.
-            var period = await (from candidate in db.BillingPeriods.AsNoTracking()
-                                join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
-                                where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
-                                select candidate).SingleOrDefaultAsync(cancellationToken);
-            if (period is null)
-                return Results.NotFound();
-
-            ClaimResponseIngestOutcome outcome;
-            try
-            {
-                outcome = await new ClaimResponseIngestion(db).IngestAsync(
-                    request.Document, actor.AgencyId, periodId, DateTime.UtcNow, cancellationToken);
-            }
-            catch (Exception failure) when (failure is InvalidOperationException or FormatException)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["document"] = [$"The response could not be read: {failure.Message}"]
-                });
-            }
-
-            if (outcome.Kind == ClaimResponseKind.Unrecognised)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["document"] = [outcome.Explanation]
-                });
-            }
-
-            auditTrail.Record(actor, AuditActions.BillingEdiGenerated, "BillingPeriod", periodId);
-            await db.SaveChangesAsync(cancellationToken);
-
-            return Results.Ok(new ClaimResponseIngestResultDto(
-                outcome.Kind.ToString(),
-                outcome.IsSynthetic,
-                outcome.StageRecorded?.ToString(),
-                outcome.ClaimOutcomesRecorded,
-                outcome.DepositRecorded,
-                outcome.Explanation));
-        });
+        MapClaimResponseIntake(api);
 
         // Drive the mock clearinghouse. Scaffolding: it fabricates responses and then hands
         // them to the same ingestion path above, rather than writing rows directly, so the
@@ -4932,6 +5433,7 @@ internal static partial class ApiEndpoints
             AuditTrail auditTrail,
             IOptions<SatiApiOptions> options,
             IHostEnvironment hostEnvironment,
+            ClaimResponseIngestion ingestion,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -5015,7 +5517,6 @@ internal static partial class ApiEndpoints
                 });
             }
 
-            var ingestion = new ClaimResponseIngestion(db);
             var stages = new List<string> { BillingSubmissionStage.Transmitted.ToString() };
             var claimOutcomes = 0;
             var depositRecorded = false;
@@ -5024,6 +5525,7 @@ internal static partial class ApiEndpoints
             {
                 AgencyId = actor.AgencyId,
                 BillingPeriodId = periodId,
+                EdiGenerationId = generation.Id,
                 OccurredAtUtc = receivedAt,
                 Stage = BillingSubmissionStage.Transmitted,
                 Reference = generation.FileName,
@@ -5031,6 +5533,8 @@ internal static partial class ApiEndpoints
                 Explanation = "Test 837P submitted to the mock clearinghouse.",
                 IsSynthetic = true
             });
+            auditTrail.Record(actor, AuditActions.BillingEdiTransmitted, "BillingPeriod", periodId);
+            await db.SaveChangesAsync(cancellationToken);
 
             foreach (var document in new[]
                      {
@@ -5042,16 +5546,14 @@ internal static partial class ApiEndpoints
                 if (document is null)
                     continue;
 
-                var outcome = await ingestion.IngestAsync(
-                    document, actor.AgencyId, periodId, receivedAt, cancellationToken);
+                ClaimResponseIngestResultDto outcome;
+                try { outcome = await ingestion.ImportAsync(document, actor, periodId, cancellationToken); }
+                catch (ClaimResponseRejected rejected) { return ClaimResponseFailure(rejected); }
                 if (outcome.StageRecorded is { } stage)
-                    stages.Add(stage.ToString());
+                    stages.Add(stage);
                 claimOutcomes += outcome.ClaimOutcomesRecorded;
                 depositRecorded |= outcome.DepositRecorded;
             }
-
-            auditTrail.Record(actor, AuditActions.BillingEdiTransmitted, "BillingPeriod", periodId);
-            await db.SaveChangesAsync(cancellationToken);
 
             return Results.Ok(new MockClearinghouseResultDto(
                 request.Scenario.ToString(),
@@ -5061,6 +5563,98 @@ internal static partial class ApiEndpoints
                 stages,
                 claimOutcomes,
                 depositRecorded));
+        });
+
+        api.MapGet("/billing/compliance-recovery/{personId:int}", async Task<IResult> (
+            int personId,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            ApiClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasAdminPermissions)
+                return Results.Forbid();
+
+            var inputs = await LoadRecoveryInputsAsync(
+                db, actor.AgencyId, personId, cancellationToken);
+            if (inputs is null)
+                return Results.NotFound();
+
+            return Results.Ok(PrepareRecoveryPlan(inputs, clock.Today));
+        });
+
+        api.MapPost("/billing/compliance-recovery/{personId:int}", async Task<IResult> (
+            int personId,
+            CreateBillingComplianceRecoveryRequest request,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            ApiClock clock,
+            AuditTrail auditTrail,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasAdminPermissions)
+                return Results.Forbid();
+
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var inputs = await LoadRecoveryInputsAsync(
+                db, actor.AgencyId, personId, cancellationToken);
+            if (inputs is null)
+                return Results.NotFound();
+
+            var plan = PrepareRecoveryPlan(inputs, clock.Today);
+            var result = BillingComplianceRecoveryRules.CreateDecision(
+                plan,
+                request.SelectedNoteIds ?? [],
+                actor.UserId,
+                clock.UtcNow.UtcDateTime,
+                request.Explanation,
+                request.AttestationConfirmed);
+            if (!result.Accepted || result.Decision is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["recovery"] = result.Errors.ToArray()
+                });
+            }
+
+            db.BillingComplianceRecoveryDecisions.Add(
+                Sati.Models.BillingComplianceRecoveryDecision.FromContract(result.Decision));
+            auditTrail.Record(
+                actor,
+                AuditActions.BillingComplianceRecoveryRecorded,
+                "Person",
+                personId,
+                JsonSerializer.Serialize(new
+                {
+                    result.Decision.DecisionId,
+                    result.Decision.PersonId,
+                    result.Decision.NoteIds,
+                    obligations = result.Decision.Obligations.Select(item => new
+                    {
+                        item.ObligationId,
+                        item.DueDate,
+                        item.CompletedDate,
+                        item.EvidenceId
+                    })
+                }));
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return Results.Conflict(new ApiErrorDto(
+                    "billing_recovery_stale",
+                    "A selected note was already recovered or changed. Refresh the checklist.",
+                    string.Empty));
+            }
+
+            return Results.Ok(result.Decision);
         });
 
         api.MapGet("/billing/candidates", async Task<IResult> (
@@ -5076,6 +5670,7 @@ internal static partial class ApiEndpoints
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
                               where note.Status == 6 && owner.AgencyId == actor.AgencyId &&
+                                    person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId &&
                                     !db.ClaimLines.Any(line => line.NoteId == note.Id)
                               orderby note.EventDate
                               select new ReviewableNote(note, person)).ToListAsync(cancellationToken);
@@ -5083,18 +5678,24 @@ internal static partial class ApiEndpoints
                 .SingleOrDefaultAsync(candidate => candidate.Id == actor.AgencyId, cancellationToken);
             var personIds = rows.Select(row => row.Person.Id).Distinct().ToList();
             var formsByPerson = (await db.Forms.AsNoTracking()
+                    .Include(form => form.Attestations)
                     .Where(form => personIds.Contains(form.PersonId))
                     .ToListAsync(cancellationToken))
                 .GroupBy(form => form.PersonId)
                 .ToDictionary(group => group.Key, group => (IReadOnlyList<ServerForm>)group.ToList());
-            var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
-            var complianceRequirements = (await GetOrCreateSettingsAsync(
-                db, actor.AgencyId, cancellationToken)).BillingComplianceRequirements;
+            var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
+                db, personIds, cancellationToken);
+            var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
+                db, actor.AgencyId, cancellationToken);
+            var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(
+                db, actor.AgencyId, rows.Select(row => row.Note.Id), cancellationToken);
             var candidates = rows.Select(row => new BillingCandidateDto(
                 ContractMapper.ToNote(row.Note, row.Person),
                 ValidateBillingCandidate(row.Note, row.Person, agency,
-                    formsByPerson.GetValueOrDefault(row.Person.Id) ?? [], today,
-                    complianceRequirements))).ToList();
+                    formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
+                    releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
+                    compliancePolicy,
+                    recoveryByNote.GetValueOrDefault(row.Note.Id) ?? []))).ToList();
             return Results.Ok(candidates);
         });
 
@@ -5113,7 +5714,8 @@ internal static partial class ApiEndpoints
                              join person in db.People on note.PersonId equals person.Id
                              join owner in db.Users on person.UserId equals owner.Id
                              where note.Id == request.NoteId && note.Status == 6 &&
-                                   owner.AgencyId == actor.AgencyId
+                                   owner.AgencyId == actor.AgencyId &&
+                                   person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId
                              select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
             if (row is null)
                 return Results.NotFound();
@@ -5122,13 +5724,19 @@ internal static partial class ApiEndpoints
             var agency = await db.Agencies.AsNoTracking()
                 .SingleOrDefaultAsync(candidate => candidate.Id == actor.AgencyId, cancellationToken);
             var forms = await db.Forms.AsNoTracking()
+                .Include(form => form.Attestations)
                 .Where(form => form.PersonId == row.Person.Id)
                 .ToListAsync(cancellationToken);
-            var complianceRequirements = (await GetOrCreateSettingsAsync(
-                db, actor.AgencyId, cancellationToken)).BillingComplianceRequirements;
-            var errors = ValidateBillingCandidate(row.Note, row.Person, agency, forms,
-                BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow),
-                complianceRequirements);
+            var releaseRows = (await LoadReleaseBillingRowsByPersonAsync(
+                db, [row.Person.Id], cancellationToken))
+                .GetValueOrDefault(row.Person.Id) ?? [];
+            var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
+                db, actor.AgencyId, cancellationToken);
+            var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(
+                db, actor.AgencyId, [row.Note.Id], cancellationToken);
+            var errors = ValidateBillingCandidate(
+                row.Note, row.Person, agency, forms, releaseRows, compliancePolicy,
+                recoveryByNote.GetValueOrDefault(row.Note.Id) ?? []);
             if (errors.Count > 0)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = errors.ToArray() });
 
@@ -5229,6 +5837,8 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             if (!actor.HasBillingPermissions)
                 return Results.Forbid();
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
             var selected = await (from candidate in db.BillingPeriods.Include(value => value.Lines)
                                   join owner in db.Users on candidate.UserId equals owner.Id
                                   where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
@@ -5248,6 +5858,15 @@ internal static partial class ApiEndpoints
                     ["period"] = ["A billing period with no claim lines cannot be submitted."]
                 });
             }
+            var complianceErrors = await RevalidateDraftPeriodComplianceAsync(
+                db, actor.AgencyId, period, cancellationToken);
+            if (complianceErrors.Count > 0)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["compliance"] = complianceErrors.ToArray()
+                });
+            }
             if (EdiReadinessConflict(period) is { } readinessConflict)
                 return readinessConflict;
             period.Status = 1;
@@ -5256,6 +5875,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -5377,6 +5997,7 @@ internal static partial class ApiEndpoints
                                     join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
                                     where noteIds.Contains(note.Id) &&
                                           owner.AgencyId == actor.AgencyId &&
+                                          note.AgencyId == actor.AgencyId &&
                                           person.AgencyId == actor.AgencyId
                                     select new { Note = note, Person = person })
                 .ToListAsync(cancellationToken);
@@ -5390,26 +6011,33 @@ internal static partial class ApiEndpoints
 
             var generatedAt = DateTime.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
+            if (await db.EdiGenerations.AnyAsync(item => item.AgencyId == actor.AgencyId &&
+                    item.IsTest == request.IsTest && item.ControlNumber == controlNumber, cancellationToken))
+                return Results.Conflict(new ApiErrorDto("edi_control_conflict",
+                    "This submission identity has already been used. Start a new generation attempt.", string.Empty));
             var content = ServerEdiGenerator.Generate(
                 period, request.IsTest, generatedAt, controlNumber);
             var timestamp = generatedAt.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture);
             var testMarker = request.IsTest ? ".OATEST" : string.Empty;
             var file = new EdiFileDto($"837P{testMarker}_{period.Year}{period.Month:D2}_{timestamp}_{normalizedKey[..8]}.txt", content);
-            db.EdiGenerations.Add(new ServerEdiGeneration
+            var retainedGeneration = new ServerEdiGeneration
             {
                 AgencyId = actor.AgencyId,
                 ActorUserId = actor.UserId,
                 BillingPeriodId = periodId,
                 IdempotencyKey = normalizedKey,
                 IsTest = request.IsTest,
+                ControlNumber = controlNumber,
                 FileName = file.FileName,
                 Content = file.Content,
                 CreatedAtUtc = DateTime.UtcNow
-            });
+            };
+            db.EdiGenerations.Add(retainedGeneration);
             db.BillingSubmissionEvents.Add(new ServerBillingSubmissionEvent
             {
                 AgencyId = actor.AgencyId,
                 BillingPeriodId = periodId,
+                EdiGeneration = retainedGeneration,
                 OccurredAtUtc = DateTime.UtcNow,
                 Stage = BillingSubmissionStage.Generated,
                 Reference = file.FileName,
@@ -5562,6 +6190,14 @@ internal static partial class ApiEndpoints
                 var validation = AgencyReleaseRules.Validate(release);
                 if (validation.Count > 0)
                     return Results.ValidationProblem(validation);
+                if (release.IsRevocation && request.ReleaseObligationId is not null)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["releaseObligationId"] =
+                        ["A revocation cannot replace the document linked to a release obligation. Record the withdrawal separately so the historical authorization is preserved."]
+                    }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
             }
 
             var actor = Actor.From(principal);
@@ -5579,14 +6215,35 @@ internal static partial class ApiEndpoints
             var agency = await db.Agencies.AsNoTracking().SingleAsync(
                 candidate => candidate.Id == actor.AgencyId, cancellationToken);
             var generatedAtUtc = clock.UtcNow.UtcDateTime;
-            var cycleStart = request.CycleStart?.Date ??
+            var requestedCycleStart = request.CycleStart?.Date;
+            var cycleStart = requestedCycleStart ??
                 AnnualDocumentCycle.CurrentStart(effectiveDate, generatedAtUtc.ToLocalTime());
+            var releaseLink = await ResolveDocumentReleaseObligationAsync(
+                db, actor, personId, documentKind, requestedCycleStart,
+                request.ReleaseObligationId, clock.Today, cancellationToken);
+            if (releaseLink.Error is not null)
+                return releaseLink.Error;
+            // The durable obligation owns its annual-cycle identity. This matters while the
+            // next cycle is already available: an exact link must not be silently forced into
+            // whichever cycle happens to be current on the server today.
+            cycleStart = releaseLink.Obligation?.TargetEffectiveDate.Date ?? cycleStart;
             if (AnnualDocumentCycle.CurrentStart(effectiveDate, cycleStart) != cycleStart)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
                     ["cycleStart"] = ["The document cycle must begin on the consumer's effective-date anniversary."]
                 }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+            if (documentKind == AnnualDocumentKind.SafetyPlan)
+            {
+                var safetyTiming = await GetSafetyTimingAsync(
+                    db, actor.AgencyId, cancellationToken);
+                if (!AnnualDocumentCycle.IsAvailable(
+                        cycleStart,
+                        clock.Today,
+                        safetyTiming.OpenDaysBefore,
+                        safetyTiming.DueDaysBeforeEffective))
+                    return SafetyCycleNotAvailable(cycleStart, safetyTiming);
             }
 
             var subject = new AgencyReleaseSubject(
@@ -5677,7 +6334,8 @@ internal static partial class ApiEndpoints
                 db, personId, actor.AgencyId, documentKind, cycleStart,
                 origin,
                 generatedAtUtc, actor.UserId, pdf, fileName,
-                blankFields, cancellationToken, templateOwner, templateKey, templateVersion, sourceContentId, sourceContentVersion);
+                blankFields, cancellationToken, templateOwner, templateKey, templateVersion,
+                sourceContentId, sourceContentVersion, releaseLink.Obligation?.Id);
             auditTrail.Record(actor, AuditActions.DocumentGenerated, "Person", personId,
                 JsonSerializer.Serialize(new
                 {
@@ -5688,7 +6346,9 @@ internal static partial class ApiEndpoints
                     templateKey,
                     templateVersion,
                     sourceContentId,
-                    sourceContentVersion
+                    sourceContentVersion,
+                    releaseObligationId = releaseLink.Obligation?.ObligationId,
+                    releaseObligationKey = releaseLink.Obligation?.StableKey
                 }));
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -5719,7 +6379,7 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             if (person.EffectiveDate is not DateTime effectiveDate ||
                 AnnualDocumentCycle.CurrentStart(effectiveDate, request.CycleStart) != request.CycleStart.Date)
@@ -5729,16 +6389,24 @@ internal static partial class ApiEndpoints
                     ["cycleStart"] = ["The document cycle must begin on the consumer's effective-date anniversary."]
                 }, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
+            var releaseLink = await ResolveDocumentReleaseObligationAsync(
+                db, actor, personId, documentKind, request.CycleStart.Date,
+                request.ReleaseObligationId, clock.Today, cancellationToken);
+            if (releaseLink.Error is not null)
+                return releaseLink.Error;
 
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             var artifact = await DocumentArtifactPersistence.StageExternalAsync(
                 db, personId, actor.AgencyId, documentKind, request.CycleStart,
-                clock.UtcNow.UtcDateTime, actor.UserId, request.Note, cancellationToken);
+                clock.UtcNow.UtcDateTime, actor.UserId, request.Note, cancellationToken,
+                releaseLink.Obligation?.Id);
             auditTrail.Record(actor, AuditActions.DocumentRecordedExternal, "Person", personId,
                 JsonSerializer.Serialize(new
                 {
                     kind = documentKind.ToString(),
-                    cycleStart = request.CycleStart.Date.ToString("yyyy-MM-dd")
+                    cycleStart = request.CycleStart.Date.ToString("yyyy-MM-dd"),
+                    releaseObligationId = releaseLink.Obligation?.ObligationId,
+                    releaseObligationKey = releaseLink.Obligation?.StableKey
                 }));
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -5756,7 +6424,7 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             var artifacts = await db.DocumentArtifacts.AsNoTracking()
                 .Where(artifact => artifact.PersonId == personId &&
@@ -5766,6 +6434,123 @@ internal static partial class ApiEndpoints
             return Results.Ok(artifacts.Select(DocumentArtifactPersistence.ToDto).ToList());
         });
     }
+
+    private static async Task<DocumentReleaseLinkResolution> ResolveDocumentReleaseObligationAsync(
+        ApiDbContext db,
+        Actor actor,
+        int personId,
+        AnnualDocumentKind documentKind,
+        DateTime? requestedCycleStart,
+        Guid? obligationId,
+        DateTime today,
+        CancellationToken cancellationToken)
+    {
+        var expectedCategory = documentKind switch
+        {
+            AnnualDocumentKind.ReleaseAgency => ReleaseObligationCategory.Agency,
+            AnnualDocumentKind.ReleaseMedical => ReleaseObligationCategory.Medical,
+            AnnualDocumentKind.ReleaseDhhs => ReleaseObligationCategory.Dhhs,
+            _ => (ReleaseObligationCategory?)null
+        };
+        if (obligationId is null &&
+            (documentKind != AnnualDocumentKind.ReleaseDhhs || requestedCycleStart is null))
+            return new(null, null);
+        if (expectedCategory is null)
+        {
+            return new(null, Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["releaseObligationId"] =
+                    ["Only an agency, medical, or DHHS release document can be linked to a release obligation."]
+            }, statusCode: StatusCodes.Status422UnprocessableEntity));
+        }
+
+        var obligations = db.ReleaseObligations.AsNoTracking()
+            .Include(item => item.AuthorizationEvents)
+            .Where(item =>
+                item.AgencyId == actor.AgencyId &&
+                item.PersonId == personId);
+        var obligation = obligationId is Guid exactId
+            ? await obligations.SingleOrDefaultAsync(
+                item => item.ObligationId == exactId,
+                cancellationToken)
+            : await obligations.SingleOrDefaultAsync(
+                item => item.Category == ReleaseObligationCategory.Dhhs &&
+                        item.TargetEffectiveDate == requestedCycleStart!.Value.Date,
+                cancellationToken);
+        if (obligation is null)
+            return obligationId is null
+                ? new(null, null)
+                : new(null, Results.NotFound());
+        if (obligation.Category != expectedCategory.Value)
+        {
+            return new(null, Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["releaseObligationId"] =
+                    [$"The selected obligation requires a {obligation.Category} release, not a {expectedCategory.Value} release."]
+            }, statusCode: StatusCodes.Status422UnprocessableEntity));
+        }
+        if (requestedCycleStart is DateTime cycleStart &&
+            obligation.TargetEffectiveDate.Date != cycleStart.Date)
+        {
+            return new(null, Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["releaseObligationId"] =
+                    ["The selected obligation belongs to a different annual effective-date cycle."]
+            }, statusCode: StatusCodes.Status422UnprocessableEntity));
+        }
+        if (today.Date < obligation.AvailableOn.Date)
+        {
+            return new(null, Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["releaseObligationId"] =
+                    [$"This release obligation becomes available on {obligation.AvailableOn:yyyy-MM-dd}."]
+            }, statusCode: StatusCodes.Status422UnprocessableEntity));
+        }
+        if (obligation.RetiredOn is DateTime retiredOn && today.Date >= retiredOn.Date)
+        {
+            return new(null, Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["releaseObligationId"] =
+                    ["This release obligation has been retired and cannot receive a new document."]
+            }, statusCode: StatusCodes.Status422UnprocessableEntity));
+        }
+        if (obligation.WithdrawnOn is not null)
+        {
+            return new(null, Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["releaseObligationId"] =
+                    ["This release authorization was withdrawn and cannot receive a replacement document."]
+            }, statusCode: StatusCodes.Status422UnprocessableEntity));
+        }
+
+        return new(obligation, null);
+    }
+
+    private static async Task<AnnualReleaseTiming> GetDhhsReleaseTimingAsync(
+        ApiDbContext db,
+        int agencyId,
+        CancellationToken cancellationToken)
+    {
+        var timing = await db.Settings.AsNoTracking()
+            .Where(item => item.AgencyId == agencyId)
+            .Select(item => new AnnualReleaseTiming(
+                item.ReleaseDhhsOpenDaysBefore,
+                item.ReleaseDhhsDaysBeforeAnniversary))
+            .SingleOrDefaultAsync(cancellationToken);
+        return timing is null
+            ? new AnnualReleaseTiming(90, 0)
+            : new AnnualReleaseTiming(
+                Math.Max(0, timing.OpenDaysBefore),
+                Math.Max(0, timing.DueDaysBeforeEffective));
+    }
+
+    private sealed record DocumentReleaseLinkResolution(
+        ReleaseObligation? Obligation,
+        IResult? Error);
+
+    private sealed record AnnualReleaseTiming(
+        int OpenDaysBefore,
+        int DueDaysBeforeEffective);
 
     private static void MapForms(RouteGroupBuilder api)
     {
@@ -5781,46 +6566,46 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             var form = await db.Forms.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == formId && candidate.PersonId == personId && candidate.Type == type,
                 cancellationToken);
             if (form is null || person.EffectiveDate is not DateTime effectiveDate)
                 return Results.NotFound();
-            var cycle = FormAttestationRules.ResolveCycle(effectiveDate, form.DueDate);
+            var cycle = FormAttestationRules.ResolveCycleForForm(
+                effectiveDate,
+                form.Type,
+                form.DueDate,
+                form.TargetEffectiveDate == default ? null : form.TargetEffectiveDate);
             if (cycle is null)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["form"] = ["The form has no valid compliance cycle."] });
-            var artifacts = await db.DocumentArtifacts.AsNoTracking()
-                .Where(artifact => artifact.PersonId == personId &&
-                    artifact.CycleStart == cycle.Value.CycleStart.Date && artifact.SupersededByArtifactId == null)
-                .Select(artifact => new ArtifactFact(
-                    artifact.Id, artifact.PersonId, artifact.Kind, artifact.CycleStart,
-                    artifact.Origin == nameof(DocumentArtifactOrigin.Draft),
-                    artifact.Origin == nameof(DocumentArtifactOrigin.RecordedAsExternal),
-                    db.DocumentAcknowledgments.Any(receipt => receipt.DocumentArtifactId == artifact.Id)))
-                .ToListAsync(cancellationToken);
-            var forms = await db.Forms.AsNoTracking().Where(candidate => candidate.PersonId == personId)
-                .Select(candidate => new FormFact(
-                    candidate.Id, candidate.PersonId, candidate.Type, candidate.DueDate, candidate.CompletedDate))
-                .ToListAsync(cancellationToken);
-            var actorKind = actor.UserId == person.UserId
-                ? AttestationActorKind.CaseManager
-                : AttestationActorKind.Supervisor;
-            var decision = FormAttestationRules.Evaluate(
-                form.Type, DateTime.Today, cycle.Value.CycleStart, DateTime.Today,
-                actorKind, artifacts, forms);
             var prerequisite = FormAttestationRules.PrerequisiteFor(form.Type);
+            if (prerequisite == PrerequisiteKind.None)
+            {
+                return Results.Ok(new FormPrerequisiteStatusDto(
+                    prerequisite.ToString(),
+                    true,
+                    "Attestation is sufficient; no separate document prerequisite applies.",
+                    [],
+                    CanSupervisorOverride: false));
+            }
+
+            var assessment = await FindAssessmentForAnnualTargetAsync(
+                db,
+                personId,
+                form,
+                cycle.Value,
+                cancellationToken);
+            var isSatisfied = assessment?.CompletedDate is not null;
             return Results.Ok(new FormPrerequisiteStatusDto(
                 prerequisite.ToString(),
-                decision.UnmetPrerequisites.Count == 0,
-                decision.UnmetPrerequisites.Count == 0
-                    ? prerequisite == PrerequisiteKind.None
-                        ? "No additional document prerequisite applies."
-                        : "The prerequisite is satisfied."
-                    : string.Join(" ", decision.UnmetPrerequisites.Select(item => item.Message)),
-                MatchingArtifactIds(form.Type, artifacts),
-                actorKind == AttestationActorKind.Supervisor && actor.HasSupervisorPermissions));
+                isSatisfied,
+                isSatisfied
+                    ? "The Comprehensive Assessment for this annual effective date is already attested."
+                    : "A completed Reclassification implies a completed Comprehensive Assessment. Enter the actual assessment completion date; Sati will save two separate attestations together.",
+                [],
+                CanSupervisorOverride: false));
         });
 
         api.MapPost("/people/{personId:int}/forms/{type}/attestation", async Task<IResult> (
@@ -5829,6 +6614,7 @@ internal static partial class ApiEndpoints
             AttestFormRequest request,
             ClaimsPrincipal principal,
             ApiDbContext db,
+            ApiClock clock,
             AuditTrail auditTrail,
             CancellationToken cancellationToken) =>
         {
@@ -5838,7 +6624,7 @@ internal static partial class ApiEndpoints
                     candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
                     cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
             var form = await db.Forms.SingleOrDefaultAsync(candidate =>
@@ -5856,8 +6642,21 @@ internal static partial class ApiEndpoints
                     string.Empty));
             }
 
+            if (!string.IsNullOrWhiteSpace(request.SupervisorOverrideReason))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["supervisorOverrideReason"] =
+                        ["Form prerequisite overrides are no longer supported."]
+                }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
             var cycle = person.EffectiveDate is DateTime effectiveDate
-                ? FormAttestationRules.ResolveCycle(effectiveDate, form.DueDate)
+                ? FormAttestationRules.ResolveCycleForForm(
+                    effectiveDate,
+                    form.Type,
+                    form.DueDate,
+                    form.TargetEffectiveDate == default ? null : form.TargetEffectiveDate)
                 : null;
             if (cycle is null)
             {
@@ -5870,34 +6669,118 @@ internal static partial class ApiEndpoints
             var actorKind = actor.UserId == person.UserId
                 ? AttestationActorKind.CaseManager
                 : AttestationActorKind.Supervisor;
-            var artifactFacts = await db.DocumentArtifacts.AsNoTracking()
-                .Where(artifact => artifact.PersonId == personId &&
-                    artifact.CycleStart == cycle.Value.CycleStart.Date &&
-                    artifact.SupersededByArtifactId == null)
-                .Select(artifact => new ArtifactFact(
-                    artifact.Id,
-                    artifact.PersonId,
-                    artifact.Kind,
-                    artifact.CycleStart,
-                    artifact.Origin == nameof(DocumentArtifactOrigin.Draft),
-                    artifact.Origin == nameof(DocumentArtifactOrigin.RecordedAsExternal),
-                    db.DocumentAcknowledgments.Any(receipt => receipt.DocumentArtifactId == artifact.Id)))
-                .ToListAsync(cancellationToken);
+            var settings = await db.Settings.AsNoTracking()
+                .SingleOrDefaultAsync(candidate => candidate.AgencyId == actor.AgencyId,
+                    cancellationToken)
+                ?? new ServerSettings { AgencyId = actor.AgencyId };
+            var availableOn = form.DueDate.Date.AddDays(
+                -OpenDaysBefore(form.Type, settings));
             var formFacts = await db.Forms.AsNoTracking()
                 .Where(candidate => candidate.PersonId == personId)
                 .Select(candidate => new FormFact(
                     candidate.Id, candidate.PersonId, candidate.Type,
-                    candidate.DueDate, candidate.CompletedDate))
+                    candidate.DueDate, candidate.CompletedDate,
+                    candidate.TargetEffectiveDate))
                 .ToListAsync(cancellationToken);
+            ServerForm? assessment = null;
+            ServerFormAttestation? impliedAssessmentAttestation = null;
+
+            if (string.Equals(form.Type, "Reclassification", StringComparison.Ordinal))
+            {
+                assessment = await FindAssessmentForAnnualTargetAsync(
+                    db,
+                    personId,
+                    form,
+                    cycle.Value,
+                    cancellationToken);
+                if (assessment is null)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["comprehensiveAssessment"] =
+                            ["The Comprehensive Assessment obligation for this annual effective date is missing. Refresh the consumer's compliance forms before attesting the Reclassification."]
+                    }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+
+                if (assessment.CompletedDate is null)
+                {
+                    if (request.ComprehensiveAssessmentCompletedOn is not DateTime assessmentCompletedOn)
+                    {
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            ["comprehensiveAssessmentCompletedOn"] =
+                                ["Enter the actual Comprehensive Assessment completion date. A completed Reclassification implies that its Comprehensive Assessment was completed."]
+                        }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    }
+
+                    var assessmentDateError = FormAttestationRules.ValidateAssessmentCompletionDate(
+                        assessmentCompletedOn,
+                        request.CompletedOn,
+                        cycle.Value.CycleStart,
+                        clock.Today,
+                        assessment.DueDate.Date.AddDays(
+                            -OpenDaysBefore(assessment.Type, settings)));
+                    if (assessmentDateError is not null)
+                    {
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            ["comprehensiveAssessmentCompletedOn"] = [assessmentDateError]
+                        }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    }
+
+                    assessment.ApplyAttestation(assessmentCompletedOn);
+                    impliedAssessmentAttestation = new ServerFormAttestation
+                    {
+                        FormId = assessment.Id,
+                        Kind = "Attested",
+                        CompletedOn = assessmentCompletedOn.Date,
+                        ActorKind = actorKind.ToString(),
+                        ActorUserId = actor.UserId,
+                        RecordedAtUtc = clock.UtcNow.UtcDateTime,
+                        PrerequisiteStateJson = FormAttestationRules.NoPrerequisitesStateJson
+                    };
+                    db.FormAttestations.Add(impliedAssessmentAttestation);
+                    formFacts = formFacts
+                        .Where(fact => fact.FormId != assessment.Id)
+                        .Append(new FormFact(
+                            assessment.Id,
+                            assessment.PersonId,
+                            assessment.Type,
+                            assessment.DueDate,
+                            assessment.CompletedDate,
+                            assessment.TargetEffectiveDate))
+                        .ToList();
+                }
+                else if (request.ComprehensiveAssessmentCompletedOn is not null)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["comprehensiveAssessmentCompletedOn"] =
+                            ["The Comprehensive Assessment already has an attestation. Do not enter a replacement date unless that attestation is revoked first."]
+                    }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+            }
+            else if (request.ComprehensiveAssessmentCompletedOn is not null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["comprehensiveAssessmentCompletedOn"] =
+                        ["A Comprehensive Assessment completion date can be supplied only with a Reclassification attestation."]
+                }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
             var decision = FormAttestationRules.Evaluate(
                 form.Type,
                 request.CompletedOn,
                 cycle.Value.CycleStart,
-                DateTime.Today,
+                clock.Today,
                 actorKind,
-                artifactFacts,
+                [],
                 formFacts,
-                request.SupervisorOverrideReason);
+                targetEffectiveDate: form.TargetEffectiveDate == default
+                    ? null
+                    : form.TargetEffectiveDate,
+                availableOn: availableOn);
             if (!decision.Accepted)
             {
                 var errorKey = decision.DateError is null ? "prerequisite" : "completedOn";
@@ -5932,9 +6815,10 @@ internal static partial class ApiEndpoints
                 }
             }
 
-            var prerequisiteArtifactIds = MatchingArtifactIds(form.Type, artifactFacts);
-            var prerequisiteStateJson = FormAttestationRules.PrerequisiteStateJson(
-                decision, prerequisiteArtifactIds, request.SupervisorOverrideReason);
+            var recordedAtUtc = clock.UtcNow.UtcDateTime;
+            var prerequisiteStateJson = assessment is null
+                ? FormAttestationRules.NoPrerequisitesStateJson
+                : FormAttestationRules.AssessmentPrerequisiteStateJson(assessment.Id);
             form.ApplyAttestation(request.CompletedOn);
             db.FormAttestations.Add(new ServerFormAttestation
             {
@@ -5943,13 +6827,28 @@ internal static partial class ApiEndpoints
                 CompletedOn = request.CompletedOn.Date,
                 ActorKind = actorKind.ToString(),
                 ActorUserId = actor.UserId,
-                RecordedAtUtc = DateTime.UtcNow,
+                RecordedAtUtc = recordedAtUtc,
                 EvidenceNoteId = request.EvidenceNoteId,
-                PrerequisiteStateJson = prerequisiteStateJson,
-                Reason = decision.SupervisorOverrideAccepted
-                    ? request.SupervisorOverrideReason?.Trim()
-                    : null
+                PrerequisiteStateJson = prerequisiteStateJson
             });
+            if (impliedAssessmentAttestation is not null)
+            {
+                auditTrail.Record(
+                    actor,
+                    AuditActions.FormAttested,
+                    "Form",
+                    assessment!.Id,
+                    JsonSerializer.Serialize(new
+                    {
+                        formType = assessment.Type,
+                        targetEffectiveDate = assessment.TargetEffectiveDate == default
+                            ? null
+                            : assessment.TargetEffectiveDate.ToString("yyyy-MM-dd"),
+                        completedOn = impliedAssessmentAttestation.CompletedOn!.Value.ToString("yyyy-MM-dd"),
+                        actorKind = actorKind.ToString(),
+                        impliedByReclassificationFormId = form.Id
+                    }));
+            }
             auditTrail.Record(
                 actor,
                 AuditActions.FormAttested,
@@ -5958,30 +6857,13 @@ internal static partial class ApiEndpoints
                 JsonSerializer.Serialize(new
                 {
                     formType = form.Type,
-                    cycleStart = cycle.Value.CycleStart.ToString("yyyy-MM-dd"),
+                    targetEffectiveDate = form.TargetEffectiveDate == default
+                        ? null
+                        : form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
                     completedOn = request.CompletedOn.Date.ToString("yyyy-MM-dd"),
                     actorKind = actorKind.ToString(),
-                    prerequisiteArtifactIds,
-                    supervisorOverride = decision.SupervisorOverrideAccepted
+                    comprehensiveAssessmentFormId = assessment?.Id
                 }));
-            if (decision.SupervisorOverrideAccepted)
-            {
-                auditTrail.Record(
-                    actor,
-                    AuditActions.FormPrerequisiteOverridden,
-                    "Form",
-                    form.Id,
-                    JsonSerializer.Serialize(new
-                    {
-                        formType = form.Type,
-                        cycleStart = cycle.Value.CycleStart.ToString("yyyy-MM-dd"),
-                        unmetPrerequisites = decision.UnmetPrerequisites
-                            .Select(item => item.Kind.ToString())
-                            .Distinct()
-                            .Order()
-                            .ToArray()
-                    }));
-            }
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
@@ -6019,7 +6901,7 @@ internal static partial class ApiEndpoints
                     candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
                     cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             var form = await db.Forms.SingleOrDefaultAsync(candidate =>
                 candidate.Id == request.FormId && candidate.PersonId == personId && candidate.Type == type,
@@ -6074,7 +6956,7 @@ internal static partial class ApiEndpoints
                     candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
                     cancellationToken);
             if (person is null ||
-                !await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken))
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
             var forms = await db.Forms.AsNoTracking()
                 .Where(candidate => candidate.PersonId == personId)
@@ -6083,7 +6965,8 @@ internal static partial class ApiEndpoints
                     candidate.PersonId,
                     candidate.Type,
                     candidate.DueDate,
-                    candidate.CompletedDate))
+                    candidate.CompletedDate,
+                    candidate.TargetEffectiveDate))
                 .ToListAsync(cancellationToken);
             var notes = await db.Notes.AsNoTracking()
                 .Where(candidate => candidate.PersonId == personId &&
@@ -6113,36 +6996,45 @@ internal static partial class ApiEndpoints
             ApiDbContext db,
             CancellationToken cancellationToken) =>
         {
-            var ids = request.FormIds.Where(id => id > 0).Distinct().ToList();
-            if (ids.Count > 100)
+            var actor = Actor.From(principal);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
+
+            if (request.FormIds is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    ["formIds"] = ["No more than 100 forms may be deleted at once."]
+                    ["formIds"] = ["Form IDs are required."]
+                });
+            }
+            var ids = request.FormIds.Where(id => id > 0).Distinct()
+                .Take(FormRetentionRules.MaximumRequestIds + 1).ToList();
+            if (ids.Count > FormRetentionRules.MaximumRequestIds)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["formIds"] = [FormRetentionRules.RequestLimitMessage]
                 });
             }
             if (ids.Count == 0)
                 return Results.Ok(new CountDto(0));
 
-            var actor = Actor.From(principal);
             var ownedIds = await (from form in db.Forms.AsNoTracking()
                                   join person in db.People.AsNoTracking() on form.PersonId equals person.Id
-                                  where ids.Contains(form.Id) && person.UserId == actor.UserId
+                                  join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
+                                  where ids.Contains(form.Id) && person.UserId == actor.UserId &&
+                                        person.AgencyId == actor.AgencyId && owner.AgencyId == actor.AgencyId &&
+                                        owner.Role == actor.Role && owner.Permissions == actor.Permissions
                                   select form.Id).ToListAsync(cancellationToken);
             if (ownedIds.Count != ids.Count)
                 return Results.NotFound();
-            if (await db.FormAttestations.AsNoTracking()
-                    .AnyAsync(attestation => ownedIds.Contains(attestation.FormId), cancellationToken))
-            {
-                return Results.Conflict(new ApiErrorDto(
-                    "form_history_locked",
-                    "A form with attestation history cannot be deleted.",
-                    string.Empty));
-            }
 
-            var deleted = await db.Forms.Where(form => ownedIds.Contains(form.Id))
-                .ExecuteDeleteAsync(cancellationToken);
-            return Results.Ok(new CountDto(deleted));
+            // Stored due dates are billing evidence even without an attestation.
+            // This compatibility endpoint never deletes or regenerates form rows.
+            return Results.Conflict(new ApiErrorDto(
+                FormRetentionRules.ErrorCode,
+                FormRetentionRules.Message,
+                string.Empty));
         });
 
         api.MapPut("/forms/{id:int}", async Task<IResult> (
@@ -6154,8 +7046,8 @@ internal static partial class ApiEndpoints
         {
             var actor = Actor.From(principal);
             var form = await (from f in db.Forms
-                              join p in db.People on f.PersonId equals p.Id
-                              where f.Id == id && p.UserId == actor.UserId
+                              join p in TenantAccess.OwnedPeople(db, actor) on f.PersonId equals p.Id
+                              where f.Id == id
                               select f).SingleOrDefaultAsync(cancellationToken);
             if (form is null)
                 return TypedResults.NotFound();
@@ -6176,9 +7068,76 @@ internal static partial class ApiEndpoints
                     ["completedDate"] = ["A completion date can be changed only through an attestation or revocation."]
                 });
             }
-            form.OpenedDate = request.OpenedDate?.Date;
-            await db.SaveChangesAsync(cancellationToken);
+            if (request.OpenedDate?.Date != form.OpenedDate?.Date)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["openedDate"] = ["An opening date can be recorded only through the audited form-opening workflow."]
+                });
+            }
             return TypedResults.Ok(ContractMapper.ToForm(form));
+        });
+
+        api.MapPost("/forms/{id:int}/open", async Task<IResult> (
+            int id,
+            OpenFormRequest request,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            ApiClock clock,
+            AuditTrail auditTrail,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            var form = await (from candidate in db.Forms
+                              join person in TenantAccess.OwnedPeople(db, actor)
+                                  on candidate.PersonId equals person.Id
+                              where candidate.Id == id
+                              select candidate).SingleOrDefaultAsync(cancellationToken);
+            if (form is null)
+                return Results.NotFound();
+
+            if (form.OpenedDate is DateTime existing)
+            {
+                if (existing.Date == request.OpenedOn.Date)
+                    return Results.Ok(ContractMapper.ToForm(form));
+
+                return Results.Conflict(new ApiErrorDto(
+                    "form_opening_already_recorded",
+                    "This form already has an opening date. Correcting it requires an audited correction workflow.",
+                    string.Empty));
+            }
+
+            var settings = await GetOrCreateSettingsAsync(
+                db, actor.AgencyId, cancellationToken);
+            var availableOn = form.DueDate.Date.AddDays(
+                -OpenDaysBefore(form.Type, settings));
+            var dateError = FormOpeningRules.Validate(
+                request.OpenedOn, availableOn, clock.Today);
+            if (dateError is not null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["openedOn"] = [dateError]
+                });
+            }
+
+            form.OpenedDate = request.OpenedOn.Date;
+            auditTrail.Record(
+                actor,
+                AuditActions.FormOpened,
+                "Form",
+                form.Id,
+                JsonSerializer.Serialize(new
+                {
+                    formType = form.Type,
+                    targetEffectiveDate = form.TargetEffectiveDate == default
+                        ? null
+                        : form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
+                    openedOn = request.OpenedOn.Date.ToString("yyyy-MM-dd"),
+                    recordedAtUtc = clock.UtcNow.UtcDateTime
+                }));
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(ContractMapper.ToForm(form));
         });
     }
 
@@ -6191,9 +7150,17 @@ internal static partial class ApiEndpoints
             .Where(x => x.PersonId == person.Id)
             .ToListAsync(cancellationToken);
         var notes = await db.Notes.AsNoTracking()
-            .Where(x => x.PersonId == person.Id)
+            .Where(x => x.PersonId == person.Id && x.AgencyId == person.AgencyId)
             .ToListAsync(cancellationToken);
-        return ContractMapper.ToPerson(person, forms, notes);
+        var releases = await db.ReleaseObligations.AsNoTracking()
+            .Include(item => item.Attestations)
+            .Where(item => item.PersonId == person.Id && item.AgencyId == person.AgencyId)
+            .ToListAsync(cancellationToken);
+        return ContractMapper.ToPerson(
+            person,
+            forms,
+            notes,
+            releases.Select(item => item.ToComplianceFact()).ToArray());
     }
 
     private static Task<ServerPerson?> LoadAuditablePersonAsync(
@@ -6202,7 +7169,7 @@ internal static partial class ApiEndpoints
         int personId,
         CancellationToken cancellationToken) =>
         (from person in db.People
-         join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
+         join owner in db.Users on person.UserId equals owner.Id
          where person.Id == personId &&
                person.AgencyId == actor.AgencyId &&
                owner.AgencyId == actor.AgencyId
@@ -6273,16 +7240,19 @@ internal static partial class ApiEndpoints
         var byType = requestForms
             .Where(form => form.Id == 0)
             .ToDictionary(form => form.Type, StringComparer.Ordinal);
-        var cycleEnd = effectiveDate.AddYears(1);
-        var forms = new List<ServerForm>(ContractMapper.FormTypeCount);
-        for (var type = 0; type < ContractMapper.FormTypeCount; type++)
+        var forms = new List<ServerForm>(PersonSaveRules.FormTypes.Count);
+        foreach (var typeName in PersonSaveRules.FormTypes)
         {
-            var typeName = ContractMapper.FormTypeName(type);
             var requested = byType[typeName];
+            // New clients send the explicit annual-cycle identity. During a rolling
+            // upgrade, an older client can omit it only for the admission cycle.
+            var targetEffectiveDate = requested.TargetEffectiveDate?.Date ?? effectiveDate.Date;
             forms.Add(new ServerForm
             {
                 Type = typeName,
-                DueDate = ComputeFormDueDate(type, effectiveDate, cycleEnd, settings),
+                TargetEffectiveDate = targetEffectiveDate,
+                DueDate = ComplianceScheduleRules.DueDate(
+                    typeName, targetEffectiveDate, ToComplianceSchedule(settings)),
                 // requested.IsCompliant is deliberately not stored. Compliance is the
                 // completion date; accepting a flag from the client alongside the date
                 // is what let the two disagree, and the client's flag is itself
@@ -6301,21 +7271,35 @@ internal static partial class ApiEndpoints
         AuditTrail auditTrail,
         Actor actor,
         DateTime effectiveDate,
-        IEnumerable<ServerForm> forms)
+        ServerSettings settings,
+        IEnumerable<ServerForm> forms,
+        IReadOnlyCollection<ServerForm> allForms)
     {
         foreach (var form in forms.Where(candidate =>
                      candidate.CompletedDate is not null && candidate.Attestations.Count == 0))
         {
             var completedOn = form.CompletedDate!.Value.Date;
-            var cycle = FormAttestationRules.ResolveCycle(effectiveDate, form.DueDate)
+            var targetEffectiveDate = form.TargetEffectiveDate == default
+                ? (DateTime?)null
+                : form.TargetEffectiveDate.Date;
+            var cycle = FormAttestationRules.ResolveCycleForForm(
+                    effectiveDate,
+                    form.Type,
+                    form.DueDate,
+                    targetEffectiveDate)
                 ?? throw new InvalidOperationException(
                     "A completed form is not attached to a valid compliance cycle.");
+            var availableOn = form.DueDate.Date.AddDays(
+                -OpenDaysBefore(form.Type, settings));
             var decision = FormAttestationRules.Evaluate(
                 form.Type, completedOn, cycle.CycleStart, DateTime.Today,
                 AttestationActorKind.CaseManager, [],
-                forms.Select(candidate => new FormFact(
+                allForms.Select(candidate => new FormFact(
                     candidate.Id, candidate.PersonId, candidate.Type,
-                    candidate.DueDate, candidate.CompletedDate)).ToList());
+                    candidate.DueDate, candidate.CompletedDate,
+                    candidate.TargetEffectiveDate)).ToList(),
+                targetEffectiveDate: targetEffectiveDate,
+                availableOn: availableOn);
             if (!decision.Accepted)
             {
                 throw new InvalidOperationException(decision.DateError ?? string.Join(" ",
@@ -6340,6 +7324,7 @@ internal static partial class ApiEndpoints
                 metadataJson: JsonSerializer.Serialize(new
                 {
                     formType = form.Type,
+                    targetEffectiveDate = targetEffectiveDate?.ToString("yyyy-MM-dd"),
                     cycleStart = cycle.CycleStart.ToString("yyyy-MM-dd"),
                     completedOn = completedOn.ToString("yyyy-MM-dd"),
                     actorKind = AttestationActorKind.CaseManager.ToString(),
@@ -6348,26 +7333,76 @@ internal static partial class ApiEndpoints
         }
     }
 
+    private static async Task<ServerForm?> FindAssessmentForAnnualTargetAsync(
+        ApiDbContext db,
+        int personId,
+        ServerForm reclassification,
+        (DateTime CycleStart, DateTime CycleEnd) cycle,
+        CancellationToken cancellationToken)
+    {
+        var candidates = await db.Forms
+            .Where(candidate =>
+                candidate.PersonId == personId &&
+                candidate.Type == "ComprehensiveAssessment")
+            .OrderByDescending(candidate => candidate.DueDate)
+            .ThenByDescending(candidate => candidate.Id)
+            .ToListAsync(cancellationToken);
+
+        if (reclassification.TargetEffectiveDate != default)
+        {
+            var exact = candidates.FirstOrDefault(candidate =>
+                candidate.TargetEffectiveDate != default &&
+                candidate.TargetEffectiveDate.Date == reclassification.TargetEffectiveDate.Date);
+            if (exact is not null)
+                return exact;
+
+            return candidates.FirstOrDefault(candidate =>
+                candidate.TargetEffectiveDate == default &&
+                candidate.DueDate.Date > cycle.CycleStart.Date &&
+                candidate.DueDate.Date <= cycle.CycleEnd.Date);
+        }
+
+        return candidates.FirstOrDefault(candidate =>
+            candidate.DueDate.Date > cycle.CycleStart.Date &&
+            candidate.DueDate.Date <= cycle.CycleEnd.Date);
+    }
+
     private static DateTime ComputeFormDueDate(
         int type,
-        DateTime cycleStart,
-        DateTime cycleEnd,
-        ServerSettings settings) => type switch
+        DateTime targetEffectiveDate,
+        ServerSettings settings)
     {
-        0 => cycleStart.AddDays(90),
-        1 => cycleStart.AddDays(180),
-        2 => cycleStart.AddDays(270),
-        3 => cycleEnd.AddDays(-settings.Q4RDaysBeforeAnniversary),
-        4 => cycleEnd.AddDays(-settings.PcpDaysBeforeAnniversary),
-        5 => cycleEnd.AddDays(-settings.CompAssessmentDaysBeforeAnniversary),
-        6 => cycleEnd.AddDays(-settings.ReclassificationDaysBeforeAnniversary),
-        7 => cycleEnd.AddDays(-settings.SafetyPlanDaysBeforeAnniversary),
-        8 => cycleEnd.AddDays(-settings.PrivacyPracticesDaysBeforeAnniversary),
-        9 => cycleEnd.AddDays(-settings.ReleaseAgencyDaysBeforeAnniversary),
-        10 => cycleEnd.AddDays(-settings.ReleaseDhhsDaysBeforeAnniversary),
-        11 => cycleEnd.AddDays(-settings.ReleaseMedicalDaysBeforeAnniversary),
-        _ => throw new ArgumentOutOfRangeException(nameof(type))
-    };
+        if (!Enum.IsDefined(typeof(FormType), type))
+            throw new ArgumentOutOfRangeException(nameof(type));
+        return ComplianceScheduleRules.DueDate(
+            ((FormType)type).ToString(),
+            targetEffectiveDate,
+            ToComplianceSchedule(settings));
+    }
+
+    private static int OpenDaysBefore(string formType, ServerSettings settings) =>
+        ComplianceScheduleRules.OpenDaysBefore(
+            formType,
+            ToComplianceSchedule(settings));
+
+    private static ComplianceScheduleSettings ToComplianceSchedule(ServerSettings settings) => new(
+        settings.ReviewOpenDaysBefore,
+        settings.PcpOpenDaysBefore,
+        settings.CompAssessmentOpenDaysBefore,
+        settings.ReclassificationOpenDaysBefore,
+        settings.SafetyPlanOpenDaysBefore,
+        settings.PrivacyPracticesOpenDaysBefore,
+        settings.ReleaseAgencyOpenDaysBefore,
+        settings.ReleaseDhhsOpenDaysBefore,
+        settings.ReleaseMedicalOpenDaysBefore,
+        settings.PcpDaysBeforeAnniversary,
+        settings.CompAssessmentDaysBeforeAnniversary,
+        settings.ReclassificationDaysBeforeAnniversary,
+        settings.SafetyPlanDaysBeforeAnniversary,
+        settings.PrivacyPracticesDaysBeforeAnniversary,
+        settings.ReleaseAgencyDaysBeforeAnniversary,
+        settings.ReleaseDhhsDaysBeforeAnniversary,
+        settings.ReleaseMedicalDaysBeforeAnniversary);
 
     private static Dictionary<string, string[]> ValidatePersonContact(SavePersonContactRequest request)
     {
@@ -6429,6 +7464,7 @@ internal static partial class ApiEndpoints
                       join person in db.People on note.PersonId equals person.Id
                       join owner in db.Users on person.UserId equals owner.Id
                       where note.Id == noteId && owner.AgencyId == actor.AgencyId &&
+                            note.AgencyId == actor.AgencyId &&
                             person.AgencyId == actor.AgencyId &&
                             (owner.Permissions & UserPermissions.CaseManagement) != 0 &&
                             (actor.HasAgencyWideSupervisionPermissions ||
@@ -6436,25 +7472,190 @@ internal static partial class ApiEndpoints
                       select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
     }
 
-    private static BillingComplianceResult EvaluatePersonCompliance(
+    private static BillingComplianceResult EvaluateNoteCompliance(
+        ServerNote note,
         ServerPerson person,
         IReadOnlyList<ServerForm> forms,
-        DateTime today,
-        BillingComplianceRequirements requirements)
-        => BillingComplianceGate.Evaluate(
+        IReadOnlyList<ReleaseObligation> releaseObligations,
+        ServerBillingCompliancePolicyContext policy)
+    {
+        if (note.EventDate is not DateTime serviceDate)
+            return new BillingComplianceResult(true, [], []);
+
+        var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingDhhs(
             person.EffectiveDate,
-            forms.Select(form => new ComplianceFormSnapshot(
-                form.Type, form.DueDate, form.CompletedDate)),
-            today,
-            requirements: requirements);
+            releaseObligations.Select(item => item.ToComplianceFact()),
+            serviceDate);
+        var reconciledReleaseCycles = releaseFacts
+            .Where(item => item.TargetEffectiveDate is not null)
+            .Select(item => item.TargetEffectiveDate!.Value.Date)
+            .ToHashSet();
+        var formSnapshots = forms
+            .Where(form => !IsLegacyReleaseFormType(form.Type) ||
+                           !reconciledReleaseCycles.Contains(
+                               (form.TargetEffectiveDate == default
+                                   ? form.DueDate
+                                   : form.TargetEffectiveDate).Date))
+            .Select(form => new ComplianceFormSnapshot(
+                form.Type,
+                form.DueDate,
+                form.CompletedDate,
+                form.OpenedDate,
+                $"form:{form.Id}",
+                TargetEffectiveDate: form.TargetEffectiveDate == default
+                    ? null
+                    : form.TargetEffectiveDate));
+        var withExpectedForms = ExpectedBillingComplianceObligations.IncludeMissingForms(
+            person.EffectiveDate,
+            formSnapshots,
+            serviceDate,
+            policy.Schedule);
+        var snapshots = BillingComplianceGate.IncludePcpOpeningObligations(
+                withExpectedForms)
+            .Concat(ReleaseBillingRules.BuildComplianceSnapshots(
+                releaseFacts,
+                serviceDate));
+        return BillingComplianceGate.EvaluateBillingWindowDetailed(
+                snapshots,
+                serviceDate,
+                policy.Resolve(serviceDate));
+    }
+
+    private static bool IsLegacyReleaseFormType(string type) => type is
+        "Release_Agency" or "Release_DHHS" or "Release_Medical";
 
     private static IReadOnlyList<string> ValidateBillingCandidate(
         ServerNote note,
         ServerPerson person,
         ServerAgency? agency,
         IReadOnlyList<ServerForm> forms,
-        DateTime today,
-        BillingComplianceRequirements requirements)
+        IReadOnlyList<ReleaseObligation> releaseObligations,
+        ServerBillingCompliancePolicyContext policy,
+        IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null)
+    {
+        var errors = ValidateNonComplianceBillingCandidate(note, person, agency).ToList();
+        var compliance = EvaluateNoteCompliance(
+            note, person, forms, releaseObligations, policy);
+        if (compliance.Passed)
+        {
+            // No exception is needed for this service date.
+        }
+        else if (IsReleasedByRecovery(
+                     note,
+                     person,
+                     forms,
+                     releaseObligations,
+                     policy,
+                     recoveryDecisions ?? []))
+        {
+            // This exact note and blocker evidence were released by an immutable
+            // Admin recovery decision after compliance was restored.
+        }
+        else if (note.ComplianceOverride)
+        {
+            IReadOnlyList<string> selectedIds;
+            try
+            {
+                selectedIds = string.IsNullOrWhiteSpace(note.OverrideObligationIdsJson)
+                    ? []
+                    : JsonSerializer.Deserialize<string[]>(note.OverrideObligationIdsJson) ?? [];
+            }
+            catch (JsonException)
+            {
+                selectedIds = [];
+            }
+
+            var exception = BillingComplianceExceptionRules.Validate(
+                compliance.Blockers ?? [],
+                selectedIds,
+                note.OverrideReason,
+                note.OverrideAttestationConfirmed &&
+                note.OverrideApprovedById is not null &&
+                note.OverrideApprovedAt is not null);
+            errors.AddRange(exception.Errors.Select(error => $"Compliance exception: {error}"));
+            if (exception.Accepted)
+            {
+                errors.AddRange(BillingComplianceExceptionRules.RemainingBlockers(
+                        compliance.Blockers ?? [],
+                        exception.SelectedObligationIds)
+                    .Select(blocker =>
+                        $"{blocker.Name} was due {blocker.DueDate:MMM d, yyyy} " +
+                        "and was not completed as of this service date."));
+            }
+        }
+        else
+        {
+            errors.AddRange(compliance.Reasons);
+        }
+        return errors;
+    }
+
+    private static async Task<IReadOnlyList<string>> RevalidateDraftPeriodComplianceAsync(
+        ApiDbContext db,
+        int agencyId,
+        ServerBillingPeriod period,
+        CancellationToken cancellationToken)
+    {
+        var noteIds = period.Lines.Select(line => line.NoteId).Distinct().ToArray();
+        var rows = await (from note in db.Notes.AsNoTracking()
+                          join person in db.People.AsNoTracking() on note.PersonId equals person.Id
+                          join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
+                          where noteIds.Contains(note.Id) &&
+                                note.AgencyId == agencyId &&
+                                person.AgencyId == agencyId &&
+                                owner.AgencyId == agencyId
+                          select new ReviewableNote(note, person))
+            .ToListAsync(cancellationToken);
+        if (rows.Count != noteIds.Length)
+            return ["A draft claim line no longer has an accessible source note."];
+
+        var agency = await db.Agencies.AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.Id == agencyId, cancellationToken);
+        var personIds = rows.Select(row => row.Person.Id).Distinct().ToArray();
+        var formsByPerson = (await db.Forms.AsNoTracking()
+                .Include(form => form.Attestations)
+                .Where(form => personIds.Contains(form.PersonId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(form => form.PersonId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<ServerForm>)group.ToList());
+        var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
+            db, personIds, cancellationToken);
+        var policy = await LoadBillingCompliancePolicyContextAsync(
+            db, agencyId, cancellationToken);
+        var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(
+            db, agencyId, noteIds, cancellationToken);
+        var rowsByNoteId = rows.ToDictionary(row => row.Note.Id);
+        var errors = new List<string>();
+
+        foreach (var line in period.Lines)
+        {
+            if (!rowsByNoteId.TryGetValue(line.NoteId, out var row))
+                continue;
+            if (row.Note.EventDate?.Date != line.DateOfService.Date)
+            {
+                errors.Add($"Draft claim line {line.Id} no longer matches its source note's service date.");
+                continue;
+            }
+
+            var validation = ValidateBillingCandidate(
+                row.Note,
+                row.Person,
+                agency,
+                formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
+                releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
+                policy,
+                recoveryByNote.GetValueOrDefault(row.Note.Id) ?? []);
+            errors.AddRange(validation.Select(error =>
+                $"Draft claim line {line.Id} is no longer eligible for submission: {error}"));
+        }
+
+        return errors;
+    }
+
+    private static IReadOnlyList<string> ValidateNonComplianceBillingCandidate(
+        ServerNote note,
+        ServerPerson person,
+        ServerAgency? agency)
     {
         var errors = new List<string>();
         if (note.Status != 6)
@@ -6475,27 +7676,203 @@ internal static partial class ApiEndpoints
             errors.Add("Agency NPI is missing or invalid.");
         if (agency is not null)
             errors.AddRange(ValidateBillingConfiguration(agency));
-
-        if (note.ComplianceOverride)
-        {
-            if (string.IsNullOrWhiteSpace(note.OverrideReason) ||
-                note.OverrideApprovedById is null || note.OverrideApprovedAt is null)
-                errors.Add("Compliance override is incomplete.");
-        }
-        else
-        {
-            if (!EvaluatePersonCompliance(person, forms, today, requirements).Passed)
-                errors.Add("Consumer does not meet current compliance requirements.");
-            if (note.EventDate is DateTime serviceDate)
-            {
-                errors.AddRange(BillingComplianceGate.EvaluateBillingWindow(
-                    forms.Select(form => new ComplianceFormSnapshot(
-                        form.Type, form.DueDate, form.CompletedDate)),
-                    serviceDate,
-                    requirements));
-            }
-        }
         return errors;
+    }
+
+    private static bool IsReleasedByRecovery(
+        ServerNote note,
+        ServerPerson person,
+        IReadOnlyList<ServerForm> forms,
+        IReadOnlyList<ReleaseObligation> releaseObligations,
+        ServerBillingCompliancePolicyContext policy,
+        IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision> decisions)
+    {
+        if (note.EventDate is not DateTime serviceDate || decisions.Count == 0)
+            return false;
+
+        var noteSnapshot = new BillingRecoveryNoteSnapshot(
+            note.Id, person.Id, serviceDate, IsSubmittedOrBilled: false);
+        var obligations = BuildRecoveryObligations(
+            person.Id,
+            person.EffectiveDate,
+            forms,
+            releaseObligations,
+            policy.Schedule,
+            serviceDate);
+        var version = policy.ResolveSnapshot(serviceDate);
+        return decisions.Any(decision => BillingComplianceRecoveryRules.IsReleased(
+            noteSnapshot, obligations, version, decision));
+    }
+
+    private static IReadOnlyList<BillingComplianceObligationSnapshot> BuildRecoveryObligations(
+        int personId,
+        DateTime? initialEffectiveDate,
+        IReadOnlyList<ServerForm> forms,
+        IReadOnlyList<ReleaseObligation> releaseObligations,
+        ComplianceScheduleSettings schedule,
+        DateTime asOfDate)
+    {
+        var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingDhhs(
+            initialEffectiveDate,
+            releaseObligations.Select(item => item.ToComplianceFact()),
+            asOfDate);
+        var reconciledReleaseCycles = releaseFacts
+            .Where(item => item.TargetEffectiveDate is not null)
+            .Select(item => item.TargetEffectiveDate!.Value.Date)
+            .ToHashSet();
+        var formSnapshots = forms
+            .Where(form => !IsLegacyReleaseFormType(form.Type) ||
+                           !reconciledReleaseCycles.Contains(
+                               (form.TargetEffectiveDate == default
+                                   ? form.DueDate
+                                   : form.TargetEffectiveDate).Date))
+            .Select(form =>
+            {
+                var attestation = form.CompletedDate is DateTime completedOn
+                    ? form.Attestations
+                        .Where(item => string.Equals(
+                                           item.Kind,
+                                           FormAttestationKind.Attested.ToString(),
+                                           StringComparison.Ordinal) &&
+                                       item.CompletedOn?.Date == completedOn.Date)
+                        .OrderBy(item => item.RecordedAtUtc)
+                        .ThenBy(item => item.Id)
+                        .FirstOrDefault()
+                    : null;
+                var completionEvidence = attestation is { Id: > 0 }
+                    ? $"form-attestation:{attestation.Id}"
+                    : form.CompletedDate is DateTime completed
+                        ? $"form-completion:{form.Id}:{completed:yyyy-MM-dd}"
+                        : null;
+                var openingEvidence = form.OpenedDate is DateTime opened
+                    ? $"form-opened:{form.Id}:{opened:yyyy-MM-dd}"
+                    : null;
+                return new ComplianceFormSnapshot(
+                    form.Type,
+                    form.DueDate,
+                    form.CompletedDate,
+                    form.OpenedDate,
+                    $"form:{form.Id}",
+                    completionEvidence,
+                    openingEvidence,
+                    form.TargetEffectiveDate == default
+                        ? null
+                        : form.TargetEffectiveDate);
+            });
+        var withExpectedForms = ExpectedBillingComplianceObligations.IncludeMissingForms(
+            initialEffectiveDate,
+            formSnapshots,
+            asOfDate,
+            schedule);
+        var formsAndOpening = BillingComplianceGate.IncludePcpOpeningObligations(
+            withExpectedForms);
+        return BillingComplianceRecoveryRules.FromComplianceSnapshots(personId, formsAndOpening)
+            .Concat(ReleaseBillingRules.BuildRecoveryObligations(
+                personId,
+                releaseFacts))
+            .ToArray();
+    }
+
+    private static async Task<IReadOnlyDictionary<int, IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>>>
+        LoadRecoveryDecisionsByNoteAsync(
+            ApiDbContext db,
+            int agencyId,
+            IEnumerable<int> noteIds,
+            CancellationToken cancellationToken)
+    {
+        var ids = noteIds.Distinct().ToArray();
+        if (ids.Length == 0)
+            return new Dictionary<int, IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>>();
+
+        var rows = await db.BillingComplianceRecoveryDecisions.AsNoTracking()
+            .Include(item => item.Obligations)
+            .Include(item => item.Notes)
+            .Where(item => item.AgencyId == agencyId &&
+                           item.Notes.Any(note => ids.Contains(note.NoteId)))
+            .ToListAsync(cancellationToken);
+        return ids.ToDictionary(
+            noteId => noteId,
+            noteId => (IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>)rows
+                .Where(item => item.Notes.Any(note => note.NoteId == noteId))
+                .Select(item => item.ToContract())
+                .ToArray());
+    }
+
+    private static async Task<ServerRecoveryInputs?> LoadRecoveryInputsAsync(
+        ApiDbContext db,
+        int agencyId,
+        int personId,
+        CancellationToken cancellationToken)
+    {
+        var person = await (from candidate in db.People.AsNoTracking()
+                            join owner in db.Users.AsNoTracking()
+                                on candidate.UserId equals owner.Id
+                            where candidate.Id == personId &&
+                                  candidate.AgencyId == agencyId &&
+                                  owner.AgencyId == agencyId
+                            select candidate)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (person is null)
+            return null;
+
+        var agency = await db.Agencies.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == agencyId, cancellationToken);
+        var forms = await db.Forms.AsNoTracking()
+            .Include(form => form.Attestations)
+            .Where(form => form.PersonId == personId)
+            .ToListAsync(cancellationToken);
+        var releases = (await LoadReleaseBillingRowsByPersonAsync(
+                db, [personId], cancellationToken))
+            .GetValueOrDefault(personId) ?? [];
+        var notes = await db.Notes.AsNoTracking()
+            .Where(note => note.PersonId == personId &&
+                           note.AgencyId == agencyId &&
+                           note.Status == 6 &&
+                           !db.ClaimLines.Any(line => line.NoteId == note.Id))
+            .OrderBy(note => note.EventDate)
+            .ThenBy(note => note.Id)
+            .ToListAsync(cancellationToken);
+        var policy = await LoadBillingCompliancePolicyContextAsync(
+            db, agencyId, cancellationToken);
+        var decisionsByNote = await LoadRecoveryDecisionsByNoteAsync(
+            db, agencyId, notes.Select(note => note.Id), cancellationToken);
+        notes = notes.Where(note => !IsReleasedByRecovery(
+                note,
+                person,
+                forms,
+                releases,
+                policy,
+                decisionsByNote.GetValueOrDefault(note.Id) ?? []))
+            .ToList();
+        return new ServerRecoveryInputs(person, agency, forms, releases, notes, policy);
+    }
+
+    private static BillingComplianceRecoveryPlan PrepareRecoveryPlan(
+        ServerRecoveryInputs inputs,
+        DateTime agencyToday)
+    {
+        var notes = inputs.Notes
+            .Where(note => ValidateNonComplianceBillingCandidate(
+                note, inputs.Person, inputs.Agency).Count == 0)
+            .Select(note => new BillingRecoveryNoteSnapshot(
+                note.Id,
+                inputs.Person.Id,
+                note.EventDate!.Value.Date,
+                IsSubmittedOrBilled: false))
+            .ToArray();
+        return BillingComplianceRecoveryRules.Prepare(
+            inputs.Policy.AgencyId,
+            inputs.Person.Id,
+            inputs.Policy.RecoveryVersions,
+            BuildRecoveryObligations(
+                inputs.Person.Id,
+                inputs.Person.EffectiveDate,
+                inputs.Forms,
+                inputs.ReleaseObligations,
+                inputs.Policy.Schedule,
+                agencyToday),
+            notes,
+            agencyToday);
     }
 
     private static IReadOnlyList<string> ValidateBillingConfiguration(ServerAgency agency)
@@ -6604,7 +7981,7 @@ internal static partial class ApiEndpoints
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
             x => x.Id == item.PersonId, cancellationToken);
         return person is not null &&
-               await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)
+               await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)
             ? item
             : null;
     }
@@ -6832,14 +8209,47 @@ internal static partial class ApiEndpoints
         DateTime? EffectiveDate);
 
     private sealed record BillingLossFormRow(
+        int Id,
         int PersonId,
         string Type,
         DateTime DueDate,
-        DateTime? CompletedDate);
+        DateTime? CompletedDate,
+        DateTime? OpenedDate,
+        DateTime TargetEffectiveDate);
 
     private sealed record BillingLossNoteRow(int PersonId, DateTime EventDate, int? Minutes);
 
     private sealed record ReviewableNote(ServerNote Note, ServerPerson Person);
+
+    private sealed record ServerRecoveryInputs(
+        ServerPerson Person,
+        ServerAgency? Agency,
+        IReadOnlyList<ServerForm> Forms,
+        IReadOnlyList<ReleaseObligation> ReleaseObligations,
+        IReadOnlyList<ServerNote> Notes,
+        ServerBillingCompliancePolicyContext Policy);
+
+    private sealed record ServerBillingCompliancePolicyContext(
+        int AgencyId,
+        BillingComplianceRequirements FallbackRequirements,
+        int PcpOpenDaysBefore,
+        ComplianceScheduleSettings Schedule,
+        IReadOnlyList<BillingCompliancePolicyVersionSnapshot> Versions)
+    {
+        public BillingCompliancePolicyVersionSnapshot ResolveSnapshot(DateTime serviceDate) =>
+            BillingCompliancePolicyRules.ResolveForServiceDate(
+                Versions,
+                AgencyId,
+                serviceDate) ?? new BillingCompliancePolicyVersionSnapshot(
+                    long.MinValue, AgencyId, DateTime.MinValue, FallbackRequirements);
+
+        public BillingComplianceRequirements Resolve(DateTime serviceDate) =>
+            ResolveSnapshot(serviceDate).Requirements;
+
+        public IReadOnlyList<BillingCompliancePolicyVersionSnapshot> RecoveryVersions =>
+            [new BillingCompliancePolicyVersionSnapshot(
+                long.MinValue, AgencyId, DateTime.MinValue, FallbackRequirements), .. Versions];
+    }
 
     private static async Task<ServerSettings> GetOrCreateSettingsAsync(
         ApiDbContext db,
@@ -6858,16 +8268,206 @@ internal static partial class ApiEndpoints
         return settings;
     }
 
+    internal static async Task<BillingComplianceRequirements> ResolveBillingComplianceRequirementsAsync(
+        ApiDbContext db,
+        int agencyId,
+        DateTime serviceDate,
+        BillingComplianceRequirements fallbackRequirements,
+        CancellationToken cancellationToken)
+    {
+        var rows = await db.BillingCompliancePolicyVersions.AsNoTracking()
+            .Where(version => version.AgencyId == agencyId &&
+                              version.EffectiveOn <= serviceDate.Date)
+            .ToListAsync(cancellationToken);
+        return BillingCompliancePolicyRules.ResolveForServiceDate(
+                rows.Select(version => version.ToSnapshot()), agencyId, serviceDate)
+            ?.Requirements ?? fallbackRequirements;
+    }
+
+    private static async Task<ServerBillingCompliancePolicyContext> LoadBillingCompliancePolicyContextAsync(
+        ApiDbContext db,
+        int agencyId,
+        CancellationToken cancellationToken)
+    {
+        var settings = await GetOrCreateSettingsAsync(db, agencyId, cancellationToken);
+        var versions = await db.BillingCompliancePolicyVersions.AsNoTracking()
+            .Where(version => version.AgencyId == agencyId)
+            .OrderBy(version => version.EffectiveOn)
+            .ThenBy(version => version.Id)
+            .ToListAsync(cancellationToken);
+        return new ServerBillingCompliancePolicyContext(
+            agencyId,
+            settings.BillingComplianceRequirements,
+            settings.PcpOpenDaysBefore,
+            ToComplianceSchedule(settings),
+            versions.Select(version => version.ToSnapshot()).ToList());
+    }
+
+    private static async Task<ServerBillingPolicyImpactEvaluation>
+        BuildBillingCompliancePolicyImpactPreviewAsync(
+            ApiDbContext db,
+            int agencyId,
+            DateTime effectiveOn,
+            BillingComplianceRequirements proposedRequirements,
+            CancellationToken cancellationToken)
+    {
+        // Preview is deliberately read-only. Do not use GetOrCreateSettingsAsync
+        // here: an inspection must never initialize or otherwise mutate agency data.
+        var settings = await db.Settings.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.AgencyId == agencyId, cancellationToken);
+        var policyRows = await db.BillingCompliancePolicyVersions.AsNoTracking()
+            .Where(version => version.AgencyId == agencyId)
+            .OrderBy(version => version.EffectiveOn)
+            .ThenBy(version => version.Id)
+            .ToListAsync(cancellationToken);
+        var policy = new ServerBillingCompliancePolicyContext(
+            agencyId,
+            settings?.BillingComplianceRequirements ??
+                BillingComplianceGate.DefaultRequirements,
+            settings?.PcpOpenDaysBefore ?? 90,
+            settings is null
+                ? new ComplianceScheduleSettings()
+                : ToComplianceSchedule(settings),
+            policyRows.Select(version => version.ToSnapshot()).ToArray());
+        var enforcementDate = effectiveOn.Date;
+        var nextPolicyDate = policy.Versions
+            .Where(version => version.EffectiveOn.Date > enforcementDate)
+            .Select(version => (DateTime?)version.EffectiveOn.Date)
+            .Min();
+        var relevantStatuses = new[]
+        {
+            NoteWorkflow.HeldForCompliance,
+            NoteWorkflow.Logged,
+            NoteWorkflow.Approved,
+            NoteWorkflow.ComplianceBlocked
+        };
+
+        var notes = await (from note in db.Notes.AsNoTracking()
+                           join person in db.People.AsNoTracking()
+                               on note.PersonId equals person.Id
+                           join owner in db.Users.AsNoTracking()
+                               on person.UserId equals owner.Id
+                           where note.EventDate != null &&
+                                 note.EventDate.Value >= enforcementDate &&
+                                 (nextPolicyDate == null ||
+                                  note.EventDate.Value < nextPolicyDate.Value) &&
+                                 note.AgencyId == agencyId &&
+                                 person.AgencyId == agencyId &&
+                                 owner.AgencyId == agencyId &&
+                                 person.Status != (int)PersonStatus.Ghost &&
+                                 (relevantStatuses.Contains(note.Status!.Value) ||
+                                  db.ClaimLines.Any(line => line.NoteId == note.Id))
+                           select new
+                           {
+                               note.Id,
+                               note.PersonId,
+                               person.EffectiveDate,
+                               ServiceDate = note.EventDate!.Value,
+                               note.Status
+                           })
+            .ToListAsync(cancellationToken);
+        var noteIds = notes.Select(note => note.Id).ToArray();
+        var personIds = notes.Select(note => note.PersonId).Distinct().ToArray();
+        var formsByPerson = (await db.Forms.AsNoTracking()
+                .Include(form => form.Attestations)
+                .Where(form => personIds.Contains(form.PersonId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(form => form.PersonId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<ServerForm>)group.ToList());
+        var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
+            db, personIds, cancellationToken);
+        var claims = await (from line in db.ClaimLines.AsNoTracking()
+                            join period in db.BillingPeriods.AsNoTracking()
+                                on line.BillingPeriodId equals period.Id
+                            join owner in db.Users.AsNoTracking()
+                                on period.UserId equals owner.Id
+                            where noteIds.Contains(line.NoteId) &&
+                                  owner.AgencyId == agencyId
+                            select new
+                            {
+                                line.Id,
+                                line.NoteId,
+                                IsFinalized = period.SubmittedAt != null || period.Status != 0
+                            })
+            .ToListAsync(cancellationToken);
+        var claimsByNote = claims.ToLookup(claim => claim.NoteId);
+        var facts = notes.Select(note =>
+        {
+            var noteClaims = claimsByNote[note.Id].ToArray();
+            var finalizedCount = noteClaims.Count(claim => claim.IsFinalized);
+            return new BillingCompliancePolicyImpactRecordSnapshot(
+                note.Id,
+                note.PersonId,
+                note.ServiceDate.Date,
+                note.Status is NoteWorkflow.Logged or NoteWorkflow.Approved ||
+                    finalizedCount > 0,
+                noteClaims.Length - finalizedCount,
+                finalizedCount,
+                BuildRecoveryObligations(
+                    note.PersonId,
+                    note.EffectiveDate,
+                    formsByPerson.GetValueOrDefault(note.PersonId) ?? [],
+                    releasesByPerson.GetValueOrDefault(note.PersonId) ?? [],
+                    policy.Schedule,
+                    note.ServiceDate.Date),
+                noteClaims.Where(claim => claim.IsFinalized)
+                    .Select(claim => claim.Id)
+                    .ToArray());
+        }).ToArray();
+
+        var impacts = BillingCompliancePolicyImpactRules.Analyze(
+            agencyId,
+            policy.FallbackRequirements,
+            policy.Versions,
+            enforcementDate,
+            proposedRequirements,
+            facts);
+        var preview = BillingCompliancePolicyImpactRules.Preview(
+            agencyId,
+            policy.FallbackRequirements,
+            policy.Versions,
+            enforcementDate,
+            proposedRequirements,
+            facts);
+        return new ServerBillingPolicyImpactEvaluation(preview, impacts);
+    }
+
+    private static List<BillingCompliancePolicyReviewFlag>
+        CreateBillingCompliancePolicyReviewFlags(
+            BillingCompliancePolicyVersion version,
+            IEnumerable<BillingCompliancePolicyRecordImpact> impacts,
+            DateTime createdAtUtc)
+    {
+        var flags = new List<BillingCompliancePolicyReviewFlag>();
+        foreach (var impact in impacts.Where(item => item.IsSubmittedOrFinalized))
+        {
+            flags.Add(BillingCompliancePolicyReviewFlag.ForNote(
+                version, impact, createdAtUtc));
+            flags.AddRange(impact.SubmittedOrFinalizedClaimRecordIds.Select(
+                claimLineId => BillingCompliancePolicyReviewFlag.ForClaimLine(
+                    version, impact, claimLineId, createdAtUtc)));
+        }
+
+        return flags;
+    }
+
+    private sealed record ServerBillingPolicyImpactEvaluation(
+        BillingCompliancePolicyImpactPreviewDto Preview,
+        IReadOnlyList<BillingCompliancePolicyRecordImpact> Impacts);
+
     private sealed record DayNoteRow(ServerNote Note, ServerPerson Person);
 
     private static async Task<List<DayNoteRow>> LoadDayNotesAsync(
-        ApiDbContext db, int userId, DateTime date, CancellationToken cancellationToken)
+        ApiDbContext db, int userId, int agencyId, DateTime date, CancellationToken cancellationToken)
     {
         var dayStart = date.Date;
         var dayEnd = dayStart.AddDays(1);
         return await (from note in db.Notes.AsNoTracking()
                       join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                       where person.UserId == userId &&
+                            person.AgencyId == agencyId && note.AgencyId == agencyId &&
                             note.EventDate >= dayStart && note.EventDate < dayEnd
                       select new DayNoteRow(note, person))
             .ToListAsync(cancellationToken);
@@ -6899,7 +8499,7 @@ internal static partial class ApiEndpoints
         if (request.EventDate is not DateTime eventDate)
             return null;
 
-        var sameDay = await LoadDayNotesAsync(db, actor.UserId, eventDate, cancellationToken);
+        var sameDay = await LoadDayNotesAsync(db, actor.UserId, actor.AgencyId, eventDate, cancellationToken);
         var blocks = sameDay
             .Select(row => ServiceTimeline.TryCreateBlock(
                 row.Note.Id,
@@ -7242,7 +8842,7 @@ internal static partial class ApiEndpoints
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
             x => x.Id == request.PersonId, cancellationToken);
         return person is not null &&
-               await TenantAccess.CanAccessUserAsync(db, actor, person.UserId, cancellationToken)
+               await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken)
             ? request
             : null;
     }

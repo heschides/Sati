@@ -3,12 +3,14 @@ using CommunityToolkit.Mvvm.Input;
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
+using System.Collections.ObjectModel;
 
 namespace Sati.ViewModels.ClientDocuments;
 
 public partial class AgencyReleaseViewModel : ObservableObject
 {
     private readonly IAgencyReleaseService _service;
+    private readonly List<ReleaseObligationDto> _knownReleaseObligations = [];
     private int? _personId;
     private int _personVersion;
 
@@ -49,12 +51,18 @@ public partial class AgencyReleaseViewModel : ObservableObject
     public IReadOnlyList<AgencyReleaseScopeChoice> ScopeChoices { get; }
     public IReadOnlyList<string> ContactTypeChoices { get; }
     public IReadOnlyList<AgencyReleaseCategoryOption> InformationCategories { get; }
+    public ObservableCollection<ReleaseDocumentObligationChoice> ReleaseObligationChoices { get; } = [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WorkspaceTitle))]
     [NotifyPropertyChangedFor(nameof(WorkspaceDescription))]
     [NotifyPropertyChangedFor(nameof(GenerateButtonText))]
     private ReleaseKindChoice selectedReleaseKind;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedReleaseObligation))]
+    [NotifyPropertyChangedFor(nameof(ObligationSelectionGuidance))]
+    private ReleaseDocumentObligationChoice? selectedReleaseObligation;
 
     [ObservableProperty]
     private string personName = "Select a consumer";
@@ -134,6 +142,22 @@ public partial class AgencyReleaseViewModel : ObservableObject
 
     public bool HasPerson => _personId.HasValue;
     public bool CanGenerate => HasPerson && !IsBusy;
+    public bool HasReleaseObligationChoices => ReleaseObligationChoices.Count != 0;
+    public bool HasSelectedReleaseObligation => SelectedReleaseObligation is not null;
+    public bool CanSelectReleaseObligation => !IsRevocation && HasReleaseObligationChoices;
+    public string ObligationSelectionGuidance
+    {
+        get
+        {
+            if (IsRevocation)
+                return "Record the withdrawal in the tracked obligation above. A revocation PDF cannot replace the original authorization evidence.";
+            if (!HasReleaseObligationChoices)
+                return $"No available tracked {DocumentName} obligation matches this consumer. You may still prepare an unlinked release, but it cannot satisfy recipient-specific compliance.";
+            if (SelectedReleaseObligation is null)
+                return "Choose the exact recipient obligation when this document is meant to satisfy compliance. Leave it blank only for an authorization that is not one of the tracked provider releases.";
+            return $"This PDF will be linked only to {SelectedReleaseObligation.DisplayName}. A later supported electronic signature can attest that exact obligation.";
+        }
+    }
     public string WorkspaceTitle => SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
         ? "MEDICAL RELEASE OF INFORMATION"
         : "AGENCY RELEASE OF INFORMATION";
@@ -143,6 +167,9 @@ public partial class AgencyReleaseViewModel : ObservableObject
     public string GenerateButtonText => SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
         ? "Generate medical release PDF"
         : "Generate agency release PDF";
+    private string DocumentName => SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
+        ? "medical release"
+        : "agency release";
 
     public event EventHandler<AgencyReleasePdfReadyEventArgs>? PdfReady;
     public event EventHandler<AgencyReleaseProblemEventArgs>? Problem;
@@ -152,6 +179,20 @@ public partial class AgencyReleaseViewModel : ObservableObject
     {
         GenerateCommand.NotifyCanExecuteChanged();
         ClearCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnSelectedReleaseKindChanged(ReleaseKindChoice value) =>
+        RebuildReleaseObligationChoices();
+
+    partial void OnSelectedReleaseObligationChanged(ReleaseDocumentObligationChoice? value)
+    {
+        if (value is null || !string.IsNullOrWhiteSpace(ContactName))
+            return;
+
+        ContactName = value.RecipientDisplayName;
+        ContactType = value.DocumentKind == AnnualDocumentKind.ReleaseMedical
+            ? "Healthcare provider"
+            : "Service provider";
     }
 
     partial void OnSelectedScopeChanged(AgencyReleaseScopeChoice? value)
@@ -176,6 +217,10 @@ public partial class AgencyReleaseViewModel : ObservableObject
     {
         if (value && RevokedOn is null)
             RevokedOn = DateTime.Today;
+        if (value)
+            SelectedReleaseObligation = null;
+        OnPropertyChanged(nameof(CanSelectReleaseObligation));
+        OnPropertyChanged(nameof(ObligationSelectionGuidance));
     }
 
     public void SetPerson(Person? person)
@@ -183,10 +228,31 @@ public partial class AgencyReleaseViewModel : ObservableObject
         _personVersion++;
         _personId = person?.Id;
         PersonName = person?.FullName ?? "Select a consumer";
+        _knownReleaseObligations.Clear();
         ResetInputs();
+        RebuildReleaseObligationChoices();
         OnPropertyChanged(nameof(HasPerson));
         OnPropertyChanged(nameof(CanGenerate));
         GenerateCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Supplies the currently reconciled release rows. Only exact rows for the selected
+    /// consumer and document category are offered; a display name is never used as identity.
+    /// </summary>
+    public void SetReleaseObligations(IEnumerable<ReleaseObligationDto> obligations)
+    {
+        ArgumentNullException.ThrowIfNull(obligations);
+        var personId = _personId;
+        _knownReleaseObligations.Clear();
+        if (personId is not null)
+        {
+            _knownReleaseObligations.AddRange(obligations
+                .Where(item => item.PersonId == personId && item.ObligationId != Guid.Empty)
+                .GroupBy(item => item.ObligationId)
+                .Select(group => group.First()));
+        }
+        RebuildReleaseObligationChoices();
     }
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
@@ -213,7 +279,7 @@ public partial class AgencyReleaseViewModel : ObservableObject
                 AgencyReleaseRules.AttestationScopeNotice)) == true;
             if (!confirmed)
             {
-                StatusMessage = "The staff attestation was not recorded; no PDF was generated.";
+                StatusMessage = "The staff generation confirmation was not recorded; no PDF was generated.";
                 return;
             }
         }
@@ -221,21 +287,33 @@ public partial class AgencyReleaseViewModel : ObservableObject
         var version = _personVersion;
         IsBusy = true;
         ValidationMessage = string.Empty;
-        var documentName = SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
-            ? "medical release"
-            : "agency release";
+        var documentName = DocumentName;
+        var selectedObligation = SelectedReleaseObligation;
         StatusMessage = $"Preparing the Sati {documentName}...";
         try
         {
-            var result = SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
-                ? await _service.GenerateMedicalAsync(personId, request)
-                : await _service.GenerateAsync(personId, request);
+            var result = (SelectedReleaseKind.Kind, selectedObligation) switch
+            {
+                (AnnualDocumentKind.ReleaseMedical, not null) =>
+                    await _service.GenerateMedicalForObligationAsync(
+                        personId, request, selectedObligation.ObligationId),
+                (AnnualDocumentKind.ReleaseMedical, null) =>
+                    await _service.GenerateMedicalAsync(personId, request),
+                (_, not null) =>
+                    await _service.GenerateForObligationAsync(
+                        personId, request, selectedObligation.ObligationId),
+                _ => await _service.GenerateAsync(personId, request)
+            };
             if (version != _personVersion || _personId != personId)
                 return;
 
-            StatusMessage = request.ConfirmedObtainedRoi
-                ? $"The {documentName} and staff attestation are ready to save. Consumer signature lines remain blank."
-                : $"The {documentName} draft is ready to save. No staff attestation was recorded.";
+            var linkageMessage = selectedObligation is null
+                ? " It is not linked to a tracked recipient obligation."
+                : $" It is linked to {selectedObligation.DisplayName}, which remains outstanding until its separate completion attestation or a supported electronic signature.";
+            StatusMessage = (request.ConfirmedObtainedRoi
+                ? $"The {documentName} and staff generation confirmation are ready to save. Consumer or guardian signature lines remain blank. This generation did not complete tracked compliance."
+                : $"The {documentName} draft is ready to save. No staff generation confirmation was recorded.") +
+                linkageMessage;
             PdfReady?.Invoke(this, new AgencyReleasePdfReadyEventArgs(result.Pdf, result.FileName));
         }
         catch (Exception ex)
@@ -262,6 +340,46 @@ public partial class AgencyReleaseViewModel : ObservableObject
     }
 
     private bool CanClear() => !IsBusy;
+
+    [RelayCommand]
+    private void ClearReleaseObligationLink() => SelectedReleaseObligation = null;
+
+    private void RebuildReleaseObligationChoices()
+    {
+        var selectedId = SelectedReleaseObligation?.ObligationId;
+        var expectedCategory = SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
+            ? nameof(ReleaseObligationCategory.Medical)
+            : nameof(ReleaseObligationCategory.Agency);
+        var today = DateTime.Today;
+
+        ReleaseObligationChoices.Clear();
+        foreach (var item in _knownReleaseObligations
+                     .Where(item => string.Equals(
+                         item.Category, expectedCategory, StringComparison.OrdinalIgnoreCase))
+                     .Where(item => item.AvailableOn.Date <= today &&
+                                    (item.RetiredOn is null || item.RetiredOn.Value.Date > today) &&
+                                    item.WithdrawnOn is null)
+                     .OrderBy(item => item.DueOn)
+                     .ThenBy(item => item.RecipientDisplayName, StringComparer.CurrentCultureIgnoreCase)
+                     .ThenBy(item => item.RecipientProviderId))
+        {
+            ReleaseObligationChoices.Add(new ReleaseDocumentObligationChoice(
+                item.ObligationId,
+                SelectedReleaseKind.Kind,
+                item.RecipientDisplayName ?? "provider not linked",
+                item.RecipientProviderId,
+                item.TargetEffectiveDate.Date,
+                item.DueOn.Date,
+                item.CompletedOn?.Date));
+        }
+
+        SelectedReleaseObligation = selectedId is Guid id
+            ? ReleaseObligationChoices.SingleOrDefault(item => item.ObligationId == id)
+            : null;
+        OnPropertyChanged(nameof(HasReleaseObligationChoices));
+        OnPropertyChanged(nameof(CanSelectReleaseObligation));
+        OnPropertyChanged(nameof(ObligationSelectionGuidance));
+    }
 
     internal AgencyReleaseRequest BuildRequest() => new(
         AuthorizationChoice?.Value,
@@ -313,6 +431,7 @@ public partial class AgencyReleaseViewModel : ObservableObject
         IsRevocation = false;
         RevokedOn = null;
         DidObtainRoi = false;
+        SelectedReleaseObligation = null;
         ValidationMessage = string.Empty;
         StatusMessage = string.Empty;
     }
@@ -321,6 +440,25 @@ public partial class AgencyReleaseViewModel : ObservableObject
 public sealed record YesNoChoice(string DisplayName, bool Value);
 public sealed record AgencyReleaseScopeChoice(string DisplayName, AgencyReleaseScope Value);
 public sealed record ReleaseKindChoice(AnnualDocumentKind Kind, string DisplayName);
+
+public sealed record ReleaseDocumentObligationChoice(
+    Guid ObligationId,
+    AnnualDocumentKind DocumentKind,
+    string RecipientDisplayName,
+    int? RecipientProviderId,
+    DateTime TargetEffectiveDate,
+    DateTime DueOn,
+    DateTime? CompletedOn)
+{
+    public string DisplayName =>
+        $"{RecipientDisplayName}" +
+        (RecipientProviderId is int providerId ? $" (directory #{providerId})" : string.Empty) +
+        $" — due {DueOn:MMM d, yyyy} (effective {TargetEffectiveDate:MMM d, yyyy})";
+
+    public string Status => CompletedOn is DateTime completedOn
+        ? $"Already attested {completedOn:MMM d, yyyy}; document remains linked to this recipient."
+        : "Attestation outstanding.";
+}
 
 public partial class AgencyReleaseCategoryOption(string value, string displayName) : ObservableObject
 {

@@ -7,8 +7,9 @@ namespace Sati.Data
 {
     public interface ISessionService
     {
-        bool AllowComplianceOverride { get; set; }
         User? CurrentUser { get; }
         void SetUser(User user);
+        bool HasSessionEnded => false;
+        void Invalidate(User capturedUser) { }
     }
 }

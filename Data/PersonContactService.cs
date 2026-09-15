@@ -17,6 +17,7 @@ namespace Sati.Data
         public async Task<List<PersonContact>> GetActiveByPersonAsync(int personId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             await EnsureOwnedAsync(context, personId);
             var contacts = await context.PersonContacts
@@ -32,6 +33,7 @@ namespace Sati.Data
         public async Task<PersonContact> SaveAsync(PersonContact contact)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await using var signatureChangeTransaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var actor = await EnsureOwnedAsync(context, contact.PersonId);
 
@@ -64,6 +66,7 @@ namespace Sati.Data
         public async Task ArchiveAsync(int contactId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await using var signatureChangeTransaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var contact = await context.PersonContacts.SingleOrDefaultAsync(x => x.Id == contactId);
             if (contact is null) return;

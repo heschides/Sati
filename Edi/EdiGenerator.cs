@@ -32,8 +32,8 @@ namespace Sati.Helpers
         {
             var dateStr = generatedAt.ToString("yyyyMMdd");
             var timeStr = generatedAt.ToString("HHmm");
-            var icn = controlNumber; // interchange control number
-            var gcn = "1"; // group control number — one group per file
+            var icn = ClaimSubmissionIdentity.RequireControlNumber(controlNumber);
+            var gcn = icn; // The acknowledgment must identify this exact generation.
 
             var rows = ReadAndValidateRows(period);
 
@@ -222,7 +222,7 @@ namespace Sati.Helpers
                 foreach (var row in personGroup)
                 {
                     var line = row.Line;
-                    var claimId = $"{period.Id}-{line.NoteId}";
+                    var claimId = ClaimSubmissionIdentity.ClaimReference(icn, period.Id, line.NoteId);
 
                     var units = BillingRules.FormatDecimal(line.Units ?? 0m);
                     var charge = BillingRules.FormatDecimal(line.ChargeAmount);
@@ -273,6 +273,7 @@ namespace Sati.Helpers
                         line.DateOfService.ToString("yyyyMMdd")             // DTP03
                     ));
 
+                    sb.AppendLine(Seg("REF", "6R", line.NoteId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
                     claimCounter++;
                 }
             }

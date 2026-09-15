@@ -21,18 +21,17 @@ namespace Sati.Data
     /// those rows cannot support historical billing-window evaluation until reconciled.
     /// Existing recorded completion dates are never overwritten.
     ///
-    /// Two-phase with the same latch as FormDueDateBackfill: DryRunAsync reports what
-    /// it would mark and arms the latch with the count AND the cutoff; CommitAsync
-    /// refuses unless a dry run ran this session and both the count and cutoff match.
-    /// Delete this class with the rest of the migration scaffolding when done.
+    /// Two-phase: DryRunAsync reports what it would mark and arms an instance-local
+    /// latch with the count, cutoff, and completion date; CommitAsync refuses unless
+    /// all reviewed values still match. Delete this class with the rest of the
+    /// one-time completion scaffolding when done.
     /// </summary>
     public class FormBulkCompletion
     {
         private readonly IDbContextFactory<SatiContext> _contextFactory;
 
-        // Latch — see FormDueDateBackfill for the rationale. Here it pins BOTH the
-        // count, cutoff, and completion date, so the commit cannot silently change
-        // any of the facts that were reviewed in the dry run.
+        // The latch pins the count, cutoff, and completion date, so commit cannot
+        // silently change any fact that was reviewed in the dry run.
         private bool _dryRunCompleted;
         private int _dryRunCount;
         private DateTime _dryRunCutoff;
@@ -144,8 +143,11 @@ namespace Sati.Data
                 var effectiveDate = form.Person?.EffectiveDate
                     ?? throw new InvalidOperationException(
                         $"Form {form.Id} has no effective date and cannot be attested.");
-                var cycle = Sati.Contracts.V1.FormAttestationRules.ResolveCycle(
-                    effectiveDate, form.DueDate)
+                var cycle = Sati.Contracts.V1.FormAttestationRules.ResolveCycleForForm(
+                    effectiveDate,
+                    form.Type.ToString(),
+                    form.DueDate,
+                    form.TargetEffectiveDate)
                     ?? throw new InvalidOperationException(
                         $"Form {form.Id} is not attached to a valid compliance cycle.");
                 var decision = Sati.Contracts.V1.FormAttestationRules.Evaluate(

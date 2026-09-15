@@ -71,6 +71,8 @@ internal static class AuditActions
     public const string BillingEdiGenerated = "billing-edi.generated";
     public const string BillingEdiTransmitted = "billing-edi.transmitted";
     public const string BillingConfigurationUpdated = "billing-configuration.updated";
+    public const string BillingCompliancePolicyAppended = "billing-compliance-policy.appended";
+    public const string BillingComplianceRecoveryRecorded = "billing-compliance-recovery.recorded";
     public const string AtRequestPublished = "at-request.published";
     public const string AtRequestReopened = "at-request.reopened";
     public const string CheckRequestPublished = "check-request.published";
@@ -78,8 +80,13 @@ internal static class AuditActions
     public const string PlatformIncidentsViewed = "platform-incidents.viewed";
     public const string IncidentStatusUpdated = "incident-status.updated";
     public const string FormAttested = "form.attested";
+    public const string FormOpened = "form.opened";
+    public const string ComplianceObligationsGenerated = "compliance-obligations.generated";
     public const string FormAttestationRevoked = "form.attestation-revoked";
     public const string FormPrerequisiteOverridden = "form.prerequisite-overridden";
+    public const string ReleaseObligationsReconciled = "release-obligations.reconciled";
+    public const string ReleaseObligationAttested = "release-obligation.attested";
+    public const string ReleaseAuthorizationWithdrawn = "release-authorization.withdrawn";
     public const string DocumentGenerated = "document.generated";
     public const string DocumentRecordedExternal = "document.recorded-external";
     public const string DocumentTemplatePublished = "document-template.published";

@@ -1,6 +1,6 @@
 # API authorization and tenant ownership
 
-*Route inventory mechanically reconciled 2026-09-06: 170 protected routes. The table matches
+*Route manifest updated 2026-09-14: 188 protected routes. The table is maintained with
 `ApiSurface.Routes` after excluding health and anonymous login, and `ApiSurfaceTests` checks that
 manifest against live endpoint registration. Every route added, removed, or rescoped must be
 reflected here in the same change.*
@@ -24,6 +24,11 @@ the session already selected by the cookie. State refresh validates it when supp
 signer changes stop external receipt access and invalidate old sessions without erasing a signed
 decision. Expiry is rechecked after awaited work and before the protected decision or release.
 
+Portal signing records immutable signature evidence only. A separately privileged API worker may
+idempotently project an eligible completion onto the exact form or recipient release obligation,
+after rechecking target identity and the guardian-or-consumer signer rule. The public portal never
+writes a form, release obligation, attestation, or compliance projection directly.
+
 `POST /api/v1/auth/login` carries one invariant that is not visible from the route table: it must
 spend the same key-derivation work whether or not the username exists, so that sign-in cannot be
 used to enumerate accounts. `PasswordVerifier.VerifyMissingUser` exists solely for that path and
@@ -31,14 +36,20 @@ must not be removed as dead code.
 
 Every protected route has two layers of protection:
 
-1. JWT authentication establishes a claimed user, legacy identity label, and agency.
-2. `ValidatedActorFilter` confirms that identity and agency against the database, then resolves the
+1. JWT authentication establishes a claimed user, legacy identity label, agency and mandatory
+   positive `sati_security_version`. Tokens missing that version must sign in again after upgrade.
+2. `ValidatedActorFilter` confirms an enabled account and exact current security version as well
+   as identity and agency against the database, then resolves the
    current persisted permission set before every endpoint runs. Permissions are deliberately not
-   trusted from the token, so revocation takes effect immediately. `TenantAccess` supplies the
-   shared actor, caseload, and supervisory checks used by feature endpoints.
+   trusted from the token. Effective revocation additionally requires each endpoint to enforce
+   the current capability. The September 11 follow-up replaces owner-only casework checks with
+   `TenantAccess.OwnedPeople`, and accessible consumer routes use `CanAccessPersonAsync` to
+   include both person and owner agency. `TenantAccess` supplies the shared live actor, caseload
+   and supervisory checks. See SECURITY_REVIEW_2026-09-10.md for evidence and remaining limits.
 
-“Own user” means the authenticated user. “Own caseload” means a person assigned to that user and
-the same agency. “Accessible case manager” means the actor themself when they have case-management
+“Own user” means the authenticated user. “Own caseload” requires current CaseManagement permission,
+an assignment to that current actor, and matching person and owner agency.
+“Accessible case manager” means the actor themself when they have case-management
 permission, an assigned case manager when they have supervision permission, or any case manager in
 the agency when they also have agency-wide supervision.
 
@@ -47,6 +58,13 @@ administration implies it. The two were briefly conflated: the legacy `Director`
 agency-wide review WITHOUT any administration route, so a backfill that mapped it to
 administration handed every existing Director the audit export, settings writes, destructive
 test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
+
+The September 11 casework follow-up also requires matching Note.AgencyId on note lists,
+person-response note hydration, note transitions, supervisor queues and billing-candidate/claim
+creation reads. Null/conflicting markers are not treated as inherited authority: the existing
+`ReconcileTenantOwnership` migration establishes that invariant. No data repair runs on access.
+Billing retains its own permission and existing DTOs; personal scratchpads, exemptions and
+incentives are separate own-user information, not an extension of consumer caseload rights.
 
 | Feature | Protected route | Authoritative tenant owner | Access rule |
 |---|---|---|---|
@@ -94,14 +112,16 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Admin | `POST /admin/audit-export.csv` | Audit event's `AgencyId` | Administration permission; agency derived from the actor and never from the caller. Requires a 10–250 character reason and a window of at most 366 days, caps at 10,000 rows, marks the response `no-store`, and records one `audit.exported` event. Exported values are neutralized against spreadsheet formula evaluation. |
 | Users | `POST /users` | New user's `AgencyId` | Supervision or administration permission; requested agency must equal actor agency. A non-administrator may create only a case-management-only user assigned to themself. |
 | Users | `PUT /users/{userId}` | Target user's `AgencyId` | Supervision or administration permission in the same agency; non-administrators only manage assigned case-management-only users. |
-| Users | `PUT /users/{userId}/password` | Target user's `AgencyId` | Same rule as user update. |
-| Users | `PUT /users/me/password` | User's `AgencyId` | Own user plus current-password verification. |
+| Users | `PUT /users/{userId}/password` | Target user's `AgencyId` | Same rule as user update; successful reset advances the target's security version and invalidates existing sign-ins. |
+| Users | `PUT /users/me/password` | User's `AgencyId` | Own current sign-in plus current-password verification; successful change invalidates existing sign-ins, including the caller's. |
+| Users | `PUT /users/{userId}/enabled` | Target user's `AgencyId` | Current same-agency Administration; platform operators and disabling oneself are refused. A state change advances the version, retains the user and records, and is audited. |
+| Users | `DELETE /users/{userId}/sessions` | Target user's `AgencyId` | Current same-agency Administration; platform operators excluded. Advances the target's version and audits revocation; does not delete user or session-history records. |
 | Supervisor | `GET /supervisor/supervisees` | Case manager user's `AgencyId` | Supervision permission sees assigned users with case-management permission; the current route returns directly assigned users. |
 | Supervisor | `GET /supervisor/notes` | Note person's own and owning user's `AgencyId` | Supervision permission sees assigned case managers; agency-wide supervision broadens that to every case manager in the agency. Administration implies agency-wide supervision but does not on its own substitute for supervision. |
 | Supervisor | `GET /supervisor/notes/page` | Note person's own and owning user's `AgencyId` | Existing paged review route: same supervision and caseload scope, bounded by the review page size and captured upper note ID. Added to this inventory during chat reconciliation; not a new chat route. |
 | Supervisor | `GET /supervisor/notes/filters` | Case manager and person's `AgencyId` | Returns only case-manager and client choices inside the caller's supervisory scope. |
 | Supervisor | `POST /supervisor/notes/{noteId}/approve` | Note person's own and owning user's `AgencyId` | Same supervisory scope; server owns approval transition and requires the caller's expected Note revision. |
-| Supervisor | `POST /supervisor/notes/{noteId}/approve-override` | Note person's own and owning user's `AgencyId` | Same supervisory scope; reason and expected revision required; server records approver. |
+| Supervisor | `POST /supervisor/notes/{noteId}/approve-override` | Note person's own and owning user's `AgencyId` | Same supervisory scope. Requires expected revision, explanation, explicit attestation, and the exact current compliance-obligation IDs. The server derives the actor/time and refuses stale, unknown, or incomplete selections; any unselected blocker continues to block. The immutable selection is revalidated during claim creation. |
 | Supervisor | `POST /supervisor/notes/{noteId}/return` | Note person's own and owning user's `AgencyId` | Same supervisory scope; reason and expected revision required; server records returner. |
 | Caseload | `GET /caseload` | Target user's `AgencyId` | Accessible case manager only. |
 | Caseload | `GET /people/{personId}/journal` | Person's assigned user and agency | Own caseload only. |
@@ -123,7 +143,7 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Contacts | `DELETE /contacts/{contactId}` | Contact's person and assigned user | Own caseload and current permission rechecked inside the write transaction; soft archive and signing-access invalidation commit together. |
 | Reviews | `GET /reviews` | Review person's assigned user and agency | Accessible case manager only. |
 | Reviews | `GET /people/{personId}/reviews` | Review person's assigned user and agency | Accessible case manager only. |
-| Reviews | `POST /reviews/ensure-current` | Each review person's assigned user and agency | Processes only people belonging to accessible case managers; inaccessible IDs are skipped. |
+| Reviews | `POST /reviews/ensure-current` | Each review person's assigned user and agency | Requires current CaseManagement or Supervision even for an empty batch; processes only people belonging to accessible case managers in the same agency. Inaccessible IDs are skipped. |
 | Reviews | `PUT /reviews/{reviewItemId}/stage` | Review person's assigned user and agency | Accessible case manager only. |
 | Reviews | `PUT /reviews/{reviewItemId}/appointment` | Review person's assigned user and agency | Accessible case manager only. |
 | Reviews | `GET /people/{personId}/appointments/latest` | Appointment review's person, assigned user, and agency | Accessible case manager only. |
@@ -166,10 +186,14 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Notes | `GET /people/{personId}/notes` | Note person's assigned user and agency | Own caseload only. |
 | Notes | `GET /notes/monthly` | Target user's `AgencyId` | Accessible case manager only. |
 | Notes | `GET /notes/day` | Target user's `AgencyId` | Accessible case manager only; returns one date across that user's whole caseload for the service-time overlap rule. |
-| Notes | `GET /notes/year/{year}` | Own user and caseload | Own user only. |
-| Notes | `POST /notes/abandon-overdue` | Own user and caseload | Own user only; only that user's eligible notes are transitioned, with each revision incremented. |
-| Settings | `GET /settings` | Settings `AgencyId` | Actor's agency only. |
-| Settings | `PUT /settings` | Settings `AgencyId` | Administration permission in actor's agency; provider references must share the agency. |
+| Notes | `GET /notes/year/{year}` | Own user, person and note agency | Current CaseManagement and own caseload only. |
+| Notes | `POST /notes/abandon-overdue` | Own user, person and note agency | Current CaseManagement and own caseload only; denied before settings creation. Only eligible matching-agency notes are transitioned, with each revision incremented. |
+| Settings | `GET /settings` | Settings `AgencyId` | Actor's agency only. The returned billing mask is the policy resolved for the agency's current date, not permission to reinterpret historical service. |
+| Settings | `GET /settings/billing-compliance-requirements?serviceDate=...` | Validated actor's `AgencyId`; policy versions are filtered by that agency | Any authenticated, currently enabled actor may resolve the single requirement mask in force for an exact service date in their own agency. The response contains only the date and resolved mask; it does not expose policy history, explanations, or administrator identities. |
+| Settings | `PUT /settings` | Settings `AgencyId` | Administration permission in actor's agency; provider references must share the agency. The ordinary save may change the separate past-policy-date switch but must echo the active billing mask; a mask change uses the append-only route below. |
+| Settings | `GET /settings/billing-compliance-policies` | Policy version `AgencyId` | Administration permission; returns only the actor agency's append-only policy history. |
+| Settings | `POST /settings/billing-compliance-policies/preview` | Actor's `AgencyId`; notes, people, forms, obligations, claim lines, and period owners are all joined back to that agency | Administration permission. Computes only the actor agency's service-date impact and exact prior/new blocker IDs; read-only and creates no policy or flag. |
+| Settings | `POST /settings/billing-compliance-policies` | Actor's `AgencyId` | Administration permission. Requires a unique change id and enforcement date; a past date is refused unless the separate agency setting permits it, and then requires an explanation. Actor, UTC recording time, mask and enforcement date are server-bound and audited. Exact idempotent replay returns the existing version; reuse with different values is a conflict. |
 | Scratchpad | `GET /scratchpad/today` | Scratchpad `UserId` | Own user only. |
 | Scratchpad | `GET /scratchpad/tomorrow` | Scratchpad `UserId` | Own user only; server resolves the next workday, including Friday-to-Monday rollover. |
 | Scratchpad | `GET /scratchpad/history` | Scratchpad `UserId` | Own user only. |
@@ -187,26 +211,35 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Reports | `GET /reports/productivity-units` | Validated actor's user and agency | Own caseload only; both Person and Note agency markers must match, the request accepts no user id, and the response contains narrative-free monthly aggregates. |
 | Billing | `POST /billing/periods/{year}/{month}` | Billing period user's `AgencyId` | Billing permission; target user must be in actor agency. |
 | Billing | `GET /billing/periods` | Billing period user's `AgencyId` | Billing permission; response joined to actor agency. Each returned line includes only its frozen client display name and shared 837P-readiness errors; raw note narrative is not returned. |
-| Billing | `POST /billing/periods/{periodId}/responses` | Billing period user's `AgencyId` | Billing permission; the period is resolved through its owning user's agency, so a response cannot be attached to another tenant's history. No tenant is ever read from the document. `IsSynthetic` comes from the document's ISA15 usage indicator, not from configuration. |
+| Billing | `POST /billing/responses` | Validated actor, retained generation agency and period owning user's agency | Current Billing permission; exact Demo/Testing identity and ISA15=T only. Every claim/group must match retained outbound evidence, mode and interchange parties uniquely within the agency. Encrypted receipt, immutable matches/effects and audit commit atomically; duplicates replay without effects. |
+| Billing | `POST /billing/periods/{periodId}/responses` | Same as automatic intake, plus selected period owner agency | Compatibility route only. Same intake and limits; the period is an additional assertion, never matching authority. Unknown/foreign periods are 404; a response matching another period is rejected. |
 | Billing | `POST /billing/periods/{periodId}/mock-clearinghouse` | Billing period user's `AgencyId` | Billing permission, and additionally restricted to a validated `SatiDemo`/`Demo` deployment or the isolated test host. Returns 404 elsewhere so the route is absent in effect on Production. Requires a retained test 837P, consumes its exact immutable content once, records a synthetic `Transmitted` event, and ingests fabricated responses through the same path as a real response. |
 | Billing | `GET /billing/submissions` | Event `AgencyId` plus billing period user's `AgencyId` | Billing permission; both ownership markers must equal actor agency. Synthetic provenance is explicit. |
 | Billing | `GET /billing/remittances` | Outcome `AgencyId` | Billing permission; returns bounded claim-level outcomes for actor agency, without raw 835 or note narrative. |
 | Billing | `GET /billing/remittance-deposits` | Deposit `AgencyId` | Billing permission; returns bounded 835/EFT reconciliation totals for actor agency. Provider-level (PLB) adjustments are explicit; no bank credentials are returned. |
 | Billing | `GET /billing/configuration` | Authenticated actor's `AgencyId` | Billing permission; returns only the actor agency's payer/provider defaults. |
 | Billing | `PUT /billing/configuration` | Authenticated actor's `AgencyId` | Billing permission; writes and audits only the actor agency's configuration. |
-| Billing | `GET /billing/candidates` | Note person's owning user's `AgencyId` | Billing permission; candidates joined to actor agency. |
-| Billing | `POST /billing/claim-lines` | Source note person's owning user's `AgencyId` | Billing permission; source note must be approved and in actor agency. The API validates the exact constructed frozen row with the shared 837P-readiness rule before saving it. |
+| Billing review | `GET /billing/compliance-policy-review-flags` | Flag and policy-version `AgencyId`; referenced note/person/claim are constrained when the flag is created | Administration or Billing permission. Returns only the actor agency's append-only unresolved flags and exact prior/new blocker IDs. It is read-only and never changes a submitted note or finalized claim line. |
+| Billing recovery | `GET /billing/compliance-recovery/{personId}` | Person's and owning user's `AgencyId` | Administration permission. Both ownership markers must equal the actor agency; a foreign or missing consumer is 404. Returns only otherwise claim-ready approved notes with no claim line or prior recovery, selected by default, and separates still-unresolved notes. Every offered blocker has satisfaction evidence. |
+| Billing recovery | `POST /billing/compliance-recovery/{personId}` | Person's and owning user's `AgencyId`; selected notes and frozen obligations remain in that agency | Administration permission. Rebuilds the plan in a serializable transaction, refuses an empty/ineligible selection, and requires an explanation plus explicit attestation. Actor/time are server-derived. The immutable decision and audit event freeze exact note IDs and each current blocker's ID, due/completion dates and evidence ID; candidate/claim validation rechecks them and fails closed if facts change. It never edits a Note, ClaimLine, BillingPeriod, or submitted/finalized history. |
+| Billing | `GET /billing/candidates` | Note person's owning user's `AgencyId` | Billing permission; candidates joined to actor agency. Compliance is evaluated with the append-only policy version in force on each note's service date, including recipient-release and optional PCP-opening obligations. |
+| Billing | `POST /billing/claim-lines` | Source note person's owning user's `AgencyId` | Billing permission; source note must be approved and in actor agency. The API re-evaluates its service-date policy and exact blockers, including any retained one-note Supervisor exception or Admin recovery whose frozen evidence still matches, then validates the exact constructed frozen row with the shared 837P-readiness rule before saving it. |
 | Billing | `GET /billing/claim-lines/draft` | Billing period user's `AgencyId` | Billing permission; period owner joined to actor agency. |
 | Billing | `POST /billing/periods/{periodId}/submit` | Billing period user's `AgencyId` | Billing permission in same agency. |
 | Billing | `POST /billing/periods/{periodId}/return-to-draft` | Billing period user's `AgencyId` | Billing permission in same agency; only Submitted periods with no 837 generation or submission-event history may return. |
 | Billing | `POST /billing/periods/{periodId}/edi` | Billing period user's `AgencyId` | Billing permission; period, every source note/person, and generated file must remain in actor agency. |
-| Forms | `POST /forms/delete` | Form person's assigned user and agency | Own caseload only; all requested IDs must be owned. Refuses any form carrying append-only attestation history. |
-| Forms | `PUT /forms/{id}` | Form person's assigned user and agency | Own caseload only. Changes `OpenedDate`; any attempt to change `CompletedDate` is rejected because completion belongs to attestation/revocation. |
-| Forms | `POST /people/{personId}/forms/{type}/attestation` | Form person's assigned user and agency | Accessible case manager only through `TenantAccess.CanAccessUserAsync`; Form id, person id, and type must identify the same row. Server rechecks date/cycle/evidence rules, writes actor from validated identity, and returns typed 409 on a concurrent attestation change. |
+| Forms | `POST /forms/delete` | Form person's assigned user and agency, current persisted owner identity | Compatibility refusal only: current CaseManagement required even for empty requests. At most 100 positive distinct IDs; all must belong to the actor's same-agency caseload or return 404. Empty authorized requests return 0; every owned nonempty request returns 409 `form_retention_required` without any write, regardless of attestation, age or enabled requirements. |
+| Forms | `PUT /forms/{id}` | Form person's assigned user and agency | Own caseload compatibility route. Both `CompletedDate` and `OpenedDate` must equal stored values; completion belongs to attestation/revocation and opening belongs to the audited route below. |
+| Forms | `POST /forms/{id}/open` | Form person's assigned user and agency | Own caseload only. Records the user-selected actual opening date once, after server-side availability/future-date validation; actor and UTC recording time are server-derived and audited. A different second date is a conflict requiring a future audited correction workflow. |
+| Forms | `POST /people/{personId}/forms/{type}/attestation` | Form person's assigned user and agency | Accessible case manager only through `TenantAccess.CanAccessUserAsync`; Form id, person id, type, and target must identify the same row. Attestation itself is sufficient; artifacts are not required. The server rechecks occurrence date, availability, cycle, and concurrency and derives actor/recording time. For Reclassification only, a missing same-target CA requires its actual date and two distinct attestations commit atomically with CA ≤ Reclass. No Supervisor prerequisite bypass exists. |
 | Forms | `POST /people/{personId}/forms/{type}/attestation/revoke` | Form person's assigned user and agency | Same accessible-caseload gate; a nonblank reason is required and the actor is server-derived. A successful live revocation is append-only and audited. |
-| Forms | `GET /people/{personId}/forms/{type}/prerequisite` | Form person's assigned user and agency | Same accessible-caseload gate; form id, person id, and type must match before the API derives the live prerequisite state. |
+| Forms | `GET /people/{personId}/forms/{type}/prerequisite` | Form person's assigned user and agency | Same accessible-caseload gate; form id, person id, type, and target must match. Reports only Reclassification's semantic same-target CA implication; every other form is attestation-sufficient and there is no technical override. |
 | Forms | `GET /people/{personId}/attestations/pending` | Person's assigned user and agency | Accessible case manager only through `TenantAccess.CanAccessUserAsync`; derives suggestions from eligible notes and forms after the gate. |
-| Annual documents | `POST /people/{personId}/documents/{kind}` | Person's assigned user and agency | Assigned case manager for Agency/Medical releases. Privacy/Safety Plan rendering also admits reviewers authorized by `TenantAccess.CanAccessUserAsync`, never every supervisor merely sharing an agency. Identity, template/source version, approval status and artifact provenance are derived server-side. Privacy generation does not create acknowledgment or completion. |
+| Release obligations | `GET /people/{personId}/release-obligations` | Person's and obligation's `AgencyId` | Accessible caseload only. The target must be one of the consumer's annual effective dates. Returns exact recipient obligations, signer policy, and fail-visible assignment-linkage issues; it never invents a provider recipient. |
+| Release obligations | `POST /people/{personId}/release-obligations/reconcile` | Person's and provider assignments' `AgencyId` | Accessible caseload only, inside one serializable transaction. Adds missing DHHS/provider-recipient obligations and records prospective retirements without deleting history; target, assignments, provider identities, dates, and actor are resolved server-side. |
+| Release obligations | `POST /people/{personId}/release-obligations/{obligationId}/attest` | Person's and obligation's `AgencyId` | Accessible caseload only; route person and opaque obligation id must match. Records a separate manual attestation with validated actual/available dates and server-derived actor/UTC time. No artifact is required. |
+| Release obligations | `POST /people/{personId}/release-obligations/{obligationId}/withdraw` | Person's and obligation's `AgencyId` | Accessible caseload only; requires an existing completion, nonfuture effective date at or after completion, and explanation. Appends a prospective authorization event; it does not revoke historical compliance. |
+| Annual documents | `POST /people/{personId}/documents/{kind}` | Person's assigned user and agency | Assigned case manager for Agency/Medical releases. A supplied release-obligation id must resolve to the same person, agency, target, category, active recipient and availability window; the artifact then occupies that obligation's own live slot. Privacy/Safety Plan rendering also admits reviewers authorized by `TenantAccess.CanAccessUserAsync`, never every supervisor merely sharing an agency. Identity, template/source version, approval status and provenance are derived server-side. Generation never completes an obligation. |
 | Annual documents | `GET /people/{personId}/annual-documents` | Person's agency and assigned user | Same-agency accessible caseload through `TenantAccess.CanAccessUserAsync`; window, live artifacts, receipt IDs and preparation reminder are derived server-side. |
 | Annual documents | `POST /people/{personId}/annual-packet` | Person's agency and assigned user | Assigned case manager through `OwnsPersonAsync`; validates the anniversary/window, reads authorization and medical-release attestation and records artifacts in one serializable transaction. Downloads only. |
 | Annual documents | `POST /people/{personId}/documents/privacy-practices/acknowledgment` | Person and artifact's agency | Accessible caseload; exact live generated Privacy Practices artifact must belong to that person/agency. Validated receipt date or good-faith effort; actor server-derived, append-only. |
@@ -218,7 +251,7 @@ test-data deletion, and provider merge. See `DECISIONS.md`, 2026-08-31.
 | Safety plans | `POST /safety-plans/{planId}/approve` | Plan person's agency and assigned user | Supervisor permission plus `CanAccessUserAsync`; cannot review own plan. ReadyForReview and expected revision required. |
 | Safety plans | `POST /safety-plans/{planId}/return` | Plan person's agency and assigned user | Same supervisor/nonself/caseload gate; ReadyForReview, expected revision and reason required. |
 | People | `PUT /people/{personId}/status` | Person's agency and assigned user | Shared `PersonStatusRules`: own case manager may set allowed lifecycle statuses; Ghost requires administration. Tenant scope, expected revision, history and audit enforced. |
-| Annual documents | `POST /people/{personId}/documents/{kind}/external` | Person's assigned user and agency | Accessible case manager only; validates a supported prerequisite kind, cycle anniversary, and required external-record note before recording the artifact. |
+| Annual documents | `POST /people/{personId}/documents/{kind}/external` | Person's assigned user and agency | Accessible case manager only; validates supported kind, annual target, required external-record note, and any supplied exact release obligation before recording artifact metadata. Recording the artifact is not completion. |
 | Annual documents | `GET /people/{personId}/documents` | Person's assigned user and agency | Accessible case manager only; lists live artifact metadata for one requested cycle after tenant validation. |
 | Document templates | `GET /agencies/{agencyId}/templates/{kind}` | Actor's agency | Administration permission only; requested agency must equal actor agency. Returns that agency's versions and Sati-default versions, never another agency's. |
 | Document templates | `POST /agencies/{agencyId}/templates/{kind}` | Actor's agency | Same Administration/agency gate; validates closed tokens and source bounds, derives author/version/timestamp, appends an immutable version plus audit event, and returns typed 409 on a version collision. Cannot publish a global default. |
@@ -237,6 +270,11 @@ isolated agencies. It must retain rejection tests for authentication, users, peo
 reports, billing exports, AT requests and snapshots, check requests, assessments, and supervisor actions whenever
 these routes are refactored.
 
+`Sati.Api.Tests/BillingComplianceRecoveryApiTests.cs` covers the recovery routes' Administration
+gate, foreign-tenant 404, incomplete/unselected refusal, exact frozen evidence, selected-only claim
+release, and preservation of the source Note. Recovery must remain separate from the one-note
+Supervisor exception and cannot become a person-wide bypass.
+
 It additionally covers two properties that are invisible in the table above and easy to regress:
 
 - **Sign-in costs the same whether or not the account exists**
@@ -253,8 +291,9 @@ separately data-scoped queries, so removing one usually yields an empty result r
 See `API_SECURITY_AUDIT.md`, third pass, before relying on a green suite as evidence for those rows.
 
 The 2026-09-03 reconciliation includes the partial endpoint files `SafetyPlanEndpoints.cs` and
-`AnnualPacketEndpoints.cs`, not just `ApiEndpoints.cs`. The 169 protected routes match in both
-directions after normalizing route parameter constraints. Re-run this comparison on route changes.
+`AnnualPacketEndpoints.cs`, not just `ApiEndpoints.cs`. At that historical checkpoint, its 169
+protected routes matched in both directions after normalizing route parameter constraints. The
+current count is maintained at the top of this document; re-run the comparison on route changes.
 
 Safety-plan regressions were proven to fail with the old same-agency-only supervisor check and
 with the revision check removed. Packet isolation fails with its ownership gate removed. Receipt

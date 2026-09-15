@@ -27,6 +27,7 @@ public sealed class DocumentArtifact
     public string BlankFieldsJson { get; private set; } = "[]";
     public string? ExternalNote { get; private set; }
     public int? SupersededByArtifactId { get; private set; }
+    public long? ReleaseObligationId { get; private set; }
 
     private DocumentArtifact() { }
 
@@ -45,7 +46,8 @@ public sealed class DocumentArtifact
         string? templateKey = null,
         int? templateVersion = null,
         int? sourceContentId = null,
-        int? sourceContentVersion = null)
+        int? sourceContentVersion = null,
+        long? releaseObligationId = null)
     {
         if (origin == DocumentArtifactOrigin.RecordedAsExternal)
             throw new ArgumentException("Generated content cannot use the external origin.", nameof(origin));
@@ -70,6 +72,7 @@ public sealed class DocumentArtifact
             TemplateVersion = templateVersion,
             SourceContentId = sourceContentId,
             SourceContentVersion = sourceContentVersion,
+            ReleaseObligationId = releaseObligationId,
             BlankFieldsJson = JsonSerializer.Serialize(
                 (blankFields ?? []).Where(value => !string.IsNullOrWhiteSpace(value))
                     .Select(value => value.Trim()).Distinct(StringComparer.Ordinal).Order().ToArray())
@@ -83,7 +86,8 @@ public sealed class DocumentArtifact
         DateTime cycleStart,
         DateTime recordedAtUtc,
         int recordedByUserId,
-        string note)
+        string note,
+        long? releaseObligationId = null)
     {
         var noteError = AnnualDocumentRules.ValidateExternalNote(note);
         if (noteError is not null)
@@ -97,7 +101,8 @@ public sealed class DocumentArtifact
             Origin = DocumentArtifactOrigin.RecordedAsExternal,
             GeneratedAtUtc = DateTime.SpecifyKind(recordedAtUtc, DateTimeKind.Utc),
             GeneratedByUserId = recordedByUserId,
-            ExternalNote = note.Trim()
+            ExternalNote = note.Trim(),
+            ReleaseObligationId = releaseObligationId
         };
     }
 

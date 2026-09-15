@@ -51,10 +51,47 @@ public static class AnnualDocumentCycle
     public static DateTime EndInclusive(DateTime effectiveDate, DateTime cycleStart) =>
         effectiveDate.AddYears(cycleStart.Year - effectiveDate.Year + 1).Date.AddDays(-1);
 
-    public static DateTime CurrentStart(DateTime effectiveDate, DateTime onDate)
+    public static DateTime CurrentStart(DateTime effectiveDate, DateTime onDate) =>
+        ComplianceScheduleRules.CurrentTargetEffectiveDate(effectiveDate, onDate);
+
+    /// <summary>
+    /// Selects the annual target that can be worked on as of <paramref name="onDate"/>.
+    /// Before enrollment, the first effective date remains the identity; an earlier,
+    /// invented cycle is never returned. Once the next target's configured work window
+    /// opens, that next target is selected even though the prior cycle is still in force.
+    /// </summary>
+    public static DateTime SuggestedStart(
+        DateTime effectiveDate,
+        DateTime onDate,
+        int openDaysBefore,
+        int dueDaysBeforeEffective = 0)
     {
-        var start = effectiveDate.AddYears(onDate.Year - effectiveDate.Year).Date;
-        return start > onDate.Date ? effectiveDate.AddYears(onDate.Year - effectiveDate.Year - 1).Date : start;
+        ArgumentOutOfRangeException.ThrowIfNegative(openDaysBefore);
+        ArgumentOutOfRangeException.ThrowIfNegative(dueDaysBeforeEffective);
+
+        var current = CurrentStart(effectiveDate, onDate);
+        if (onDate.Date < effectiveDate.Date)
+            return effectiveDate.Date;
+
+        // Advance from the original effective date so a February-29 enrollment can
+        // recover its leap-day anniversary instead of drifting permanently to Feb 28.
+        var next = effectiveDate.AddYears(current.Year - effectiveDate.Year + 1).Date;
+        return IsAvailable(next, onDate, openDaysBefore, dueDaysBeforeEffective)
+            ? next
+            : current;
+    }
+
+    public static bool IsAvailable(
+        DateTime targetEffectiveDate,
+        DateTime onDate,
+        int openDaysBefore,
+        int dueDaysBeforeEffective = 0)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(openDaysBefore);
+        ArgumentOutOfRangeException.ThrowIfNegative(dueDaysBeforeEffective);
+        return onDate.Date >= targetEffectiveDate.Date
+            .AddDays(-dueDaysBeforeEffective)
+            .AddDays(-openDaysBefore);
     }
 }
 
@@ -76,9 +113,13 @@ public sealed record DocumentArtifactDto(
     string? TemplateKey = null,
     int? TemplateVersion = null,
     int? SourceContentId = null,
-    int? SourceContentVersion = null);
+    int? SourceContentVersion = null,
+    long? ReleaseObligationRecordId = null);
 
-public sealed record RecordExternalDocumentRequest(DateTime CycleStart, string Note);
+public sealed record RecordExternalDocumentRequest(
+    DateTime CycleStart,
+    string Note,
+    Guid? ReleaseObligationId = null);
 
 public static class AnnualDocumentRules
 {
@@ -97,7 +138,8 @@ public static class AnnualDocumentRules
 public sealed record RenderAnnualDocumentRequest(
     DateTime? CycleStart = null,
     AgencyReleaseRequest? Release = null,
-    DhhsFormRequest? Dhhs = null);
+    DhhsFormRequest? Dhhs = null,
+    Guid? ReleaseObligationId = null);
 
 public sealed record FormPrerequisiteStatusDto(
     string Kind,

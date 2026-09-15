@@ -169,6 +169,46 @@ public sealed class SignatureWorkflowTests
         Assert.Single(await f.Db.SignatureRequests.ToListAsync());
     }
 
+    [Fact]
+    public async Task WorkflowEnforcesGuardianOnlyOrConsumerOnlyAndNeverRepresentative()
+    {
+        await using var f = await Fixture.Create();
+        await f.Workflow.FreezeAsync(
+            f.Actor, 2, 3, new(Guid.NewGuid(), f.Pdf, true));
+        var baseRequest = new CreateSignatureRequest(
+            Guid.NewGuid(), 2, 3, SignerCapacity.Consumer, null,
+            Fixture.Pin, Fixture.Pin, true, true, null);
+
+        await Assert.ThrowsAsync<SignatureWorkflowException>(() =>
+            f.Workflow.CreateAsync(
+                f.Actor,
+                baseRequest,
+                new("Synthetic Person", "synthetic@example.test", HasGuardian: true)));
+        await Assert.ThrowsAsync<SignatureWorkflowException>(() =>
+            f.Workflow.CreateAsync(
+                f.Actor,
+                baseRequest with
+                {
+                    ClientRequestId = Guid.NewGuid(),
+                    SignerCapacity = SignerCapacity.AuthorizedRepresentative,
+                    SignerContactId = 91,
+                    AuthorityEvidence = "Synthetic authority reference"
+                },
+                new("Synthetic Representative", "representative@example.test")));
+
+        var accepted = await f.Workflow.CreateAsync(
+            f.Actor,
+            baseRequest with
+            {
+                ClientRequestId = Guid.NewGuid(),
+                SignerCapacity = SignerCapacity.Guardian,
+                SignerContactId = 90,
+                AuthorityEvidence = "Synthetic guardianship reference"
+            },
+            new("Synthetic Guardian", "guardian@example.test", HasGuardian: true));
+        Assert.Equal(SignerCapacity.Guardian.ToString(), accepted.SignerCapacity);
+    }
+
     internal sealed class Fixture : IAsyncDisposable
     {
         public const string Pin = "58392716";

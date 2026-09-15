@@ -143,6 +143,14 @@ public sealed class CloudSettingsService(CloudApiClient api) : ISettingsService
     public async Task<Settings> LoadAsync() =>
         CloudContractMapper.ToSettings(await api.GetAsync<SettingsDto>("/api/v1/settings"));
 
+    public async Task<BillingComplianceRequirements>
+        ResolveBillingComplianceRequirementsAsync(DateTime serviceDate)
+    {
+        var result = await api.GetAsync<BillingComplianceRequirementsAtDateDto>(
+            $"/api/v1/settings/billing-compliance-requirements?serviceDate={serviceDate:yyyy-MM-dd}");
+        return result.Requirements;
+    }
+
     public async Task SaveAsync(Settings settings)
     {
         try
@@ -158,6 +166,88 @@ public sealed class CloudSettingsService(CloudApiClient api) : ISettingsService
         catch (CloudApiException ex)
         {
             throw new SettingsSaveException(ex.Message, ex);
+        }
+    }
+
+    public async Task<IReadOnlyList<BillingCompliancePolicyVersionDto>>
+        LoadBillingCompliancePolicyHistoryAsync()
+    {
+        try
+        {
+            return await api.GetAsync<List<BillingCompliancePolicyVersionDto>>(
+                "/api/v1/settings/billing-compliance-policies");
+        }
+        catch (CloudApiException ex)
+        {
+            throw new SettingsSaveException(ex.Message, ex);
+        }
+        catch (CloudConnectivityException ex)
+        {
+            throw new SettingsSaveException(
+                "Billing-policy history could not be loaded because the server could not be reached.",
+                ex);
+        }
+    }
+
+    public async Task<BillingCompliancePolicyImpactPreviewDto>
+        PreviewBillingCompliancePolicyAsync(
+            PreviewBillingCompliancePolicyRequest request)
+    {
+        try
+        {
+            return await api.PostAsync<PreviewBillingCompliancePolicyRequest,
+                BillingCompliancePolicyImpactPreviewDto>(
+                "/api/v1/settings/billing-compliance-policies/preview", request);
+        }
+        catch (CloudApiException ex)
+        {
+            throw new SettingsSaveException(ex.Message, ex);
+        }
+        catch (CloudConnectivityException ex)
+        {
+            throw new SettingsSaveException(
+                "The impact preview could not be loaded because the server could not be reached.",
+                ex);
+        }
+    }
+
+    public async Task<IReadOnlyList<BillingCompliancePolicyReviewFlagDto>>
+        LoadBillingCompliancePolicyReviewFlagsAsync()
+    {
+        try
+        {
+            return await api.GetAsync<List<BillingCompliancePolicyReviewFlagDto>>(
+                "/api/v1/billing/compliance-policy-review-flags");
+        }
+        catch (CloudApiException ex)
+        {
+            throw new SettingsSaveException(ex.Message, ex);
+        }
+        catch (CloudConnectivityException ex)
+        {
+            throw new SettingsSaveException(
+                "Billing-policy review flags could not be loaded because the server could not be reached.",
+                ex);
+        }
+    }
+
+    public async Task<BillingCompliancePolicyVersionDto> AppendBillingCompliancePolicyAsync(
+        AppendBillingCompliancePolicyRequest request)
+    {
+        try
+        {
+            return await api.PostAsync<AppendBillingCompliancePolicyRequest, BillingCompliancePolicyVersionDto>(
+                "/api/v1/settings/billing-compliance-policies", request);
+        }
+        catch (CloudApiException ex)
+        {
+            throw new SettingsSaveException(ex.Message, ex);
+        }
+        catch (CloudConnectivityException ex)
+        {
+            throw new SettingsSaveException(
+                "The policy result is unknown because the server could not be reached. Refresh policy history before retrying.",
+                ex);
         }
     }
 }
@@ -255,9 +345,31 @@ public sealed class CloudFormService(CloudApiClient api) : IFormService
         int? evidenceNoteId,
         string? supervisorOverrideReason)
     {
+        if (!string.IsNullOrWhiteSpace(supervisorOverrideReason))
+            throw new NotSupportedException("Form prerequisite overrides are no longer supported.");
         var response = await api.PostAsync<AttestFormRequest, FormDto>(
             $"/api/v1/people/{form.PersonId}/forms/{form.Type}/attestation",
-            new AttestFormRequest(form.Id, completedOn, evidenceNoteId, supervisorOverrideReason));
+            new AttestFormRequest(form.Id, completedOn, evidenceNoteId));
+        Apply(response, form);
+    }
+
+    public async Task AttestReclassificationAsync(
+        Form form,
+        DateTime reclassificationCompletedOn,
+        DateTime? comprehensiveAssessmentCompletedOn,
+        int? evidenceNoteId = null)
+    {
+        if (form.Type != FormType.Reclassification)
+            throw new ArgumentException(
+                "The combined attestation operation is only valid for Reclassification.",
+                nameof(form));
+        var response = await api.PostAsync<AttestFormRequest, FormDto>(
+            $"/api/v1/people/{form.PersonId}/forms/{form.Type}/attestation",
+            new AttestFormRequest(
+                form.Id,
+                reclassificationCompletedOn,
+                evidenceNoteId,
+                ComprehensiveAssessmentCompletedOn: comprehensiveAssessmentCompletedOn));
         Apply(response, form);
     }
 
@@ -268,7 +380,11 @@ public sealed class CloudFormService(CloudApiClient api) : IFormService
     public Task<DocumentArtifactDto> RecordExternalPrerequisiteAsync(Form form, string note)
     {
         var cycle = form.Person?.EffectiveDate is DateTime effectiveDate
-            ? FormAttestationRules.ResolveCycle(effectiveDate, form.DueDate)
+            ? FormAttestationRules.ResolveCycleForForm(
+                effectiveDate,
+                form.Type.ToString(),
+                form.DueDate,
+                form.TargetEffectiveDate)
             : null;
         if (cycle is null)
             throw new InvalidOperationException("The form is not attached to a valid compliance cycle.");
@@ -288,9 +404,14 @@ public sealed class CloudFormService(CloudApiClient api) : IFormService
     }
 
     public Task OpenFormAsync(Form form)
+        => OpenFormAsync(form, DateTime.Today);
+
+    public async Task OpenFormAsync(Form form, DateTime openedOn)
     {
-        form.OpenedDate = DateTime.Today;
-        return SaveAsync(form);
+        var response = await api.PostAsync<OpenFormRequest, FormDto>(
+            $"/api/v1/forms/{form.Id}/open",
+            new OpenFormRequest(openedOn.Date));
+        Apply(response, form);
     }
     public async Task DeleteFormsAsync(IEnumerable<Form> forms) =>
         _ = await api.PostAsync<DeleteFormsRequest, CountDto>(

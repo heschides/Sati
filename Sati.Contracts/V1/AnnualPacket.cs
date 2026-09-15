@@ -17,10 +17,9 @@ public static class AnnualPacketWindow
     }
     public static DateTime SuggestedCycle(DateTime effective, DateTime today, int openDays)
     {
-        var current = AnnualDocumentCycle.CurrentStart(effective, today);
-        if (current < effective.Date) return effective.Date;
-        var next = effective.AddYears(current.Year - effective.Year + 1).Date;
-        return today.Date >= next.AddDays(-openDays) ? next : current;
+        if (openDays is < 0 or > 180)
+            throw new ArgumentException("Choose an opening window of 0–180 days.", nameof(openDays));
+        return AnnualDocumentCycle.SuggestedStart(effective, today, openDays);
     }
 }
 
@@ -79,15 +78,61 @@ public static class DocumentVerification
 
 public static class AnnualDocumentReminder
 {
-    public static string Describe(bool windowOpen, bool pcpAttested, IEnumerable<DocumentArtifactDto> artifacts)
+    public static string Describe(
+        bool windowOpen,
+        bool pcpAttested,
+        IEnumerable<DocumentArtifactDto> artifacts,
+        IEnumerable<ReleaseComplianceFact>? releaseObligations = null,
+        bool safetyPlanAttested = false,
+        bool privacyPracticesAttested = false,
+        DateTime? asOf = null)
     {
         if (!windowOpen && !pcpAttested) return "";
-        var list = artifacts.ToList();
-        var missing = new[] { AnnualDocumentKind.ReleaseAgency, AnnualDocumentKind.ReleaseDhhs,
-            AnnualDocumentKind.ReleaseMedical, AnnualDocumentKind.SafetyPlan }
-            .Where(kind => !list.Any(x => x.Kind == kind.ToString() && x.Origin != "Draft"))
-            .Select(kind => AnnualDocumentCatalog.ForKind(kind).DisplayName).ToArray();
-        return missing.Length == 0 ? "" : "Preparation still needed: " + string.Join(", ", missing) +
+        _ = artifacts;
+        var today = (asOf ?? DateTime.Today).Date;
+        var exactReleases = (releaseObligations ?? [])
+            .Where(item => item.RetiredOn is null || today < item.RetiredOn.Value.Date)
+            .ToList();
+        var missing = new List<string>();
+
+        if (exactReleases.Count == 0)
+        {
+            // DHHS applies to every consumer. Agency and Medical are intentionally
+            // not guessed: they exist only when an exact provider assignment does.
+            missing.Add("DHHS release obligation setup");
+        }
+        else
+        {
+            foreach (var obligation in exactReleases)
+            {
+                var completed = ReleaseAttestationRules.CompletedOn(
+                    obligation.StableKey, obligation.Attestations);
+                if (completed is DateTime completedOn && completedOn.Date <= today)
+                    continue;
+
+                var label = obligation.Category switch
+                {
+                    ReleaseObligationCategory.Agency => "Agency release",
+                    ReleaseObligationCategory.Medical => "Medical release",
+                    ReleaseObligationCategory.Dhhs => "DHHS authorization to release",
+                    _ => "Release"
+                };
+                if (!string.IsNullOrWhiteSpace(obligation.RecipientDisplayName))
+                    label += $" — {obligation.RecipientDisplayName.Trim()}";
+                missing.Add(label);
+            }
+        }
+
+        if (!safetyPlanAttested)
+            missing.Add(AnnualDocumentCatalog.ForKind(AnnualDocumentKind.SafetyPlan).DisplayName);
+        if (!privacyPracticesAttested)
+            missing.Add(AnnualDocumentCatalog.ForKind(AnnualDocumentKind.PrivacyPractices).DisplayName);
+
+        // A live artifact is useful evidence and must be retained, but it is not an
+        // attestation by itself. Exact release completion above therefore remains the
+        // deciding fact instead of one category-wide PDF hiding several recipients.
+        missing = missing.Distinct(StringComparer.Ordinal).ToList();
+        return missing.Count == 0 ? "" : "Preparation still needed: " + string.Join(", ", missing) +
             ". Open the release or safety-plan workspace to complete the saved work.";
     }
 }

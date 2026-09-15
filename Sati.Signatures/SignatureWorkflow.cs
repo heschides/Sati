@@ -9,7 +9,11 @@ using Sati.Models;
 namespace Sati.Signatures;
 
 public sealed record SignatureActor(int AgencyId, int UserId);
-public sealed record VerifiedSignatureSigner(string Name, string Email, DateTime? BirthDate = null);
+public sealed record VerifiedSignatureSigner(
+    string Name,
+    string Email,
+    DateTime? BirthDate = null,
+    bool HasGuardian = false);
 public sealed record SignatureAuthentication(string SessionToken, DateTime ExpiresAtUtc);
 public sealed record SignaturePortalDetails(string SignerName, string Capacity, string DocumentName, string DisclosureVersion,
     string DisclosureText, string IntentText, string State, bool HasConsent, bool DocumentReleased, bool AccessAcknowledged,
@@ -112,6 +116,10 @@ public sealed class SignatureWorkflow(DbContext db, SignatureFeature feature, Si
         if (input.ExpiryHours is < SignatureRules.MinimumExpiryHours or > SignatureRules.MaximumExpiryHours) throw Invalid("The signing link must last between 24 hours and seven days.");
         if (string.IsNullOrWhiteSpace(signer.Name) || signer.Name.Length > 120 || signer.Email.Length > 254 || !MailAddress.TryCreate(signer.Email, out var email) || email.Address != signer.Email || signer.Email.Any(char.IsControl))
             throw Invalid("The signer needs a current name and a valid, confirmed email address.");
+        if (!ReleaseSigningRules.CanSign(signer.HasGuardian, input.SignerCapacity))
+            throw Invalid(signer.HasGuardian
+                ? "This consumer's forms require a guardian signature. The consumer and an authorized representative cannot sign them."
+                : "This consumer must sign these forms. A guardian or authorized representative cannot sign them.");
         if (input.SignerCapacity == SignerCapacity.Consumer && input.SignerContactId is not null || input.SignerCapacity != SignerCapacity.Consumer && (input.SignerContactId is null || string.IsNullOrWhiteSpace(input.AuthorityEvidence)))
             throw Invalid("Record the representative's current authority before sending a request.");
         if (input.AuthorityEvidence?.Length > 500) throw Invalid("Keep the authority explanation within 500 characters.");

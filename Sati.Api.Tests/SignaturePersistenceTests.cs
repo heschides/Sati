@@ -36,6 +36,9 @@ public sealed class SignaturePersistenceTests
             Assert.All(left.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
             Assert.Equal(Properties(left), Properties(narrow.FindEntityType(type)!));
         }
+        Assert.NotNull(a.FindEntityType(typeof(SignatureComplianceProjection)));
+        Assert.NotNull(b.FindEntityType(typeof(SignatureComplianceProjection)));
+        Assert.Null(narrow.FindEntityType(typeof(SignatureComplianceProjection)));
         Assert.DoesNotContain(narrow.GetEntityTypes(), entity => entity.GetTableName() is "People" or "Users" or "Notes" or "AuditEvents" or "DocumentArtifacts");
         Assert.Equal("SignatureSourceDocuments", narrow.FindEntityType(typeof(SignatureSourceDocument))!.GetViewName());
         Assert.Equal("SignatureDatabaseEnvironment", narrow.FindEntityType(typeof(SignatureDatabaseEnvironment))!.GetViewName());

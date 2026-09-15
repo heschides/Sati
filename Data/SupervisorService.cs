@@ -13,10 +13,9 @@ public sealed class SupervisorService(
         bool allSupervisees = false)
     {
         var notes = await GetLoggedNotesAsync(supervisorId, allSupervisees);
-        var today = DateTime.Today;
-        var requirements = await LoadComplianceRequirementsAsync();
-        return notes.Where(note => note.Person.EvaluateComplianceGate(
-            today, requirements: requirements).Passed);
+        var policy = await LoadCompliancePolicyAsync();
+        return notes.Where(note =>
+            ServiceDateCompliance(note, policy).Passed);
     }
 
     public async Task<IEnumerable<Note>> GetNonCompliantNotesAsync(
@@ -24,16 +23,15 @@ public sealed class SupervisorService(
         bool allSupervisees = false)
     {
         var notes = await GetLoggedNotesAsync(supervisorId, allSupervisees);
-        var today = DateTime.Today;
-        var requirements = await LoadComplianceRequirementsAsync();
+        var policy = await LoadCompliancePolicyAsync();
         var nonCompliant = new List<Note>();
         foreach (var note in notes)
         {
-            var result = note.Person.EvaluateComplianceGate(
-                today, requirements: requirements);
-            if (result.Passed)
+            var compliance = ServiceDateCompliance(note, policy);
+            if (compliance.Passed)
                 continue;
-            note.ComplianceFailureReasons = result.Reasons;
+            note.ComplianceFailureReasons = compliance.Reasons;
+            note.ComplianceBlockers = compliance.Blockers ?? [];
             nonCompliant.Add(note);
         }
         return nonCompliant;
@@ -41,28 +39,15 @@ public sealed class SupervisorService(
 
     public async Task ApproveNoteAsync(int noteId, int supervisorId, int expectedRevision, int? maximumUnits = null)
     {
-        var actor = CurrentReviewer(supervisorId);
+        var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
 
         EnsureCurrentRevision(note, expectedRevision);
         if (!NoteWorkflow.CanSupervisorTransition((int?)note.Status, NoteWorkflow.Approved))
             throw new InvalidOperationException("Only logged notes can be approved.");
-
-        var requirements = await context.Settings.AsNoTracking()
-            .Where(settings => settings.AgencyId == actor.AgencyId)
-            .Select(settings => (BillingComplianceRequirements?)settings.BillingComplianceRequirements)
-            .SingleOrDefaultAsync() ?? BillingComplianceGate.DefaultRequirements;
-        var (passed, reasons) = note.Person.EvaluateComplianceGate(
-            DateTime.Today, requirements: requirements);
-        if (!passed)
-        {
-            throw new InvalidOperationException(
-                $"Cannot approve note {noteId}: {note.Person.FullName} does not meet " +
-                $"compliance requirements. Failures: {string.Join("; ", reasons)}. " +
-                "Use ApproveWithOverrideAsync if a supervisor exception is warranted.");
-        }
 
         if (maximumUnits is int limit)
         {
@@ -85,14 +70,13 @@ public sealed class SupervisorService(
         int noteId,
         int supervisorId,
         string overrideReason,
-        int expectedRevision)
+        int expectedRevision,
+        IReadOnlyList<string>? blockingObligationIds = null,
+        bool attestationConfirmed = false)
     {
-        var reason = overrideReason?.Trim() ?? string.Empty;
-        if (reason.Length is < 1 or > 4_000)
-            throw new ArgumentException("Override reason is required and must not exceed 4,000 characters.", nameof(overrideReason));
-
-        var actor = CurrentReviewer(supervisorId);
+        var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
 
@@ -100,17 +84,35 @@ public sealed class SupervisorService(
         if (!NoteWorkflow.CanSupervisorTransition((int?)note.Status, NoteWorkflow.Approved))
             throw new InvalidOperationException("Only logged notes can be approved.");
 
+        var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
+            context, actor.AgencyId);
+        var compliance = ServiceDateCompliance(note, policy);
+        var decision = BillingComplianceExceptionRules.Validate(
+            compliance.Blockers ?? [],
+            blockingObligationIds,
+            overrideReason,
+            attestationConfirmed);
+        if (!decision.Accepted)
+            throw new ArgumentException(string.Join(" ", decision.Errors), nameof(blockingObligationIds));
+
         var now = DateTime.UtcNow;
         note.Status = NoteStatus.Approved;
         note.ApprovedById = actor.Id;
         note.ApprovedAt = now;
         note.ComplianceOverride = true;
-        note.OverrideReason = reason;
+        note.OverrideReason = overrideReason.Trim();
         note.OverrideApprovedById = actor.Id;
         note.OverrideApprovedAt = now;
+        note.OverrideAttestationConfirmed = true;
+        note.OverrideObligationIds = decision.SelectedObligationIds;
         note.Revision++;
         await SaveNoteTransitionAsync(
-            context, actor, LocalAuditActions.NoteApprovalOverridden, noteId);
+            context, actor, LocalAuditActions.NoteApprovalOverridden, noteId,
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                attestationConfirmed = true,
+                obligationIds = decision.SelectedObligationIds
+            }));
     }
 
     public async Task ReturnNoteAsync(
@@ -123,8 +125,9 @@ public sealed class SupervisorService(
         if (reason.Length is < 1 or > 4_000)
             throw new ArgumentException("A return reason is required and must not exceed 4,000 characters.", nameof(reason));
 
-        var actor = CurrentReviewer(supervisorId);
+        var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
 
@@ -144,9 +147,10 @@ public sealed class SupervisorService(
     public async Task<NoteReviewPage<Note>> GetReviewPageAsync(
         int supervisorId, int afterId = 0, int? throughId = null, NoteReviewQuery? filter = null)
     {
-        var actor = CurrentReviewer(supervisorId);
+        var actor = await CurrentReviewerAsync(supervisorId);
         var appliedFilter = filter ?? new NoteReviewQuery();
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var agencyWide = UserPermissionRules.HasAgencyWideSupervisionPermissions(actor.Permissions);
         var term = NormalizeSearchTerm(appliedFilter.SearchTerm);
         var fromDate = appliedFilter.FromDate?.Date;
@@ -154,7 +158,7 @@ public sealed class SupervisorService(
             ? toDate.Date.AddDays(1)
             : (DateTime?)null;
         var query = context.Notes.AsNoTracking().Where(note =>
-            note.Status == NoteStatus.Logged && note.Person.AgencyId == actor.AgencyId &&
+            note.Status == NoteStatus.Logged && note.AgencyId == actor.AgencyId && note.Person.AgencyId == actor.AgencyId &&
             (!appliedFilter.UserId.HasValue || note.Person.UserId == appliedFilter.UserId.Value) &&
             (!appliedFilter.PersonId.HasValue || note.PersonId == appliedFilter.PersonId.Value) &&
             (!fromDate.HasValue || note.EventDate >= fromDate.Value) &&
@@ -171,23 +175,28 @@ public sealed class SupervisorService(
         // cursor is opaque to the client and walks toward older IDs.
         var rows = await query.Where(note => note.Id <= ceiling && (afterId <= 0 || note.Id < afterId))
             .OrderByDescending(note => note.Id).Take(NoteReviewRules.PageSize + 1)
-            .Include(note => note.Person).ThenInclude(person => person.Forms).ToListAsync();
+            .Include(note => note.Person).ThenInclude(person => person.Forms)
+            .Include(note => note.Person).ThenInclude(person => person.ReleaseObligations)
+                .ThenInclude(obligation => obligation.Attestations)
+            .ToListAsync();
         var more = rows.Count > NoteReviewRules.PageSize;
         rows = rows.Take(NoteReviewRules.PageSize).ToList();
-        var requirements = await context.Settings.AsNoTracking()
-            .Where(settings => settings.AgencyId == actor.AgencyId)
-            .Select(settings => (BillingComplianceRequirements?)settings.BillingComplianceRequirements)
-            .SingleOrDefaultAsync() ?? BillingComplianceGate.DefaultRequirements;
+        var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
+            context, actor.AgencyId);
         foreach (var note in rows)
-            note.ComplianceFailureReasons = note.Person.EvaluateComplianceGate(
-                DateTime.Today, requirements: requirements).Reasons;
+        {
+            var compliance = ServiceDateCompliance(note, policy);
+            note.ComplianceFailureReasons = compliance.Reasons;
+            note.ComplianceBlockers = compliance.Blockers ?? [];
+        }
         return new(rows, more ? rows[^1].Id : null, ceiling);
     }
 
     public async Task<NoteReviewFilterOptions> GetReviewFilterOptionsAsync(int supervisorId)
     {
-        var actor = CurrentReviewer(supervisorId);
+        var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var agencyWide = UserPermissionRules.HasAgencyWideSupervisionPermissions(actor.Permissions);
         var users = await context.Users.AsNoTracking()
             .Where(user => user.AgencyId == actor.AgencyId &&
@@ -219,11 +228,22 @@ public sealed class SupervisorService(
         return string.IsNullOrEmpty(term) ? null : term[..Math.Min(term.Length, 200)];
     }
 
+    private static BillingComplianceResult ServiceDateCompliance(
+        Note note,
+        BillingCompliancePolicyContext policy) =>
+        note.EventDate is DateTime serviceDate
+            ? note.Person.EvaluateBillingWindowDetailed(
+                serviceDate,
+                policy.Resolve(serviceDate),
+                policy.Schedule)
+            : new BillingComplianceResult(true, [], []);
+
     private async Task<List<Note>> GetLoggedNotesAsync(int supervisorId, bool allSupervisees)
     {
         _ = allSupervisees;
-        var actor = CurrentReviewer(supervisorId);
+        var actor = await CurrentReviewerAsync(supervisorId);
         await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var canReviewAgency = UserPermissionRules.HasAgencyWideSupervisionPermissions(actor.Permissions);
         var caseManagerIds = await context.Users.AsNoTracking()
             .Where(user => user.AgencyId == actor.AgencyId &&
@@ -235,7 +255,11 @@ public sealed class SupervisorService(
         return await context.Notes.AsNoTracking()
             .Include(note => note.Person)
                 .ThenInclude(person => person.Forms)
+            .Include(note => note.Person)
+                .ThenInclude(person => person.ReleaseObligations)
+                    .ThenInclude(obligation => obligation.Attestations)
             .Where(note => note.Status == NoteStatus.Logged &&
+                note.AgencyId == actor.AgencyId &&
                 note.Person.AgencyId == actor.AgencyId &&
                 caseManagerIds.Contains(note.Person.UserId))
             .OrderBy(note => note.EventDate)
@@ -251,8 +275,12 @@ public sealed class SupervisorService(
         return context.Notes
             .Include(note => note.Person)
                 .ThenInclude(person => person.Forms)
+            .Include(note => note.Person)
+                .ThenInclude(person => person.ReleaseObligations)
+                    .ThenInclude(obligation => obligation.Attestations)
             .SingleOrDefaultAsync(note =>
                 note.Id == noteId &&
+                note.AgencyId == actor.AgencyId &&
                 note.Person.AgencyId == actor.AgencyId &&
                 context.Users.Any(user =>
                     user.Id == note.Person.UserId &&
@@ -261,7 +289,7 @@ public sealed class SupervisorService(
                     (canReviewAgency || user.SupervisorId == actor.Id)));
     }
 
-    private User CurrentReviewer(int requestedReviewerId)
+    private async Task<User> CurrentReviewerAsync(int requestedReviewerId)
     {
         var actor = sessionService.CurrentUser
             ?? throw new UnauthorizedAccessException("A signed-in reviewer is required.");
@@ -269,18 +297,21 @@ public sealed class SupervisorService(
         {
             throw new UnauthorizedAccessException("Only the signed-in reviewer may perform this action.");
         }
+        await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
         return actor;
     }
 
-    private async Task<BillingComplianceRequirements> LoadComplianceRequirementsAsync()
+    private async Task<BillingCompliancePolicyContext> LoadCompliancePolicyAsync()
     {
         var actor = sessionService.CurrentUser
             ?? throw new UnauthorizedAccessException("A signed-in reviewer is required.");
         await using var context = contextFactory.CreateDbContext();
-        return await context.Settings.AsNoTracking()
-            .Where(settings => settings.AgencyId == actor.AgencyId)
-            .Select(settings => (BillingComplianceRequirements?)settings.BillingComplianceRequirements)
-            .SingleOrDefaultAsync() ?? BillingComplianceGate.DefaultRequirements;
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        await LocalTenantAccess.EnsureCurrentActorAsync(context, actor);
+        return await BillingCompliancePolicyContextLoader.LoadAsync(
+            context, actor.AgencyId);
     }
 
     private static void EnsureCurrentRevision(Note note, int expectedRevision)

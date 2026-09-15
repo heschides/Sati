@@ -20,7 +20,7 @@ namespace Sati.Data
             var userEntity = await context.Users
                 .SingleOrDefaultAsync(u => u.Username == username);
 
-            if (userEntity is null)
+            if (userEntity is null || !userEntity.IsEnabled || userEntity.SecurityVersion <= 0)
                 return null;
 
             var passwordHasher = new PasswordHasher();
@@ -37,16 +37,24 @@ namespace Sati.Data
                 userEntity.Id);
             await context.SaveChangesAsync();
 
-            return User.Create(
+            // Session identity keeps the persisted capabilities, not the legacy role's
+            // migration defaults. Password verification material never belongs in it.
+            var sessionUser = User.Create(
                 userEntity.Id,
                 userEntity.Username,
                 userEntity.DisplayName,
-                userEntity.PasswordHash,
-                userEntity.Salt,
+                string.Empty,
+                string.Empty,
                 userEntity.Role,
                 userEntity.SupervisorId,
                 userEntity.AgencyId
             );
+            sessionUser.Permissions = userEntity.Permissions;
+            sessionUser.IsEnabled = userEntity.IsEnabled;
+            sessionUser.SecurityVersion = userEntity.SecurityVersion;
+            sessionUser.Email = userEntity.Email;
+            sessionUser.Phone = userEntity.Phone;
+            return sessionUser;
         }
     }
 }

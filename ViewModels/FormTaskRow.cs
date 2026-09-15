@@ -58,4 +58,56 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(OverdueTooltip));
         }
     }
+
+    /// <summary>
+    /// One recipient-specific release deadline on the dashboard. It intentionally does not
+    /// wrap a legacy <see cref="Form"/>: the durable obligation key identifies the recipient,
+    /// and completion belongs in the Releases workspace where the exact attestation is shown.
+    /// </summary>
+    public sealed class ReleaseTaskRow
+    {
+        public ReleaseTaskRow(
+            string obligationKey,
+            Guid? obligationId,
+            string clientName,
+            string typeLabel,
+            DateTime targetEffectiveDate,
+            DateTime openByDate,
+            DateTime dueDate,
+            DateTime today)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(obligationKey);
+            ObligationKey = obligationKey;
+            ObligationId = obligationId;
+            ClientName = clientName;
+            TypeLabel = typeLabel;
+            TargetEffectiveDate = targetEffectiveDate.Date;
+            OpenByDate = openByDate.Date;
+            DueDate = dueDate.Date;
+            IsAvailable = today.Date >= OpenByDate;
+            IsOverdue = today.Date > DueDate;
+            DaysOverdue = IsOverdue ? (today.Date - DueDate).Days : 0;
+        }
+
+        public string ObligationKey { get; }
+        public Guid? ObligationId { get; }
+        public string ClientName { get; }
+        public string TypeLabel { get; }
+        public DateTime TargetEffectiveDate { get; }
+        public DateTime OpenByDate { get; }
+        public DateTime DueDate { get; }
+        public bool IsAvailable { get; }
+        public bool CanOpenExact => ObligationId.HasValue && IsAvailable;
+        public bool IsOverdue { get; }
+        public int DaysOverdue { get; }
+        public string OverdueTooltip =>
+            $"{DaysOverdue} day{(DaysOverdue == 1 ? "" : "s")} overdue";
+        public string ActionLabel => IsAvailable
+            ? "Attest in Releases"
+            : $"Available {OpenByDate:MMM d}";
+        public string AutomationName =>
+            $"{ClientName}, {TypeLabel}, effective {TargetEffectiveDate:MMM d, yyyy}, due {DueDate:MMM d, yyyy}. " +
+            (IsOverdue ? $"{OverdueTooltip}. " : string.Empty) +
+            $"{ActionLabel}.";
+    }
 }

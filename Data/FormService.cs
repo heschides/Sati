@@ -13,6 +13,7 @@ public sealed class FormService(
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
 
         if (stored.CompletedDate?.Date != form.CompletedDate?.Date)
@@ -21,40 +22,164 @@ public sealed class FormService(
                 "A completion date can be changed only through an attestation or revocation.");
         }
 
-        stored.OpenedDate = form.OpenedDate?.Date;
-        await context.SaveChangesAsync();
+        if (stored.OpenedDate?.Date != form.OpenedDate?.Date)
+        {
+            throw new InvalidOperationException(
+                "An opening date can be recorded only through the audited form-opening workflow.");
+        }
+
         form.OpenedDate = stored.OpenedDate;
     }
 
     public Task AttestAsync(Form form, DateTime completedOn, int? evidenceNoteId = null) =>
-        AttestAsync(form, completedOn, evidenceNoteId, supervisorOverrideReason: null);
+        AttestCoreAsync(
+            form,
+            completedOn,
+            comprehensiveAssessmentCompletedOn: null,
+            evidenceNoteId);
 
-    public async Task AttestAsync(
+    public Task AttestAsync(
         Form form,
         DateTime completedOn,
         int? evidenceNoteId,
         string? supervisorOverrideReason)
     {
+        if (!string.IsNullOrWhiteSpace(supervisorOverrideReason))
+            throw new NotSupportedException("Form prerequisite overrides are no longer supported.");
+
+        return AttestAsync(form, completedOn, evidenceNoteId);
+    }
+
+    public Task AttestReclassificationAsync(
+        Form form,
+        DateTime reclassificationCompletedOn,
+        DateTime? comprehensiveAssessmentCompletedOn,
+        int? evidenceNoteId = null)
+    {
+        if (form.Type != FormType.Reclassification)
+            throw new ArgumentException(
+                "The combined attestation operation is only valid for Reclassification.",
+                nameof(form));
+
+        return AttestCoreAsync(
+            form,
+            reclassificationCompletedOn,
+            comprehensiveAssessmentCompletedOn,
+            evidenceNoteId);
+    }
+
+    private async Task AttestCoreAsync(
+        Form form,
+        DateTime completedOn,
+        DateTime? comprehensiveAssessmentCompletedOn,
+        int? evidenceNoteId)
+    {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        await using var transaction = await context.Database.BeginTransactionAsync();
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         if (stored.CompletedDate is not null)
             throw new InvalidOperationException(
                 "This form already has a live attestation. Revoke it before recording a replacement.");
-        var cycle = FormAttestationRules.ResolveCycle(
-            stored.Person.EffectiveDate
-                ?? throw new InvalidOperationException("The consumer has no effective date."),
-            stored.DueDate)
-            ?? throw new InvalidOperationException("The form is not attached to a valid compliance cycle.");
+
+        var cycle = ResolveStoredCycle(stored);
+        var settings = await context.Settings.AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.AgencyId == actor.AgencyId)
+            ?? new Settings();
+        var availableOn = FormDueDateCalculator.ComputeAvailableDateForDueDate(
+            stored.Type,
+            stored.DueDate,
+            settings);
+        var completionDateError = FormAttestationRules.ValidateCompletionDate(
+            completedOn,
+            cycle.CycleStart,
+            DateTime.Today,
+            availableOn);
+        if (completionDateError is not null)
+            throw new ArgumentOutOfRangeException(nameof(completedOn), completionDateError);
+
         var actorKind = actor.Id == stored.Person.UserId
             ? AttestationActorKind.CaseManager
             : AttestationActorKind.Supervisor;
-        var artifacts = await LoadArtifactFactsAsync(
-            context, stored.PersonId, cycle.CycleStart, cancellationToken: default);
         var formFacts = await LoadFormFactsAsync(context, stored.PersonId);
+        Form? assessment = null;
+        FormAttestation? impliedAssessmentAttestation = null;
+
+        if (stored.Type == FormType.Reclassification)
+        {
+            assessment = await FindAssessmentForSameAnnualObligationAsync(
+                context,
+                stored,
+                cycle);
+            if (assessment is null)
+            {
+                throw new InvalidOperationException(
+                    "The Comprehensive Assessment obligation for this annual effective date is missing. Refresh the consumer's compliance forms before attesting the Reclassification.");
+            }
+
+            if (assessment.CompletedDate is null)
+            {
+                if (comprehensiveAssessmentCompletedOn is not DateTime assessmentCompletedOn)
+                {
+                    throw new InvalidOperationException(
+                        "Enter the actual Comprehensive Assessment completion date. A completed Reclassification implies that its Comprehensive Assessment was completed.");
+                }
+
+                var assessmentDateError = FormAttestationRules.ValidateAssessmentCompletionDate(
+                    assessmentCompletedOn,
+                    completedOn,
+                    cycle.CycleStart,
+                    DateTime.Today,
+                    FormDueDateCalculator.ComputeAvailableDateForDueDate(
+                        assessment.Type,
+                        assessment.DueDate,
+                        settings));
+                if (assessmentDateError is not null)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(comprehensiveAssessmentCompletedOn),
+                        assessmentDateError);
+                }
+
+                impliedAssessmentAttestation = FormAttestation.Attested(
+                    assessmentCompletedOn,
+                    actorKind,
+                    actor.Id,
+                    DateTime.UtcNow,
+                    prerequisiteStateJson: FormAttestationRules.NoPrerequisitesStateJson);
+                assessment.Attest(impliedAssessmentAttestation);
+                formFacts = formFacts
+                    .Where(fact => fact.FormId != assessment.Id)
+                    .Append(ToFormFact(assessment))
+                    .ToList();
+            }
+            else if (comprehensiveAssessmentCompletedOn is not null)
+            {
+                throw new InvalidOperationException(
+                    "The Comprehensive Assessment already has an attestation. Do not enter a replacement date unless that attestation is revoked first.");
+            }
+        }
+        else if (comprehensiveAssessmentCompletedOn is not null)
+        {
+            throw new ArgumentException(
+                "A Comprehensive Assessment completion date can be supplied only with a Reclassification attestation.",
+                nameof(comprehensiveAssessmentCompletedOn));
+        }
+
+        DateTime? targetEffectiveDate = stored.TargetEffectiveDate == default
+            ? null
+            : stored.TargetEffectiveDate;
         var decision = FormAttestationRules.Evaluate(
-            stored.Type.ToString(), completedOn, cycle.CycleStart, DateTime.Today,
-            actorKind, artifacts, formFacts, supervisorOverrideReason);
+            stored.Type.ToString(),
+            completedOn,
+            cycle.CycleStart,
+            DateTime.Today,
+            actorKind,
+            [],
+            formFacts,
+            targetEffectiveDate: targetEffectiveDate,
+            availableOn: availableOn);
         if (!decision.Accepted)
         {
             if (decision.DateError is not null)
@@ -63,71 +188,45 @@ public sealed class FormService(
                 decision.UnmetPrerequisites.Select(prerequisite => prerequisite.Message)));
         }
 
-        if (evidenceNoteId is int noteId)
-        {
-            var evidenceIsValid = await context.Notes.AsNoTracking().AnyAsync(note =>
-                note.Id == noteId &&
-                note.PersonId == stored.PersonId &&
-                note.FormType == stored.Type &&
-                note.EventDate != null &&
-                note.EventDate.Value.Date >= cycle.CycleStart.Date &&
-                note.EventDate.Value.Date < cycle.CycleEnd.Date &&
-                (note.Status == NoteStatus.Pending ||
-                 note.Status == NoteStatus.Logged ||
-                 note.Status == NoteStatus.Approved));
-            if (!evidenceIsValid)
-                throw new ArgumentException("The cited note is not matching form evidence.", nameof(evidenceNoteId));
-        }
+        await EnsureEvidenceIsValidAsync(context, stored, cycle, evidenceNoteId);
 
-        var prerequisiteArtifactIds = MatchingArtifactIds(stored.Type.ToString(), artifacts);
-        var prerequisiteStateJson = FormAttestationRules.PrerequisiteStateJson(
-            decision, prerequisiteArtifactIds, supervisorOverrideReason);
+        var recordedAtUtc = DateTime.UtcNow;
+        var prerequisiteStateJson = assessment is null
+            ? FormAttestationRules.NoPrerequisitesStateJson
+            : FormAttestationRules.AssessmentPrerequisiteStateJson(assessment.Id);
         var attestation = FormAttestation.Attested(
             completedOn,
             actorKind,
             actor.Id,
-            DateTime.UtcNow,
+            recordedAtUtc,
             evidenceNoteId,
-            prerequisiteStateJson: prerequisiteStateJson,
-            reason: decision.SupervisorOverrideAccepted ? supervisorOverrideReason : null);
+            prerequisiteStateJson);
         stored.Attest(attestation);
-        LocalAuditTrail.Record(
-            context,
-            actor,
-            LocalAuditActions.FormAttested,
-            "Form",
-            stored.Id,
-            JsonSerializer.Serialize(new
-            {
-                formType = stored.Type.ToString(),
-                cycleStart = cycle.CycleStart.ToString("yyyy-MM-dd"),
-                completedOn = completedOn.Date.ToString("yyyy-MM-dd"),
-                actorKind = actorKind.ToString(),
-                prerequisiteArtifactIds,
-                supervisorOverride = decision.SupervisorOverrideAccepted
-            }));
-        if (decision.SupervisorOverrideAccepted)
+
+        if (impliedAssessmentAttestation is not null)
         {
-            LocalAuditTrail.Record(
+            RecordAttestationAudit(
                 context,
                 actor,
-                LocalAuditActions.FormPrerequisiteOverridden,
-                "Form",
-                stored.Id,
-                JsonSerializer.Serialize(new
-                {
-                    formType = stored.Type.ToString(),
-                    cycleStart = cycle.CycleStart.ToString("yyyy-MM-dd"),
-                    unmetPrerequisites = decision.UnmetPrerequisites
-                        .Select(item => item.Kind.ToString())
-                        .Distinct()
-                        .Order()
-                        .ToArray()
-                }));
+                assessment!,
+                actorKind,
+                cycle,
+                impliedAssessmentAttestation.CompletedOn!.Value,
+                impliedByReclassificationFormId: stored.Id);
         }
+        RecordAttestationAudit(
+            context,
+            actor,
+            stored,
+            actorKind,
+            cycle,
+            completedOn,
+            comprehensiveAssessmentFormId: assessment?.Id);
+
         try
         {
             await context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -135,58 +234,59 @@ public sealed class FormService(
                 "This form's attestation changed in another session. Refresh it and try again.",
                 exception);
         }
+
         form.Attest(FormAttestation.Attested(
             stored.CompletedDate!.Value,
             actorKind,
             actor.Id,
-            attestation.RecordedAtUtc,
+            recordedAtUtc,
             evidenceNoteId,
-            prerequisiteStateJson,
-            decision.SupervisorOverrideAccepted ? supervisorOverrideReason : null));
+            prerequisiteStateJson));
     }
 
     public async Task<FormPrerequisiteStatusDto> GetPrerequisiteStatusAsync(Form form)
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
-        var cycle = FormAttestationRules.ResolveCycle(
-            stored.Person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
-            stored.DueDate)
-            ?? throw new InvalidOperationException("The form is not attached to a valid compliance cycle.");
-        var artifacts = await LoadArtifactFactsAsync(context, stored.PersonId, cycle.CycleStart, default);
-        var forms = await LoadFormFactsAsync(context, stored.PersonId);
-        var actorKind = actor.Id == stored.Person.UserId
-            ? AttestationActorKind.CaseManager
-            : AttestationActorKind.Supervisor;
-        var decision = FormAttestationRules.Evaluate(
-            stored.Type.ToString(), DateTime.Today, cycle.CycleStart, DateTime.Today,
-            actorKind, artifacts, forms);
         var prerequisite = FormAttestationRules.PrerequisiteFor(stored.Type.ToString());
+        if (prerequisite == PrerequisiteKind.None)
+        {
+            return new FormPrerequisiteStatusDto(
+                prerequisite.ToString(),
+                true,
+                "Attestation is sufficient; no separate document prerequisite applies.",
+                [],
+                CanSupervisorOverride: false);
+        }
+
+        var cycle = ResolveStoredCycle(stored);
+        var assessment = await FindAssessmentForSameAnnualObligationAsync(
+            context,
+            stored,
+            cycle);
+        var isSatisfied = assessment?.CompletedDate is not null;
         return new FormPrerequisiteStatusDto(
             prerequisite.ToString(),
-            decision.UnmetPrerequisites.Count == 0,
-            decision.UnmetPrerequisites.Count == 0
-                ? prerequisite == PrerequisiteKind.None
-                    ? "No additional document prerequisite applies."
-                    : "The prerequisite is satisfied."
-                : string.Join(" ", decision.UnmetPrerequisites.Select(item => item.Message)),
-            MatchingArtifactIds(stored.Type.ToString(), artifacts),
-            actorKind == AttestationActorKind.Supervisor);
+            isSatisfied,
+            isSatisfied
+                ? "The Comprehensive Assessment for this annual effective date is already attested."
+                : "A completed Reclassification implies a completed Comprehensive Assessment. Enter the actual assessment completion date; Sati will save two separate attestations together.",
+            [],
+            CanSupervisorOverride: false);
     }
 
     public async Task<DocumentArtifactDto> RecordExternalPrerequisiteAsync(Form form, string note)
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await using var transaction = await context.Database.BeginTransactionAsync();
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         var entry = AnnualDocumentCatalog.ForFormType(stored.Type.ToString())
             ?? throw new InvalidOperationException("This form does not have an external-document prerequisite.");
-        var cycle = FormAttestationRules.ResolveCycle(
-            stored.Person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
-            stored.DueDate)
-            ?? throw new InvalidOperationException("The form is not attached to a valid compliance cycle.");
+        var cycle = ResolveStoredCycle(stored);
         var artifact = await DocumentArtifactStore.StageExternalAsync(
             context, stored.PersonId, actor.AgencyId, entry.Kind, cycle.CycleStart,
             DateTime.UtcNow, actor.Id, note, default);
@@ -210,6 +310,7 @@ public sealed class FormService(
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         if (stored.CompletedDate is null)
             return;
@@ -250,30 +351,93 @@ public sealed class FormService(
 
     public async Task OpenFormAsync(Form form)
     {
-        form.OpenedDate = DateTime.Today;
-        await UpdateFormAsync(form);
+        await OpenFormAsync(form, DateTime.Today);
+    }
+
+    public async Task OpenFormAsync(Form form, DateTime openedOn)
+    {
+        var actor = CurrentCaseManager();
+        await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        var stored = await LoadOwnedFormAsync(context, actor, form.Id);
+        if (stored.OpenedDate is not null)
+        {
+            if (stored.OpenedDate.Value.Date == openedOn.Date)
+            {
+                form.OpenedDate = stored.OpenedDate;
+                return;
+            }
+
+            throw new InvalidOperationException(
+                "This form already has an opening date. Correcting an opening date requires an audited correction workflow.");
+        }
+
+        var settings = await context.Settings.AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.AgencyId == actor.AgencyId)
+            ?? new Settings { AgencyId = actor.AgencyId };
+        var availableOn = FormDueDateCalculator.ComputeAvailableDateForDueDate(
+            stored.Type,
+            stored.DueDate,
+            settings);
+        var dateError = FormOpeningRules.Validate(openedOn, availableOn, DateTime.Today);
+        if (dateError is not null)
+            throw new ArgumentOutOfRangeException(nameof(openedOn), dateError);
+
+        stored.OpenedDate = openedOn.Date;
+        LocalAuditTrail.Record(
+            context,
+            actor,
+            LocalAuditActions.FormOpened,
+            "Form",
+            stored.Id,
+            JsonSerializer.Serialize(new
+            {
+                formType = stored.Type.ToString(),
+                targetEffectiveDate = stored.TargetEffectiveDate == default
+                    ? null
+                    : stored.TargetEffectiveDate.ToString("yyyy-MM-dd"),
+                openedOn = openedOn.Date.ToString("yyyy-MM-dd"),
+                recordedAtUtc = DateTime.UtcNow
+            }));
+        await context.SaveChangesAsync();
+        form.OpenedDate = stored.OpenedDate;
     }
 
     public async Task DeleteFormsAsync(IEnumerable<Form> forms)
     {
         var actor = CurrentCaseManager();
-        var ids = forms.Select(candidate => candidate.Id).Where(id => id > 0).Distinct().ToList();
         await using var context = await contextFactory.CreateDbContextAsync();
-        var owned = await (from stored in context.Forms
-                           join person in context.People on stored.PersonId equals person.Id
-                           where ids.Contains(stored.Id) &&
-                                 person.UserId == actor.Id &&
-                                 person.AgencyId == actor.AgencyId
-                           select stored).ToListAsync();
-        if (owned.Count != ids.Count)
-            throw new UnauthorizedAccessException("One or more forms are outside the signed-in caseload.");
-        if (await context.FormAttestations.AnyAsync(attestation => ids.Contains(attestation.FormId)))
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        // Even an empty request must validate the persisted actor. The session's
+        // capabilities alone may be stale after an administrator changes access.
+        if (!actor.HasCaseManagerPermissions ||
+            !await LocalTenantAccess.IsCurrentActorAsync(context, actor))
         {
-            throw new InvalidOperationException(
-                "A form with attestation history cannot be deleted. Its compliance history is append-only.");
+            throw new UnauthorizedAccessException("A current case manager account is required.");
         }
-        context.Forms.RemoveRange(owned);
-        await context.SaveChangesAsync();
+
+        ArgumentNullException.ThrowIfNull(forms);
+        var ids = forms.Select(candidate => candidate.Id).Where(id => id > 0).Distinct()
+            .Take(FormRetentionRules.MaximumRequestIds + 1).ToList();
+        if (ids.Count > FormRetentionRules.MaximumRequestIds)
+            throw new ArgumentException(FormRetentionRules.RequestLimitMessage, nameof(forms));
+        if (ids.Count == 0)
+            return;
+
+        var ownedIds = await (from stored in context.Forms.AsNoTracking()
+                              join person in context.People.AsNoTracking() on stored.PersonId equals person.Id
+                              join owner in context.Users.AsNoTracking() on person.UserId equals owner.Id
+                              where ids.Contains(stored.Id) &&
+                                    person.UserId == actor.Id && person.AgencyId == actor.AgencyId &&
+                                    owner.AgencyId == actor.AgencyId &&
+                                    owner.Role == actor.Role && owner.Permissions == actor.Permissions
+                              select stored.Id).ToListAsync();
+        if (ownedIds.Count != ids.Count)
+            throw new UnauthorizedAccessException("One or more forms are outside the signed-in caseload.");
+
+        // Do not infer deletion safety from today's requirements or missing
+        // attestations: removing an overdue row would erase the billing block.
+        throw new InvalidOperationException(FormRetentionRules.Message);
     }
 
     private User CurrentCaseManager()
@@ -299,41 +463,124 @@ public sealed class FormService(
         return form;
     }
 
-    private static async Task<List<ArtifactFact>> LoadArtifactFactsAsync(
-        SatiContext context,
-        int personId,
-        DateTime cycleStart,
-        CancellationToken cancellationToken) =>
-        await context.DocumentArtifacts.AsNoTracking()
-            .Where(artifact => artifact.PersonId == personId &&
-                artifact.CycleStart == cycleStart.Date &&
-                artifact.SupersededByArtifactId == null)
-            .Select(artifact => new ArtifactFact(
-                artifact.Id,
-                artifact.PersonId,
-                artifact.Kind.ToString(),
-                artifact.CycleStart,
-                artifact.Origin == DocumentArtifactOrigin.Draft,
-                artifact.Origin == DocumentArtifactOrigin.RecordedAsExternal,
-                context.DocumentAcknowledgments.Any(receipt => receipt.DocumentArtifactId == artifact.Id)))
-            .ToListAsync(cancellationToken);
-
     private static async Task<List<FormFact>> LoadFormFactsAsync(SatiContext context, int personId) =>
         await context.Forms.AsNoTracking()
             .Where(form => form.PersonId == personId)
             .Select(form => new FormFact(
-                form.Id, form.PersonId, form.Type.ToString(), form.DueDate, form.CompletedDate))
+                form.Id,
+                form.PersonId,
+                form.Type.ToString(),
+                form.DueDate,
+                form.CompletedDate,
+                form.TargetEffectiveDate))
             .ToListAsync();
 
-    private static int[] MatchingArtifactIds(string formType, IReadOnlyCollection<ArtifactFact> artifacts)
+    private static FormFact ToFormFact(Form form) => new(
+        form.Id,
+        form.PersonId,
+        form.Type.ToString(),
+        form.DueDate,
+        form.CompletedDate,
+        form.TargetEffectiveDate);
+
+    private static (DateTime CycleStart, DateTime CycleEnd) ResolveStoredCycle(Form form)
     {
-        var entry = AnnualDocumentCatalog.ForFormType(formType);
-        return entry is null
-            ? []
-            : artifacts.Where(artifact =>
-                    artifact.Kind.Equals(entry.Kind.ToString(), StringComparison.OrdinalIgnoreCase) &&
-                    !artifact.IsDraft)
-                .Select(artifact => artifact.ArtifactId)
-                .Distinct().Order().ToArray();
+        var effectiveDate = form.Person.EffectiveDate
+            ?? throw new InvalidOperationException("The consumer has no effective date.");
+        return FormAttestationRules.ResolveCycleForForm(
+                effectiveDate,
+                form.Type.ToString(),
+                form.DueDate,
+                form.TargetEffectiveDate == default ? null : form.TargetEffectiveDate)
+            ?? throw new InvalidOperationException(
+                "The form is not attached to a valid compliance cycle.");
     }
+
+    private static async Task<Form?> FindAssessmentForSameAnnualObligationAsync(
+        SatiContext context,
+        Form reclassification,
+        (DateTime CycleStart, DateTime CycleEnd) cycle)
+    {
+        var candidates = await context.Forms
+            .Include(candidate => candidate.Attestations)
+            .Where(candidate =>
+                candidate.PersonId == reclassification.PersonId &&
+                candidate.Type == FormType.ComprehensiveAssessment)
+            .OrderByDescending(candidate => candidate.DueDate)
+            .ThenByDescending(candidate => candidate.Id)
+            .ToListAsync();
+
+        if (reclassification.TargetEffectiveDate != default)
+        {
+            var exact = candidates.FirstOrDefault(candidate =>
+                candidate.TargetEffectiveDate != default &&
+                candidate.TargetEffectiveDate.Date == reclassification.TargetEffectiveDate.Date);
+            if (exact is not null)
+                return exact;
+
+            // Compatibility during a rolling upgrade: only a legacy row with no
+            // explicit identity may be matched by its deadline window.
+            return candidates.FirstOrDefault(candidate =>
+                candidate.TargetEffectiveDate == default &&
+                candidate.DueDate.Date > cycle.CycleStart.Date &&
+                candidate.DueDate.Date <= cycle.CycleEnd.Date);
+        }
+
+        return candidates.FirstOrDefault(candidate =>
+            candidate.DueDate.Date > cycle.CycleStart.Date &&
+            candidate.DueDate.Date <= cycle.CycleEnd.Date);
+    }
+
+    private static async Task EnsureEvidenceIsValidAsync(
+        SatiContext context,
+        Form form,
+        (DateTime CycleStart, DateTime CycleEnd) cycle,
+        int? evidenceNoteId)
+    {
+        if (evidenceNoteId is not int noteId)
+            return;
+
+        var evidenceIsValid = await context.Notes.AsNoTracking().AnyAsync(note =>
+            note.Id == noteId &&
+            note.PersonId == form.PersonId &&
+            note.FormType == form.Type &&
+            note.EventDate != null &&
+            note.EventDate.Value.Date >= cycle.CycleStart.Date &&
+            note.EventDate.Value.Date < cycle.CycleEnd.Date &&
+            (note.Status == NoteStatus.Pending ||
+             note.Status == NoteStatus.Logged ||
+             note.Status == NoteStatus.Approved));
+        if (!evidenceIsValid)
+            throw new ArgumentException(
+                "The cited note is not matching form evidence.",
+                nameof(evidenceNoteId));
+    }
+
+    private static void RecordAttestationAudit(
+        SatiContext context,
+        User actor,
+        Form form,
+        AttestationActorKind actorKind,
+        (DateTime CycleStart, DateTime CycleEnd) cycle,
+        DateTime completedOn,
+        int? comprehensiveAssessmentFormId = null,
+        int? impliedByReclassificationFormId = null) =>
+        LocalAuditTrail.Record(
+            context,
+            actor,
+            LocalAuditActions.FormAttested,
+            "Form",
+            form.Id,
+            JsonSerializer.Serialize(new
+            {
+                formType = form.Type.ToString(),
+                targetEffectiveDate = form.TargetEffectiveDate == default
+                    ? null
+                    : form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
+                cycleStart = cycle.CycleStart.ToString("yyyy-MM-dd"),
+                completedOn = completedOn.Date.ToString("yyyy-MM-dd"),
+                actorKind = actorKind.ToString(),
+                comprehensiveAssessmentFormId,
+                impliedByReclassificationFormId
+            }));
 }

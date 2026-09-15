@@ -194,6 +194,19 @@ namespace Sati
         // -------------------------------------------------------------------------
 
         public List<Form> Forms { get; set; } = [];
+        public List<ReleaseObligation> ReleaseObligations { get; set; } = [];
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public List<ReleaseComplianceFact> ReleaseComplianceSnapshots { get; set; } = [];
+        IReadOnlyCollection<ReleaseComplianceFact> IEventSource.ReleaseComplianceFacts =>
+            // A populated snapshot is the latest authoritative read returned by the
+            // release-obligation boundary. Local Production also carries detached EF
+            // entities on Person, but those entities do not update when a short-lived
+            // context records an attestation, withdrawal, or provider reconciliation.
+            // Prefer the refreshed snapshot once one has been published so the profile
+            // and billing presentation cannot keep reading that stale detached graph.
+            ReleaseComplianceSnapshots.Count != 0
+                ? ReleaseComplianceSnapshots
+                : ReleaseObligations.Select(item => item.ToComplianceFact()).ToArray();
         public List<Note> Notes { get; set; } = [];
         public List<PersonContact> Contacts { get; set; } = [];
 
@@ -253,89 +266,54 @@ namespace Sati
         // Methods
         // -------------------------------------------------------------------------
 
-        // First-cycle generation, for the creation dialog. Annual non-reviews are in
-        // force from the cycle start when that cycle is the one we are in; reviews
-        // stay open. The dialog then lets the case manager correct every assumption
-        // before anything is saved, which is the right place to record what actually
-        // happened for a backdated admission.
+        // First-cycle generation, for the creation dialog. Generation creates
+        // obligations; it never manufactures evidence that the work happened. A
+        // case manager may record an actual completion through an attestation before
+        // the graph is saved, but absence of an attestation remains absence.
         public static List<Form> GenerateFormList(DateTime effective, Settings settings)
         {
-            var cycleStart = effective;
-            var cycleEnd = effective.AddYears(1);
-            var today = DateTime.Today;
+            var targetEffectiveDate = effective.Date;
 
-            return Enum.GetValues<FormType>()
+            return Contracts.V1.PersonSaveRules.FormTypes
+                .Select(typeName => Enum.Parse<FormType>(typeName))
                 .Select(type => new Form(
                     type,
-                    FormDueDateCalculator.Compute(type, cycleStart, cycleEnd, settings),
-                    InForceSince(type, cycleStart, cycleEnd, today)))
+                    FormDueDateCalculator.Compute(
+                        type,
+                        targetEffectiveDate,
+                        settings),
+                    completedOn: null,
+                    targetEffectiveDate: targetEffectiveDate))
                 .ToList();
         }
 
-        // THE single answer to "was this document already satisfied when its cycle
-        // began, and if so, since when."
-        //
-        // A non-review form with no prerequisite is in force from the day its cycle
-        // started. Document-backed forms stay outstanding until their artifact is
-        // prepared and a human attests; inventing that evidence during person creation
-        // would bypass FormAttestationRules.
-        //
-        // Historically every annual document was treated as in force because the
-        // cycle was assumed to have started BY it being signed — what an admission or renewal
-        // is. Reviews are never assumed: a quarterly review is an attestation that
-        // work happened, and no date can be inferred for work nobody has recorded.
-        //
-        // ONLY the cycle we are in now gets that assumption, and this is where that
-        // limit lives. Two other kinds of cycle get nothing:
-        //
-        //   A cycle that has not started assumes nothing. Its documents are
-        //   outstanding until someone renews them, which is how missed renewal prep
-        //   gets flagged.
-        //
-        //   A cycle that has already ENDED assumes nothing either. Sati has no record
-        //   of whether those documents were renewed on time, and a later cycle
-        //   beginning proves nothing — cycles turn over on the anniversary date, not
-        //   because anything was signed. Marking a closed year satisfied would assert
-        //   compliance nobody attested, across every historical cycle at once. Those
-        //   forms are generated outstanding instead, so an unknown reads as unknown.
-        //   For a backdated admission the creation dialog is where the case manager
-        //   records what actually happened.
-        //
-        // This returns a DATE rather than a flag on purpose. The old code paths
-        // expressed the same belief two different ways — GenerateFormList stamped the
-        // effective date, AddMissingFormsForCycle set a bare compliant flag with no
-        // date — and the second produced the 147 rows that read complete while
-        // blocking billing. One helper, one answer.
-        private static DateTime? InForceSince(
-            FormType type, DateTime cycleStart, DateTime cycleEnd, DateTime today) =>
-            !IsReviewType(type) &&
-            FormAttestationRules.PrerequisiteFor(type.ToString()) == PrerequisiteKind.None &&
-            cycleStart.Date <= today.Date &&
-            today.Date < cycleEnd.Date
-                ? cycleStart.Date
-                : null;
-
-        // Returns (cycleStart, cycleEnd) bracketing the cycle containing today:
-        // cycleStart <= today < cycleEnd. The anniversary itself belongs to the
-        // next cycle. Null if EffectiveDate is unset.
+        // Returns (cycleStart, cycleEnd) bracketing the cycle containing today.
+        // Before the first effective date, returns the first planned cycle so its
+        // pre-service obligations can be prepared. Null if EffectiveDate is unset.
         public (DateTime cycleStart, DateTime cycleEnd)? GetCurrentCycleBoundaries(DateTime today)
         {
             if (EffectiveDate is null)
                 return null;
 
-            var effective = EffectiveDate.Value;
-            var yearsElapsed = today.Year - effective.Year;
-            if (today < effective.AddYears(yearsElapsed))
-                yearsElapsed--;
-
-            var cycleStart = effective.AddYears(yearsElapsed);
-            var cycleEnd = effective.AddYears(yearsElapsed + 1);
+            var cycleStart = ResolveCurrentTargetEffectiveDate(EffectiveDate.Value, today);
+            var cycleEnd = cycleStart.AddYears(1);
             return (cycleStart, cycleEnd);
         }
 
+        /// <summary>
+        /// Resolves the annual effective date whose plan is in force on
+        /// <paramref name="asOf"/>. Before a consumer's first effective date, the
+        /// first date is returned so pre-service work can still be prepared.
+        /// </summary>
+        public static DateTime ResolveCurrentTargetEffectiveDate(
+            DateTime initialEffectiveDate,
+            DateTime asOf) =>
+            Contracts.V1.ComplianceScheduleRules.CurrentTargetEffectiveDate(
+                initialEffectiveDate, asOf);
+
         // Which quarter of the current cycle today falls in, 1-4. Quarters are
         // 90-day blocks from cycleStart, matching how Q1R-Q4R due dates are
-        // anchored (prevAnniversary + 90/180/270/365) — so "we're in Q3" means
+        // anchored (prevAnniversary + 90/180/270/360) — so "we're in Q3" means
         // Q3R is the review currently in play.
         //
         // The clamp matters: a 365-day cycle divided into 90-day blocks leaves a
@@ -354,17 +332,14 @@ namespace Sati
             return Math.Clamp(elapsed / 90 + 1, 1, 4);
         }
 
-        // THE single definition of form-to-cycle membership: a form belongs to a
-        // cycle if its due date falls in (cycleStart, cycleEnd] — after the start,
-        // on OR before the end. The anniversary is INCLUSIVE because annual forms
-        // are dated cycleEnd − offset and the offset-0 forms land exactly on
-        // cycleEnd; an exclusive end would drop them into the next cycle.
-        //
-        // Every membership question in this class routes through here. The
-        // dashboard's forward-looking task filter deliberately does NOT — it
-        // scans current-and-future with no upper bound by design.
-        private static bool FormBelongsToCycle(DateTime dueDate, DateTime cycleStart, DateTime cycleEnd)
-            => dueDate > cycleStart && dueDate <= cycleEnd;
+        // Transitional fallback for rows created before TargetEffectiveDate existed.
+        // The migration must backfill every real row; this keeps detached legacy DTOs
+        // readable during a rolling client/API upgrade without letting due-date math
+        // override an explicit identity.
+        private static bool LegacyFormBelongsToCycle(
+            DateTime dueDate,
+            DateTime cycleStart,
+            DateTime cycleEnd) => dueDate > cycleStart && dueDate <= cycleEnd;
 
         // Returns the current-cycle form of the given type, or null if none
         // exists — the caller surfaces that as NoForm rather than borrowing a
@@ -374,10 +349,7 @@ namespace Sati
 
         // Static single-source-of-truth for current-cycle form lookup. Extracted so
         // PersonSummary (the blob-free sidebar DTO) can answer GetCurrentCycleForm
-        // without a shadow copy of cycle-membership math. Cycle boundaries are computed
-        // inline here from effectiveDate rather than via the instance
-        // GetCurrentCycleBoundaries, so the helper needs no Person instance — same
-        // convention, (cycleStart, cycleEnd], enforced by FormBelongsToCycle.
+        // without a shadow copy of cycle math.
         public static Form? FindCurrentCycleForm(
             List<Form> forms, DateTime? effectiveDate, FormType type, DateTime? asOf = null)
         {
@@ -385,21 +357,37 @@ namespace Sati
                 return null;
 
             var today = asOf ?? DateTime.Today;
-            var effective = effectiveDate.Value;
+            var target = ResolveCurrentTargetEffectiveDate(effectiveDate.Value, today);
+            var identified = FindFormForTargetEffectiveDate(forms, type, target);
+            if (identified is not null)
+                return identified;
 
-            var yearsElapsed = today.Year - effective.Year;
-            if (today < effective.AddYears(yearsElapsed))
-                yearsElapsed--;
-
-            var cycleStart = effective.AddYears(yearsElapsed);
-            var cycleEnd = effective.AddYears(yearsElapsed + 1);
-
+            // Compatibility only. An explicit row always wins, and migrated data
+            // never reaches this branch.
             return forms
-                .Where(f => f.Type == type &&
-                            FormBelongsToCycle(f.DueDate, cycleStart, cycleEnd))
-                .OrderByDescending(f => f.DueDate)
+                .Where(form =>
+                    form.Type == type &&
+                    form.TargetEffectiveDate == default &&
+                    LegacyFormBelongsToCycle(form.DueDate, target, target.AddYears(1)))
+                .OrderByDescending(form => form.DueDate)
                 .FirstOrDefault();
         }
+
+        /// <summary>
+        /// Finds one obligation by its stable annual identity. The due date is
+        /// deliberately absent from this lookup: changing a deadline must not create
+        /// or select a different annual obligation.
+        /// </summary>
+        public static Form? FindFormForTargetEffectiveDate(
+            IEnumerable<Form> forms,
+            FormType type,
+            DateTime targetEffectiveDate) =>
+            forms
+                .Where(form =>
+                    form.Type == type &&
+                    form.TargetEffectiveDate.Date == targetEffectiveDate.Date)
+                .OrderByDescending(form => form.DueDate)
+                .FirstOrDefault();
 
         public FormComplianceStatus GetComplianceStatus(FormType type, DateTime referenceDate, Settings settings)
         {
@@ -431,36 +419,12 @@ namespace Sati
             return FormComplianceStatus.Overdue;
         }
 
-        public static int GetOpenDaysBefore(FormType type, Settings settings) => type switch
-        {
-            FormType.Q1R or FormType.Q2R or FormType.Q3R or FormType.Q4R
-                => settings.ReviewOpenDaysBefore,
-            FormType.PCP
-                => settings.PcpOpenDaysBefore,
-            FormType.ComprehensiveAssessment
-                => settings.CompAssessmentOpenDaysBefore,
-            FormType.Reclassification
-                => settings.ReclassificationOpenDaysBefore,
-            FormType.SafetyPlan
-                => settings.SafetyPlanOpenDaysBefore,
-            FormType.PrivacyPractices
-                => settings.PrivacyPracticesOpenDaysBefore,
-            FormType.Release_Agency
-                => settings.ReleaseAgencyOpenDaysBefore,
-            FormType.Release_DHHS
-                => settings.ReleaseDhhsOpenDaysBefore,
-            FormType.Release_Medical
-                => settings.ReleaseMedicalOpenDaysBefore,
-            _ => 30
-        };
+        public static int GetOpenDaysBefore(FormType type, Settings settings) =>
+            FormDueDateCalculator.GetOpenDaysBeforeDue(type, settings);
 
-        // Ensures forms exist for the current AND next cycle. Current-cycle forms
-        // with no prerequisite are created already satisfied, dated from the cycle
-        // start. Document-backed forms remain outstanding until their prerequisite
-        // and attestation exist. Next-cycle annuals are satisfied during the prep window as
-        // renewals are signed — if the cycle rolls over with them still open, missed
-        // prep is correctly flagged. Reviews are outstanding in both cycles.
-        // InForceSince owns that whole distinction.
+        // Ensures forms exist for every annual effective date through the next
+        // renewal. Every generated row is outstanding. Only an explicit attestation
+        // can supply a completion date.
         //
         // This is the only thing that generates forms for an ongoing caseload, so if
         // it does not run, clients silently stop having compliance records once their
@@ -470,14 +434,11 @@ namespace Sati
         // decides that race in the database, and PersonService discards the losing
         // insert and re-reads, so the guard is no longer needed.
         //
-        // Settings is unused after the form-model refactor; kept so PersonService
-        // doesn't change in lockstep. Remove in a follow-up sweep.
         public bool EnsureCurrentCycleForms(DateTime today, Settings settings)
         {
             if (EffectiveDate is null)
                 return false;
 
-            var effective = EffectiveDate.Value;
             var added = false;
 
             // Cycle 0 starts on the effective date; cycle N starts N years later.
@@ -489,38 +450,25 @@ namespace Sati
             // requirements. Absent is not the same as satisfied, and generating the
             // row is what makes the difference visible.
             //
-            // Closed cycles are generated outstanding — see InForceSince — so a real
-            // historical gap surfaces as an open document rather than an invented
-            // completion date.
-            var yearsElapsed = today.Year - effective.Year;
-            if (today < effective.AddYears(yearsElapsed))
-                yearsElapsed--;
-            var lastIndex = Math.Max(yearsElapsed + 1, 0);
-
-            // Skip from the OLDEST end when the range is implausible. The current and
-            // next cycles — the only ones that can be worked on now — are always
-            // generated, and what remains is a contiguous run ending at the next
-            // cycle rather than an arbitrary subset.
-            var firstIndex = Math.Max(0, lastIndex + 1 - MaxGeneratedCycles);
-
-            for (var index = firstIndex; index <= lastIndex; index++)
+            // Closed cycles are generated outstanding, so a real historical gap
+            // surfaces rather than being replaced by invented completion evidence.
+            foreach (var targetEffectiveDate in
+                     Contracts.V1.ComplianceScheduleRules.TargetEffectiveDatesThroughNext(
+                         EffectiveDate.Value, today, MaxGeneratedCycles))
             {
-                var cycleStart = effective.AddYears(index);
-                var cycleEnd = effective.AddYears(index + 1);
-                added |= AddMissingFormsForCycle(cycleStart, cycleEnd, today, settings);
+                added |= AddMissingFormsForTargetEffectiveDate(targetEffectiveDate, settings);
             }
 
             return added;
         }
 
-        // Twenty-five annual cycles is beyond any real case-management tenure and
-        // still cheap; past it, the effective date is far likelier to be a typo than
-        // a record.
-        private const int MaxGeneratedCycles = 25;
+        // This is a corruption guard, not a rolling window. Every cycle is generated
+        // or the operation fails explicitly; older obligations are never dropped.
+        private const int MaxGeneratedCycles = 150;
 
         // Adds only the candidates this person does not already have, keyed by
-        // (type, due date) — the same key as IX_Forms_PersonId_Type_DueDate, so what
-        // this refuses to add is exactly what the database would refuse to store.
+        // (type, target effective date). A due-date policy change adjusts an existing
+        // obligation; it must not create a second obligation for the same year.
         //
         // Callers hold a freshly generated form list, whose members all carry Id == 0.
         // Assigning such a list over Forms looks like replacement but is not: saves go
@@ -534,14 +482,23 @@ namespace Sati
         public int AddMissingForms(IEnumerable<Form> candidates)
         {
             var present = Forms
+                .Where(form => form.TargetEffectiveDate != default)
+                .Select(form => (form.Type, form.TargetEffectiveDate.Date))
+                .ToHashSet();
+            var legacyDueDates = Forms
+                .Where(form => form.TargetEffectiveDate == default)
                 .Select(form => (form.Type, form.DueDate.Date))
                 .ToHashSet();
             var added = 0;
 
             foreach (var candidate in candidates)
             {
-                if (!present.Add((candidate.Type, candidate.DueDate.Date)))
+                var identity = (candidate.Type, candidate.TargetEffectiveDate.Date);
+                if (present.Contains(identity) ||
+                    legacyDueDates.Contains((candidate.Type, candidate.DueDate.Date)))
                     continue;
+
+                present.Add(identity);
                 candidate.PersonId = Id;
                 Forms.Add(candidate);
                 added++;
@@ -550,34 +507,44 @@ namespace Sati
             return added;
         }
 
-        // Idempotent: only adds forms missing for the cycle. Membership routes
-        // through FormBelongsToCycle — the (cycleStart, cycleEnd] convention —
-        // so a form created here is visible to GetCurrentCycleForm.
-        private bool AddMissingFormsForCycle(
-            DateTime cycleStart, DateTime cycleEnd, DateTime today, Settings settings)
+        // Idempotent: only adds forms missing for one target effective date.
+        private bool AddMissingFormsForTargetEffectiveDate(
+            DateTime targetEffectiveDate,
+            Settings settings)
         {
-            // One pass over Forms per cycle rather than one per (cycle, type). This
-            // now runs across a client's whole tenure, so the old nested scan was
-            // O(cycles x types x forms) on every caseload load.
-            var presentForCycle = Forms
-                .Where(form => FormBelongsToCycle(form.DueDate, cycleStart, cycleEnd))
+            var target = targetEffectiveDate.Date;
+            var presentForTarget = Forms
+                .Where(form => form.TargetEffectiveDate.Date == target)
                 .Select(form => form.Type)
                 .ToHashSet();
 
             var added = false;
 
-            foreach (var type in Enum.GetValues<FormType>())
+            foreach (var typeName in Contracts.V1.PersonSaveRules.FormTypes)
             {
-                if (presentForCycle.Contains(type))
+                var type = Enum.Parse<FormType>(typeName);
+                if (presentForTarget.Contains(type))
                     continue;
 
-                // InForceSince, not a bare flag: a document created already satisfied
-                // carries the date that satisfied it. This call site is where the 147
-                // dateless-but-compliant rows came from.
+                var dueDate = FormDueDateCalculator.Compute(
+                    type,
+                    target,
+                    settings);
+
+                // A detached legacy row can arrive during a rolling upgrade. Match
+                // it only by the former identity for compatibility; migrated rows
+                // always use TargetEffectiveDate above.
+                if (Forms.Any(form =>
+                    form.TargetEffectiveDate == default &&
+                    form.Type == type &&
+                    form.DueDate.Date == dueDate.Date))
+                    continue;
+
                 Forms.Add(new Form(
-                                    type,
-                                    FormDueDateCalculator.Compute(type, cycleStart, cycleEnd, settings),
-                                    InForceSince(type, cycleStart, cycleEnd, today))
+                    type,
+                    dueDate,
+                    completedOn: null,
+                    targetEffectiveDate: target)
                 {
                     PersonId = Id
                 });
@@ -593,12 +560,19 @@ namespace Sati
             DateTime today,
             FormType? beingCompleted = null,
             Contracts.V1.BillingComplianceRequirements requirements =
-                Contracts.V1.BillingComplianceGate.DefaultRequirements)
+                Contracts.V1.BillingComplianceGate.DefaultRequirements,
+            int pcpOpenDaysBefore = 90)
         {
+            // Kept in the public signature for source compatibility with callers
+            // that also use the setting for UI availability. Billing itself uses
+            // the fixed ninety-day PCP-opening rule.
+            _ = pcpOpenDaysBefore;
+            var obligations = BillingComplianceSnapshots(
+                today,
+                new Contracts.V1.ComplianceScheduleSettings());
             var result = Contracts.V1.BillingComplianceGate.Evaluate(
                 EffectiveDate,
-                Forms.Select(form => new Contracts.V1.ComplianceFormSnapshot(
-                    form.Type.ToString(), form.DueDate, form.CompletedDate)),
+                obligations,
                 today,
                 beingCompleted?.ToString(),
                 requirements);
@@ -668,12 +642,71 @@ namespace Sati
         public IReadOnlyList<string> EvaluateBillingWindow(
             DateTime noteDate,
             Contracts.V1.BillingComplianceRequirements requirements =
-                Contracts.V1.BillingComplianceGate.DefaultRequirements) =>
-            Contracts.V1.BillingComplianceGate.EvaluateBillingWindow(
-                Forms.Select(form => new Contracts.V1.ComplianceFormSnapshot(
-                    form.Type.ToString(), form.DueDate, form.CompletedDate)),
+                Contracts.V1.BillingComplianceGate.DefaultRequirements,
+            Contracts.V1.ComplianceScheduleSettings? schedule = null) =>
+            EvaluateBillingWindowDetailed(noteDate, requirements, schedule).Reasons;
+
+        public Contracts.V1.BillingComplianceResult EvaluateBillingWindowDetailed(
+            DateTime noteDate,
+            Contracts.V1.BillingComplianceRequirements requirements =
+                Contracts.V1.BillingComplianceGate.DefaultRequirements,
+            Contracts.V1.ComplianceScheduleSettings? schedule = null) =>
+            Contracts.V1.BillingComplianceGate.EvaluateBillingWindowDetailed(
+                BillingComplianceSnapshots(
+                    noteDate,
+                    schedule ?? new Contracts.V1.ComplianceScheduleSettings()),
                 noteDate,
                 requirements);
+
+        private IReadOnlyList<Contracts.V1.ComplianceFormSnapshot> BillingComplianceSnapshots(
+            DateTime asOfDate,
+            Contracts.V1.ComplianceScheduleSettings schedule)
+        {
+            var releaseFacts = Contracts.V1.ExpectedBillingComplianceObligations
+                .IncludeMissingDhhs(
+                    EffectiveDate,
+                    ((IEventSource)this).ReleaseComplianceFacts,
+                    asOfDate);
+            // The always-present DHHS obligation marks a reconciled annual cycle. Once that
+            // row exists, the old three fixed release forms for the same cycle must not create
+            // a second, contradictory gate beside the recipient-specific obligations.
+            var reconciledReleaseCycles = releaseFacts
+                .Select(item => item.TargetEffectiveDate)
+                .Where(item => item is not null)
+                .Select(item => item!.Value.Date)
+                .ToHashSet();
+            var formSnapshots = Forms
+                .Where(form => !IsLegacyReleaseForm(form.Type) ||
+                               !reconciledReleaseCycles.Contains(
+                                   (form.TargetEffectiveDate == default
+                                       ? form.DueDate
+                                       : form.TargetEffectiveDate).Date))
+                .Select(form => new Contracts.V1.ComplianceFormSnapshot(
+                    form.Type.ToString(),
+                    form.DueDate,
+                    form.CompletedDate,
+                    form.OpenedDate,
+                    form.Id > 0 ? $"form:{form.Id}" : null,
+                    TargetEffectiveDate: form.TargetEffectiveDate == default
+                        ? null
+                        : form.TargetEffectiveDate));
+            var withExpectedForms = Contracts.V1.ExpectedBillingComplianceObligations
+                .IncludeMissingForms(
+                    EffectiveDate,
+                    formSnapshots,
+                    asOfDate,
+                    schedule);
+            var withOpening = Contracts.V1.BillingComplianceGate
+                .IncludePcpOpeningObligations(withExpectedForms);
+            return withOpening.Concat(
+                    Contracts.V1.ReleaseBillingRules.BuildComplianceSnapshots(
+                        releaseFacts,
+                        asOfDate))
+                .ToArray();
+        }
+
+        private static bool IsLegacyReleaseForm(FormType type) => type is
+            FormType.Release_Agency or FormType.Release_DHHS or FormType.Release_Medical;
 
         public static string FormDisplayName(FormType type) => type switch
         {
@@ -691,8 +724,5 @@ namespace Sati
             FormType.Q4R => "Q4 Review",
             _ => type.ToString()
         };
-
-        private static bool IsReviewType(FormType type) => type is
-                FormType.Q1R or FormType.Q2R or FormType.Q3R or FormType.Q4R;
     }
 }

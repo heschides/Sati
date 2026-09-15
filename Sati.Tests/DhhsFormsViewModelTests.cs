@@ -105,6 +105,45 @@ public sealed class DhhsFormsViewModelTests
         Assert.Equal("Not stored in local Production.", viewModel.SsnStatusMessage);
     }
 
+    [Fact]
+    public async Task Dhhs_release_generation_carries_the_exact_target_and_obligation()
+    {
+        var service = new RecordingDhhsFormService(false);
+        var viewModel = new DhhsFormsViewModel(service);
+        var person = PersonFor(81, "Release");
+        var target = person.EffectiveDate!.Value.AddYears(1).Date;
+        var obligationId = Guid.NewGuid();
+        viewModel.SetPerson(person);
+        viewModel.SetReleaseObligations(
+        [
+            new ReleaseObligationDto(
+                902,
+                obligationId,
+                person.Id,
+                $"release:v1:{target:yyyy-MM-dd}:dhhs:annual",
+                nameof(ReleaseObligationCategory.Dhhs),
+                nameof(ReleaseObligationTrigger.AnnualRenewal),
+                target,
+                null,
+                null,
+                target.AddDays(-90),
+                target,
+                target,
+                null,
+                null,
+                null,
+                false,
+                [])
+        ]);
+        viewModel.SelectForm(DhhsFormDefinition.FormKey.AuthorizationToRelease);
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        Assert.Equal(target, service.GeneratedTargetEffectiveDate);
+        Assert.Equal(obligationId, service.GeneratedReleaseObligationId);
+        Assert.Contains($"Annual effective date: {target:MMM d, yyyy}", viewModel.StatusMessage);
+    }
+
     private static Person PersonFor(int id, string lastName)
     {
         var person = Person.CreatePerson(
@@ -134,6 +173,8 @@ public sealed class DhhsFormsViewModelTests
         public int? GeneratedPersonId { get; private set; }
         public DhhsFormDefinition.FormKey? GeneratedForm { get; private set; }
         public DhhsFormDefinition.Selections? GeneratedSelections { get; private set; }
+        public DateTime? GeneratedTargetEffectiveDate { get; private set; }
+        public Guid? GeneratedReleaseObligationId { get; private set; }
 
         public Task<SsnStatusDto> GetSsnStatusAsync(int personId, CancellationToken cancellationToken = default) =>
             Task.FromResult(new SsnStatusDto(SsnMask.NotOnFile, false));
@@ -167,6 +208,25 @@ public sealed class DhhsFormsViewModelTests
             GeneratedForm = form;
             GeneratedPersonId = personId;
             GeneratedSelections = selections;
+            return Task.FromResult(new DhhsFormResult(
+                [1, 2, 3],
+                "form.pdf",
+                ["Individual's SSN"]));
+        }
+
+        public Task<DhhsFormResult> GenerateForAnnualTargetAsync(
+            DhhsFormDefinition.FormKey form,
+            int personId,
+            DhhsFormDefinition.Selections selections,
+            DateTime targetEffectiveDate,
+            Guid? releaseObligationId,
+            CancellationToken cancellationToken = default)
+        {
+            GeneratedForm = form;
+            GeneratedPersonId = personId;
+            GeneratedSelections = selections;
+            GeneratedTargetEffectiveDate = targetEffectiveDate.Date;
+            GeneratedReleaseObligationId = releaseObligationId;
             return Task.FromResult(new DhhsFormResult(
                 [1, 2, 3],
                 "form.pdf",

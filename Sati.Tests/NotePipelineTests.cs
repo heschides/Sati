@@ -581,6 +581,38 @@ public sealed class NotePipelineTests
     }
 
     [Fact]
+    public async Task LaterOverdueFormDoesNotBlockEarlierServiceFromApprovalOrBilling()
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var serviceDate = DateTime.Today.AddDays(-7);
+        var laterDueDate = DateTime.Today.AddDays(-5);
+        var noteId = await fixture.SeedNoteAsync(
+            fixture.PersonOneId, NoteStatus.Logged, serviceDate);
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            db.Forms.Add(new Form(
+                FormType.PCP,
+                laterDueDate,
+                targetEffectiveDate: laterDueDate)
+            {
+                PersonId = fixture.PersonOneId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var supervisor = fixture.SupervisionAs(fixture.SupervisorOne);
+        Assert.Contains(
+            await supervisor.GetPendingNotesAsync(fixture.SupervisorOne.Id),
+            note => note.Id == noteId);
+        await supervisor.ApproveNoteAsync(
+            noteId, fixture.SupervisorOne.Id, await fixture.RevisionOfAsync(noteId));
+
+        var line = await fixture.BillingAs(fixture.AdminOne).CreateClaimLineAsync(noteId);
+
+        Assert.Equal(serviceDate.Date, line.DateOfService.Date);
+    }
+
+    [Fact]
     public async Task TheFirstClaimLineOfANewMonthAttachesToItsOwnPeriod()
     {
         await using var fixture = await PipelineFixture.CreateAsync();
@@ -735,14 +767,74 @@ public sealed class NotePipelineTests
         var noteId = await fixture.SeedNoteAsync(
             fixture.PersonOneId, NoteStatus.Logged, fixture.BillableDate);
 
+        int blockerFormId;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var blocker = new Form(
+                FormType.Q1R,
+                fixture.BillableDate.AddDays(-1),
+                targetEffectiveDate: fixture.BillableDate.AddYears(-1))
+            {
+                PersonId = fixture.PersonOneId
+            };
+            db.Forms.Add(blocker);
+            await db.SaveChangesAsync();
+            blockerFormId = blocker.Id;
+        }
+
         await supervisor.ApproveWithOverrideAsync(noteId, fixture.SupervisorOne.Id,
-            "Documented supervisory exception.", await fixture.RevisionOfAsync(noteId));
+            "Documented supervisory exception.", await fixture.RevisionOfAsync(noteId),
+            [$"form:{blockerFormId}"], attestationConfirmed: true);
 
         // The caller asks for no exception; the note's record decides anyway.
         var line = await billing.CreateClaimLineAsync(noteId, false, null);
 
         Assert.True(line.IsComplianceException);
         Assert.Equal("Documented supervisory exception.", line.ComplianceExceptionReason);
+    }
+
+    [Fact]
+    public async Task NarrowSupervisorExceptionLeavesUnselectedBlockerInForce()
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var supervisor = fixture.SupervisionAs(fixture.SupervisorOne);
+        var billing = fixture.BillingAs(fixture.AdminOne);
+        var noteId = await fixture.SeedNoteAsync(
+            fixture.PersonOneId, NoteStatus.Logged, fixture.BillableDate);
+
+        int selectedBlockerId;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var selected = new Form(
+                FormType.Q1R,
+                fixture.BillableDate.AddDays(-2),
+                targetEffectiveDate: fixture.BillableDate.AddYears(-1))
+            {
+                PersonId = fixture.PersonOneId
+            };
+            var remaining = new Form(
+                FormType.Q2R,
+                fixture.BillableDate.AddDays(-1),
+                targetEffectiveDate: fixture.BillableDate.AddYears(-1))
+            {
+                PersonId = fixture.PersonOneId
+            };
+            db.Forms.AddRange(selected, remaining);
+            await db.SaveChangesAsync();
+            selectedBlockerId = selected.Id;
+        }
+
+        await supervisor.ApproveWithOverrideAsync(
+            noteId,
+            fixture.SupervisorOne.Id,
+            "Narrow exception for one exact obligation.",
+            await fixture.RevisionOfAsync(noteId),
+            [$"form:{selectedBlockerId}"],
+            attestationConfirmed: true);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            billing.CreateClaimLineAsync(noteId));
+        Assert.Contains("Q2 Review", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1143,12 +1235,12 @@ public sealed class NotePipelineTests
         }
 
         /// <summary>
-        /// The four required annual documents, compliant, due later in the current
-        /// cycle. No review is due yet, so the compliance gate passes cleanly.
+        /// The fixture's annual documents, completed from their first legitimate
+        /// availability date. No review is due yet, so the gate passes cleanly.
         /// </summary>
         private static List<Form> CompliantForms(DateTime effective)
         {
-            var dueDate = effective.AddMonths(6);
+            var settings = new Settings();
             var forms = new List<Form>();
             foreach (var type in new[]
                      {
@@ -1156,8 +1248,15 @@ public sealed class NotePipelineTests
                          FormType.Reclassification, FormType.SafetyPlan
                      })
             {
-                var form = new Form(type, dueDate, DateTime.Today);
-                form.SetInitialCompletion(effective);
+                var dueDate = FormDueDateCalculator.Compute(type, effective, settings);
+                var form = new Form(
+                    type,
+                    dueDate,
+                    completedOn: FormDueDateCalculator.ComputeAvailableDate(
+                        type,
+                        dueDate,
+                        settings),
+                    targetEffectiveDate: effective);
                 forms.Add(form);
             }
             return forms;

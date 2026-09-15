@@ -75,10 +75,12 @@ public sealed class CloudUserService(CloudApiClient api) : IUserService
         api.PutAsync($"/api/v1/users/{user.Id}", ToRequest(user));
     public async Task ResetPasswordAsync(AgencyActor actor, User user, SecureString newPassword)
     {
+        var generation = api.SessionGeneration;
         var plainText = ToPlainText(newPassword);
         try
         {
             await api.PutAsync($"/api/v1/users/{user.Id}/password", new ResetPasswordRequest(plainText));
+            if (actor.UserId == user.Id) api.InvalidateCurrentSession(generation);
         }
         finally
         {
@@ -87,18 +89,33 @@ public sealed class CloudUserService(CloudApiClient api) : IUserService
     }
     public async Task ChangePasswordAsync(User user, SecureString currentPassword, SecureString newPassword)
     {
+        var generation = api.SessionGeneration;
         var currentPlainText = ToPlainText(currentPassword);
         var newPlainText = ToPlainText(newPassword);
         try
         {
             await api.PutAsync("/api/v1/users/me/password",
                 new ChangePasswordRequest(currentPlainText, newPlainText));
+            api.InvalidateCurrentSession(generation);
         }
         finally
         {
             currentPlainText = string.Empty;
             newPlainText = string.Empty;
         }
+    }
+    public async Task SetEnabledAsync(AgencyActor actor, User user, bool isEnabled)
+    {
+        var generation = api.SessionGeneration;
+        await api.PutAsync($"/api/v1/users/{user.Id}/enabled", new SetUserEnabledRequest(isEnabled));
+        if (actor.UserId == user.Id && !isEnabled) api.InvalidateCurrentSession(generation);
+    }
+
+    public async Task RevokeSessionsAsync(AgencyActor actor, User user)
+    {
+        var generation = api.SessionGeneration;
+        await api.DeleteAsync($"/api/v1/users/{user.Id}/sessions");
+        if (actor.UserId == user.Id) api.InvalidateCurrentSession(generation);
     }
     public async Task<List<User>> GetSuperviseesAsync(int supervisorId) =>
         (await api.GetAsync<List<UserProfileDto>>("/api/v1/supervisor/supervisees"))
@@ -169,10 +186,20 @@ public sealed class CloudSupervisorService(CloudApiClient api) : ISupervisorServ
             $"/api/v1/supervisor/notes/{noteId}/approve",
             new SupervisorNoteActionRequest(null, expectedRevision, maximumUnits));
 
-    public async Task ApproveWithOverrideAsync(int noteId, int supervisorId, string overrideReason, int expectedRevision) =>
+    public async Task ApproveWithOverrideAsync(
+        int noteId,
+        int supervisorId,
+        string overrideReason,
+        int expectedRevision,
+        IReadOnlyList<string>? blockingObligationIds = null,
+        bool attestationConfirmed = false) =>
         _ = await SendNoteActionAsync(
             $"/api/v1/supervisor/notes/{noteId}/approve-override",
-            new SupervisorNoteActionRequest(overrideReason, expectedRevision));
+            new SupervisorNoteActionRequest(
+                overrideReason,
+                expectedRevision,
+                BlockingObligationIds: blockingObligationIds,
+                AttestationConfirmed: attestationConfirmed));
 
     public async Task ReturnNoteAsync(int noteId, int supervisorId, string reason, int expectedRevision) =>
         _ = await SendNoteActionAsync(
@@ -269,8 +296,8 @@ public sealed class CloudAtRequestService(CloudApiClient api) : IATRequestServic
     // what it now holds. The caseManager argument is ignored on this path — the
     // API derives the signer from the bearer token, and taking the client's word
     // for who signed is precisely what the publish route refuses to do. It stays
-    // in the signature because the desktop-local implementation, which has no
-    // token to read, genuinely needs it.
+    // in the interface for compatibility; desktop-local publication now derives
+    // its signer from the authenticated local session too.
     public async Task<ATRequest> PublishAsync(ATRequest request, User caseManager)
     {
         try
@@ -558,6 +585,11 @@ public sealed class CloudConsumerBillingLossReportService(CloudApiClient api) : 
 public sealed class CloudBillingService(CloudApiClient api) : IBillingService
 {
     public bool SupportsMockClearinghouse => true;
+    public bool SupportsResponseImport => true;
+    public Task<ClaimResponseIngestResultDto> ImportResponseAsync(
+        AgencyActor actor, string document, CancellationToken cancellationToken = default) =>
+        api.PostWithCapturedSessionAsync<ClaimResponseIngestRequest, ClaimResponseIngestResultDto>(
+            "/api/v1/billing/responses", new ClaimResponseIngestRequest(document), cancellationToken);
     private readonly Dictionary<int, IReadOnlyList<string>> _candidateErrors = [];
 
     public async Task<BillingPeriod> GetOrCreateBillingPeriodAsync(AgencyActor actor, int userId, int month, int year) =>
@@ -599,6 +631,21 @@ public sealed class CloudBillingService(CloudApiClient api) : IBillingService
         return candidates.Select(candidate => CloudContractMapper.ToNote(candidate.Note)).ToList();
     }
 
+    public Task<BillingComplianceRecoveryPlan> PrepareComplianceRecoveryAsync(
+        AgencyActor actor,
+        int personId,
+        CancellationToken cancellationToken = default) =>
+        api.GetAsync<BillingComplianceRecoveryPlan>(
+            $"/api/v1/billing/compliance-recovery/{personId}", cancellationToken);
+
+    public Task<Sati.Contracts.V1.BillingComplianceRecoveryDecision> RecordComplianceRecoveryAsync(
+        AgencyActor actor,
+        int personId,
+        CreateBillingComplianceRecoveryRequest request,
+        CancellationToken cancellationToken = default) =>
+        api.PostWithCapturedSessionAsync<CreateBillingComplianceRecoveryRequest, Sati.Contracts.V1.BillingComplianceRecoveryDecision>(
+            $"/api/v1/billing/compliance-recovery/{personId}", request, cancellationToken);
+
     public BillingValidationResult ValidateNoteForBilling(Note note)
     {
         var errors = _candidateErrors.GetValueOrDefault(note.Id) ?? ["Billing validation was not loaded for this note."];
@@ -624,6 +671,11 @@ public sealed class CloudBillingService(CloudApiClient api) : IBillingService
 
     public async Task<IReadOnlyList<BillingSubmissionHistoryDto>> GetSubmissionHistoryAsync(AgencyActor actor) =>
         await api.GetAsync<List<BillingSubmissionHistoryDto>>("/api/v1/billing/submissions");
+
+    public async Task<IReadOnlyList<BillingCompliancePolicyReviewFlagDto>>
+        GetBillingCompliancePolicyReviewFlagsAsync(AgencyActor actor) =>
+        await api.GetAsync<List<BillingCompliancePolicyReviewFlagDto>>(
+            "/api/v1/billing/compliance-policy-review-flags");
 
     public async Task<MockClearinghouseResultDto> SubmitToMockClearinghouseAsync(
         AgencyActor actor,

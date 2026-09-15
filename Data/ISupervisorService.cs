@@ -23,7 +23,13 @@ namespace Sati.Data
 
         // Override path — supervisor judges billing appropriate despite compliance gap.
         // Requires written justification. Creates a flagged claim visible to billing.
-        Task ApproveWithOverrideAsync(int noteId, int supervisorId, string overrideReason, int expectedRevision);
+        Task ApproveWithOverrideAsync(
+            int noteId,
+            int supervisorId,
+            string overrideReason,
+            int expectedRevision,
+            IReadOnlyList<string>? blockingObligationIds = null,
+            bool attestationConfirmed = false);
 
         Task ReturnNoteAsync(int noteId, int supervisorId, string reason, int expectedRevision);
     }

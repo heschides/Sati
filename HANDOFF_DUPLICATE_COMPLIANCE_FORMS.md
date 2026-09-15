@@ -7,12 +7,18 @@ that has not happened. Pieces 1–3 below are done; piece 4 and the adjacent def
 **Evidence:** `scripts/Diagnose-BillingGateDisagreement.sql`, run against `SatiProduction`
 on the other Windows login, 2026-09-01.
 
+> **2026-09-14 maintenance correction:** current form identity is now
+> `(PersonId, Type, TargetEffectiveDate)`. The due-date-keyed repair described below survives only
+> as a schema/history-gated compatibility step immediately before the historical due-date index;
+> current rows are never grouped across targets merely because their deadlines match. The obsolete
+> Settings due-date backfill has been removed.
+
 ### What shipped
 
 | | |
 |---|---|
 | Unique index | `20260901150802_AddUniqueFormPersonTypeDueDateIndex`; `Form.Type` narrowed to `nvarchar(40)` to be indexable. Refuses with a named message if duplicates remain. |
-| Repair | `Data/FormDuplicateRepair.cs`, run by `LocalDatabaseUpdater` after the backup and before `MigrateAsync`. |
+| Repair | `Data/FormDuplicateRepair.cs`; current repair is target-keyed. For the old index only, `LocalDatabaseUpdater` backs up, stages through the exact preceding migration, then runs the guarded targetless repair before continuing. |
 | Lost-race handling | `GetAllPeopleAsync` discards its losing inserts and re-reads. |
 | Second duplication path | `Person.AddMissingForms`, called by `NewClientViewModel`. |
 | Server parity | `ApiDbContext.ServerForm` declares the same index and length. |

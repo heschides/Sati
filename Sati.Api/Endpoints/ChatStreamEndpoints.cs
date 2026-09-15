@@ -86,7 +86,8 @@ internal static partial class ApiEndpoints
     internal static bool TryChatLease(ClaimsPrincipal principal, int maxSessionMinutes, out DateTimeOffset deadline)
     {
         deadline = default;
-        if (!long.TryParse(principal.FindFirstValue("exp"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var exp) ||
+        if (!Actor.TrySecurityVersion(principal, out _) ||
+            !long.TryParse(principal.FindFirstValue("exp"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var exp) ||
             !long.TryParse(principal.FindFirstValue(TokenIssuer.AuthenticatedAtClaim), NumberStyles.Integer,
                 CultureInfo.InvariantCulture, out var auth)) return false;
         try

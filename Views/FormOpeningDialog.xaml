@@ -1,0 +1,79 @@
+<Window x:Class="Sati.Views.FormOpeningDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Record actual opening date"
+        Width="430"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        TextElement.FontFamily="{StaticResource AppFont}"
+        AutomationProperties.Name="Record actual form opening date">
+    <Window.Resources>
+        <!-- The action begins disabled because an occurrence date is deliberately not
+             assumed. Keep that state visibly distinct without falling back to the
+             low-contrast operating-system disabled-button colours. -->
+        <Style x:Key="FormOpeningPrimaryButton"
+               TargetType="Button"
+               BasedOn="{StaticResource PrimaryButton}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                    <Setter Property="Cursor" Value="Arrow" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="PromptText"
+                   FontSize="17"
+                   FontWeight="SemiBold"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextPrimaryBrush}" />
+        <TextBlock x:Name="WindowText"
+                   Grid.Row="1"
+                   Margin="0,6,0,12"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+        <StackPanel Grid.Row="2">
+            <TextBlock Text="ACTUAL OPENING DATE"
+                       Style="{StaticResource LabelStyle}" />
+            <DatePicker x:Name="OpeningDatePicker"
+                        Width="180"
+                        HorizontalAlignment="Left"
+                        SelectedDateChanged="OpeningDatePicker_SelectedDateChanged"
+                        AutomationProperties.Name="Actual form opening date"
+                        AutomationProperties.HelpText="Choose the date the form was actually opened. This field starts blank." />
+            <TextBlock x:Name="ErrorText"
+                       Margin="0,5,0,0"
+                       Foreground="{DynamicResource DangerStrongBrush}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Assertive" />
+        </StackPanel>
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,18,0,0">
+            <Button Content="Cancel"
+                    IsCancel="True"
+                    Padding="14,7" />
+            <Button x:Name="SaveButton"
+                    Content="Record opening"
+                    Style="{StaticResource FormOpeningPrimaryButton}"
+                    Margin="8,0,0,0"
+                    Padding="14,7"
+                    IsDefault="True"
+                    IsEnabled="False"
+                    Click="SaveButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

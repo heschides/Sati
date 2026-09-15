@@ -17,7 +17,10 @@ public sealed class FormCompletionValidationTests
         {
             var person = await db.People.SingleAsync(candidate => candidate.Id == fixture.PersonOneId);
             person.EffectiveDate = DateTime.Today.AddMonths(-6);
-            var form = new Form(FormType.Q1R, DateTime.Today)
+            var form = new Form(
+                FormType.Q1R,
+                DateTime.Today,
+                targetEffectiveDate: DateTime.Today.AddDays(-90))
             {
                 PersonId = fixture.PersonOneId
             };

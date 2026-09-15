@@ -891,7 +891,8 @@ public sealed class TenantAuthorizationTests
             await ediResponse.Content.ReadAsStringAsync());
         var edi = await ediResponse.Content.ReadFromJsonAsync<EdiFileDto>();
         Assert.Contains(".OATEST", edi!.FileName);
-        Assert.Contains($"CLM*{claim.BillingPeriodId}-{approved.Id}", edi.Content);
+        var interchangeControl = edi.Content.Split('~')[0].Split('*')[13];
+        Assert.Contains($"CLM*{interchangeControl}-{claim.BillingPeriodId}-{approved.Id}*", edi.Content);
         Assert.Contains("ST*837*", edi.Content);
     }
 
@@ -1111,7 +1112,10 @@ public sealed class TenantAuthorizationTests
         Assert.Equal(first, retry);
         Assert.Contains("NM1*IL*1*Two*Person****MI*222222~", first!.Content);
         Assert.Contains("N3*20 Test Street~", first.Content);
-        Assert.Contains("CLM*1202-603*33.25***11::1", first.Content);
+        var interchangeControl = first.Content.Split('~')[0].Split('*')[13];
+        Assert.Contains($"CLM*{interchangeControl}-1202-603*33.25***11::1", first.Content);
+        Assert.Contains($"GE*1*{interchangeControl}~", first.Content);
+        Assert.Contains("REF*6R*603~", first.Content);
         Assert.Contains("SV1*HC:G9012:HI*33.25*UN*1.33*11", first.Content);
         Assert.Equal(106, first.Content.Split('~', StringSplitOptions.RemoveEmptyEntries)[0].Length + 1);
         var segments = first.Content.Split('~', StringSplitOptions.RemoveEmptyEntries);
@@ -1714,7 +1718,6 @@ public sealed class TenantAuthorizationTests
             original with
             {
                 ProductivityThreshold = original.ProductivityThreshold + 7,
-                BillingComplianceRequirements = updatedRequirements,
                 AllowCredibleProfileUpdates = true,
                 VrAssistantTitle = "VR Employment Assistant"
             });
@@ -1772,7 +1775,7 @@ public sealed class TenantAuthorizationTests
         var auditAfter = await _factory.GetAuditEventsAsync("settings.updated");
 
         Assert.Equal(original.ProductivityThreshold + 7, stored!.ProductivityThreshold);
-        Assert.Equal(updatedRequirements, stored.BillingComplianceRequirements);
+        Assert.Equal(original.BillingComplianceRequirements, stored.BillingComplianceRequirements);
         Assert.True(stored.AllowCredibleProfileUpdates);
         Assert.Equal("VR Employment Assistant", stored.VrAssistantTitle);
         Assert.Equal(successful.Revision, stored.Revision);
@@ -1782,6 +1785,31 @@ public sealed class TenantAuthorizationTests
         Assert.Equal(1, savedEvent.AgencyId);
         Assert.Equal(11, savedEvent.ActorUserId);
         Assert.Equal("Settings", savedEvent.ResourceType);
+    }
+
+    [Fact]
+    public async Task OrdinarySettingsSaveCannotChangeBillingPolicyWithoutAnEnforcementDate()
+    {
+        using var admin = await _factory.CreateAuthenticatedClientAsync("admin-two");
+        var original = await admin.GetFromJsonAsync<SettingsDto>("/api/v1/settings");
+        Assert.NotNull(original);
+
+        var attemptedRequirements = original.BillingComplianceRequirements == BillingComplianceRequirements.None
+            ? BillingComplianceRequirements.Pcp
+            : BillingComplianceRequirements.None;
+
+        var response = await admin.PutAsJsonAsync(
+            "/api/v1/settings",
+            original with
+            {
+                ProductivityThreshold = original.ProductivityThreshold + 1,
+                BillingComplianceRequirements = attemptedRequirements
+            });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var stored = await admin.GetFromJsonAsync<SettingsDto>("/api/v1/settings");
+        Assert.Equal(original.BillingComplianceRequirements, stored!.BillingComplianceRequirements);
+        Assert.Equal(original.ProductivityThreshold, stored.ProductivityThreshold);
     }
 
     [Fact]

@@ -17,7 +17,9 @@ public sealed class SuggestedFollowUpRealServiceTests
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var today = DateTime.Today;
-        var person = await EffectiveTodayAsync(fixture, today);
+        // Put admission far enough ahead that none of its pre-service documents
+        // has entered its configured preparation window yet.
+        var person = await EffectiveOnAsync(fixture, today.AddDays(180));
         var settings = new Settings();
         var service = new UpcomingEventService();
 
@@ -44,7 +46,7 @@ public sealed class SuggestedFollowUpRealServiceTests
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var today = DateTime.Today;
-        var person = await EffectiveTodayAsync(fixture, today);
+        var person = await EffectiveOnAsync(fixture, today);
 
         var panel = fixture.NoteEntry();
         await panel.InitializeAsync();
@@ -52,7 +54,7 @@ public sealed class SuggestedFollowUpRealServiceTests
 
         // Before the fallback existed this was false for every ordinary client.
         Assert.True(panel.IsSuggestedFollowUpVisible);
-        Assert.Contains("Review", panel.SuggestedFollowUpText);
+        Assert.Contains("PCP", panel.SuggestedFollowUpText);
         Assert.True(panel.AcceptSuggestedFollowUpCommand.CanExecute(null));
         Assert.StartsWith("UPCOMING:", panel.ClientWorkStatusText);
 
@@ -67,7 +69,7 @@ public sealed class SuggestedFollowUpRealServiceTests
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var today = DateTime.Today;
-        var person = await EffectiveTodayAsync(fixture, today);
+        var person = await EffectiveOnAsync(fixture, today);
         var settings = new Settings();
         var service = new UpcomingEventService();
 
@@ -90,18 +92,56 @@ public sealed class SuggestedFollowUpRealServiceTests
         Assert.True(second!.Date > first!.Date);
     }
 
-    // A client whose coverage starts today: the ordinary case, and the one where
-    // the open/late window reports nothing for months.
-    private static async Task<Person> EffectiveTodayAsync(NoteEntryFixture fixture, DateTime today)
+    [Fact]
+    public async Task ScheduledFormSuggestionNamesItsRecordedFormType()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var today = DateTime.Today;
+        var person = await EffectiveOnAsync(fixture, today);
+        person.Notes.Add(Note.Create(
+            "Prepare the safety plan.", today.AddDays(2), NoteStatus.Scheduled, 30,
+            person.Id, FormType.SafetyPlan, NoteType.Form));
+
+        var item = Assert.Single(new UpcomingEventService()
+            .GenerateEvents([person], new Settings(), today),
+            candidate => candidate.Kind == UpcomingEventKind.ScheduledForm);
+
+        Assert.Equal($"Safety Plan — {person.FullName}", item.Title);
+        Assert.Equal(FormType.SafetyPlan, item.FormType);
+    }
+
+    [Fact]
+    public async Task LegacyScheduledFormWithoutATypeSaysTheTypeWasNotRecorded()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var today = DateTime.Today;
+        var person = await EffectiveOnAsync(fixture, today);
+        person.Notes.Add(Note.Create(
+            "Legacy scheduled form.", today.AddDays(2), NoteStatus.Scheduled, 30,
+            person.Id, formType: null, NoteType.Form));
+
+        var item = Assert.Single(new UpcomingEventService()
+            .GenerateEvents([person], new Settings(), today),
+            candidate => candidate.Kind == UpcomingEventKind.ScheduledForm);
+
+        Assert.Equal($"Form (type not recorded) — {person.FullName}", item.Title);
+        Assert.Null(item.FormType);
+    }
+
+    // Rebuild the person's synthetic annual obligations around the supplied
+    // effective date so each test controls whether a preparation window is open.
+    private static async Task<Person> EffectiveOnAsync(
+        NoteEntryFixture fixture,
+        DateTime effectiveOn)
     {
         await using (var db = fixture.Factory.CreateDbContext())
         {
             var stored = await db.People.Include(p => p.Forms)
                 .SingleAsync(p => p.Id == fixture.PersonOneId);
-            stored.EffectiveDate = today;
+            stored.EffectiveDate = effectiveOn;
             stored.Forms = Person.CreatePerson(
                 stored.UserId, "Journal", "Person", string.Empty,
-                new DateTime(1990, 1, 1), today, WaiverType.Section21, new Settings()).Forms;
+                new DateTime(1990, 1, 1), effectiveOn, WaiverType.Section21, new Settings()).Forms;
             await db.SaveChangesAsync();
         }
 

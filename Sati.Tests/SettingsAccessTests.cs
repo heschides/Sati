@@ -73,6 +73,26 @@ public sealed class SettingsAccessTests
         Assert.DoesNotContain("CanManageAgencySettings", appearanceTab, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ObsoleteDueDateBackfillIsNotReachableFromSettingsOrDependencyInjection()
+    {
+        var root = RepositoryRoot();
+        Assert.False(File.Exists(Path.Combine(root, "Data", "FormDueDateBackfill.cs")));
+
+        foreach (var path in new[]
+                 {
+                     Path.Combine(root, "App.xaml.cs"),
+                     Path.Combine(root, "ViewModels", "SettingsViewModel.cs"),
+                     Path.Combine(root, "Views", "SettingsWindow.xaml")
+                 })
+        {
+            var source = File.ReadAllText(path);
+            Assert.DoesNotContain("FormDueDateBackfill", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("BackfillDryRunCommand", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("BackfillCommitCommand", source, StringComparison.Ordinal);
+        }
+    }
+
     private static string RepositoryRoot([System.Runtime.CompilerServices.CallerFilePath] string callerPath = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(callerPath)!, ".."));
 

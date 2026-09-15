@@ -142,7 +142,7 @@ public sealed class AdminTestDataDeletionTests
                 fixture.TestPersonRevision,
                 TestDataDeletionRules.ConsumerAttestation));
 
-        Assert.Contains("current Admin", error.Message);
+        Assert.Equal("Your account access has changed. Sign in again before continuing.", error.Message);
         Assert.Equal(before, await fixture.SnapshotAsync());
     }
 
@@ -243,7 +243,8 @@ public sealed class AdminTestDataDeletionTests
         Assert.Equal(false, addColumn.DefaultValue);
         Assert.Contains("DB_NAME() = N'SatiDemo'", backfill.Sql, StringComparison.Ordinal);
         Assert.Contains("SatiDatabaseIdentity", backfill.Sql, StringComparison.Ordinal);
-        Assert.Contains("EnvironmentName = N'Demo'", backfill.Sql, StringComparison.Ordinal);
+        Assert.Contains("EnvironmentName = N''Demo''", backfill.Sql, StringComparison.Ordinal);
+        Assert.Contains("EXEC sp_executesql", backfill.Sql, StringComparison.Ordinal);
     }
 
     private sealed class Fixture : IAsyncDisposable
@@ -353,7 +354,11 @@ public sealed class AdminTestDataDeletionTests
                 ItemCost = 1m,
                 Quantity = 1
             });
-            db.Forms.Add(new Form(FormType.PCP, DateTime.Today.AddDays(30))
+            var formDue = DateTime.Today.AddDays(30);
+            db.Forms.Add(new Form(
+                FormType.PCP,
+                formDue,
+                targetEffectiveDate: formDue)
             {
                 PersonId = person.Id,
                 Person = person

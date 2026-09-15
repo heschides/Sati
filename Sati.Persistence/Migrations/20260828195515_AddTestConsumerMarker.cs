@@ -23,14 +23,20 @@ namespace Sati.Migrations
             migrationBuilder.Sql("""
                 IF DB_NAME() = N'SatiDemo'
                    AND OBJECT_ID(N'dbo.SatiDatabaseIdentity', N'U') IS NOT NULL
-                   AND EXISTS
-                   (
-                       SELECT 1
-                       FROM dbo.SatiDatabaseIdentity
-                       WHERE Id = 1 AND EnvironmentName = N'Demo'
-                   )
                 BEGIN
-                    UPDATE dbo.People SET IsTestData = 1;
+                    -- Keep the optional-table reference inside dynamic SQL. SQL
+                    -- Server resolves object names for the whole batch before it
+                    -- evaluates the OBJECT_ID guard, so a direct reference makes
+                    -- clean-database migrations fail when this operational table
+                    -- has not been provisioned yet.
+                    EXEC sp_executesql N'
+                        IF EXISTS
+                        (
+                            SELECT 1
+                            FROM dbo.SatiDatabaseIdentity
+                            WHERE Id = 1 AND EnvironmentName = N''Demo''
+                        )
+                            UPDATE dbo.People SET IsTestData = 1;';
                 END;
                 """);
         }

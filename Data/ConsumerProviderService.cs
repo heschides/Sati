@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Models;
+using System.Data;
 
 namespace Sati.Data
 {
@@ -27,6 +28,7 @@ namespace Sati.Data
         public async Task<List<PersonProvider>> GetByPersonAsync(int personId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnedPersonAsync(context, personId);
 
             return await context.PersonProviders.AsNoTracking()
@@ -40,15 +42,29 @@ namespace Sati.Data
         public async Task<PersonProvider> SaveAsync(PersonProvider link)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnedPersonAsync(context, link.PersonId);
 
             link.Role = Normalize(link.Role);
             await GuardAsync(context, link);
+            // Reconciliation derives release obligations from the provider link id. The link
+            // therefore has to be flushed first, but both saves belong to one transaction so a
+            // reconciliation failure cannot leave an assignment without its compliance rows.
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable);
 
             if (link.Id == 0)
             {
+                // The discovery date is server/service-owned. It is needed only for a
+                // provider added after the annual date; legacy nulls remain explicit.
+                link.AssignmentKnownOn = DateTime.Today;
                 context.PersonProviders.Add(link);
                 await context.SaveChangesAsync();
+                await ReconcileCurrentReleaseCyclesAsync(
+                    context, link.PersonId, "provider-created");
+                if (context.ChangeTracker.HasChanges())
+                    await context.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return link;
             }
 
@@ -65,21 +81,31 @@ namespace Sati.Data
             tracked.HasActiveRelease = link.HasActiveRelease;
             tracked.SortOrder = link.SortOrder;
             await context.SaveChangesAsync();
+            await ReconcileCurrentReleaseCyclesAsync(
+                context, tracked.PersonId, "provider-updated");
+            if (context.ChangeTracker.HasChanges())
+                await context.SaveChangesAsync();
+            await transaction.CommitAsync();
             return tracked;
         }
 
         public async Task EndAsync(int personId, int linkId, DateTime endDate)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var link = await LoadOwnedLinkAsync(context, personId, linkId);
             link.EndDate = endDate.Date;
+            await RetireReleaseObligationsAsync(context, personId, linkId, endDate.Date);
             await context.SaveChangesAsync();
         }
 
         public async Task RemoveAsync(int personId, int linkId)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             var link = await LoadOwnedLinkAsync(context, personId, linkId);
+            await RetireReleaseObligationsAsync(
+                context, personId, linkId, DateTime.Today);
             context.PersonProviders.Remove(link);
             await context.SaveChangesAsync();
         }
@@ -150,10 +176,7 @@ namespace Sati.Data
                 ?? throw new InvalidOperationException(
                     "A signed-in user is required to read a consumer's providers.");
 
-            var owned = await context.People.AsNoTracking().AnyAsync(person =>
-                person.Id == personId &&
-                person.UserId == user.Id &&
-                person.AgencyId == user.AgencyId);
+            var owned = await LocalTenantAccess.OwnsPersonAsync(context, user, personId);
             if (!owned)
                 throw new UnauthorizedAccessException(
                     "That consumer is not on your caseload.");
@@ -165,5 +188,84 @@ namespace Sati.Data
 
         private static string? Normalize(string? value) =>
             string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+        private async Task RetireReleaseObligationsAsync(
+            SatiContext context,
+            int personId,
+            int linkId,
+            DateTime retiredOn)
+        {
+            var key = ReleaseAssignmentResolution.AssignmentKey(linkId);
+            var rows = await context.ReleaseObligations
+                .Where(item => item.PersonId == personId &&
+                               item.AssignmentKey == key &&
+                               item.RetiredOn == null)
+                .ToListAsync();
+            if (rows.Count == 0)
+                return;
+
+            var nowUtc = DateTime.UtcNow;
+            foreach (var row in rows)
+                row.Retire(retiredOn, nowUtc);
+            LocalAuditTrail.Record(
+                context,
+                _sessionService.CurrentUser!,
+                LocalAuditActions.ReleaseObligationsReconciled,
+                "Person",
+                personId,
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    retired = rows.Select(item => item.StableKey).OrderBy(item => item).ToArray(),
+                    retiredOn = retiredOn.ToString("yyyy-MM-dd")
+                }));
+        }
+
+        private async Task ReconcileCurrentReleaseCyclesAsync(
+            SatiContext context,
+            int personId,
+            string source)
+        {
+            var person = await context.People.AsNoTracking()
+                .SingleAsync(item => item.Id == personId && item.AgencyId == CurrentAgencyId());
+            if (person.EffectiveDate is not DateTime effectiveDate)
+                return;
+
+            var today = DateTime.Today;
+            var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
+                effectiveDate, today);
+            foreach (var target in new[] { currentTarget, currentTarget.AddYears(1) })
+            {
+                var resolution = await ReleaseObligationService.ResolveAssignmentsAsync(
+                    context, person, target, today, CancellationToken.None);
+                var rows = await context.ReleaseObligations
+                    .Where(item => item.PersonId == personId &&
+                                   item.TargetEffectiveDate == target.Date)
+                    .ToListAsync();
+                var changes = ReleaseObligationService.ReconcileRows(
+                    context,
+                    person,
+                    target,
+                    resolution,
+                    rows,
+                    today,
+                    DateTime.UtcNow);
+                if (changes.CreatedKeys.Count == 0 && changes.RetiredKeys.Count == 0)
+                    continue;
+
+                LocalAuditTrail.Record(
+                    context,
+                    _sessionService.CurrentUser!,
+                    LocalAuditActions.ReleaseObligationsReconciled,
+                    "Person",
+                    personId,
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        targetEffectiveDate = target.ToString("yyyy-MM-dd"),
+                        created = changes.CreatedKeys,
+                        retired = changes.RetiredKeys,
+                        source
+                    }));
+            }
+        }
     }
 }

@@ -69,4 +69,19 @@ public interface IDhhsFormService
         int personId,
         DhhsFormDefinition.Selections selections,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fills an annual DHHS authorization for one explicit effective-date target.
+    /// The public obligation id links the resulting artifact to the exact compliance
+    /// row. The default keeps older/test implementations source-compatible; runtime
+    /// implementations preserve both values.
+    /// </summary>
+    Task<DhhsFormResult> GenerateForAnnualTargetAsync(
+        DhhsFormDefinition.FormKey form,
+        int personId,
+        DhhsFormDefinition.Selections selections,
+        DateTime targetEffectiveDate,
+        Guid? releaseObligationId,
+        CancellationToken cancellationToken = default) =>
+        GenerateAsync(form, personId, selections, cancellationToken);
 }

@@ -65,7 +65,7 @@
                         <TextBlock Text="AUTHORIZATION, NOT A PROFILE INFERENCE"
                                    FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                         <TextBlock Margin="0,4,0,0"
-                                   Text="Every permission below must reflect the consumer's direction. The generated PDF includes consumer signature lines. A staff attestation records who prepared it, but is not the consumer's electronic signature."
+                                   Text="Every permission below must reflect the consumer's direction. The generated PDF includes consumer or guardian signature lines. A staff generation confirmation records who prepared it; it is not the required signature and does not complete tracked compliance."
                                    TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
                 </Border>
@@ -75,6 +75,57 @@
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                       AutomationProperties.Name="Agency release entry form">
             <StackPanel>
+                <Border Style="{StaticResource ReleaseCard}"
+                        AutomationProperties.Name="Tracked recipient obligation selection">
+                    <StackPanel>
+                        <TextBlock Text="TRACKED RECIPIENT OBLIGATION"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   AutomationProperties.HeadingLevel="Level3" />
+                        <TextBlock Text="Linking uses the obligation's durable identifier, not the recipient's displayed name."
+                                   Margin="0,4,0,8"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox Grid.Column="0"
+                                      ItemsSource="{Binding ReleaseObligationChoices}"
+                                      SelectedItem="{Binding SelectedReleaseObligation}"
+                                      DisplayMemberPath="DisplayName"
+                                      IsEnabled="{Binding CanSelectReleaseObligation}"
+                                      MinWidth="360"
+                                      HorizontalAlignment="Stretch"
+                                      Style="{StaticResource ReleaseCombo}"
+                                      AutomationProperties.Name="Exact tracked release obligation"
+                                      AutomationProperties.HelpText="Choose the exact provider and annual effective-date cycle this release will satisfy. Leave blank for an untracked authorization." />
+                            <Button Grid.Column="1"
+                                    Content="Clear link"
+                                    Command="{Binding ClearReleaseObligationLinkCommand}"
+                                    Visibility="{Binding HasSelectedReleaseObligation, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                    Padding="10,5"
+                                    Margin="8,2,0,8"
+                                    VerticalAlignment="Top"
+                                    AutomationProperties.Name="Do not link this PDF to a tracked release obligation" />
+                        </Grid>
+                        <TextBlock Text="{Binding ObligationSelectionGuidance}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   AutomationProperties.Name="Release obligation linkage guidance" />
+                        <TextBlock Text="{Binding SelectedReleaseObligation.Status}"
+                                   Visibility="{Binding HasSelectedReleaseObligation, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   AutomationProperties.Name="Selected release obligation status" />
+                    </StackPanel>
+                </Border>
+
                 <Border Style="{StaticResource ReleaseCard}">
                     <StackPanel>
                         <TextBlock Text="1  AUTHORIZATION STATUS" FontSize="15" FontWeight="SemiBold"
@@ -266,11 +317,11 @@
                                 Background="{DynamicResource PersonGroupAltBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                             <StackPanel>
-                                <CheckBox Content="I obtained the consumer's authorization and want to attach my staff attestation"
+                                <CheckBox Content="I prepared this release from the authorization provided and want to attach my staff generation confirmation"
                                           IsChecked="{Binding DidObtainRoi}" FontWeight="SemiBold"
-                                          AutomationProperties.Name="Attach staff attestation that authorization was obtained" />
+                                          AutomationProperties.Name="Attach staff generation confirmation" />
                                 <TextBlock Margin="24,5,0,0" TextWrapping="Wrap"
-                                           Text="If unchecked, Sati generates a draft. If checked, Sati asks for confirmation and records the authenticated user and generation time. It does not sign for the consumer."
+                                           Text="If unchecked, Sati generates a draft. If checked, Sati records the authenticated user and generation time. This does not sign for the consumer or guardian and does not complete the tracked release obligation; record completion separately in Recipient-specific releases."
                                            Foreground="{DynamicResource TextSecondaryBrush}" />
                             </StackPanel>
                         </Border>

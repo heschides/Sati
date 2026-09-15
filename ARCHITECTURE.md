@@ -1,6 +1,190 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-09-10.*
+*Living document. Updated during structured review sessions. Last updated: 2026-09-14.*
+
+## Annual compliance and service-date billing — September 14 correction (unreleased)
+
+This section is the authoritative description of annual compliance in the current source. It
+supersedes the older due-date-inferred cycle, born-complete annual-form, document-prerequisite,
+mutable billing-mask, due-day-blocked, and signature-does-not-attest descriptions retained later in
+this file as development history. A controlled migration now exists in source, but it has not been
+applied; no deployment is implied by this source change.
+
+### Annual identity, deadlines, and availability
+
+`Form.TargetEffectiveDate` is the stable identity of one annual obligation. `DueDate` is a deadline,
+not an identity from which a cycle may be inferred. Current and upcoming annual targets are separate
+years, and a missing form remains visibly missing; readers may not borrow a row from the adjacent
+year. The database uniqueness target is `(PersonId, Type, TargetEffectiveDate)`. The only legacy
+due-date identity fallback is isolated inside the schema-gated startup repair immediately before
+the old 2026-09-01 unique-index migration; current runtime readers and repair code may not use it.
+
+All dates are calendar dates. With the confirmed defaults:
+
+| Obligation | Available | Due |
+|---|---:|---:|
+| Comprehensive Assessment | target − 120 days | target − 90 days |
+| PCP | target − 90 days | target |
+| Reclassification | target − 90 days | target − 30 days |
+| Safety Plan, Privacy Practices, annual releases | target − 90 days | target |
+| Q1/Q2/Q3/Q4 review | 10 days before its due date | target + 90/180/270/360 days |
+
+The open-window values remain agency settings. Changing a window changes availability, not the
+obligation's annual identity. Generation creates outstanding obligations only; it never treats the
+passage of an effective date as evidence of completion. `EnsureCurrentCycleForms` creates missing
+rows through the upcoming target, while displays keep current and upcoming rows distinct.
+`UpcomingEventsService` begins returning an unfinished obligation as open work on its availability
+date; this is the case manager's in-app prompt, not completion evidence or a billing event. Event
+and daily-agenda rows retain `FormId` plus `TargetEffectiveDate`, or the exact
+`ReleaseObligationId`, through navigation. An explicit missed historical target remains actionable
+after the ordinary late-reminder window; opening it may not redirect to today's cycle.
+
+One source-level exception remains in the older annual-packet status/rendering path:
+`AnnualDocumentService` and `AnnualPacketEndpoints` still locate completed PCP and Medical Release
+forms through a due-date range. That lookup must move to exact `TargetEffectiveDate` identity (with
+only the bounded legacy fallback) before this correction is described as fully integrated.
+
+### Completion and opening evidence
+
+The selected `CompletedOn` or `OpenedOn` date is the date the work actually occurred. The system's
+immutable UTC recording time is a separate fact. Past occurrence dates are ordinary; future dates
+are invalid, and work cannot be recorded before its configured availability date. Generic form
+updates cannot change either date. Opening uses the dedicated audited `/forms/{id}/open` path;
+completion uses an append-only attestation. Form notes, PDFs, external-artifact records, safety-plan
+approval, and privacy receipts may be useful evidence, but none is a second completion gate.
+
+Reclassification has one semantic dependency rather than an artifact prerequisite: a completed
+Reclassification means the Comprehensive Assessment for the same `TargetEffectiveDate` was already
+completed. If that CA has no attestation, the capture asks for its actual completion date and the
+service writes two distinct attestations atomically; the CA date cannot follow the Reclassification
+date. There is no supervisor bypass and Sati does not model the Evergreen Reclass packet.
+
+### Billing policy and note decisions
+
+`BillingComplianceGate`, `BillingCompliancePolicyRules`, and
+`BillingComplianceExceptionRules` are the shared rule owners. The default blocking set is exactly
+PCP completion, Comprehensive Assessment, and all four reviews. PCP opening is a separate optional
+requirement and is off by default. Reclassification, Safety Plan, Privacy Practices, and Agency,
+DHHS, and Medical releases remain selectable soft requirements; each can gate billing only when an
+administrator includes it in an effective-dated policy version.
+
+Policy versions are append-only and are resolved by the note's service date. Every change requires
+an enforcement date. Past enforcement dates are refused by default; the separate agency switch may
+allow one only with an explanation and the change remains audited. Settings shows an impact preview
+before applying a version: service dates on/after the date may be re-evaluated, while submitted or
+finalized billing must not be silently rewritten. Applying the version atomically appends an
+unresolved `BillingCompliancePolicyReviewFlag` for each affected submitted note and finalized claim
+line, freezing its prior/new exact blocker IDs. Admin and Billing users see the same tenant-scoped,
+read-only review queue; resolution is deliberately not inferred or automated. The ordinary Settings
+save cannot silently rewrite the active mask.
+
+The desktop does not download policy history to make this decision. `ISettingsService` resolves the
+single `BillingComplianceRequirements` value for an exact service date: Local Production performs a
+tenant-scoped EF query and the cloud client calls a tenant-scoped API that returns only the date and
+mask. Both note-entry pre-gates await that answer; API approval and billing independently repeat the
+authoritative service-date evaluation.
+
+The due date itself is billable. A selected obligation blocks only when
+`serviceDate > DueDate && serviceDate < CompletedDate`; if completion is still absent, the interval
+has no end. The completion date is billable. Late completion therefore stops future blocking but
+does not silently make notes in the historical gap eligible. Supervisory approval and claim
+creation re-evaluate the same service-date policy and exact blocker identities.
+
+A supervisor exception belongs to one note. It requires an explanation, explicit confirmation,
+the expected note revision, and the exact current obligation IDs; an unselected or newly appearing
+blocker continues to block. The persisted exception fields become immutable after approval and are
+revalidated when a claim is built. This is separate from post-compliance administrative recovery.
+
+The consumer profile's billing banner is outside its tab content, so every profile destination
+shows the same status. Compliance mutations advance the shared presentation revision so the banner,
+profile forms, and sidebar projection refresh together; this is synchronization, not enforcement.
+
+`BillingComplianceRecoveryRules` and immutable persistence shapes define recovery after every
+named blocker has later been satisfied. The agency-scoped Admin GET/POST API and the parallel local
+service offer otherwise billing-valid, approved, unclaimed, unrecovered notes as a default-selected
+checklist. An Admin may omit individual notes, but must retain at least one and provide both an
+explanation and explicit attestation. The serializable write freezes the actor, UTC recording time,
+selected notes, and each applicable obligation's ID, due date, completion date, and evidence ID.
+Candidate and claim-line validation release a selected note only while those exact facts still
+match; a changed or newly applicable blocker fails closed. The reusable WPF recovery workspace is
+available from both the Administration dashboard and Billing Overview; Administration-only users
+do not need Billing permission to use the Admin entry point.
+
+### Recipient-specific releases and electronic signatures
+
+`ReleaseObligation` replaces the fixed “one form per release category” assumption for reconciled
+cycles. There are only three categories: Agency, Medical, and DHHS. Every annual target has one
+DHHS obligation. Medical obligations derive from active healthcare-provider assignments; Agency
+obligations derive from active service/waiver-provider assignments, and no recipient is invented
+when no applicable assignment exists. A mid-cycle assignment is available when Sati knows it and
+is due the day before service begins. Each recipient has its own stable obligation, artifact slot,
+and append-only attestation. Ending an assignment retires it prospectively; authorization
+withdrawal also acts prospectively and never erases historical completion.
+
+Completed `Release_Agency`, `Release_Medical`, and `Release_DHHS` rows from the former
+category-level model remain retained evidence. Exact-release status and reconciliation report a
+review issue whenever one of those legacy dates coexists with still-outstanding exact obligations
+for the same category and annual target. The date is never copied into an exact attestation because
+the legacy row cannot identify a recipient or prove the required signer for that obligation.
+
+When a guardian exists, only the guardian satisfies these release forms and the shared signer
+policy label is “Guardian signature only”; otherwise the consumer signs. An authorized
+representative cannot sign them. The API-only
+`SignatureComplianceProjectionService` idempotently maps an eligible immutable signature
+completion to the exact form or release obligation, using the agency-local date of `SignedAtUtc`
+as `CompletedOn` and retaining a later UTC projection time. It does not overwrite an earlier manual
+attestation. This bridge remains within the separately gated synthetic signature implementation;
+Local Production electronic signing is still disabled, and source code is not deployment, legal
+approval, or Production readiness.
+
+### Migration and rollout boundary
+
+Migration `20260915004541_CorrectAnnualComplianceAndBillingPolicy` stages nullable
+`TargetEffectiveDate`, derives review targets as the greatest anniversary strictly before their
+deadline and annual targets as the first anniversary on or after it, validates the result, then
+makes the identity required and uniquely indexed. It refuses missing owners/effective dates,
+unknown form types, pre-1900 dates, invalid cycle relationships, duplicate target identities, and
+legacy blanket note overrides rather than manufacturing clinical or exception evidence. It changes
+only recognized old Settings defaults and writes a system/migration audit event for those changes.
+The same migration creates the policy, recovery, release-obligation, and signature-projection
+schema. Its synthetic migration tests and script-generation check pass, but it has not been applied
+to Demo, Local Production, or Production and has not been rehearsed against an approved data copy.
+
+## Account lifecycle and session revocation — September 11 follow-up
+
+`AccountSessionRules` in `Sati.Contracts.V1` owns enabled/version interpretation, safe version
+advancement and administrator lifecycle policy. Persistence `User` and API `ServerUser` both
+carry `IsEnabled` and `SecurityVersion`; the latter is also an EF concurrency token. Authenticated
+user snapshots and `AgencyActor` retain the version captured at sign-in rather than fetching a
+new version to authorize an old credential. Safe profile contracts expose state/version but never
+password hashes, salts or bearer tokens as profile fields.
+
+The API issues a mandatory version claim and checks it against an enabled account on protected
+requests, renewal and chat authorization leases. Password change/reset and administrator revocation
+advance the version; disable/re-enable advances it on a real state change. Ordinary profile saves
+cannot express account state or version. Lifecycle administration retains records, uses a serialized
+transaction with a current administrator check and excludes self-disable/platform identities.
+
+Transitional local services repeat live checks, including personal data and independent Billing,
+Administration and Supervision paths. Local EDI checks precede generation/replay and require Billing.
+Session-ended notification locks access until a fresh sign-in; it is not remote erasure of already
+delivered data. Cloud transport generation guards reject responses and renewals belonging to an
+older sign-in rather than installing them into a replacement session.
+
+Reauthentication separately pauses authenticated transport, and entering a candidate credential
+does not clear that pause. Accepted identity publication precedes resuming requests and timers;
+declining a changed account/access set invalidates the candidate and leaves access paused. The
+shell underlay is disabled while its shield is up, with a usable retry control. Same-access
+reauthentication replaces the captured user identity without clearing editors. Already-open child
+windows and previously delivered/cache contents are not remotely erased by the shell shield.
+
+Migration `20260911120000_AddAccountSessionLifecycle` adds enabled-by-default retained accounts
+with initial version 1. Its frozen target model matches the persistence snapshot. It has not been
+applied to a real database. Upgrade requires a reviewed migration and coordinated updated clients
+and server, followed by fresh sign-in; old JWTs without a version are intentionally rejected.
+Direct SQL/old desktop clients, global maintenance utilities and operations already authorized and
+in flight remain separate limitations. Do not describe this change as immediate remote wiping,
+SQL Server concurrency certification, a deployment, or general launch clearance.
 
 ## Productivity forecast and documentation backlog
 
@@ -123,8 +307,12 @@ is not a security boundary. Portal startup validates the real SQL environment wh
 Eight retained tables separate frozen originals, requests, sessions, consent, events, completions,
 derived PDF packages and encrypted outbox work. Clinical-source replacement revokes open requests
 inside its existing transaction. Source metadata is immutable; signing never replaces the source
-artifact, writes a fake staff acknowledgment or sets ordinary form/billing completion. All signing
-timestamps hydrate as UTC. Terminal history and originals cannot be silently rewritten or deleted.
+artifact or writes a fake staff acknowledgment. The September 14 compliance bridge supersedes the
+earlier blanket statement that signing never sets form completion: the API may now project an
+eligible consumer/guardian completion onto the exact supported form or recipient release obligation,
+with a one-per-completion immutable projection record. The public portal still has no clinical
+write authority. All signing timestamps hydrate as UTC. Terminal history and originals cannot be
+silently rewritten or deleted.
 
 Relevant signer/contact changes revoke unfinished requests and stop external access to existing
 receipts in the same authorized profile transaction. Signed decisions and staff copies remain
@@ -165,7 +353,8 @@ client content. Passive chat reads/socket opening do not renew sessions. The she
 visibility and account boundaries; room editing retains its original concurrency revision.
 
 See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
-`TEAM_CHAT_VALIDATION.md`. Account suspension/session revocation, retained-message discovery/export,
+`TEAM_CHAT_VALIDATION.md`. Account suspension/session revocation is implemented in the follow-up
+above but still needs approved rollout. Retained-message discovery/export,
 broad legal holds including backups, retention and agency acceptance remain real-data prerequisites.
 
 ## Inactivity privacy screen
@@ -208,7 +397,7 @@ Every theme dictionary now supplies `AccentButtonBrush`, `AccentButtonHoverBrush
 `AccentButtonPressedBrush`, and `OnAccentButtonBrush` alongside the accent tokens. Only
 `PrimaryButton` binds the button set; selection highlights and accent type still bind
 `AccentBrush`. A theme dictionary is swapped in whole, so a theme missing a key loses the fill
-rather than inheriting one — a structure test asserts all twenty-four supply all four.
+rather than inheriting one — a structure test asserts all twenty-five supply all four.
 
 Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor occupy the richer-light portion of
 the palette range: brown, coastal blue, muted red, and the Sati leaf's turquoise/blue/violet/coral
@@ -217,7 +406,7 @@ themes. Saturation and border depth carry their identity; shared content surface
 for the fixed semantic status colors to remain readable.
 
 Decorative themes use tiled vector resources for the outer window and navigation chrome. Ironworks
-Matte, Paisley, Art Nouveau, Mid-Century Modern, and Vanilla Bean keep that pattern crisp on
+Matte, Paisley, Art Nouveau, Mid-Century Modern, Vanilla Bean, and Umber Facets keep that pattern crisp on
 uncovered canvas.
 Their shared `SurfaceBrush` is a frosted-glass tile: the same motif is blurred inside the brush,
 reduced to 12–14 percent opacity, and laid over a high-opacity theme tint. `NavBackgroundBrush`
@@ -237,6 +426,9 @@ larger compositions reduce obvious row-and-column repetition while remaining lig
 Vanilla Bean uses a 300-by-220 cream tile with broad pale folds and scattered, irregular short
 strokes and ellipses that read as vanilla-seed flecks. Its brown-and-caramel palette uses the same
 frosted content boundary as the other illustrated themes.
+Umber Facets uses broad intersecting espresso, chestnut, caramel, ochre, and tan polygons. It is a
+dark-surface theme, so its text and semantic-state luminance follow the same measured contract as
+the established night themes while the reference palette remains recognizable on open canvas.
 
 ## Theme legibility
 
@@ -244,7 +436,7 @@ frosted content boundary as the other illustrated themes.
 luminance, contrast ratio, alpha compositing, and the flattening of a gradient or tiled pattern
 into the colours a reader actually receives. Nothing else may reimplement it.
 
-`ThemeLegibilityTests` holds every one of the twenty-four palettes to WCAG AA (4.5:1) two ways. The
+`ThemeLegibilityTests` holds every one of the twenty-five palettes to WCAG AA (4.5:1) two ways. The
 token pass scores each text role against each surface role it can land on, plus each fill that
 carries its own named ink, so a pair fails before any screen ships that uses it. The rendered pass
 loads every view under every theme, reads the brushes WPF resolved, and finds each run's background
@@ -326,6 +518,13 @@ performs no domain write or reload. Shell navigation spacing and the Clients wor
 to their own measured widths, so the Clients user's compact-list choice is no longer overwritten by
 a startup monitor decision.
 
+The same control exposes History as a third tab only while it occupies the Overview host. History
+is a child of the shell's existing `ScratchpadViewModel`, loads on tab entry, and uses a
+`LatestRequestTracker` before publishing user-scoped rows. Moving back to the side dock removes the
+tab and returns the selection to Today's Work. `ScratchpadHistoryView` owns only the Calendar
+selection and responsive two-column/stacked presentation; the former modal window and factory no
+longer exist.
+
 `NoteEntryView` retains the same controls and bindings in every size. Below 840 units it exposes
 Details and Write sections under a pinned context header; changing sections collapses Grid rows
 rather than reconstructing text boxes. The compact header uses its second line for the selected
@@ -396,10 +595,18 @@ attestation that the form itself was completed. Saving or deleting evidence neve
 revokes a form.
 
 The Reviews workspace, dashboard, and Clients workspace share one `FormAttestationControl` for all
-twelve form types. The date picker starts blank. `FormAttestationRules` in `Sati.Contracts.V1`
-rejects future dates and dates before the form's cycle start in the WPF capture, Local
-`FormService`, and API. `PUT /api/v1/forms/{id}` can change only `OpenedDate`; only the attestation
-and revocation routes can change persisted completion state.
+twelve legacy form types. The date picker starts blank. `FormAttestationRules` in
+`Sati.Contracts.V1` rejects future dates and dates before the obligation's cycle or availability
+window in the WPF capture, Local `FormService`, and API. `PUT /api/v1/forms/{id}` cannot change
+either completion or opening state. Only the attestation/revocation routes can change completion;
+only `POST /api/v1/forms/{id}/open` can record the actual opening date.
+
+The Clients workspace adds a per-selected-person presentation lock around its Forms matrix.
+Selecting or switching a person always relocks it and cancels an unfinished attestation capture;
+only its lock icon enables the profile command. The command repeats the lock check rather than
+trusting `IsEnabled`. `AttestationCheckBox` suppresses `ToggleButton`'s local check-state change
+while still executing the command, so the visual checkmark continues to come only from the
+one-way `Form.IsCompliant` binding after a dated attestation has committed.
 
 `FormAttestation` is an append-only ledger. `Form.CompletedDate` remains the authoritative scalar
 read by billing and the UI, but it is now the projection of the latest attestation/revocation.
@@ -418,19 +625,22 @@ The pending-attestation list is derived from eligible form-tagged notes and outs
 person, form type, and the cycle containing the note's event date. It is not a stored prompt and
 does not depend on which dashboard person happened to be selected when the note was saved.
 
-Document-backed forms add a separate server fact. `DocumentArtifact` stores metadata for a generated,
-Draft, or externally recorded annual document; PDF bytes remain only in the response/save flow.
-`AnnualDocumentCatalog` maps document kinds to form types, while `FormAttestationRules` decides
-whether the live artifact, same-cycle Comprehensive Assessment, or reasoned Supervisor technical
-override permits attestation. A Draft never satisfies a release prerequisite. Regeneration
-supersedes the previous live row, and the database permits only one live artifact for each person,
-kind, and cycle.
+`DocumentArtifact` remains a separate server fact for a generated, Draft, or externally recorded
+annual document; PDF bytes remain only in the response/save flow. A form attestation is sufficient
+without an artifact. The one semantic exception is Reclassification: it implies a same-target
+Comprehensive Assessment attestation on or before the Reclassification date, and a missing CA date
+is captured and committed as a separate attestation in the same transaction. The former
+artifact-prerequisite and Supervisor technical-override design is superseded. Regeneration still
+supersedes the previous live artifact row, except that recipient-specific release artifacts use
+their release-obligation identity so different recipients do not replace each other.
 
 Agency, DHHS, and Medical release generation records artifact metadata and a PHI-minimized audit
-event in the same transaction. Both local and cloud form services can record an external document
-with a required note, but every API route first revalidates agency and accessible-caseload scope.
-The Medical Release is a distinct Sati-owned PDF generator that shares the release-choice contract;
-it is not represented as a state-issued or independently approved form.
+event in the same transaction. Reconciled cycles use recipient-specific `ReleaseObligation` rows
+and separate attestations rather than treating one fixed category form as every recipient's release.
+Both local and cloud services can record an external document with a required note, but every API
+route first revalidates agency and accessible-caseload scope. The Medical Release is a distinct
+Sati-owned PDF generator that shares the release-choice contract; it is not represented as a
+state-issued or independently approved form.
 
 `DocumentTemplate` stores immutable published source versions. `DocumentTemplateResolution` and
 `DocumentTemplateRules` in `Sati.Contracts.V1` own agency-over-default precedence, the closed token
@@ -460,6 +670,37 @@ The `AddUserPermissions` migration preserves existing access by backfilling the 
 new user management edits the permission set directly. Unknown bits and an empty set deny by
 default. Billing UI visibility follows billing permission, but every billing route and the local
 billing service enforce it independently.
+
+### Consumer-record permission revocation (2026-09-11)
+
+`TenantAccess.OwnedPeople` is the API query boundary for assigned casework: current
+case-management capability plus exact persisted actor identity, person agency and owner agency.
+`CanAccessPersonAsync` adds the person's agency to the shared supervisory/caseload decision.
+An assignment left in place after permission removal is not continuing access. Billing and
+Administration retain their separately authorized, purpose-specific operations; neither becomes
+case-management authority. Note reads and transitions also require the note's agency marker to
+match, consistent with the existing `ReconcileTenantOwnership` migration.
+
+Local sign-in copies the actual persisted permission set and safe contact fields, never the legacy
+role's defaults or password verifier. `LocalTenantAccess` verifies persisted identity and current
+permissions before ordinary consumer service operations. A changed local permission set fails
+closed until sign-in refreshes the session; API requests resolve it afresh. Review items, AT
+requests and PCP source services now require session injection too. Supervisor and Admin record
+services repeat the live check; AI context and SSN/document preparation use the same own-caseload
+boundary. Existing annual-document, safety-plan and form services inherit the shared live check.
+
+AT publication derives the signer from the authenticated session; ordinary saves cannot stamp an
+attestation, and published requests cannot be deleted through the local service. This does not
+claim complete local/API AT workflow parity. Batch local review generation resolves stored person
+facts and checks the entire requested batch before writing. No schema or historical-data repair
+is part of this change. Previously delivered/cached information is not remotely erased, in-flight
+work is not a session-revocation protocol, and direct SQL access is outside these service guards.
+The separately recorded global maintenance and bearer-session findings remain open.
+
+The shell initializes own-casework panels only for CaseManagement, so a Billing-, Supervision-
+or Administration-only account can reach its workspace without a denied casework preload.
+Personal scratchpads remain available; consumer-linked scheduled work is not loaded for those
+accounts. Scheduled results also check the current session/permission before publishing to the UI.
 
 ## Incident and health boundary
 
@@ -566,9 +807,41 @@ Prior review (2026-06-25) covered Models, services, helpers, all ViewModel layer
 - `Seed-BillingPipelineData.ps1` remains hard-limited to a Demo identity and adds eight submission
   stages plus six remittance and four deposit contingencies, all explicitly synthetic. A separate history consumer
   keeps the established three-ready/seven-blocked queue examples intact.
-- This is a read model and scenario catalog, not transport or import. Real X12 parsing, validation,
-  matching, posting, reconciliation, corrections, retention decisions, and payer certification
-  remain outstanding.
+- The original read model/scenario catalog is now backed by the bounded response intake described
+  below. Live transport, full implementation-guide validation, bank reconciliation, corrected/void
+  claims, operational retention approval, and payer certification remain outstanding.
+
+### Bounded clearinghouse response intake (2026-09-10; unreleased)
+
+`ClaimResponseReader` in Contracts owns strict envelope and supported 999/277CA/835 parsing; it is
+not a full X12 implementation-guide validator. One ISA/GS/ST and at most 2 MiB of printable ASCII
+plus line endings are supported. Unsupported, malformed, unmatched, or ambiguous documents fail
+closed. Response interchange controls are not outbound correlation controls: 999 matches AK1/AK2,
+and claim responses match the exact retained CLM references. New generators share
+`ClaimSubmissionIdentity` for generation-specific CLM01 and preserve the original note in REF6R.
+
+`ClaimResponseIngestion` owns API authorization, exact authenticated-agency/test-mode/sender and
+receiver correlation, serializable receipt/effect persistence, and safe retry handling. It checks
+retained submissions rather than accepting a caller-selected period as authority. The legacy
+period route remains only as an additional assertion. This slice is enabled only for exact
+Demo/SatiDemo or Testing/SatiApiTests identities and accepts ISA15=T; Production stays disabled.
+
+`ClearinghouseResponseReceipt` preserves the raw original in envelope encryption with field binding,
+parser version, hashes and safe receipt metadata. `ClearinghouseResponseMatch` links immutable
+receipt evidence to generations and claims. Unique exact/semantic/document/payment identities
+prevent duplicate financial effects; conflicting identity reuse is rejected. Import does not
+retain local file paths, place raw X12 in audit metadata, or expose raw evidence through a new read
+route. Authorized receipt readback/export and operational retention remain follow-up work.
+
+Submission/remittance/deposit facts are appended in the same transaction as the receipt and audit.
+An 835 may match several periods but creates one deposit observation, with no invented bank EFT.
+Shared lifecycle reduction protects financial/review state from late earlier acknowledgments.
+Receiving an 835 does not mean the bank deposit is reconciled or corrections are complete.
+
+The desktop picker reads bounded original bytes. `BillingSubmissionsViewModel` cancels and
+invalidates import work on account changes; upload captures the original credential without an
+intervening renewal/account handoff. A committed receipt survives a later refresh failure and an
+uncertain upload can be retried safely. Direct-database Local Production exposes no importer.
 
 Representative-payee profile:
 
@@ -620,9 +893,10 @@ Agency release workflow:
   `POST /people/{personId}/agency-release.pdf`, where tenant/caseload access and identity derivation
   happen before rendering. Both paths record `agency-release.generated` without recipient PHI in
   audit metadata.
-- `AgencyReleasePdfGenerator` creates a two-page Sati-branded PDF. Consumer signature lines remain
-  blank. The optional staff attestation records the signed-in user and UTC generation time only and
-  explicitly states that it is not the consumer's electronic signature.
+- `AgencyReleasePdfGenerator` creates a two-page Sati-branded PDF. Consumer or guardian signature
+  lines remain blank. The optional staff generation confirmation records the signed-in user and UTC
+  generation time only; it is neither the required signature nor completion of a tracked release
+  obligation.
 
 ---
 
@@ -689,10 +963,9 @@ empty-tabs diagnosis detour; keep them distinct.
 - **Duplicate-form cleanup NOT done in-session:** 372 triplicate cells across 25 real clients
   (IDs 1032–1056 less 1034, plus 1357); 347 identical triplets, 25 divergent across 5 clients
   (1033, 1043, 1047, 1050, 1056). Membership fix stops *new* duplicates; the historical ones remain.
-- **Maintenance scaffolding still present?** The backfill + bulk-complete UI blocks in
-  `SettingsWindow.xaml` / `SettingsViewModel.cs` and their DI registrations are temporary. The
-  `FormDueDateBackfill` / `FormBulkCompletion` service classes are worth keeping as reusable
-  reconciliation tools; the UI hooks are throwaway.
+- **Historical maintenance follow-up:** the due-date backfill and bulk-complete controls were
+  temporary. The due-date backfill UI, service, and DI path were retired on 2026-09-14 after the
+  target-based audited migration superseded it; the separate bulk-completion scaffold remains.
 
 ---
 
@@ -890,6 +1163,12 @@ is absent.
 | `Person` | `Sati` | Central domain entity. Owns compliance logic, form generation, billing window evaluation. |
 | `Form` | `Sati.Models` | Represents a single compliance document for one person in one cycle. |
 | `FormAttestation` | `Sati.Models` | Append-only evidence of an attestation or reasoned revocation; projects the live completion date onto `Form`. |
+| `BillingCompliancePolicyVersion` | `Sati.Models` | Append-only agency requirement mask, selected by a note's service date rather than today's settings. |
+| `BillingCompliancePolicyReviewFlag` | `Sati.Models` | Append-only unresolved signal for a submitted note or finalized claim line whose exact blocker set changed under a new effective-dated policy; never rewrites the source record. |
+| `BillingComplianceRecoveryDecision` | `Sati.Models` | Immutable Admin recovery decision over exact completed obligations and explicitly selected approved, unclaimed notes; candidate and claim-line validation recheck its frozen evidence. |
+| `ReleaseObligation` | `Sati.Models` | One annual or assignment-start authorization obligation for DHHS or one exact provider recipient. |
+| `ReleaseObligationAttestation` | `Sati.Models` | Append-only manual or electronic-signature completion evidence for one release obligation. |
+| `ReleaseAuthorizationEvent` | `Sati.Models` | Append-only prospective withdrawal; never deletes the release's historical completion. |
 | `DocumentArtifact` | `Sati.Models` | Metadata and supersession history for a generated, Draft, or externally recorded annual document; stores hashes, not document bytes. |
 | `Note` | `Sati.Models` | Service note — visit, contact, form completion, or other. |
 | `User` | `Sati.Models` | Staff member. Has role, supervisor chain, and agency affiliation. |
@@ -903,7 +1182,7 @@ is absent.
 | `ClaimLine` | `Sati.Models.Billing` | One billable service note within a billing period. |
 | `EdiGeneration` | `Sati.Models.Billing` | Exact 837P response retained for tenant- and actor-scoped idempotent replay. |
 | `BillingSubmissionEvent` | `Sati.Models.Billing` | Append-only generated/transmitted/acknowledgment event with explicit synthetic provenance. |
-| `RemittanceClaimOutcome` | `Sati.Models.Billing` | Append-only claim-level payment/denial/reversal matching read model; raw 835 import is pending. |
+| `RemittanceClaimOutcome` | `Sati.Models.Billing` | Append-only claim-level payment/denial/reversal observations linked to matched response receipts; live activation is pending. |
 | `RemittanceDeposit` | `Sati.Models.Billing` | Append-only 835/EFT reconciliation anchor with explicit PLB adjustment and derived match state. |
 | `BillingValidationResult` | `Sati.Models.Billing` | Immutable result record from billing validation. |
 | `ComprehensiveAssessment` | `Sati.Models.Assessments` | Versioned assessment envelope: ownership, workflow, timestamps, and serialized document aggregate. |
@@ -955,9 +1234,10 @@ is absent.
   return/approval.
 
 **Deadline owner remains `Form` + `FormDueDateCalculator`.** The assessment table does not
-introduce another due-date field. `Settings.CompAssessmentDaysBeforeAnniversary` now defaults to
-60. Stored `Form.DueDate` values remain authoritative and require an explicit reconciliation for
-records generated under the old 120-day setting.
+introduce another due-date field. The September 14 correction supersedes the temporary 60-day
+default: `Settings.CompAssessmentDaysBeforeAnniversary` defaults to 90, and its 30-day open window
+makes the CA available 120 days before the target. Stored historical `Form.DueDate` values remain
+evidence and require an explicit inspected reconciliation rather than an on-read rewrite.
 
 ### Compliance State
 
@@ -966,16 +1246,37 @@ records generated under the old 120-day setting.
 
 - `Form.IsCompliant` is derived as `CompletedDate.HasValue`; there is no stored compliance flag.
 - `CompletedDate` has a private setter. `MarkComplete` and `Reset` are private entity helpers called
-  only while appending an attestation or revocation. `SetInitialCompletion` is guarded to new,
-  unattested forms and exists only for the admission confirmation before the Person graph is saved.
-- New-client generation does not use the legacy "compliant with no completion date" state. When
-  the admission workflow assumes an in-force annual document exists, it records the effective date
-  as its completion date; the confirmation dialog lets the case manager correct that assumption.
+  only while appending an attestation or revocation. `SetInitialCompletion` remains a guarded
+  creation seam, not authority for generation to invent a date.
+- New-client and rollover generation create every obligation outstanding. The September 14
+  correction supersedes the admission/effective-date completion assumption; only an actual
+  attestation supplies a completion date.
 - EF Core materializes entities via the `protected Form()` parameterless constructor,
   which does not touch `IsCompliant`.
 - **Cascade rule:** persisted completion changes go through attestation/revocation. Both database
   contexts reject updates or deletes of ledger rows, the Form relationship uses restricted delete,
-  and form deletion refuses any row with attestation history.
+  and standalone form deletion refuses every persisted row, including rows without attestations.
+  `FormRetentionRules` in Contracts owns the shared refusal code/message and request bound. The API
+  and local service first verify current persisted case-management permission and exact tenant/
+  caseload ownership, then reject nonempty requests without a database write. This prevents removal
+  of the evidence used by current and historical billing gates. Empty authorized requests remain
+  harmless compatibility no-ops. Named audited duplicate repair and whole-consumer lifecycle
+  deletion remain separate operations; no global EF deletion rule is introduced here.
+
+Stored due dates remain authoritative: this guard does not regenerate missing obligations using
+today's settings or manufacture completion history. Already-deleted rows and claims created before
+the fix require a separately approved reconciliation. Cloud cycle rollover and pre-EDI compliance
+revalidation remain tracked in AGENDA.md.
+
+`FormDuplicateRepair` follows the same identity boundary. On the current schema it groups only
+`(PersonId, Type, TargetEffectiveDate)` and refuses targetless rows. Equal deadlines belonging to
+different targets never meet; different deadlines within one target are a conflict and remain
+untouched. `LocalDatabaseUpdater` invokes the due-date-keyed fallback only when the old
+`20260901150802_AddUniqueFormPersonTypeDueDateIndex` migration is genuinely pending. It first
+migrates through `20260830231500_SeparateAgencyWideSupervision`, then a raw projection guarded by
+that exact migration history merges only targetless `(PersonId, Type, DueDate)` duplicates. This
+staging avoids querying the current EF model against a table that lacks `TargetEffectiveDate` and
+prevents the legacy fallback from being reused after target identity exists.
 
 ### Form Generation
 
@@ -983,45 +1284,42 @@ records generated under the old 120-day setting.
 
 - Called by `Person.CreatePerson()` at admission; `Settings` is now threaded in and forwarded to
   `FormDueDateCalculator.Compute`.
-- For an effective date through today, annual non-review forms start completed on that effective
-  date and review forms start incomplete. For a future effective date, every form starts incomplete;
-  Sati never writes a future completion date. The confirmation dialog can correct these assumptions
-  before the Person graph is saved.
+- Every generated form starts outstanding, regardless of whether the target effective date has
+  passed. Generation establishes obligations, never evidence that work occurred.
 
 **Related: `Person.EnsureCurrentCycleForms(DateTime, Settings)`**
-- Idempotent form generation for rollover — ensures both current and next cycle have form records.
-- `Settings` is now **used** (forwarded through `AddMissingFormsForCycle` to `Compute`). The prior
-  "unused parameter, safe to remove" note is obsolete.
-- Called by `PersonService.GetAllPeopleAsync` on every load — **currently gated behind the temporary
-  `EnableEnsureCycleFormsOnLoad` flag** (see PersonService). With correct membership `(cs, ce]` and
-  corrected dates, this method is genuinely idempotent: existing forms are found, nothing is added.
+- Idempotent form generation through the upcoming annual target; it never stretches one row across
+  years and never writes a completion date.
+- `Settings` is used for deadline and availability inputs. The former temporary feature gate is
+  gone; database identity is now `(PersonId, Type, TargetEffectiveDate)`.
+- Called by `PersonService.GetAllPeopleAsync`; a lost concurrent insert is re-read after the unique
+  constraint decides the race.
 
 ### Form Due Dates
 
-**Single source of truth: `FormDueDateCalculator` (in `Helpers/`) — corrected 2026-06-29.**
+**Single source of truth: `FormDueDateCalculator` (in `Sati.Persistence/Helpers/`) — corrected
+again 2026-09-14.**
 
-- Both `Person.GenerateFormList` and `Person.AddMissingFormsForCycle` call it, passing `Settings`.
+- Both `Person.GenerateFormList` and the target-specific missing-form generator call it with the
+  explicit `TargetEffectiveDate` and `Settings`.
 - `UpcomingEventService` and `CaseManagerDashboardViewModel` read stored `Form.DueDate` — they do
   not recompute. The stored date is authoritative after creation.
 - No shadow copies of date logic found in any service reviewed.
 
 ### Cycle Boundaries
 
-**Today→cycle: `Person.GetCurrentCycleBoundaries(DateTime today)`.
-Form→cycle: `Person.FormBelongsToCycle(dueDate, cycleStart, cycleEnd)` (new 2026-06-29).**
+**Today→target: `Person.ResolveCurrentTargetEffectiveDate(...)`.
+Form→target: `Form.TargetEffectiveDate`.**
 
-- `GetCurrentCycleBoundaries` keys *today* to a cycle with the half-open `[cycleStart, cycleEnd)`
-  rule — today on the anniversary belongs to the *next* cycle. **Unchanged.**
-- **Form-to-cycle membership is `(cycleStart, cycleEnd]`** — exclusive start, inclusive end.
-  Centralized in `FormBelongsToCycle`, the single definition of membership. A form due exactly on
-  the anniversary (offset-0 annuals) belongs to the cycle it *closes*, not the next one. Proven
-  against real data: every stored form maps to exactly one cycle under this rule (no orphans, no
-  double-counts).
-- Membership call sites routed through the helper: `GetCurrentCycleForm`,
-  `AddMissingFormsForCycle` (existence check).
-- **Deliberately NOT routed through it:** `CaseManagerDashboardViewModel.BuildFormRows`, a
-  forward-looking `>= cycleStart` queue with no upper bound (by design). Code comment marks why —
-  do not "helpfully" convert it.
+- The current target is the latest anniversary on or before the reference date; before initial
+  service it is the first effective date. The upcoming target is exactly one year later.
+- Annual documents due on a target describe that target's renewal. Reviews with the same target
+  describe the plan beginning on it and are due at +90/+180/+270/+360 days.
+- Due-date membership `(cycleStart, cycleEnd]` is retained only as a transitional fallback for rows
+  created before `TargetEffectiveDate`. It is no longer a business identity and must not win over
+  an explicit target.
+- A missing target-specific row returns `NoForm`/missing. Neither current nor upcoming displays may
+  borrow the other's row.
 
 ### Compliance Evaluation
 
@@ -1040,27 +1338,27 @@ Form→cycle: `Person.FormBelongsToCycle(dueDate, cycleStart, cycleEnd)` (new 20
   Anything whose answer depends on today (caseload matrix, `UpcomingEvents`, task rows,
   `GetComplianceStatus`) must ask `IsSatisfiedAsOf`, which shares its predicate with
   `BillingComplianceGate.IsIncompleteAndOverdue`; checkbox bindings ask `IsCompliant`.
-- **`Person.InForceSince` owns "was this already satisfied when its cycle began."** Annual
-  documents are in force from their cycle start; reviews are never assumed; a cycle that has not
-  started assumes nothing. Both generation paths route through it, so a form cannot be born
-  compliant without a date.
-- The due date remains billable. The block begins the following day and ends on the completion
-  date. An absent effective date is a separate profile/data-quality issue, not an overdue form.
+- The former `Person.InForceSince` generation assumption is superseded. A row is never born
+  complete merely because its target arrived; only attestation evidence supplies `CompletedDate`.
+- Historical service remains billable through the due date, is blocked beginning the following
+  day, and becomes billable again on the recorded completion date. An absent effective date is a
+  separate profile/data-quality issue, not an overdue form.
 - **The gate reads every row in `Person.Forms`; `Person.GetCurrentCycleForm` reads one.** That
   asymmetry is why a duplicated form could block billing while every screen showed it complete —
   the checkbox, matrix and task board resolve the due-date tie to one copy, the gate sees them
-  all. `dbo.Forms` now carries a unique index on `(PersonId, Type, DueDate)`, so the two readers
-  cannot disagree about how many records exist. Whether the gate *should* also be cycle-scoped is
-  still open (`AGENDA.md`); today a genuinely stale prior-cycle form blocks indefinitely.
-- `BillingComplianceRequirements` is an agency-scoped flags value stored on `Settings`. Admins may
-  enable or disable 90-day reviews, PCP, Comprehensive Assessment, Reclassification, Safety Plan,
-  Privacy Practices, and each release type. The migration default preserves the former intended
-  set: reviews, PCP, Comprehensive Assessment, Reclassification, and Safety Plan.
+  all. The September 14 schema target is a unique index on
+  `(PersonId, Type, TargetEffectiveDate)`; the due date may change without creating a second annual
+  identity.
+- `BillingComplianceRequirements` is stored in append-only, effective-dated agency policy versions.
+  The Settings row retains only a compatibility fallback. Admins may enable or disable reviews,
+  PCP completion, PCP opening, Comprehensive Assessment, Reclassification, Safety Plan, Privacy
+  Practices, and each release category. The default is exactly reviews, PCP completion, and CA.
 - `beingCompleted` exempts only the newest overdue instance of that form type in the same action;
   an older overdue instance of the same type still blocks.
-- Desktop supervisor queues, note entry, client presentation, billing validation, and loss reports
-  pass the agency setting to this owner. API supervisor, billing, and reporting endpoints load the
-  tenant's setting and call the same owner. Approval remains enforced below the UI.
+- Current client presentation uses the current-date result. Note entry, supervisor queues and
+  approval, billing validation, and loss reports use the note's service date and resolve the policy
+  version in force on that date, so a later policy or deadline cannot silently reach backward.
+  Approval remains enforced below the UI.
 
 ### Billing Window Evaluation
 
@@ -1068,10 +1366,10 @@ Form→cycle: `Person.FormBelongsToCycle(dueDate, cycleStart, cycleEnd)` (new 20
 
 - Reasons as of the *note's event date*, not today — necessary for back-entered notes in a
   different cycle. Walks `Forms` directly by each form's own due date (not `GetCurrentCycleForm`).
-- The exact same agency requirement set and type mapping used by current compliance controls the
-  historical window; the two decisions cannot silently disagree about a form type.
-- Window is exclusive on both ends: a note ON the due date bills; a note ON or after completion
-  date bills.
+- The effective-dated agency requirement set and shared type mapping control the historical window;
+  current Settings cannot reinterpret an older service date.
+- Window is exclusive at both boundaries: a note on the due date is billable; dates after due and
+  before completion are blocked; a note on the completion date is billable.
 - `Person.EvaluateBillingWindow(...)` and `Person.IsBillingWindowBlocked(...)` are desktop adapters.
   The API and `ConsumerBillingLossReportService` call the contracts owner, so Statistics cannot
   drift to a different definition of an overdue billing gap.
@@ -1211,12 +1509,14 @@ wrapper or delete it.
 **Single source of truth: `UpcomingEventService` (in `Data/`)**
 
 - `UpcomingEvent` is a pure record — no Id, never persisted. Generated fresh per load.
-- Form events read stored due dates via `GetCurrentCycleForm`; do not recompute. Skips compliant
-  forms. (Note: "compliant" = not overdue, so this skips not-yet-overdue forms — consistent with
-  its "upcoming/late" purpose.)
+- Form events resolve the current target and the exact next `TargetEffectiveDate` separately, then
+  read each row's stored due date. They skip only a form satisfied as of the reference date; a
+  future-dated completion remains visible until it takes effect.
+- Recipient-specific release obligations use the same current/upcoming targets and retain their
+  provider name in the task label; retired obligations stop producing future work.
 - Scheduled note events: 30-day lookahead; `NoteType` drives `UpcomingEventKind`.
-- Visibility window per form: `[dueDate − openBefore, dueDate + daysAfter]`, both from `Settings`.
-- `OpenReview` vs `LateReview` is determined by today vs. due date — not by form type.
+- Visibility begins on the configured availability date and ends after the type's configured late
+  window. `OpenReview` includes the due day; `LateReview` begins the following day.
 
 ### Workday / Holiday Exclusions
 
@@ -1230,21 +1530,16 @@ wrapper or delete it.
 
 ---
 
-## Maintenance Tools (added 2026-06-29 — temporary UI, keepable services)
+## Maintenance Tools (added 2026-06-29 — historical one-time work)
 
-Both mirror the same latch safety pattern: `DryRunAsync` computes + writes a timestamped Desktop
-report and arms a latch; `CommitAsync(...)` refuses unless a dry run ran *this session* and the
-caller passes back the exact reviewed values. Bulk completion pins count, cutoff, and the explicitly
-entered completion date. Transient DI means a fresh instance starts un-armed.
-
-### `FormDueDateBackfill` (`Sati.Data`)
-- Corrects stored `Form.DueDate` from old (cycleStart-anchored) values to the current calculator's
-  output. Touches **`DueDate` only** — never `IsCompliant`/`CompletedDate`.
-- Buckets each form into the cycle that *produced* it, derived from `EffectiveDate` (never from the
-  wrong stored date). The old-rule offsets appear **only** in `ImpliedOldCycleStart` for bucketing;
-  new dates come from `FormDueDateCalculator.Compute` — one source of date-math truth.
-- Anomalies (a stored date that fits no cycle) are reported and left untouched, not guessed.
-- **Run 2026-06-29: 4,095 changed, 0 anomalies.** Reusable for future imports / provider swaps.
+### Retired `FormDueDateBackfill`
+- The 2026-06-29 tool changed 4,095 deadlines and reported zero anomalies under the then-current
+  model. It is retained here as historical evidence, not as a reusable operation.
+- Its Settings controls, view-model commands, DI registration, and service implementation were
+  removed on 2026-09-14. It inferred cycle placement and read across agencies, both of which are
+  incompatible with explicit `TargetEffectiveDate` identity and tenant-scoped mutation.
+- Deadline correction now belongs only to the fail-closed audited migration; there is no ordinary
+  Local Production command that can rerun or reinterpret it.
 
 ### `FormBulkCompletion` (`Sati.Data`)
 - Marks every form due ≤ a cutoff and not already complete using one explicitly entered date,
@@ -1298,11 +1593,13 @@ Replacement forms travel with the Person update, so cancellation and validation 
 old rows as a side effect.
 
 ### `FormService`
-- Owns `Form` updates, open-date stamping, deletion.
-- `UpdateFormAsync` is a raw `context.Forms.Update(form)` with no invariant guards. If a caller ever
-  mutates `form.IsCompliant` directly before calling it, the `MarkComplete`/`Reset` invariant is
-  bypassed at the DB layer (EF tracks by reference). ViewModel review found no current offender, but
-  the guard is still absent. `OpenFormAsync` stamps `OpenedDate` directly — fine, no invariant.
+- Owns the guarded compatibility update, actual-date opening, attestation/revocation, and retained
+  form reads/deletion refusal. Every write reloads current ownership and session authority.
+- `UpdateFormAsync` refuses both completion and opening changes. `OpenFormAsync` validates the
+  selected occurrence date against the configured availability window and current agency date,
+  then records actor/time and `form.opened`. Attestation is append-only; Reclassification may add
+  the same-target CA attestation in the same transaction, but no artifact or Supervisor bypass is
+  required.
 
 ### `ComprehensiveAssessmentService`
 
@@ -1318,8 +1615,10 @@ old rows as a side effect.
 ### `SupervisorService`
 - Owns approval/return/override for `Logged` notes. No duplicated compliance logic — delegates to
   `person.EvaluateComplianceGate`. `ApproveNoteAsync` enforces compliance as a hard throw.
-- `ApproveWithOverrideAsync` stamps `ComplianceOverride = true`; the `ClaimLine` carries
-  `IsComplianceException = true`.
+- `ApproveWithOverrideAsync` requires the expected note revision, reason, explicit attestation, and
+  every exact current blocker ID. It persists those immutable facts with the server-derived actor
+  and time; unselected or newly appearing blockers still block claim creation. The resulting
+  `ClaimLine` carries `IsComplianceException = true` only after that revalidation.
 - Supervisor scope is limited to assigned case managers in the same agency; Director/Admin scope
   may include all case managers in that agency but never another agency. Caller IDs cannot override
   the signed-in reviewer, and successful decisions are audited with the note transition.
@@ -1341,9 +1640,10 @@ old rows as a side effect.
   Every stateful method takes an explicit minimal `AgencyActor`; the local implementation reloads
   the matching database user before work, while the cloud API ignores the client actor and uses the
   server-derived actor from `ValidatedActorFilter`.
-- `ValidateNoteForBilling` collects approval, duration, current-compliance, historical billing-window,
-  subscriber, provider, and EDI-configuration failures. Claim creation repeats validation against
-  freshly loaded records before writing.
+- `ValidateNoteForBilling` collects approval, duration, service-date policy/compliance, subscriber,
+  provider, and EDI-configuration failures. It recognizes only a one-note Supervisor exception or
+  Admin recovery whose frozen blocker evidence still matches. Claim creation repeats validation
+  against freshly loaded records before writing.
 - Section 13 unit arithmetic is shared in `BillingRules`: substantive contacts up to 15 minutes
   receive one unit; longer services retain two-decimal partial 15-minute units. `ChargeAmount` is
   calculated separately from units using the agency's configured unit rate.
@@ -1405,7 +1705,8 @@ old rows as a side effect.
   session cannot slide past the configured 12-hour maximum without credential entry.
 
 ### `SessionService`
-- Singleton; holds logged-in `User`. `AllowComplianceOverride` flag lives here.
+- Singleton; holds the logged-in `User`. There is no session-wide compliance-override toggle;
+  Supervisor exceptions are durable, one-note decisions over exact blockers.
 
 ### `ExemptDateService`
 - Clean CRUD over `ExemptDate`. Strips time on `AddAsync` (`date.Date`).
@@ -1475,9 +1776,15 @@ rather than in either client.
 
 | Owner | Rule |
 |---|---|
-| `BillingComplianceGate` | Whether a client's paperwork permits billing, with reasons. |
-| `FormAttestationRules` | Attestation date legality, form-note evidence eligibility, person/type/event-cycle resolution, and the derived pending-attestation list. |
-| `AnnualDocumentCatalog` | Annual-document identity, display names, form-prerequisite mapping, and later packet eligibility. |
+| `BillingComplianceGate` | Service-date compliance, exact blocker identities, and the day-after-due/completion-day boundaries. |
+| `BillingCompliancePolicyRules` | Append-only policy-change validation and policy resolution by agency plus service date. |
+| `BillingComplianceExceptionRules` | Exact-blocker validation for one-note supervisory exceptions; unselected blockers continue to block. |
+| `BillingComplianceRecoveryRules` | Post-compliance Admin checklist, immutable decision validation, and exact-evidence revalidation before a selected note may reach billing. |
+| `FormAttestationRules` | Attestation-date legality, Reclassification's same-target CA implication, person/type/target resolution, and the derived pending-attestation list. |
+| `FormOpeningRules` | Actual opening-date validation against availability and the agency date. |
+| `AnnualDocumentCatalog` | Annual-document identity, display names, and packet eligibility; artifact generation is not form completion. |
+| `ReleaseObligationRules` / `ReleaseAssignmentResolution` | Recipient-specific annual/assignment-start release generation, stable identity, and fail-visible provider-link resolution. |
+| `ReleaseAttestationRules` / `ReleaseSigningRules` / `ReleaseAuthorizationRules` | Separate release completion, guardian-or-consumer signer capacity, and prospective withdrawal. |
 | `BillingRules` | Payer-neutral unit arithmetic, charge rounding, NPI and procedure-code format. |
 | `NoteWorkflow` | Which note status may become which, for the case manager, the supervisor, and the overdue sweep — and therefore which notes can reach approval and billing at all. |
 | `NoteSchedulingPolicy` | Future work becomes non-billable Scheduled work, retaining its type, estimated minutes, and optional form type while clearing actual start time, visit facts, and justification. Reminder remains a separate non-service shape. |
@@ -1523,9 +1830,12 @@ rather than in either client.
   comments before "fixing."
 - **`Incentive.ExcludedDatesJson` superseded** by `ExemptDate`; rollback pending `SchedulerViewModel`
   deletion. No new callers.
-- ~~**Configurable billability scope** deferred.~~ Implemented through agency `Settings` and the
-  shared `BillingComplianceRequirements` owner on 2026-08-27.
-- **`ComplianceOverride` on `Note`** — fields exist, full UI not wired. Do not remove.
+- ~~**Configurable billability scope** deferred.~~ First implemented as a mutable agency `Settings`
+  mask on 2026-08-27; that storage decision was superseded on 2026-09-14 by append-only,
+  effective-dated policy versions. Ordinary Settings save cannot mutate the active mask.
+- ~~**`ComplianceOverride` on `Note` fields exist, full UI not wired.**~~ The Supervisor workflow is
+  wired. The boolean is now only a summary marker beside immutable reason, actor/time,
+  attestation-confirmation, revision, and exact-obligation fields; it is not blanket authority.
 
 ### Architectural Tension
 
@@ -1541,30 +1851,29 @@ All helpers are static, stateless, DI-free pure functions.
 
 ### `FormDueDateCalculator`
 
-**Single source of truth for due-date math. Corrected 2026-06-29 — now takes `Settings`.**
+**Single source of truth for due-date math. Corrected 2026-09-14 — now takes the stable target.**
 
-Signature: `Compute(FormType type, DateTime cycleStart, DateTime cycleEnd, Settings settings)`.
+Signature: `Compute(FormType type, DateTime targetEffectiveDate, Settings settings)`.
 Throws `ArgumentOutOfRangeException` for unhandled `FormType`.
 
-**Two families, opposite ends of the cycle:**
+**Two families sharing one target effective date:**
 
 | Form | Rule | Source |
 |------|------|--------|
-| Q1R / Q2R / Q3R | `cycleStart + 90 / 180 / 270` | literal (fixed regulatory intervals) |
-| Q4R | `cycleEnd − Q4RDaysBeforeAnniversary` (5) | Settings |
-| Comp Assessment | `cycleEnd − CompAssessmentDaysBeforeAnniversary` (120) | Settings |
-| Reclassification | `cycleEnd − ReclassificationDaysBeforeAnniversary` (30) | Settings |
-| PCP | `cycleEnd − PcpDaysBeforeAnniversary` (0) — due on anniversary | Settings |
-| SafetyPlan / PrivacyPractices / Releases | `cycleEnd − *DaysBeforeAnniversary` (0) | Settings |
+| Q1R / Q2R / Q3R / Q4R | `target + 90 / 180 / 270 / 360` | fixed calendar-day intervals |
+| Comp Assessment | `target − CompAssessmentDaysBeforeAnniversary` (90) | Settings |
+| Reclassification | `target − ReclassificationDaysBeforeAnniversary` (30) | Settings |
+| PCP | `target − PcpDaysBeforeAnniversary` (0) | Settings |
+| SafetyPlan / PrivacyPractices / legacy release forms | `target − *DaysBeforeAnniversary` (0) | Settings |
 
-- Every annual form reads its **own** setting; nothing hardcoded (multi-agency requirement). A form
-  set to 0 is due exactly on `cycleEnd` — which is why form membership had to move to `(cs, ce]`.
-- Q1R–Q3R are intentionally *not* settings-driven (fixed intervals). The Q4R-reads-a-setting /
-  Q1–Q3-don't asymmetry is deliberate and on the record.
-- **Verified against the production spreadsheet — all 25 clients, zero exceptions.** Offset-0 annual
-  types weren't in the spreadsheet but are confirmed by Josh as due on the effective date.
-- Note: `PcpOpenDaysBefore` (90) is a *separate* setting governing when the PCP surfaces in the
-  upcoming/task views — not the due date. Do not conflate.
+- Every annual form reads its own due-offset setting. Reviews use the exact +90/+180/+270/+360
+  cadence; the legacy Q4-before-anniversary setting no longer defines Q4's due date.
+- `ComputeAvailableDate` subtracts each type's open-window setting from its stored due date. Thus
+  the default CA is due target−90 and available target−120, while PCP is due on target and available
+  target−90. Availability must not be confused with due date or annual identity.
+- Recipient-specific release obligations use `ReleaseObligationRules`: annual rows are available
+  target−90 and due on target; assignment-start rows are available when known and due one day
+  before the provider service begins.
 
 ### `FormCellStatusCalculator`
 Pure timing→color for the Caseload Matrix. `(Form?, today) → FormCellStatus`. Orthogonal to the
@@ -1656,34 +1965,29 @@ signature upload, attachment store, concurrency token, save retry queue, questio
 version, rich need validation, or runtime provider selection. The code-behind service-locator
 construction is a temporary composition seam, not the preferred architecture.
 
-### Compliance state writes — confirmed safe
-Every `FormService.UpdateFormAsync` call in the ViewModel layer goes through `MarkComplete`,
-`Reset`, or only touches `OpenedDate`. The `private set` invariant holds. Partial exception:
-`ToggleForm` (uses the right methods but the wrong date).
+### Compliance state writes — attestation-only since September 14
+
+The earlier direct `MarkComplete`/`Reset` and generic-update opening paths are superseded. Ordinary
+completion now flows through the shared attestation capture and service; opening prompts for the
+actual date and uses `OpenFormAsync`. `FormService.UpdateFormAsync` rejects any completion or opening
+change. Initial completed rows supplied during consumer onboarding are validated and converted to
+append-only attestations by `PersonService` in the save transaction rather than remaining bare
+`CompletedDate` values.
 
 ### `CaseManagerDashboardViewModel`
 The load-bearing ViewModel. Owns note submission, form status commands, compliance dialog routing,
 productivity calc, and task board construction.
 
-**`BuildFormRows` (updated 2026-06-29).** Task-board tabs (PCPs, Releases, Comp, Reclass, Reviews,
-All) flow through here. Filter changed from `!f.IsCompliant` to **`f.CompletedDate is null`** —
-"show what isn't done," not "show what's overdue." Then the existing window/overdue gate decides
-visibility (`inWindow = today >= dueDate − max(openDaysBefore, DefaultLookaheadDays=90)`) and
-`isOverdue` drives the red triangle. This is why the annual tabs had appeared empty: their forms
-were compliant-but-incomplete, and `!IsCompliant` (i.e., overdue-only) hid them. Still uses
-`>= cycleStart` with no upper bound — deliberately not the `(cs, ce]` membership helper.
-*Interaction:* with duplicates still present, `OrderBy(DueDate).FirstOrDefault()` picks a copy
-arbitrarily among equal dates — harmless for display, another reason to dedup.
+**`BuildFormRows` (corrected 2026-09-14).** PCP, CA, Reclass, and Review task rows resolve the exact
+current and next `TargetEffectiveDate`, then choose the earliest unfinished obligation inside those
+two targets. Due date controls ordering and timing only; it cannot decide cycle membership. A
+due-range fallback is restricted to detached legacy rows with no target. The Releases tab uses
+`BuildReleaseRows` so each recipient-specific obligation has its own task; it falls back to fixed
+release forms only for an unreconciled target and never displays both models for one target.
 
-**`ToggleForm` bug (still on AGENDA).**
-```csharp
-if (form.IsCompliant) form.Reset();
-else form.MarkComplete(form.DueDate);  // stamps DueDate, not today/user-chosen
-```
-Now that the calculator is fixed, annual forms have a *future* `cycleEnd`-based due date, so toggling
-one compliant stamps a completion date that hasn't happened yet — a sharper wrong than before.
-**[DECISION NEEDED]** stamp `DateTime.Today` vs. prompt (recommend prompt — dialog already has the
-picker). Fix before anyone toggles an annual form on a corrected client.
+**`ToggleForm` correction.** The former toggle that stamped `DueDate` is removed. Activating a form
+opens the shared blank-date attestation workflow; marking it open uses a separate actual-date
+picker. Neither UI path can assign completion by toggling a checkbox.
 
 **Other:** `SubmitNote` correctly runs both `EvaluateComplianceGate` and `EvaluateBillingWindow`;
 `_dialogIsWindowBlock` routes hold outcome. `LoadNotesForPersonAsync` is `async void` (unobservable
@@ -1691,13 +1995,16 @@ exceptions). `SubmitNote` catch uses `MessageBox` vs. `_validationDialog` elsewh
 uses non-generic `Enum.GetValues`.
 
 ### `ComplianceFormRow` / `ComplianceReviewViewModel`
-Checkbox/date invariant correctly enforced. `Commit()` is the single write-back, via
-`MarkComplete`/`Reset`. Clean.
+
+This onboarding-only reconciliation holds proposed completion dates until Confirm. `PersonService`
+validates accepted dates and creates their initial append-only attestation rows in the same save;
+ordinary profile/dashboard completion does not use this compatibility path.
 
 ### `FormTaskRow`
-`State` computed from `CompletedDate` and `OpenedDate`, deliberately ignoring `IsCompliant` (which
-defaults true/"not overdue" for annuals at admission). `State` and `IsCompliant` can diverge by
-design — the board tracks *work done*, not overdue-ness.
+`State` is computed from `CompletedDate` and `OpenedDate`; overdue timing is a separate calculation
+using the due date and reference date. The board therefore distinguishes work evidence from
+deadline status and never infers completion from “not yet overdue.” `ReleaseTaskRow` separately
+represents one exact recipient obligation and directs completion to the Releases workflow.
 
 ### `SchedulerViewModel`
 Dead — on AGENDA. **Only active caller of `Incentive.ExcludedDates`.** Delete it + `WorkdayTile` +
@@ -1823,7 +2130,7 @@ pre-live checklist item above remains.
 | Registration | Lifetime | Notes |
 |---|---|---|
 | All domain services | Transient | Correct |
-| **`FormDueDateBackfill`, `FormBulkCompletion`** | **Transient** | **Concrete types, no interface (one-shot tools). Fresh instance per settings-window open keeps the latch un-armed. Temporary UI only.** |
+| **`FormBulkCompletion`** | **Transient** | **Concrete one-shot tool. Fresh instance per settings-window open keeps its dry-run latch un-armed. The obsolete due-date backfill is no longer registered.** |
 | `ISessionService` | Singleton | Holds logged-in user |
 | `IDbContextFactory<SatiContext>` | Singleton | Per-method context via `await using` |
 | `IComprehensiveAssessmentService` | Transient | Correct service lifetime; workspace currently resolves it through `App.Services` and should move to injected composition. |
@@ -2090,13 +2397,21 @@ assessment document is fetched. `GET /api/v1/people/{personId:int}/assessments/l
 read-only DTO route guarded by the ordinary person-ownership check. Progress is calculated by the
 same section definitions and answer-status rule as `ComprehensiveAssessmentViewModel`.
 
+Compliance rows carry their durable identity rather than only a display category. Form navigation
+resolves the exact persisted id/annual target and fails visibly if it no longer exists; it never
+falls back to `GetCurrentCycleForm` after an exact lookup misses. Release rows carry the recipient
+obligation id and open the Releases workspace with that obligation selected. The dashboard and
+profile retain unfinished explicit historical targets through the upcoming cycle, while legacy
+targetless rows stay behind the bounded compatibility selector.
+
 Startup ordering is deliberate. `App` awaits `ShellViewModel.InitializeAsync`, including
 `Scratchpad.InitializeAsync` and the caseload load, before showing `ShellWindow`. The window's
 `Loaded` handler then invokes `DailyAgendaLauncher`. Account switches invoke it only after
 `ReinitializeAsync`. Confirm sends selected forms through `ScratchpadViewModel` to
 `WorkAgendaService`, which creates Scheduled Form notes for today without altering the freeform
-scratchpad. Exact retries recognize rows already added. Skip writes nothing. Open commands navigate
-to the existing case-management/form surface and do not perform a record transition.
+scratchpad. Exact retries recognize rows already added. Skip writes nothing. Opening a form uses
+the dedicated actual-opening-date prompt and audited form-opening path for that exact form; opening
+a release only selects its exact recipient obligation and does not record an attestation.
 
 `DailyAgendaPreferenceService` stores `ShowAtSignIn` and `LastShownDate` under
 `%LOCALAPPDATA%\Sati\daily-agenda-preferences.json`, keyed by environment and Sati user id. This is
@@ -2124,10 +2439,13 @@ database or network access. Packet writes use one serializable transaction, incl
 release prerequisite read, and validate each PDF's fingerprint against its recorded artifact.
 
 `DocumentAcknowledgment` is append-only and references the exact Privacy Practices artifact;
-regeneration requires another receipt. Safety artifacts identify the source plan id/version.
-No PDF bytes are retained in the database. Previously completed/external releases are listed in
-the manifest for retrieval from their original saved/signed copies rather than reconstructed.
-Medical requests are downloads only; there is no sending service or scheduled packet job.
+regeneration requires another receipt, but receipt remains evidence rather than the form-completion
+rule. Safety artifacts identify the source plan id/version. No PDF bytes are retained in the
+database. Recipient-scoped Agency/Medical release artifacts may identify a `ReleaseObligation`, so
+one recipient's regeneration does not supersede another recipient's artifact. Previously completed
+or external releases are listed for retrieval from their original saved/signed copies rather than
+reconstructed. Medical requests are downloads only; there is no sending service or scheduled
+packet job.
 
 `SingleAttemptWriteFilter` establishes an EF execution scope around protected non-read endpoints.
 This allows explicit multi-save transactions under SQL Server's configured retry provider without
