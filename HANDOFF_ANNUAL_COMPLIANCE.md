@@ -26,6 +26,7 @@ Implement the clarified annual compliance and service-date billing rules. Source
 
 - `a673e8b` (pushed): release generation/presentation item verified and closed. Removed the last legacy presenter (unbound `NewClientViewModel.Release*DueDate`) and added `ReleaseUiStructureTests.DesktopSurfacesDoNotPresentLegacyCategoryReleaseForms`, confirmed failing first.
 - Packet window: Josh chose to defer the 90-vs-30 mismatch (tracked in AGENDA). Only the hard-coded 30 in `AnnualDocumentsViewModel.SetPerson` was fixed; a failed settings load now leaves no cycle selected. `AnnualDocumentSelectionTests.PacketCycleStaysUnselectedWhenAgencySettingsCannotLoad` was confirmed failing first.
+- Verification at `802d434`: desktop/domain 2,046 passed, 0 failed, 1 optional native-AI skip; API 739 passed, 0 failed. Signature (119) and portal (8) suites were not re-run; neither commit touched those areas and they need escalated local access.
 - Remaining unchecked AGENDA items are all outside source scope: matrix/new-client 0/N projections after the targetless fallback is retired, migration rehearsal on an approved non-production copy, the deferred packet window, and separate legal/accessibility/operations review plus authorized release.
 
 ## Next work
