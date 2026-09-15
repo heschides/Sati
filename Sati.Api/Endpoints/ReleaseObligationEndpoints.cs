@@ -323,6 +323,43 @@ internal static partial class ApiEndpoints
                 group => (IReadOnlyList<ReleaseObligation>)group.ToList());
     }
 
+    private static async Task<Dictionary<int, IReadOnlyList<ReleaseProviderLinkFact>>>
+        LoadReleaseProviderLinksByPersonAsync(
+            ApiDbContext db,
+            int agencyId,
+            IReadOnlyCollection<int> personIds,
+            CancellationToken cancellationToken)
+    {
+        if (personIds.Count == 0)
+            return [];
+
+        var rows = await (from link in db.PersonProviders.AsNoTracking()
+                          join provider in db.Providers.AsNoTracking()
+                              on link.ProviderId equals provider.Id
+                          where personIds.Contains(link.PersonId) &&
+                                provider.AgencyId == agencyId
+                          select new
+                          {
+                              link.PersonId,
+                              Fact = new ReleaseProviderLinkFact(
+                                  link.Id,
+                                  link.ProviderId,
+                                  provider.Type,
+                                  link.Role,
+                                  link.StartDate,
+                                  link.EndDate,
+                                  link.AssignmentKnownOn,
+                                  provider.Name)
+                          })
+            .ToListAsync(cancellationToken);
+        return rows.GroupBy(row => row.PersonId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<ReleaseProviderLinkFact>)group
+                    .Select(row => row.Fact)
+                    .ToArray());
+    }
+
     private static async Task<ReleaseObligation?> LoadReleaseRowAsync(
         ApiDbContext db,
         int agencyId,

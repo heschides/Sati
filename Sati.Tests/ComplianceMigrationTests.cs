@@ -156,4 +156,15 @@ public sealed class ComplianceMigrationTests
         Assert.Contains("CREATE TABLE [SignatureComplianceProjections]", script);
         Assert.DoesNotContain("UPDATE [DocumentTemplates]", script, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void ASecondImmutableRecoveryMayReferenceTheSameNote()
+    {
+        var operations = new Migrations.AllowSupersedingBillingComplianceRecovery().UpOperations;
+        Assert.Contains(operations.OfType<DropIndexOperation>(), operation =>
+            operation.Name == "IX_BillingComplianceRecoveryNotes_NoteId");
+        var replacement = Assert.Single(operations.OfType<CreateIndexOperation>());
+        Assert.Equal("IX_BillingComplianceRecoveryNotes_NoteId", replacement.Name);
+        Assert.False(replacement.IsUnique);
+    }
 }

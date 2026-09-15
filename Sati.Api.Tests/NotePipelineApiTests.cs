@@ -532,6 +532,50 @@ public sealed class NotePipelineApiTests
     }
 
     [Fact]
+    public async Task DraftClaimIsRecheckedWhenComplianceChangesBeforeSubmission()
+    {
+        using var author = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        using var supervisor = await _factory.CreateAuthenticatedClientAsync("supervisor-one");
+        using var admin = await _factory.CreateAuthenticatedClientAsync("admin-one");
+        var personId = await _factory.CreateBillingWorkflowPersonAsync();
+        var serviceDate = DateTime.Today;
+
+        var create = await author.PostAsJsonAsync("/api/v1/notes",
+            new SaveNoteRequest("Draft claim revalidation.", serviceDate, "Logged",
+                60, null, personId, null, null, null, null));
+        var note = await create.Content.ReadFromJsonAsync<NoteDto>();
+        using var approval = await supervisor.PostAsJsonAsync(
+            $"/api/v1/supervisor/notes/{note!.Id}/approve",
+            new SupervisorNoteActionRequest(null, note.Revision));
+        Assert.Equal(HttpStatusCode.OK, approval.StatusCode);
+        using var claim = await admin.PostAsJsonAsync("/api/v1/billing/claim-lines",
+            new CreateClaimLineRequest(note.Id, false, null));
+        var line = await claim.Content.ReadFromJsonAsync<ClaimLineDto>();
+        Assert.Equal(HttpStatusCode.OK, claim.StatusCode);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            db.Forms.Add(new ServerForm
+            {
+                PersonId = personId,
+                Type = "Q1R",
+                TargetEffectiveDate = serviceDate.AddDays(-91),
+                DueDate = serviceDate.AddDays(-1)
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var submit = await admin.PostAsync(
+            $"/api/v1/billing/periods/{line!.BillingPeriodId}/submit", null);
+        Assert.Equal(HttpStatusCode.BadRequest, submit.StatusCode);
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var verify = verifyScope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        Assert.Equal(0, (await verify.BillingPeriods.AsNoTracking()
+            .SingleAsync(period => period.Id == line.BillingPeriodId)).Status);
+    }
+
+    [Fact]
     public async Task TheDocumentedOverrideTravelsFromTheNoteOntoTheClaim()
     {
         using var supervisor = await _factory.CreateAuthenticatedClientAsync("supervisor-one");

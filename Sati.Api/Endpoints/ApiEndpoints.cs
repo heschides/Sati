@@ -1558,6 +1558,8 @@ internal static partial class ApiEndpoints
                 .ToDictionary(group => group.Key, group => (IReadOnlyList<ServerForm>)group.ToList());
             var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
                 db, personIds, cancellationToken);
+            var providerLinksByPerson = await LoadReleaseProviderLinksByPersonAsync(
+                db, actor.AgencyId, personIds, cancellationToken);
 
             var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
                 db, actor.AgencyId, cancellationToken);
@@ -1570,7 +1572,8 @@ internal static partial class ApiEndpoints
                         row.Person,
                         formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
                         releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
-                        compliancePolicy)
+                        compliancePolicy,
+                        providerLinksByPerson.GetValueOrDefault(row.Person.Id) ?? [])
                 })
                 .Select(row => ContractMapper.ToNote(
                     row.Row.Note,
@@ -1652,6 +1655,8 @@ internal static partial class ApiEndpoints
                 .ToDictionary(group => group.Key, group => (IReadOnlyList<ServerForm>)group.ToList());
             var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
                 db, personIds, cancellationToken);
+            var providerLinksByPerson = await LoadReleaseProviderLinksByPersonAsync(
+                db, actor.AgencyId, personIds, cancellationToken);
 
             var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
                 db, actor.AgencyId, cancellationToken);
@@ -1664,7 +1669,8 @@ internal static partial class ApiEndpoints
                         row.Person,
                         formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
                         releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
-                        compliancePolicy)
+                        compliancePolicy,
+                        providerLinksByPerson.GetValueOrDefault(row.Person.Id) ?? [])
                 })
                 .Where(row => row.Compliance.Passed == compliant)
                 .Select(row => ContractMapper.ToNote(
@@ -1756,10 +1762,13 @@ internal static partial class ApiEndpoints
             var releaseRows = (await LoadReleaseBillingRowsByPersonAsync(
                 db, [row.Person.Id], cancellationToken))
                 .GetValueOrDefault(row.Person.Id) ?? [];
+            var providerLinks = (await LoadReleaseProviderLinksByPersonAsync(
+                    db, actor.AgencyId, [row.Person.Id], cancellationToken))
+                .GetValueOrDefault(row.Person.Id) ?? [];
             var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
                 db, actor.AgencyId, cancellationToken);
             var compliance = EvaluateNoteCompliance(
-                row.Note, row.Person, forms, releaseRows, compliancePolicy);
+                row.Note, row.Person, forms, releaseRows, compliancePolicy, providerLinks);
             var decision = BillingComplianceExceptionRules.Validate(
                 compliance.Blockers ?? [],
                 request.BlockingObligationIds,
@@ -4602,6 +4611,8 @@ internal static partial class ApiEndpoints
                 });
             }
 
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
             var settings = await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken);
             var existing = await db.BillingCompliancePolicyVersions.AsNoTracking()
                 .SingleOrDefaultAsync(version => version.VersionId == request.ChangeId, cancellationToken);
@@ -4659,6 +4670,8 @@ internal static partial class ApiEndpoints
             var reviewFlags = CreateBillingCompliancePolicyReviewFlags(
                 version, impact.Impacts, recordedAtUtc);
             db.BillingCompliancePolicyReviewFlags.AddRange(reviewFlags);
+            await RecalculateUnsubmittedNoteStatesAsync(
+                db, impact.Impacts, cancellationToken);
             auditTrail.Record(
                 actor,
                 AuditActions.BillingCompliancePolicyAppended,
@@ -4672,6 +4685,7 @@ internal static partial class ApiEndpoints
                     unresolvedReviewFlags = reviewFlags.Count
                 }));
             await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return Results.Ok(ContractMapper.ToBillingCompliancePolicyVersion(version));
         });
 
@@ -5129,6 +5143,8 @@ internal static partial class ApiEndpoints
                 .ToListAsync(cancellationToken);
             var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
                 db, personIds, cancellationToken);
+            var providerLinksByPerson = await LoadReleaseProviderLinksByPersonAsync(
+                db, actor.AgencyId, personIds, cancellationToken);
             var endExclusive = end.AddDays(1);
             var notes = await db.Notes.AsNoTracking()
                 .Where(x => personIds.Contains(x.PersonId) && x.AgencyId == actor.AgencyId &&
@@ -5154,28 +5170,39 @@ internal static partial class ApiEndpoints
                 {
                     var personForms = formsByPerson.GetValueOrDefault(person.Id) ?? [];
                     var personReleases = releasesByPerson.GetValueOrDefault(person.Id) ?? [];
-                    var reconciledCycles = personReleases
-                        .Select(item => item.TargetEffectiveDate.Date)
-                        .ToHashSet();
-                    var formObligations = BillingComplianceGate.IncludePcpOpeningObligations(
-                        personForms
+                    var personProviderLinks = providerLinksByPerson
+                        .GetValueOrDefault(person.Id) ?? [];
+                    for (var date = activeStart; date <= end; date = date.AddDays(1))
+                    {
+                        var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingReleases(
+                            person.EffectiveDate,
+                            personReleases.Select(item => item.ToComplianceFact()),
+                            date,
+                            personProviderLinks);
+                        var reconciledCycles = releaseFacts
+                            .Where(item => item.TargetEffectiveDate is not null)
+                            .Select(item => item.TargetEffectiveDate!.Value.Date)
+                            .ToHashSet();
+                        var storedForms = personForms
                             .Where(form => !IsLegacyReleaseFormType(form.Type) ||
                                 !reconciledCycles.Contains(
                                     (form.TargetEffectiveDate == default
                                         ? form.DueDate
                                         : form.TargetEffectiveDate).Date))
                             .Select(form => new ComplianceFormSnapshot(
-                                form.Type,
-                                form.DueDate,
-                                form.CompletedDate,
-                                form.OpenedDate,
-                                $"form:{form.Id}")));
-                    for (var date = activeStart; date <= end; date = date.AddDays(1))
-                    {
+                                form.Type, form.DueDate, form.CompletedDate,
+                                form.OpenedDate, $"form:{form.Id}",
+                                TargetEffectiveDate: form.TargetEffectiveDate == default
+                                    ? null
+                                    : form.TargetEffectiveDate));
+                        var formObligations = BillingComplianceGate.IncludePcpOpeningObligations(
+                            ExpectedBillingComplianceObligations.IncludeMissingForms(
+                                person.EffectiveDate, storedForms, date,
+                                compliancePolicy.Schedule));
                         if (BillingComplianceGate.EvaluateBillingWindow(
                                 formObligations.Concat(
                                     ReleaseBillingRules.BuildComplianceSnapshots(
-                                        personReleases.Select(item => item.ToComplianceFact()),
+                                        releaseFacts,
                                         date)),
                                 date,
                                 compliancePolicy.Resolve(date)).Count > 0)
@@ -5685,6 +5712,8 @@ internal static partial class ApiEndpoints
                 .ToDictionary(group => group.Key, group => (IReadOnlyList<ServerForm>)group.ToList());
             var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
                 db, personIds, cancellationToken);
+            var providerLinksByPerson = await LoadReleaseProviderLinksByPersonAsync(
+                db, actor.AgencyId, personIds, cancellationToken);
             var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
                 db, actor.AgencyId, cancellationToken);
             var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(
@@ -5695,7 +5724,8 @@ internal static partial class ApiEndpoints
                     formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
                     releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
                     compliancePolicy,
-                    recoveryByNote.GetValueOrDefault(row.Note.Id) ?? []))).ToList();
+                    recoveryByNote.GetValueOrDefault(row.Note.Id) ?? [],
+                    providerLinksByPerson.GetValueOrDefault(row.Person.Id) ?? []))).ToList();
             return Results.Ok(candidates);
         });
 
@@ -5730,13 +5760,16 @@ internal static partial class ApiEndpoints
             var releaseRows = (await LoadReleaseBillingRowsByPersonAsync(
                 db, [row.Person.Id], cancellationToken))
                 .GetValueOrDefault(row.Person.Id) ?? [];
+            var providerLinks = (await LoadReleaseProviderLinksByPersonAsync(
+                    db, actor.AgencyId, [row.Person.Id], cancellationToken))
+                .GetValueOrDefault(row.Person.Id) ?? [];
             var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
                 db, actor.AgencyId, cancellationToken);
             var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(
                 db, actor.AgencyId, [row.Note.Id], cancellationToken);
             var errors = ValidateBillingCandidate(
                 row.Note, row.Person, agency, forms, releaseRows, compliancePolicy,
-                recoveryByNote.GetValueOrDefault(row.Note.Id) ?? []);
+                recoveryByNote.GetValueOrDefault(row.Note.Id) ?? [], providerLinks);
             if (errors.Count > 0)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = errors.ToArray() });
 
@@ -5858,6 +5891,8 @@ internal static partial class ApiEndpoints
                     ["period"] = ["A billing period with no claim lines cannot be submitted."]
                 });
             }
+            if (EdiReadinessConflict(period) is { } readinessConflict)
+                return readinessConflict;
             var complianceErrors = await RevalidateDraftPeriodComplianceAsync(
                 db, actor.AgencyId, period, cancellationToken);
             if (complianceErrors.Count > 0)
@@ -5867,8 +5902,6 @@ internal static partial class ApiEndpoints
                     ["compliance"] = complianceErrors.ToArray()
                 });
             }
-            if (EdiReadinessConflict(period) is { } readinessConflict)
-                return readinessConflict;
             period.Status = 1;
             period.SubmittedAt = DateTime.UtcNow;
             auditTrail.Record(actor, AuditActions.BillingPeriodSubmitted, "BillingPeriod", periodId);
@@ -7477,15 +7510,17 @@ internal static partial class ApiEndpoints
         ServerPerson person,
         IReadOnlyList<ServerForm> forms,
         IReadOnlyList<ReleaseObligation> releaseObligations,
-        ServerBillingCompliancePolicyContext policy)
+        ServerBillingCompliancePolicyContext policy,
+        IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null)
     {
         if (note.EventDate is not DateTime serviceDate)
             return new BillingComplianceResult(true, [], []);
 
-        var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingDhhs(
+        var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingReleases(
             person.EffectiveDate,
             releaseObligations.Select(item => item.ToComplianceFact()),
-            serviceDate);
+            serviceDate,
+            providerLinks ?? []);
         var reconciledReleaseCycles = releaseFacts
             .Where(item => item.TargetEffectiveDate is not null)
             .Select(item => item.TargetEffectiveDate!.Value.Date)
@@ -7531,11 +7566,12 @@ internal static partial class ApiEndpoints
         IReadOnlyList<ServerForm> forms,
         IReadOnlyList<ReleaseObligation> releaseObligations,
         ServerBillingCompliancePolicyContext policy,
-        IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null)
+        IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null,
+        IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null)
     {
         var errors = ValidateNonComplianceBillingCandidate(note, person, agency).ToList();
         var compliance = EvaluateNoteCompliance(
-            note, person, forms, releaseObligations, policy);
+            note, person, forms, releaseObligations, policy, providerLinks);
         if (compliance.Passed)
         {
             // No exception is needed for this service date.
@@ -7546,7 +7582,8 @@ internal static partial class ApiEndpoints
                      forms,
                      releaseObligations,
                      policy,
-                     recoveryDecisions ?? []))
+                     recoveryDecisions ?? [],
+                     providerLinks ?? []))
         {
             // This exact note and blocker evidence were released by an immutable
             // Admin recovery decision after compliance was restored.
@@ -7620,6 +7657,8 @@ internal static partial class ApiEndpoints
             .ToDictionary(group => group.Key, group => (IReadOnlyList<ServerForm>)group.ToList());
         var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
             db, personIds, cancellationToken);
+        var providerLinksByPerson = await LoadReleaseProviderLinksByPersonAsync(
+            db, agencyId, personIds, cancellationToken);
         var policy = await LoadBillingCompliancePolicyContextAsync(
             db, agencyId, cancellationToken);
         var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(
@@ -7644,7 +7683,8 @@ internal static partial class ApiEndpoints
                 formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
                 releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
                 policy,
-                recoveryByNote.GetValueOrDefault(row.Note.Id) ?? []);
+                recoveryByNote.GetValueOrDefault(row.Note.Id) ?? [],
+                providerLinksByPerson.GetValueOrDefault(row.Person.Id) ?? []);
             errors.AddRange(validation.Select(error =>
                 $"Draft claim line {line.Id} is no longer eligible for submission: {error}"));
         }
@@ -7685,7 +7725,8 @@ internal static partial class ApiEndpoints
         IReadOnlyList<ServerForm> forms,
         IReadOnlyList<ReleaseObligation> releaseObligations,
         ServerBillingCompliancePolicyContext policy,
-        IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision> decisions)
+        IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision> decisions,
+        IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null)
     {
         if (note.EventDate is not DateTime serviceDate || decisions.Count == 0)
             return false;
@@ -7698,7 +7739,8 @@ internal static partial class ApiEndpoints
             forms,
             releaseObligations,
             policy.Schedule,
-            serviceDate);
+            serviceDate,
+            providerLinks ?? []);
         var version = policy.ResolveSnapshot(serviceDate);
         return decisions.Any(decision => BillingComplianceRecoveryRules.IsReleased(
             noteSnapshot, obligations, version, decision));
@@ -7710,12 +7752,14 @@ internal static partial class ApiEndpoints
         IReadOnlyList<ServerForm> forms,
         IReadOnlyList<ReleaseObligation> releaseObligations,
         ComplianceScheduleSettings schedule,
-        DateTime asOfDate)
+        DateTime asOfDate,
+        IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null)
     {
-        var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingDhhs(
+        var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingReleases(
             initialEffectiveDate,
             releaseObligations.Select(item => item.ToComplianceFact()),
-            asOfDate);
+            asOfDate,
+            providerLinks ?? []);
         var reconciledReleaseCycles = releaseFacts
             .Where(item => item.TargetEffectiveDate is not null)
             .Select(item => item.TargetEffectiveDate!.Value.Date)
@@ -7834,6 +7878,9 @@ internal static partial class ApiEndpoints
             .ToListAsync(cancellationToken);
         var policy = await LoadBillingCompliancePolicyContextAsync(
             db, agencyId, cancellationToken);
+        var providerLinks = (await LoadReleaseProviderLinksByPersonAsync(
+                db, agencyId, [personId], cancellationToken))
+            .GetValueOrDefault(personId) ?? [];
         var decisionsByNote = await LoadRecoveryDecisionsByNoteAsync(
             db, agencyId, notes.Select(note => note.Id), cancellationToken);
         notes = notes.Where(note => !IsReleasedByRecovery(
@@ -7842,9 +7889,11 @@ internal static partial class ApiEndpoints
                 forms,
                 releases,
                 policy,
-                decisionsByNote.GetValueOrDefault(note.Id) ?? []))
+                decisionsByNote.GetValueOrDefault(note.Id) ?? [],
+                providerLinks))
             .ToList();
-        return new ServerRecoveryInputs(person, agency, forms, releases, notes, policy);
+        return new ServerRecoveryInputs(
+            person, agency, forms, releases, providerLinks, notes, policy);
     }
 
     private static BillingComplianceRecoveryPlan PrepareRecoveryPlan(
@@ -7870,7 +7919,8 @@ internal static partial class ApiEndpoints
                 inputs.Forms,
                 inputs.ReleaseObligations,
                 inputs.Policy.Schedule,
-                agencyToday),
+                agencyToday,
+                inputs.ProviderLinks),
             notes,
             agencyToday);
     }
@@ -8226,6 +8276,7 @@ internal static partial class ApiEndpoints
         ServerAgency? Agency,
         IReadOnlyList<ServerForm> Forms,
         IReadOnlyList<ReleaseObligation> ReleaseObligations,
+        IReadOnlyList<ReleaseProviderLinkFact> ProviderLinks,
         IReadOnlyList<ServerNote> Notes,
         ServerBillingCompliancePolicyContext Policy);
 
@@ -8337,6 +8388,7 @@ internal static partial class ApiEndpoints
         var relevantStatuses = new[]
         {
             NoteWorkflow.HeldForCompliance,
+            NoteWorkflow.Pending,
             NoteWorkflow.Logged,
             NoteWorkflow.Approved,
             NoteWorkflow.ComplianceBlocked
@@ -8378,6 +8430,8 @@ internal static partial class ApiEndpoints
                 group => (IReadOnlyList<ServerForm>)group.ToList());
         var releasesByPerson = await LoadReleaseBillingRowsByPersonAsync(
             db, personIds, cancellationToken);
+        var providerLinksByPerson = await LoadReleaseProviderLinksByPersonAsync(
+            db, agencyId, personIds, cancellationToken);
         var claims = await (from line in db.ClaimLines.AsNoTracking()
                             join period in db.BillingPeriods.AsNoTracking()
                                 on line.BillingPeriodId equals period.Id
@@ -8411,7 +8465,8 @@ internal static partial class ApiEndpoints
                     formsByPerson.GetValueOrDefault(note.PersonId) ?? [],
                     releasesByPerson.GetValueOrDefault(note.PersonId) ?? [],
                     policy.Schedule,
-                    note.ServiceDate.Date),
+                    note.ServiceDate.Date,
+                    providerLinksByPerson.GetValueOrDefault(note.PersonId) ?? []),
                 noteClaims.Where(claim => claim.IsFinalized)
                     .Select(claim => claim.Id)
                     .ToArray());
@@ -8432,6 +8487,37 @@ internal static partial class ApiEndpoints
             proposedRequirements,
             facts);
         return new ServerBillingPolicyImpactEvaluation(preview, impacts);
+    }
+
+    private static async Task RecalculateUnsubmittedNoteStatesAsync(
+        ApiDbContext db,
+        IEnumerable<BillingCompliancePolicyRecordImpact> impacts,
+        CancellationToken cancellationToken)
+    {
+        var changes = impacts
+            .Where(impact => !impact.IsSubmittedOrFinalized &&
+                             impact.ChangeKind is
+                                 BillingCompliancePolicyImpactChangeKind.NewlyBlocked or
+                                 BillingCompliancePolicyImpactChangeKind.NewlyUnblocked)
+            .ToDictionary(impact => impact.NoteId, impact => impact.ChangeKind);
+        if (changes.Count == 0)
+            return;
+
+        var noteIds = changes.Keys.ToArray();
+        var notes = await db.Notes
+            .Where(note => noteIds.Contains(note.Id))
+            .ToListAsync(cancellationToken);
+        foreach (var note in notes)
+        {
+            note.Status = changes[note.Id] switch
+            {
+                BillingCompliancePolicyImpactChangeKind.NewlyBlocked
+                    when note.Status == NoteWorkflow.Pending => NoteWorkflow.ComplianceBlocked,
+                BillingCompliancePolicyImpactChangeKind.NewlyUnblocked
+                    when note.Status == NoteWorkflow.ComplianceBlocked => NoteWorkflow.Pending,
+                _ => note.Status
+            };
+        }
     }
 
     private static List<BillingCompliancePolicyReviewFlag>

@@ -128,7 +128,7 @@ public sealed class ReleaseComplianceRefreshTests
     private static Person PersonWithStaleCurrentDhhs()
     {
         var person = Person.Rehydrate(40, 1);
-        person.EffectiveDate = new DateTime(2024, 3, 7);
+        person.EffectiveDate = CurrentTarget.AddYears(-1);
         person.ReleaseObligations.Add(CreateDhhsEntity(person.Id, CurrentTarget));
         return person;
     }

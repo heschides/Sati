@@ -759,6 +759,36 @@ public sealed class NotePipelineTests
     }
 
     [Fact]
+    public async Task DraftClaimIsRecheckedWhenComplianceChangesBeforeSubmission()
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var billing = fixture.BillingAs(fixture.AdminOne);
+        var noteId = await fixture.SeedNoteAsync(
+            fixture.PersonOneId, NoteStatus.Approved, fixture.BillableDate);
+        var line = await billing.CreateClaimLineAsync(noteId);
+
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            db.Forms.Add(new Form(
+                FormType.Q1R,
+                fixture.BillableDate.AddDays(-1),
+                targetEffectiveDate: fixture.BillableDate.AddDays(-91))
+            {
+                PersonId = fixture.PersonOneId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            billing.SubmitBillingPeriodAsync(line.BillingPeriodId));
+        Assert.Contains("no longer eligible", error.Message, StringComparison.OrdinalIgnoreCase);
+        await using var verification = fixture.Factory.CreateDbContext();
+        Assert.Equal(BillingStatus.Draft,
+            (await verification.BillingPeriods.SingleAsync(
+                period => period.Id == line.BillingPeriodId)).Status);
+    }
+
+    [Fact]
     public async Task TheDocumentedOverrideTravelsFromTheNoteOntoTheClaim()
     {
         await using var fixture = await PipelineFixture.CreateAsync();

@@ -81,6 +81,57 @@ public sealed class BillingComplianceRecoveryServiceTests : IAsyncDisposable
         Assert.Contains("not found", foreign.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task LaterBackdatedBlockerRequiresAndAllowsASecondImmutableRecovery()
+    {
+        var service = ServiceFor(_admin);
+        await service.RecordComplianceRecoveryAsync(
+            _admin.ToAgencyActor(),
+            _personId,
+            new CreateBillingComplianceRecoveryRequest(
+                [_noteIds[0]],
+                "The original PCP gap is complete.",
+                AttestationConfirmed: true));
+
+        await using (var db = _factory.CreateDbContext())
+        {
+            var assessment = new Form(
+                FormType.ComprehensiveAssessment,
+                new DateTime(2010, 7, 30),
+                targetEffectiveDate: new DateTime(2010, 10, 28))
+            {
+                PersonId = _personId
+            };
+            assessment.Attest(FormAttestation.Attested(
+                new DateTime(2010, 8, 7),
+                AttestationActorKind.CaseManager,
+                _caseManager.Id,
+                new DateTime(2010, 8, 8, 12, 0, 0, DateTimeKind.Utc)));
+            db.Forms.Add(assessment);
+            await db.SaveChangesAsync();
+        }
+
+        var secondPlan = await service.PrepareComplianceRecoveryAsync(
+            _admin.ToAgencyActor(), _personId);
+        var note = Assert.Single(secondPlan.NoteOptions,
+            option => option.NoteId == _noteIds[0]);
+        Assert.Equal(2, note.BlockingObligationIds.Count);
+
+        await service.RecordComplianceRecoveryAsync(
+            _admin.ToAgencyActor(),
+            _personId,
+            new CreateBillingComplianceRecoveryRequest(
+                [_noteIds[0]],
+                "A corrected assessment record exposed a second historical gap.",
+                AttestationConfirmed: true));
+
+        await using var verification = _factory.CreateDbContext();
+        Assert.Equal(2, await verification.BillingComplianceRecoveryDecisions
+            .CountAsync(decision => decision.PersonId == _personId));
+        Assert.Equal(2, await verification.BillingComplianceRecoveryNotes
+            .CountAsync(item => item.NoteId == _noteIds[0]));
+    }
+
     private async Task InitializeAsync()
     {
         _connection = new SqliteConnection("Data Source=:memory:");

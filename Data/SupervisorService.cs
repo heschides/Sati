@@ -44,6 +44,8 @@ public sealed class SupervisorService(
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
+        await ReleaseComplianceProjectionLoader.PopulateAsync(
+            context, [note.Person], actor.AgencyId);
 
         EnsureCurrentRevision(note, expectedRevision);
         if (!NoteWorkflow.CanSupervisorTransition((int?)note.Status, NoteWorkflow.Approved))
@@ -79,6 +81,8 @@ public sealed class SupervisorService(
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
+        await ReleaseComplianceProjectionLoader.PopulateAsync(
+            context, [note.Person], actor.AgencyId);
 
         EnsureCurrentRevision(note, expectedRevision);
         if (!NoteWorkflow.CanSupervisorTransition((int?)note.Status, NoteWorkflow.Approved))
@@ -181,6 +185,8 @@ public sealed class SupervisorService(
             .ToListAsync();
         var more = rows.Count > NoteReviewRules.PageSize;
         rows = rows.Take(NoteReviewRules.PageSize).ToList();
+        await ReleaseComplianceProjectionLoader.PopulateAsync(
+            context, rows.Select(note => note.Person), actor.AgencyId);
         var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
             context, actor.AgencyId);
         foreach (var note in rows)
@@ -252,7 +258,7 @@ public sealed class SupervisorService(
             .Select(user => user.Id)
             .ToListAsync();
 
-        return await context.Notes.AsNoTracking()
+        var notes = await context.Notes.AsNoTracking()
             .Include(note => note.Person)
                 .ThenInclude(person => person.Forms)
             .Include(note => note.Person)
@@ -264,6 +270,9 @@ public sealed class SupervisorService(
                 caseManagerIds.Contains(note.Person.UserId))
             .OrderBy(note => note.EventDate)
             .ToListAsync();
+        await ReleaseComplianceProjectionLoader.PopulateAsync(
+            context, notes.Select(note => note.Person), actor.AgencyId);
+        return notes;
     }
 
     private static Task<Note?> LoadReviewableNoteAsync(

@@ -101,6 +101,66 @@ public static class ExpectedBillingComplianceObligations
         return projected;
     }
 
+    /// <summary>
+    /// Completes the release fact set from the consumer's provider assignments.
+    /// This is the read-side safety net: if reconciliation failed to persist a
+    /// recipient row, billing still fails closed for the exact expected release.
+    /// </summary>
+    public static IReadOnlyList<ReleaseComplianceFact> IncludeMissingReleases(
+        DateTime? initialEffectiveDate,
+        IEnumerable<ReleaseComplianceFact> storedObligations,
+        DateTime asOfDate,
+        IEnumerable<ReleaseProviderLinkFact> providerLinks)
+    {
+        ArgumentNullException.ThrowIfNull(storedObligations);
+        ArgumentNullException.ThrowIfNull(providerLinks);
+
+        var projected = storedObligations.ToList();
+        if (initialEffectiveDate is not DateTime effectiveDate)
+            return projected;
+
+        var links = providerLinks.ToArray();
+        var existingKeys = projected
+            .Select(item => item.StableKey)
+            .ToHashSet(StringComparer.Ordinal);
+        var recipients = links.ToDictionary(
+            link => ReleaseAssignmentResolution.AssignmentKey(link.LinkId),
+            link => link.RecipientDisplayName,
+            StringComparer.Ordinal);
+
+        foreach (var target in ComplianceScheduleRules.TargetEffectiveDatesThroughNext(
+                     effectiveDate, asOfDate, MaximumCycles))
+        {
+            var resolution = ReleaseAssignmentResolution.Resolve(
+                target,
+                DateTime.MaxValue.Date,
+                requiresServiceProvider: false,
+                links);
+            foreach (var plan in ReleaseObligationRules.GenerateCycle(
+                         target, resolution.Assignments))
+            {
+                if (!existingKeys.Add(plan.StableKey))
+                    continue;
+
+                projected.Add(new ReleaseComplianceFact(
+                    plan.StableKey,
+                    plan.Category,
+                    plan.DueOn,
+                    plan.AppliesFromOn,
+                    plan.RetiredOn,
+                    [],
+                    TargetEffectiveDate: plan.TargetEffectiveDate,
+                    AvailableOn: plan.AvailableOn,
+                    RecipientDisplayName: plan.AssignmentKey is not null &&
+                                          recipients.TryGetValue(plan.AssignmentKey, out var recipient)
+                        ? recipient
+                        : null));
+            }
+        }
+
+        return projected;
+    }
+
     public static string MissingFormObligationId(string type, DateTime targetEffectiveDate)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);

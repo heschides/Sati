@@ -79,6 +79,19 @@ namespace Sati.Data
                 .Include(item => item.Attestations)
                 .Where(item => personIds.Contains(item.PersonId))
                 .ToListAsync();
+            var providerLinks = await (from link in context.PersonProviders.AsNoTracking()
+                                       join provider in context.Providers.AsNoTracking()
+                                           on link.ProviderId equals provider.Id
+                                       where personIds.Contains(link.PersonId) &&
+                                             provider.AgencyId == agencyId
+                                       select new
+                                       {
+                                           link.PersonId,
+                                           Fact = new ReleaseProviderLinkFact(
+                                               link.Id, link.ProviderId, provider.Type.ToString(),
+                                               link.Role, link.StartDate, link.EndDate,
+                                               link.AssignmentKnownOn, provider.Name)
+                                       }).ToListAsync();
 
             var notes = await context.Notes
                 .AsNoTracking()
@@ -101,6 +114,10 @@ namespace Sati.Data
             var releasesByPerson = releaseObligations
                 .GroupBy(item => item.PersonId)
                 .ToDictionary(group => group.Key, group => group.ToList());
+            var providerLinksByPerson = providerLinks
+                .GroupBy(item => item.PersonId)
+                .ToDictionary(group => group.Key,
+                    group => group.Select(item => item.Fact).ToArray());
             var notesByPerson = notes
                 .GroupBy(n => n.PersonId)
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -121,28 +138,37 @@ namespace Sati.Data
                 {
                     var personForms = formsByPerson.GetValueOrDefault(person.Id) ?? [];
                     var personReleases = releasesByPerson.GetValueOrDefault(person.Id) ?? [];
-                    var reconciledCycles = personReleases
-                        .Select(item => item.TargetEffectiveDate.Date)
-                        .ToHashSet();
-                    var formObligations = BillingComplianceGate.IncludePcpOpeningObligations(
-                        personForms
+                    var personProviderLinks = providerLinksByPerson.GetValueOrDefault(person.Id) ?? [];
+                    for (var date = activeStart; date <= end; date = date.AddDays(1))
+                    {
+                        var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingReleases(
+                            person.EffectiveDate,
+                            personReleases.Select(item => item.ToComplianceFact()),
+                            date,
+                            personProviderLinks);
+                        var reconciledCycles = releaseFacts
+                            .Where(item => item.TargetEffectiveDate is not null)
+                            .Select(item => item.TargetEffectiveDate!.Value.Date)
+                            .ToHashSet();
+                        var storedForms = personForms
                             .Where(form => !IsLegacyReleaseForm(form.Type) ||
                                 !reconciledCycles.Contains(
                                     (form.TargetEffectiveDate == default
                                         ? form.DueDate
                                         : form.TargetEffectiveDate).Date))
                             .Select(form => new ComplianceFormSnapshot(
-                                form.Type.ToString(),
-                                form.DueDate,
-                                form.CompletedDate,
-                                form.OpenedDate,
-                                $"form:{form.Id}")));
-                    for (var date = activeStart; date <= end; date = date.AddDays(1))
-                    {
+                                form.Type.ToString(), form.DueDate, form.CompletedDate,
+                                form.OpenedDate, $"form:{form.Id}",
+                                TargetEffectiveDate: form.TargetEffectiveDate == default
+                                    ? null
+                                    : form.TargetEffectiveDate));
+                        var formObligations = BillingComplianceGate.IncludePcpOpeningObligations(
+                            ExpectedBillingComplianceObligations.IncludeMissingForms(
+                                person.EffectiveDate, storedForms, date, policy.Schedule));
                         if (BillingComplianceGate.EvaluateBillingWindow(
                                 formObligations.Concat(
                                     ReleaseBillingRules.BuildComplianceSnapshots(
-                                        personReleases.Select(item => item.ToComplianceFact()),
+                                        releaseFacts,
                                         date)),
                                 date,
                                 policy.Resolve(date)).Count > 0)

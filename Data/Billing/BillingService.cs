@@ -127,6 +127,8 @@ namespace Sati.Services.Billing
 
             if (note.Person is null)
                 throw new InvalidOperationException($"Note {noteId} has no associated person.");
+            await ReleaseComplianceProjectionLoader.PopulateAsync(
+                context, [note.Person], actor.AgencyId);
 
             if (note.Status != NoteStatus.Approved)
                 throw new InvalidOperationException("Only an approved service note can become a claim line.");
@@ -247,8 +249,6 @@ namespace Sati.Services.Billing
             if (period.Lines.Count == 0)
                 throw new InvalidOperationException("A billing period with no claim lines cannot be submitted.");
 
-            await RevalidateDraftPeriodComplianceAsync(context, actor.AgencyId, period);
-
             try
             {
                 EdiGenerator.ValidatePeriod(period);
@@ -258,6 +258,8 @@ namespace Sati.Services.Billing
                 throw new InvalidOperationException(
                     $"This billing period is not ready to submit: {exception.Message}", exception);
             }
+
+            await RevalidateDraftPeriodComplianceAsync(context, actor.AgencyId, period);
 
             period.Status = BillingStatus.Submitted;
             period.SubmittedAt = DateTime.UtcNow;
@@ -302,6 +304,8 @@ namespace Sati.Services.Billing
             if (notes.Count != noteIds.Length)
                 throw new InvalidOperationException(
                     "A draft claim line no longer has an accessible source note.");
+            await ReleaseComplianceProjectionLoader.PopulateAsync(
+                context, notes.Select(note => note.Person), agencyId);
 
             var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, agencyId);
@@ -356,6 +360,8 @@ namespace Sati.Services.Billing
                          && !context.ClaimLines.Any(c => c.NoteId == n.Id))
                 .OrderBy(n => n.EventDate)
                 .ToListAsync();
+            await ReleaseComplianceProjectionLoader.PopulateAsync(
+                context, notes.Select(note => note.Person), actor.AgencyId);
 
             var noteIds = notes.Select(note => note.Id).ToArray();
             var decisions = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
@@ -587,10 +593,11 @@ namespace Sati.Services.Billing
             ComplianceScheduleSettings schedule,
             DateTime asOfDate)
         {
-            var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingDhhs(
+            var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingReleases(
                 person.EffectiveDate,
                 person.ReleaseObligations.Select(item => item.ToComplianceFact()),
-                asOfDate);
+                asOfDate,
+                person.ReleaseProviderLinksForCompliance);
             var reconciledReleaseCycles = releaseFacts
                 .Where(item => item.TargetEffectiveDate is not null)
                 .Select(item => item.TargetEffectiveDate!.Value.Date)
@@ -677,6 +684,8 @@ namespace Sati.Services.Billing
 
             var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, agencyId, cancellationToken);
+            await ReleaseComplianceProjectionLoader.PopulateAsync(
+                context, [person], agencyId, cancellationToken);
             var decisions = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
                 .Include(item => item.Obligations)
                 .Include(item => item.Notes)

@@ -83,6 +83,31 @@ public sealed class ExpectedBillingComplianceObligationsTests
     }
 
     [Fact]
+    public void MissingProviderReleaseRowsFailClosedFromAssignedRecipients()
+    {
+        var links = new[]
+        {
+            new ReleaseProviderLinkFact(
+                17, 31, "Healthcare", "Primary care",
+                EffectiveOn.AddYears(-1), null, EffectiveOn.AddYears(-1), "Dr. Example"),
+            new ReleaseProviderLinkFact(
+                18, 32, "Waiver", "Community support",
+                EffectiveOn.AddYears(-1), null, EffectiveOn.AddYears(-1), "Service Agency")
+        };
+        var facts = ExpectedBillingComplianceObligations.IncludeMissingReleases(
+            EffectiveOn, [], EffectiveOn.AddDays(1), links);
+        var snapshots = ReleaseBillingRules.BuildComplianceSnapshots(
+            facts, EffectiveOn.AddDays(1));
+
+        Assert.Contains(BillingComplianceGate.EvaluateBillingWindow(
+                snapshots, EffectiveOn.AddDays(1), BillingComplianceRequirements.MedicalRelease),
+            reason => reason.Contains("Dr. Example", StringComparison.Ordinal));
+        Assert.Contains(BillingComplianceGate.EvaluateBillingWindow(
+                snapshots, EffectiveOn.AddDays(1), BillingComplianceRequirements.AgencyRelease),
+            reason => reason.Contains("Service Agency", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void RecipientNameFlowsIntoBillingAndRecoveryLabels()
     {
         var fact = new ReleaseComplianceFact(

@@ -215,9 +215,10 @@ public sealed class BillingCompliancePolicyApiTests(SatiApiFactory factory)
         Assert.All(appliedFlags, flag =>
         {
             Assert.Equal("Unresolved", flag.Status);
-            Assert.StartsWith("form:",
-                Assert.Single(flag.PreviousBlockingObligationIds),
-                StringComparison.Ordinal);
+            Assert.Contains(flag.PreviousBlockingObligationIds,
+                obligationId => obligationId.StartsWith("form:", StringComparison.Ordinal));
+            Assert.Contains(flag.PreviousBlockingObligationIds,
+                obligationId => obligationId.StartsWith("missing-form:PCP:", StringComparison.Ordinal));
             Assert.Empty(flag.NewBlockingObligationIds);
         });
 
@@ -231,7 +232,7 @@ public sealed class BillingCompliancePolicyApiTests(SatiApiFactory factory)
             .ToListAsync());
         Assert.Equal(2, await verify.BillingCompliancePolicyReviewFlags.AsNoTracking()
             .CountAsync(flag => flag.PolicyVersionId == applied!.Id));
-        Assert.Equal(NoteWorkflow.ComplianceBlocked,
+        Assert.Equal(NoteWorkflow.Pending,
             (await verify.Notes.AsNoTracking().SingleAsync(note => note.Id == draftNoteId)).Status);
         Assert.Equal(NoteWorkflow.Approved,
             (await verify.Notes.AsNoTracking().SingleAsync(note => note.Id == finalizedNoteId)).Status);

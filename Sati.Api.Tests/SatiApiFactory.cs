@@ -676,7 +676,9 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                 new ServerNote
                 {
                     Id = 601, PersonId = 201, AgencyId = 2, Narrative = "Agency two note",
-                    EventDate = new DateTime(2026, 7, 11), Minutes = 60, Status = 2
+                    // This note already owns seeded claim line 1401, so it must be
+                    // in the approved state the billing pipeline requires.
+                    EventDate = new DateTime(2026, 7, 11), Minutes = 60, Status = 6
                 },
                 new ServerNote
                 {
@@ -1400,7 +1402,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
             FirstName = "Future",
             LastName = "Documents",
             BirthDate = new DateTime(1990, 1, 1),
-            EffectiveDate = DateTime.Today.AddMonths(-1),
+            EffectiveDate = futureDueDate,
             Forms =
             [
                 FutureIncompleteForm(personId, "PCP", futureDueDate),

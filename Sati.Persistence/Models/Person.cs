@@ -197,6 +197,8 @@ namespace Sati
         public List<ReleaseObligation> ReleaseObligations { get; set; } = [];
         [System.ComponentModel.DataAnnotations.Schema.NotMapped]
         public List<ReleaseComplianceFact> ReleaseComplianceSnapshots { get; set; } = [];
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public List<ReleaseProviderLinkFact> ReleaseProviderLinksForCompliance { get; set; } = [];
         IReadOnlyCollection<ReleaseComplianceFact> IEventSource.ReleaseComplianceFacts =>
             // A populated snapshot is the latest authoritative read returned by the
             // release-obligation boundary. Local Production also carries detached EF
@@ -663,10 +665,11 @@ namespace Sati
             Contracts.V1.ComplianceScheduleSettings schedule)
         {
             var releaseFacts = Contracts.V1.ExpectedBillingComplianceObligations
-                .IncludeMissingDhhs(
+                .IncludeMissingReleases(
                     EffectiveDate,
                     ((IEventSource)this).ReleaseComplianceFacts,
-                    asOfDate);
+                    asOfDate,
+                    ReleaseProviderLinksForCompliance);
             // The always-present DHHS obligation marks a reconciled annual cycle. Once that
             // row exists, the old three fixed release forms for the same cycle must not create
             // a second, contradictory gate beside the recipient-specific obligations.

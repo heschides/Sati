@@ -4,6 +4,7 @@ using Sati.Services;
 using Sati.Services.Billing;
 using Sati.Contracts.V1;
 using System.Text.Json;
+using System.Data;
 
 namespace Sati.Data
 {
@@ -262,6 +263,8 @@ namespace Sati.Data
 
             await using var context = _contextFactory.CreateDbContext();
             var actor = await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable);
             var settings = await context.Settings.SingleOrDefaultAsync(
                 candidate => candidate.AgencyId == actor.AgencyId)
                 ?? throw new SettingsSaveException(
@@ -326,6 +329,7 @@ namespace Sati.Data
             context.BillingCompliancePolicyVersions.Add(version);
             var reviewFlags = CreateReviewFlags(version, impact.Impacts, recordedAtUtc);
             context.BillingCompliancePolicyReviewFlags.AddRange(reviewFlags);
+            await RecalculateUnsubmittedNoteStatesAsync(context, impact.Impacts);
             LocalAuditTrail.Record(
                 context,
                 actor,
@@ -340,6 +344,7 @@ namespace Sati.Data
                     unresolvedReviewFlags = reviewFlags.Count
                 }));
             await context.SaveChangesAsync();
+            await transaction.CommitAsync();
             return ToPolicyDto(version);
         }
 
@@ -361,6 +366,7 @@ namespace Sati.Data
             var relevantStatuses = new[]
             {
                 NoteStatus.HeldForCompliance,
+                NoteStatus.Pending,
                 NoteStatus.Logged,
                 NoteStatus.Approved,
                 NoteStatus.ComplianceBlocked
@@ -392,6 +398,8 @@ namespace Sati.Data
                 .Where(person => personIds.Contains(person.Id) &&
                                  person.AgencyId == agencyId)
                 .ToListAsync(cancellationToken);
+            await ReleaseComplianceProjectionLoader.PopulateAsync(
+                context, people, agencyId, cancellationToken);
             var claims = await (from line in context.ClaimLines.AsNoTracking()
                                 join period in context.BillingPeriods.AsNoTracking()
                                     on line.BillingPeriodId equals period.Id
@@ -444,6 +452,36 @@ namespace Sati.Data
                 proposedRequirements,
                 facts);
             return new BillingPolicyImpactEvaluation(preview, impacts);
+        }
+
+        private static async Task RecalculateUnsubmittedNoteStatesAsync(
+            SatiContext context,
+            IEnumerable<BillingCompliancePolicyRecordImpact> impacts)
+        {
+            var changes = impacts
+                .Where(impact => !impact.IsSubmittedOrFinalized &&
+                                 impact.ChangeKind is
+                                     BillingCompliancePolicyImpactChangeKind.NewlyBlocked or
+                                     BillingCompliancePolicyImpactChangeKind.NewlyUnblocked)
+                .ToDictionary(impact => impact.NoteId, impact => impact.ChangeKind);
+            if (changes.Count == 0)
+                return;
+
+            var noteIds = changes.Keys.ToArray();
+            var notes = await context.Notes
+                .Where(note => noteIds.Contains(note.Id))
+                .ToListAsync();
+            foreach (var note in notes)
+            {
+                note.Status = changes[note.Id] switch
+                {
+                    BillingCompliancePolicyImpactChangeKind.NewlyBlocked
+                        when note.Status == NoteStatus.Pending => NoteStatus.ComplianceBlocked,
+                    BillingCompliancePolicyImpactChangeKind.NewlyUnblocked
+                        when note.Status == NoteStatus.ComplianceBlocked => NoteStatus.Pending,
+                    _ => note.Status
+                };
+            }
         }
 
         private static List<BillingCompliancePolicyReviewFlag> CreateReviewFlags(
