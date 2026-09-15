@@ -4130,11 +4130,11 @@ day, or treating completion as automatic repair of the gap.
 
 ### A Supervisor exception and an Admin recovery are different decisions
 
-A Supervisor may approve one otherwise blocked note only by supplying the expected revision, a
-reason, an explicit attestation, and the exact current blocker IDs. The decision does not mean
-“ignore compliance”: an unselected, stale, or newly discovered blocker still prevents approval or
-claim creation. After the decision, its reason, actor, time, confirmation, and IDs cannot be
-silently rewritten.
+Clinical approval and billing eligibility are separate. A Supervisor may approve clinical work
+while compliance still blocks billing. A billing exception additionally requires the expected
+revision, a reason, an explicit attestation, and the exact selected blocker IDs. An unselected,
+stale, or newly discovered blocker still prevents claim creation. After the decision, its reason,
+actor, time, confirmation, and IDs cannot be silently rewritten.
 
 Administrative recovery applies only after the named obligations are actually satisfied. The
 shared recovery rule produces otherwise billing-valid, approved, unclaimed, unrecovered notes in
@@ -4145,6 +4145,14 @@ service seams record that decision atomically and billing revalidates its exact 
 releasing a note. Submitted/finalized financial history must never be silently rewritten. The WPF
 workflow is available through an Administration-only entry point as well as Billing Overview, so
 administrative authority does not accidentally depend on Billing permission.
+
+Previously recovered notes may become eligible for a new recovery when corrected historical facts
+introduce another blocker. The earlier decision remains immutable; a second decision freezes the
+new exact evidence. Decision-plus-note identity remains unique, while NoteId alone is not unique
+in recovery records. ClaimLines.NoteId remains unique. Missing stored obligations are derived from
+annual and recipient-assignment facts for billing, policy impact, recovery, and loss reporting.
+Draft submission repeats compliance validation before locking claims. Policy append and pending
+note-state recalculation share the same serializable transaction as impact and review flags.
 
 **Rejected:** a consumer-wide blanket override, inferring exception scope from a display name,
 letting resolution of one blocker waive unrelated blockers, reopening every gap note automatically,

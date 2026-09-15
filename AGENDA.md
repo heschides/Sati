@@ -95,9 +95,14 @@ signature-never-attests items retained later as history.
       leap-day targets, historical gaps, duplicate/legacy forms, mid-cycle provider changes, and
       policies on both sides of an enforcement date. Do not query or alter Production PHI for this
       development task.
-- [ ] Run the complete focused and full synthetic suites after integration, then complete separate
-      legal/accessibility/operations review and an explicitly authorized release. No source-level
-      result here is a deployment or Production-readiness claim.
+- [x] Complete synthetic verification of the integrated compliance correction: API 739 passed;
+      desktop/domain 2,044 passed and one optional native-AI test skipped; signatures 119 passed;
+      portal 8 passed. Correct the recovery migration snapshot while retaining claim-line uniqueness.
+- [x] Revalidate draft claims at submission; make policy append/impact/pending-state refresh atomic;
+      derive missing annual/provider obligations for billing and allow a second immutable recovery
+      after corrected facts. Keep clinical approval separate from billing eligibility.
+- [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
+      No source-level result here is a deployment or Production-readiness claim.
 
 ## Unreleased — locked client-profile form attestations
 

@@ -39,10 +39,9 @@ and daily-agenda rows retain `FormId` plus `TargetEffectiveDate`, or the exact
 `ReleaseObligationId`, through navigation. An explicit missed historical target remains actionable
 after the ordinary late-reminder window; opening it may not redirect to today's cycle.
 
-One source-level exception remains in the older annual-packet status/rendering path:
-`AnnualDocumentService` and `AnnualPacketEndpoints` still locate completed PCP and Medical Release
-forms through a due-date range. That lookup must move to exact `TargetEffectiveDate` identity (with
-only the bounded legacy fallback) before this correction is described as fully integrated.
+`AnnualDocumentService` and `AnnualPacketEndpoints` locate completion and release evidence by
+the selected exact `TargetEffectiveDate`. Packet assembly retains its separate configurable
+availability window; it is not the opening or attestation gate for the underlying obligations.
 
 ### Completion and opening evidence
 
@@ -78,6 +77,12 @@ line, freezing its prior/new exact blocker IDs. Admin and Billing users see the 
 read-only review queue; resolution is deliberately not inferred or automated. The ordinary Settings
 save cannot silently rewrite the active mask.
 
+Policy impact calculation, version append, review flags, and Pending/ComplianceBlocked note-state
+refresh share a serializable transaction. Draft claim submission checks compliance again before
+locking the period, so a draft created before a policy or evidence change cannot bypass it.
+PCP opening uses a fixed target-minus-90-day billing deadline; adjusting notification availability
+does not rewrite that historical boundary.
+
 The desktop does not download policy history to make this decision. `ISettingsService` resolves the
 single `BillingComplianceRequirements` value for an exact service date: Local Production performs a
 tenant-scoped EF query and the cloud client calls a tenant-scoped API that returns only the date and
@@ -109,6 +114,16 @@ Candidate and claim-line validation release a selected note only while those exa
 match; a changed or newly applicable blocker fails closed. The reusable WPF recovery workspace is
 available from both the Administration dashboard and Billing Overview; Administration-only users
 do not need Billing permission to use the Admin entry point.
+
+Here, unrecovered means not covered by a decision matching the current exact facts. A later
+backdated blocker may require another immutable recovery decision for the same note. Migration
+`20260915153000_AllowSupersedingBillingComplianceRecovery` permits this while preserving uniqueness
+within each decision. Claim lines still enforce one line per note. Ordinary clinical approval can
+precede recovery; it does not itself release compliance-blocked billing.
+
+`ExpectedBillingComplianceObligations` derives missing required annual forms and recipient releases
+from effective dates and provider-assignment facts. Billing, policy impact, recovery, and billing-loss
+reports use this projection, so an absent stored row cannot silently count as completed.
 
 ### Recipient-specific releases and electronic signatures
 
