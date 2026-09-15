@@ -36,7 +36,8 @@ public sealed class FormDuplicateRepairTests
 
         // What the gate sees: every row in Person.Forms, including the two nobody can
         // reach from any screen.
-        var gate = person.EvaluateComplianceGate(Today);
+        var gate = person.EvaluateComplianceGate(Today,
+            requirements: Sati.Contracts.V1.BillingComplianceRequirements.QuarterlyReviews);
 
         Assert.False(gate.Passed);
         Assert.Contains(gate.Reasons, reason => reason.Contains("Q1 Review"));
@@ -49,7 +50,8 @@ public sealed class FormDuplicateRepairTests
 
         ApplyPlanInMemory(person);
 
-        var gate = person.EvaluateComplianceGate(Today);
+        var gate = person.EvaluateComplianceGate(Today,
+            requirements: Sati.Contracts.V1.BillingComplianceRequirements.QuarterlyReviews);
         Assert.True(gate.Passed);
         Assert.Empty(gate.Reasons);
 

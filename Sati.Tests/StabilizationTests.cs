@@ -348,8 +348,11 @@ public sealed class StabilizationTests
         var reasons = NewClientViewModel.GetComplianceReasons(person, new DateTime(2026, 8, 14));
         var converter = new PersonBillingComplianceConverter();
 
-        Assert.Single(reasons);
-        Assert.Contains("Comprehensive Assessment", reasons[0]);
+        // Missing required rows also contribute blockers; presentation must use
+        // the same complete obligation projection as the authoritative gate.
+        Assert.Equal(person.EvaluateComplianceGate(new DateTime(2026, 8, 14)).Reasons, reasons);
+        Assert.Contains(reasons, reason => reason.Contains("Comprehensive Assessment"));
+        Assert.Contains(reasons, reason => reason.Contains("PCP"));
         Assert.False(Assert.IsType<bool>(converter.Convert(
             [person, BillingComplianceGate.DefaultRequirements],
             typeof(bool), null, CultureInfo.InvariantCulture)));

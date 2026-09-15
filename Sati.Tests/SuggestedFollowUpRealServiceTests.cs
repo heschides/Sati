@@ -56,7 +56,9 @@ public sealed class SuggestedFollowUpRealServiceTests
         Assert.True(panel.IsSuggestedFollowUpVisible);
         Assert.Contains("PCP", panel.SuggestedFollowUpText);
         Assert.True(panel.AcceptSuggestedFollowUpCommand.CanExecute(null));
-        Assert.StartsWith("UPCOMING:", panel.ClientWorkStatusText);
+        // Admission today does not manufacture completion of the CA due 90 days earlier.
+        Assert.StartsWith("OVERDUE:", panel.ClientWorkStatusText);
+        Assert.Contains("Comprehensive Assessment", panel.ClientWorkStatusText);
 
         panel.AcceptSuggestedFollowUpCommand.Execute(null);
 

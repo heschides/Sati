@@ -502,7 +502,8 @@ namespace Sati.Migrations
 
                     b.HasIndex("BillingPeriodId");
 
-                    b.HasIndex("NoteId");
+                    b.HasIndex("NoteId")
+                        .IsUnique();
 
                     b.ToTable("ClaimLines");
                 });
@@ -997,8 +998,7 @@ namespace Sati.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("NoteId")
-                        .IsUnique();
+                    b.HasIndex("NoteId");
 
                     b.HasIndex("BillingComplianceRecoveryDecisionId", "NoteId")
                         .IsUnique();
