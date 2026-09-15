@@ -74,9 +74,17 @@ signature-never-attests items retained later as history.
       shapes, and audits every assigned target and changed deadline without altering completion,
       opening, or attestation evidence. Downgrade refuses when that conversion cannot be reversed
       losslessly. The migrations have not been applied to an operational environment.
-- [ ] Remove the remaining parallel fixed release `Form` generation/presentation for reconciled
+- [x] Remove the remaining parallel fixed release `Form` generation/presentation for reconciled
       targets; new consumers and provider assignments must atomically produce only exact recipient
-      obligations, while legacy rows remain historical compatibility records.
+      obligations, while legacy rows remain historical compatibility records. Verified 2026-09-15:
+      every generator (local/API creation, caseload load, `ExpectedBillingComplianceObligations`)
+      enumerates `PersonSaveRules.FormTypes`, which has no release; local and API creation and
+      provider create/update/end/remove reconcile or retire exact obligations inside the same
+      transaction with an audit event; matrix, board, agenda, and events read exact facts and
+      filter superseded legacy rows. The last presenter, three unbound `NewClientViewModel`
+      `Release*DueDate` properties, was removed and `ReleaseUiStructureTests` now guards against a
+      current-cycle lookup of a legacy release form. The note-entry form-type picker still offers
+      the three release categories as note subjects; that tags documentation, not an obligation.
 - [ ] Make Safety Plan, DHHS, Annual Documents, and annual-packet artifact workflows select and
       persist the exact annual target/release obligation instead of defaulting from today's cycle or
       a separate 30-day packet window.

@@ -364,9 +364,6 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(CompAssessmentDueDate));
             OnPropertyChanged(nameof(ReclassificationDueDate));
             OnPropertyChanged(nameof(SafetyPlanDueDate));
-            OnPropertyChanged(nameof(ReleaseAgencyDueDate));
-            OnPropertyChanged(nameof(ReleaseMedicalDueDate));
-            OnPropertyChanged(nameof(ReleaseDhhsDueDate));
             RefreshComplianceFlags();
             _ = LoadSelectedPersonWorkspaceSafelyAsync(value, _workspaceLoads.Begin());
             SsnPanel?.SetPerson(value?.Id);
@@ -606,9 +603,7 @@ namespace Sati.ViewModels
         public DateTime? ReclassificationDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.DueDate;
         public DateTime? SafetyPlanDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.DueDate;
         public DateTime? PrivacyPracticesDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.DueDate;
-        public DateTime? ReleaseAgencyDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Agency)?.DueDate;
-        public DateTime? ReleaseDhhsDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Release_DHHS)?.DueDate;
-        public DateTime? ReleaseMedicalDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Release_Medical)?.DueDate;
+        // Release due dates are per recipient; see ReleaseObligations and ReleaseCellViewModel.
 
         // Compliance flags
         public bool Q1RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q1R)?.IsCompliant ?? false;

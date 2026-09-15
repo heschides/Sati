@@ -9,6 +9,23 @@ public sealed class ReleaseUiStructureTests
         Path.GetDirectoryName(typeof(ReleaseUiStructureTests).Assembly.Location)!,
         "..", "..", "..", "..", ".."));
 
+    // Releases are per-recipient ReleaseObligations. A current-cycle lookup of a
+    // category-wide Release_* form reads a retained legacy row as if it were the
+    // live obligation, so no desktop surface may present one that way.
+    [Fact]
+    public void DesktopSurfacesDoNotPresentLegacyCategoryReleaseForms()
+    {
+        var offenders = new[] { "ViewModels", "Views", "Services", "Helpers", "Data" }
+            .SelectMany(folder => Directory.EnumerateFiles(
+                Path.Combine(Root, folder), "*.cs", SearchOption.AllDirectories))
+            .Where(path => File.ReadAllText(path)
+                .Contains("GetCurrentCycleForm(FormType.Release_", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(Root, path))
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
     [Fact]
     public void ProductivityForecastSeparatesBacklogFromFutureCapacity()
     {
