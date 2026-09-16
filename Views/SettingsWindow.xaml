@@ -554,6 +554,30 @@
                            TextWrapping="Wrap"
                            Margin="24,0,0,20" />
 
+                <TextBlock Text="WEEKLY CHECK REQUESTS"
+                           Style="{StaticResource LabelStyle}" />
+                <CheckBox Content="Create and remind me about weekly check-request drafts"
+                          AutomationProperties.Name="Create and remind me about weekly check-request drafts"
+                          AutomationProperties.HelpText="When enabled, Sati creates due drafts from each consumer's weekly default and reminds you until each draft is submitted."
+                          IsChecked="{Binding EnableWeeklyCheckRequestAutomation, Mode=TwoWay}"
+                          Margin="0,0,0,6" />
+                <TextBlock Text="When enabled, Sati creates drafts from your saved weekly defaults. Every draft still requires your review, PDF preparation, and submission."
+                           FontSize="11"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap"
+                           Margin="24,0,0,4" />
+                <TextBlock Text="Turning this off stops automatic creation and reminders for this account on this computer; it does not delete existing drafts or defaults."
+                           FontSize="11"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap"
+                           Margin="24,0,0,4" />
+                <TextBlock Text="{Binding CheckRequestAutomationPreferenceStatus}"
+                           AutomationProperties.LiveSetting="Polite"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="24,0,0,20" />
+
                 <TextBlock Text="LOADING INDICATOR TEST"
                            Style="{StaticResource SectionHeader}"
                            Margin="0,10,0,0" />
@@ -1093,6 +1117,30 @@
                      Style="{StaticResource SettingsTabItemStyle}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="36,30">
+
+                <!-- NOTE TEMPLATES -->
+                <TextBlock Text="OPTIONAL OADS WORKFLOWS"
+                           Style="{StaticResource SectionHeader}"
+                           Margin="0,8,0,8" />
+                <Separator />
+                <TextBlock Text="These unfinished workflows are off by default. Turn one on only for a deliberate demonstration. Leaving it off hides Sati's builder but keeps historical records, Evergreen attestations, deadlines, reminders, and billing rules."
+                           TextWrapping="Wrap"
+                           MaxWidth="620"
+                           HorizontalAlignment="Left"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="0,0,0,12" />
+                <CheckBox Content="Comprehensive Assessment"
+                          AutomationProperties.Name="Enable Comprehensive Assessment workflow"
+                          IsChecked="{Binding IsComprehensiveAssessmentAuthoringEnabled}"
+                          Margin="0,0,0,8" />
+                <CheckBox Content="Classification"
+                          AutomationProperties.Name="Enable Classification workflow"
+                          IsChecked="{Binding IsClassificationAuthoringEnabled}"
+                          Margin="0,0,0,8" />
+                <CheckBox Content="Person-Centered Plan (PCP)"
+                          AutomationProperties.Name="Enable Person-Centered Plan workflow"
+                          IsChecked="{Binding IsPersonCenteredPlanAuthoringEnabled}"
+                          Margin="0,0,0,20" />
 
                 <!-- NOTE TEMPLATES -->
                 <TextBlock Text="NOTE TEMPLATES"

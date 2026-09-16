@@ -10,11 +10,12 @@ public sealed class SignatureLabelConverter : IValueConverter
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value?.ToString() switch
     {
         "ChangesRequested" => "Changes requested",
+        "Declined" => "Denied",
         "PinRejected" => "Incorrect signing code",
         "SignerRecordChanged" => "Signer details changed",
         "ExternalAccessRevoked" => "Online copy access stopped",
-        "Issued" => "Link prepared",
-        "Viewed" => "Opened for review",
+        "Issued" => "Pending",
+        "Viewed" => "Pending — opened for review",
         "Revoked" => "Request stopped",
         "AuthorizationWithdrawn" => "Authorization withdrawn",
         "ElectronicConsentWithdrawn" => "Electronic signing declined",
@@ -23,6 +24,7 @@ public sealed class SignatureLabelConverter : IValueConverter
         "ReleaseAgency" => "Agency release",
         "ReleaseMedical" => "Medical release",
         "ReleaseDhhs" => "DHHS release",
+        "DhhsAuthorizedRepresentative" => "DHHS Authorized Representative",
         "PrivacyPractices" => "Notice of privacy practices",
         "MedicalRecordsRequest" => "Medical records request",
         "Staff" => "Staff member",

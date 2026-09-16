@@ -460,19 +460,19 @@
                                     CornerRadius="4"
                                     Padding="10,8"
                                     Margin="0,0,0,10"
-                                    Visibility="{Binding HasStaleNoteMessage,
+                                    Visibility="{Binding HasNoteAttentionMessage,
                                         Converter={StaticResource BoolToVisibilityConverter}}">
                                 <StackPanel>
-                                    <TextBlock Text="NOTE CHANGED ON THE SERVER"
+                                    <TextBlock Text="NOTE NEEDS ATTENTION"
                                                FontSize="10"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource DangerStrongBrush}"
                                                Margin="0,0,0,4" />
-                                    <TextBlock Text="{Binding StaleNoteMessage}"
+                                    <TextBlock Text="{Binding NoteAttentionMessage}"
                                                FontSize="12"
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                TextWrapping="Wrap"
-                                               AutomationProperties.Name="Note changed on the server"
+                                               AutomationProperties.Name="{Binding NoteAttentionAutomationName}"
                                                AutomationProperties.LiveSetting="Assertive" />
                                 </StackPanel>
                             </Border>
@@ -629,6 +629,8 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!-- Carries the unit count the removed detail panel
@@ -651,6 +653,16 @@
                                 SelectedDate="{Binding EventDate}"
                                 ToolTip="Choosing a future date automatically changes this entry to a non-billable calendar Reminder." />
 
+                    <TextBlock Text="GOAL PROGRESS — REQUIRED TO SUBMIT"
+                               Grid.Row="4"
+                               Style="{StaticResource LabelStyle}" />
+                    <ComboBox Grid.Row="5"
+                              ItemsSource="{Binding GoalProgressOptions}"
+                              SelectedItem="{Binding GoalProgress, Mode=TwoWay}"
+                              IsEnabled="{Binding IsGoalProgressEnabled}"
+                              AutomationProperties.Name="Goal progress"
+                              AutomationProperties.HelpText="Required before the note is submitted for review. Choose None when no progress was made. Scheduled work and reminders do not require an answer." />
+
                     <!-- ═══ SERVICE DAY ═══
                          A case manager cannot bill the same minute twice, so the
                          draft's start time and minutes are drawn against the rest
@@ -659,7 +671,7 @@
                          enforced again by the API; this panel is the preview.
                          A Reminder claims no service time, so the whole panel —
                          start time, bar, and verdict — disables with it. -->
-                    <Border Grid.Row="4"
+                    <Border Grid.Row="6"
                             Margin="0,2,0,10"
                             Padding="11"
                             CornerRadius="6"
@@ -814,7 +826,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Expander Grid.Row="5"
+                    <Expander Grid.Row="7"
                               Header="IN-PERSON MEETING DETAILS"
                               IsExpanded="True"
                               Margin="0,2,0,10"
@@ -1002,7 +1014,7 @@
                         </Border>
                     </Expander>
 
-                    <Grid Grid.Row="6">
+                    <Grid Grid.Row="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -1051,7 +1063,7 @@
                     </Grid>
 
                             <TextBox x:Name="NarrativeTextBox"
-                                     AutomationProperties.Name="Note narrative" Grid.Row="7"
+                                     AutomationProperties.Name="Note narrative" Grid.Row="9"
                                      services:TextShortcutTarget.IsEnabled="True"
                                      MinHeight="160"
                                      TextWrapping="Wrap"
@@ -1062,7 +1074,7 @@
                                      FontSize="{Binding NarrativeFontSize}"
                                      Text="{Binding Narrative, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <Border Grid.Row="8"
+                            <Border Grid.Row="10"
                                     Margin="0,6,0,10"
                                     Padding="10,8"
                                     CornerRadius="6"
@@ -1100,7 +1112,7 @@
                                  Gated on IsVisitNote, not IsLocalAiEnabled: the template is
                                  built from the meeting checkboxes, which only a Visit note
                                  has, and it needs no model. -->
-                            <StackPanel Grid.Row="9"
+                            <StackPanel Grid.Row="11"
                                         Margin="0,2,0,10"
                                         IsEnabled="{Binding AreNoteFieldsEnabled}"
                                         Visibility="{Binding IsVisitNote,
@@ -1172,7 +1184,7 @@
                                              AutomationProperties.Name="Local AI model download progress" />
                             </StackPanel>
 
-                            <Border Grid.Row="10"
+                            <Border Grid.Row="12"
                                     Margin="0,2,0,10"
                                     Padding="12"
                                     CornerRadius="6"
@@ -1278,7 +1290,7 @@
             <!-- MaxHeight bound to the overlay Grid keeps the dialog inside the
                  module's clip bounds (module-only dimming). Inside, a DockPanel
                  pins the button row to the bottom and lets the message + reasons +
-                 justification scroll — so buttons are reachable no matter how many
+                 explanation scroll — so buttons are reachable no matter how many
                  compliance reasons or how long the client name. -->
             <Border Background="{DynamicResource WindowBackgroundBrush}"
                     BorderBrush="{DynamicResource OverdueBorderBrush}"
@@ -1296,7 +1308,7 @@
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 Margin="0,16,0,0">
-                        <Button Content="Cancel"
+                        <Button Content="Return to Note"
                                 Padding="14,6"
                                 FontSize="12"
                                 Cursor="Hand"
@@ -1338,6 +1350,7 @@
                             </Button.Template>
                         </Button>
                         <Button Content="Send to Supervisor"
+                                AutomationProperties.Name="Send this note to a supervisor with a written justification"
                                 Padding="14,6"
                                 FontSize="12"
                                 Cursor="Hand"

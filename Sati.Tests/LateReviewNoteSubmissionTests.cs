@@ -16,7 +16,8 @@ public sealed class LateReviewNoteSubmissionTests
         var panel = fixture.NoteEntry();
         var person = await fixture.PersonOneAsync();
         var serviceDate = new DateTime(2026, 8, 20);
-        person.Forms.Add(new Form(FormType.Q4R, serviceDate.AddDays(-1)));
+        person.Forms.Add(new Form(FormType.Q4R, serviceDate.AddDays(-1),
+            targetEffectiveDate: serviceDate.AddDays(-1).Date));
         panel.SetPeople([person]);
         panel.SelectedPerson = person;
         panel.SelectedNoteType = NoteType.Form;
@@ -24,6 +25,7 @@ public sealed class LateReviewNoteSubmissionTests
         panel.Status = NoteStatus.Logged;
         panel.EventDate = serviceDate;
         panel.Minutes = 30;
+        panel.GoalProgress = GoalProgressLevel.Moderate;
         panel.Narrative = "Completed the Q4 90-day review meeting.";
 
         await panel.SubmitNoteCommand.ExecuteAsync(null);

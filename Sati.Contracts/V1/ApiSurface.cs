@@ -43,6 +43,9 @@ public static class ApiSurface
         "billing-compliance-policy-impact-preview-v1",
         "billing-compliance-policy-review-flags-v1",
         "billing-compliance-recovery-v1",
+        // The billing queue carries service and claim-readiness facts only. It does
+        // not serialize clinical narrative, visit documentation, or consumer names.
+        "billing-candidate-minimum-necessary-v1",
         "billing-exchange-history-v4",
         "claim-response-ingestion-v2",
         "form-retention-v1",
@@ -58,9 +61,15 @@ public static class ApiSurface
         // SettingsDto gained the existing-profile Credible policy and configurable VR
         // assistant title. Both must round-trip through the agency-authoritative API.
         "settings-profile-import-and-vr-label-v1",
+        // The three OADS authoring switches are independent from the external-work
+        // attestation and billing-compliance requirements.
+        "oads-authoring-settings-v1",
         // Form completion is now an explicit, append-only attestation with a
         // separately revocable projection and a derived evidence queue.
         "form-attestation-v1",
+        // Authorized users can see the signer, timestamp, completion date, and
+        // revocation history behind the current form-compliance projection.
+        "form-attestation-history-v1",
         "form-attestation-prerequisite-v1",
         "annual-document-artifact-v1",
         "document-template-v1",
@@ -75,7 +84,14 @@ public static class ApiSurface
         "demo-full-reset-v1",
         // Prevent same-month periods for different case managers from rendering identically.
         "billing-period-case-manager-name-v1",
-        "check-request-v1"
+        "check-request-v1",
+        "representative-payee-workflow-v1",
+        "weekly-check-request-automation-v1",
+        "time-off-check-request-reminders-v1",
+        "case-note-goal-progress-v1",
+        "cwic-referral-packet-v1",
+        "housing-support-funds-v1",
+        "person-photo-v1"
     ];
 
     /// <summary>
@@ -90,6 +106,7 @@ public static class ApiSurface
         "DELETE /api/v1/contacts/{contactId:int}",
         "DELETE /api/v1/exempt-dates/{id:int}",
         "DELETE /api/v1/notes/{id:int}",
+        "DELETE /api/v1/people/{personId:int}/photo",
         "DELETE /api/v1/people/{personId:int}/providers/{linkId:int}",
         "DELETE /api/v1/providers/{id:int}",
         "DELETE /api/v1/providers/{providerId:int}/contacts/{contactId:int}",
@@ -122,6 +139,9 @@ public static class ApiSurface
         "GET /api/v1/chat/rooms/{roomId:int}/members",
         "GET /api/v1/chat/rooms/{roomId:int}/messages",
         "GET /api/v1/chat/stream",
+        "GET /api/v1/check-requests/generated-drafts/pending",
+        "GET /api/v1/check-requests/supervisor-queue",
+        "GET /api/v1/check-requests/time-off-collisions",
         "GET /api/v1/check-requests/{id:int}",
         "GET /api/v1/exempt-dates/{year:int}",
         "GET /api/v1/incentives/history",
@@ -135,16 +155,19 @@ public static class ApiSurface
         "GET /api/v1/people/{personId:int}/appointments/latest",
         "GET /api/v1/people/{personId:int}/assessments/latest",
         "GET /api/v1/people/{personId:int}/at-requests",
-        "GET /api/v1/people/{personId:int}/check-requests",
         "GET /api/v1/people/{personId:int}/attestations/pending",
+        "GET /api/v1/people/{personId:int}/check-request-template",
+        "GET /api/v1/people/{personId:int}/check-requests",
         "GET /api/v1/people/{personId:int}/contacts",
         "GET /api/v1/people/{personId:int}/documents",
+        "GET /api/v1/people/{personId:int}/forms/{type}/attestations",
         "GET /api/v1/people/{personId:int}/forms/{type}/prerequisite",
         "GET /api/v1/people/{personId:int}/history",
         "GET /api/v1/people/{personId:int}/history.pdf",
         "GET /api/v1/people/{personId:int}/journal",
         "GET /api/v1/people/{personId:int}/notes",
         "GET /api/v1/people/{personId:int}/pcp-source",
+        "GET /api/v1/people/{personId:int}/photo",
         "GET /api/v1/people/{personId:int}/providers",
         "GET /api/v1/people/{personId:int}/release-obligations",
         "GET /api/v1/people/{personId:int}/reviews",
@@ -157,6 +180,9 @@ public static class ApiSurface
         "GET /api/v1/providers/{providerId:int}/contacts",
         "GET /api/v1/reports/consumer-billing-loss",
         "GET /api/v1/reports/productivity-units",
+        "GET /api/v1/representative-payee/check-requests",
+        "GET /api/v1/representative-payee/consumers",
+        "GET /api/v1/representative-payee/consumers/{personId:int}/ledger",
         "GET /api/v1/reviews",
         "GET /api/v1/scratchpad/history",
         "GET /api/v1/scratchpad/today",
@@ -205,7 +231,10 @@ public static class ApiSurface
         "POST /api/v1/chat/rooms/{roomId:int}/messages",
         "POST /api/v1/chat/rooms/{roomId:int}/read",
         "POST /api/v1/check-requests",
+        "POST /api/v1/check-requests/time-off-drafts/ensure",
+        "POST /api/v1/check-requests/weekly-drafts/ensure",
         "POST /api/v1/check-requests/{id:int}/publish",
+        "POST /api/v1/check-requests/{id:int}/workflow",
         "POST /api/v1/exempt-dates",
         "POST /api/v1/forms/delete",
         "POST /api/v1/forms/{id:int}/open",
@@ -220,6 +249,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/annual-packet",
         "POST /api/v1/people/{personId:int}/assessments/draft",
         "POST /api/v1/people/{personId:int}/contacts",
+        "POST /api/v1/people/{personId:int}/cwic-referral.pdf",
         "POST /api/v1/people/{personId:int}/documents/privacy-practices/acknowledgment",
         "POST /api/v1/people/{personId:int}/documents/verify",
         "POST /api/v1/people/{personId:int}/documents/{artifactId:int}/freeze",
@@ -228,6 +258,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/forms.pdf",
         "POST /api/v1/people/{personId:int}/forms/{type}/attestation",
         "POST /api/v1/people/{personId:int}/forms/{type}/attestation/revoke",
+        "POST /api/v1/people/{personId:int}/housing-support-funds.pdf",
         "POST /api/v1/people/{personId:int}/journal/entries",
         "POST /api/v1/people/{personId:int}/providers",
         "POST /api/v1/people/{personId:int}/release-obligations/reconcile",
@@ -237,6 +268,7 @@ public static class ApiSurface
         "POST /api/v1/providers",
         "POST /api/v1/providers/{providerId:int}/contacts",
         "POST /api/v1/providers/{survivingId:int}/merge",
+        "POST /api/v1/representative-payee/ledger-entries",
         "POST /api/v1/reviews/ensure-current",
         "POST /api/v1/safety-plans/{planId:int}/approve",
         "POST /api/v1/safety-plans/{planId:int}/return",
@@ -262,9 +294,11 @@ public static class ApiSurface
         "PUT /api/v1/incentives/{id:int}",
         "PUT /api/v1/notes/{id:int}",
         "PUT /api/v1/people/{personId:int}",
+        "PUT /api/v1/people/{personId:int}/check-request-template",
         "PUT /api/v1/people/{personId:int}/contacts/{contactId:int}",
         "PUT /api/v1/people/{personId:int}/journal",
         "PUT /api/v1/people/{personId:int}/owner",
+        "PUT /api/v1/people/{personId:int}/photo",
         "PUT /api/v1/people/{personId:int}/providers/{linkId:int}",
         "PUT /api/v1/people/{personId:int}/ssn",
         "PUT /api/v1/people/{personId:int}/status",

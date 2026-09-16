@@ -28,6 +28,14 @@ internal static class LocalAuditTrail
 internal static class LocalAuditActions
 {
     public const string CheckRequestPublished = "check-request.published";
+    public const string CheckRequestSubmitted = "check-request.submitted";
+    public const string CheckRequestApproved = "check-request.approved";
+    public const string CheckRequestReturned = "check-request.returned";
+    public const string CheckRequestReleased = "check-request.released";
+    public const string CheckRequestReceiptAcknowledged = "check-request.receipt-acknowledged";
+    public const string CheckRequestTemplateUpdated = "check-request-template.updated";
+    public const string CheckRequestDraftGenerated = "check-request.draft-generated";
+    public const string RepresentativePayeeLedgerEntryAdded = "representative-payee.ledger-entry-added";
     public const string AuthenticationSucceeded = "authentication.succeeded";
     public const string PersonCreated = "person.created";
     public const string PersonUpdated = "person.updated";
@@ -59,6 +67,8 @@ internal static class LocalAuditActions
     // Mirrors AuditActions.PersonReassigned on the API side.
     public const string PersonReassigned = "person.reassigned";
     public const string PersonSsnUpdated = "person.ssn-updated";
+    public const string PersonPhotoUpdated = "person.photo-updated";
+    public const string PersonPhotoRemoved = "person.photo-removed";
     // A read is the disclosure, so it is recorded separately from whatever document
     // occasioned it. Mirrors AuditActions.PersonSsnDecrypted on the API side.
     public const string PersonSsnRevealed = "person.ssn-revealed";

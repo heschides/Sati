@@ -109,6 +109,16 @@ remain outstanding.
 
 ## Current Azure Demo database
 
+On September 14, 2026, the three additive migrations for Representative Payee workflow, weekly
+check-request automation, and case-note goal progress were rehearsed with rollback, applied, and
+rerun idempotently against identity-checked `SatiDemo`, moving migration history from 102 to 105.
+After separate authorization, the canonical full-reset baseline was replaced with a September 14
+timeline anchor. Its 56-table inventory and row counts matched the live database, the new workflow
+tables were present as empty canonical tables, and a complete reset rehearsal inside an outer
+transaction left constraints trusted before rolling back to the exact prior live state. The
+temporary workstation firewall rule remained operator-managed throughout and must be removed by
+the operator after database work is complete.
+
 Provisioned and validated on August 11, 2026:
 
 | Setting | Value |

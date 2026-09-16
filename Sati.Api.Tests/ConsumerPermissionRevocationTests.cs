@@ -282,7 +282,7 @@ public sealed class ConsumerPermissionRevocationTests(SatiApiFactory factory)
         try
         {
             var candidates = await client.GetFromJsonAsync<List<BillingCandidateDto>>("/api/v1/billing/candidates");
-            Assert.DoesNotContain(candidates!, candidate => candidate.Note.Id == noteId);
+            Assert.DoesNotContain(candidates!, candidate => candidate.NoteId == noteId);
             using var response = await client.PostAsJsonAsync("/api/v1/billing/claim-lines", new CreateClaimLineRequest(noteId, false, null));
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
             await using var scope = factory.Services.CreateAsyncScope();

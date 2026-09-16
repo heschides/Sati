@@ -574,6 +574,23 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                     EdiPayerId = "MCDME", EdiContactName = "Test Billing",
                     EdiContactPhone = "2075550102"
                 });
+            // Endpoint authorization tests exercise the dormant authoring prototypes.
+            // Enable them explicitly here; the release/database defaults remain off.
+            db.Settings.AddRange(
+                new ServerSettings
+                {
+                    AgencyId = 1,
+                    IsComprehensiveAssessmentAuthoringEnabled = true,
+                    IsClassificationAuthoringEnabled = true,
+                    IsPersonCenteredPlanAuthoringEnabled = true
+                },
+                new ServerSettings
+                {
+                    AgencyId = 2,
+                    IsComprehensiveAssessmentAuthoringEnabled = true,
+                    IsClassificationAuthoringEnabled = true,
+                    IsPersonCenteredPlanAuthoringEnabled = true
+                });
             db.Users.AddRange(
                 CreateUser(verifier, 11, "admin-one", "Admin", 1),
                 CreateUser(verifier, 12, "case-manager-one", "CaseManager", 1, 13),
@@ -595,6 +612,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                 CreateUser(verifier, 18, "demoted-supervisor-one", "CaseManager", 1,
                     permissions: UserPermissions.CaseManagement),
                 CreateUser(verifier, 19, "supervisee-of-demoted-one", "CaseManager", 1, 18),
+                CreateUser(verifier, 20, "finance-one", "Finance", 1),
                 CreateUser(verifier, 21, "admin-two", "Admin", 2),
                 CreateUser(verifier, 22, "case-manager-two", "CaseManager", 2, 23),
                 CreateUser(verifier, 23, "supervisor-two", "Supervisor", 2),
@@ -608,6 +626,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                     DiagnosisCode = "F89", PlaceOfService = 11,
                     BillingStreet = "10 Test Street", BillingCity = "Portland",
                     BillingState = "ME", BillingZip = "04101",
+                    CaseManagerIsRepPayee = true, RepPayeeMonthlyIncome = 1200m,
                     Forms =
                     [
                         CompliantForm(101, "PCP"),
@@ -653,7 +672,19 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                     BirthDate = new DateTime(1990, 1, 1), Journal = "Agency two journal",
                     MaineCareId = "222222", DiagnosisCode = "F89", PlaceOfService = 11,
                     BillingStreet = "20 Test Street", BillingCity = "Bangor",
-                    BillingState = "ME", BillingZip = "04401"
+                    BillingState = "ME", BillingZip = "04401",
+                    // This consumer carries agency two's seeded billing history, so its
+                    // annual obligations are explicit. A missing row counts as
+                    // outstanding, which would otherwise block the seeded claim as soon
+                    // as another test gives this record an effective date.
+                    EffectiveDate = CycleStart,
+                    Forms =
+                    [
+                        CompliantForm(201, "PCP"),
+                        CompliantForm(201, "ComprehensiveAssessment"),
+                        CompliantForm(201, "Reclassification"),
+                        CompliantForm(201, "SafetyPlan")
+                    ]
                 });
             db.Providers.AddRange(
                 new ServerProvider { Id = 301, AgencyId = 1, Type = "Other", Name = "Provider One" },
@@ -1203,6 +1234,11 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         await using var scope = Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
         var nextId = await db.Notes.MaxAsync(note => note.Id) + 1;
+        // Every synthetic source person gets a private historical billing month.
+        // Billing periods belong to the case manager rather than the consumer, so
+        // reusing one hard-coded month lets an unrelated test's submitted period
+        // make a later test fail with period_submitted.
+        var serviceDate = new DateTime(2020, 1, 15).AddMonths(-(personId - 202));
         var approvedAt = new DateTime(2026, 8, 4, 12, 0, 0, DateTimeKind.Utc);
         db.Notes.Add(new ServerNote
         {
@@ -1210,7 +1246,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
             PersonId = personId,
             AgencyId = 1,
             Narrative = "Approved billable note",
-            EventDate = new DateTime(2026, 8, 3),
+            EventDate = serviceDate,
             Minutes = minutes,
             Status = 6,
             ApprovedById = 13,

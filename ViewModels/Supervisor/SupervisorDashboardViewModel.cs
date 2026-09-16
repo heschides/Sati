@@ -34,6 +34,7 @@ namespace Sati.ViewModels.Supervisor
         private readonly UserManagementViewModel _userManagementViewModel;
         public UserManagementViewModel UserManagement => _userManagementViewModel;
         private readonly PendingApprovalsViewModel _pendingApprovalsViewModel;
+        private readonly CheckRequestApprovalsViewModel _checkRequestApprovalsViewModel;
         private readonly CaseloadDistributionViewModel _caseloadDistributionViewModel;
         private readonly CaseloadImportViewModel _caseloadImportViewModel;
 
@@ -52,6 +53,7 @@ namespace Sati.ViewModels.Supervisor
             ThemeService themeService,
             UserManagementViewModel userManagementViewModel,
             PendingApprovalsViewModel pendingApprovalsViewModel,
+            CheckRequestApprovalsViewModel checkRequestApprovalsViewModel,
             CaseloadDistributionViewModel caseloadDistributionViewModel,
             CaseloadImportViewModel caseloadImportViewModel)
         {
@@ -91,6 +93,7 @@ namespace Sati.ViewModels.Supervisor
             // Start on team overview
             CurrentSubView = _teamOverviewViewModel;
             _pendingApprovalsViewModel = pendingApprovalsViewModel;
+            _checkRequestApprovalsViewModel = checkRequestApprovalsViewModel;
             _caseloadDistributionViewModel = caseloadDistributionViewModel;
 
             // A distribution changes who holds which consumers, so the sidebar counts the
@@ -130,6 +133,7 @@ namespace Sati.ViewModels.Supervisor
         public int TotalOverdue => CaseManagers.Sum(cm => cm.OverdueCount);
         public int TotalNotesThisMonth => CaseManagers.Sum(cm => cm.NotesThisMonth);
         public bool IsPendingApprovalsActive => CurrentSubView is PendingApprovalsViewModel;
+        public bool IsCheckRequestApprovalsActive => CurrentSubView is CheckRequestApprovalsViewModel;
 
         public string AvgComplianceLabel
         {
@@ -161,6 +165,7 @@ namespace Sati.ViewModels.Supervisor
             OnPropertyChanged(nameof(IsMonthlyProductivityActive));
             OnPropertyChanged(nameof(IsUserManagementActive));
             OnPropertyChanged(nameof(IsPendingApprovalsActive));
+            OnPropertyChanged(nameof(IsCheckRequestApprovalsActive));
             OnPropertyChanged(nameof(IsCaseloadDistributionActive));
             OnPropertyChanged(nameof(IsCaseloadImportActive));
         }
@@ -252,6 +257,13 @@ namespace Sati.ViewModels.Supervisor
             CurrentSubView = _pendingApprovalsViewModel;
             await _pendingApprovalsViewModel.LoadAsync(SelectedCaseManager?.UserId);
         }
+
+        [RelayCommand]
+        private async Task NavigateToCheckRequestApprovals()
+        {
+            CurrentSubView = _checkRequestApprovalsViewModel;
+            await _checkRequestApprovalsViewModel.LoadAsync();
+        }
    
         // -------------------------------------------------------------------------
         // Initialization
@@ -340,6 +352,7 @@ namespace Sati.ViewModels.Supervisor
             SelectedCaseManager = null;
             CaseManagers.Clear();
             _pendingApprovalsViewModel.ClearForAccountSwitch();
+            _checkRequestApprovalsViewModel.ClearForAccountSwitch();
             CurrentSubView = _teamOverviewViewModel;
             _teamOverviewViewModel.Refresh(CaseManagers);
             _overdueItemsViewModel.Refresh(CaseManagers);

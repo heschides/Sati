@@ -94,7 +94,7 @@
                               MaxHeight="210"
                               Visibility="{Binding HasSelectedPeriodLines, Converter={StaticResource BoolToVisibilityConverter}}">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="CLIENT" Binding="{Binding ClientName}" Width="125" />
+                            <DataGridTextColumn Header="CONSUMER RECORD" Binding="{Binding ClientDisplayName}" Width="125" />
                             <DataGridTextColumn Header="SERVICE DATE"
                                                 Binding="{Binding DateOfService, StringFormat={}{0:yyyy-MM-dd}}"
                                                 Width="90" />

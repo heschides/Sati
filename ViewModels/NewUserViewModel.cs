@@ -33,6 +33,7 @@ namespace Sati.ViewModels
         [ObservableProperty] private bool hasAgencyWideSupervision;
         [ObservableProperty] private bool hasAdminPermissions;
         [ObservableProperty] private bool hasBillingPermissions;
+        [ObservableProperty] private bool hasRepresentativePayeePermissions;
 
         public ObservableCollection<User> Supervisors { get; } = [];
         public User? CreatedUser { get; private set; }
@@ -86,6 +87,7 @@ namespace Sati.ViewModels
                 if (HasAgencyWideSupervision) permissions |= UserPermissions.AgencyWideSupervision;
                 if (HasAdminPermissions) permissions |= UserPermissions.Administration;
                 if (HasBillingPermissions) permissions |= UserPermissions.Billing;
+                if (HasRepresentativePayeePermissions) permissions |= UserPermissions.RepresentativePayee;
             }
             else
             {

@@ -38,6 +38,8 @@ public sealed class NotePipelineTests
                     fixture.PersonOneId, current, fixture.ServiceDate(day++));
                 var draft = await fixture.DetachedNoteAsync(noteId);
                 draft.Status = target;
+                if (target == NoteStatus.Logged)
+                    draft.GoalProgress = GoalProgressLevel.Moderate;
                 draft.Narrative = $"{current} to {target}";
 
                 var allowed = NoteWorkflow.CanCaseManagerTransition((int?)current, (int?)target);
@@ -64,6 +66,8 @@ public sealed class NotePipelineTests
         foreach (var status in AllStatuses)
         {
             var note = Note.Create("New note", fixture.ServiceDate(1), status, 30, fixture.PersonOneId);
+            if (status == NoteStatus.Logged)
+                note.GoalProgress = GoalProgressLevel.Moderate;
             if (NoteWorkflow.IsCaseManagerWritableStatus((int?)status))
             {
                 var saved = await service.AddNoteAsync(note);
@@ -74,6 +78,29 @@ public sealed class NotePipelineTests
                 await Assert.ThrowsAsync<InvalidOperationException>(() => service.AddNoteAsync(note));
             }
         }
+    }
+
+    [Fact]
+    public async Task GoalProgressIsRequiredForSubmissionAndNoneIsARealAnswer()
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var notes = fixture.NotesAs(fixture.CaseManagerOne);
+        var saved = await notes.AddNoteAsync(Note.Create(
+            "Goal progress test.", fixture.BillableDate, NoteStatus.Pending, 15,
+            fixture.PersonOneId, noteType: NoteType.Contact));
+
+        var submitting = await fixture.DetachedNoteAsync(saved.Id);
+        submitting.Status = NoteStatus.Logged;
+        var missing = await Assert.ThrowsAsync<ArgumentException>(() =>
+            notes.UpdateNoteAsync(submitting));
+        Assert.Contains("Goal progress", missing.Message);
+        Assert.Equal(NoteStatus.Pending, await fixture.StatusOfAsync(saved.Id));
+
+        submitting.GoalProgress = GoalProgressLevel.None;
+        await notes.UpdateNoteAsync(submitting);
+        var stored = await fixture.NoteAsync(saved.Id);
+        Assert.Equal(NoteStatus.Logged, stored.Status);
+        Assert.Equal(GoalProgressLevel.None, stored.GoalProgress);
     }
 
     [Fact]
@@ -313,6 +340,7 @@ public sealed class NotePipelineTests
         {
             var submitting = await fixture.DetachedNoteAsync(noteId);
             submitting.Status = NoteStatus.Logged;
+            submitting.GoalProgress = GoalProgressLevel.Moderate;
             submitting.Narrative = $"Submission {round}";
             await notes.UpdateNoteAsync(submitting);
             Assert.Equal(NoteStatus.Logged, await fixture.StatusOfAsync(noteId));
@@ -380,6 +408,7 @@ public sealed class NotePipelineTests
 
             var straightToReview = await fixture.DetachedNoteAsync(noteId);
             straightToReview.Status = NoteStatus.Logged;
+            straightToReview.GoalProgress = GoalProgressLevel.Moderate;
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 notes.UpdateNoteAsync(straightToReview));
 
@@ -390,6 +419,7 @@ public sealed class NotePipelineTests
 
             var resubmitted = await fixture.DetachedNoteAsync(noteId);
             resubmitted.Status = NoteStatus.Logged;
+            resubmitted.GoalProgress = GoalProgressLevel.Moderate;
             await notes.UpdateNoteAsync(resubmitted);
             Assert.Equal(NoteStatus.Logged, await fixture.StatusOfAsync(noteId));
         }
@@ -959,6 +989,7 @@ public sealed class NotePipelineTests
 
         var submitting = await fixture.DetachedNoteAsync(created.Id);
         submitting.Status = NoteStatus.Logged;
+        submitting.GoalProgress = GoalProgressLevel.Moderate;
         await notes.UpdateNoteAsync(submitting);
 
         var pending = await supervisor.GetPendingNotesAsync(fixture.SupervisorOne.Id);
@@ -1062,6 +1093,114 @@ public sealed class NotePipelineTests
     // Fixture
     // ---------------------------------------------------------------------
 
+    [Theory]
+    [InlineData(false, "current")]
+    [InlineData(true, "current")]
+    [InlineData(false, "historical")]
+    [InlineData(true, "historical")]
+    [InlineData(false, "form-tag")]
+    [InlineData(true, "form-tag")]
+    public async Task LoggedSubmissionRefusesComplianceFailuresWithoutWriting(bool update, string contingency)
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        await SeedSubmissionRequirementAsync(fixture, today.AddDays(-5),
+            contingency == "historical" ? today : null);
+        var service = fixture.NotesAs(fixture.CaseManagerOne);
+        var note = update
+            ? await fixture.DetachedNoteAsync(await fixture.SeedNoteAsync(
+                fixture.PersonOneId, NoteStatus.Pending, today.AddDays(-2)))
+            : Note.Create("Do not lose this clinical draft.", today.AddDays(-2), NoteStatus.Pending, 30,
+                fixture.PersonOneId);
+        var before = update ? await fixture.NoteAsync(note.Id) : null;
+        note.Narrative = "Do not lose this clinical draft.";
+        note.Status = NoteStatus.Logged;
+        note.GoalProgress = GoalProgressLevel.Moderate;
+        if (contingency == "form-tag")
+        {
+            note.NoteType = NoteType.Form;
+            note.FormType = FormType.PCP;
+        }
+
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(async () =>
+        {
+            if (update) await service.UpdateNoteAsync(note);
+            else await service.AddNoteAsync(note);
+        });
+
+        Assert.Contains("PCP", error.Message);
+        Assert.Contains("Pending", error.Message);
+        Assert.Equal("Do not lose this clinical draft.", note.Narrative);
+        Assert.Equal(update ? before!.Revision : 1, note.Revision);
+        await using var verification = fixture.Factory.CreateDbContext();
+        Assert.False(await verification.AuditEvents.AnyAsync());
+        if (update)
+        {
+            var stored = await fixture.NoteAsync(note.Id);
+            Assert.Equal(before!.Narrative, stored.Narrative);
+            Assert.Equal(before.Status, stored.Status);
+            Assert.Equal(before.Revision, stored.Revision);
+        }
+        else Assert.False(await verification.Notes.AnyAsync());
+    }
+
+    [Theory]
+    [InlineData(NoteStatus.Pending)]
+    [InlineData(NoteStatus.HeldForCompliance)]
+    [InlineData(NoteStatus.ComplianceBlocked)]
+    public async Task NoncompliantSubmissionDocumentationStillSavesAndEdits(NoteStatus status)
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        await SeedSubmissionRequirementAsync(fixture, today.AddDays(-5), null);
+        var service = fixture.NotesAs(fixture.CaseManagerOne);
+        var saved = await service.AddNoteAsync(Note.Create("Clinical documentation", today, status, 30,
+            fixture.PersonOneId));
+        saved.Narrative = "Corrected clinical documentation";
+
+        await service.UpdateNoteAsync(saved);
+
+        Assert.Equal(status, await fixture.StatusOfAsync(saved.Id));
+        Assert.Equal(saved.Narrative, await fixture.NarrativeOfAsync(saved.Id));
+    }
+
+    [Theory]
+    [InlineData("due-today")]
+    [InlineData("future-due")]
+    [InlineData("completed-today")]
+    [InlineData("requirement-disabled")]
+    public async Task LoggedSubmissionPreservesConfiguredDateBoundaries(string contingency)
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        await SeedSubmissionRequirementAsync(fixture,
+            contingency == "due-today" ? today : contingency == "future-due" ? today.AddDays(1) : today.AddDays(-5),
+            contingency == "completed-today" ? today : null,
+            contingency == "requirement-disabled" ? BillingComplianceRequirements.None : BillingComplianceRequirements.Pcp);
+
+        var candidate = Note.Create(
+            "Compliant submission", today, NoteStatus.Logged, 30, fixture.PersonOneId);
+        candidate.GoalProgress = GoalProgressLevel.Moderate;
+        var saved = await fixture.NotesAs(fixture.CaseManagerOne).AddNoteAsync(candidate);
+
+        Assert.Equal(NoteStatus.Logged, await fixture.StatusOfAsync(saved.Id));
+    }
+
+    private static async Task SeedSubmissionRequirementAsync(PipelineFixture fixture, DateTime dueDate,
+        DateTime? completedDate, BillingComplianceRequirements requirements = BillingComplianceRequirements.Pcp)
+    {
+        await using var db = fixture.Factory.CreateDbContext();
+        var form = new Form(FormType.PCP, dueDate, completedDate,
+            targetEffectiveDate: dueDate.Date) { PersonId = fixture.PersonOneId };
+        db.Forms.Add(form);
+        db.Settings.Add(new Settings
+        {
+            AgencyId = fixture.CaseManagerOne.AgencyId,
+            BillingComplianceRequirements = requirements
+        });
+        await db.SaveChangesAsync();
+    }
+
     private sealed class PipelineFixture : IAsyncDisposable
     {
         private const int AgencyOne = 101;
@@ -1152,6 +1291,7 @@ public sealed class NotePipelineTests
             await using var db = Factory.CreateDbContext();
             var person = await db.People.SingleAsync(candidate => candidate.Id == personId);
             var note = Note.Create("Seeded note", eventDate, status, 60, personId);
+            note.GoalProgress = GoalProgressLevel.Moderate;
             note.AgencyId = person.AgencyId;
             if (status == NoteStatus.Approved)
             {

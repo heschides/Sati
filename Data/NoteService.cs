@@ -6,12 +6,14 @@ namespace Sati.Data;
 
 public class NoteService(
     IDbContextFactory<SatiContext> contextFactory,
-    ISessionService sessionService) : INoteService
+    ISessionService sessionService,
+    TimeProvider? timeProvider = null) : INoteService
 {
     public async Task<Note> AddNoteAsync(Note note)
     {
         ArgumentNullException.ThrowIfNull(note);
-        NormalizeScheduling(note);
+        var today = BillingRules.MaineBusinessDate((timeProvider ?? TimeProvider.System).GetUtcNow());
+        NormalizeScheduling(note, today);
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
@@ -20,10 +22,14 @@ public class NoteService(
             throw new UnauthorizedAccessException("You may create notes only for your own caseload.");
 
         note.AgencyId = actor.AgencyId;
+        await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(
+            context, actor.AgencyId, actor.Id);
+        await EnsureSubmissionAllowedAsync(context, actor, note, today);
         await EnsureServiceTimeAvailableAsync(context, actor.Id, note, null);
         context.Notes.Add(note);
         LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteCreated, "Note");
         await context.SaveChangesAsync();
+        await scheduleWrite.CommitAsync();
         return note;
     }
 
@@ -34,6 +40,8 @@ public class NoteService(
         await using var context = contextFactory.CreateDbContext();
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, actor.Id);
+        await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(
+            context, actor.AgencyId, actor.Id);
         var stored = await context.Notes.Include(candidate => candidate.Person)
             .SingleOrDefaultAsync(candidate => candidate.Id == note.Id);
         if (stored is null || stored.Revision != note.Revision)
@@ -45,19 +53,26 @@ public class NoteService(
             throw new InvalidOperationException("Submitted and workflow-controlled notes are retained as part of the clinical record.");
 
         context.Notes.Remove(stored);
-        try { await context.SaveChangesAsync(); }
+        try
+        {
+            await context.SaveChangesAsync();
+            await scheduleWrite.CommitAsync();
+        }
         catch (DbUpdateConcurrencyException ex) { throw new NoteConcurrencyException(ex); }
     }
 
     public async Task UpdateNoteAsync(Note note)
     {
         ArgumentNullException.ThrowIfNull(note);
-        NormalizeScheduling(note);
+        var today = BillingRules.MaineBusinessDate((timeProvider ?? TimeProvider.System).GetUtcNow());
+        NormalizeScheduling(note, today);
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
         await using var context = contextFactory.CreateDbContext();
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         await EnsureUserInScopeAsync(context, actor, actor.Id);
+        await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(
+            context, actor.AgencyId, actor.Id);
         var stored = await context.Notes.Include(candidate => candidate.Person)
             .SingleOrDefaultAsync(candidate => candidate.Id == note.Id);
         if (stored is null || stored.Revision != note.Revision)
@@ -84,6 +99,7 @@ public class NoteService(
                     "You may reassign a note only to another client on your own caseload.");
         }
 
+        await EnsureSubmissionAllowedAsync(context, actor, note, today);
         await EnsureServiceTimeAvailableAsync(context, actor.Id, note, stored.Id);
         CopyCaseManagerValues(note, stored);
         stored.PersonId = note.PersonId;
@@ -107,6 +123,7 @@ public class NoteService(
         try
         {
             await context.SaveChangesAsync();
+            await scheduleWrite.CommitAsync();
             note.Revision = stored.Revision;
             note.Person = targetPerson;
         }
@@ -199,6 +216,7 @@ public class NoteService(
         target.StartTime = source.StartTime;
         target.FormType = source.FormType;
         target.NoteType = source.NoteType;
+        target.GoalProgress = source.GoalProgress;
         target.CaseManagerJustification = source.CaseManagerJustification;
         target.VisitDocumentationJson = source.VisitDocumentationJson;
     }
@@ -231,20 +249,23 @@ public class NoteService(
             throw new ArgumentException("Service start time must fall inside the logging window.", nameof(note));
         if (!NoteWorkflow.IsCaseManagerWritableStatus((int?)note.Status))
             throw new InvalidOperationException("That note status is controlled by a supervisor workflow.");
+        if (note.Status == NoteStatus.Logged && note.GoalProgress is null)
+            throw new ArgumentException("Goal progress is required before a note can be submitted for review.", nameof(note));
     }
 
-    private static void NormalizeScheduling(Note note)
+    private static void NormalizeScheduling(Note note, DateTime today)
     {
         var values = NoteSchedulingPolicy.Normalize(
             note.EventDate,
-            DateTime.Today,
+            today,
             note.Status?.ToString(),
             note.Minutes,
             note.StartTime,
             note.FormType?.ToString(),
             note.NoteType?.ToString(),
             note.CaseManagerJustification,
-            note.VisitDocumentationJson);
+            note.VisitDocumentationJson,
+            note.GoalProgress?.ToString());
 
         note.EventDate = values.EventDate;
         note.Status = ParseNullable<NoteStatus>(values.Status);
@@ -254,10 +275,40 @@ public class NoteService(
         note.NoteType = ParseNullable<NoteType>(values.NoteType);
         note.CaseManagerJustification = values.CaseManagerJustification;
         note.VisitDocumentationJson = values.VisitDocumentationJson;
+        note.GoalProgress = ParseNullable<GoalProgressLevel>(values.GoalProgress);
     }
 
     private static T? ParseNullable<T>(string? value) where T : struct, Enum =>
         value is null ? null : Enum.Parse<T>(value, ignoreCase: false);
+
+    private static async Task EnsureSubmissionAllowedAsync(
+        SatiContext context, User actor, Note note, DateTime today)
+    {
+        _ = today;
+        if (note.Status != NoteStatus.Logged) return;
+        if (note.EventDate is not DateTime serviceDate) return;
+
+        // The transitional local service repeats the API's rule rather than
+        // relying on being the only caller: the note's own service date, under the
+        // policy version in force on that date, with exact recipient obligations.
+        var person = await context.People.AsNoTracking()
+            .Include(candidate => candidate.Forms).ThenInclude(form => form.Attestations)
+            .SingleAsync(x =>
+                x.Id == note.PersonId && x.UserId == actor.Id && x.AgencyId == actor.AgencyId);
+        await ReleaseComplianceProjectionLoader.PopulateAsync(
+            context, [person], actor.AgencyId);
+        var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
+            context, actor.AgencyId);
+        var compliance = person.EvaluateBillingWindowDetailed(
+            serviceDate, policy.Resolve(serviceDate), policy.Schedule);
+        if (compliance.Passed) return;
+
+        var configurationInvalid = !BillingComplianceGate.IsSupported(policy.Resolve(serviceDate));
+        var result = new NoteSubmissionResult(
+            false, compliance.Reasons, !configurationInvalid, configurationInvalid);
+        if (!NoteSubmissionGate.IsSubmissionAllowed(result, note.CaseManagerJustification))
+            throw new NoteSubmissionException(result.Message);
+    }
 
     internal static async Task EnsureServiceTimeAvailableAsync(
         SatiContext context, int userId, Note note, int? editingNoteId)

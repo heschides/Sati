@@ -31,7 +31,8 @@ public sealed class ClaimExchangeLoopTests
         var generation = await client.PostAsJsonAsync(
             $"/api/v1/billing/periods/{SubmittedPeriodId}/edi",
             new GenerateEdiRequest(true, Guid.NewGuid().ToString("N")));
-        generation.EnsureSuccessStatusCode();
+        Assert.True(generation.IsSuccessStatusCode,
+            $"{generation.StatusCode}: {await generation.Content.ReadAsStringAsync()}");
 
         var response = await client.PostAsJsonAsync(
             $"/api/v1/billing/periods/{SubmittedPeriodId}/mock-clearinghouse",

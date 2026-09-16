@@ -54,14 +54,15 @@ public sealed class AccountLifecycleUiContractTests
     public void ReauthenticationInstallsFreshIdentityWithoutResettingSamePermissionDrafts()
     {
         var source = Read("Views/ShellWindow.xaml.cs");
-        Assert.Contains("ResumeReauthenticatedSession(user)", source);
+        Assert.Contains("await _shellViewModel.ResumeReauthenticatedSessionAsync(user)", source);
         Assert.Contains("_sessionLifetime.Invalidate()", source);
         var shell = Read("ViewModels/ShellViewModel.cs");
-        var start = shell.IndexOf("public void ResumeReauthenticatedSession", StringComparison.Ordinal);
+        var start = shell.IndexOf("public async Task ResumeReauthenticatedSessionAsync", StringComparison.Ordinal);
         Assert.True(start >= 0);
         var method = shell[start..shell.IndexOf("private void ApplyEasyEyesMode", start, StringComparison.Ordinal)];
         Assert.Contains("_sessionService.SetUser(user)", method);
         Assert.Contains("NotesViewModel.LoggedInUser = _sessionService.CurrentUser", method);
+        Assert.Contains("await Scratchpad.ResumeAfterReauthenticationAsync()", method);
         Assert.DoesNotContain(".Reset()", method);
         Assert.Contains("ReauthenticateCommand", Read("Views/ShellWindow.xaml"));
     }

@@ -296,7 +296,7 @@
                                 Padding="10,6"
                                 Margin="0,0,0,6" />
                         <Button Content="{Binding SelectedDayExemptActionLabel}"
-                                AutomationProperties.Name="Change selected day's exempt status"
+                                AutomationProperties.Name="Schedule time off or restore the selected workday"
                                 Command="{Binding ToggleExemptCommand}"
                                 CommandParameter="{Binding SelectedDay}"
                                 Padding="10,6"
@@ -368,7 +368,7 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="0,0,0,7">
-                        <Run Text="EXEMPT — " /><Run Text="{Binding SelectedMonthName, Mode=OneWay}" />
+                        <Run Text="TIME OFF / EXEMPT — " /><Run Text="{Binding SelectedMonthName, Mode=OneWay}" />
                     </TextBlock>
 
                     <ItemsControl ItemsSource="{Binding ExemptDaysForSelectedMonth}">
@@ -806,7 +806,7 @@
                         <DockPanel>
                             <Button DockPanel.Dock="Right"
                                     Content="{Binding SelectedDayExemptActionLabel}"
-                                    AutomationProperties.Name="Change focused day's exempt status"
+                                    AutomationProperties.Name="Schedule time off or restore the focused workday"
                                     Command="{Binding ToggleExemptCommand}"
                                     CommandParameter="{Binding SelectedDay}"
                                     Padding="10,5"

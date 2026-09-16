@@ -19,6 +19,8 @@ internal static class ContractMapper
     // for existing records; new clients author Phone or Email at appended values.
     internal static readonly string[] NoteTypeNames =
         ["Visit", "Contact", "Form", "Other", "Reminder", "Phone", "Email"];
+    internal static readonly string[] GoalProgressNames =
+        ["None", "Minimal", "Moderate", "Substantial"];
     internal static readonly string[] FormTypeNames =
     [
         "Q1R", "Q2R", "Q3R", "Q4R", "PCP", "ComprehensiveAssessment", "Reclassification",
@@ -145,7 +147,8 @@ internal static class ContractMapper
         complianceFailureReasons,
         complianceBlockers,
         ParseStringArray(note.OverrideObligationIdsJson),
-        note.OverrideAttestationConfirmed);
+        note.OverrideAttestationConfirmed,
+        NullableNameAt(GoalProgressNames, note.GoalProgress));
 
     private static IReadOnlyList<string> ParseStringArray(string? json)
     {
@@ -315,11 +318,17 @@ internal static class ContractMapper
         a.PassthroughRate,
         a.SignedByName, a.SignedByRole, a.SignedByUserId, a.SignedAtUtc, a.AttestationStatement);
 
-    public static CheckRequestDto ToCheckRequest(ServerCheckRequest x) => new(
+    public static CheckRequestDto ToCheckRequest(
+        ServerCheckRequest x,
+        CheckRequestWorkflowStatus? workflowStatus = null) => new(
         x.Id, x.PersonId, x.Revision, x.ConsumerName, x.AgencyName, x.CaseManagerName,
         x.SupervisorName, x.RequestDate, x.PayableTo, x.MailingAddress, x.Amount,
         x.NeededByDate, x.Reason, x.CreatedAtUtc, x.PublishedAtUtc,
-        x.PublishedByUserId, x.PublishedByName);
+        x.PublishedByUserId, x.PublishedByName,
+        workflowStatus ?? (x.PublishedAtUtc is null
+            ? CheckRequestWorkflowStatus.Draft
+            : CheckRequestWorkflowStatus.Prepared),
+        x.TemplateId, x.ScheduledForDate);
 
     public static SettingsDto ToSettings(ServerSettings s) => new(
         s.Id, s.AbandonedAfterDays, s.ProductivityThreshold, s.BaseIncentive, s.PerUnitIncentive,
@@ -346,7 +355,9 @@ internal static class ContractMapper
         s.BillingComplianceRequirements,
         s.AllowCredibleProfileUpdates,
         VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle), s.AnnualPacketOpenDaysBefore,
-        s.AllowPastBillingPolicyEffectiveDates);
+        s.AllowPastBillingPolicyEffectiveDates,
+        s.IsComprehensiveAssessmentAuthoringEnabled, s.IsClassificationAuthoringEnabled,
+        s.IsPersonCenteredPlanAuthoringEnabled);
 
     public static BillingCompliancePolicyVersionDto ToBillingCompliancePolicyVersion(
         Sati.Models.BillingCompliancePolicyVersion version) => new(
@@ -360,6 +371,9 @@ internal static class ContractMapper
 
     public static bool TryParseNoteStatus(string? value, out int? parsed) =>
         TryParseNullableOrdinal(NoteStatusNames, value, out parsed);
+
+    public static bool TryParseGoalProgress(string? value, out int? parsed) =>
+        TryParseNullableOrdinal(GoalProgressNames, value, out parsed);
 
     public static bool TryParseNoteType(string? value, out int? parsed) =>
         TryParseNullableOrdinal(NoteTypeNames, value, out parsed);

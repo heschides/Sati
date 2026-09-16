@@ -24,12 +24,15 @@ namespace Sati.ViewModels
         private readonly DatabaseActivityPreview _databaseActivityPreview;
         private readonly TextShortcutService _textShortcutService;
         private readonly DailyAgendaPreferenceService _dailyAgendaPreferences;
+        private readonly CheckRequestAutomationPreferenceService _checkRequestAutomationPreferences;
         private readonly EasyEyesPreferenceService _easyEyesPreferences;
         private readonly IdleLockPreferenceService _idlePreferences;
         private readonly ConsumerPickerSortPreferenceService _consumerPickerSortPreferences;
         private Settings? _settings;
         private bool _loadingDailyAgendaPreference;
         private bool _savedShowDailyAgendaAtSignIn = true;
+        private bool _loadingCheckRequestAutomationPreference;
+        private bool _savedEnableWeeklyCheckRequestAutomation = true;
         private bool _loadingEasyEyesPreference;
         private bool _savedEasyEyesMode;
         private bool _loadingIdlePreference;
@@ -47,6 +50,7 @@ namespace Sati.ViewModels
             DatabaseActivityPreview databaseActivityPreview,
             TextShortcutService textShortcutService,
             DailyAgendaPreferenceService dailyAgendaPreferences,
+            CheckRequestAutomationPreferenceService checkRequestAutomationPreferences,
             EasyEyesPreferenceService easyEyesPreferences,
             IdleLockPreferenceService idlePreferences,
             ConsumerPickerSortPreferenceService consumerPickerSortPreferences,
@@ -64,6 +68,7 @@ namespace Sati.ViewModels
             _databaseActivityPreview = databaseActivityPreview;
             _textShortcutService = textShortcutService;
             _dailyAgendaPreferences = dailyAgendaPreferences;
+            _checkRequestAutomationPreferences = checkRequestAutomationPreferences;
             _easyEyesPreferences = easyEyesPreferences;
             _idlePreferences = idlePreferences;
             _consumerPickerSortPreferences = consumerPickerSortPreferences;
@@ -76,6 +81,7 @@ namespace Sati.ViewModels
             BillingPolicyReviewFlags = new ObservableCollection<BillingCompliancePolicyReviewFlagItem>();
             _ = LoadTextShortcutsAsync();
             _ = LoadDailyAgendaPreferenceAsync();
+            _ = LoadCheckRequestAutomationPreferenceAsync();
             _ = LoadEasyEyesPreferenceAsync();
             _ = LoadIdlePreferenceAsync();
             _ = LoadConsumerPickerSortPreferenceAsync();
@@ -124,6 +130,12 @@ namespace Sati.ViewModels
 
         [ObservableProperty]
         private string dailyAgendaPreferenceStatus = string.Empty;
+
+        [ObservableProperty]
+        private bool enableWeeklyCheckRequestAutomation = true;
+
+        [ObservableProperty]
+        private string checkRequestAutomationPreferenceStatus = string.Empty;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(EasyEyesScale))]
@@ -201,6 +213,12 @@ namespace Sati.ViewModels
         {
             if (!_loadingDailyAgendaPreference)
                 _ = SaveDailyAgendaPreferenceAsync(value);
+        }
+
+        partial void OnEnableWeeklyCheckRequestAutomationChanged(bool value)
+        {
+            if (!_loadingCheckRequestAutomationPreference)
+                _ = SaveCheckRequestAutomationPreferenceAsync(value);
         }
 
         partial void OnEasyEyesModeChanged(bool value)
@@ -455,6 +473,67 @@ namespace Sati.ViewModels
             }
         }
 
+        private async Task LoadCheckRequestAutomationPreferenceAsync()
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            if (userId is null)
+            {
+                CheckRequestAutomationPreferenceStatus =
+                    "Sign in to change the weekly check-request reminder preference.";
+                return;
+            }
+
+            var enabled = await _checkRequestAutomationPreferences.LoadForUserAsync(userId.Value);
+            _loadingCheckRequestAutomationPreference = true;
+            try
+            {
+                EnableWeeklyCheckRequestAutomation = enabled;
+                _savedEnableWeeklyCheckRequestAutomation = enabled;
+            }
+            finally
+            {
+                _loadingCheckRequestAutomationPreference = false;
+            }
+
+            CheckRequestAutomationPreferenceStatus =
+                _checkRequestAutomationPreferences.LastLoadWarning ??
+                "This personal setting is saved immediately for this Sati account on this computer.";
+        }
+
+        private async Task SaveCheckRequestAutomationPreferenceAsync(bool value)
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            if (userId is null)
+            {
+                CheckRequestAutomationPreferenceStatus =
+                    "Sign in before changing the weekly check-request reminder preference.";
+                return;
+            }
+
+            CheckRequestAutomationPreferenceStatus = "Saving weekly check-request preference...";
+            try
+            {
+                await _checkRequestAutomationPreferences.SetEnabledAsync(userId.Value, value);
+                _savedEnableWeeklyCheckRequestAutomation = value;
+                CheckRequestAutomationPreferenceStatus = "Weekly check-request preference saved.";
+            }
+            catch (CheckRequestAutomationPreferenceSaveException exception)
+            {
+                _loadingCheckRequestAutomationPreference = true;
+                try
+                {
+                    EnableWeeklyCheckRequestAutomation = _savedEnableWeeklyCheckRequestAutomation;
+                }
+                finally
+                {
+                    _loadingCheckRequestAutomationPreference = false;
+                }
+
+                CheckRequestAutomationPreferenceStatus =
+                    $"Preference was not changed. {exception.Message}";
+            }
+        }
+
         private async Task LoadTextShortcutsAsync()
         {
             var userId = _sessionService.CurrentUser?.Id;
@@ -665,6 +744,10 @@ namespace Sati.ViewModels
         [ObservableProperty] private string contactTemplate = string.Empty;
         [ObservableProperty] private string documentationTemplate = string.Empty;
 
+        [ObservableProperty] private bool isComprehensiveAssessmentAuthoringEnabled;
+        [ObservableProperty] private bool isClassificationAuthoringEnabled;
+        [ObservableProperty] private bool isPersonCenteredPlanAuthoringEnabled;
+
         [ObservableProperty] private bool excludeMonday;
         [ObservableProperty] private bool excludeTuesday;
         [ObservableProperty] private bool excludeWednesday;
@@ -769,6 +852,9 @@ namespace Sati.ViewModels
             ComplianceAgencyRelease = compliance.HasFlag(BillingComplianceRequirements.AgencyRelease);
             ComplianceDhhsRelease = compliance.HasFlag(BillingComplianceRequirements.DhhsRelease);
             ComplianceMedicalRelease = compliance.HasFlag(BillingComplianceRequirements.MedicalRelease);
+            IsComprehensiveAssessmentAuthoringEnabled = _settings.IsComprehensiveAssessmentAuthoringEnabled;
+            IsClassificationAuthoringEnabled = _settings.IsClassificationAuthoringEnabled;
+            IsPersonCenteredPlanAuthoringEnabled = _settings.IsPersonCenteredPlanAuthoringEnabled;
             VisitTemplate = _settings.VisitTemplate;
             ContactTemplate = _settings.ContactTemplate;
             DocumentationTemplate = _settings.DocumentationTemplate;
@@ -848,6 +934,9 @@ namespace Sati.ViewModels
             _settings.ProductivityThreshold = ProductivityThreshold;
             _settings.BaseIncentive = BaseIncentive;
             _settings.PerUnitIncentive = PerUnitIncentive;
+            _settings.IsComprehensiveAssessmentAuthoringEnabled = IsComprehensiveAssessmentAuthoringEnabled;
+            _settings.IsClassificationAuthoringEnabled = IsClassificationAuthoringEnabled;
+            _settings.IsPersonCenteredPlanAuthoringEnabled = IsPersonCenteredPlanAuthoringEnabled;
             _settings.VisitTemplate = VisitTemplate;
             _settings.ContactTemplate = ContactTemplate;
             _settings.DocumentationTemplate = DocumentationTemplate;

@@ -91,9 +91,22 @@ public sealed class CloudPersonService(CloudApiClient api) : IPersonService
 
 public sealed class CloudNoteService(CloudApiClient api) : INoteService
 {
-    public async Task<Note> AddNoteAsync(Note note) =>
-        CloudContractMapper.ToNote(await api.PostAsync<SaveNoteRequest, NoteDto>(
-            "/api/v1/notes", CloudContractMapper.ToSaveNoteRequest(note)));
+    public async Task<Note> AddNoteAsync(Note note)
+    {
+        try
+        {
+            return CloudContractMapper.ToNote(await api.PostAsync<SaveNoteRequest, NoteDto>(
+                "/api/v1/notes", CloudContractMapper.ToSaveNoteRequest(note)));
+        }
+        catch (CloudApiException ex) when (ex.Code == NoteSubmissionGate.RefusalCode)
+        {
+            throw new NoteSubmissionException(ex.Message, ex);
+        }
+        catch (CloudApiException ex) when (IsServiceTimeRefusal(ex.Code))
+        {
+            throw new ServiceTimeWriteConflictException(ex.Message, ex);
+        }
+    }
 
     public async Task DeleteNoteAsync(Note note)
     {
@@ -115,11 +128,22 @@ public sealed class CloudNoteService(CloudApiClient api) : INoteService
                 $"/api/v1/notes/{note.Id}", CloudContractMapper.ToSaveNoteRequest(note));
             note.Revision = updated.Revision;
         }
+        catch (CloudApiException ex) when (ex.Code == NoteSubmissionGate.RefusalCode)
+        {
+            throw new NoteSubmissionException(ex.Message, ex);
+        }
+        catch (CloudApiException ex) when (IsServiceTimeRefusal(ex.Code))
+        {
+            throw new ServiceTimeWriteConflictException(ex.Message, ex);
+        }
         catch (CloudApiException ex) when (ex.Code == "stale_note")
         {
             throw new NoteConcurrencyException(ex);
         }
     }
+
+    private static bool IsServiceTimeRefusal(string? code) => code is
+        "service_time_busy" or "service_time_window" or "service_time_overlap";
 
     public async Task<List<Note>> GetAllByPersonAsync(int personId) =>
         (await api.GetAsync<List<NoteDto>>($"/api/v1/people/{personId}/notes")).Select(CloudContractMapper.ToNote).ToList();
@@ -254,11 +278,11 @@ public sealed class CloudSettingsService(CloudApiClient api) : ISettingsService
 
 public sealed class CloudScratchpadService(CloudApiClient api) : IScratchpadService
 {
-    public async Task<Scratchpad> LoadTodayAsync(int userId) =>
-        CloudContractMapper.ToScratchpad(await api.GetAsync<ScratchpadDto>("/api/v1/scratchpad/today"));
+    public Task<Scratchpad> LoadTodayAsync(int userId) =>
+        LoadAgendaAsync("/api/v1/scratchpad/today");
 
-    public async Task<Scratchpad> LoadTomorrowAsync(int userId) =>
-        CloudContractMapper.ToScratchpad(await api.GetAsync<ScratchpadDto>("/api/v1/scratchpad/tomorrow"));
+    public Task<Scratchpad> LoadTomorrowAsync(int userId) =>
+        LoadAgendaAsync("/api/v1/scratchpad/tomorrow");
 
     public async Task<List<Scratchpad>> GetHistoryAsync(int userId) =>
         (await api.GetAsync<List<ScratchpadDto>>("/api/v1/scratchpad/history")).Select(CloudContractMapper.ToScratchpad).ToList();
@@ -291,6 +315,21 @@ public sealed class CloudScratchpadService(CloudApiClient api) : IScratchpadServ
         catch (CloudApiException ex)
         {
             throw new ScratchpadSaveException(ex.Message, ex);
+        }
+    }
+
+    private async Task<Scratchpad> LoadAgendaAsync(string path)
+    {
+        try
+        {
+            return CloudContractMapper.ToScratchpad(await api.GetAsync<ScratchpadDto>(path));
+        }
+        catch (CloudApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            // Session expiry is an expected lifecycle pause, not a load failure.
+            // Keep the transport exception behind the data boundary so the WPF
+            // layer can preserve its visible drafts without knowing about HTTP.
+            throw new SessionExpiredException(ex);
         }
     }
 }
@@ -376,6 +415,10 @@ public sealed class CloudFormService(CloudApiClient api) : IFormService
     public Task<FormPrerequisiteStatusDto> GetPrerequisiteStatusAsync(Form form) =>
         api.GetAsync<FormPrerequisiteStatusDto>(
             $"/api/v1/people/{form.PersonId}/forms/{form.Type}/prerequisite?formId={form.Id}");
+
+    public async Task<IReadOnlyList<FormAttestationHistoryDto>> GetAttestationHistoryAsync(Form form) =>
+        await api.GetAsync<List<FormAttestationHistoryDto>>(
+            $"/api/v1/people/{form.PersonId}/forms/{form.Type}/attestations?formId={form.Id}");
 
     public Task<DocumentArtifactDto> RecordExternalPrerequisiteAsync(Form form, string note)
     {

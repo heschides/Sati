@@ -226,4 +226,32 @@ public sealed class AnnualPacketTests
         var exactCycle = await service.GetStatusAsync(fixture.PersonOneId, target);
         Assert.Contains("Preparation still needed", exactCycle.Reminder);
     }
+
+    [Fact]
+    public async Task SignedAuthorizedRepresentativeFormIsRecordedOnceAndCarriesAcrossAnnualPeriods()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var session = new SessionService(); session.SetUser(fixture.CaseManagerOne);
+        var service = new AnnualDocumentService(fixture.Factory, session, Composer());
+        await using (var setup = fixture.Factory.CreateDbContext())
+        {
+            var person = await setup.People.SingleAsync(x => x.Id == fixture.PersonOneId);
+            person.EffectiveDate = DateTime.Today.AddYears(-2);
+            await setup.SaveChangesAsync();
+        }
+        var firstCycle = DateTime.Today.AddYears(-1).Date;
+        var currentCycle = DateTime.Today.Date;
+
+        await service.RecordAuthorizedRepresentativeOnFileAsync(
+            fixture.PersonOneId, firstCycle, "Verified signed paper copy in the agency record.");
+        var laterStatus = await service.GetStatusAsync(fixture.PersonOneId, currentCycle);
+
+        Assert.True(laterStatus.AuthorizedRepresentativeOnFile);
+        var artifact = Assert.Single(laterStatus.Artifacts,
+            item => item.Kind == AnnualDocumentKind.DhhsAuthorizedRepresentative.ToString());
+        Assert.Equal(DocumentArtifactOrigin.RecordedAsExternal.ToString(), artifact.Origin);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.RecordAuthorizedRepresentativeOnFileAsync(
+                fixture.PersonOneId, currentCycle, "Attempted duplicate."));
+    }
 }

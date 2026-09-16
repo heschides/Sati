@@ -93,6 +93,7 @@ public sealed class NotePanelRenderTests
             // Anything that would change the record is off.
             Assert.False(WpfUiHarness.FindByAutomationName<ComboBox>(view, "Person").IsEnabled);
             Assert.False(WpfUiHarness.FindByAutomationName<ComboBox>(view, "Status").IsEnabled);
+            Assert.False(WpfUiHarness.FindByAutomationName<ComboBox>(view, "Goal progress").IsEnabled);
             Assert.False(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Event date").IsEnabled);
             Assert.All(
                 WpfUiHarness.Descendants(view).OfType<RadioButton>(),
@@ -116,6 +117,7 @@ public sealed class NotePanelRenderTests
 
             var narrative = WpfUiHarness.FindByAutomationName<TextBox>(view, "Note narrative");
             var person = WpfUiHarness.FindByAutomationName<ComboBox>(view, "Person");
+            var goalProgress = WpfUiHarness.FindByAutomationName<ComboBox>(view, "Goal progress");
             Assert.True(narrative.IsReadOnly);
 
             panel.ToggleLockCommand.Execute(null);
@@ -123,6 +125,10 @@ public sealed class NotePanelRenderTests
 
             Assert.False(narrative.IsReadOnly);
             Assert.True(person.IsEnabled);
+            Assert.True(goalProgress.IsEnabled);
+            Assert.Equal(
+                [GoalProgressLevel.None, GoalProgressLevel.Minimal, GoalProgressLevel.Moderate, GoalProgressLevel.Substantial],
+                goalProgress.Items.Cast<GoalProgressLevel>().ToArray());
             Assert.All(
                 WpfUiHarness.Descendants(view).OfType<RadioButton>(),
                 radio => Assert.True(radio.IsEnabled));
@@ -182,6 +188,7 @@ public sealed class NotePanelRenderTests
             Assert.Equal(NoteStatus.Scheduled, panel.Status);
             Assert.True(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Event date").IsEnabled);
             Assert.False(WpfUiHarness.FindByAutomationName<ComboBox>(view, "Status").IsEnabled);
+            Assert.False(WpfUiHarness.FindByAutomationName<ComboBox>(view, "Goal progress").IsEnabled);
             Assert.False(WpfUiHarness.FindByAutomationName<ComboBox>(view, "Service start time").IsEnabled);
             Assert.Contains("planned work", panel.StatusGuidance, StringComparison.OrdinalIgnoreCase);
             var save = WpfUiHarness.Descendants(view)

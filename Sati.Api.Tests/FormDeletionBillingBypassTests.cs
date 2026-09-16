@@ -15,9 +15,9 @@ public sealed class FormDeletionBillingBypassTests(SatiApiFactory factory)
     public async Task DeletingAnUnattestedOverdueFormCannotRemoveItsBillingBlock()
     {
         var noteId = await factory.CreateApprovedBillableNoteAsync();
-        // The helper's service date is 2026-08-03, so this due date places that
-        // service inside the form's historical non-billable window.
-        var formId = await AddFormForNoteAsync(noteId, "PCP", new DateTime(2026, 8, 1));
+        // An obligation blocks the service dates after its own due date, so this one
+        // is keyed to a target two days before the helper's service date.
+        var formId = await AddOverdueFormForNoteAsync(noteId, "PCP");
         using var billing = await factory.CreateAuthenticatedClientAsync("admin-one");
         using var before = await CreateClaimAsync(billing, noteId);
         Assert.Equal(HttpStatusCode.BadRequest, before.StatusCode);
@@ -283,6 +283,19 @@ public sealed class FormDeletionBillingBypassTests(SatiApiFactory factory)
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
         Assert.Equal(formIds.Length, await db.Forms.CountAsync(form => formIds.Contains(form.Id)));
+    }
+
+    private async Task<int> AddOverdueFormForNoteAsync(int noteId, string type)
+    {
+        DateTime serviceDate;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            serviceDate = (await db.Notes.AsNoTracking()
+                .SingleAsync(item => item.Id == noteId)).EventDate!.Value;
+        }
+
+        return await AddFormForNoteAsync(noteId, type, serviceDate.AddDays(-2));
     }
 
     private async Task<int> AddFormForNoteAsync(

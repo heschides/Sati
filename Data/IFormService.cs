@@ -35,6 +35,8 @@ namespace Sati.Data
             Task.FromResult(new FormPrerequisiteStatusDto(
                 PrerequisiteKind.None.ToString(), true,
                 "No additional prerequisite applies.", [], false));
+        Task<IReadOnlyList<FormAttestationHistoryDto>> GetAttestationHistoryAsync(Form form) =>
+            Task.FromResult<IReadOnlyList<FormAttestationHistoryDto>>([]);
         Task<DocumentArtifactDto> RecordExternalPrerequisiteAsync(Form form, string note) =>
             throw new NotSupportedException("External document recording is not available on this data path.");
         Task RevokeAttestationAsync(Form form, string reason);

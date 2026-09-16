@@ -56,6 +56,7 @@ public sealed class CalendarApiTests
         Assert.Equal(60, created.Minutes);
         Assert.Null(created.StartTime);
         Assert.Null(created.CaseManagerJustification);
+        Assert.Null(created.GoalProgress);
 
         var year = await client.GetFromJsonAsync<List<NoteDto>>("/api/v1/notes/year/2097");
         Assert.Contains(year!, note =>

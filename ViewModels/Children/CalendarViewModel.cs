@@ -31,6 +31,7 @@ public partial class CalendarViewModel : ObservableObject
     // rather than an async-void EventHandler. Each subscriber is awaited and
     // isolated below; a failed summary refresh must never reach WPF's dispatcher.
     public event Func<Task>? ExemptDateChanged;
+    public event Func<DateTime, Task>? TimeOffScheduled;
 
     [ObservableProperty]
     private int currentYear = DateTime.Today.Year;
@@ -94,7 +95,7 @@ public partial class CalendarViewModel : ObservableObject
     }
 
     public string SelectedDayExemptActionLabel =>
-        SelectedDay?.IsExempt == true ? "Restore workday" : "Mark as exempt";
+        SelectedDay?.IsExempt == true ? "Restore workday" : "Schedule time off";
 
     public List<ExemptDate> ExemptDaysForSelectedMonth =>
         _exemptDates
@@ -250,6 +251,7 @@ public partial class CalendarViewModel : ObservableObject
         }
 
         IsUpdatingExemptDate = true;
+        var scheduledTimeOff = false;
         try
         {
             // Read the canonical loaded collection instead of trusting a CalendarDay
@@ -267,6 +269,7 @@ public partial class CalendarViewModel : ObservableObject
                 var exempt = await _exemptDateService.AddAsync(user.Id, day.Date.Date);
                 _exemptDates.RemoveAll(entry => entry.Date.Date == day.Date.Date);
                 _exemptDates.Add(exempt);
+                scheduledTimeOff = true;
             }
 
             BuildMonths();
@@ -276,6 +279,8 @@ public partial class CalendarViewModel : ObservableObject
                 StatusMessage =
                     "The calendar changed, but the dashboard summary could not be refreshed. Refresh the dashboard before relying on its totals.";
             }
+            if (scheduledTimeOff)
+                await NotifyTimeOffScheduledAsync(day.Date.Date);
         }
         catch (Exception ex)
         {
@@ -488,6 +493,23 @@ public partial class CalendarViewModel : ObservableObject
         }
 
         return succeeded;
+    }
+
+    private async Task NotifyTimeOffScheduledAsync(DateTime date)
+    {
+        var handlers = TimeOffScheduled;
+        if (handlers is null) return;
+        foreach (var handler in handlers.GetInvocationList().Cast<Func<DateTime, Task>>())
+        {
+            try
+            {
+                await handler(date);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"CalendarViewModel.TimeOffScheduled subscriber failed: {ex.Message}");
+            }
+        }
     }
 
     private async Task<(List<ImportedOutlookEvent> Events, string Warning)> LoadOutlookEventsAsync(

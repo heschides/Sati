@@ -55,12 +55,16 @@ internal static class AuditActions
     // its own action rather than a person.updated with different fields.
     public const string PersonReassigned = "person.reassigned";
     public const string PersonSsnUpdated = "person.ssn-updated";
+    public const string PersonPhotoUpdated = "person.photo-updated";
+    public const string PersonPhotoRemoved = "person.photo-removed";
     // Recorded on every decryption, separately from the form generation that caused
     // it. An SSN read is a disclosure, and accounting of disclosures needs the read
     // itself in the trail, not merely the document that occasioned it.
     public const string PersonSsnDecrypted = "person.ssn-decrypted";
     public const string DhhsFormGenerated = "dhhs-form.generated";
     public const string AgencyReleaseGenerated = "agency-release.generated";
+    public const string CwicPacketGenerated = "cwic-packet.generated";
+    public const string HousingSupportFundsGenerated = "housing-support-funds.generated";
     public const string PersonHistoryViewed = "person-history.viewed";
     public const string PersonHistoryPdfGenerated = "person-history-pdf.generated";
     public const string TestConsumerDeleted = "test-data.consumer-deleted";
@@ -76,6 +80,14 @@ internal static class AuditActions
     public const string AtRequestPublished = "at-request.published";
     public const string AtRequestReopened = "at-request.reopened";
     public const string CheckRequestPublished = "check-request.published";
+    public const string CheckRequestSubmitted = "check-request.submitted";
+    public const string CheckRequestApproved = "check-request.approved";
+    public const string CheckRequestReturned = "check-request.returned";
+    public const string CheckRequestReleased = "check-request.released";
+    public const string CheckRequestReceiptAcknowledged = "check-request.receipt-acknowledged";
+    public const string CheckRequestTemplateUpdated = "check-request-template.updated";
+    public const string CheckRequestDraftGenerated = "check-request.draft-generated";
+    public const string RepresentativePayeeLedgerEntryAdded = "representative-payee.ledger-entry-added";
     public const string AuditExported = "audit.exported";
     public const string PlatformIncidentsViewed = "platform-incidents.viewed";
     public const string IncidentStatusUpdated = "incident-status.updated";

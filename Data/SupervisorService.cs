@@ -44,6 +44,13 @@ public sealed class SupervisorService(
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
+        var scheduleOwnerId = note.Person.UserId;
+        context.ChangeTracker.Clear();
+        await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(context, actor.AgencyId, scheduleOwnerId);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        note = await LoadReviewableNoteAsync(context, actor, noteId) ?? throw new NoteConcurrencyException();
+        if (note.Person.UserId != scheduleOwnerId)
+            throw new NoteConcurrencyException();
         await ReleaseComplianceProjectionLoader.PopulateAsync(
             context, [note.Person], actor.AgencyId);
 
@@ -51,12 +58,13 @@ public sealed class SupervisorService(
         if (!NoteWorkflow.CanSupervisorTransition((int?)note.Status, NoteWorkflow.Approved))
             throw new InvalidOperationException("Only logged notes can be approved.");
 
+        await NoteService.EnsureServiceTimeAvailableAsync(context, note.Person.UserId, note, note.Id);
+
         if (maximumUnits is int limit)
         {
             if (!NoteReviewRules.Eligible(limit, (int?)note.Status, note.NoteType?.ToString(),
                 note.Narrative, note.EventDate, note.Minutes, note.StartTime, DateTime.Today))
                 throw new InvalidOperationException("This note is not eligible for automatic approval.");
-            await NoteService.EnsureServiceTimeAvailableAsync(context, note.Person.UserId, note, note.Id);
         }
 
         note.Status = NoteStatus.Approved;
@@ -66,6 +74,7 @@ public sealed class SupervisorService(
         await SaveNoteTransitionAsync(
             context, actor, LocalAuditActions.NoteApproved, noteId,
             maximumUnits is int threshold ? System.Text.Json.JsonSerializer.Serialize(new { maximumUnits = threshold, batch = true }) : "{}");
+        await scheduleWrite.CommitAsync();
     }
 
     public async Task ApproveWithOverrideAsync(
@@ -81,6 +90,13 @@ public sealed class SupervisorService(
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
         var note = await LoadReviewableNoteAsync(context, actor, noteId)
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
+        var scheduleOwnerId = note.Person.UserId;
+        context.ChangeTracker.Clear();
+        await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(context, actor.AgencyId, scheduleOwnerId);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        note = await LoadReviewableNoteAsync(context, actor, noteId) ?? throw new NoteConcurrencyException();
+        if (note.Person.UserId != scheduleOwnerId)
+            throw new NoteConcurrencyException();
         await ReleaseComplianceProjectionLoader.PopulateAsync(
             context, [note.Person], actor.AgencyId);
 
@@ -99,6 +115,7 @@ public sealed class SupervisorService(
         if (!decision.Accepted)
             throw new ArgumentException(string.Join(" ", decision.Errors), nameof(blockingObligationIds));
 
+        await NoteService.EnsureServiceTimeAvailableAsync(context, note.Person.UserId, note, note.Id);
         var now = DateTime.UtcNow;
         note.Status = NoteStatus.Approved;
         note.ApprovedById = actor.Id;
@@ -117,6 +134,7 @@ public sealed class SupervisorService(
                 attestationConfirmed = true,
                 obligationIds = decision.SelectedObligationIds
             }));
+        await scheduleWrite.CommitAsync();
     }
 
     public async Task ReturnNoteAsync(

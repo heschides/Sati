@@ -385,13 +385,35 @@ namespace Sati.Services.Billing
                 _complianceContext,
                 _recoveryDecisionsByNoteId.GetValueOrDefault(note.Id) ?? []);
 
-        private static BillingValidationResult ValidateNoteForBilling(
+        internal static BillingValidationResult ValidateNoteForBilling(
             Note note,
             BillingCompliancePolicyContext complianceContext,
             IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null)
         {
             var errors = ValidateNonComplianceBillingRequirements(note).ToList();
+            errors.AddRange(EvaluateBillingComplianceRelease(
+                note, complianceContext, recoveryDecisions));
 
+            return new BillingValidationResult(
+                IsValid: errors.Count == 0,
+                Note: note,
+                Errors: errors);
+        }
+
+        /// <summary>
+        /// The one compliance decision for releasing a note to billing: the
+        /// service-date policy, minus an exact-obligation Supervisor exception or an
+        /// Admin recovery whose frozen evidence still matches. Claim creation and
+        /// 837P release share it, so a released note cannot be re-blocked by a
+        /// second, weaker rule, and release never re-forms the frozen claim's
+        /// identity checks.
+        /// </summary>
+        internal static IReadOnlyList<string> EvaluateBillingComplianceRelease(
+            Note note,
+            BillingCompliancePolicyContext complianceContext,
+            IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null)
+        {
+            var errors = new List<string>();
             if (note.Person is not null && note.EventDate is not null)
             {
                 // Claim eligibility is historical: later noncompliance cannot
@@ -441,10 +463,7 @@ namespace Sati.Services.Billing
                 }
             }
 
-            return new BillingValidationResult(
-                IsValid: errors.Count == 0,
-                Note: note,
-                Errors: errors);
+            return errors;
         }
 
         public async Task<BillingComplianceRecoveryPlan> PrepareComplianceRecoveryAsync(
@@ -700,7 +719,7 @@ namespace Sati.Services.Billing
             return (person, notes, policy);
         }
 
-        private static async Task<IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>>
+        internal static async Task<IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>>
             LoadRecoveryDecisionsForNoteAsync(
                 SatiContext context,
                 int agencyId,

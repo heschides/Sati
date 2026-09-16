@@ -319,7 +319,8 @@ public sealed record NoteDto(
     IReadOnlyList<string>? ComplianceFailureReasons = null,
     IReadOnlyList<BillingComplianceBlocker>? ComplianceBlockers = null,
     IReadOnlyList<string>? OverrideObligationIds = null,
-    bool OverrideAttestationConfirmed = false);
+    bool OverrideAttestationConfirmed = false,
+    string? GoalProgress = null);
 
 public sealed record SaveNoteRequest(
     string Narrative,
@@ -332,7 +333,8 @@ public sealed record SaveNoteRequest(
     string? NoteType,
     string? CaseManagerJustification,
     string? VisitDocumentationJson,
-    int ExpectedRevision = 0);
+    int ExpectedRevision = 0,
+    string? GoalProgress = null);
 
 public sealed record PersonReferenceDto(int Id, int UserId, string? FirstName, string? LastName);
 
@@ -406,7 +408,10 @@ public sealed record SettingsDto(
     bool AllowCredibleProfileUpdates = false,
     string VrAssistantTitle = VocationalRehabilitationProfile.DefaultAssistantTitle,
     int AnnualPacketOpenDaysBefore = AnnualPacketWindow.DefaultOpenDays,
-    bool AllowPastBillingPolicyEffectiveDates = false);
+    bool AllowPastBillingPolicyEffectiveDates = false,
+    bool IsComprehensiveAssessmentAuthoringEnabled = false,
+    bool IsClassificationAuthoringEnabled = false,
+    bool IsPersonCenteredPlanAuthoringEnabled = false);
 
 /// <summary>
 /// One immutable agency billing-compliance policy version. The numeric id is the
@@ -703,7 +708,17 @@ public sealed record SaveBillingConfigurationRequest(
     string ContactName,
     string ContactPhone);
 
-public sealed record BillingCandidateDto(NoteDto Note, IReadOnlyList<string> Errors);
+// Deliberately narrower than NoteDto. Billing staff need the service facts used to
+// create a claim, but the billing queue must not carry the clinical narrative,
+// visit documentation, return history, or the consumer's name into that UI.
+public sealed record BillingCandidateDto(
+    int NoteId,
+    DateTime? EventDate,
+    int? Minutes,
+    int PersonId,
+    int PersonOwnerUserId,
+    bool ComplianceOverride,
+    IReadOnlyList<string> Errors);
 public sealed record CreateClaimLineRequest(int NoteId, bool IsComplianceException, string? ComplianceExceptionReason);
 public sealed record GenerateEdiRequest(bool IsTest, string IdempotencyKey);
 public sealed record EdiFileDto(string FileName, string Content);
@@ -816,7 +831,10 @@ public sealed record CheckRequestListItemDto(
     string? PayableTo,
     decimal Amount,
     DateTime? NeededByDate,
-    DateTime? PublishedAtUtc);
+    DateTime? PublishedAtUtc,
+    CheckRequestWorkflowStatus WorkflowStatus = CheckRequestWorkflowStatus.Draft,
+    int? TemplateId = null,
+    DateTime? ScheduledForDate = null);
 
 public sealed record CheckRequestDto(
     int Id,
@@ -835,7 +853,10 @@ public sealed record CheckRequestDto(
     DateTime CreatedAtUtc,
     DateTime? PublishedAtUtc,
     int? PublishedByUserId,
-    string? PublishedByName);
+    string? PublishedByName,
+    CheckRequestWorkflowStatus WorkflowStatus = CheckRequestWorkflowStatus.Draft,
+    int? TemplateId = null,
+    DateTime? ScheduledForDate = null);
 
 public sealed record CreateCheckRequestRequest(int PersonId);
 
@@ -864,6 +885,17 @@ public sealed record AttestFormRequest(
     string? SupervisorOverrideReason = null,
     DateTime? ComprehensiveAssessmentCompletedOn = null);
 public sealed record RevokeFormAttestationRequest(int FormId, string Reason);
+public sealed record FormAttestationHistoryDto(
+    long Id,
+    int FormId,
+    string Kind,
+    DateTime? CompletedOn,
+    string ActorKind,
+    int? ActorUserId,
+    string ActorDisplayName,
+    DateTime RecordedAtUtc,
+    int? EvidenceNoteId,
+    string? Reason);
 public sealed record PendingAttestationDto(
     int FormId,
     int PersonId,

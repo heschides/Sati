@@ -225,6 +225,13 @@
                                 Command="{Binding NavigateToBillingCommand}"
                                 Visibility="{Binding IsBillingAvailable,
                                     Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <Button Content="Representative Payee"
+                                Style="{StaticResource ShellNavTabButton}"
+                                AutomationProperties.Name="Representative Payee"
+                                views:NavTab.IsActive="{Binding IsRepresentativePayeeActive}"
+                                Command="{Binding NavigateToRepresentativePayeeCommand}"
+                                Visibility="{Binding IsRepresentativePayeeAvailable,
+                                    Converter={StaticResource BoolToVisibilityConverter}}" />
 
                         <Button Content="{Binding Chat.NavigationLabel}"
                                 Style="{StaticResource ShellNavTabButton}"

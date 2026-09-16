@@ -71,6 +71,10 @@ public static class ConsumerDeletionRules
         "a payer. Billing records are retained even when a consumer record is later found to " +
         "be a mistake. Seek guidance in the help menu for a safe cleanup.";
 
+    public const string RepresentativePayeeLedgerMessage =
+        "This consumer was not deleted because a representative-payee ledger transaction " +
+        "has been recorded. Financial ledger history must be retained; archive the consumer instead.";
+
     public const string LegalHoldActiveMessage =
         "This consumer was not deleted because a legal hold is active on the record.";
 

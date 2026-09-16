@@ -8,6 +8,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$configurationTestScript = Join-Path $repoRoot 'installer\Test-SatiLocalConfiguration.ps1'
+. $configurationTestScript
 if ([string]::IsNullOrWhiteSpace($WorkingRoot)) {
     $WorkingRoot = Join-Path $repoRoot 'artifacts\SatiLocalInstallerAcceptance'
 }
@@ -62,6 +64,7 @@ try {
     $requiredFiles = @(
         'Sati.exe',
         'appsettings.json',
+        'appsettings.Public.json',
         'Uninstall-SatiLocal.ps1',
         'Run-PowerShellHidden.vbs')
     foreach ($requiredFile in $requiredFiles) {
@@ -74,14 +77,9 @@ try {
         throw "Installed payload is missing the versioned icon 'Sati.$expectedVersion.ico'."
     }
 
-    $privateConfiguration = Get-Content -LiteralPath (Join-Path $runRoot 'appsettings.json') -Raw
-    if ($privateConfiguration -match '(?i)Password\s*=' -or
-        $privateConfiguration -match '(?i)User ID\s*=') {
-        throw 'The installed LocalDB configuration contains a SQL username or password.'
-    }
-    if ($privateConfiguration -notmatch '(?i)(Trusted_Connection|Integrated Security)\s*=\s*true') {
-        throw 'The installed LocalDB configuration does not use Windows integrated security.'
-    }
+    $configuration = Test-SatiLocalConfiguration `
+        -PrivateConfigurationPath (Join-Path $runRoot 'appsettings.json') `
+        -PublicConfigurationPath (Join-Path $runRoot 'appsettings.Public.json')
 
     $actualVersion = (Get-Item -LiteralPath (Join-Path $runRoot 'Sati.exe')).VersionInfo.FileVersion
     if (-not $actualVersion.StartsWith("$expectedVersion.", [StringComparison]::Ordinal)) {
@@ -89,7 +87,7 @@ try {
     }
 
     $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-    Write-Output "LOCAL_INSTALLER_ACCEPTANCE_PASSED installer=$installerName sha256=$hash version=$actualVersion integratedSecurity=True"
+    Write-Output "LOCAL_INSTALLER_ACCEPTANCE_PASSED installer=$installerName sha256=$hash version=$actualVersion database=$($configuration.DatabaseName) integratedSecurity=$($configuration.IntegratedSecurity)"
 }
 finally {
     if ($null -eq $priorTestMode) {

@@ -373,7 +373,8 @@ public sealed class CloudCheckRequestService(CloudApiClient api) : ICheckRequest
     public async Task<List<CheckRequestListItem>> GetAllForPersonAsync(int personId) =>
         (await api.GetAsync<List<CheckRequestListItemDto>>($"/api/v1/people/{personId}/check-requests"))
         .Select(x => new CheckRequestListItem(
-            x.Id, x.Revision, x.RequestDate, x.PayableTo, x.Amount, x.NeededByDate, x.PublishedAtUtc))
+            x.Id, x.Revision, x.RequestDate, x.PayableTo, x.Amount, x.NeededByDate, x.PublishedAtUtc,
+            x.WorkflowStatus, x.TemplateId, x.ScheduledForDate))
         .ToList();
 
     public async Task<CheckRequest?> GetByIdAsync(int id) =>
@@ -420,6 +421,7 @@ public sealed class CloudCheckRequestService(CloudApiClient api) : ICheckRequest
         target.Reason = source.Reason;
         target.Revision = source.Revision;
         target.RehydratePublication(source.PublishedAtUtc, source.PublishedByUserId, source.PublishedByName);
+        target.RehydrateWorkflow(source.WorkflowStatus);
     }
 }
 
@@ -627,8 +629,20 @@ public sealed class CloudBillingService(CloudApiClient api) : IBillingService
         var candidates = await api.GetAsync<List<BillingCandidateDto>>("/api/v1/billing/candidates");
         _candidateErrors.Clear();
         foreach (var candidate in candidates)
-            _candidateErrors[candidate.Note.Id] = candidate.Errors;
-        return candidates.Select(candidate => CloudContractMapper.ToNote(candidate.Note)).ToList();
+            _candidateErrors[candidate.NoteId] = candidate.Errors;
+        return candidates.Select(ToBillingCandidateNote).ToList();
+    }
+
+    private static Note ToBillingCandidateNote(BillingCandidateDto candidate)
+    {
+        var note = Note.Rehydrate(candidate.NoteId);
+        note.EventDate = candidate.EventDate;
+        note.Minutes = candidate.Minutes;
+        note.PersonId = candidate.PersonId;
+        note.Status = NoteStatus.Approved;
+        note.ComplianceOverride = candidate.ComplianceOverride;
+        note.Person = Person.Rehydrate(candidate.PersonId, candidate.PersonOwnerUserId);
+        return note;
     }
 
     public Task<BillingComplianceRecoveryPlan> PrepareComplianceRecoveryAsync(

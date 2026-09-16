@@ -100,9 +100,9 @@ public sealed class BillingComplianceRecoveryApiTests(SatiApiFactory factory)
 
         var candidates = await admin.GetFromJsonAsync<List<BillingCandidateDto>>(
             "/api/v1/billing/candidates");
-        Assert.Empty(Assert.Single(candidates!, item => item.Note.Id == selectedNoteId).Errors);
+        Assert.Empty(Assert.Single(candidates!, item => item.NoteId == selectedNoteId).Errors);
         Assert.Contains(
-            Assert.Single(candidates!, item => item.Note.Id == unselectedNoteId).Errors,
+            Assert.Single(candidates!, item => item.NoteId == unselectedNoteId).Errors,
             error => error.Contains("PCP", StringComparison.Ordinal));
 
         using var selectedClaim = await admin.PostAsJsonAsync(

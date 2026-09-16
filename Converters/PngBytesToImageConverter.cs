@@ -7,12 +7,13 @@ using System.Windows.Media.Imaging;
 namespace Sati.Converters
 {
     /// <summary>
-    /// Turns stored PNG bytes into something an Image control can show.
+    /// Turns stored PNG or JPEG bytes into something an Image control can show.
     ///
     /// This exists so view models can hold <c>byte[]</c> rather than
     /// <c>BitmapImage</c>. AT request item screenshots are edited by view models
     /// that are also exercised by tests and used on the API-backed path, and
-    /// neither should have to load WPF imaging to hold a picture.
+    /// neither should have to load WPF imaging to hold a picture. BitmapImage also
+    /// decodes the validated JPG/PNG bytes used by consumer profile photos.
     /// </summary>
     public sealed class PngBytesToImageConverter : IValueConverter
     {

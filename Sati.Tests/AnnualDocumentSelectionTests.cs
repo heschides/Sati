@@ -97,6 +97,44 @@ public sealed class AnnualDocumentSelectionTests
         public Task SaveAsync(Settings settings) => throw new NotSupportedException();
     }
 
+    [Fact]
+    public async Task AnnualWorkflowSeparatesEachRequiredDocumentAndHidesTheOnceOnlyFormWhenRecorded()
+    {
+        var service = new AnnualService();
+        var vm = new AnnualDocumentsViewModel(service, null!, new SettingsServiceStub(), new Session());
+        vm.SetPerson(Person.CreatePerson(12, "Synthetic", "Person", "", DateTime.Today.AddYears(-30),
+            DateTime.Today.AddYears(-1), WaiverType.Section21, new Settings()));
+
+        Assert.Equal(
+            ["DHHS release", "Medical Provider Release", "Agency Release", "Safety Plan", "Privacy Practices", "DHHS Authorized Representative"],
+            vm.DocumentWorkflow.Select(item => item.DisplayName).ToArray());
+        Assert.All(vm.DocumentWorkflow, item => Assert.Equal("Not started", item.Status));
+
+        service.AuthorizedRepresentativeOnFile = true;
+        await vm.ReloadCommand.ExecuteAsync(null);
+
+        Assert.DoesNotContain(vm.DocumentWorkflow, item => item.DisplayName == "DHHS Authorized Representative");
+        Assert.Contains("already recorded on file", vm.AuthorizedRepresentativeRecordedMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RecordingTheOnceOnlyFormRequiresANoteAndRemovesItFromAnnualWork()
+    {
+        var service = new AnnualService();
+        var vm = new AnnualDocumentsViewModel(service, null!, new SettingsServiceStub(), new Session());
+        vm.SetPerson(Person.CreatePerson(12, "Synthetic", "Person", "", DateTime.Today.AddYears(-30),
+            DateTime.Today.AddYears(-1), WaiverType.Section21, new Settings()));
+        Assert.False(vm.CanRecordAuthorizedRepresentativeOnFile);
+
+        vm.AuthorizedRepresentativeOnFileNote = "Verified the signed paper copy in the agency record.";
+        Assert.True(vm.CanRecordAuthorizedRepresentativeOnFile);
+        await vm.RecordAuthorizedRepresentativeOnFileCommand.ExecuteAsync(null);
+
+        Assert.True(service.AuthorizedRepresentativeOnFile);
+        Assert.False(vm.NeedsAuthorizedRepresentative);
+        Assert.DoesNotContain(vm.DocumentWorkflow, item => item.DisplayName == "DHHS Authorized Representative");
+    }
+
     private sealed class Session : ISessionService
     {
         public bool AllowComplianceOverride { get; set; }
@@ -110,9 +148,19 @@ public sealed class AnnualDocumentSelectionTests
     }
     private sealed class AnnualService : IAnnualDocumentService
     {
+        public bool AuthorizedRepresentativeOnFile { get; set; }
         public Task<AnnualDocumentsStatusDto> GetStatusAsync(int id, DateTime cycle) => Task.FromResult(
-            new AnnualDocumentsStatusDto(new(cycle, cycle.AddDays(-30), cycle.AddYears(1).AddDays(-1), true), [], [], ""));
+            new AnnualDocumentsStatusDto(new(cycle, cycle.AddDays(-30), cycle.AddYears(1).AddDays(-1), true), [], [], "",
+                AuthorizedRepresentativeOnFile));
         public Task<DocumentAcknowledgmentDto> AcknowledgeAsync(int id, AcknowledgeDocumentRequest request) => throw new NotSupportedException();
+        public Task<DocumentArtifactDto> RecordAuthorizedRepresentativeOnFileAsync(int id, DateTime cycle, string note)
+        {
+            AuthorizedRepresentativeOnFile = true;
+            return Task.FromResult(new DocumentArtifactDto(91, id, 1,
+                AnnualDocumentKind.DhhsAuthorizedRepresentative.ToString(), cycle,
+                DocumentArtifactOrigin.RecordedAsExternal.ToString(), DateTime.UtcNow, 12,
+                null, null, null, [], note));
+        }
         public Task<VerifyDocumentResult> VerifyAsync(int id, VerifyDocumentRequest request) => throw new NotSupportedException();
         public Task<AgencyReleaseResult> SavePacketAsync(int id, DateTime cycle) => throw new NotSupportedException();
     }

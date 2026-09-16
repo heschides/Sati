@@ -14,5 +14,5 @@ public class ScratchpadSaveException(string message, Exception innerException)
 /// </summary>
 public sealed class ScratchpadSessionExpiredException(Exception innerException)
     : ScratchpadSaveException(
-        "Your Demo session has expired. Your text remains visible; restart Sati and sign in again before saving.",
+        "Your session has ended. Your text remains visible; sign in again when prompted and Sati will retry the save.",
         innerException);

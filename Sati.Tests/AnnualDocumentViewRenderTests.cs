@@ -25,7 +25,11 @@ public sealed class AnnualDocumentViewRenderTests
             var submit = buttons.Single(x => Equals(x.Content, "Submit for review"));
             Assert.Same(model.SubmitCommand, submit.Command); Assert.False(submit.IsEnabled);
             Assert.Same(model.ApproveCommand, buttons.Single(x => Equals(x.Content, "Approve submitted plan")).Command);
-            Assert.NotNull(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Safety plan cycle beginning"));
+            Assert.NotNull(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Safety plan annual period beginning"));
+            var openPeriod = buttons.Single(x => Equals(x.Content, "Open selected period"));
+            Assert.Same(model.ReloadCommand, openPeriod.Command);
+            Assert.Equal("Loads the saved safety plan for this annual period without changing it.", openPeriod.ToolTip);
+            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(view, "Live safety plan preview"));
             SavePreview(view, "safety-workspace.png");
         });
     }
@@ -44,6 +48,17 @@ public sealed class AnnualDocumentViewRenderTests
             var receipt = buttons.Single(x => Equals(x.Content, "Record receipt or effort"));
             Assert.Same(model.AcknowledgeCommand, receipt.Command); Assert.False(receipt.IsEnabled);
             Assert.NotNull(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Privacy notice received on"));
+            var openPeriod = buttons.Single(x => Equals(x.Content, "Open selected period"));
+            Assert.Same(model.ReloadCommand, openPeriod.Command);
+            Assert.Equal("Loads document status for this annual period without changing historical records.", openPeriod.ToolTip);
+            Assert.NotNull(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Annual document period beginning"));
+            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(view, "Annual document workflow by type"));
+            Assert.Contains(buttons, button => Equals(button.Content, "Submit to consumer or guardian for review"));
+            var templateEditor = WpfUiHarness.Descendants(view).OfType<Expander>()
+                .Single(x => Equals(x.Header, "Agency privacy template (administrators)"));
+            templateEditor.IsExpanded = true;
+            view.UpdateLayout();
+            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(view, "Live privacy template preview"));
             SavePreview(view, "annual-workspace.png");
         });
     }

@@ -162,6 +162,11 @@
                           AutomationProperties.Name="Billing permission"
                           IsChecked="{Binding HasBillingPermissions}"
                           Margin="0,0,12,6" />
+                <CheckBox Content="Representative payee"
+                          AutomationProperties.Name="Representative payee permission"
+                          AutomationProperties.HelpText="View approved check requests, update consumer ledgers, release checks, and acknowledge receipts. Does not grant case-management access."
+                          IsChecked="{Binding HasRepresentativePayeePermissions}"
+                          Margin="0,0,12,6" />
             </WrapPanel>
 
             <Button Content="Create Account"

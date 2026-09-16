@@ -311,15 +311,17 @@
                                                 <StackPanel Grid.Column="0">
                                                     <TextBlock Text="Item Cost"
                                                                Style="{StaticResource LabelStyle}" />
-                                                    <!-- LostFocus (default): per-keystroke
-                                                         decimal parse chokes on "1." — same
-                                                         reason as Sales Tax below. -->
-                                                    <TextBox AutomationProperties.Name="Item Cost" Text="{Binding ItemCost, StringFormat=F2}" />
+                                                    <!-- A short delay keeps transient numeric text
+                                                         comfortable to type while valid changes still
+                                                         reach the live document without leaving the field. -->
+                                                    <TextBox AutomationProperties.Name="Item Cost"
+                                                             Text="{Binding ItemCost, StringFormat=F2, UpdateSourceTrigger=PropertyChanged, Delay=200}" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2">
                                                     <TextBlock Text="Quantity"
                                                                Style="{StaticResource LabelStyle}" />
-                                                    <TextBox AutomationProperties.Name="Quantity" Text="{Binding Quantity}" />
+                                                    <TextBox AutomationProperties.Name="Quantity"
+                                                             Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged, Delay=200}" />
                                                 </StackPanel>
                                             </Grid>
 
@@ -365,15 +367,15 @@
 
                         <TextBlock Text="Sales Tax"
                                    Style="{StaticResource LabelStyle}" />
-                        <!-- Decimal: default LostFocus trigger, not PropertyChanged —
-                             per-keystroke parsing chokes on partial input ("1."). Preview
-                             tax updates on focus-loss, which is fine.
+                        <!-- Valid numeric changes flow to the live preview after a short
+                             typing delay. An incomplete numeric value leaves the last valid
+                             amount visible until the entry becomes valid.
                              Editable only while the override is ticked; otherwise the
                              field shows the figure calculated from the agency rate and
                              recalculates as items change. -->
                         <TextBox AutomationProperties.Name="Sales tax"
                                  IsEnabled="{Binding CurrentEditor.SalesTaxOverridden}"
-                                 Text="{Binding CurrentEditor.SalesTax, StringFormat=F2}" />
+                                 Text="{Binding CurrentEditor.SalesTax, StringFormat=F2, UpdateSourceTrigger=PropertyChanged, Delay=200}" />
 
                         <CheckBox Content="Enter sales tax manually"
                                   Margin="0,2,0,2"

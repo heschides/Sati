@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
 using Sati.Services;
@@ -225,8 +226,15 @@ namespace Sati.ViewModels
         private async Task LogNoteDirectlyAsync()
         {
             if (SelectedNote is null) return;
-            SelectedNote.Status = NoteStatus.Logged;
-            if (!await TryUpdateNoteAsync(SelectedNote)) return;
+            var note = SelectedNote;
+            var previousStatus = note.Status;
+            note.Status = NoteStatus.Logged;
+            if (!await TryUpdateNoteAsync(note))
+            {
+                note.Status = previousStatus;
+                RefreshView();
+                return;
+            }
             RefreshView();
             RefreshPanelForSelectedNote();
             NoteStatusChanged?.Invoke(this, EventArgs.Empty);
@@ -262,6 +270,8 @@ namespace Sati.ViewModels
         [RelayCommand]
         private async Task SendToSupervisor()
         {
+            // Clinical review only. Billing remains blocked for the gap until a
+            // supervisor exception names the exact blockers, or Admin recovery runs.
             if (SelectedNote is null) return;
             if (string.IsNullOrWhiteSpace(PendingJustification)) return;
 
@@ -418,6 +428,11 @@ namespace Sati.ViewModels
             {
                 await _noteService.UpdateNoteAsync(note);
                 return true;
+            }
+            catch (NoteSubmissionException ex)
+            {
+                NoteEntry.ShowSubmissionRefusal(ex.Message);
+                return false;
             }
             catch (NoteConcurrencyException)
             {

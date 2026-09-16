@@ -20,6 +20,7 @@ public partial class SafetyPlanViewModel(
     private int personVersion;
     private int openDaysBefore = 90;
     private int dueDaysBeforeEffective;
+    [ObservableProperty] private string personName = "Select a consumer";
     [ObservableProperty] private DateTime? cycleStart;
     [ObservableProperty] private string message = "Select a consumer.";
     [ObservableProperty] private string returnReason = "";
@@ -38,6 +39,7 @@ public partial class SafetyPlanViewModel(
     private bool IsSelectedCycleAvailable => CycleStart is DateTime target &&
         AnnualDocumentCycle.IsAvailable(
             target, DateTime.Today, openDaysBefore, dueDaysBeforeEffective);
+    public bool IsApproved => plan?.Status == "Approved";
     public event Action<AgencyReleaseResult>? PdfReady;
     partial void OnIsBusyChanged(bool value) => NotifyState();
     partial void OnCycleStartChanged(DateTime? value)
@@ -45,12 +47,13 @@ public partial class SafetyPlanViewModel(
         requests.Invalidate(); plan = null; Sections.Clear(); ReturnReason = ""; IsBusy = false;
         Message = value is DateTime target && !IsSelectedCycleAvailable
             ? $"This safety plan becomes available on {target.Date.AddDays(-dueDaysBeforeEffective).AddDays(-openDaysBefore):MMM d, yyyy}."
-            : "Load or start the plan for this annual effective date.";
+            : "Open the selected annual period to view its saved plan, or start a new revision.";
         NotifyState();
     }
     public void SetPerson(Person? selected)
     {
         var version = ++personVersion;
+        PersonName = selected?.FullName ?? "Select a consumer";
         requests.Invalidate(); person = selected; plan = null; Sections.Clear(); IsBusy = false;
         CycleStart = selected?.EffectiveDate is DateTime effective
             ? AnnualDocumentCycle.SuggestedStart(
@@ -105,6 +108,7 @@ public partial class SafetyPlanViewModel(
         OnPropertyChanged(nameof(CanAuthor)); OnPropertyChanged(nameof(CanEdit));
         OnPropertyChanged(nameof(CanReview)); OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(AvailabilityMessage));
+        OnPropertyChanged(nameof(IsApproved));
     }
     private void Apply(SafetyPlanDto? value)
     {
@@ -159,5 +163,8 @@ public partial class SafetyPlanSectionViewModel(string id, string text) : Observ
 {
     public string Id { get; } = id;
     public string Title => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Id.Replace('-', ' '));
-    [ObservableProperty] private string text = text;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PreviewText))]
+    private string text = text;
+    public string PreviewText => string.IsNullOrWhiteSpace(Text) ? "[Not yet completed]" : Text.Trim();
 }

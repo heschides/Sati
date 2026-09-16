@@ -22,6 +22,13 @@ public sealed class PersonCenteredPlanSourceService(IDbContextFactory<SatiContex
         {
             throw new UnauthorizedAccessException("That assessment source is not available to this user.");
         }
+        var authoringEnabled = await db.Settings.AsNoTracking()
+            .Where(settings => settings.AgencyId == actor.AgencyId)
+            .Select(settings => (bool?)settings.IsPersonCenteredPlanAuthoringEnabled)
+            .SingleOrDefaultAsync() ?? false;
+        if (!authoringEnabled)
+            throw new NotSupportedException(
+                "Sati Person-Centered Plan authoring is turned off for this agency. Record the Evergreen completion through the form attestation workflow.");
 
         // An approved assessment is the authoritative PCP source. Until approval
         // exists, expose only the assigned author's working version to users who

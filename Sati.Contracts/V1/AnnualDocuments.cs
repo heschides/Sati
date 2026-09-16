@@ -7,7 +7,10 @@ public enum AnnualDocumentKind
     ReleaseMedical,
     SafetyPlan,
     PrivacyPractices,
-    MedicalRecordsRequest
+    MedicalRecordsRequest,
+    CwicReferralPacket,
+    HousingSupportFundsApplication,
+    DhhsAuthorizedRepresentative
 }
 
 public enum DocumentArtifactOrigin
@@ -34,7 +37,10 @@ public static class AnnualDocumentCatalog
         new(AnnualDocumentKind.ReleaseMedical, "Medical release", "Release_Medical", true, false),
         new(AnnualDocumentKind.SafetyPlan, "Consumer safety plan", "SafetyPlan", true, false),
         new(AnnualDocumentKind.PrivacyPractices, "Notice of Privacy Practices", "PrivacyPractices", true, true),
-        new(AnnualDocumentKind.MedicalRecordsRequest, "Medical records request", null, true, true)
+        new(AnnualDocumentKind.MedicalRecordsRequest, "Medical records request", null, true, true),
+        new(AnnualDocumentKind.CwicReferralPacket, "CWIC referral packet", null, false, false),
+        new(AnnualDocumentKind.HousingSupportFundsApplication, "Housing Support Funds application", null, false, false),
+        new(AnnualDocumentKind.DhhsAuthorizedRepresentative, "DHHS Authorized Representative", null, false, false)
     ];
 
     public static AnnualDocumentCatalogEntry? ForFormType(string formType) =>

@@ -114,6 +114,7 @@ internal static class CloudContractMapper
         note.PersonId = dto.PersonId;
         note.FormType = ParseNullable<FormType>(dto.FormType);
         note.NoteType = ParseNullable<NoteType>(dto.NoteType);
+        note.GoalProgress = ParseNullable<GoalProgressLevel>(dto.GoalProgress);
         note.AgencyId = dto.AgencyId;
         note.ReturnReason = dto.ReturnReason;
         note.ReturnedById = dto.ReturnedById;
@@ -143,6 +144,9 @@ internal static class CloudContractMapper
     public static Settings ToSettings(SettingsDto s) => new()
     {
         Id = s.Id,
+        IsComprehensiveAssessmentAuthoringEnabled = s.IsComprehensiveAssessmentAuthoringEnabled,
+        IsClassificationAuthoringEnabled = s.IsClassificationAuthoringEnabled,
+        IsPersonCenteredPlanAuthoringEnabled = s.IsPersonCenteredPlanAuthoringEnabled,
         AllowCredibleProfileUpdates = s.AllowCredibleProfileUpdates,
         VrAssistantTitle = VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle),
         AnnualPacketOpenDaysBefore = s.AnnualPacketOpenDaysBefore,
@@ -228,7 +232,9 @@ internal static class CloudContractMapper
         s.BillingComplianceRequirements,
         s.AllowCredibleProfileUpdates,
         VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle), s.AnnualPacketOpenDaysBefore,
-        s.AllowPastBillingPolicyEffectiveDates);
+        s.AllowPastBillingPolicyEffectiveDates,
+        s.IsComprehensiveAssessmentAuthoringEnabled, s.IsClassificationAuthoringEnabled,
+        s.IsPersonCenteredPlanAuthoringEnabled);
 
     public static Scratchpad ToScratchpad(ScratchpadDto dto) => new()
     {
@@ -282,7 +288,8 @@ internal static class CloudContractMapper
         note.NoteType?.ToString(),
         note.CaseManagerJustification,
         note.VisitDocumentationJson,
-        note.Revision);
+        note.Revision,
+        note.GoalProgress?.ToString());
 
     public static SavePersonRequest ToSavePersonRequest(Person person) =>
         PersonContractMapper.ToSaveRequest(person);
@@ -483,7 +490,8 @@ internal static class CloudContractMapper
         dto.Id, dto.PersonId, dto.Revision, dto.ConsumerName, dto.AgencyName,
         dto.CaseManagerName, dto.SupervisorName, dto.RequestDate, dto.PayableTo,
         dto.MailingAddress, dto.Amount, dto.NeededByDate, dto.Reason,
-        dto.CreatedAtUtc, dto.PublishedAtUtc, dto.PublishedByUserId, dto.PublishedByName);
+        dto.CreatedAtUtc, dto.PublishedAtUtc, dto.PublishedByUserId, dto.PublishedByName,
+        dto.WorkflowStatus, dto.TemplateId, dto.ScheduledForDate);
 
     public static SaveCheckRequestRequest ToSaveCheckRequestRequest(CheckRequest request) => new(
         request.RequestDate, request.PayableTo, request.MailingAddress, request.Amount,

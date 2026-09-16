@@ -3,6 +3,8 @@ using Sati.ViewModels.Children;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.Win32;
+using System.IO;
 
 namespace Sati.Views
 {
@@ -27,6 +29,8 @@ namespace Sati.Views
                 _viewModel.AtRequestPdfReady -= SaveAtRequestPdf;
                 _viewModel.AtRequestProblem -= ShowAtRequestProblem;
                 _viewModel.ClientSaveProblemOccurred -= ShowClientSaveProblem;
+                _viewModel.PersonPhoto.PhotoPickerRequested -= ChoosePersonPhoto;
+                _viewModel.PersonPhoto.ProblemOccurred -= ShowPersonPhotoProblem;
                 _viewModel = null;
             }
 
@@ -36,6 +40,8 @@ namespace Sati.Views
                 vm.AtRequestPdfReady += SaveAtRequestPdf;
                 vm.AtRequestProblem += ShowAtRequestProblem;
                 vm.ClientSaveProblemOccurred += ShowClientSaveProblem;
+                vm.PersonPhoto.PhotoPickerRequested += ChoosePersonPhoto;
+                vm.PersonPhoto.ProblemOccurred += ShowPersonPhotoProblem;
 
                 vm.ComplianceReviewRequested += (forms) =>
                 {
@@ -94,6 +100,43 @@ namespace Sati.Views
                 e.Problem.Title,
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+
+        private async void ChoosePersonPhoto(object? sender, EventArgs e)
+        {
+            if (_viewModel is null)
+                return;
+
+            var dialog = new OpenFileDialog
+            {
+                Title = "Choose a consumer profile photo",
+                Filter = "JPG or PNG image (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+            if (dialog.ShowDialog() != true)
+                return;
+
+            try
+            {
+                var bytes = await File.ReadAllBytesAsync(dialog.FileName);
+                await _viewModel.PersonPhoto.SaveSelectedAsync(bytes);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(
+                    $"Sati could not read that image. {exception.Message}",
+                    "Photo not saved",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private void ShowPersonPhotoProblem(object? sender, PersonPhotoProblemEventArgs e) =>
+            MessageBox.Show(
+                e.Message,
+                e.Title,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
 
         private void ClientList_MouseDoubleClick(object sender, MouseEventArgs e)
         {

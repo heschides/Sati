@@ -107,7 +107,10 @@ public sealed class DailyAgendaCoordinatorTests : IDisposable
 
         var result = await Coordinator(
                 Preferences(),
-                new StubSettingsService(),
+                new StubSettingsService
+                {
+                    Result = new Settings { IsComprehensiveAssessmentAuthoringEnabled = true }
+                },
                 new StubUpcomingEventService(),
                 assessments)
             .TryCreateAsync(User(), [person], Scratchpad(), Today);
@@ -130,13 +133,48 @@ public sealed class DailyAgendaCoordinatorTests : IDisposable
 
         var result = await Coordinator(
                 Preferences(),
-                new StubSettingsService(),
+                new StubSettingsService
+                {
+                    Result = new Settings { IsComprehensiveAssessmentAuthoringEnabled = true }
+                },
                 new StubUpcomingEventService(),
                 new StubAssessmentService())
             .TryCreateAsync(User(), [person], Scratchpad(), Today);
 
         Assert.NotNull(result);
         Assert.Equal("Not started.", result.AssessmentProgressText);
+    }
+
+    [Fact]
+    public async Task DisabledSatiAuthoringKeepsEvergreenAssessmentSuggestionAndSkipsBuilder()
+    {
+        var person = Person.Rehydrate(7, 41);
+        person.FirstName = "Alex";
+        person.LastName = "Person";
+        person.Forms.Add(new Form(
+            FormType.ComprehensiveAssessment,
+            new DateTime(2027, 4, 1)));
+        var settings = new StubSettingsService
+        {
+            Result = new Settings
+            {
+                IsComprehensiveAssessmentAuthoringEnabled = false
+            }
+        };
+        var assessments = new StubAssessmentService();
+
+        var result = await Coordinator(
+                Preferences(),
+                settings,
+                new StubUpcomingEventService(),
+                assessments)
+            .TryCreateAsync(User(), [person], Scratchpad(), Today);
+
+        Assert.NotNull(result);
+        Assert.True(result.HasAssessmentSuggestion);
+        Assert.Contains("Evergreen is the source", result.AssessmentProgressText, StringComparison.Ordinal);
+        Assert.Contains("Attest completion in Sati", result.AssessmentProgressText, StringComparison.Ordinal);
+        Assert.Equal(0, assessments.LoadCount);
     }
 
     private DailyAgendaCoordinator Coordinator(
@@ -181,11 +219,12 @@ public sealed class DailyAgendaCoordinatorTests : IDisposable
     private sealed class StubSettingsService : ISettingsService
     {
         public int LoadCount { get; private set; }
+        public Settings Result { get; init; } = new();
 
         public Task<Settings> LoadAsync()
         {
             LoadCount++;
-            return Task.FromResult(new Settings());
+            return Task.FromResult(Result);
         }
 
         public Task SaveAsync(Settings settings) => throw new NotSupportedException();

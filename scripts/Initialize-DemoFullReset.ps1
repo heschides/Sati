@@ -4,7 +4,8 @@ param(
     [string]$Database = 'SatiDemo',
     [string]$ResetIdentityName = 'sati-demo-refresh-satilogica',
     [string]$ApiIdentityName = 'sati-demo-api-satilogica-46417',
-    [switch]$ReplaceBaseline
+    [switch]$ReplaceBaseline,
+    [DateTime]$TimelineAnchorDate = [DateTime]::Today
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,6 +30,8 @@ $connection.Open()
 try {
     $command = $connection.CreateCommand()
     $command.CommandTimeout = 1200
+    [void]$command.Parameters.Add('@TimelineAnchorDate', [System.Data.SqlDbType]::Date)
+    $command.Parameters['@TimelineAnchorDate'].Value = $TimelineAnchorDate.Date
     $command.CommandText = @"
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
@@ -41,6 +44,35 @@ DECLARE @captureLockResult int;
 EXEC @captureLockResult=sys.sp_getapplock @Resource=N'SatiDemo.FullReset',
     @LockMode=N'Exclusive', @LockOwner=N'Transaction', @LockTimeout=60000;
 IF @captureLockResult < 0 THROW 51001, 'The Demo is busy; baseline capture did not begin.', 1;
+
+-- This table deliberately stays outside demo_baseline. The snapshot is a
+-- calendar template; its anchor tells every later reset how far to move that
+-- template. LastAppliedAsOfDate makes a direct same-day seed rerun idempotent.
+IF OBJECT_ID(N'dbo.SatiDemoResetState', N'U') IS NULL
+    EXEC(N'CREATE TABLE dbo.SatiDemoResetState
+    (
+        Id tinyint NOT NULL CONSTRAINT PK_SatiDemoResetState PRIMARY KEY,
+        TimelineAnchorDate date NOT NULL,
+        LastAppliedAsOfDate date NULL,
+        CapturedAtUtc datetime2 NOT NULL,
+        LastAppliedAtUtc datetime2 NULL,
+        CONSTRAINT CK_SatiDemoResetState_Singleton CHECK (Id=1)
+    );');
+
+EXEC sys.sp_executesql N'
+IF EXISTS (SELECT 1 FROM dbo.SatiDemoResetState WHERE Id=1)
+    UPDATE dbo.SatiDemoResetState SET
+        TimelineAnchorDate=@Anchor,
+        LastAppliedAsOfDate=@Anchor,
+        CapturedAtUtc=SYSUTCDATETIME(),
+        LastAppliedAtUtc=SYSUTCDATETIME()
+    WHERE Id=1;
+ELSE
+    INSERT dbo.SatiDemoResetState
+        (Id,TimelineAnchorDate,LastAppliedAsOfDate,CapturedAtUtc,LastAppliedAtUtc)
+    VALUES (1,@Anchor,@Anchor,SYSUTCDATETIME(),SYSUTCDATETIME());',
+    N'@Anchor date', @Anchor=@TimelineAnchorDate;
+
 IF SCHEMA_ID(N'demo_baseline') IS NULL EXEC(N'CREATE SCHEMA demo_baseline AUTHORIZATION dbo;');
 
 DECLARE @drop nvarchar(max)=N'';
@@ -58,6 +90,7 @@ EXEC sys.sp_executesql @capture;
 COMMIT;
 "@
     [void]$command.ExecuteNonQuery()
+    $command.Parameters.Clear()
 
 $command.CommandText = @"
 CREATE OR ALTER PROCEDURE dbo.SatiResetToCanonicalBaseline
@@ -130,6 +163,9 @@ BEGIN
     EXEC sys.sp_executesql @sql;
     UPDATE dbo.SatiDatabaseIdentity SET InstanceId=NEWID(), CreatedAtUtc=SYSUTCDATETIME()
       WHERE Id=1 AND EnvironmentName=N'Demo';
+    UPDATE dbo.SatiDemoResetState
+      SET LastAppliedAsOfDate=NULL, LastAppliedAtUtc=NULL
+      WHERE Id=1;
     COMMIT;
 END
 "@

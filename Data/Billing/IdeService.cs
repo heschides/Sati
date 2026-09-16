@@ -2,8 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Sati.Data;
 using Sati.Helpers;
 using Sati.Models.Billing;
+using Sati.Services.Billing;
 using System.IO;
 using System.Data;
+using Sati.Contracts.V1;
 
 namespace Sati.Edi
 {
@@ -41,25 +43,11 @@ namespace Sati.Edi
             {
                 if (previous.BillingPeriodId != billingPeriodId || previous.IsTest != isTest)
                     throw new InvalidOperationException("This EDI retry key was already used for a different request.");
-                return await SaveFileAsync(previous.FileName, previous.Content);
             }
 
-            var period = await context.BillingPeriods
-                .Include(p => p.User)
-                .Include(p => p.Lines)
-                .FirstOrDefaultAsync(p => p.Id == billingPeriodId)
-                ?? throw new InvalidOperationException(
-                    $"Billing period {billingPeriodId} not found.");
-
-            if (period.User.AgencyId != actor.AgencyId)
-                throw new InvalidOperationException($"Billing period {billingPeriodId} not found.");
-
-            if (!period.Lines.Any())
-                throw new InvalidOperationException(
-                    $"Billing period {billingPeriodId} has no claim lines.");
-            if (period.Status != BillingStatus.Submitted)
-                throw new InvalidOperationException(
-                    "Submit and lock the billing period before generating its 837P file.");
+            var period = await LoadExportablePeriodAsync(context, billingPeriodId, actor);
+            if (previous is not null)
+                return await SaveFileAsync(previous.FileName, previous.Content);
 
             var generatedAt = DateTime.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
@@ -107,7 +95,10 @@ namespace Sati.Edi
             catch (DbUpdateException)
             {
                 await transaction.RollbackAsync();
+                await transaction.DisposeAsync();
                 context.ChangeTracker.Clear();
+                await using var replayTransaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                await LoadExportablePeriodAsync(context, billingPeriodId, actor);
                 var completed = await context.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(generation =>
                     generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.Id &&
                     generation.IdempotencyKey == normalizedKey);
@@ -121,6 +112,72 @@ namespace Sati.Edi
                 return await SaveFileAsync(completed.FileName, completed.Content);
             }
             return await SaveFileAsync(fileName, ediContent);
+        }
+
+        private async Task<BillingPeriod> LoadExportablePeriodAsync(
+            SatiContext context, int billingPeriodId, Sati.Models.User capturedActor)
+        {
+            var actor = await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            if (!ReferenceEquals(actor, capturedActor))
+                throw new UnauthorizedAccessException("The signed-in account changed while the 837P was being prepared. Start again.");
+            if (!actor.HasBillingPermissions)
+                throw new UnauthorizedAccessException("Billing permission is required to generate EDI.");
+            var period = await context.BillingPeriods.AsNoTracking().Include(p => p.User).Include(p => p.Lines)
+                .SingleOrDefaultAsync(p => p.Id == billingPeriodId && p.User.AgencyId == actor.AgencyId)
+                ?? throw new InvalidOperationException($"Billing period {billingPeriodId} not found.");
+            if (period.Lines.Count == 0)
+                throw new InvalidOperationException($"Billing period {billingPeriodId} has no claim lines.");
+            if (period.Status != BillingStatus.Submitted)
+                throw new InvalidOperationException("Submit and lock the billing period before generating its 837P file.");
+            EdiGenerator.ValidatePeriod(period);
+
+            var noteIds = period.Lines.Select(line => line.NoteId).Distinct().ToList();
+            var notes = await context.Notes.AsNoTracking()
+                .Include(note => note.Person).ThenInclude(person => person.Forms)
+                    .ThenInclude(form => form.Attestations)
+                .Include(note => note.Person).ThenInclude(person => person.ReleaseObligations)
+                    .ThenInclude(obligation => obligation.Attestations)
+                .Where(note => noteIds.Contains(note.Id) && note.AgencyId == actor.AgencyId &&
+                    note.Person.AgencyId == actor.AgencyId && note.Person.User != null &&
+                    note.Person.User.AgencyId == actor.AgencyId)
+                .AsSplitQuery()
+                .ToListAsync();
+            if (notes.Count != noteIds.Count)
+                throw new InvalidOperationException("The billing period contains a note outside the agency boundary or a missing source record.");
+            await ReleaseComplianceProjectionLoader.PopulateAsync(
+                context, notes.Select(note => note.Person), actor.AgencyId);
+            var compliancePolicy = await BillingCompliancePolicyContextLoader.LoadAsync(
+                context, actor.AgencyId);
+            var approverIds = notes.Where(note => note.OverrideApprovedById.HasValue)
+                .Select(note => note.OverrideApprovedById!.Value).Distinct().ToList();
+            var agencyApprovers = await context.Users.AsNoTracking()
+                .Where(user => user.AgencyId == actor.AgencyId && approverIds.Contains(user.Id))
+                .Select(user => user.Id).ToListAsync();
+            var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+            var errors = new List<string>();
+            foreach (var line in period.Lines)
+            {
+                var note = notes.Single(candidate => candidate.Id == line.NoteId);
+                await NoteService.EnsureServiceTimeAvailableAsync(context, note.Person.UserId, note, note.Id);
+                var facts = new BillingExportSource(note.PersonId, (int?)note.Status, note.EventDate,
+                    note.ComplianceOverride, note.OverrideReason, note.ApprovedById, note.ApprovedAt,
+                    note.OverrideApprovedById, note.OverrideApprovedAt,
+                    note.OverrideApprovedById is int approverId && agencyApprovers.Contains(approverId));
+                // Release re-checks the same service-date decision claim creation
+                // made, including any exact-obligation exception or Admin recovery.
+                var recoveryDecisions = await BillingService.LoadRecoveryDecisionsForNoteAsync(
+                    context, actor.AgencyId, note.PersonId, note.Id);
+                var complianceErrors = BillingService.EvaluateBillingComplianceRelease(
+                    note, compliancePolicy, recoveryDecisions);
+                errors.AddRange(BillingExportGate.Evaluate(
+                    ProfessionalClaimSnapshotCodec.Deserialize(line.ClaimSnapshotJson), actor.AgencyId,
+                    line.DateOfService, line.IsComplianceException, line.ComplianceExceptionReason, facts,
+                    complianceErrors, compliancePolicy.Resolve(line.DateOfService))
+                    .Select(error => $"Note {line.NoteId}: {error}"));
+            }
+            if (errors.Count > 0)
+                throw new InvalidOperationException("The 837P cannot be released. " + string.Join(" ", errors));
+            return period;
         }
 
         private static string CreateEdiControlNumber(string normalizedKey) =>

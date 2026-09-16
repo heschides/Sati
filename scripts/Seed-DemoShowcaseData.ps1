@@ -392,6 +392,33 @@ if ($actualDatabase -cne "SatiDemo" -or $actualEnvironment -cne "Demo") {
     throw "Refusing to seed database '$actualDatabase' marked '$actualEnvironment'. Nothing was changed."
 }
 
+# A full reset restores the data exactly as it looked on TimelineAnchorDate and
+# clears LastAppliedAsOfDate. A direct rerun starts from the last applied date
+# instead. Using the delta between those dates makes this step both rolling and
+# idempotent; it can never add the full age of the baseline twice.
+$timelineCommand = $connection.CreateCommand()
+$timelineCommand.CommandText = "SELECT COUNT(*) FROM sys.tables WHERE object_id=OBJECT_ID(N'dbo.SatiDemoResetState', N'U');"
+if ([int]$timelineCommand.ExecuteScalar() -ne 1) {
+    $connection.Dispose()
+    throw 'The Demo timeline anchor is missing. Capture a new canonical baseline before refreshing.'
+}
+$timelineCommand.CommandText = "SELECT TimelineAnchorDate, LastAppliedAsOfDate FROM dbo.SatiDemoResetState WHERE Id=1;"
+$timelineReader = $timelineCommand.ExecuteReader()
+if (-not $timelineReader.Read()) {
+    $timelineReader.Close()
+    $connection.Dispose()
+    throw 'The Demo timeline anchor row is missing. Capture a new canonical baseline before refreshing.'
+}
+$timelineAnchorDate = $timelineReader.GetDateTime(0).Date
+$timelineFromDate = if ($timelineReader.IsDBNull(1)) {
+    $timelineAnchorDate
+}
+else {
+    $timelineReader.GetDateTime(1).Date
+}
+$timelineReader.Close()
+$timelineShiftDays = ($today - $timelineFromDate).Days
+
 $transaction = $connection.BeginTransaction()
 try {
     $personColumns = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -402,7 +429,123 @@ try {
     while ($columnReader.Read()) { [void]$personColumns.Add($columnReader.GetString(0)) }
     $columnReader.Close()
     $hasPersonProviders = [int](Invoke-SeedScalar "SELECT COUNT(*) FROM sys.tables WHERE object_id=OBJECT_ID('dbo.PersonProviders');") -eq 1
+    $hasFormAttestations = [int](Invoke-SeedScalar "SELECT COUNT(*) FROM sys.tables WHERE object_id=OBJECT_ID('dbo.FormAttestations');") -eq 1
     $hasStoredFormCompliance = [int](Invoke-SeedScalar "SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.Forms') AND name='IsCompliant';") -eq 1
+    if (-not $hasFormAttestations) {
+        throw 'The Demo database is missing the form-attestation ledger. Apply current migrations before refreshing.'
+    }
+
+    $requiredAuthoringColumns = @(
+        'IsComprehensiveAssessmentAuthoringEnabled',
+        'IsClassificationAuthoringEnabled',
+        'IsPersonCenteredPlanAuthoringEnabled'
+    )
+    foreach ($column in $requiredAuthoringColumns) {
+        $exists = [int](Invoke-SeedScalar "SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.Settings') AND name=@Column;" @{ Column=$column })
+        if ($exists -ne 1) {
+            throw "The Demo database is missing Settings.$column. Apply current migrations before refreshing."
+        }
+    }
+
+    # The public Demo teaches the real Evergreen handoff: staff attest that the
+    # external work occurred, while Sati's in-product OADS builders stay hidden.
+    # Billing-compliance flags are deliberately untouched; those gates remain.
+    $settingsUpdated = Invoke-SeedNonQuery @"
+UPDATE dbo.Settings
+SET IsComprehensiveAssessmentAuthoringEnabled=0,
+    IsClassificationAuthoringEnabled=0,
+    IsPersonCenteredPlanAuthoringEnabled=0
+WHERE AgencyId=2;
+"@
+    if ($settingsUpdated -ne 1) {
+        throw 'The Demo agency must have exactly one Settings row before refreshing.'
+    }
+
+    # Move the recurring workflow template by the exact elapsed-day delta. These
+    # fields define current cycles, due/open windows, quarterly follow-up, and the
+    # work agenda. Form evidence and scratchpad comments move with their parent
+    # workflow dates; general audit, billing, and publication history does not.
+    if ($timelineShiftDays -ne 0) {
+        Invoke-SeedNonQuery @"
+UPDATE person
+SET EffectiveDate=DATEADD(day,@TimelineShiftDays,person.EffectiveDate)
+FROM dbo.People person
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2 AND person.EffectiveDate IS NOT NULL;
+
+UPDATE form
+SET DueDate=DATEADD(day,@TimelineShiftDays,form.DueDate),
+    CompletedDate=DATEADD(day,@TimelineShiftDays,form.CompletedDate),
+    OpenedDate=DATEADD(day,@TimelineShiftDays,form.OpenedDate)
+FROM dbo.Forms form
+JOIN dbo.People person ON person.Id=form.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE review
+SET CycleAnchor=DATEADD(day,@TimelineShiftDays,review.CycleAnchor),
+    RequestedDate=DATEADD(day,@TimelineShiftDays,review.RequestedDate),
+    ReceivedDate=DATEADD(day,@TimelineShiftDays,review.ReceivedDate),
+    LoggedDate=DATEADD(day,@TimelineShiftDays,review.LoggedDate)
+FROM dbo.ReviewItems review
+JOIN dbo.People person ON person.Id=review.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE appointment
+SET Date=DATEADD(day,@TimelineShiftDays,appointment.Date)
+FROM dbo.Appointments appointment
+JOIN dbo.ReviewItems review ON review.Id=appointment.ReviewItemId
+JOIN dbo.People person ON person.Id=review.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE scratchpad
+SET Date=DATEADD(day,@TimelineShiftDays,scratchpad.Date)
+FROM dbo.Scratchpad scratchpad
+JOIN dbo.Users owner ON owner.Id=scratchpad.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE comment
+SET CreatedAtUtc=DATEADD(day,@TimelineShiftDays,comment.CreatedAtUtc)
+FROM dbo.ScratchpadComments comment
+JOIN dbo.Scratchpad scratchpad ON scratchpad.Id=comment.ScratchpadId
+JOIN dbo.Users owner ON owner.Id=scratchpad.UserId
+WHERE owner.AgencyId=2;
+"@ @{ TimelineShiftDays=$timelineShiftDays } | Out-Null
+
+        Invoke-SeedNonQuery @"
+UPDATE attestation
+SET CompletedOn=DATEADD(day,@TimelineShiftDays,attestation.CompletedOn),
+    RecordedAtUtc=DATEADD(day,@TimelineShiftDays,attestation.RecordedAtUtc)
+FROM dbo.FormAttestations attestation
+JOIN dbo.Forms form ON form.Id=attestation.FormId
+JOIN dbo.People person ON person.Id=form.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+"@ @{ TimelineShiftDays=$timelineShiftDays } | Out-Null
+    }
+
+    # Scheduled records are working plans, not history. Give each case manager
+    # one stable item per day (up to the available seeded records) across a
+    # rolling 90-day horizon, so Today's Work and the next-30-days dashboard can
+    # never empty merely because the canonical snapshot got older.
+    Invoke-SeedNonQuery @"
+;WITH scheduled AS
+(
+    SELECT note.Id,
+           CONVERT(int,(ROW_NUMBER() OVER
+               (PARTITION BY person.UserId ORDER BY note.Id)-1)%90) AS DayOffset
+    FROM dbo.Notes note
+    JOIN dbo.People person ON person.Id=note.PersonId
+    JOIN dbo.Users owner ON owner.Id=person.UserId
+    WHERE owner.AgencyId=2 AND note.Status=0
+)
+UPDATE note
+SET EventDate=DATEADD(day,scheduled.DayOffset,@Today)
+FROM dbo.Notes note
+JOIN scheduled ON scheduled.Id=note.Id;
+"@ @{ Today=$today } | Out-Null
 
     $optionalAssignments = [System.Collections.Generic.List[string]]::new()
     if ($personColumns.Contains('IsTestData')) { $optionalAssignments.Add('IsTestData = 1') }
@@ -698,6 +841,47 @@ ORDER BY DueDate DESC;
             }
             Invoke-SeedNonQuery $formCompletionSql @{ CompletedOn=$completedOn; Id=[int]$formId } | Out-Null
 
+            # These two compliance rows represent work completed in Evergreen
+            # while Sati authoring is disabled. Keep the append-only provenance
+            # ledger aligned with the synthetic completion date. A direct rerun
+            # on the same date is idempotent; a later rolling reset appends a
+            # revocation and a fresh case-manager attestation.
+            Invoke-SeedNonQuery @"
+DECLARE @LatestKind nvarchar(20), @LatestCompletedOn date;
+SELECT TOP (1)
+    @LatestKind=Kind,
+    @LatestCompletedOn=CompletedOn
+FROM dbo.FormAttestations
+WHERE FormId=@FormId
+ORDER BY RecordedAtUtc DESC, Id DESC;
+
+IF @LatestKind=N'Attested' AND (@LatestCompletedOn IS NULL OR @LatestCompletedOn<>@CompletedOn)
+BEGIN
+    INSERT dbo.FormAttestations
+        (FormId,Kind,CompletedOn,ActorKind,ActorUserId,RecordedAtUtc,
+         EvidenceNoteId,PrerequisiteStateJson,Reason)
+    VALUES
+        (@FormId,N'Revoked',NULL,N'CaseManager',@ActorUserId,SYSUTCDATETIME(),
+         NULL,NULL,N'Demo reset replaced the prior synthetic completion date.');
+END;
+
+IF @LatestKind IS NULL OR @LatestKind<>N'Attested' OR @LatestCompletedOn<>@CompletedOn
+BEGIN
+    INSERT dbo.FormAttestations
+        (FormId,Kind,CompletedOn,ActorKind,ActorUserId,RecordedAtUtc,
+         EvidenceNoteId,PrerequisiteStateJson,Reason)
+    VALUES
+        (@FormId,N'Attested',@CompletedOn,N'CaseManager',@ActorUserId,
+         DATEADD(millisecond,1,SYSUTCDATETIME()),NULL,
+         N'{"prerequisiteArtifactIds":[]}',
+         N'Demo attestation of work completed in Evergreen.');
+END;
+"@ @{
+                FormId=[int]$formId
+                CompletedOn=$completedOn
+                ActorUserId=[int]$person.UserId
+            } | Out-Null
+
             $formMarker = "$seedTag`_FORM_$($formSpec.Type)_$($person.Id)"
             $formNarrative = "$($formSpec.Label) for $($person.FirstName) $($person.LastName) was completed with the person's preferences, strengths, chosen outcomes, provider responsibilities, and follow-up dates documented. $($formSpec.Joke) Copies and next steps were reviewed in plain language."
             $matchingFormNotes = [int](Invoke-SeedScalar "SELECT COUNT(*) FROM dbo.Notes WHERE CaseManagerJustification=@Marker" @{ Marker=$formMarker })
@@ -906,6 +1090,13 @@ JOIN dbo.Agencies agency ON agency.Id=owner.AgencyId
 WHERE agency.BillingUnitRate>0;
 "@ | Out-Null
 
+    Invoke-SeedNonQuery @"
+UPDATE dbo.SatiDemoResetState
+SET LastAppliedAsOfDate=@Today,
+    LastAppliedAtUtc=SYSUTCDATETIME()
+WHERE Id=1;
+"@ @{ Today=$today } | Out-Null
+
     $transaction.Commit()
 }
 catch {
@@ -931,8 +1122,36 @@ SELECT
     (SELECT COUNT(*) FROM dbo.Notes WHERE CaseManagerJustification LIKE 'DEMO_SHOWCASE_V1%') AS ShowcaseNotes,
     (SELECT COUNT(*) FROM dbo.Forms WHERE $completedFormsPredicate) AS CompletedForms,
     (SELECT COUNT(*) FROM dbo.ComprehensiveAssessments WHERE Status='Approved') AS ApprovedAssessments,
+    (SELECT COUNT(*) FROM dbo.Settings
+       WHERE AgencyId=2 AND
+             (IsComprehensiveAssessmentAuthoringEnabled<>0 OR
+              IsClassificationAuthoringEnabled<>0 OR
+              IsPersonCenteredPlanAuthoringEnabled<>0)) AS EnabledDemoOadsAuthoringSettings,
+    (SELECT COUNT(*)
+       FROM dbo.Forms f
+       JOIN dbo.People p ON p.Id=f.PersonId
+       JOIN dbo.Users u ON u.Id=p.UserId
+       OUTER APPLY
+       (
+           SELECT TOP (1) a.Kind, a.CompletedOn
+           FROM dbo.FormAttestations a
+           WHERE a.FormId=f.Id
+           ORDER BY a.RecordedAtUtc DESC, a.Id DESC
+       ) live
+       WHERE u.AgencyId=2
+         AND f.Type IN ('PCP','ComprehensiveAssessment')
+         AND f.CompletedDate IS NOT NULL
+         AND (live.Kind IS NULL OR live.Kind<>'Attested' OR
+              live.CompletedOn IS NULL OR live.CompletedOn<>f.CompletedDate)) AS UnattestedEvergreenCompletions,
     (SELECT COUNT(*) FROM dbo.PersonContacts WHERE Email LIKE '%@demo.sati.invalid') AS ShowcaseContacts,
     (SELECT COUNT(*) FROM dbo.ATRequests WHERE CaseManagerEmail LIKE 'showcase-at-%@demo.sati.invalid') AS ShowcaseATRequests,
+    (SELECT LastAppliedAsOfDate FROM dbo.SatiDemoResetState WHERE Id=1) AS TimelineAsOfDate,
+    (SELECT COUNT(*) FROM dbo.Forms f JOIN dbo.People p ON p.Id=f.PersonId JOIN dbo.Users u ON u.Id=p.UserId
+       WHERE u.AgencyId=2 AND f.DueDate BETWEEN @Today AND DATEADD(day,30,@Today)
+         AND (f.CompletedDate IS NULL OR f.CompletedDate>@Today)) AS UpcomingForms,
+    (SELECT COUNT(*) FROM dbo.Notes n JOIN dbo.People p ON p.Id=n.PersonId JOIN dbo.Users u ON u.Id=p.UserId
+       WHERE u.AgencyId=2 AND n.Status=0
+         AND n.EventDate BETWEEN @Today AND DATEADD(day,30,@Today)) AS UpcomingScheduledNotes,
     (SELECT COUNT(*) FROM dbo.People p JOIN dbo.Users u ON u.Id=p.UserId WHERE u.AgencyId=2) AS CaseloadClients,
     (SELECT COUNT(*) FROM dbo.People p JOIN dbo.Users u ON u.Id=p.UserId WHERE u.AgencyId=2 AND p.Bio LIKE '[[]DEMO TEACHING CASE%') AS TeachingCases,
     (SELECT COUNT(*) FROM dbo.People p JOIN dbo.Users u ON u.Id=p.UserId
@@ -961,6 +1180,7 @@ SELECT
             OR claim.ClientMaineCareId<>JSON_VALUE(CASE WHEN ISJSON(claim.ClaimSnapshotJson)=1 THEN claim.ClaimSnapshotJson ELSE '{}' END,'$.SubscriberMemberId')
             OR claim.RenderingProviderNpi<>JSON_VALUE(CASE WHEN ISJSON(claim.ClaimSnapshotJson)=1 THEN claim.ClaimSnapshotJson ELSE '{}' END,'$.BillingProviderNpi'))) AS UnreadyClaims;
 "@
+[void]$checkCommand.Parameters.AddWithValue('@Today', $today)
 $reader = $checkCommand.ExecuteReader()
 $result = [System.Data.DataTable]::new()
 $result.Load($reader)
@@ -978,5 +1198,20 @@ if ([int]$row.InvalidClientDiagnoses -ne 0) {
 }
 if ([int]$row.UnreadyClaims -ne 0) {
     throw "Demo refresh left $($row.UnreadyClaims) claims unready for 837P generation."
+}
+if ([int]$row.EnabledDemoOadsAuthoringSettings -ne 0) {
+    throw 'Demo refresh did not turn off all three Sati OADS authoring workspaces.'
+}
+if ([int]$row.UnattestedEvergreenCompletions -ne 0) {
+    throw "Demo refresh left $($row.UnattestedEvergreenCompletions) completed PCP or Comprehensive Assessment rows without a matching live attestation."
+}
+if ([DateTime]$row.TimelineAsOfDate -ne $today) {
+    throw "Demo refresh timeline validation did not reach $($today.ToString('yyyy-MM-dd'))."
+}
+if ([int]$row.UpcomingForms -lt 1) {
+    throw 'Demo refresh produced no incomplete forms due in the next 30 days.'
+}
+if ([int]$row.UpcomingScheduledNotes -lt 1) {
+    throw 'Demo refresh produced no scheduled work in the next 30 days.'
 }
 $result | Format-Table -AutoSize

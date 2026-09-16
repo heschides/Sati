@@ -22,8 +22,16 @@ public enum UserPermissions
     /// </summary>
     AgencyWideSupervision = 1 << 4,
 
+    /// <summary>
+    /// Agency representative-payee operations: the approved check-request queue,
+    /// consumer ledgers, check release, and receipt acknowledgement. This does not
+    /// grant case-management access or permission to read clinical records.
+    /// </summary>
+    RepresentativePayee = 1 << 5,
+
     AllAgencyPermissions =
-        CaseManagement | Supervision | Administration | Billing | AgencyWideSupervision
+        CaseManagement | Supervision | Administration | Billing | AgencyWideSupervision |
+        RepresentativePayee
 }
 
 /// <summary>
@@ -50,6 +58,9 @@ public static class UserPermissionRules
 
     public static bool HasBillingPermissions(UserPermissions permissions) =>
         IsSupported(permissions) && permissions.HasFlag(UserPermissions.Billing);
+
+    public static bool HasRepresentativePayeePermissions(UserPermissions permissions) =>
+        IsSupported(permissions) && permissions.HasFlag(UserPermissions.RepresentativePayee);
 
     /// <summary>
     /// Whether supervisory queries reach every case manager in the agency rather than only
@@ -83,6 +94,7 @@ public static class UserPermissionRules
         "Supervisor" => UserPermissions.CaseManagement | UserPermissions.Supervision,
         "Director" => UserPermissions.CaseManagement | UserPermissions.Supervision |
                       UserPermissions.AgencyWideSupervision,
+        "Finance" => UserPermissions.Billing | UserPermissions.RepresentativePayee,
         "Admin" => UserPermissions.AllAgencyPermissions,
         _ => UserPermissions.None
     };
@@ -93,6 +105,9 @@ public static class UserPermissionRules
     /// </summary>
     public static string LegacyLabel(UserPermissions permissions) =>
         HasAdminPermissions(permissions) ? "Admin" :
+        IsSupported(permissions) &&
+        permissions == (UserPermissions.Billing | UserPermissions.RepresentativePayee)
+            ? "Finance" :
         IsSupported(permissions) && permissions.HasFlag(UserPermissions.AgencyWideSupervision)
             ? "Director" :
         HasSupervisorPermissions(permissions) ? "Supervisor" :
@@ -100,13 +115,14 @@ public static class UserPermissionRules
 
     public static string Describe(UserPermissions permissions)
     {
-        var names = new List<string>(5);
+        var names = new List<string>(6);
         if (HasCaseManagerPermissions(permissions)) names.Add("Case management");
         if (HasSupervisorPermissions(permissions)) names.Add("Supervision");
         if (IsSupported(permissions) && permissions.HasFlag(UserPermissions.AgencyWideSupervision))
             names.Add("Agency-wide supervision");
         if (HasAdminPermissions(permissions)) names.Add("Administration");
         if (HasBillingPermissions(permissions)) names.Add("Billing");
+        if (HasRepresentativePayeePermissions(permissions)) names.Add("Representative payee");
         return names.Count == 0 ? "No agency permissions" : string.Join(", ", names);
     }
 }

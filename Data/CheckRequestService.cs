@@ -14,13 +14,22 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
         await using var db = contextFactory.CreateDbContext();
         await LocalTenantAccess.EnsureSessionAsync(db, session);
         await EnsureCanReadPersonAsync(db, personId);
-        return await db.CheckRequests.AsNoTracking()
+        var rows = await db.CheckRequests.AsNoTracking()
             .Where(x => x.PersonId == personId)
             .OrderByDescending(x => x.RequestDate)
             .ThenByDescending(x => x.Id)
-            .Select(x => new CheckRequestListItem(
-                x.Id, x.Revision, x.RequestDate, x.PayableTo, x.Amount, x.NeededByDate, x.PublishedAtUtc))
             .ToListAsync();
+        var requestIds = rows.Select(x => x.Id).ToList();
+        var actions = await db.CheckRequestWorkflowEvents.AsNoTracking()
+            .Where(x => requestIds.Contains(x.CheckRequestId))
+            .Select(x => new { x.CheckRequestId, x.Action })
+            .ToListAsync();
+        return rows.Select(x => new CheckRequestListItem(
+            x.Id, x.Revision, x.RequestDate, x.PayableTo, x.Amount, x.NeededByDate, x.PublishedAtUtc,
+            CheckRequestWorkflowRules.Resolve(x.IsPublished,
+                actions.Where(e => e.CheckRequestId == x.Id).Select(e => e.Action)),
+            x.TemplateId, x.ScheduledForDate))
+            .ToList();
     }
 
     public async Task<CheckRequest?> GetByIdAsync(int id)
@@ -32,7 +41,12 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
             .Select(x => (int?)x.PersonId).SingleOrDefaultAsync();
         if (personId is null) return null;
         await EnsureCanReadPersonAsync(db, personId.Value);
-        return await db.CheckRequests.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+        var request = await db.CheckRequests.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+        if (request is null) return null;
+        var actions = await db.CheckRequestWorkflowEvents.AsNoTracking()
+            .Where(x => x.CheckRequestId == id).Select(x => x.Action).ToListAsync();
+        request.RehydrateWorkflow(CheckRequestWorkflowRules.Resolve(request.IsPublished, actions));
+        return request;
     }
 
     public async Task<CheckRequest> CreateDraftAsync(int personId)
@@ -44,6 +58,9 @@ public sealed class CheckRequestService(IDbContextFactory<SatiContext> contextFa
             throw new UnauthorizedAccessException("Only the consumer's current assigned case manager can create a check request.");
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == personId)
             ?? throw new KeyNotFoundException("The consumer was not found.");
+        if (!person.CaseManagerIsRepPayee)
+            throw new InvalidOperationException(
+                "Representative Payee must be enabled for this consumer before creating a check request.");
         var owner = await db.Users.AsNoTracking().Include(x => x.Agency).Include(x => x.Supervisor)
             .SingleAsync(x => x.Id == person.UserId);
         var request = CheckRequest.CreateForClient(person, owner, DateTime.UtcNow);

@@ -165,6 +165,85 @@ The same migration creates the policy, recovery, release-obligation, and signatu
 schema. Its synthetic migration tests and script-generation check pass, but it has not been applied
 to Demo, Local Production, or Production and has not been rehearsed against an approved data copy.
 
+## Controlled 2026-09-14 schema application
+
+`scripts/Apply-Release139Migrations.ps1` owns the guarded application of the Representative Payee
+workflow, weekly check-request automation, and case-note goal-progress schema. It checks the exact
+database and resident environment marker, verifies existing base tables, refuses a history/schema
+contradiction, applies all missing effects transactionally, and verifies the new tables, columns,
+indexes, foreign keys, and migration rows. Local Production receives a checked full backup before
+the real write; SatiDemo uses its configured Azure point-in-time recovery. Rollback-only rehearsal,
+real application, and a zero-change second pass are required for each target.
+
+These schema changes add three resettable Demo tables. The full Demo reset intentionally refuses
+when the live and `demo_baseline` table inventories differ, so applying the schema does not silently
+alter the canonical data snapshot. After separate authorization, the baseline was recaptured with
+a 2026-09-14 anchor and all 56 tables. A complete reset inside an outer transaction verified exact
+row counts and trusted constraints, then rolled back to the exact pre-rehearsal live identity and
+date state.
+
+## Live form draft previews
+
+Every currently editable document workspace presents a document-shaped preview driven by the same
+in-memory draft as its entry controls. Text bindings use `UpdateSourceTrigger=PropertyChanged`;
+numeric fields that would otherwise react badly to transient input use a short delay and retain the
+last valid typed value. The preview therefore follows deliberate entries without requiring the user
+to leave each field.
+
+This is presentation behavior, not publication. A preview mutation cannot update an already
+published request, a generated `DocumentArtifact`, or an immutable `DocumentTemplate` version.
+The separate generation/publish command still validates, freezes, audits, and versions the output.
+PCP, Comprehensive Assessment, and Classification authoring are not counted as editable Sati forms:
+their agency gates are off and current PCP/assessment compliance is recorded through timestamped
+Evergreen attestations.
+
+## Housing Support Funds application
+
+`HousingSupportFundsRules` owns the June 30, 2025 source label, the form's closed housing choices,
+$3,000 request ceiling, subsidy detail requirement, bounded text, and review-item wording. The
+request contains application-specific answers, while `HousingSupportFundsService` and the API route
+derive consumer identity, waiver, Shared Living status, guardian, assigned case manager, and agency
+provider facts after current session, capability, caseload, and tenant checks. Profile facts cannot
+be substituted by the request.
+
+`HousingSupportFundsPdfGenerator` edits the exact fillable three-page OADS AcroForm supplied for
+this feature. It retains the original page content and interactive fields, installs portable field
+appearances, and wraps the narrative inside its printed box. It never fills the consumer/guardian
+signature or date fields and never fills any field on the page labeled DHHS Staff Only. The source
+has a fixed revision-bearing resource name and regression hash, so replacement is an explicit,
+reviewed change.
+
+The entry workspace shows the application structure and profile-derived facts while the user types.
+Shared Living, an existing housing subsidy, missing supporting proof, and unsigned attestation are
+prominent review items taken from the published form and official program page; Sati does not turn
+them into an unreviewed eligibility determination. Each generation returns a no-store PDF, appends
+audits, and records a versioned `HousingSupportFundsApplication` Draft artifact through the existing
+append-and-supersede mechanism. It is not an annual packet member and satisfies no billing gate.
+Electronic signing, transmission to OADS, receipt tracking, and approval status are intentionally
+outside this draft-generation workflow.
+
+## CWIC / Benefits Counseling referral packet
+
+`CwicPacketRules` owns the packet's bounded request contract, closed choices, one-year Maine DOL
+release window, source label, and incomplete-field advisory. The request deliberately excludes
+consumer identity, birth date, age, and SSN. `CwicPacketService` and the API route derive identity
+from the authorized person; the API decrypts the SSN only in process and returns PDF bytes rather
+than plaintext. The local path repeats current-session/caseload authorization and uses the existing
+DPAPI-backed SSN envelope. Both paths audit SSN reads separately from packet generation.
+
+`CwicPacketPdfGenerator` imports the exact ten-page MaineHealth packet supplied for this feature
+and draws values over it. It does not recreate logos or legal text. The embedded resource has a
+fixed revision-bearing name and a regression hash, so replacing the source is an explicit reviewed
+change. The entry workspace previews the same user-controlled answers live while the final PDF
+retains every original page. Signatures, signature dates, and unanswered sensitive choices stay
+blank.
+
+Each generation records a `CwicReferralPacket` `DocumentArtifact` with MaineHealth/source-version
+provenance and `Draft` origin. Regeneration uses the existing append-and-supersede mechanism; it
+does not rewrite the previous artifact. The packet is not an annual-packet member and does not
+satisfy a billing form. Electronic signature routing is policy-disabled pending written confirmation
+for the packet's several independent authorization/signature sections.
+
 ## Account lifecycle and session revocation — September 11 follow-up
 
 `AccountSessionRules` in `Sati.Contracts.V1` owns enabled/version interpretation, safe version
@@ -237,15 +316,49 @@ address, amount, needed-by date, and reason remain deliberate entries: represent
 context is reference information, not payment authorization. `CheckRequestPublication` is the one
 shared completeness/length rule owner.
 
-Only the assigned case manager may create, edit, or publish. Existing caseload supervisors may
-read and regenerate. Publication atomically saves the displayed values, derives the publisher from
-the signed-in/validated actor, writes `check-request.published`, and locks the row permanently.
-In the current manual-delivery phase, that publication means only “PDF prepared”: the case manager
-saves the attachment, emails it to Finance, and CCs the supervisor. It does not record delivery,
-supervisor approval, or an electronic signature. The later routing lifecycle must be a separate,
-server-authoritative state machine over the frozen version rather than overloading publication.
-Corrections are new requests. `CheckRequestPdfExporter` regenerates the one-page original-style
-form from frozen data; the PDF itself is saved by the user rather than duplicated in the database.
+Only the assigned case manager may create, edit, publish, or submit, and Representative Payee must
+be enabled on the consumer. Existing caseload supervisors may read and regenerate. Publication
+atomically saves the displayed values, derives the publisher from the signed-in/validated actor,
+writes `check-request.published`, and locks the row permanently. It means only “PDF prepared” and is
+never supervisor approval, Finance release, delivery proof, or an electronic signature. Corrections
+are new requests. `CheckRequestPdfExporter` regenerates the one-page original-style form from frozen
+data; the PDF itself is saved by the user rather than duplicated in the database.
+
+`CheckRequestWorkflowEvent` is the separate server-authoritative lifecycle over that frozen row.
+The assigned case manager submits; the assigned supervisor (or an agency-wide supervisor) approves
+or returns; a Representative Payee user records release and receipt acknowledgement. Events freeze
+the authenticated actor, UTC time, action, and optional protected note. A unique request/checkpoint
+index makes submission, decision, release, and receipt single-attempt transitions; a return requires
+a reason and consumes the decision checkpoint, so correction begins as a new request.
+
+`RepresentativePayeeLedgerEntry` is an append-only signed-money ledger. Manual positive deposits and
+negative expenses require a date and description. Recording release adds exactly one negative
+`CheckRelease` row in the same serializable transaction as the release event and audit record; a
+unique `CheckRequestId` prevents double posting. The Finance workspace displays the agency's current
+Representative Payee consumers, current balance, ledger, approved/released queue, and release/receipt
+controls. Consumer deletion refuses to erase this financial history.
+
+`CheckRequestTemplate` holds one current weekly default per Representative Payee consumer. It is
+revisioned and restricted to the assigned case manager. The configured weekday and effective date
+feed `WeeklyCheckRequestSchedule`; a unique `(TemplateId, ScheduledForDate)` index makes each due
+occurrence idempotent even when two sessions ask at once. Generation copies the template values into
+a new `CheckRequest`, so later default changes never rewrite historical drafts. An outstanding
+generated request suppresses newer automatic drafts until it reaches the Submitted checkpoint.
+
+`CheckRequestPromptLauncher` is the desktop coordinator. With the user's local personal preference
+enabled, it asks the server to ensure due drafts at sign-in, calendar-day rollover, and shutdown,
+then opens the case-manager review window for pending generated requests. Review navigates to the
+ordinary Check Requests editor; Defer writes nothing. `CheckRequestAutomationPreferenceService`
+stores the opt-out by Sati environment and user under the current Windows profile. It is presentation
+state only and does not delete agency defaults or financial records.
+
+The same coordinator joins scheduled time off to weekly defaults without adding a second calendar
+store. `ExemptDate` remains the per-user source of workday exclusions. When Calendar adds one,
+`TimeOffScheduled` asks for collisions immediately; sign-in and date rollover query tomorrow again.
+The server returns only the actor's enabled matching templates and ignores occurrences already
+submitted. Prepare now is an explicit action: it creates the future occurrence once, stamps the
+actual early request date, retains the scheduled occurrence as provenance, and opens the normal
+draft editor. Later writes nothing. Removing an exemption raises no preparation prompt.
 
 ## Billing submission staging
 
@@ -548,6 +661,15 @@ client name already shown by the picker. The narrative therefore retains its tex
 and undo state through resizing. The save action remains docked below the scrolling content, and the
 module-scoped compliance overlay remains above both presentations.
 
+Case-note goal progress is a nullable, append-only ordinal choice on `Note`: None, Minimal,
+Moderate, or Substantial. Null means unanswered, not “None.” Drafts may be incomplete, while both
+`NoteService` and the notes API refuse a transition to Logged until a deliberate value is present.
+The scheduling policy clears it from future Scheduled work and Reminders because those records do
+not yet describe an outcome. Existing historical rows remain readable with null rather than being
+backfilled with invented clinical data. Goal progress is intentionally independent of a particular
+goal; when PCP authoring is enabled in Sati, a separate goal reference can be added without changing
+the historical meaning of this field.
+
 Statistics uses `IProductivityReportService` for its unit history. Local Production projects only
 note date and minutes for the signed-in worker; Demo calls `GET /reports/productivity-units`, where
 the validated API actor supplies the scope and the response contains monthly totals only. Note
@@ -669,8 +791,8 @@ ordinary agency routes cannot change it. See `DOCUMENT_TEMPLATES.md` for the sou
 ## Agency authorization model
 
 Agency access is a persisted per-user `[Flags]` value owned by
-`Sati.Contracts.V1.UserPermissions`: case management, supervision, administration, and billing are
-independent capabilities. `UserPermissionRules` is the sole interpreter used by the desktop and
+`Sati.Contracts.V1.UserPermissions`: case management, supervision, administration, billing, and
+representative-payee work are independent capabilities. `UserPermissionRules` is the sole interpreter used by the desktop and
 API. The legacy `User.Role` value remains temporarily for display, signed-record compatibility,
 and the orthogonal `PlatformOperator` identity; it is not an agency authorization source.
 
@@ -683,8 +805,12 @@ Neither path accepts a persistence `User` object as a network or service authori
 
 The `AddUserPermissions` migration preserves existing access by backfilling the old labels, while
 new user management edits the permission set directly. Unknown bits and an empty set deny by
-default. Billing UI visibility follows billing permission, but every billing route and the local
-billing service enforce it independently.
+default. The legacy Finance label maps to Billing plus Representative Payee; the additive migration
+extends existing administrators with the new bit. Billing and Representative Payee UI visibility
+follow their permissions, but every route and local service enforce them independently. Finance-only
+Billing grids show stable consumer-record labels instead of names, and `/billing/candidates` returns
+only note id/date/minutes, consumer record/owner ids, compliance-override fact, and server-derived
+readiness errors—never clinical narrative, visit documentation, exception text, or consumer names.
 
 ### Consumer-record permission revocation (2026-09-11)
 
@@ -2462,6 +2588,20 @@ or external releases are listed for retrieval from their original saved/signed c
 reconstructed. Medical requests are downloads only; there is no sending service or scheduled
 packet job.
 
+The Annual Documents screen now projects the live artifacts into separate, fixed workflow rows for
+the three releases, Safety Plan, Privacy Practices, and the once-only DHHS Authorized Representative
+appointment. Preparation labels are presentation only; `DocumentArtifact.Origin`, immutable signer
+requests, and form attestations remain the authoritative records. The signing grid maps Issued and
+Viewed to Pending and Declined to Denied for staff readability without changing persisted states.
+
+`DhhsAuthorizedRepresentative` is a distinct document kind. Generating that state form records a
+Draft or review-ready artifact but does not claim that a signed appointment is on file. The assigned
+case manager may separately record a verified signed physical copy as an external artifact with a
+required protected note and audit event. Annual status returns the current period's artifacts plus
+the latest once-only appointment record and an explicit on-file fact; after that fact is recorded,
+the screen omits the appointment from recurring annual work. PDF bytes are not stored by this
+on-file action, and a second live on-file assertion is refused.
+
 `SingleAttemptWriteFilter` establishes an EF execution scope around protected non-read endpoints.
 This allows explicit multi-save transactions under SQL Server's configured retry provider without
 automatically replaying an ambiguous commit. The caller must reload before retrying a failed write.
@@ -2491,3 +2631,20 @@ per-note approval method with optional `MaximumUnits`. Both persistence implemen
 `NoteReviewRules` and `ServiceTimeline`; existing compliance, scope, optimistic concurrency and
 audit remain authoritative. The API approval DTO gains only an optional threshold; no schema
 migration or new write endpoint is required. Deploy the updated API before distributing this client.
+
+## Consumer profile photographs — 2026-09-12
+
+`PersonPhoto` is a separate, one-row-per-consumer current-media record. Its bounded JPG/PNG bytes
+never join `Person` or the caseload query, so opening the client list does not multiply image memory
+or copy binary data into every `PersonVersion` snapshot. `PersonPhotoRules` identifies the format
+from the bytes and applies the shared 5 MB, 4096-pixel-side and total-pixel limits before either the
+local or HTTP-backed service writes.
+
+An authorized consumer reader may load the dedicated, non-cacheable photo route; only the assigned
+case manager may replace or remove it. Writes recheck ownership in a serializable transaction, use
+an expected revision, and append PHI-free update/removal audit actions. The desktop clears the old
+image as soon as selection changes and uses `LatestRequestTracker`, so a delayed response cannot
+place one consumer's portrait on another profile. The view displays the original image without
+an opacity feather and exposes named keyboard-accessible change and remove actions. Migration
+`20260912053013_AddPersonPhotos` creates the storage; it was generated
+and tested here but was not applied to a real database or deployment.

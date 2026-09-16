@@ -13,6 +13,7 @@ using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati;
 using Sati.Contracts.V1;
+using Sati.Data;
 using Sati.Forms;
 using Sati.Models;
 
@@ -35,9 +36,12 @@ internal static partial class ApiEndpoints
         MapSupervisor(api);
         MapCaseload(api);
         MapPeople(api);
+        MapPersonPhotos(api);
         MapReviews(api);
         MapAssessments(api);
         MapSafetyPlans(api);
+        MapCwicPackets(api);
+        MapHousingSupportFunds(api);
         MapChat(api);
         MapAnnualPackets(api);
         MapReleaseObligations(api);
@@ -573,8 +577,14 @@ internal static partial class ApiEndpoints
                 var atRequestsDeleted = await db.AtRequests
                     .Where(atRequest => atRequest.PersonId == personId)
                     .ExecuteDeleteAsync(cancellationToken);
+                await db.RepresentativePayeeLedgerEntries
+                    .Where(entry => entry.PersonId == personId)
+                    .ExecuteDeleteAsync(cancellationToken);
                 var checkRequestsDeleted = await db.CheckRequests
                     .Where(request => request.PersonId == personId)
+                    .ExecuteDeleteAsync(cancellationToken);
+                await db.CheckRequestTemplates
+                    .Where(template => template.PersonId == personId)
                     .ExecuteDeleteAsync(cancellationToken);
                 var assessmentsDeleted = await db.ComprehensiveAssessments
                     .Where(assessment => assessment.PersonId == personId)
@@ -871,6 +881,13 @@ internal static partial class ApiEndpoints
                     "consumer_transmitted_billing",
                     ConsumerDeletionRules.TransmittedBillingMessage, string.Empty));
             }
+            if (await db.RepresentativePayeeLedgerEntries.AsNoTracking()
+                    .AnyAsync(entry => entry.PersonId == personId, cancellationToken))
+            {
+                return Results.Conflict(new ApiErrorDto(
+                    "consumer_has_representative_payee_ledger",
+                    ConsumerDeletionRules.RepresentativePayeeLedgerMessage, string.Empty));
+            }
 
             // Itemized tombstone, captured before any delete. Ids, dates, and types only —
             // never narrative, name, MaineCareId, birth date, or address.
@@ -971,8 +988,14 @@ internal static partial class ApiEndpoints
             var atRequestsDeleted = await db.AtRequests
                 .Where(request => request.PersonId == personId)
                 .ExecuteDeleteAsync(cancellationToken);
+            await db.RepresentativePayeeLedgerEntries
+                .Where(entry => entry.PersonId == personId)
+                .ExecuteDeleteAsync(cancellationToken);
             var checkRequestsDeleted = await db.CheckRequests
                 .Where(request => request.PersonId == personId)
+                .ExecuteDeleteAsync(cancellationToken);
+            await db.CheckRequestTemplates
+                .Where(template => template.PersonId == personId)
                 .ExecuteDeleteAsync(cancellationToken);
             var assessmentsDeleted = await db.ComprehensiveAssessments
                 .Where(assessment => assessment.PersonId == personId)
@@ -1695,10 +1718,23 @@ internal static partial class ApiEndpoints
             var row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
             if (row is null)
                 return actor.HasSupervisorPermissions ? Results.NotFound() : Results.Forbid();
+            var scheduleOwnerId = row.Person.UserId;
+            db.ChangeTracker.Clear();
+            await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(db,
+                actor.AgencyId, scheduleOwnerId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                return Results.Unauthorized();
+            row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
+            if (row is null || row.Person.UserId != scheduleOwnerId)
+                return StaleNoteConflict();
             if (request.ExpectedRevision != row.Note.Revision)
                 return StaleNoteConflict();
             if (!NoteWorkflow.CanSupervisorTransition(row.Note.Status, NoteWorkflow.Approved))
                 return Results.Conflict(new ApiErrorDto("invalid_note_status", "Only logged notes can be approved.", string.Empty));
+
+            var reviewTimeConflict = await FindReviewServiceTimeProblemAsync(db, row, actor.AgencyId, cancellationToken);
+            if (reviewTimeConflict is not null)
+                return reviewTimeConflict;
 
             if (request.MaximumUnits is int limit)
             {
@@ -1707,18 +1743,6 @@ internal static partial class ApiEndpoints
                     row.Note.EventDate, row.Note.Minutes, row.Note.StartTime, clock.Today))
                     return Results.Conflict(new ApiErrorDto("batch_ineligible",
                         "This note is not eligible for automatic approval.", string.Empty));
-                var candidate = ServiceTimeline.TryCreateBlock(row.Note.Id, row.Note.StartTime,
-                    row.Note.Minutes, "Logged");
-                if (candidate is not null && row.Note.EventDate is DateTime date)
-                {
-                    var day = await LoadDayNotesAsync(db, row.Person.UserId, actor.AgencyId, date, cancellationToken);
-                    var blocks = day.Select(item => ServiceTimeline.TryCreateBlock(item.Note.Id,
-                        item.Note.StartTime, item.Note.Minutes, ContractMapper.NoteStatusName(item.Note.Status)))
-                        .OfType<ServiceBlock>();
-                    if (ServiceTimeline.FindConflicts(candidate, blocks).Count > 0)
-                        return Results.Conflict(new ApiErrorDto("batch_ineligible",
-                            "This note overlaps another service time.", string.Empty));
-                }
             }
 
             row.Note.Status = 6;
@@ -1730,6 +1754,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await scheduleWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -1751,6 +1776,15 @@ internal static partial class ApiEndpoints
             var row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
             if (row is null)
                 return actor.HasSupervisorPermissions ? Results.NotFound() : Results.Forbid();
+            var scheduleOwnerId = row.Person.UserId;
+            db.ChangeTracker.Clear();
+            await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(db,
+                actor.AgencyId, scheduleOwnerId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                return Results.Unauthorized();
+            row = await LoadReviewableNoteAsync(db, actor, noteId, cancellationToken);
+            if (row is null || row.Person.UserId != scheduleOwnerId)
+                return StaleNoteConflict();
             if (request.ExpectedRevision != row.Note.Revision)
                 return StaleNoteConflict();
             if (!NoteWorkflow.CanSupervisorTransition(row.Note.Status, NoteWorkflow.Approved))
@@ -1782,6 +1816,10 @@ internal static partial class ApiEndpoints
                 });
             }
 
+            var reviewTimeConflict = await FindReviewServiceTimeProblemAsync(db, row, actor.AgencyId, cancellationToken);
+            if (reviewTimeConflict is not null)
+                return reviewTimeConflict;
+
             var now = clock.UtcNow.UtcDateTime;
             row.Note.Status = 6;
             row.Note.ApprovedById = actor.UserId;
@@ -1803,6 +1841,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await scheduleWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -2824,23 +2863,33 @@ internal static partial class ApiEndpoints
             var unfilled = DhhsFormDefinition.UnfilledFields(form, subject).ToList();
             var generatedAtUtc = clock.UtcNow.UtcDateTime;
             await using var documentTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            if (form == DhhsFormDefinition.FormKey.AuthorizationToRelease)
+            if (form is DhhsFormDefinition.FormKey.AuthorizationToRelease or
+                DhhsFormDefinition.FormKey.AuthorizedRepresentative)
             {
                 var isDraft = (request.Checks is null || request.Checks.Count == 0) &&
                     (request.Text is null || request.Text.Count == 0);
                 if (isDraft)
-                    unfilled.Add("Consumer authorization choices");
-                var cycleStart = dhhsTargetEffectiveDate!.Value;
+                    unfilled.Add(form == DhhsFormDefinition.FormKey.AuthorizationToRelease
+                        ? "Consumer authorization choices"
+                        : "Representative authority choices");
+                // The DHHS release is filed under its exact annual target; the once-only
+                // Authorized Representative form keeps the current period as placement.
+                var cycleStart = dhhsTargetEffectiveDate ?? AnnualDocumentCycle.CurrentStart(
+                    person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
+                    generatedAtUtc.ToLocalTime());
                 var artifactFileName = $"{form}-{personId}-{SafeFileName($"{person.LastName}-{person.FirstName}")}.pdf";
+                var documentKind = form == DhhsFormDefinition.FormKey.AuthorizationToRelease
+                    ? AnnualDocumentKind.ReleaseDhhs
+                    : AnnualDocumentKind.DhhsAuthorizedRepresentative;
                 await DocumentArtifactPersistence.StageGeneratedAsync(
-                    db, personId, actor.AgencyId, AnnualDocumentKind.ReleaseDhhs, cycleStart,
+                    db, personId, actor.AgencyId, documentKind, cycleStart,
                     isDraft ? DocumentArtifactOrigin.Draft : DocumentArtifactOrigin.GeneratedInSati,
                     generatedAtUtc, actor.UserId, pdf, artifactFileName, unfilled, cancellationToken,
                     releaseObligationId: dhhsReleaseLink?.Obligation?.Id);
                 auditTrail.Record(actor, AuditActions.DocumentGenerated, "Person", personId,
                     JsonSerializer.Serialize(new
                     {
-                        kind = AnnualDocumentKind.ReleaseDhhs.ToString(),
+                        kind = documentKind.ToString(),
                         cycleStart = cycleStart.ToString("yyyy-MM-dd"),
                         releaseObligationId = dhhsReleaseLink?.Obligation?.ObligationId,
                         releaseObligationKey = dhhsReleaseLink?.Obligation?.StableKey,
@@ -3415,6 +3464,9 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
 
@@ -3432,6 +3484,9 @@ internal static partial class ApiEndpoints
             AuditTrail auditTrail, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             if (authorUserId != actor.UserId ||
                 !await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
@@ -3469,6 +3524,9 @@ internal static partial class ApiEndpoints
             try { using var _ = JsonDocument.Parse(request.DocumentJson); }
             catch (JsonException) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["document"] = ["Assessment data is invalid."] }); }
             var actor = Actor.From(principal);
+            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             var assessment = await db.ComprehensiveAssessments.SingleOrDefaultAsync(x => x.Id == assessmentId, cancellationToken);
             if (assessment is null ||
                 !await TenantAccess.CanAuthorAssessmentAsync(db, actor, assessment, cancellationToken))
@@ -3497,6 +3555,9 @@ internal static partial class ApiEndpoints
             AuditTrail auditTrail, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             var assessment = await db.ComprehensiveAssessments.SingleOrDefaultAsync(x => x.Id == assessmentId, cancellationToken);
             if (assessment is null || authorUserId != actor.UserId ||
                 !await TenantAccess.CanAuthorAssessmentAsync(db, actor, assessment, cancellationToken))
@@ -3525,6 +3586,9 @@ internal static partial class ApiEndpoints
             int personId, int preferredAuthorUserId, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            if (!await IsPersonCenteredPlanAuthoringEnabledAsync(
+                    db, actor.AgencyId, cancellationToken))
+                return Results.NotFound();
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
                 x => x.Id == personId, cancellationToken);
             if (person is null || person.UserId != preferredAuthorUserId ||
@@ -4064,6 +4128,419 @@ internal static partial class ApiEndpoints
 
     private static void MapCheckRequests(RouteGroupBuilder api)
     {
+        api.MapGet("/people/{personId:int}/check-request-template", async Task<IResult> (
+            int personId, ClaimsPrincipal principal, ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
+                return Results.NotFound();
+            var template = await db.CheckRequestTemplates.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.PersonId == personId, cancellationToken);
+            return Results.Ok(template is null ? null : ToCheckRequestTemplateDto(template));
+        });
+
+        api.MapPut("/people/{personId:int}/check-request-template", async Task<IResult> (
+            int personId, SaveCheckRequestTemplateRequest input, ClaimsPrincipal principal,
+            ApiDbContext db, AuditTrail audit, ApiClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
+                return Results.NotFound();
+            var person = await db.People.AsNoTracking().SingleAsync(
+                item => item.Id == personId, cancellationToken);
+            if (!person.CaseManagerIsRepPayee)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["personId"] = ["Representative Payee must be enabled for this consumer before saving a weekly default."]
+                });
+            var errors = CheckRequestTemplateRules.Validate(
+                input.GenerateOn, input.NeededByDaysAfterRequest, input.PayableTo,
+                input.MailingAddress, input.Amount, input.Reason);
+            if (errors.Count > 0)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["template"] = [.. errors] });
+
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var template = await db.CheckRequestTemplates.SingleOrDefaultAsync(
+                item => item.PersonId == personId, cancellationToken);
+            var now = clock.UtcNow.UtcDateTime;
+            if (template is null)
+            {
+                if (input.ExpectedRevision != 0) return StaleCheckRequestTemplateConflict();
+                template = new ServerCheckRequestTemplate
+                {
+                    PersonId = personId,
+                    Revision = 1,
+                    EffectiveFrom = clock.Today,
+                    CreatedAtUtc = now
+                };
+                db.CheckRequestTemplates.Add(template);
+            }
+            else
+            {
+                if (template.Revision != input.ExpectedRevision) return StaleCheckRequestTemplateConflict();
+                template.Revision++;
+            }
+
+            template.IsEnabled = input.IsEnabled;
+            template.GenerateOn = input.GenerateOn;
+            template.NeededByDaysAfterRequest = input.NeededByDaysAfterRequest;
+            template.PayableTo = input.PayableTo!.Trim();
+            template.MailingAddress = input.MailingAddress!.Trim();
+            template.Amount = input.Amount;
+            template.Reason = input.Reason!.Trim();
+            template.UpdatedAtUtc = now;
+            audit.Record(actor, AuditActions.CheckRequestTemplateUpdated, "Person", personId);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return StaleCheckRequestTemplateConflict();
+            }
+            catch (DbUpdateException)
+            {
+                return StaleCheckRequestTemplateConflict();
+            }
+            return Results.Ok(ToCheckRequestTemplateDto(template));
+        });
+
+        api.MapGet("/check-requests/generated-drafts/pending", async Task<IResult> (
+            ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasCaseManagerPermissions) return Results.Forbid();
+            return Results.Ok(await LoadPendingGeneratedCheckRequestDraftsAsync(
+                db, actor, cancellationToken));
+        });
+
+        api.MapPost("/check-requests/weekly-drafts/ensure", async Task<IResult> (
+            ClaimsPrincipal principal, ApiDbContext db, AuditTrail audit, ApiClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasCaseManagerPermissions) return Results.Forbid();
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var templates = await (from template in db.CheckRequestTemplates
+                join person in db.People on template.PersonId equals person.Id
+                where template.IsEnabled && person.UserId == actor.UserId &&
+                      person.AgencyId == actor.AgencyId && person.CaseManagerIsRepPayee
+                select new { Template = template, Person = person }).ToListAsync(cancellationToken);
+            var templateIds = templates.Select(item => item.Template.Id).ToList();
+            var pendingTemplateIds = templateIds.Count == 0
+                ? new List<int>()
+                : await db.CheckRequests.AsNoTracking()
+                    .Where(request => request.TemplateId != null &&
+                        templateIds.Contains(request.TemplateId.Value) &&
+                        !db.CheckRequestWorkflowEvents.Any(workflow =>
+                            workflow.CheckRequestId == request.Id &&
+                            workflow.Action == CheckRequestWorkflowAction.Submitted))
+                    .Select(request => request.TemplateId!.Value)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+            var pendingSet = pendingTemplateIds.ToHashSet();
+            var owner = await db.Users.AsNoTracking().SingleAsync(
+                user => user.Id == actor.UserId && user.AgencyId == actor.AgencyId,
+                cancellationToken);
+            var agencyName = await db.Agencies.AsNoTracking()
+                .Where(agency => agency.Id == actor.AgencyId).Select(agency => agency.Name)
+                .SingleAsync(cancellationToken);
+            var supervisorName = owner.SupervisorId is int supervisorId
+                ? await db.Users.AsNoTracking().Where(user => user.Id == supervisorId)
+                    .Select(user => user.DisplayName).SingleOrDefaultAsync(cancellationToken) ?? string.Empty
+                : string.Empty;
+            var now = clock.UtcNow.UtcDateTime;
+            var created = 0;
+
+            foreach (var item in templates)
+            {
+                if (pendingSet.Contains(item.Template.Id)) continue;
+                var scheduledFor = WeeklyCheckRequestSchedule.MostRecentOccurrence(
+                    item.Template.GenerateOn, item.Template.EffectiveFrom, clock.Today);
+                if (scheduledFor is null) continue;
+                if (await db.CheckRequests.AsNoTracking().AnyAsync(request =>
+                        request.TemplateId == item.Template.Id &&
+                        request.ScheduledForDate == scheduledFor.Value, cancellationToken))
+                    continue;
+
+                db.CheckRequests.Add(new ServerCheckRequest
+                {
+                    PersonId = item.Person.Id,
+                    ConsumerName = $"{item.Person.FirstName} {item.Person.LastName}".Trim(),
+                    AgencyName = agencyName,
+                    CaseManagerName = owner.DisplayName,
+                    SupervisorName = supervisorName,
+                    RequestDate = scheduledFor.Value,
+                    PayableTo = item.Template.PayableTo,
+                    MailingAddress = item.Template.MailingAddress,
+                    Amount = item.Template.Amount,
+                    NeededByDate = scheduledFor.Value.AddDays(item.Template.NeededByDaysAfterRequest),
+                    Reason = item.Template.Reason,
+                    TemplateId = item.Template.Id,
+                    ScheduledForDate = scheduledFor.Value,
+                    CreatedAtUtc = now
+                });
+                audit.Record(actor, AuditActions.CheckRequestDraftGenerated, "Person", item.Person.Id,
+                    JsonSerializer.Serialize(new
+                    {
+                        templateId = item.Template.Id,
+                        scheduledForDate = scheduledFor.Value
+                    }));
+                created++;
+            }
+
+            try
+            {
+                if (created > 0) await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                return Results.Conflict(new ApiErrorDto(
+                    "weekly_check_request_generation_conflict",
+                    "Weekly drafts changed while Sati was generating them. Reload and try again.",
+                    string.Empty));
+            }
+            var pending = await LoadPendingGeneratedCheckRequestDraftsAsync(
+                db, actor, cancellationToken);
+            return Results.Ok(new WeeklyCheckRequestDraftResultDto(created, pending));
+        });
+
+        api.MapGet("/check-requests/time-off-collisions", async Task<IResult> (
+            DateTime date, ClaimsPrincipal principal, ApiDbContext db, ApiClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasCaseManagerPermissions) return Results.Forbid();
+            return Results.Ok(await LoadTimeOffCheckRequestCollisionsAsync(
+                db, actor, date.Date, clock.Today, cancellationToken));
+        });
+
+        api.MapPost("/check-requests/time-off-drafts/ensure", async Task<IResult> (
+            EnsureTimeOffCheckRequestDraftsRequest input, ClaimsPrincipal principal,
+            ApiDbContext db, AuditTrail audit, ApiClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasCaseManagerPermissions) return Results.Forbid();
+            var date = input.TimeOffDate.Date;
+            if (date < clock.Today)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["timeOffDate"] = ["Choose today or a future scheduled day off."]
+                });
+            if (!await db.ExemptDates.AsNoTracking().AnyAsync(item =>
+                    item.UserId == actor.UserId && item.Date == date, cancellationToken))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["timeOffDate"] = ["That date is not currently marked as time off on your calendar."]
+                });
+
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var templates = await (from template in db.CheckRequestTemplates
+                join person in db.People on template.PersonId equals person.Id
+                where template.IsEnabled && template.GenerateOn == date.DayOfWeek &&
+                      template.EffectiveFrom <= date && person.UserId == actor.UserId &&
+                      person.AgencyId == actor.AgencyId && person.CaseManagerIsRepPayee
+                select new { Template = template, Person = person }).ToListAsync(cancellationToken);
+            var templateIds = templates.Select(item => item.Template.Id).ToList();
+            var pendingTemplateIds = templateIds.Count == 0
+                ? new List<int>()
+                : await db.CheckRequests.AsNoTracking()
+                    .Where(request => request.TemplateId != null &&
+                        templateIds.Contains(request.TemplateId.Value) &&
+                        !db.CheckRequestWorkflowEvents.Any(workflow =>
+                            workflow.CheckRequestId == request.Id &&
+                            workflow.Action == CheckRequestWorkflowAction.Submitted))
+                    .Select(request => request.TemplateId!.Value).Distinct()
+                    .ToListAsync(cancellationToken);
+            var pendingSet = pendingTemplateIds.ToHashSet();
+            var owner = await db.Users.AsNoTracking().SingleAsync(
+                user => user.Id == actor.UserId && user.AgencyId == actor.AgencyId,
+                cancellationToken);
+            var agencyName = await db.Agencies.AsNoTracking()
+                .Where(agency => agency.Id == actor.AgencyId).Select(agency => agency.Name)
+                .SingleAsync(cancellationToken);
+            var supervisorName = owner.SupervisorId is int supervisorId
+                ? await db.Users.AsNoTracking().Where(user => user.Id == supervisorId)
+                    .Select(user => user.DisplayName).SingleOrDefaultAsync(cancellationToken) ?? string.Empty
+                : string.Empty;
+            var now = clock.UtcNow.UtcDateTime;
+            var created = 0;
+
+            foreach (var item in templates)
+            {
+                if (pendingSet.Contains(item.Template.Id)) continue;
+                if (await db.CheckRequests.AsNoTracking().AnyAsync(request =>
+                        request.TemplateId == item.Template.Id &&
+                        request.ScheduledForDate == date, cancellationToken))
+                    continue;
+
+                db.CheckRequests.Add(new ServerCheckRequest
+                {
+                    PersonId = item.Person.Id,
+                    ConsumerName = $"{item.Person.FirstName} {item.Person.LastName}".Trim(),
+                    AgencyName = agencyName,
+                    CaseManagerName = owner.DisplayName,
+                    SupervisorName = supervisorName,
+                    RequestDate = clock.Today,
+                    PayableTo = item.Template.PayableTo,
+                    MailingAddress = item.Template.MailingAddress,
+                    Amount = item.Template.Amount,
+                    NeededByDate = date.AddDays(item.Template.NeededByDaysAfterRequest),
+                    Reason = item.Template.Reason,
+                    TemplateId = item.Template.Id,
+                    ScheduledForDate = date,
+                    CreatedAtUtc = now
+                });
+                audit.Record(actor, AuditActions.CheckRequestDraftGenerated,
+                    "Person", item.Person.Id, JsonSerializer.Serialize(new
+                    {
+                        templateId = item.Template.Id,
+                        scheduledForDate = date,
+                        trigger = "time-off"
+                    }));
+                created++;
+            }
+
+            try
+            {
+                if (created > 0) await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                return Results.Conflict(new ApiErrorDto(
+                    "time_off_check_request_generation_conflict",
+                    "Check-request drafts changed while Sati was preparing for time off. Reload and try again.",
+                    string.Empty));
+            }
+
+            var pending = await LoadPendingGeneratedCheckRequestDraftsAsync(
+                db, actor, cancellationToken);
+            return Results.Ok(new WeeklyCheckRequestDraftResultDto(
+                created, pending.Where(item => templateIds.Contains(item.TemplateId)).ToList()));
+        });
+
+        api.MapGet("/check-requests/supervisor-queue", async Task<IResult> (
+            ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasSupervisorPermissions) return Results.Forbid();
+            var agencyWide = actor.HasAgencyWideSupervisionPermissions;
+            var requests = await (from request in db.CheckRequests.AsNoTracking()
+                join person in db.People.AsNoTracking() on request.PersonId equals person.Id
+                join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
+                where person.AgencyId == actor.AgencyId &&
+                      (agencyWide || owner.SupervisorId == actor.UserId)
+                select request).ToListAsync(cancellationToken);
+            return Results.Ok(await BuildCheckRequestQueueAsync(db, requests,
+                status => status == CheckRequestWorkflowStatus.Submitted, cancellationToken));
+        });
+
+        api.MapGet("/representative-payee/check-requests", async Task<IResult> (
+            ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasRepresentativePayeePermissions) return Results.Forbid();
+            var requests = await (from request in db.CheckRequests.AsNoTracking()
+                join person in db.People.AsNoTracking() on request.PersonId equals person.Id
+                where person.AgencyId == actor.AgencyId && person.CaseManagerIsRepPayee
+                select request).ToListAsync(cancellationToken);
+            return Results.Ok(await BuildCheckRequestQueueAsync(db, requests,
+                status => status is CheckRequestWorkflowStatus.Approved or
+                    CheckRequestWorkflowStatus.Released or CheckRequestWorkflowStatus.ReceiptAcknowledged,
+                cancellationToken));
+        });
+
+        api.MapGet("/representative-payee/consumers", async Task<IResult> (
+            ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasRepresentativePayeePermissions) return Results.Forbid();
+            var consumers = await db.People.AsNoTracking()
+                .Where(person => person.AgencyId == actor.AgencyId && person.CaseManagerIsRepPayee)
+                .OrderBy(person => person.LastName).ThenBy(person => person.FirstName)
+                .Select(person => new RepresentativePayeeConsumerDto(
+                    person.Id, (person.FirstName + " " + person.LastName).Trim(), person.RepPayeeMonthlyIncome))
+                .ToListAsync(cancellationToken);
+            return Results.Ok(consumers);
+        });
+
+        api.MapGet("/representative-payee/consumers/{personId:int}/ledger", async Task<IResult> (
+            int personId, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasRepresentativePayeePermissions) return Results.Forbid();
+            var consumer = await db.People.AsNoTracking()
+                .Where(person => person.Id == personId && person.AgencyId == actor.AgencyId &&
+                                 person.CaseManagerIsRepPayee)
+                .Select(person => new RepresentativePayeeConsumerDto(
+                    person.Id, (person.FirstName + " " + person.LastName).Trim(), person.RepPayeeMonthlyIncome))
+                .SingleOrDefaultAsync(cancellationToken);
+            if (consumer is null) return Results.NotFound();
+            var entries = await db.RepresentativePayeeLedgerEntries.AsNoTracking()
+                .Where(entry => entry.PersonId == personId)
+                .OrderByDescending(entry => entry.EntryDate).ThenByDescending(entry => entry.Id)
+                .Select(entry => new RepresentativePayeeLedgerEntryDto(
+                    entry.Id, entry.PersonId, entry.CheckRequestId, entry.EntryDate, entry.Kind,
+                    entry.Amount, entry.Description, entry.RecordedAtUtc, entry.RecordedByUserId,
+                    entry.RecordedByName))
+                .ToListAsync(cancellationToken);
+            return Results.Ok(new RepresentativePayeeWorkspaceDto(
+                consumer, entries, entries.Sum(entry => entry.Amount)));
+        });
+
+        api.MapPost("/representative-payee/ledger-entries", async Task<IResult> (
+            AddRepresentativePayeeLedgerEntryRequest input, ClaimsPrincipal principal,
+            ApiDbContext db, AuditTrail audit, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasRepresentativePayeePermissions) return Results.Forbid();
+            var errors = RepresentativePayeeLedgerRules.ValidateManualEntry(
+                input.EntryDate, input.Amount, input.Description);
+            if (errors.Count > 0)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["entry"] = [.. errors] });
+            if (!await db.People.AsNoTracking().AnyAsync(person =>
+                    person.Id == input.PersonId && person.AgencyId == actor.AgencyId &&
+                    person.CaseManagerIsRepPayee, cancellationToken))
+                return Results.NotFound();
+            var entry = new ServerRepresentativePayeeLedgerEntry
+            {
+                PersonId = input.PersonId,
+                EntryDate = input.EntryDate!.Value.Date,
+                Kind = input.Amount > 0 ? RepresentativePayeeLedgerEntryKind.Deposit :
+                    RepresentativePayeeLedgerEntryKind.Expense,
+                Amount = input.Amount,
+                Description = input.Description!.Trim(),
+                RecordedAtUtc = DateTime.UtcNow,
+                RecordedByUserId = actor.UserId,
+                RecordedByName = actor.DisplayName
+            };
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, cancellationToken);
+            db.RepresentativePayeeLedgerEntries.Add(entry);
+            await db.SaveChangesAsync(cancellationToken);
+            audit.Record(actor, AuditActions.RepresentativePayeeLedgerEntryAdded,
+                "Person", input.PersonId,
+                JsonSerializer.Serialize(new { ledgerEntryId = entry.Id, entry.Kind }));
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(ToLedgerDto(entry));
+        });
+
+        api.MapPost("/check-requests/{id:int}/workflow", async Task<IResult> (
+            int id, ApplyCheckRequestWorkflowActionRequest input, ClaimsPrincipal principal,
+            ApiDbContext db, AuditTrail audit, CancellationToken cancellationToken) =>
+            await ApplyCheckRequestWorkflowActionAsync(
+                id, input, principal, db, audit, cancellationToken));
+
         api.MapGet("/people/{personId:int}/check-requests", async Task<IResult> (
             int personId, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
         {
@@ -4072,13 +4549,22 @@ internal static partial class ApiEndpoints
             if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
-            var rows = await db.CheckRequests.AsNoTracking()
+            var requests = await db.CheckRequests.AsNoTracking()
                 .Where(x => x.PersonId == personId)
                 .OrderByDescending(x => x.RequestDate)
                 .ThenByDescending(x => x.Id)
-                .Select(x => new CheckRequestListItemDto(
-                    x.Id, x.Revision, x.RequestDate, x.PayableTo, x.Amount, x.NeededByDate, x.PublishedAtUtc))
                 .ToListAsync(cancellationToken);
+            var requestIds = requests.Select(x => x.Id).ToList();
+            var actions = await db.CheckRequestWorkflowEvents.AsNoTracking()
+                .Where(x => requestIds.Contains(x.CheckRequestId))
+                .Select(x => new { x.CheckRequestId, x.Action })
+                .ToListAsync(cancellationToken);
+            var rows = requests.Select(x => new CheckRequestListItemDto(
+                x.Id, x.Revision, x.RequestDate, x.PayableTo, x.Amount, x.NeededByDate,
+                x.PublishedAtUtc, CheckRequestWorkflowRules.Resolve(x.PublishedAtUtc is not null,
+                    actions.Where(e => e.CheckRequestId == x.Id).Select(e => e.Action)),
+                x.TemplateId, x.ScheduledForDate))
+                .ToList();
             return Results.Ok(rows);
         });
 
@@ -4091,7 +4577,10 @@ internal static partial class ApiEndpoints
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.PersonId, cancellationToken);
             if (person is null || !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
-            return Results.Ok(ContractMapper.ToCheckRequest(request));
+            var actions = await db.CheckRequestWorkflowEvents.AsNoTracking()
+                .Where(x => x.CheckRequestId == id).Select(x => x.Action).ToListAsync(cancellationToken);
+            return Results.Ok(ContractMapper.ToCheckRequest(request,
+                CheckRequestWorkflowRules.Resolve(request.PublishedAtUtc is not null, actions)));
         });
 
         api.MapPost("/check-requests", async Task<IResult> (
@@ -4102,6 +4591,11 @@ internal static partial class ApiEndpoints
                 return Results.NotFound();
 
             var person = await db.People.AsNoTracking().SingleAsync(x => x.Id == input.PersonId, cancellationToken);
+            if (!person.CaseManagerIsRepPayee)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["personId"] = ["Representative Payee must be enabled for this consumer before creating a check request."]
+                });
             var owner = await db.Users.AsNoTracking().SingleAsync(x => x.Id == person.UserId, cancellationToken);
             var supervisorName = owner.SupervisorId is int supervisorId
                 ? await db.Users.AsNoTracking().Where(x => x.Id == supervisorId).Select(x => x.DisplayName)
@@ -4225,8 +4719,14 @@ internal static partial class ApiEndpoints
             var validation = ValidateNote(request);
             if (validation is not null)
                 return Results.ValidationProblem(validation);
+            await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(db,
+                actor.AgencyId, actor.UserId, cancellationToken);
             if (!await TenantAccess.OwnsPersonAsync(db, actor, request.PersonId, cancellationToken))
                 return Results.NotFound();
+
+            var submissionProblem = await FindNoteSubmissionProblemAsync(db, actor, request, clock.Today, cancellationToken);
+            if (submissionProblem is not null)
+                return submissionProblem;
 
             var timeConflict = await FindServiceTimeProblemAsync(db, actor, request, null, cancellationToken);
             if (timeConflict is not null)
@@ -4235,6 +4735,7 @@ internal static partial class ApiEndpoints
             ContractMapper.TryParseNoteStatus(request.Status, out var status);
             ContractMapper.TryParseFormType(request.FormType, out var formType);
             ContractMapper.TryParseNoteType(request.NoteType, out var noteType);
+            ContractMapper.TryParseGoalProgress(request.GoalProgress, out var goalProgress);
             var note = new ServerNote
             {
                 Narrative = request.Narrative,
@@ -4245,12 +4746,14 @@ internal static partial class ApiEndpoints
                 PersonId = request.PersonId,
                 FormType = formType,
                 NoteType = noteType,
+                GoalProgress = goalProgress,
                 AgencyId = actor.AgencyId,
                 CaseManagerJustification = request.CaseManagerJustification,
                 VisitDocumentationJson = request.VisitDocumentationJson
             };
             db.Notes.Add(note);
             await db.SaveChangesAsync(cancellationToken);
+            await scheduleWrite.CommitAsync(cancellationToken);
             return Results.Ok(ContractMapper.ToNote(note));
         });
 
@@ -4268,6 +4771,8 @@ internal static partial class ApiEndpoints
             var validation = ValidateNote(request);
             if (validation is not null)
                 return Results.ValidationProblem(validation);
+            await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(db,
+                actor.AgencyId, actor.UserId, cancellationToken);
             var row = await (from note in db.Notes
                              join person in TenantAccess.OwnedPeople(db, actor) on note.PersonId equals person.Id
                              where person.UserId == actor.UserId &&
@@ -4305,6 +4810,10 @@ internal static partial class ApiEndpoints
                     return Results.NotFound();
             }
 
+            var submissionProblem = await FindNoteSubmissionProblemAsync(db, actor, request, clock.Today, cancellationToken);
+            if (submissionProblem is not null)
+                return submissionProblem;
+
             var timeConflict = await FindServiceTimeProblemAsync(db, actor, request, id, cancellationToken);
             if (timeConflict is not null)
                 return timeConflict;
@@ -4312,6 +4821,7 @@ internal static partial class ApiEndpoints
             ContractMapper.TryParseNoteStatus(request.Status, out var status);
             ContractMapper.TryParseFormType(request.FormType, out var formType);
             ContractMapper.TryParseNoteType(request.NoteType, out var noteType);
+            ContractMapper.TryParseGoalProgress(request.GoalProgress, out var goalProgress);
             row.Note.Narrative = request.Narrative;
             row.Note.EventDate = request.EventDate;
             row.Note.Status = status;
@@ -4320,6 +4830,7 @@ internal static partial class ApiEndpoints
             row.Note.PersonId = request.PersonId;
             row.Note.FormType = formType;
             row.Note.NoteType = noteType;
+            row.Note.GoalProgress = goalProgress;
             row.Note.CaseManagerJustification = request.CaseManagerJustification;
             row.Note.VisitDocumentationJson = request.VisitDocumentationJson;
             row.Note.Revision++;
@@ -4339,6 +4850,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await scheduleWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -5719,7 +6231,12 @@ internal static partial class ApiEndpoints
             var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(
                 db, actor.AgencyId, rows.Select(row => row.Note.Id), cancellationToken);
             var candidates = rows.Select(row => new BillingCandidateDto(
-                ContractMapper.ToNote(row.Note, row.Person),
+                row.Note.Id,
+                row.Note.EventDate,
+                row.Note.Minutes,
+                row.Person.Id,
+                row.Person.UserId,
+                row.Note.ComplianceOverride,
                 ValidateBillingCandidate(row.Note, row.Person, agency,
                     formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
                     releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
@@ -5773,7 +6290,18 @@ internal static partial class ApiEndpoints
             if (errors.Count > 0)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = errors.ToArray() });
 
+            // Older database rows can predate the service-time reservation guard.
+            // Approval normally rechecks this rule, but claim creation is the final
+            // financial boundary and must not turn a legacy overlap into billing.
+            var serviceTimeConflict = await FindReviewServiceTimeProblemAsync(
+                db, row, actor.AgencyId, cancellationToken);
+            if (serviceTimeConflict is not null)
+                return serviceTimeConflict;
+
             var serviceDate = row.Note.EventDate!.Value.Date;
+            await using var periodWrite = await BillingPeriodWriteScope.BeginAsync(
+                db, actor.AgencyId, row.Person.UserId, serviceDate.Year, serviceDate.Month,
+                cancellationToken);
             var period = await db.BillingPeriods
                 .Include(candidate => candidate.Lines)
                 .SingleOrDefaultAsync(candidate =>
@@ -5834,6 +6362,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await periodWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateException exception) when (IsDuplicateClaimLine(exception))
             {
@@ -5870,8 +6399,16 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             if (!actor.HasBillingPermissions)
                 return Results.Forbid();
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+            var periodKey = await (from candidate in db.BillingPeriods.AsNoTracking()
+                                   join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
+                                   where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
+                                   select new { candidate.UserId, candidate.Year, candidate.Month })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (periodKey is null)
+                return Results.NotFound();
+            await using var periodWrite = await BillingPeriodWriteScope.BeginAsync(
+                db, actor.AgencyId, periodKey.UserId, periodKey.Year, periodKey.Month,
+                cancellationToken);
             var selected = await (from candidate in db.BillingPeriods.Include(value => value.Lines)
                                   join owner in db.Users on candidate.UserId equals owner.Id
                                   where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
@@ -5908,10 +6445,12 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
+                await periodWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
+                await periodWrite.RollbackAsync(cancellationToken);
+                await periodWrite.DisposeAsync();
                 db.ChangeTracker.Clear();
                 var completed = await (from candidate in db.BillingPeriods.AsNoTracking().Include(value => value.Lines)
                                        join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
@@ -5935,8 +6474,16 @@ internal static partial class ApiEndpoints
             var actor = Actor.From(principal);
             if (!actor.HasBillingPermissions)
                 return Results.Forbid();
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+            var periodKey = await (from candidate in db.BillingPeriods.AsNoTracking()
+                                   join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
+                                   where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
+                                   select new { candidate.UserId, candidate.Year, candidate.Month })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (periodKey is null)
+                return Results.NotFound();
+            await using var transaction = await BillingPeriodWriteScope.BeginAsync(
+                db, actor.AgencyId, periodKey.UserId, periodKey.Year, periodKey.Month,
+                cancellationToken);
             var selected = await (from candidate in db.BillingPeriods
                                   join owner in db.Users on candidate.UserId equals owner.Id
                                   where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
@@ -6000,47 +6547,29 @@ internal static partial class ApiEndpoints
                 });
             }
             var normalizedKey = parsedKey.ToString("N");
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+            var periodKey = await (from candidate in db.BillingPeriods.AsNoTracking()
+                                   join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
+                                   where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
+                                   select new { candidate.UserId, candidate.Year, candidate.Month })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (periodKey is null)
+                return Results.NotFound();
+            await using var transaction = await BillingPeriodWriteScope.BeginAsync(
+                db, actor.AgencyId, periodKey.UserId, periodKey.Year, periodKey.Month,
+                cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                return Results.Unauthorized();
             var previous = await db.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(generation =>
                 generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                 generation.IdempotencyKey == normalizedKey, cancellationToken);
-            if (previous is not null)
+            if (previous is not null && (previous.BillingPeriodId != periodId || previous.IsTest != request.IsTest))
                 return ReplayEdiOrConflict(previous, periodId, request.IsTest);
 
-            var period = await (from candidate in db.BillingPeriods.AsNoTracking().Include(value => value.Lines)
-                                join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
-                                where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
-                                select candidate).SingleOrDefaultAsync(cancellationToken);
-            if (period is null)
-                return Results.NotFound();
-            if (period.Lines.Count == 0)
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["period"] = ["The billing period has no claim lines."] });
-            if (period.Status != 1)
-                return Results.Conflict(new ApiErrorDto(
-                    "billing_period_not_submitted",
-                    "Submit and lock the billing period before generating its 837P file.",
-                    string.Empty));
-            if (EdiReadinessConflict(period) is { } readinessConflict)
-                return readinessConflict;
-
-            var noteIds = period.Lines.Select(line => line.NoteId).Distinct().ToList();
-            var sourceRows = await (from note in db.Notes.AsNoTracking()
-                                    join person in db.People.AsNoTracking() on note.PersonId equals person.Id
-                                    join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
-                                    where noteIds.Contains(note.Id) &&
-                                          owner.AgencyId == actor.AgencyId &&
-                                          note.AgencyId == actor.AgencyId &&
-                                          person.AgencyId == actor.AgencyId
-                                    select new { Note = note, Person = person })
-                .ToListAsync(cancellationToken);
-            if (sourceRows.Select(row => row.Note.Id).Distinct().Count() != noteIds.Count)
-            {
-                return Results.Conflict(new ApiErrorDto(
-                    "invalid_billing_source",
-                    "The billing period contains a note outside the agency boundary or a missing source record.",
-                    string.Empty));
-            }
+            var export = await LoadExportablePeriodAsync(db, actor, periodId, cancellationToken);
+            if (export.Failure is not null) return export.Failure;
+            var period = export.Period!;
+            if (previous is not null)
+                return ReplayEdiOrConflict(previous, periodId, request.IsTest);
 
             var generatedAt = DateTime.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
@@ -6088,7 +6617,15 @@ internal static partial class ApiEndpoints
             catch (DbUpdateException exception) when (IsDuplicateEdiGeneration(exception))
             {
                 await transaction.RollbackAsync(cancellationToken);
+                await transaction.DisposeAsync();
                 db.ChangeTracker.Clear();
+                // Rollback ended the first authorization/source read boundary.
+                // A competing completed file is not an exemption from the gate.
+                await using var replayTransaction = await BillingPeriodWriteScope.BeginAsync(
+                    db, actor.AgencyId, periodKey.UserId, periodKey.Year, periodKey.Month,
+                    cancellationToken);
+                var replay = await LoadExportablePeriodAsync(db, actor, periodId, cancellationToken);
+                if (replay.Failure is not null) return replay.Failure;
                 var completed = await db.EdiGenerations.AsNoTracking().SingleAsync(generation =>
                     generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                     generation.IdempotencyKey == normalizedKey, cancellationToken);
@@ -6402,7 +6939,8 @@ internal static partial class ApiEndpoints
         {
             if (!Enum.TryParse<AnnualDocumentKind>(kind, true, out var documentKind) ||
                 !Enum.IsDefined(documentKind) ||
-                AnnualDocumentCatalog.ForKind(documentKind).SatisfiesFormType is null)
+                (AnnualDocumentCatalog.ForKind(documentKind).SatisfiesFormType is null &&
+                 documentKind != AnnualDocumentKind.DhhsAuthorizedRepresentative))
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["kind"] = ["Unknown prerequisite document kind."] });
             var noteError = AnnualDocumentRules.ValidateExternalNote(request.Note);
             if (noteError is not null)
@@ -6413,6 +6951,9 @@ internal static partial class ApiEndpoints
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
             if (person is null ||
                 !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
+                return Results.NotFound();
+            if (documentKind == AnnualDocumentKind.DhhsAuthorizedRepresentative &&
+                !await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
             if (person.EffectiveDate is not DateTime effectiveDate ||
                 AnnualDocumentCycle.CurrentStart(effectiveDate, request.CycleStart) != request.CycleStart.Date)
@@ -6428,7 +6969,19 @@ internal static partial class ApiEndpoints
             if (releaseLink.Error is not null)
                 return releaseLink.Error;
 
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable, cancellationToken);
+            if (documentKind == AnnualDocumentKind.DhhsAuthorizedRepresentative &&
+                await db.DocumentArtifacts.AnyAsync(artifact => artifact.PersonId == personId &&
+                    artifact.Kind == nameof(AnnualDocumentKind.DhhsAuthorizedRepresentative) &&
+                    artifact.Origin == nameof(DocumentArtifactOrigin.RecordedAsExternal) &&
+                    artifact.SupersededByArtifactId == null, cancellationToken))
+            {
+                return Results.Conflict(new ApiErrorDto(
+                    "authorized_representative_already_on_file",
+                    "A signed DHHS Authorized Representative form is already recorded on file.",
+                    string.Empty));
+            }
             var artifact = await DocumentArtifactPersistence.StageExternalAsync(
                 db, personId, actor.AgencyId, documentKind, request.CycleStart,
                 clock.UtcNow.UtcDateTime, actor.UserId, request.Note, cancellationToken,
@@ -6587,6 +7140,47 @@ internal static partial class ApiEndpoints
 
     private static void MapForms(RouteGroupBuilder api)
     {
+        api.MapGet("/people/{personId:int}/forms/{type}/attestations", async Task<IResult> (
+            int personId,
+            string type,
+            int formId,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
+                candidate.Id == personId && candidate.AgencyId == actor.AgencyId, cancellationToken);
+            if (person is null ||
+                !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
+                return Results.NotFound();
+            var formExists = await db.Forms.AsNoTracking().AnyAsync(candidate =>
+                candidate.Id == formId && candidate.PersonId == personId && candidate.Type == type,
+                cancellationToken);
+            if (!formExists)
+                return Results.NotFound();
+
+            var history = await (
+                from entry in db.FormAttestations.AsNoTracking()
+                join user in db.Users.AsNoTracking()
+                    on entry.ActorUserId equals (int?)user.Id into actorUsers
+                from user in actorUsers.DefaultIfEmpty()
+                where entry.FormId == formId
+                orderby entry.RecordedAtUtc descending, entry.Id descending
+                select new FormAttestationHistoryDto(
+                    entry.Id,
+                    entry.FormId,
+                    entry.Kind,
+                    entry.CompletedOn,
+                    entry.ActorKind,
+                    entry.ActorUserId,
+                    user == null ? "Sati" : user.DisplayName,
+                    entry.RecordedAtUtc,
+                    entry.EvidenceNoteId,
+                    entry.Reason)).ToListAsync(cancellationToken);
+            return Results.Ok(history);
+        });
+
         api.MapGet("/people/{personId:int}/forms/{type}/prerequisite", async Task<IResult> (
             int personId,
             string type,
@@ -7196,6 +7790,253 @@ internal static partial class ApiEndpoints
             releases.Select(item => item.ToComplianceFact()).ToArray());
     }
 
+    private static async Task<IResult> ApplyCheckRequestWorkflowActionAsync(
+        int id,
+        ApplyCheckRequestWorkflowActionRequest input,
+        ClaimsPrincipal principal,
+        ApiDbContext db,
+        AuditTrail audit,
+        CancellationToken cancellationToken)
+    {
+        var actor = Actor.From(principal);
+        var errors = CheckRequestWorkflowRules.ValidateNote(input.Action, input.Note);
+        if (errors.Count > 0)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["workflow"] = [.. errors] });
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, cancellationToken);
+        var request = await db.CheckRequests.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (request is null) return Results.NotFound();
+        var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
+            x => x.Id == request.PersonId, cancellationToken);
+        if (person is null || person.AgencyId != actor.AgencyId) return Results.NotFound();
+        var owner = await db.Users.AsNoTracking().SingleAsync(x => x.Id == person.UserId, cancellationToken);
+
+        if (input.Action == CheckRequestWorkflowAction.Submitted)
+        {
+            if (!person.CaseManagerIsRepPayee)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["personId"] = ["Representative Payee must be enabled for this consumer before submitting a check request."]
+                });
+            if (!await TenantAccess.OwnsPersonAsync(db, actor, person.Id, cancellationToken))
+                return Results.NotFound();
+        }
+        else if (input.Action is CheckRequestWorkflowAction.Approved or CheckRequestWorkflowAction.Returned)
+        {
+            if (!actor.HasSupervisorPermissions ||
+                (!actor.HasAgencyWideSupervisionPermissions && owner.SupervisorId != actor.UserId))
+                return Results.NotFound();
+        }
+        else if (!actor.HasRepresentativePayeePermissions || !person.CaseManagerIsRepPayee)
+        {
+            return Results.NotFound();
+        }
+
+        var existing = await db.CheckRequestWorkflowEvents
+            .Where(x => x.CheckRequestId == request.Id).OrderBy(x => x.Id).ToListAsync(cancellationToken);
+        var current = CheckRequestWorkflowRules.Resolve(request.PublishedAtUtc is not null,
+            existing.Select(x => x.Action));
+        if (!CheckRequestWorkflowRules.CanApply(current, input.Action))
+            return Results.Conflict(new ApiErrorDto("invalid_check_request_workflow_state",
+                $"This action cannot be applied while the check request is {CheckRequestWorkflowRules.Describe(current).ToLowerInvariant()}.",
+                string.Empty));
+        var now = DateTime.UtcNow;
+        var workflowEvent = new ServerCheckRequestWorkflowEvent
+        {
+            CheckRequestId = request.Id,
+            Checkpoint = CheckRequestWorkflowRules.Checkpoint(input.Action),
+            Action = input.Action,
+            OccurredAtUtc = now,
+            ActorUserId = actor.UserId,
+            ActorName = actor.DisplayName,
+            Note = Normalize(input.Note)
+        };
+        db.CheckRequestWorkflowEvents.Add(workflowEvent);
+        if (input.Action == CheckRequestWorkflowAction.Released)
+        {
+            db.RepresentativePayeeLedgerEntries.Add(new ServerRepresentativePayeeLedgerEntry
+            {
+                PersonId = person.Id,
+                CheckRequestId = request.Id,
+                EntryDate = now.Date,
+                Kind = RepresentativePayeeLedgerEntryKind.CheckRelease,
+                Amount = -request.Amount,
+                Description = $"Check #{request.Id} released to {request.PayableTo}",
+                RecordedAtUtc = now,
+                RecordedByUserId = actor.UserId,
+                RecordedByName = actor.DisplayName
+            });
+        }
+        audit.Record(actor, CheckRequestWorkflowAuditAction(input.Action), "CheckRequest", request.Id);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Results.Conflict(new ApiErrorDto("check_request_workflow_already_completed",
+                "This workflow step was already completed. Reload the queue.", string.Empty));
+        }
+        existing.Add(workflowEvent);
+        return Results.Ok(ToCheckRequestQueueDto(request, existing));
+    }
+
+    private static async Task<IReadOnlyList<CheckRequestWorkflowQueueItemDto>> BuildCheckRequestQueueAsync(
+        ApiDbContext db,
+        IReadOnlyList<ServerCheckRequest> requests,
+        Func<CheckRequestWorkflowStatus, bool> include,
+        CancellationToken cancellationToken)
+    {
+        var ids = requests.Select(x => x.Id).ToList();
+        var events = await db.CheckRequestWorkflowEvents.AsNoTracking()
+            .Where(x => ids.Contains(x.CheckRequestId)).OrderBy(x => x.Id).ToListAsync(cancellationToken);
+        return requests.Select(request => ToCheckRequestQueueDto(request,
+                events.Where(x => x.CheckRequestId == request.Id).ToList()))
+            .Where(item => include(item.Status))
+            .OrderBy(item => item.NeededByDate ?? DateTime.MaxValue)
+            .ThenBy(item => item.CheckRequestId)
+            .ToList();
+    }
+
+    private static CheckRequestTemplateDto ToCheckRequestTemplateDto(
+        ServerCheckRequestTemplate template) => new(
+        template.Id,
+        template.PersonId,
+        template.Revision,
+        template.IsEnabled,
+        template.GenerateOn,
+        template.NeededByDaysAfterRequest,
+        template.PayableTo,
+        template.MailingAddress,
+        template.Amount,
+        template.Reason,
+        template.EffectiveFrom,
+        template.CreatedAtUtc,
+        template.UpdatedAtUtc);
+
+    private static async Task<IReadOnlyList<GeneratedCheckRequestDraftDto>>
+        LoadPendingGeneratedCheckRequestDraftsAsync(
+            ApiDbContext db,
+            Actor actor,
+            CancellationToken cancellationToken)
+    {
+        var requests = await (from request in db.CheckRequests.AsNoTracking()
+            join person in db.People.AsNoTracking() on request.PersonId equals person.Id
+            where request.TemplateId != null && request.ScheduledForDate != null &&
+                  person.UserId == actor.UserId && person.AgencyId == actor.AgencyId &&
+                  !db.CheckRequestWorkflowEvents.Any(workflow =>
+                      workflow.CheckRequestId == request.Id &&
+                      workflow.Action == CheckRequestWorkflowAction.Submitted)
+            orderby request.ScheduledForDate, request.Id
+            select request).ToListAsync(cancellationToken);
+        var requestIds = requests.Select(request => request.Id).ToList();
+        var actions = await db.CheckRequestWorkflowEvents.AsNoTracking()
+            .Where(workflow => requestIds.Contains(workflow.CheckRequestId))
+            .Select(workflow => new { workflow.CheckRequestId, workflow.Action })
+            .ToListAsync(cancellationToken);
+
+        return requests.Select(request => new GeneratedCheckRequestDraftDto(
+                request.Id,
+                request.TemplateId!.Value,
+                request.PersonId,
+                request.ConsumerName,
+                request.ScheduledForDate!.Value,
+                request.NeededByDate,
+                request.PayableTo,
+                request.Amount,
+                CheckRequestWorkflowRules.Resolve(
+                    request.PublishedAtUtc is not null,
+                    actions.Where(action => action.CheckRequestId == request.Id)
+                        .Select(action => action.Action))))
+            .ToList();
+    }
+
+    private static async Task<IReadOnlyList<TimeOffCheckRequestCollisionDto>>
+        LoadTimeOffCheckRequestCollisionsAsync(
+            ApiDbContext db,
+            Actor actor,
+            DateTime timeOffDate,
+            DateTime today,
+            CancellationToken cancellationToken)
+    {
+        var date = timeOffDate.Date;
+        if (date < today.Date ||
+            !await db.ExemptDates.AsNoTracking().AnyAsync(item =>
+                item.UserId == actor.UserId && item.Date == date, cancellationToken))
+            return [];
+
+        var templates = await (from template in db.CheckRequestTemplates.AsNoTracking()
+            join person in db.People.AsNoTracking() on template.PersonId equals person.Id
+            where template.IsEnabled && template.GenerateOn == date.DayOfWeek &&
+                  template.EffectiveFrom <= date && person.UserId == actor.UserId &&
+                  person.AgencyId == actor.AgencyId && person.CaseManagerIsRepPayee
+            select new { Template = template, Person = person }).ToListAsync(cancellationToken);
+        var templateIds = templates.Select(item => item.Template.Id).ToList();
+        var requests = templateIds.Count == 0
+            ? new List<ServerCheckRequest>()
+            : await db.CheckRequests.AsNoTracking()
+                .Where(request => request.TemplateId != null &&
+                    templateIds.Contains(request.TemplateId.Value))
+                .OrderBy(request => request.ScheduledForDate).ThenBy(request => request.Id)
+                .ToListAsync(cancellationToken);
+        var requestIds = requests.Select(request => request.Id).ToList();
+        var submittedIds = await db.CheckRequestWorkflowEvents.AsNoTracking()
+            .Where(workflow => requestIds.Contains(workflow.CheckRequestId) &&
+                workflow.Action == CheckRequestWorkflowAction.Submitted)
+            .Select(workflow => workflow.CheckRequestId)
+            .ToListAsync(cancellationToken);
+        var submittedSet = submittedIds.ToHashSet();
+
+        return templates.Select(item =>
+            {
+                var exact = requests.FirstOrDefault(request =>
+                    request.TemplateId == item.Template.Id && request.ScheduledForDate == date);
+                if (exact is not null && submittedSet.Contains(exact.Id)) return null;
+                var pending = requests.FirstOrDefault(request =>
+                    request.TemplateId == item.Template.Id && !submittedSet.Contains(request.Id));
+                return new TimeOffCheckRequestCollisionDto(
+                    item.Template.Id,
+                    item.Person.Id,
+                    $"{item.Person.FirstName} {item.Person.LastName}".Trim(),
+                    date,
+                    item.Template.PayableTo,
+                    item.Template.Amount,
+                    pending?.Id);
+            })
+            .Where(item => item is not null)
+            .Cast<TimeOffCheckRequestCollisionDto>()
+            .ToList();
+    }
+
+    private static CheckRequestWorkflowQueueItemDto ToCheckRequestQueueDto(
+        ServerCheckRequest request,
+        IReadOnlyList<ServerCheckRequestWorkflowEvent> events)
+    {
+        var last = events.OrderBy(x => x.Id).LastOrDefault();
+        return new CheckRequestWorkflowQueueItemDto(
+            request.Id, request.PersonId, request.ConsumerName, request.CaseManagerName,
+            request.SupervisorName, request.PayableTo, request.Amount, request.NeededByDate,
+            request.Reason, CheckRequestWorkflowRules.Resolve(request.PublishedAtUtc is not null,
+                events.Select(x => x.Action)), last?.OccurredAtUtc, last?.ActorName, last?.Note);
+    }
+
+    private static RepresentativePayeeLedgerEntryDto ToLedgerDto(
+        ServerRepresentativePayeeLedgerEntry entry) => new(
+        entry.Id, entry.PersonId, entry.CheckRequestId, entry.EntryDate, entry.Kind,
+        entry.Amount, entry.Description, entry.RecordedAtUtc, entry.RecordedByUserId,
+        entry.RecordedByName);
+
+    private static string CheckRequestWorkflowAuditAction(CheckRequestWorkflowAction action) => action switch
+    {
+        CheckRequestWorkflowAction.Submitted => AuditActions.CheckRequestSubmitted,
+        CheckRequestWorkflowAction.Approved => AuditActions.CheckRequestApproved,
+        CheckRequestWorkflowAction.Returned => AuditActions.CheckRequestReturned,
+        CheckRequestWorkflowAction.Released => AuditActions.CheckRequestReleased,
+        CheckRequestWorkflowAction.ReceiptAcknowledged => AuditActions.CheckRequestReceiptAcknowledged,
+        _ => throw new ArgumentOutOfRangeException(nameof(action))
+    };
+
     private static Task<ServerPerson?> LoadAuditablePersonAsync(
         ApiDbContext db,
         Actor actor,
@@ -7505,6 +8346,49 @@ internal static partial class ApiEndpoints
                       select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
     }
 
+    private static async Task<IResult?> FindNoteSubmissionProblemAsync(
+        ApiDbContext db, Actor actor, SaveNoteRequest request, DateTime today,
+        CancellationToken cancellationToken)
+    {
+        ContractMapper.TryParseNoteStatus(request.Status, out var status);
+        if (status != NoteWorkflow.Logged) return null;
+
+        // Ownership has already been checked. Read the target consumer's current
+        // persisted evidence, never the client's displayed forms or FormType tag.
+        // The decision is the note's service date under the policy version in force
+        // on that date, evaluated by the same rule billing and approval use.
+        var person = await TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+            .SingleAsync(x => x.Id == request.PersonId, cancellationToken);
+        var forms = await db.Forms.AsNoTracking()
+            .Include(form => form.Attestations)
+            .Where(x => x.PersonId == person.Id)
+            .ToListAsync(cancellationToken);
+        var releaseRows = (await LoadReleaseBillingRowsByPersonAsync(
+                db, [person.Id], cancellationToken))
+            .GetValueOrDefault(person.Id) ?? [];
+        var providerLinks = (await LoadReleaseProviderLinksByPersonAsync(
+                db, actor.AgencyId, [person.Id], cancellationToken))
+            .GetValueOrDefault(person.Id) ?? [];
+        var policy = await LoadBillingCompliancePolicyContextAsync(
+            db, actor.AgencyId, cancellationToken);
+        var compliance = EvaluateNoteCompliance(
+            new ServerNote { PersonId = person.Id, EventDate = request.EventDate },
+            person, forms, releaseRows, policy, providerLinks);
+        if (compliance.Passed) return null;
+
+        var configurationInvalid = request.EventDate is DateTime serviceDate &&
+            !BillingComplianceGate.IsSupported(policy.Resolve(serviceDate));
+        var result = new NoteSubmissionResult(
+            false, compliance.Reasons, !configurationInvalid, configurationInvalid);
+
+        // Clinical review may still proceed with a written justification; billing
+        // stays blocked until a supervisor exception or an administrative recovery.
+        return NoteSubmissionGate.IsSubmissionAllowed(result, request.CaseManagerJustification)
+            ? null
+            : Results.Conflict(new ApiErrorDto(
+                NoteSubmissionGate.RefusalCode, result.Message, string.Empty));
+    }
+
     private static BillingComplianceResult EvaluateNoteCompliance(
         ServerNote note,
         ServerPerson person,
@@ -7570,6 +8454,27 @@ internal static partial class ApiEndpoints
         IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null)
     {
         var errors = ValidateNonComplianceBillingCandidate(note, person, agency).ToList();
+        errors.AddRange(EvaluateBillingComplianceRelease(
+            note, person, forms, releaseObligations, policy, recoveryDecisions, providerLinks));
+        return errors;
+    }
+
+    /// <summary>
+    /// The one compliance decision for releasing a note to billing: the service-date
+    /// policy, minus an exact-obligation Supervisor exception or an Admin recovery
+    /// whose frozen evidence still matches. Claim creation and 837P release share it
+    /// so a released note cannot be re-blocked by a second, weaker rule.
+    /// </summary>
+    private static IReadOnlyList<string> EvaluateBillingComplianceRelease(
+        ServerNote note,
+        ServerPerson person,
+        IReadOnlyList<ServerForm> forms,
+        IReadOnlyList<ReleaseObligation> releaseObligations,
+        ServerBillingCompliancePolicyContext policy,
+        IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null,
+        IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null)
+    {
+        var errors = new List<string>();
         var compliance = EvaluateNoteCompliance(
             note, person, forms, releaseObligations, policy, providerLinks);
         if (compliance.Passed)
@@ -8132,6 +9037,12 @@ internal static partial class ApiEndpoints
             "This AT request changed after it was opened. Reload the saved request before applying your changes.",
             string.Empty));
 
+    private static IResult StaleCheckRequestTemplateConflict() =>
+        Results.Conflict(new ApiErrorDto(
+            "stale_check_request_template",
+            "This weekly check-request default changed after it was opened. Reload it before trying again.",
+            string.Empty));
+
     // Distinct code from stale_at_request: the client cannot fix this by
     // reloading and retrying, which is exactly what a stale conflict invites.
     private static IResult PublishedAtRequestConflict() =>
@@ -8542,6 +9453,23 @@ internal static partial class ApiEndpoints
     private sealed record ServerBillingPolicyImpactEvaluation(
         BillingCompliancePolicyImpactPreviewDto Preview,
         IReadOnlyList<BillingCompliancePolicyRecordImpact> Impacts);
+    private static async Task<bool> IsComprehensiveAssessmentAuthoringEnabledAsync(
+        ApiDbContext db,
+        int agencyId,
+        CancellationToken cancellationToken) =>
+        await db.Settings.AsNoTracking()
+            .Where(settings => settings.AgencyId == agencyId)
+            .Select(settings => (bool?)settings.IsComprehensiveAssessmentAuthoringEnabled)
+            .SingleOrDefaultAsync(cancellationToken) ?? false;
+
+    private static async Task<bool> IsPersonCenteredPlanAuthoringEnabledAsync(
+        ApiDbContext db,
+        int agencyId,
+        CancellationToken cancellationToken) =>
+        await db.Settings.AsNoTracking()
+            .Where(settings => settings.AgencyId == agencyId)
+            .Select(settings => (bool?)settings.IsPersonCenteredPlanAuthoringEnabled)
+            .SingleOrDefaultAsync(cancellationToken) ?? false;
 
     private sealed record DayNoteRow(ServerNote Note, ServerPerson Person);
 
@@ -8566,12 +9494,23 @@ internal static partial class ApiEndpoints
     /// this runs on every create and update regardless of what the client sent.
     /// Returns null when the request claims no time or claims only free time.
     /// </summary>
-    private static async Task<IResult?> FindServiceTimeProblemAsync(
+    private static Task<IResult?> FindReviewServiceTimeProblemAsync(
+        ApiDbContext db, ReviewableNote row, int agencyId, CancellationToken cancellationToken) =>
+        FindServiceTimeProblemAsync(db, row.Person.UserId, agencyId,
+            new SaveNoteRequest(row.Note.Narrative, row.Note.EventDate, "Logged", row.Note.Minutes,
+                row.Note.StartTime, row.Person.Id, null, null, null, null), row.Note.Id, cancellationToken);
+
+    private static Task<IResult?> FindServiceTimeProblemAsync(
         ApiDbContext db,
         Actor actor,
         SaveNoteRequest request,
         int? editingNoteId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        FindServiceTimeProblemAsync(db, actor.UserId, actor.AgencyId, request, editingNoteId, cancellationToken);
+
+    private static async Task<IResult?> FindServiceTimeProblemAsync(
+        ApiDbContext db, int caseManagerId, int agencyId, SaveNoteRequest request,
+        int? editingNoteId, CancellationToken cancellationToken)
     {
         var candidate = ServiceTimeline.TryCreateBlock(
             editingNoteId ?? 0, request.StartTime, request.Minutes, request.Status);
@@ -8585,7 +9524,7 @@ internal static partial class ApiEndpoints
         if (request.EventDate is not DateTime eventDate)
             return null;
 
-        var sameDay = await LoadDayNotesAsync(db, actor.UserId, actor.AgencyId, eventDate, cancellationToken);
+        var sameDay = await LoadDayNotesAsync(db, caseManagerId, agencyId, eventDate, cancellationToken);
         var blocks = sameDay
             .Select(row => ServiceTimeline.TryCreateBlock(
                 row.Note.Id,
@@ -8635,6 +9574,11 @@ internal static partial class ApiEndpoints
             errors["formType"] = ["The form type is invalid."];
         if (!ContractMapper.TryParseNoteType(request.NoteType, out _))
             errors["noteType"] = ["The note type is invalid."];
+        if (!ContractMapper.TryParseGoalProgress(request.GoalProgress, out _))
+            errors["goalProgress"] = ["Goal progress must be None, Minimal, Moderate, or Substantial."];
+        else if (string.Equals(request.Status, "Logged", StringComparison.Ordinal) &&
+                 request.GoalProgress is null)
+            errors["goalProgress"] = ["Goal progress is required before a note can be submitted for review."];
         return errors.Count == 0 ? null : errors;
     }
 

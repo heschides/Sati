@@ -26,8 +26,22 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
         var personId = person.Id;
         var days = await db.Settings.Where(x => x.AgencyId == actor.AgencyId).Select(x => (int?)x.AnnualPacketOpenDaysBefore).FirstOrDefaultAsync() ?? 30;
         var window = AnnualPacketWindow.ForCycle(person.EffectiveDate ?? throw new InvalidOperationException("Set an effective date first."), cycleStart.Date, DateTime.Today, days);
-        var artifacts = (await db.DocumentArtifacts.AsNoTracking().Where(x => x.PersonId == personId && x.CycleStart == cycleStart.Date && x.SupersededByArtifactId == null).ToListAsync())
+        var activeArtifacts = await db.DocumentArtifacts.AsNoTracking().Where(x =>
+            x.PersonId == personId && x.SupersededByArtifactId == null &&
+            (x.CycleStart == cycleStart.Date || x.Kind == AnnualDocumentKind.DhhsAuthorizedRepresentative))
+            .ToListAsync();
+        var authorizedRepresentative = activeArtifacts
+            .Where(x => x.Kind == AnnualDocumentKind.DhhsAuthorizedRepresentative)
+            .OrderByDescending(x => x.GeneratedAtUtc).ThenByDescending(x => x.Id)
+            .FirstOrDefault();
+        var artifacts = activeArtifacts
+            .Where(x => x.CycleStart == cycleStart.Date && x.Kind != AnnualDocumentKind.DhhsAuthorizedRepresentative)
             .Select(DocumentArtifactStore.ToDto).ToList();
+        if (authorizedRepresentative is not null)
+            artifacts.Add(DocumentArtifactStore.ToDto(authorizedRepresentative));
+        var authorizedRepresentativeOnFile = activeArtifacts.Any(x =>
+            x.Kind == AnnualDocumentKind.DhhsAuthorizedRepresentative &&
+            x.Origin == DocumentArtifactOrigin.RecordedAsExternal);
         var ids = artifacts.Select(x => x.Id).ToArray();
         var acknowledged = await db.DocumentAcknowledgments.Where(x => ids.Contains(x.DocumentArtifactId)).Select(x => x.DocumentArtifactId).Distinct().ToListAsync();
         var target = cycleStart.Date;
@@ -48,7 +62,8 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
             artifacts,
             releases.Select(x => x.ToComplianceFact()),
             completedTypes.Contains(FormType.SafetyPlan),
-            completedTypes.Contains(FormType.PrivacyPractices)));
+            completedTypes.Contains(FormType.PrivacyPractices)),
+            authorizedRepresentativeOnFile);
     }
     public async Task<DocumentAcknowledgmentDto> AcknowledgeAsync(int personId, AcknowledgeDocumentRequest request)
     {
@@ -66,6 +81,38 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
         LocalAuditTrail.Record(db, actor, "document.acknowledged", "DocumentArtifact", artifact.Id);
         await db.SaveChangesAsync();
         return new(receipt.Id, receipt.DocumentArtifactId, receipt.ReceivedOn, receipt.GoodFaithEffortReason, receipt.RecordedByUserId, receipt.RecordedAtUtc);
+    }
+    public async Task<DocumentArtifactDto> RecordAuthorizedRepresentativeOnFileAsync(
+        int personId, DateTime cycleStart, string note)
+    {
+        var actor = Actor; await using var db = await factory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(db, session);
+        var person = await RequirePerson(db, actor, personId);
+        if (!SafetyPlanRules.CanAuthor(actor.Id, actor.Permissions, person.UserId))
+            throw new UnauthorizedAccessException();
+        if (person.EffectiveDate is not DateTime effectiveDate ||
+            AnnualDocumentCycle.CurrentStart(effectiveDate, cycleStart) != cycleStart.Date)
+            throw new ArgumentException("The annual period must begin on the consumer's effective-date anniversary.", nameof(cycleStart));
+        var noteError = AnnualDocumentRules.ValidateExternalNote(note);
+        if (noteError is not null) throw new ArgumentException(noteError, nameof(note));
+
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        if (await db.DocumentArtifacts.AnyAsync(x => x.PersonId == personId &&
+            x.Kind == AnnualDocumentKind.DhhsAuthorizedRepresentative &&
+            x.Origin == DocumentArtifactOrigin.RecordedAsExternal && x.SupersededByArtifactId == null))
+            throw new InvalidOperationException("A signed DHHS Authorized Representative form is already recorded on file.");
+        var artifact = await DocumentArtifactStore.StageExternalAsync(db, personId, actor.AgencyId,
+            AnnualDocumentKind.DhhsAuthorizedRepresentative, cycleStart.Date, DateTime.UtcNow, actor.Id, note,
+            CancellationToken.None);
+        LocalAuditTrail.Record(db, actor, LocalAuditActions.DocumentRecordedExternal, "Person", personId,
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                kind = AnnualDocumentKind.DhhsAuthorizedRepresentative.ToString(),
+                cycleStart = cycleStart.Date.ToString("yyyy-MM-dd")
+            }));
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return DocumentArtifactStore.ToDto(artifact);
     }
     public async Task<VerifyDocumentResult> VerifyAsync(int personId, VerifyDocumentRequest request)
     {

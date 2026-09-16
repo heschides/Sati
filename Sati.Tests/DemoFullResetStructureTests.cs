@@ -27,6 +27,54 @@ public sealed class DemoFullResetStructureTests
     }
 
     [Fact]
+    public void BaselineCaptureOwnsAnExternalRollingTimelineAnchor()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            Root, "scripts", "Initialize-DemoFullReset.ps1"));
+
+        var state = script.IndexOf("SatiDemoResetState", StringComparison.Ordinal);
+        var capture = script.IndexOf("SELECT * INTO demo_baseline", StringComparison.Ordinal);
+
+        Assert.True(state >= 0 && state < capture);
+        Assert.Contains("TimelineAnchorDate", script);
+        Assert.Contains("LastAppliedAsOfDate", script);
+        Assert.Contains("t.name NOT LIKE N'SatiDemoReset%'", script);
+        Assert.Contains("SET LastAppliedAsOfDate=NULL", script);
+    }
+
+    [Fact]
+    public void RollingSeedMovesRecurringDatesOnceAndRebuildsScheduledWork()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            Root, "scripts", "Seed-DemoShowcaseData.ps1"));
+
+        Assert.Contains("$timelineShiftDays = ($today - $timelineFromDate).Days", script);
+        Assert.Contains("DATEADD(day,@TimelineShiftDays,person.EffectiveDate)", script);
+        Assert.Contains("DATEADD(day,@TimelineShiftDays,form.DueDate)", script);
+        Assert.Contains("PARTITION BY person.UserId ORDER BY note.Id", script);
+        Assert.Contains("LastAppliedAsOfDate=@Today", script);
+        Assert.Contains("UpcomingForms", script);
+        Assert.Contains("UpcomingScheduledNotes", script);
+    }
+
+    [Fact]
+    public void DemoHidesOadsBuildersButKeepsTimestampedEvergreenAttestations()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            Root, "scripts", "Seed-DemoShowcaseData.ps1"));
+
+        Assert.Contains("SET IsComprehensiveAssessmentAuthoringEnabled=0", script);
+        Assert.Contains("IsClassificationAuthoringEnabled=0", script);
+        Assert.Contains("IsPersonCenteredPlanAuthoringEnabled=0", script);
+        Assert.DoesNotContain("SET BillingComplianceRequirements", script);
+        Assert.Contains("Demo attestation of work completed in Evergreen.", script);
+        Assert.Contains("ActorUserId,RecordedAtUtc", script);
+        Assert.Contains("ORDER BY RecordedAtUtc DESC, Id DESC", script);
+        Assert.Contains("UnattestedEvergreenCompletions", script);
+        Assert.Contains("completed PCP or Comprehensive Assessment rows without a matching live attestation", script);
+    }
+
+    [Fact]
     public void ManualAndScheduledFunctionsHoldResetLockThroughRollingValidation()
     {
         foreach (var relative in new[]

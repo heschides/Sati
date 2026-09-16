@@ -20,6 +20,7 @@ public sealed class UserPermissionTests
         Assert.NotNull(rulesType);
         Assert.True(permissionsType!.IsEnum);
         Assert.NotNull(rulesType!.GetMethod("HasBillingPermissions"));
+        Assert.NotNull(rulesType.GetMethod("HasRepresentativePayeePermissions"));
     }
 
     [Fact]
@@ -29,6 +30,10 @@ public sealed class UserPermissionTests
         Assert.False(UserPermissionRules.HasAdminPermissions(UserPermissions.Billing));
         Assert.True(UserPermissionRules.HasAdminPermissions(UserPermissions.Administration));
         Assert.False(UserPermissionRules.HasBillingPermissions(UserPermissions.Administration));
+        var finance = UserPermissionRules.FromLegacyRole("Finance");
+        Assert.True(UserPermissionRules.HasBillingPermissions(finance));
+        Assert.True(UserPermissionRules.HasRepresentativePayeePermissions(finance));
+        Assert.False(UserPermissionRules.HasCaseManagerPermissions(finance));
     }
 
     [Theory]
@@ -36,6 +41,7 @@ public sealed class UserPermissionTests
     [InlineData("Supervisor", UserPermissions.CaseManagement | UserPermissions.Supervision)]
     [InlineData("Director", UserPermissions.CaseManagement | UserPermissions.Supervision | UserPermissions.AgencyWideSupervision)]
     [InlineData("Admin", UserPermissions.AllAgencyPermissions)]
+    [InlineData("Finance", UserPermissions.Billing | UserPermissions.RepresentativePayee)]
     [InlineData("PlatformOperator", UserPermissions.None)]
     public void LegacyRolesHaveAnExplicitBackfillMapping(
         string role,
@@ -74,6 +80,7 @@ public sealed class UserPermissionTests
     [InlineData("Supervisor")]
     [InlineData("Director")]
     [InlineData("Admin")]
+    [InlineData("Finance")]
     public void TheCompatibilityLabelRoundTripsThroughThePermissionSet(string role) =>
         Assert.Equal(role, UserPermissionRules.LegacyLabel(UserPermissionRules.FromLegacyRole(role)));
 
@@ -118,12 +125,25 @@ public sealed class UserPermissionTests
         var sql = Assert.Single(builder.Operations.OfType<SqlOperation>()).Sql;
         Assert.Contains(
             $"SET [Permissions] = {(int)UserPermissionRules.FromLegacyRole("Director")}", sql);
-        Assert.Contains(
-            $"SET [Permissions] = {(int)UserPermissionRules.FromLegacyRole("Admin")}", sql);
+        Assert.Contains("SET [Permissions] = 31", sql);
 
         // Scoped to the exact values AddUserPermissions wrote, so a deliberate edit made
         // between the two migrations is preserved rather than clobbered.
         Assert.Contains("[Role] = 'Director' AND [Permissions] = 7", sql);
         Assert.Contains("[Role] = 'Admin' AND [Permissions] = 15", sql);
+    }
+
+    [Fact]
+    public void RepresentativePayeeMigrationExtendsExistingAdministrators()
+    {
+        var migration = new Sati.Migrations.AddRepresentativePayeeWorkflow();
+        var builder = new MigrationBuilder("Microsoft.EntityFrameworkCore.SqlServer");
+        typeof(Sati.Migrations.AddRepresentativePayeeWorkflow)
+            .GetMethod("Up", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(migration, [builder]);
+
+        var sql = Assert.Single(builder.Operations.OfType<SqlOperation>()).Sql;
+        Assert.Contains("[Permissions] | 32", sql);
+        Assert.Contains("([Permissions] & 4) = 4", sql);
     }
 }

@@ -54,7 +54,8 @@ namespace Sati.ViewModels.Billing
                 Debug.WriteLine($"[BillingQueue] GetApprovedUnbilledNotesAsync returned {notes.Count()} notes — {DateTime.Now:HH:mm:ss.fff}");
                 QueueItems.Clear();
                 var items = notes.Select(note => new BillingQueueItemViewModel(
-                    _billingService.ValidateNoteForBilling(note), configuration));
+                    _billingService.ValidateNoteForBilling(note), configuration,
+                    account?.HasCaseManagerPermissions == true));
                 foreach (var item in items
                     .OrderByDescending(candidate => candidate.IsValid)
                     .ThenBy(candidate => candidate.Result.Note.EventDate))

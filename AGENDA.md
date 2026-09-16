@@ -149,6 +149,317 @@ signature-never-attests items retained later as history.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.10 — 2026-09-14
+
+"Safe Local startup restored." This patch corrects the Local package configuration that made 1.3.9
+stop before database access, and makes the installer build and acceptance gates prove the complete
+startup configuration rather than checking only its private connection string.
+
+- [x] Diagnose Joshu's two 1.3.9 startup refusals from the payload-free diagnostic records. Both
+      stopped in `DataEnvironmentResolver` before provisioning, identity validation, migration, or
+      application queries, so the Local database and consumer records were not touched.
+- [x] Restore the tracked, non-secret Production expected database name in
+      `appsettings.Public.json`. The Local private configuration retains only its integrated-security
+      connection mapping; the resolver can now cross-check both halves before opening the database.
+- [x] Add one shared Local configuration validator to installer construction and isolated installer
+      acceptance. Both now require the public and private files, exact `SatiProduction` agreement,
+      Windows integrated security, and no SQL username/password before an artifact can pass.
+- [x] Add direct resolver regression coverage for the exact missing-setting failure shipped in
+      1.3.9 and structural coverage binding both installer gates to the shared validator. Focused
+      validation passes 3/3; the complete desktop suite passes 1,990 with the external local-AI and
+      opt-in Local SQL concurrency tests skipped as expected.
+- [x] Complete DATT preflight against GitHub `master` at
+      `3cc20f2c0083b5db51f8bb4ef217b9add9798493`. No branch was merged or deleted. Retain the
+      divergent setup/design branches, stale tracking refs, and the separate heavily modified user
+      checkout untouched.
+- [x] Confirm there is no schema or API-contract change, no 1.3.10 artifact collision, and no need
+      for a database, baseline, or firewall operation. The existing Microsoft LocalDB prerequisite
+      remains Authenticode-valid with SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+- [x] Complete coordinated 1.3.10 versioning and validation. The full Release build passed with
+      zero warnings and zero errors. All five standard test projects passed 2,917 tests and reported
+      seven skipped entries: five opt-in API SQL tests, one opt-in Local SQL theory, and the external
+      local-AI model check. Enabling the SQL tests exercised all seven underlying SQL cases (five API
+      cases plus two Local theory rows), and all seven passed against disposable LocalDB databases.
+      Focused resolver/shared-installer validation passed 3/3 and directly rejected the exact
+      missing-Production-name configuration from 1.3.9. Contract revision remains `66A9F0D2949E`.
+- [x] Commit source release `f594e672740ac066fa7ea4b9ba23969acf2854cf` and push it normally to
+      `https://github.com/heschides/Sati`, branch `master`, without rewriting history. GitHub
+      contained that exact commit before packaging began.
+- [x] Publish only the existing Demo API. The 9,679,338-byte framework-dependent x86 package at
+      `artifacts/SatiApi-1.3.10-fx-x86.zip` has SHA-256
+      `E699C6F4FF7B4FC2A043563DABC6912D5F30ECF7E87FDFA326DBFDE5D76FBE6C`, file version 1.3.10.0,
+      and 65 entries. It contains no malformed paths, private settings, forbidden files,
+      credentials, or secret-like values. OneDeploy deployment `88e5f219c0c444179afca374571dfab3`
+      succeeded; live and ready returned Healthy, `/health/version` reported Sati.Api 1.3.10 and
+      contract `66A9F0D2949E`, and anonymous Admin access returned HTTP 401. The optional encrypted
+      synthetic global Admin credential was absent, so the authenticated probe was not run.
+- [x] Build and pass isolated acceptance for both new installers. Demo completed five responsive
+      15-second launches with graceful exits and cleanup; its 102,572,032-byte
+      `SatiDemoSetup-1.3.10.exe` has SHA-256
+      `F5B06D2C46A86A401B201BB0CE17FA16A310A96F17B1D9B1C6B40055C70ED7D3`. Its 92-byte checksum file
+      has SHA-256 `63A7412DA8E5A078A02D360189B28FB4FF7BA9BF3C3E9220D59CA8F44C882755`. Local acceptance proved
+      version 1.3.10.0, exact `SatiProduction` public/private agreement, integrated security,
+      embedded prerequisite, and cleanup; its 204,896,297-byte `SatiLocalSetup-1.3.10.exe` has
+      SHA-256 `7BA61D990ED585E786F306DB4928353EEE78336767A9E2CE8B831FE9677A8174`. Its 93-byte checksum file has
+      SHA-256 `C1CCE1E897A73EF0FFB0425DAE75D483B854C8FC565A50266319642C3AC13811`.
+- [x] Atomically publish the accepted Demo and Local installer/checksum pairs without overwrite to
+      the designated `SatiLogica Demo Files` and `Sati Desktop` distribution folders. Final hashes
+      and checksum records match the build artifacts, and no staging file remains.
+- [x] Record deployment, test, artifact, distribution, and known workstation evidence; push the
+      final evidence commit; and confirm local/GitHub equality with a clean tracked tree.
+
+### Local Production machines
+
+Release 1.3.10 adds no migration. Database state therefore does not change merely by installing
+this hotfix; the Local client still applies any older pending migrations safely during startup.
+
+- [ ] SatiLogica workstation: Local `SatiProduction` already contains all 105 migrations, while its
+      normally installed client remains version 1.3.2.0 until 1.3.10 is installed outside isolated
+      acceptance.
+- [ ] Joshu workstation: diagnostics prove 1.3.9 is installed and that both reported launches
+      stopped in configuration resolution before database access. Its Local migration state remains
+      unverified. Install 1.3.10 and confirm that it reaches Local sign-in before treating this
+      workstation as current.
+
+## Release 1.3.9 — 2026-09-14
+
+"Financial workflows, clearer records, timely prompts." This release adds a PHI-minimized Finance
+role and Representative Payee ledger/check workflow, weekly check-request drafts and reminders,
+required case-note goal progress, clearer annual-document work, live form previews, two new public-
+program packet builders, Evergreen completion attestations while OADS authoring remains off, and a
+date-aware Demo baseline.
+
+- [x] Confirm the releasable work is based on GitHub `master` at release 1.3.8, with no relevant
+      completed branches to merge or safely delete. Retain the active, divergent, historical, and
+      uniquely valuable branches and leave the separate dirty user checkout untouched.
+- [x] Apply and verify the three additive migrations on identity-checked Local `SatiProduction` and
+      Azure `SatiDemo`, including rollback rehearsals, a verified Local backup, and an idempotent
+      second pass. Both databases contain 105 migration-history rows.
+- [x] Capture and verify the authorized 56-table canonical SatiDemo reset baseline with timeline
+      anchor 2026-09-14, and verify a complete reset inside a rolled-back outer transaction.
+- [x] Verify the temporary exact-IP Azure SQL firewall rule is closed. Only the permanent Demo API
+      outbound rules and refresh-function outbound rules remain.
+- [x] Complete the coordinated 1.3.9 Release build and all five automated test projects. The final
+      build has zero errors; 2,914 standard tests pass. The default run skips one external local-AI
+      model check and seven opt-in SQL Server cases; all seven SQL Server cases pass separately
+      against disposable LocalDB databases. The release gate also fixed a billing-period insertion/
+      submission race, Local service-time create/move races, a sliding WebSocket revalidation delay,
+      and a noisy authentication-timing measurement.
+- [x] Complete API and installer package security checks and focused installed-app acceptance. The
+      API ZIP contains 70 entries with no bad path separators, forbidden filenames, private
+      configuration, credentials, or secret-like values. The Demo installer contains only public
+      endpoint configuration; the Local installer uses integrated security and embeds the
+      Authenticode-valid Microsoft SQL LocalDB prerequisite.
+- [x] Commit source release `04689f486a9500a83317804a185ab1adf11e6925` and push it normally to
+      `https://github.com/heschides/Sati`, branch `master`, without rewriting history. GitHub
+      contained that exact commit before packaging began.
+- [x] Publish only the existing Demo API. The 9,973,829-byte framework-dependent x86 package at
+      `artifacts/SatiApi-1.3.9-fx-x86.zip` has SHA-256
+      `E91BF8CE3BD0628AA62F66D2A328FD46F328E95406DEEADB2EED801888542EA0` and file version 1.3.9.0.
+      OneDeploy deployment `84cab975b62a4160a90811c13b2ee66c` succeeded; live and ready returned
+      HTTP 200, `/health/version` reported Sati.Api 1.3.9 and contract revision `66A9F0D2949E`, and
+      anonymous Admin access returned HTTP 401. The optional encrypted synthetic global Admin
+      credential was absent, so the authenticated probe was not run.
+- [x] Build new non-overwritten installers and pass isolated acceptance. Demo completed five
+      responsive 15-second launches with graceful exits and cleanup; its 102,584,320-byte
+      `SatiDemoSetup-1.3.9.exe` has SHA-256
+      `60D1437919B9F043C37E14D1F48F2244710D37AC3B1C31A952B1CA0527B5B349`. Local passed exact-version,
+      integrated-security, embedded-prerequisite, and cleanup checks; its 204,900,391-byte
+      `SatiLocalSetup-1.3.9.exe` has SHA-256
+      `F96E33C12A1B2CB026DEB055E1C197C6867E8E0D26BE4AB0494428F64667CA16`. Each installer and its
+      matching checksum were atomically published without overwrite to the designated
+      `SatiLogica Demo Files` and `Sati Desktop` distribution folders; final hashes matched and no
+      staging file remained. Acceptance ran on the build workstation, not an external clean machine.
+- [x] Record deployment identifiers, package paths, sizes, SHA-256 hashes, test totals, distribution
+      verification, and known Local Production machine release status; then push final evidence.
+
+### Local Production machines
+
+This release adds migrations 103 through 105. Azure `SatiDemo` and the development workstation's
+Local `SatiProduction` both contain all 105 migration-history rows, but database migration and
+desktop installation remain separate facts.
+
+- [ ] SatiLogica workstation: Local `SatiProduction` is current, but the normally installed Local
+      client is still version 1.3.2.0. Install 1.3.9 outside isolated acceptance before treating the
+      installed client as current.
+- [ ] Joshu workstation: its installation folder is not readable from this Windows profile, so its
+      installed version and Local migration state remain unverified. The user plans to install 1.3.9;
+      treat the workstation as behind until that installation starts successfully.
+
+## Unreleased — 2026-09-14 controlled migration application
+
+- [x] Add a guarded, transactional, rerunnable runner for the Representative Payee workflow,
+      weekly check-request automation, and case-note goal-progress migrations. It refuses a wrong
+      database/environment marker and verifies the new tables, columns, indexes, and foreign keys.
+- [x] Rehearse all three changes with rollback on identity-checked Local `SatiProduction` and Azure
+      `SatiDemo`, then apply and rerun idempotently. Both databases moved from 102 to 105 migration
+      history rows; the second pass made zero schema, permission, or history changes.
+- [x] Back up Local Production before application to
+      `SatiProduction-2026-09-14-063854.bak` and verify it with SQL Server checksum restore
+      verification. Azure retains its configured point-in-time recovery.
+- [x] Verify the deployed Demo API remains live and ready after the additive schema change. The
+      currently deployed API remains release 1.3.8/contract `5B9D8ED7F252`; publishing the new
+      compatible API and desktop builds is still a separate release step.
+- [x] After separate explicit authorization, recapture the canonical SatiDemo reset baseline with
+      timeline anchor 2026-09-14. All 56 live resettable tables match 56 baseline tables with zero
+      missing/extra tables and zero row-count differences; the three new workflow tables are
+      present as empty canonical tables.
+- [x] Recreate and verify the reset procedure and managed-identity permissions, then exercise the
+      complete 56-table reset inside an outer transaction. It produced zero row-count differences,
+      left every foreign key/check constraint trusted and enabled, retained 177 People and all 105
+      migration rows, rotated identity/reset state inside the rehearsal, and restored the exact
+      pre-rehearsal live state when the outer transaction rolled back.
+- [x] Verify the temporary exact-IP Azure SQL firewall rule is closed after the authorized database
+      work. The remaining rules are the permanent Demo API outbound rules and refresh-function
+      outbound rules; the migration runner did not alter firewall settings.
+
+## Unreleased — live form draft previews
+
+- [x] Keep a document-shaped live preview beside every currently editable form workspace: AT
+      Request, Check Request, Agency Release, DHHS forms, Safety Plan, Privacy Practices, CWIC
+      packet, and Housing Support Funds application.
+- [x] Send bound text into the in-memory draft while the user types. Numeric AT Request and weekly
+      check-default fields use a short typing delay, so valid values reach the draft without making
+      the user leave the field and incomplete numeric text does not replace the last valid value.
+- [x] Keep disabled OADS authoring out of this scope. PCP and Comprehensive Assessment remain
+      Evergreen attestations, and Classification remains unavailable unless their separately gated
+      Sati authoring features are enabled in the future.
+- [x] Keep preview changes non-destructive: they update only the open draft. Published documents,
+      generated artifacts, and immutable template versions are not rewritten.
+- [x] Expand the UI contract and WPF render tests across all eight editable workspaces; the focused
+      preview suite passes 5/5.
+
+## Unreleased — required case-note goal progress
+
+- [x] Add a case-note Goal Progress combobox with the required state choices: None, Minimal,
+      Moderate, and Substantial. Blank remains distinct from None so the UI cannot silently answer
+      the question for the case manager.
+- [x] Require a deliberate choice when a note enters Logged/submitted-for-review status in both the
+      local service and API. Pending drafts may remain incomplete, and future Scheduled work and
+      Reminders clear the field because no service outcome exists yet.
+- [x] Preserve the choice through local/cloud save, read, edit, concurrency comparison, supervisor
+      review, and historical display. Existing historical notes remain readable without invented data.
+- [x] Keep goal progress as an independent historical observation. A future PCP-goal reference can
+      be added alongside it when PCP authoring goes live without changing these recorded choices.
+- [x] Add compatibility shape `case-note-goal-progress-v1`, migration
+      `20260914030703_AddGoalProgressToCaseNotes`, and focused local/API/UI tests.
+- [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
+      idempotency evidence through the controlled 2026-09-14 runner.
+- [x] Deploy compatible API/desktop builds through the normal approved 1.3.9 release process.
+
+## Unreleased — weekly check-request drafts and reminders
+
+- [x] Add one revisioned weekly default per Representative Payee consumer. The assigned case
+      manager chooses the weekday, needed-by offset, payee, mailing address, amount, and reason;
+      changes affect future drafts only.
+- [x] Generate at most one draft for each scheduled occurrence, preserve template and schedule
+      provenance, and keep every generated request as an ordinary frozen draft requiring review,
+      PDF preparation, submission, supervisor approval, and Finance release.
+- [x] Prompt the case manager at sign-in, after an open workstation crosses into a new day, and
+      again during shutdown until the generated request has been submitted. Defer changes no data.
+- [x] Add a per-user, per-environment personal opt-out in Settings. Turning it off stops generation
+      and reminders on that computer without deleting defaults or existing drafts.
+- [x] Treat a newly scheduled calendar exemption as time off: when its weekday matches an enabled
+      consumer default, prompt the case manager immediately with Prepare now or Later. Prepare now
+      creates or opens the matching draft early without submitting it.
+- [x] Check tomorrow's scheduled time off at sign-in and calendar-day rollover and prompt again for
+      any matching request that has not been submitted. Removing time off does not create a prompt.
+- [x] Add local/cloud services, tenant-scoped API routes, compatibility shape, narrative-free audit
+      events, migration `20260914023645_AddWeeklyCheckRequestAutomation`, and focused schedule,
+      persistence, API, authorization, preference, and UI-contract tests. Current focused runs:
+      desktop/domain/UI 26/26 and API/route surface 12/12; the broader related regression sets also
+      passed 52/52 desktop and 77/77 API before the time-off extension.
+- [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
+      idempotency evidence through the controlled 2026-09-14 runner.
+- [x] Deploy compatible API/desktop builds through the normal approved 1.3.9 release process.
+
+## Unreleased — Finance and Representative Payee workflow
+
+- [x] Add an independently assignable Representative Payee permission. The legacy Finance role
+      maps to Billing plus Representative Payee, while administrators can grant either capability
+      separately without granting case-management access.
+- [x] Add a Finance Representative Payee workspace with an agency-scoped consumer ledger, signed
+      manual deposits/expenses, current balance, approved-check queue, check-release control, and
+      receipt acknowledgement.
+- [x] Add a server-authoritative workflow over each frozen check request: the assigned case manager
+      submits, the assigned/agency-wide supervisor approves or returns it, and Finance records
+      release and receipt. Each checkpoint is an append-only, actor- and UTC-stamped event; return
+      requires a reason, and duplicate/concurrent checkpoint writes are refused.
+- [x] Post each released check to the consumer ledger atomically with the release event. Ledger rows
+      are append-only, one release can post only once, and ordinary consumer deletion is refused
+      when financial ledger history exists.
+- [x] Remove consumer identity from Finance-only Billing grids and replace the Billing candidate
+      network contract with minimum-necessary service facts that cannot serialize note narrative,
+      visit documentation, exception text, or consumer names.
+- [x] Add supervisor Check Request review UI, case-manager submission UI, user-management controls,
+      local/cloud services, API authorization, audit actions, compatibility inventory, and migration
+      `20260914015314_AddRepresentativePayeeWorkflow`.
+- [x] Focused validation passed: API surface/privacy/workflow tests 11/11 and relevant desktop,
+      domain, annual-document, permission, and UI tests 55/55. Five separate DPAPI tests require a
+      normal signed-in Windows profile and cannot run inside the restricted test sandbox.
+- [x] Apply the migration to identity-checked Local Production and SatiDemo with backup/rehearsal/
+      idempotency evidence through the controlled 2026-09-14 runner.
+- [x] Deploy compatible API/desktop builds through the normal approved 1.3.9 release process.
+
+## Unreleased — clearer annual-document workflow
+
+- [x] Replace the unexplained “Load cycle” wording in Safety Plan and Annual Documents with
+      “Open selected period,” explain that the period is the consumer's service year beginning on
+      the effective-date anniversary, and state that opening it does not change historical records.
+- [x] Give the date selectors and open-period controls specific accessible names and retain the
+      existing read-only reload behavior behind the clearer wording.
+- [x] Present separate workflow rows for DHHS release, Medical Provider Release, Agency Release,
+      Safety Plan, Privacy Practices, and the once-only DHHS Authorized Representative form, with
+      plain-language preparation status and the next workspace/action for each.
+- [x] Give the Authorized Representative form its own artifact kind instead of conflating it with
+      the annual DHHS release. A generated draft does not count as on file; the assigned case manager
+      can record a verified signed physical copy with a required protected note and audit event.
+      Once recorded, the form carries across annual periods and is no longer shown as annual work.
+- [x] Rename the e-signature action to “Submit to consumer or guardian for review” and present signer
+      request status as Pending, Denied, Signed, or the narrower terminal state when applicable.
+- [x] Focused validation passed: 32 desktop/domain/UI tests and 8 API authorization/artifact tests,
+      including cross-caseload refusal, duplicate once-only refusal, status carry-forward, accessible
+      controls, and distinct DHHS document identities.
+
+## Unreleased — Housing Support Funds application
+
+- [x] Embed the exact fillable three-page Maine DHHS OADS application dated June 30, 2025,
+      preserve the form fields, and expose one live entry/preview workspace from Clients and
+      Documents navigation.
+- [x] Prefill authoritative consumer, waiver, Shared Living, guardian, assigned case manager and
+      provider facts while keeping application-specific contact, landlord, payee, amount and
+      narrative entries in the user's control.
+- [x] Enforce the form's $3,000 ceiling and closed choices; prominently flag subsidy, Shared Living,
+      missing proof, and missing-signature review needs rather than silently deciding eligibility.
+- [x] Leave consumer/guardian signatures and dates blank and leave the entire DHHS Staff Only page
+      untouched; keep electronic signing unavailable pending program and agency confirmation.
+- [x] Return a non-cacheable PDF, audit generation, and record a versioned Draft artifact tied to
+      the controlled OADS source without rewriting prior draft history.
+- [x] Revalidated for release 1.3.8 on 2026-09-13: the official Housing Services page still links
+      the exact June 30, 2025 source embedded here (SHA-256
+      `F44074E0FFE5096369BDCB32B30DE645155108B8A96093A75B62E9DDD8588190`).
+- [ ] Define any future electronic submission, receipt, and OADS decision-status workflow
+      separately. Generating this draft does not submit it or represent OADS approval.
+
+## Unreleased — CWIC / Benefits Counseling referral packet
+
+- [x] Reproduce MaineHealth's currently linked ten-page BCS referral packet from the exact
+      supplied PDF, with a live WPF entry preview and one packet workflow in both Clients and
+      Documents navigation.
+- [x] Prefill identity, age, address/contact, guardian, employment, MaineCare and VR facts that
+      Sati already knows while keeping every answer editable and leaving signatures blank.
+- [x] Keep SSN plaintext inside the authorized local/API generation process, return only the
+      finished no-store PDF, and audit each decryption and packet generation.
+- [x] Record each generated packet as a versioned Draft artifact tied to the fixed MaineHealth
+      source revision; regeneration supersedes the prior live draft without rewriting history.
+- [x] Validate closed choice sets, bounded text and the Maine DOL one-year release window; block
+      electronic signature routing pending explicit MaineHealth/program/agency confirmation.
+- [x] Add the separately versioned Housing Support Funds application workflow described above.
+- [x] Revalidated for release 1.3.8 on 2026-09-13: MaineHealth still links the exact embedded packet
+      (SHA-256 `07450B91D9756AD4EC26D0B7F570FCE9DEBE152722A2D981ACE4CB195D3A1013`),
+      whose component forms retain their 2013/2019/2020 revision labels.
+
 ## Unreleased — account disablement and session revocation
 
 - [x] Add retained `IsEnabled` and monotonic `SecurityVersion` account state, with an EF
@@ -399,6 +710,80 @@ same view loader as the theme legibility audit. See `DECISIONS.md`.
       ARIA rather than UI Automation, and that is where TalkBack and mobile browsers would apply.
 - [ ] Check keyboard operation at the two Easy Eyes scales and under Windows high-contrast themes,
       neither of which this pass exercises.
+
+## Release 1.3.8 — 2026-09-13
+
+"Safer access, living forms, current demonstrations." This release closes account/session and
+consumer-record authorization gaps, preserves compliance and clearinghouse evidence, adds live
+CWIC and Housing Support Funds packet builders, and keeps the canonical Demo calendar current.
+
+- [x] Preflight resolved GitHub's default branch as `master`, found it equal to the reviewed
+      `d9ac8724ee44c3ca7b0e2ab724f4fe2f6c633f70`, and found a clean tracked working tree before
+      release coordination. No branch was merged or deleted. Unique or uncertain work remains on
+      `claude/local-vs-github-workflow-dlcqpb`, `second-machine-setup`, `team-chat-design`, the
+      local-origin-only `video-conferencing-design`, and worktree-owned
+      `claude/cool-jang-f6b3c4`.
+- [x] Confirm the releasable scope: retained account disablement/session revocation, current
+      permission enforcement, non-destructive form retention, stricter note/billing concurrency,
+      immutable clearinghouse response intake, consumer photos, live document previews, explicit
+      Evergreen PCP/Comprehensive Assessment attestations, agency authoring gates, CWIC and Housing
+      Support Funds packet builders, and rolling Demo seed dates.
+- [x] Revalidate both publisher sources immediately before release. MaineHealth and Maine OADS
+      still link bytes identical to Sati's embedded resources; hashes are recorded in the two
+      unreleased sections above.
+- [x] Apply the four new EF migrations to identity-validated Local `SatiProduction` and Azure
+      `SatiDemo`: `20260911022820_AddClearinghouseResponseIntake`,
+      `20260911120000_AddAccountSessionLifecycle`, `20260912053013_AddPersonPhotos`, and
+      `20260913164040_AddOadsAuthoringSettings`. Both targets reported zero pending afterward;
+      Local backup `SatiProduction-2026-09-13-194940.bak` was taken first. The Demo run was
+      explicitly authorized, verified, and rerun as already current.
+- [x] After separate explicit authorization, replace the synthetic `SatiDemo` canonical baseline
+      with timeline anchor 2026-09-13. The reset route was closed during capture, all 53 resettable
+      tables matched 53 baseline tables, the reset procedure was recreated, and the route was
+      restored with the current protected host key. Updated refresh Function deployment
+      `fb27d8750f6d4ef9a5d338cb0cff39b6` used a 51,209-byte package with SHA-256
+      `AB21706936AF7D82CC74966FAB0DBDE65099D7C1BAEA85FF3C1F64290B1EC58C`.
+- [x] The user removed `datt-workstation-temp` immediately after the controlled work; a read-only
+      Azure listing confirmed it absent before release editing continued.
+- [x] Complete coordinated 1.3.8 version/release notes and validation. The full Release build
+      passed with 0 errors and 13 existing analyzer/nullability/NuGet-audit warnings. All five test
+      projects passed: 2,885 passed, 7 skipped, 0 failed (790/5 API, 1,965/2 desktop/domain,
+      118 Signatures, 8 Portal, 4 Carika). The skips were the documented local-AI competence test
+      and six SQL Server checks whose external test connection was not configured. The symbolic
+      replay covered all 102 migrations with 0 problems, and every package-bearing solution
+      project reported no known vulnerable direct or transitive dependency from the current NuGet
+      sources.
+- [x] Commit source release `d209c367034586a4479ee8fee53dd7b7fe9af965` and push it normally to
+      `https://github.com/heschides/Sati`, branch `master`. GitHub contained that exact commit before
+      packaging began.
+- [x] Publish only the existing Demo API. The 9,753,567-byte framework-dependent x86 package had
+      SHA-256 `9C75C0929855F8CE266D7C9F00661E130A98B9238789D5B3A7B3B3EAA8CD3F60`, file
+      version 1.3.8.0, 70 entries, and no private configuration or secret-like content. OneDeploy
+      deployment `5e93037e1cf24738b70d442485bd641a` succeeded; live and ready returned HTTP
+      200, `/health/version` reported Sati.Api 1.3.8 and contract revision `5B9D8ED7F252`, exactly
+      matching the compiled client, and anonymous Admin access returned HTTP 401. The optional
+      encrypted synthetic global Admin credential was absent, so the authenticated probe was not run.
+- [x] Build new non-overwritten installers and pass isolated acceptance. Demo completed five
+      responsive 15-second launches with graceful exits and cleanup; its 102,457,344-byte installer
+      has SHA-256 `E842CBAAA016592046FF3677322113870B9487BACF450EFDA16C04BA3924174A`.
+      Local passed version, integrated-security, embedded-prerequisite, and cleanup checks; its
+      204,523,047-byte installer has SHA-256
+      `2F35D39607E6ACF5944FE62E7228A82C2A4F0489F70B4A1F35059FEC15E3E0C8`.
+      Each installer and its matching checksum were atomically published without overwrite to the
+      designated `SatiLogica Demo Files` and `Sati Desktop` distribution folders, respectively;
+      final hashes matched and no staging file remained.
+- [x] Record and push final release evidence, confirm the tracked working tree is clean, and confirm
+      local `master` equals GitHub `master`.
+
+### Local Production machines
+
+This release adds migrations 99 through 102. Demo and the development workstation's Local
+`SatiProduction` are current, but installing a client and migrating a machine are separate facts.
+
+- [ ] SatiLogica workstation: Local `SatiProduction` has all four migrations, but the installed
+      Local client remains on its prior package until 1.3.8 is installed outside isolated acceptance.
+- [ ] Joshu workstation: installed version and migration state remain unverified; treat it as
+      behind until its operator installs 1.3.8 and confirms a successful Local startup.
 
 ## Release 1.3.7 — 2026-09-10
 
@@ -5694,8 +6079,24 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
 - [ ] Before real operational use, have the agency confirm that the preserved “Signature” labels
       and routing meet its finance procedure. Sati identifies the staff and records the publisher;
       this feature does not claim electronic-signature or supervisor-approval status.
-- [ ] Add the server-authoritative workflow over a frozen request: submit to the assigned
+- [x] Add the server-authoritative workflow over a frozen request: submit to the assigned
       supervisor, approve or return with a reason, deliver to an authorized Finance destination,
-      and record completion or cancellation. Each transition needs role/tenant authorization,
-      revision checks, timestamps, actors, append-only events, idempotency, and notification-failure
-      handling; publication itself must never be treated as approval or proof of delivery.
+      and record check release and receipt acknowledgement. Each checkpoint has role/tenant
+      authorization, timestamps, actors, append-only events, and database uniqueness; publication
+      itself is still only PDF preparation and never approval or proof of delivery.
+
+## Consumer profile photos — implemented 2026-09-12
+
+- [x] Add a prominent portrait at the top of the consumer profile and increase the selected
+      consumer's name by 20%; the current approved treatment uses clean image edges.
+- [x] Add dedicated JPG/PNG storage with shared byte/type/dimension limits, separate local and
+      cloud services, a controlled migration, and person-scoped API routes.
+- [x] Recheck tenant and caseload authority on the server, require expected revisions for
+      replacement/removal, prevent response caching, and audit update/removal without photo bytes.
+- [x] Clear the portrait on every consumer switch and regression-test that a delayed old load
+      cannot display the wrong consumer's image.
+- [ ] Apply migration `20260912053013_AddPersonPhotos` and release compatible API and desktop
+      builds through the normal approved deployment process. No live database was changed here.
+- [ ] Before storing real consumer photographs, adopt agency-approved consent/notice, minimum-use,
+      retention/legal-hold, export and deletion procedures. The feature supplies technical access
+      controls; it does not decide those policies.

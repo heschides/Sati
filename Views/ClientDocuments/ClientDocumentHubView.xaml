@@ -53,6 +53,14 @@
                 DataContext="{Binding Clients.DhhsForms}"
                 Visibility="{Binding IsAuthorizedRepresentative, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+            <documents:CwicPacketWorkspace
+                DataContext="{Binding Clients.CwicPacket}"
+                Visibility="{Binding IsCwicPacket, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+            <documents:HousingSupportFundsWorkspace
+                DataContext="{Binding Clients.HousingSupportFunds}"
+                Visibility="{Binding IsHousingSupportFunds, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
             <TabControl Margin="12"
                         Visibility="{Binding IsReleases, Converter={StaticResource BooleanToVisibilityConverter}}"
                         AutomationProperties.Name="Release form choices">

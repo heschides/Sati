@@ -474,7 +474,7 @@
 
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right">
-                        <Button Content="Cancel"
+                        <Button Content="Return to Note"
                                 Padding="14,6"
                                 FontSize="12"
                                 Cursor="Hand"
@@ -516,6 +516,7 @@
                             </Button.Template>
                         </Button>
                         <Button Content="Send to Supervisor"
+                                AutomationProperties.Name="Send this note to a supervisor with a written justification"
                                 Padding="14,6"
                                 FontSize="12"
                                 Cursor="Hand"

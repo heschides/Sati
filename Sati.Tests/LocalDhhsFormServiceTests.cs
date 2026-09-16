@@ -283,6 +283,26 @@ public sealed class LocalDhhsFormServiceTests
         Assert.Equal(obligationRecordId, artifact.ReleaseObligationId);
     }
 
+    [Fact]
+    public async Task AuthorizedRepresentativeUsesItsOwnDocumentKindInsteadOfTheAnnualDhhsRelease()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var service = new DhhsFormService(fixture.Factory, fixture.Session, fixture.SsnStore);
+
+        await service.GenerateAsync(
+            Appointment,
+            fixture.PersonId,
+            new DhhsFormDefinition.Selections(
+                Checks: new Dictionary<string, bool> { ["Sign and submit app"] = true }));
+
+        await using var db = fixture.Factory.CreateDbContext();
+        var artifact = await db.DocumentArtifacts.SingleAsync();
+        Assert.Equal(AnnualDocumentKind.DhhsAuthorizedRepresentative, artifact.Kind);
+        Assert.Equal(DocumentArtifactOrigin.GeneratedInSati, artifact.Origin);
+        Assert.DoesNotContain(await db.DocumentArtifacts.ToListAsync(),
+            item => item.Kind == AnnualDocumentKind.ReleaseDhhs);
+    }
+
     private sealed class StubSession(User user) : ISessionService
     {
         public bool AllowComplianceOverride { get; set; }

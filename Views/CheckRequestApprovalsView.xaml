@@ -1,0 +1,51 @@
+<UserControl x:Class="Sati.Views.CheckRequestApprovalsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource WindowBackgroundBrush}"
+             TextElement.Foreground="{DynamicResource TextPrimaryBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,12">
+            <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshCommand}"
+                    AutomationProperties.Name="Refresh check request approvals" />
+            <StackPanel>
+                <TextBlock Text="CHECK REQUEST APPROVALS" FontSize="13" FontWeight="Bold" />
+                <TextBlock Text="Review requests submitted by your assigned case managers. Approval sends a request to Finance; it does not release a check."
+                           TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+            </StackPanel>
+        </DockPanel>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <DataGrid ItemsSource="{Binding Requests}" SelectedItem="{Binding SelectedRequest}"
+                      AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                      AutomationProperties.Name="Submitted check requests">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="CONSUMER" Binding="{Binding ConsumerName}" Width="135" />
+                    <DataGridTextColumn Header="CASE MANAGER" Binding="{Binding CaseManagerName}" Width="130" />
+                    <DataGridTextColumn Header="PAYABLE TO" Binding="{Binding PayableTo}" Width="*" />
+                    <DataGridTextColumn Header="AMOUNT" Binding="{Binding Amount, StringFormat={}{0:C}}" Width="90" />
+                    <DataGridTextColumn Header="NEEDED" Binding="{Binding NeededByDate, StringFormat={}{0:d}}" Width="90" />
+                </DataGrid.Columns>
+            </DataGrid>
+            <Border Grid.Column="2" Background="{DynamicResource SurfaceMutedBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="6" Padding="14">
+                <StackPanel>
+                    <TextBlock Text="REQUEST DETAILS" Style="{StaticResource LabelStyle}" />
+                    <TextBlock Text="{Binding SelectedRequest.ConsumerName}" FontWeight="SemiBold" FontSize="16" Margin="0,4,0,2" />
+                    <TextBlock Text="{Binding SelectedRequest.Reason}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                    <TextBlock Text="Review note" Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding ReviewNote, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="75"
+                             TextWrapping="Wrap" AutomationProperties.Name="Check request review note" Margin="0,4,0,10" />
+                    <Button Content="Approve for Finance" Command="{Binding ApproveCommand}" IsEnabled="{Binding CanReview}"
+                            Style="{StaticResource PrimaryButton}" AutomationProperties.Name="Approve check request for Finance" />
+                    <Button Content="Return to case manager" Command="{Binding ReturnCommand}" IsEnabled="{Binding CanReview}"
+                            Margin="0,8,0,0" AutomationProperties.Name="Return check request to case manager" />
+                    <TextBlock Text="A return requires a written reason." FontSize="11" Margin="0,6,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+        <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,12,0,0"
+                   Foreground="{DynamicResource TextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" />
+    </Grid>
+</UserControl>

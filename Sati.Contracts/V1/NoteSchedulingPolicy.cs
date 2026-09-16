@@ -23,7 +23,8 @@ public static class NoteSchedulingPolicy
         string? formType,
         string? noteType,
         string? caseManagerJustification,
-        string? visitDocumentationJson)
+        string? visitDocumentationJson,
+        string? goalProgress = null)
     {
         var isFutureDate = IsFutureDate(eventDate, today);
         var isReminderType = string.Equals(
@@ -39,7 +40,8 @@ public static class NoteSchedulingPolicy
                 noteType,
                 caseManagerJustification,
                 visitDocumentationJson,
-                IsCalendarReminder: false);
+                IsCalendarReminder: false,
+                GoalProgress: goalProgress);
         }
 
         if (isReminderType)
@@ -53,7 +55,8 @@ public static class NoteSchedulingPolicy
                 ReminderType,
                 CaseManagerJustification: null,
                 VisitDocumentationJson: null,
-                IsCalendarReminder: eventDate.HasValue);
+                IsCalendarReminder: eventDate.HasValue,
+                GoalProgress: null);
         }
 
         return new NoteSchedulingValues(
@@ -65,7 +68,8 @@ public static class NoteSchedulingPolicy
             noteType,
             CaseManagerJustification: null,
             VisitDocumentationJson: null,
-            IsCalendarReminder: false);
+            IsCalendarReminder: false,
+            GoalProgress: null);
     }
 
     public static SaveNoteRequest Normalize(SaveNoteRequest request, DateTime today)
@@ -80,7 +84,8 @@ public static class NoteSchedulingPolicy
             request.FormType,
             request.NoteType,
             request.CaseManagerJustification,
-            request.VisitDocumentationJson);
+            request.VisitDocumentationJson,
+            request.GoalProgress);
 
         return request with
         {
@@ -91,7 +96,8 @@ public static class NoteSchedulingPolicy
             FormType = values.FormType,
             NoteType = values.NoteType,
             CaseManagerJustification = values.CaseManagerJustification,
-            VisitDocumentationJson = values.VisitDocumentationJson
+            VisitDocumentationJson = values.VisitDocumentationJson,
+            GoalProgress = values.GoalProgress
         };
     }
 }
@@ -105,4 +111,5 @@ public sealed record NoteSchedulingValues(
     string? NoteType,
     string? CaseManagerJustification,
     string? VisitDocumentationJson,
-    bool IsCalendarReminder);
+    bool IsCalendarReminder,
+    string? GoalProgress = null);

@@ -107,6 +107,10 @@ CalendarViewModel calendarViewModel,
                 Clients, ClientDocumentHubMode.AuthorizedRepresentative);
             Releases = new ClientDocumentHubViewModel(
                 Clients, ClientDocumentHubMode.Releases);
+            CwicPacket = new ClientDocumentHubViewModel(
+                Clients, ClientDocumentHubMode.CwicPacket);
+            HousingSupportFunds = new ClientDocumentHubViewModel(
+                Clients, ClientDocumentHubMode.HousingSupportFunds);
 
             // Mirror the module's client selection onto the dashboard. One-way:
             // the CLIENT combobox lives in the module now, but the notes grid and
@@ -227,17 +231,21 @@ CalendarViewModel calendarViewModel,
         public bool IsAuthorizedRepresentativeSubActive =>
             ReferenceEquals(CurrentSubViewModel, AuthorizedRepresentative);
         public bool IsReleasesSubActive => ReferenceEquals(CurrentSubViewModel, Releases);
+        public bool IsCwicPacketSubActive => ReferenceEquals(CurrentSubViewModel, CwicPacket);
+        public bool IsHousingSupportFundsSubActive => ReferenceEquals(CurrentSubViewModel, HousingSupportFunds);
         public GuidanceViewModel Guidance { get; }
         public HelperReferenceViewModel Reference { get; }
         public bool IsGuidanceSubActive => ReferenceEquals(CurrentSubViewModel, Guidance);
         public bool IsReferenceSubActive => ReferenceEquals(CurrentSubViewModel, Reference);
         public bool IsHelpSubActive => IsGuidanceSubActive || IsReferenceSubActive;
-        public bool IsDocumentsSubActive => IsATRequestsSubActive || IsAuthorizedRepresentativeSubActive || IsReleasesSubActive;
+        public bool IsDocumentsSubActive => IsATRequestsSubActive || IsAuthorizedRepresentativeSubActive || IsReleasesSubActive || IsCwicPacketSubActive || IsHousingSupportFundsSubActive;
         public ReviewsViewModel Reviews { get; }
         public ProvidersViewModel Providers { get; }
         public ATRequestViewModel ATRequests { get; }
         public ClientDocumentHubViewModel AuthorizedRepresentative { get; }
         public ClientDocumentHubViewModel Releases { get; }
+        public ClientDocumentHubViewModel CwicPacket { get; }
+        public ClientDocumentHubViewModel HousingSupportFunds { get; }
         public FormAttestationViewModel Attestation { get; }
         public CalendarViewModel Calendar { get; }
         public StatisticsViewModel Statistics { get; }
@@ -276,6 +284,8 @@ CalendarViewModel calendarViewModel,
             OnPropertyChanged(nameof(IsATRequestsSubActive));
             OnPropertyChanged(nameof(IsAuthorizedRepresentativeSubActive));
             OnPropertyChanged(nameof(IsReleasesSubActive));
+            OnPropertyChanged(nameof(IsCwicPacketSubActive));
+            OnPropertyChanged(nameof(IsHousingSupportFundsSubActive));
             OnPropertyChanged(nameof(IsSubViewActive));
             OnPropertyChanged(nameof(IsGuidanceSubActive));
             OnPropertyChanged(nameof(IsReferenceSubActive));
@@ -893,6 +903,20 @@ CalendarViewModel calendarViewModel,
         {
             Releases.Prepare();
             CurrentSubViewModel = Releases;
+        }
+
+        [RelayCommand]
+        private void NavigateToCwicPacket()
+        {
+            CwicPacket.Prepare();
+            CurrentSubViewModel = CwicPacket;
+        }
+
+        [RelayCommand]
+        private void NavigateToHousingSupportFunds()
+        {
+            HousingSupportFunds.Prepare();
+            CurrentSubViewModel = HousingSupportFunds;
         }
 
         [RelayCommand]

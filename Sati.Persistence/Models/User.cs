@@ -91,6 +91,13 @@ namespace Sati.Models
             set => SetPermission(UserPermissions.Billing, value);
         }
 
+        [NotMapped]
+        public bool HasRepresentativePayeePermissions
+        {
+            get => UserPermissionRules.HasRepresentativePayeePermissions(Permissions);
+            set => SetPermission(UserPermissions.RepresentativePayee, value);
+        }
+
         // Raw flag, deliberately not the implication. Administration implies agency-wide
         // supervisory reach for authorization (UserPermissionRules), but this property is
         // what a permission checkbox binds to, and a getter that stayed true after the box

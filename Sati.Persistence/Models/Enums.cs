@@ -64,7 +64,8 @@ namespace Sati
         Supervisor,
         Director,
         Admin,
-        PlatformOperator
+        PlatformOperator,
+        Finance
     }
     public enum UpcomingEventKind
     {
@@ -122,6 +123,17 @@ namespace Sati
         Returned,
         Abandoned,
         ComplianceBlocked
+    }
+
+    // Persisted as a nullable ordinal on the note. Null means the case manager has
+    // not answered the required question yet; None is a deliberate, valid answer.
+    // Append only so historical values retain their meaning.
+    public enum GoalProgressLevel
+    {
+        None = 0,
+        Minimal = 1,
+        Moderate = 2,
+        Substantial = 3
     }
 
     public enum NoteType

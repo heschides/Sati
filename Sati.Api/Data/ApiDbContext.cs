@@ -11,6 +11,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerDatabaseIdentity> DatabaseIdentities => Set<ServerDatabaseIdentity>();
     public DbSet<ServerUser> Users => Set<ServerUser>();
     public DbSet<ServerPerson> People => Set<ServerPerson>();
+    public DbSet<ServerPersonPhoto> PersonPhotos => Set<ServerPersonPhoto>();
     public DbSet<ServerForm> Forms => Set<ServerForm>();
     public DbSet<ServerFormAttestation> FormAttestations => Set<ServerFormAttestation>();
     public DbSet<ServerDocumentArtifact> DocumentArtifacts => Set<ServerDocumentArtifact>();
@@ -60,6 +61,9 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerAtRequest> AtRequests => Set<ServerAtRequest>();
     public DbSet<ServerAtRequestItem> AtRequestItems => Set<ServerAtRequestItem>();
     public DbSet<ServerCheckRequest> CheckRequests => Set<ServerCheckRequest>();
+    public DbSet<ServerCheckRequestTemplate> CheckRequestTemplates => Set<ServerCheckRequestTemplate>();
+    public DbSet<ServerCheckRequestWorkflowEvent> CheckRequestWorkflowEvents => Set<ServerCheckRequestWorkflowEvent>();
+    public DbSet<ServerRepresentativePayeeLedgerEntry> RepresentativePayeeLedgerEntries => Set<ServerRepresentativePayeeLedgerEntry>();
     public DbSet<ServerAuditEvent> AuditEvents => Set<ServerAuditEvent>();
     public DbSet<ServerPersonVersion> PersonVersions => Set<ServerPersonVersion>();
     public DbSet<ServerIncidentGroup> IncidentGroups => Set<ServerIncidentGroup>();
@@ -132,6 +136,29 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .WithOne()
                 .HasForeignKey(x => x.PersonId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ServerPersonPhoto>(entity =>
+        {
+            entity.ToTable("PersonPhotos");
+            entity.HasKey(photo => photo.PersonId);
+            entity.Property(photo => photo.Content).IsRequired();
+            entity.Property(photo => photo.ContentType).IsRequired().HasMaxLength(20);
+            entity.Property(photo => photo.ContentSha256).IsRequired().HasColumnType("char(64)");
+            entity.Property(photo => photo.Revision).IsConcurrencyToken();
+            entity.HasIndex(photo => photo.AgencyId);
+            entity.HasOne<ServerPerson>()
+                .WithOne()
+                .HasForeignKey<ServerPersonPhoto>(photo => photo.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ServerAgency>()
+                .WithMany()
+                .HasForeignKey(photo => photo.AgencyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerUser>()
+                .WithMany()
+                .HasForeignKey(photo => photo.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ServerForm>(entity =>
@@ -255,6 +282,9 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.ToTable("Settings");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.IsComprehensiveAssessmentAuthoringEnabled).HasDefaultValue(false);
+            entity.Property(x => x.IsClassificationAuthoringEnabled).HasDefaultValue(false);
+            entity.Property(x => x.IsPersonCenteredPlanAuthoringEnabled).HasDefaultValue(false);
             entity.Property(x => x.BillingComplianceRequirements)
                 .HasConversion<int>();
             entity.HasIndex(x => x.AgencyId).IsUnique();
@@ -571,10 +601,58 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.MailingAddress).HasMaxLength(CheckRequestPublication.MailingAddressMaxLength);
             entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
             entity.Property(x => x.NeededByDate).HasColumnType("date");
+            entity.Property(x => x.ScheduledForDate).HasColumnType("date");
             entity.Property(x => x.Reason).HasMaxLength(CheckRequestPublication.ReasonMaxLength);
             entity.Property(x => x.PublishedByName).HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
             entity.HasIndex(x => new { x.PersonId, x.RequestDate });
+            entity.HasIndex(x => new { x.TemplateId, x.ScheduledForDate })
+                .IsUnique().HasFilter("[TemplateId] IS NOT NULL AND [ScheduledForDate] IS NOT NULL");
             entity.HasOne<ServerPerson>().WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerCheckRequestTemplate>().WithMany().HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ServerCheckRequestTemplate>(entity =>
+        {
+            entity.ToTable("CheckRequestTemplates");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.GenerateOn).HasConversion<string>().HasMaxLength(10);
+            entity.Property(x => x.PayableTo).IsRequired().HasMaxLength(CheckRequestPublication.PayableToMaxLength);
+            entity.Property(x => x.MailingAddress).IsRequired().HasMaxLength(CheckRequestPublication.MailingAddressMaxLength);
+            entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Reason).IsRequired().HasMaxLength(CheckRequestPublication.ReasonMaxLength);
+            entity.Property(x => x.EffectiveFrom).HasColumnType("date");
+            entity.HasIndex(x => x.PersonId).IsUnique();
+            entity.HasOne<ServerPerson>().WithMany().HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ServerCheckRequestWorkflowEvent>(entity =>
+        {
+            entity.ToTable("CheckRequestWorkflowEvents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Checkpoint).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Action).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.ActorName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+            entity.Property(x => x.Note).HasMaxLength(CheckRequestWorkflowRules.NoteMaxLength);
+            entity.HasIndex(x => new { x.CheckRequestId, x.Checkpoint }).IsUnique();
+            entity.HasOne<ServerCheckRequest>().WithMany().HasForeignKey(x => x.CheckRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<ServerRepresentativePayeeLedgerEntry>(entity =>
+        {
+            entity.ToTable("RepresentativePayeeLedgerEntries");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EntryDate).HasColumnType("date");
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Description).IsRequired().HasMaxLength(RepresentativePayeeLedgerRules.DescriptionMaxLength);
+            entity.Property(x => x.RecordedByName).IsRequired().HasMaxLength(CheckRequestPublication.SnapshotNameMaxLength);
+            entity.HasIndex(x => new { x.PersonId, x.EntryDate, x.Id });
+            entity.HasIndex(x => x.CheckRequestId).IsUnique().HasFilter("[CheckRequestId] IS NOT NULL");
+            entity.HasOne<ServerPerson>().WithMany().HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerCheckRequest>().WithMany().HasForeignKey(x => x.CheckRequestId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<ServerAuditEvent>(entity =>
         {
@@ -712,8 +790,12 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<ServerRemittanceClaimOutcome>()
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
-            ChangeTracker.Entries<ServerRemittanceDeposit>()
-                .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+                ChangeTracker.Entries<ServerRemittanceDeposit>()
+                    .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+                ChangeTracker.Entries<ServerCheckRequestWorkflowEvent>()
+                    .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+                ChangeTracker.Entries<ServerRepresentativePayeeLedgerEntry>()
+                    .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
         {
             throw new InvalidOperationException("Audit, billing-policy, form-attestation, document-template, Person history, and billing exchange records are append-only.");
         }
@@ -819,6 +901,20 @@ internal sealed class ServerPerson
     public List<ServerForm> Forms { get; set; } = [];
 }
 
+internal sealed class ServerPersonPhoto
+{
+    public int PersonId { get; set; }
+    public int AgencyId { get; set; }
+    public byte[] Content { get; set; } = [];
+    public string ContentType { get; set; } = string.Empty;
+    public string ContentSha256 { get; set; } = string.Empty;
+    public int PixelWidth { get; set; }
+    public int PixelHeight { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public int UpdatedByUserId { get; set; }
+    public long Revision { get; set; } = 1;
+}
+
 internal sealed class ServerForm
 {
     public int Id { get; set; }
@@ -902,6 +998,7 @@ internal sealed class ServerNote
     public int PersonId { get; set; }
     public int? FormType { get; set; }
     public int? NoteType { get; set; }
+    public int? GoalProgress { get; set; }
     public int? AgencyId { get; set; }
     public string? ReturnReason { get; set; }
     public int? ReturnedById { get; set; }
@@ -924,6 +1021,9 @@ internal sealed class ServerSettings
     public int Id { get; set; }
     public int AgencyId { get; set; }
     public int Revision { get; set; } = 1;
+    public bool IsComprehensiveAssessmentAuthoringEnabled { get; set; }
+    public bool IsClassificationAuthoringEnabled { get; set; }
+    public bool IsPersonCenteredPlanAuthoringEnabled { get; set; }
     public bool AllowCredibleProfileUpdates { get; set; }
     public string VrAssistantTitle { get; set; } =
         VocationalRehabilitationProfile.DefaultAssistantTitle;
@@ -1352,10 +1452,55 @@ internal sealed class ServerCheckRequest
     public decimal Amount { get; set; }
     public DateTime? NeededByDate { get; set; }
     public string? Reason { get; set; }
+    public int? TemplateId { get; set; }
+    public DateTime? ScheduledForDate { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? PublishedAtUtc { get; set; }
     public int? PublishedByUserId { get; set; }
     public string? PublishedByName { get; set; }
+}
+
+internal sealed class ServerCheckRequestTemplate
+{
+    public int Id { get; set; }
+    public int PersonId { get; set; }
+    public int Revision { get; set; } = 1;
+    public bool IsEnabled { get; set; } = true;
+    public DayOfWeek GenerateOn { get; set; } = DayOfWeek.Monday;
+    public int NeededByDaysAfterRequest { get; set; }
+    public string PayableTo { get; set; } = string.Empty;
+    public string MailingAddress { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public DateTime EffectiveFrom { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+}
+
+internal sealed class ServerCheckRequestWorkflowEvent
+{
+    public long Id { get; set; }
+    public int CheckRequestId { get; set; }
+    public CheckRequestWorkflowCheckpoint Checkpoint { get; set; }
+    public CheckRequestWorkflowAction Action { get; set; }
+    public DateTime OccurredAtUtc { get; set; }
+    public int ActorUserId { get; set; }
+    public string ActorName { get; set; } = string.Empty;
+    public string? Note { get; set; }
+}
+
+internal sealed class ServerRepresentativePayeeLedgerEntry
+{
+    public long Id { get; set; }
+    public int PersonId { get; set; }
+    public int? CheckRequestId { get; set; }
+    public DateTime EntryDate { get; set; }
+    public RepresentativePayeeLedgerEntryKind Kind { get; set; }
+    public decimal Amount { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public DateTime RecordedAtUtc { get; set; }
+    public int RecordedByUserId { get; set; }
+    public string RecordedByName { get; set; } = string.Empty;
 }
 
 internal sealed class ServerAuditEvent

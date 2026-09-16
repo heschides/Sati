@@ -29,6 +29,10 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     private DateTime? completionDate;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CompleteAttestationCommand))]
+    private bool hasConfirmedEvergreenCompletion;
+
+    [ObservableProperty]
     private string completionDateError = string.Empty;
 
     [ObservableProperty]
@@ -49,6 +53,15 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     private string prerequisiteError = string.Empty;
 
     [ObservableProperty]
+    private IReadOnlyList<FormAttestationHistoryItemViewModel> attestationHistory = [];
+
+    [ObservableProperty]
+    private bool isHistoryLoading;
+
+    [ObservableProperty]
+    private string historyError = string.Empty;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompleteAttestationCommand))]
     [NotifyCanExecuteChangedFor(nameof(RevokeAttestationCommand))]
     private bool isSaving;
@@ -57,6 +70,16 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     public bool IsComplete => _form?.CompletedDate is not null;
     public bool IsIncomplete => !IsComplete;
+    public bool RequiresEvergreenConfirmation =>
+        _form?.Type is FormType.PCP or FormType.ComprehensiveAssessment;
+    public string AttestationStatement => _form?.Type switch
+    {
+        FormType.PCP =>
+            "I attest that this Person-Centered Plan was completed in Evergreen on the date entered above.",
+        FormType.ComprehensiveAssessment =>
+            "I attest that this Comprehensive Assessment was completed in Evergreen on the date entered above.",
+        _ => string.Empty
+    };
     public string StatusText => _form is null
         ? string.Empty
         : _form.CompletedDate is DateTime completed
@@ -68,6 +91,31 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     public bool IsReclassification => _form?.Type == FormType.Reclassification;
     public bool IsAssessmentDateRequired =>
         IsReclassification && _prerequisiteStatus is { IsSatisfied: false };
+    public bool HasAttestationHistory => AttestationHistory.Count > 0;
+    public bool HasHistoryStatus => !string.IsNullOrWhiteSpace(HistoryStatusText);
+    public string HistoryStatusText => IsHistoryLoading
+        ? "Loading attestation history…"
+        : !string.IsNullOrWhiteSpace(HistoryError)
+            ? HistoryError
+            : HasAttestationHistory
+                ? string.Empty
+                : "No attestation has been recorded for this form cycle.";
+    public bool HasCurrentAttestationEvidence =>
+        !string.IsNullOrWhiteSpace(CurrentAttestationEvidenceText);
+    public string CurrentAttestationEvidenceText
+    {
+        get
+        {
+            if (!IsComplete)
+                return string.Empty;
+            var current = AttestationHistory.FirstOrDefault(item => item.IsAttestation);
+            return current is null
+                ? IsHistoryLoading
+                    ? "Loading signer and timestamp…"
+                    : "Signer and timestamp are unavailable for this legacy completion."
+                : $"Current evidence: {current.ActorAndTimestampText}";
+        }
+    }
 
     public void Begin(
         Form form,
@@ -88,12 +136,15 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         _prerequisiteStatus = null;
         ContextLabel = contextLabel;
         CompletionDate = null;
+        HasConfirmedEvergreenCompletion = false;
         CompletionDateError = string.Empty;
         ComprehensiveAssessmentCompletionDate = null;
         ComprehensiveAssessmentCompletionDateError = string.Empty;
         RevocationReason = string.Empty;
         RevocationReasonError = string.Empty;
         PrerequisiteError = string.Empty;
+        AttestationHistory = [];
+        HistoryError = string.Empty;
         IsVisible = true;
         NotifyStateChanged();
         if (form.Type == FormType.Reclassification)
@@ -110,6 +161,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
                 CanSupervisorOverride: false);
             NotifyStateChanged();
         }
+        _ = LoadHistoryAsync(form, version);
     }
 
     partial void OnCompletionDateChanged(DateTime? value)
@@ -141,6 +193,8 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         var dateAccepted = FormAttestationRules.ValidateCompletionDate(
             date, _cycleStart, DateTime.Today) is null;
         if (!dateAccepted)
+            return false;
+        if (RequiresEvergreenConfirmation && !HasConfirmedEvergreenCompletion)
             return false;
 
         if (!IsReclassification)
@@ -213,7 +267,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
             }
             if (AttestationChangedAsync is not null)
                 await AttestationChangedAsync();
-            IsVisible = false;
+            await LoadHistoryAsync(_form, _loadVersion);
         }
         catch (ArgumentOutOfRangeException exception)
         {
@@ -271,6 +325,34 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         CompleteAttestationCommand.NotifyCanExecuteChanged();
     }
 
+    private async Task LoadHistoryAsync(Form form, int version)
+    {
+        IsHistoryLoading = true;
+        NotifyHistoryChanged();
+        try
+        {
+            var history = await formService.GetAttestationHistoryAsync(form);
+            if (version != _loadVersion || !ReferenceEquals(form, _form))
+                return;
+            AttestationHistory = history.Select(FormAttestationHistoryItemViewModel.From).ToList();
+            HistoryError = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            if (version != _loadVersion || !ReferenceEquals(form, _form))
+                return;
+            HistoryError = $"Attestation history could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            if (version == _loadVersion)
+            {
+                IsHistoryLoading = false;
+                NotifyHistoryChanged();
+            }
+        }
+    }
+
     private bool CanRevokeAttestation() =>
         !IsSaving && _form?.CompletedDate is not null;
 
@@ -291,7 +373,9 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
             await formService.RevokeAttestationAsync(_form, RevocationReason.Trim());
             if (AttestationChangedAsync is not null)
                 await AttestationChangedAsync();
-            IsVisible = false;
+            CompletionDate = null;
+            HasConfirmedEvergreenCompletion = false;
+            await LoadHistoryAsync(_form, _loadVersion);
         }
         finally
         {
@@ -307,13 +391,61 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     {
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(IsIncomplete));
+        OnPropertyChanged(nameof(RequiresEvergreenConfirmation));
+        OnPropertyChanged(nameof(AttestationStatement));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(PrerequisiteSummary));
         OnPropertyChanged(nameof(IsPrerequisiteMissing));
         OnPropertyChanged(nameof(IsReclassification));
         OnPropertyChanged(nameof(IsAssessmentDateRequired));
         ValidateAssessmentDate();
+        NotifyHistoryChanged();
         CompleteAttestationCommand.NotifyCanExecuteChanged();
         RevokeAttestationCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyHistoryChanged()
+    {
+        OnPropertyChanged(nameof(HasAttestationHistory));
+        OnPropertyChanged(nameof(HasHistoryStatus));
+        OnPropertyChanged(nameof(HistoryStatusText));
+        OnPropertyChanged(nameof(HasCurrentAttestationEvidence));
+        OnPropertyChanged(nameof(CurrentAttestationEvidenceText));
+    }
+}
+
+public sealed record FormAttestationHistoryItemViewModel(
+    long Id,
+    string ActionText,
+    string DetailText,
+    string ActorAndTimestampText,
+    string ReasonText,
+    bool IsAttestation)
+{
+    public bool HasDetail => !string.IsNullOrWhiteSpace(DetailText);
+    public bool HasReason => !string.IsNullOrWhiteSpace(ReasonText);
+
+    public static FormAttestationHistoryItemViewModel From(FormAttestationHistoryDto entry)
+    {
+        var recordedAtUtc = entry.RecordedAtUtc.Kind == DateTimeKind.Utc
+            ? entry.RecordedAtUtc
+            : DateTime.SpecifyKind(entry.RecordedAtUtc, DateTimeKind.Utc);
+        var actorKind = entry.ActorKind switch
+        {
+            nameof(AttestationActorKind.CaseManager) => "case manager",
+            nameof(AttestationActorKind.Supervisor) => "supervisor",
+            nameof(AttestationActorKind.System) => "automatic Sati evidence",
+            _ => entry.ActorKind
+        };
+        var isAttestation = entry.Kind.Equals("Attested", StringComparison.OrdinalIgnoreCase);
+        return new FormAttestationHistoryItemViewModel(
+            entry.Id,
+            isAttestation ? "Completion attested" : "Attestation revoked",
+            entry.CompletedOn is DateTime completedOn
+                ? $"Work completed {completedOn:MMM d, yyyy}"
+                : string.Empty,
+            $"{entry.ActorDisplayName} · {actorKind} · recorded {recordedAtUtc.ToLocalTime():MMM d, yyyy h:mm tt}",
+            string.IsNullOrWhiteSpace(entry.Reason) ? string.Empty : $"Reason: {entry.Reason}",
+            isAttestation);
     }
 }

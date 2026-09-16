@@ -112,9 +112,11 @@ namespace Sati
                         services.AddTransient<DailyAgendaBuilder>();
                         services.AddSingleton<DailyAgendaCoordinator>();
                         services.AddSingleton<DailyAgendaLauncher>();
+                        services.AddSingleton<CheckRequestPromptLauncher>();
                         services.AddSingleton<ThemeService>();
                         services.AddSingleton<TextShortcutService>();
                         services.AddSingleton<DailyAgendaPreferenceService>();
+                        services.AddSingleton<CheckRequestAutomationPreferenceService>();
                         services.AddSingleton<EasyEyesPreferenceService>();
                         services.AddSingleton<IdleLockPreferenceService>();
                         services.AddSingleton<ConsumerPickerSortPreferenceService>();
@@ -132,6 +134,8 @@ namespace Sati
                         services.AddSingleton<ATRequestPdfExporter>();
                         services.AddSingleton<Sati.Forms.AgencyReleasePdfGenerator>();
                         services.AddSingleton<Sati.Forms.MedicalReleasePdfGenerator>();
+                        services.AddSingleton<Sati.Forms.CwicPacketPdfGenerator>();
+                        services.AddSingleton<Sati.Forms.HousingSupportFundsPdfGenerator>();
 
                         if (dataEnvironment.UsesCloudApi)
                             AddCloudDataServices(services, dataEnvironment);
@@ -158,6 +162,7 @@ namespace Sati
                         services.AddSingleton<PlatformHealthViewModel>();
                         services.AddTransient<UserManagementViewModel>();
                         services.AddTransient<PendingApprovalsViewModel>();
+                        services.AddTransient<CheckRequestApprovalsViewModel>();
                         services.AddTransient<CaseloadDistributionViewModel>();
                         services.AddTransient<ConsumerImportViewModel>();
                         services.AddTransient<CaseloadImportViewModel>();
@@ -174,6 +179,8 @@ namespace Sati
                         services.AddTransient<SettingsViewModel>();
                         services.AddTransient<SettingsWindow>();
                         services.AddTransient<DailyAgendaWindow>();
+                        services.AddTransient<CheckRequestPromptWindow>();
+                        services.AddTransient<TimeOffCheckRequestPromptWindow>();
                         services.AddSingleton<NotesWindowViewModel>();
                         services.AddTransient<ComplianceReviewViewModel>();
                         services.AddTransient<ComplianceReviewWindow>();
@@ -188,6 +195,8 @@ namespace Sati
                         services.AddTransient<ViewModels.ClientDocuments.DhhsFormsViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.AgencyReleaseViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.ReleaseObligationsViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.CwicPacketViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.HousingSupportFundsViewModel>();
                         services.AddSingleton<Sati.Forms.DocumentTemplatePdfComposer>();
                         services.AddSingleton<Sati.Forms.SafetyPlanPdfGenerator>();
                         services.AddSingleton<Sati.Forms.DhhsFormFiller>();
@@ -208,6 +217,7 @@ namespace Sati
                         services.AddSingleton<BillingSubmissionsViewModel>();
                         services.AddSingleton<BillingRemittancesViewModel>();
                         services.AddSingleton<BillingAlertsViewModel>();
+                        services.AddSingleton<ViewModels.Finance.RepresentativePayeeDashboardViewModel>();
                         services.AddSingleton<CalendarViewModel>();
 
                         // Factories
@@ -225,6 +235,10 @@ namespace Sati
                         });
                         services.AddTransient<Func<SettingsWindow>>(sp => () => sp.GetRequiredService<SettingsWindow>());
                         services.AddTransient<Func<DailyAgendaWindow>>(sp => () => sp.GetRequiredService<DailyAgendaWindow>());
+                        services.AddTransient<Func<CheckRequestPromptWindow>>(sp =>
+                            () => sp.GetRequiredService<CheckRequestPromptWindow>());
+                        services.AddTransient<Func<TimeOffCheckRequestPromptWindow>>(sp =>
+                            () => sp.GetRequiredService<TimeOffCheckRequestPromptWindow>());
                         services.AddTransient<Func<NewUserWindow>>(sp => () => sp.GetRequiredService<NewUserWindow>());
                         services.AddTransient<Func<FirstRunAdminWindow>>(sp => () => sp.GetRequiredService<FirstRunAdminWindow>());
                         services.AddTransient<Func<SwitchUserWindow>>(sp => () => sp.GetRequiredService<SwitchUserWindow>());
@@ -456,6 +470,7 @@ namespace Sati
         {
             services.AddSingleton<DatabaseIdentityValidator>();
             services.AddTransient<IPersonService, PersonService>();
+            services.AddTransient<IPersonPhotoService, PersonPhotoService>();
             services.AddTransient<IAdminService, AdminService>();
             services.AddTransient<ILegalHoldRegistry, LocalLegalHoldRegistry>();
             services.AddTransient<IIncidentReporter, LocalIncidentReporter>();
@@ -484,8 +499,12 @@ namespace Sati
             services.AddSingleton<IClientAiContextService, ClientAiContextService>();
             services.AddTransient<IATRequestService, ATRequestService>();
             services.AddTransient<ICheckRequestService, CheckRequestService>();
+            services.AddTransient<ICheckRequestAutomationService, CheckRequestAutomationService>();
+            services.AddTransient<IRepresentativePayeeService, RepresentativePayeeService>();
             services.AddTransient<IProviderService, ProviderService>();
             services.AddTransient<IDhhsFormService, DhhsFormService>();
+            services.AddTransient<ICwicPacketService, CwicPacketService>();
+            services.AddTransient<IHousingSupportFundsService, HousingSupportFundsService>();
             // Local SSN protection: the same envelope the API uses, wrapped by the
             // Windows user account key instead of Key Vault. Singleton because none
             // of the three holds per-request state.
@@ -528,6 +547,7 @@ namespace Sati
             services.AddTransient<IIncidentReporter, CloudIncidentReporter>();
             services.AddTransient<IPlatformHealthService, CloudPlatformHealthService>();
             services.AddTransient<IPersonService, CloudPersonService>();
+            services.AddTransient<IPersonPhotoService, CloudPersonPhotoService>();
             services.AddTransient<INoteService, CloudNoteService>();
             services.AddTransient<ISettingsService, CloudSettingsService>();
             services.AddTransient<IScratchpadService, CloudScratchpadService>();
@@ -543,8 +563,12 @@ namespace Sati
             services.AddTransient<IReviewItemService, CloudReviewItemService>();
             services.AddTransient<IATRequestService, CloudAtRequestService>();
             services.AddTransient<ICheckRequestService, CloudCheckRequestService>();
+            services.AddTransient<ICheckRequestAutomationService, CloudCheckRequestAutomationService>();
+            services.AddTransient<IRepresentativePayeeService, CloudRepresentativePayeeService>();
             services.AddTransient<IProviderService, CloudProviderService>();
             services.AddTransient<IDhhsFormService, CloudDhhsFormService>();
+            services.AddTransient<ICwicPacketService, CloudCwicPacketService>();
+            services.AddTransient<IHousingSupportFundsService, CloudHousingSupportFundsService>();
             services.AddTransient<IApiCompatibilityService, CloudApiCompatibilityService>();
             services.AddTransient<IAgencyReleaseService, CloudAgencyReleaseService>();
             services.AddTransient<IDocumentTemplateService, CloudDocumentTemplateService>();

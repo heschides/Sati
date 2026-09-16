@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Sati.Api.Data;
+using Sati.Contracts.V1;
+using Sati.Data;
 
 namespace Sati.Api.Infrastructure;
 
@@ -17,7 +19,20 @@ internal sealed class SingleAttemptWriteFilter(IDbContextFactory<ApiDbContext> f
         if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method))
             return await next(context);
         await using var db = await factory.CreateDbContextAsync(context.HttpContext.RequestAborted);
-        return await new SingleAttempt(db).ExecuteAsync(async () => await next(context));
+        try
+        {
+            return await new SingleAttempt(db).ExecuteAsync(async () => await next(context));
+        }
+        catch (ServiceTimeWriteConflictException failure)
+        {
+            return Results.Conflict(new ApiErrorDto("service_time_busy", failure.Message,
+                context.HttpContext.TraceIdentifier));
+        }
+        catch (BillingPeriodWriteConflictException failure)
+        {
+            return Results.Conflict(new ApiErrorDto("billing_period_busy", failure.Message,
+                context.HttpContext.TraceIdentifier));
+        }
     }
 
     private sealed class SingleAttempt(ApiDbContext context) : ExecutionStrategy(context, 0, TimeSpan.Zero)

@@ -6,177 +6,31 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Honest pace, richer color, safer recovery";
-    public const string ReleaseDate = "September 10, 2026";
+    public const string ReleaseName = "Safe Local startup restored";
+    public const string ReleaseDate = "September 14, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
         new(
-            "Productivity separates completed work from recoverable notes",
+            "Local startup works with its safety checks intact",
             [
-                "The Overview now distinguishes units secured by completed notes, units still recoverable within the seven-calendar-day documentation window, and future eligible workdays.",
-                "A deadline warning shows the units that expire after today and how the required pace changes if they are not completed.",
-                "Scheduled work is never counted as performed work, and pending items without a duration are disclosed without inventing units.",
-                "Older settings responses with an absent or invalid documentation window safely use the seven-day policy instead of breaking the productivity panel."
+                "The Local client now carries the required SatiProduction database name in tracked, non-secret configuration.",
+                "Sati checks that required name against the workstation's private integrated-security connection before opening the database.",
+                "A missing or mismatched database name still stops safely instead of opening an unintended database."
             ]),
         new(
-            "Richer color includes a new geometric dark theme",
+            "The Local installer now proves its startup configuration",
             [
-                "Walnut Linen, Deep Current, Redwood Blush, and Bodhi Watercolor add deeper brown, blue, muted red, turquoise, and violet choices while retaining dark text on light surfaces.",
-                "Bodhi Watercolor follows the turquoise, blue, violet, and restrained coral sequence of the Sati leaf.",
-                "Umber Facets layers intersecting espresso, chestnut, caramel, ochre, and tan planes across a dark shell while keeping working surfaces quiet.",
-                "All twenty-five palettes pass the same measured WCAG AA token and rendered-view checks."
+                "The installer build refuses a package unless its public database name and private connection agree exactly.",
+                "Isolated installer acceptance repeats that complete configuration check on the files actually installed.",
+                "SQL usernames and passwords remain forbidden; Local Sati continues to use the signed-in Windows identity."
             ]),
         new(
-            "Scratchpad history joins the Overview Work Agenda",
+            "No records or workflows changed",
             [
-                "History is now a third tab beside Today's Work and Tomorrow's Agenda when Work Agenda is centered on Overview.",
-                "The former history window, search icon, and startup registrations are removed; the same date-range browser and locked retrospective comments now stay in the main workspace.",
-                "A short directional slide connects the three views, and the History tab stays out of the narrow side dock on other pages."
-            ]),
-        new(
-            "Crash recovery carries safe Windows diagnostics into Admin",
-            [
-                "Sati keeps a process ID, process name, stable reference, and heartbeat so an unclean run can be recognized after the next authenticated start.",
-                "When Windows records a matching application fault, Sati attaches only allowlisted event metadata to the existing incident; raw runtime error text, paths, note narratives, credentials, and memory dumps are excluded.",
-                "Delayed or unavailable Windows reports remain visibly pending instead of being silently lost, and the Admin incident view explains the diagnostic state.",
-                "Power loss, storage failure, and very early pre-login failures can still prevent detailed correlation; the incident record does not claim that every possible crash can be captured."
-            ]),
-        new(
-            "Representative-payee check requests are ready for Finance",
-            [
-                "Each consumer profile now has a Check Requests workspace with history, a draft editor, a paper preview, and PDF preparation.",
-                "Consumer, agency, case-manager, supervisor, and publisher identity come from Sati records rather than editable document fields.",
-                "Preparing the PDF publishes and permanently locks the request. A correction is a new request, preserving the financial record and audit history.",
-                "Only the assigned case manager may create, edit, or publish. Existing authorized supervisors may read and regenerate the frozen document."
-            ]),
-        new(
-            "Outlook calendar exports can join the calendar",
-            [
-                "A one-time Outlook .ics import places appointments beside Sati work without turning them into notes, billable activity, exemptions, or compliance records.",
-                "The selected file stays on this computer, and the replaceable calendar copy is separated by Sati user and Demo or Production environment.",
-                "Imported subjects, times, and locations appear in the year, month, selected-day, and focused-day views. Common recurrences, exclusions, all-day events, UTC times, and Windows time zones are supported.",
-                "Because calendar text may contain protected information, the local copy is encrypted for the current Windows account. Sati does not connect to Outlook or store a Microsoft account token."
-            ]),
-        new(
-            "Calendar navigation is easier to read and move through",
-            [
-                "The calendar opens with a useful month view, provides direct previous-month, next-month, month, and year controls, and keeps selected-day details together.",
-                "Outlook entries and Sati notes remain visually and semantically distinct, including non-color labels and screen-reader names."
-            ]),
-        new(
-            "Themes are measured, not only inspected",
-            [
-                "All twenty-five themes are checked against WCAG AA color contrast across their named text and surface roles and across rendered application views.",
-                "Interactive tiles and navigation surfaces now receive keyboard operation, visible focus, and meaningful screen-reader names through one shared behavior.",
-                "Profile and password settings now live in the main Settings window, and the greeting badge is the single keyboard-accessible way into it."
-            ]),
-        new(
-            "Decorative themes frost every working window",
-            [
-                "Geometric and illustrated patterns remain crisp in genuinely open shell space but soften into frosted glass behind navigation, panels, startup screens, sign-in, account switching, settings, and confirmation dialogs.",
-                "Vanilla Bean joins the theme list, while the larger Paisley and Mid-Century Modern repeats reduce obvious tiling without putting sharp artwork behind text."
-            ]),
-        new(
-            "Demo administrators can restore the approved baseline",
-            [
-                "A Demo-only Admin action restores the complete approved superhero and television-themed dataset, including users, clients, notes, billing records, and demonstration passwords.",
-                "The reset rolls showcase dates forward after restoration and refuses to run if the database structure no longer matches the reviewed baseline.",
-                "Demo changes are paused during restoration, and every existing Demo session is signed out so an old screen cannot continue against replaced data.",
-                "The reset is not available in Local Production. It does not read, copy, or change Production data."
-            ]),
-        new(
-            "Dark themes keep controls and identity readable",
-            [
-                "Menus, selected navigation, workflow buttons, dialogs, and status labels now use explicit foreground and background pairs instead of borrowing the window background as a text color.",
-                "The Hello badge uses a readable raised surface with an accent outline, including on the darkest themes.",
-                "Strong success and warning actions have dedicated contrasting text colors in both light and dark palettes."
-            ]),
-        new(
-            "Decorative patterns step back from working content",
-            [
-                "Paisley, Art Nouveau, Mid-Century Modern, and Vanilla Bean softly blur their pattern behind navigable content so labels and field boundaries remain clear.",
-                "Navigation decoration is softly muted beneath its labels, and Sati never blurs the controls, case notes, forms, or tables themselves."
-            ]),
-        new(
-            "Submitted claims now have a visible staging lane",
-            [
-                "Submit & Lock moves a billing period out of the draft queue and into a visible 837 staging grid.",
-                "Billing staff can choose staged periods for generation, and successfully generated periods leave staging immediately with a clear confirmation.",
-                "A submitted historical period that fails today's exact claim gate is quarantined before 837 generation and explains what must be corrected.",
-                "Before any exchange history exists, an authorized billing user can return a blocked period to Draft for correction; generated or transmitted work cannot be rewound."
-            ]),
-        new(
-            "The daily Demo refresh repairs synthetic claim snapshots",
-            [
-                "Synthetic Demo claims now receive complete billing identifiers, procedure details, units, charges, place of service, diagnosis values, and matching frozen snapshots.",
-                "The deliberately incomplete diagnosis teaching profile receives a fictional F89 billing fallback so the lesson remains visible without breaking the claims pipeline.",
-                "The refresh verifies every repaired claim after writing it and fails visibly if an invalid synthetic claim remains."
-            ]),
-        new(
-            "Billing shows what will be submitted",
-            [
-                "The Billing Period selector is now a focused draft queue. After Submit & Lock succeeds, that period leaves the selector and moves forward to 837P generation and Submission Home.",
-                "A claim line grid beside the selector shows the client, service date, units, charge, procedure, diagnosis, readiness, and the exact correction needed before submission.",
-                "The preview, Submit & Lock action, and 837P generator now use the same exact frozen-claim readiness rule, so a line that cannot generate is stopped and explained earlier."
-            ]),
-        new(
-            "Setup stays out of the command window",
-            [
-                "Demo and Local installers now keep their internal PowerShell work hidden and show one Sati-branded progress window instead.",
-                "If Microsoft LocalDB is missing, Windows may still show its normal permission prompt; that security prompt is intentional."
-            ]),
-        new(
-            "Five decorative themes",
-            [
-                "Settings now includes Ironworks Matte, Paisley, Art Nouveau, Mid-Century Modern, and Vanilla Bean.",
-                "Their geometric and decorative patterns stay on the outer shell and navigation, while forms, notes, and tables keep calm readable surfaces."
-            ]),
-        new(
-            "Account changes now protect the whole workspace",
-            [
-                "Before Sati opens an account-change or sign-in window, it covers the entire workspace so information from the outgoing account cannot remain visible.",
-                "After a successful account change, Sati clears the outgoing account's clients, notes, approvals, billing, administration, scratchpad, and chat state before installing the new identity.",
-                "Slow results that belong to the old account are discarded instead of being allowed to refill a screen after the change.",
-                "Canceling an account change safely restores the existing workspace. Re-authenticating the same account preserves in-progress drafts."
-            ]),
-        new(
-            "Demo 837P files can complete a realistic test loop",
-            [
-                "After generating test 837P files in the current Demo session, billing staff can choose a mock clearinghouse outcome and submit those exact retained files.",
-                "The mock records a synthetic transmission and processes the selected 999, 277CA, or 835 response through Sati's normal claim-exchange history.",
-                "Submission Home and Remittances refresh after the response so accepted, rejected, adjusted, denied, and paid demonstrations can be reviewed in one workflow.",
-                "This tool is Demo-only. It does not transmit a real claim to Office Ally, a payer, or any other clearinghouse."
-            ]),
-        new(
-            "The 1.2.49 workflow improvements remain included",
-            [
-                "Supervisors can page through newest-first note approvals and filter by case manager, client, service-date range, or search term.",
-                "Billing-period choices show case-manager names, claim counts, workflow state, and readiness; Submit & Lock remains separate from 837P generation.",
-                "The synthetic Demo caseload refresh keeps showcase dates current, fills ordinary fictional profiles, and preserves a small set of clearly labeled teaching exceptions.",
-                "Team chat and electronic signing remain controlled test features with their existing safety restrictions."
-            ]),
-        new(
-            "The Overview now fits the space you have",
-            [
-                "Sati rearranges the Overview as its window changes size so Notes, deadlines, forms, productivity, and Work Agenda remain available.",
-                "Focus note gives the current note the available workspace without creating a new draft, and returning to Overview preserves what you typed.",
-                "Easy Eyes remains one switch for larger text and controls, supported by the same responsive layout."
-            ]),
-        new(
-            "Supervisors can work through large approval queues",
-            [
-                "Pending Approvals loads 10 notes at a time and keeps the selected filters while more results are loaded.",
-                "Approve all within threshold defaults to a maximum of 4 units per note; opening, scrolling, filtering, or editing the threshold never approves anything.",
-                "Every approval still passes supervision scope, compliance, revision, validity, and service-time conflict checks."
-            ]),
-        new(
-            "Still planned before commercial production",
-            [
-                "A real clearinghouse transport, authenticated acknowledgements, payer-sourced 835 import, corrected claim workflows, enrollment, and certification.",
-                "Dual-control release of a legal hold; today's administrative release remains single-admin.",
-                "Production identity and MFA, external monitoring, automated retention and legal-hold enforcement, and the remaining operational controls recorded in the project agenda.",
-                "Independent legal, security, accessibility, and program review before real clinical, signing, cross-agency chat, or claims use."
+                "This hotfix adds no database migration and changes no consumer, billing, document, or workflow records.",
+                "The 1.3.9 Local client stopped before database access, so installing this release is the recovery step.",
+                "All application features delivered in 1.3.9 remain available in this corrected build."
             ])
     ];
 }

@@ -86,6 +86,8 @@ public sealed class ExactDateNoteComplianceTests
             FormType.PCP,
             new DateTime(2026, 8, 1),
             targetEffectiveDate: new DateTime(2026, 8, 1)));
+        // Submission also requires goal progress; this test is about the policy date.
+        foreach (var row in rows) row.GoalProgress = GoalProgressLevel.Moderate;
 
         log.SelectedNote = rows[0];
         await log.MarkNoteLoggedCommand.ExecuteAsync(null);
@@ -115,6 +117,7 @@ public sealed class ExactDateNoteComplianceTests
         panel.Status = NoteStatus.Logged;
         panel.EventDate = eventDate;
         panel.Minutes = 15;
+        panel.GoalProgress = GoalProgressLevel.Moderate;
         panel.Narrative = narrative;
     }
 

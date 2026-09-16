@@ -83,10 +83,26 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
         Assert.Equal(form.Id.ToString(), audit.ResourceId);
         Assert.Contains(completedOn.ToString("yyyy-MM-dd"), audit.MetadataJson);
 
+        var historyPath =
+            $"/api/v1/people/{person.Id}/forms/{form.Type}/attestations?formId={form.Id}";
+        var attestedHistory = await owner.GetFromJsonAsync<List<FormAttestationHistoryDto>>(historyPath)
+            ?? throw new InvalidOperationException("The attestation history response was empty.");
+        var attested = Assert.IsType<FormAttestationHistoryDto>(attestedHistory.First());
+        Assert.Equal("Attested", attested.Kind);
+        Assert.Equal(completedOn.Date, attested.CompletedOn);
+        Assert.Equal("case-manager-one", attested.ActorDisplayName);
+        Assert.Equal("CaseManager", attested.ActorKind);
+        Assert.True(attested.RecordedAtUtc > DateTime.UtcNow.AddMinutes(-1));
+
         var revoke = await owner.PostAsJsonAsync(
             $"/api/v1/people/{person.Id}/forms/{form.Type}/attestation/revoke",
             new { FormId = form.Id, Reason = "API regression-test cleanup." });
         revoke.EnsureSuccessStatusCode();
+
+        var revokedHistory = await owner.GetFromJsonAsync<List<FormAttestationHistoryDto>>(historyPath)
+            ?? throw new InvalidOperationException("The revoked history response was empty.");
+        Assert.Equal("Revoked", revokedHistory.First().Kind);
+        Assert.Equal("API regression-test cleanup.", revokedHistory.First().Reason);
     }
 
     [Fact]
@@ -113,6 +129,21 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
 
         var response = await owner.GetAsync("/api/v1/people/103/attestations/pending");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AttestationHistoryRouteDoesNotExposeAnotherCaseload()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        using var supervisor = await factory.CreateAuthenticatedClientAsync("director-one");
+        var foreignPeople = await supervisor.GetFromJsonAsync<List<PersonDto>>(
+            "/api/v1/caseload?userId=19");
+        var foreignForm = foreignPeople!.Single(candidate => candidate.Id == 103).Forms.First();
+
+        var response = await owner.GetAsync(
+            $"/api/v1/people/103/forms/{foreignForm.Type}/attestations?formId={foreignForm.Id}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

@@ -277,6 +277,46 @@ public sealed class FormService(
             CanSupervisorOverride: false);
     }
 
+    public async Task<IReadOnlyList<FormAttestationHistoryDto>> GetAttestationHistoryAsync(Form form)
+    {
+        var actor = CurrentCaseManager();
+        await using var context = await contextFactory.CreateDbContextAsync();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        var stored = await LoadOwnedFormAsync(context, actor, form.Id);
+        var rows = await (
+            from entry in context.FormAttestations.AsNoTracking()
+            join user in context.Users.AsNoTracking()
+                on entry.ActorUserId equals (int?)user.Id into actorUsers
+            from user in actorUsers.DefaultIfEmpty()
+            where entry.FormId == stored.Id
+            orderby entry.RecordedAtUtc descending, entry.Id descending
+            select new
+            {
+                entry.Id,
+                entry.FormId,
+                entry.Kind,
+                entry.CompletedOn,
+                entry.ActorKind,
+                entry.ActorUserId,
+                ActorDisplayName = user == null ? "Sati" : user.DisplayName,
+                entry.RecordedAtUtc,
+                entry.EvidenceNoteId,
+                entry.Reason
+            }).ToListAsync();
+
+        return rows.Select(entry => new FormAttestationHistoryDto(
+            entry.Id,
+            entry.FormId,
+            entry.Kind.ToString(),
+            entry.CompletedOn,
+            entry.ActorKind.ToString(),
+            entry.ActorUserId,
+            entry.ActorDisplayName,
+            entry.RecordedAtUtc,
+            entry.EvidenceNoteId,
+            entry.Reason)).ToList();
+    }
+
     public async Task<DocumentArtifactDto> RecordExternalPrerequisiteAsync(Form form, string note)
     {
         var actor = CurrentCaseManager();

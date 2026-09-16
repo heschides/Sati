@@ -21,6 +21,7 @@ public sealed class ComprehensiveAssessmentService(
 
         await using var db = await contextFactory.CreateDbContextAsync();
         await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        await EnsureAuthoringEnabledAsync(db, actor.AgencyId);
         var ownsPerson = await LocalTenantAccess.OwnsPersonAsync(db, actor, personId);
         if (!ownsPerson)
             throw new UnauthorizedAccessException("Only the assigned case manager may read this assessment.");
@@ -37,6 +38,7 @@ public sealed class ComprehensiveAssessmentService(
         var actor = CurrentAuthor(authorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
         await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        await EnsureAuthoringEnabledAsync(db, actor.AgencyId);
         var canAuthor = await LocalTenantAccess.OwnsPersonAsync(db, actor, personId);
         if (!canAuthor)
             throw new UnauthorizedAccessException("Only the assigned case manager may author this assessment.");
@@ -122,6 +124,7 @@ public sealed class ComprehensiveAssessmentService(
         var actor = CurrentAuthor(assessment.AuthorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
         await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        await EnsureAuthoringEnabledAsync(db, actor.AgencyId);
         await LocalTenantAccess.EnsureCurrentActorAsync(db, actor);
         var stored = await db.ComprehensiveAssessments
             .Include(candidate => candidate.Person)
@@ -147,6 +150,7 @@ public sealed class ComprehensiveAssessmentService(
         var actor = CurrentAuthor(assessment.AuthorUserId);
         await using var db = await contextFactory.CreateDbContextAsync();
         await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
+        await EnsureAuthoringEnabledAsync(db, actor.AgencyId);
         await LocalTenantAccess.EnsureCurrentActorAsync(db, actor);
         var stored = await db.ComprehensiveAssessments
             .Include(candidate => candidate.Person)
@@ -185,5 +189,16 @@ public sealed class ComprehensiveAssessmentService(
         {
             throw new UnauthorizedAccessException("Only the assigned case manager may change this assessment.");
         }
+    }
+
+    private static async Task EnsureAuthoringEnabledAsync(SatiContext db, int agencyId)
+    {
+        var enabled = await db.Settings.AsNoTracking()
+            .Where(settings => settings.AgencyId == agencyId)
+            .Select(settings => (bool?)settings.IsComprehensiveAssessmentAuthoringEnabled)
+            .SingleOrDefaultAsync() ?? false;
+        if (!enabled)
+            throw new NotSupportedException(
+                "Sati Comprehensive Assessment authoring is turned off for this agency. Record the Evergreen completion through the form attestation workflow.");
     }
 }
