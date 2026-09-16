@@ -188,7 +188,12 @@ SELECT
     CAST(CASE WHEN OBJECT_ID(N'dbo.BillingCompliancePolicyVersions', N'U') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS PolicyVersionTable,
     CAST(CASE WHEN OBJECT_ID(N'dbo.BillingCompliancePolicyReviewFlags', N'U') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS ReviewFlagTable,
     CAST(CASE WHEN OBJECT_ID(N'dbo.BillingComplianceRecoveryDecisions', N'U') IS NOT NULL THEN 1 ELSE 0 END AS bit) AS RecoveryDecisionTable,
-    (SELECT COUNT_BIG(*) FROM dbo.Notes WHERE ComplianceOverride = 1) AS LegacyOverrideNoteCount;
+    (SELECT COUNT_BIG(*) FROM dbo.Notes WHERE ComplianceOverride = 1) AS LegacyOverrideNoteCount,
+    -- The conversion's first guard: an annual form whose consumer has no effective date
+    -- has no target to derive, so any row here aborts the migration before it changes
+    -- anything. Reported during inspection so it is found before a client launch hits it.
+    (SELECT COUNT_BIG(*) FROM dbo.Forms f LEFT JOIN dbo.People p ON p.Id = f.PersonId
+      WHERE p.Id IS NULL OR p.EffectiveDate IS NULL) AS FormsWithoutUsableEffectiveDate;
 '@
 
     $preflightReader = $preflight.ExecuteReader()
@@ -212,6 +217,7 @@ SELECT
         ReviewFlagTable = $preflightReader.GetBoolean(13)
         RecoveryDecisionTable = $preflightReader.GetBoolean(14)
         LegacyOverrideNoteCount = $preflightReader.GetInt64(15)
+        FormsWithoutUsableEffectiveDate = $preflightReader.GetInt64(16)
     }
     $preflightReader.Close()
 
