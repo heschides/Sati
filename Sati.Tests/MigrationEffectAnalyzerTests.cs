@@ -54,6 +54,38 @@ public sealed class MigrationEffectAnalyzerTests
     }
 
     [Fact]
+    public void ADefaultOnlyAlterIsNotEvidenceThatAMigrationRan()
+    {
+        // 20260915004541_CorrectAnnualComplianceAndBillingPolicy against a database that
+        // has had none of it. The correction alters Settings.BillingComplianceRequirements
+        // only to change its default from 31 to 7: same type, same nullability, no bound.
+        // That leaves nothing to observe, so counting it as applied made an untouched
+        // database read PartiallyPresent and refused to start on a real workstation.
+        var schema = MigrationEffectAnalyzer.LiveSchema.ForTests(
+            new() { ["Settings"] = new() { ["BillingComplianceRequirements"] = (false, Unbounded) } });
+
+        var finding = MigrationEffectAnalyzer.Classify(
+            "20260915004541_CorrectAnnualComplianceAndBillingPolicy",
+            [
+                new AlterColumnOperation
+                {
+                    Table = "Settings", Name = "BillingComplianceRequirements",
+                    ClrType = typeof(int), IsNullable = false, DefaultValue = 7,
+                    OldColumn = new AddColumnOperation
+                    {
+                        Table = "Settings", Name = "BillingComplianceRequirements",
+                        ClrType = typeof(int), IsNullable = false, DefaultValue = 31
+                    }
+                },
+                new CreateTableOperation { Name = "ReleaseObligations" }
+            ],
+            schema);
+
+        Assert.Equal(MigrationEffectState.NotApplied, finding.State);
+        Assert.Empty(finding.PresentEffects);
+    }
+
+    [Fact]
     public void ANarrowedColumnAndItsIndexReadAsAlreadyPresent()
     {
         // The same migration against a database that has had all of it. This is the

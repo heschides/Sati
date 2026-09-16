@@ -156,11 +156,40 @@ public static class MigrationEffectAnalyzer
                 // merely wider than the migration declared is left satisfied, because
                 // that is benign drift and narrowing the verdict there would stop
                 // startup over something that does not affect correctness.
+                // An alter that changes neither nullability nor a bound leaves no trace
+                // this analyzer can read: altering only a default value looks identical
+                // before and after. Counting it as applied made a completely
+                // un-migrated database report PartiallyPresent, because the one
+                // default-only alter in the 2026-09-15 correction read as present while
+                // every table and column beside it read as missing, and startup refused.
+                // Such an alter is evidence of nothing, so it is unverifiable.
                 case AlterColumnOperation alter:
                     var boundApplied =
                         alter.MaxLength is not int declaredLength
                         || schema.ColumnMaxLength(alter.Table, alter.Name) is not int liveLength
                         || liveLength >= declaredLength;
+
+                    // A live column that still disagrees with the target is proof the
+                    // alter has not run, whatever else the operation changes.
+                    var nullabilityMatches =
+                        schema.HasColumn(alter.Table, alter.Name)
+                        && schema.ColumnIsNullable(alter.Table, alter.Name) == alter.IsNullable;
+
+                    // When it agrees, agreement is only evidence if the alter actually
+                    // changes something observable. Altering a default leaves the column
+                    // identical, so a matching column proves nothing either way: it looks
+                    // the same before and after. Treating that as applied made a wholly
+                    // un-migrated database read PartiallyPresent and refuse to start.
+                    var changesNullability = alter.IsNullable != alter.OldColumn.IsNullable;
+                    var narrowsBound = alter.MaxLength is int target
+                        && (alter.OldColumn.MaxLength is not int previous || previous > target);
+                    if (nullabilityMatches && boundApplied && !changesNullability && !narrowsBound)
+                    {
+                        unverifiable.Add(
+                            $"{alter.Table}.{alter.Name} alters no nullability or bound");
+                        break;
+                    }
+
                     Record(
                         $"{alter.Table}.{alter.Name} is {(alter.IsNullable ? "nullable" : "not null")}"
                         + (alter.MaxLength is int bound ? $" and bounded to {bound}" : string.Empty),
