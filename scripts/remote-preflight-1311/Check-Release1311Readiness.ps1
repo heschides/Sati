@@ -93,6 +93,20 @@ WITH c AS (
     WHERE ([Type] = N'ComprehensiveAssessment'
             AND DueDate NOT IN (Expected, DATEADD(day, -60, NextAnniversary), DATEADD(day, -120, NextAnniversary)))
        OR ([Type] <> N'ComprehensiveAssessment' AND DueDate <> Expected)
+), witness AS (
+    -- The conversion also refuses annual rows it cannot date-shape: it wants a same-target
+    -- Q4 review whose agency offset is not the old hard-coded one-day value.
+    SELECT annual.Id
+    FROM f2 AS annual
+    INNER JOIN dbo.Settings AS s ON s.AgencyId = annual.AgencyId
+    WHERE annual.[Type] NOT IN (N'Q1R', N'Q2R', N'Q3R', N'Q4R')
+      AND (s.Q4RDaysBeforeAnniversary = 1
+           OR NOT EXISTS (SELECT 1 FROM f2 AS q4
+                          WHERE q4.PersonId = annual.PersonId
+                            AND q4.[Type] = N'Q4R'
+                            AND q4.Target = annual.Target))
+), duplicates AS (
+    SELECT PersonId FROM f2 GROUP BY PersonId, [Type], Target HAVING COUNT(*) > 1
 )
 SELECT
     (SELECT EnvironmentName FROM dbo.SatiDatabaseIdentity WHERE Id = 1) AS EnvironmentMarker,
@@ -109,6 +123,12 @@ SELECT
     (SELECT COUNT_BIG(*) FROM mismatch WHERE DATEDIFF(day, Expected, DueDate) <> -1
         AND (CompletedDate IS NOT NULL OR OpenedDate IS NOT NULL)) AS UnattributableWithEvidence,
     (SELECT COUNT(DISTINCT PersonId) FROM mismatch) AS ConsumersAffected,
+    (SELECT COUNT_BIG(*) FROM witness) AS AnnualRowsMissingQ4Witness,
+    (SELECT COUNT_BIG(*) FROM duplicates) AS DuplicateObligationGroups,
+    (SELECT COUNT_BIG(*) FROM dbo.Forms WHERE [Type] NOT IN (N'Q1R',N'Q2R',N'Q3R',N'Q4R',N'PCP',
+        N'ComprehensiveAssessment',N'Reclassification',N'SafetyPlan',N'PrivacyPractices',
+        N'Release_Agency',N'Release_DHHS',N'Release_Medical')) AS UnknownFormTypes,
+    (SELECT COUNT_BIG(*) FROM dbo.Notes WHERE DATALENGTH(OverrideReason) > 8000) AS OverrideReasonsTooLong,
     (SELECT COUNT_BIG(*) FROM dbo.Notes WHERE ComplianceOverride = 1) AS LegacyOverrideNotes;
 '@
     $reader = $command.ExecuteReader()
@@ -128,7 +148,12 @@ SELECT
     }
     elseif (([int64]$values['FormsWithoutUsableEffectiveDate'] +
              [int64]$values['DeadlinesOffByOneDay'] +
-             [int64]$values['DeadlinesUnattributable']) -eq 0) {
+             [int64]$values['DeadlinesUnattributable'] +
+             [int64]$values['AnnualRowsMissingQ4Witness'] +
+             [int64]$values['DuplicateObligationGroups'] +
+             [int64]$values['UnknownFormTypes'] +
+             [int64]$values['OverrideReasonsTooLong'] +
+             [int64]$values['LegacyOverrideNotes']) -eq 0) {
         'RESULT: ready. Installing 1.3.11 should convert this database without stopping.'
     }
     else {

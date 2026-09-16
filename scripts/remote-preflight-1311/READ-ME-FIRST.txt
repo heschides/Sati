@@ -32,3 +32,18 @@ IF ANYTHING LOOKS WRONG
 -----------------------
 Close the window and send Josh whatever it printed. Nothing in this folder modifies
 the database, so there is nothing to undo.
+
+IF STEP 1 SAYS "NOT ready"
+--------------------------
+Send the file to Josh first. If he says to go ahead, double-click
+"Step 2 - APPLY FIX" and type YES.
+
+Step 2 repairs compliance scheduling dates only: annual due dates that no longer
+match the schedule Sati can calculate, and old blanket billing overrides that the
+new version cannot interpret. It may also add missing quarterly-review rows.
+
+It does not change your client list, your notes, or your scratchpad. It checks all
+three before and after, and undoes the entire repair if any of them differ. It saves
+Sati-1311-repair.txt to your Desktop; keep that file.
+
+Afterwards, start Sati. It backs up your database and finishes the update itself.
