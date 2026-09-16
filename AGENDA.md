@@ -176,14 +176,54 @@ agency policy, and exceptions and administrative recovery are exact and immutabl
       the merge check, dropping the recovery, policy, and release-obligation entities.
       `StabilizationTests.EfModelMatchesLatestMigrationSnapshot` caught it before deployment; a
       regenerated check migration is empty again and the chain is now self-describing.
-- [ ] Complete coordinated 1.3.11 versioning, the full Release build, and all five test projects.
-- [ ] Apply the three 2026-09-15 migrations to identity-validated Azure `SatiDemo` through a
-      guarded, transactional, rerunnable script: rollback-only dry run, real run, then a second real
-      run proving idempotency. The user adds and removes the temporary exact-IP firewall rule.
-- [ ] Publish the Demo API and verify liveness, readiness, release version, and contract revision
-      parity with the compiled client.
-- [ ] Build, accept, and publish the Demo and Local installers and checksums without overwriting.
-- [ ] Record deployment identifiers, hashes, test totals, and Local Production machine state.
+- [x] Complete coordinated 1.3.11 versioning, the full Release build, and all five test projects.
+      The Release build has zero errors and fifteen pre-existing analyzer warnings. Desktop 2,156,
+      API 820, signatures 119, portal 8, and Carika 4 pass; the default run skips five opt-in SQL
+      Server cases and two external checks. One API run failed once with an unidentified test and
+      has not reproduced in seven consecutive runs; it is recorded here rather than treated as
+      resolved, because the failing run carried no logger.
+- [x] Apply the three 2026-09-15 migrations to identity-validated Azure `SatiDemo`. The conversion
+      aborted twice on its own guards before any change: once for a consumer with annual forms and
+      no effective date, and once for deadlines that do not match the documented legacy calculator.
+      Both aborts rolled back and left the database at 105 migrations.
+- [x] Reconcile the Demo data the rehearsal exposed, through
+      `scripts/Reconcile-Release1311LegacyDeadlines.ps1`. Consumer 1012's effective date was set to
+      2025-12-18, derived from its own review cadence at target+90/180/270/360 and its annual rows on
+      the following anniversary. 27 deadlines in the mechanical one-day family were corrected, then,
+      behind a separate switch, 62 deadlines the pre-repair generator had stamped identically for
+      every form type were recomputed from the documented calculator across 11 consumers. 60 of
+      those rows carry completion or opening evidence; that evidence was never read or written, only
+      the deadline moved. This is a deliberate synthetic-data correction, not a rule change.
+- [x] Apply through `scripts/Apply-Release1311Migrations.ps1`. A single generated script cannot
+      apply this range: the correction migration adds `Forms.TargetEffectiveDate` and then reads it
+      from its own hand-written SQL, SQL Server compiles a batch before running it, and no GO may
+      appear inside the generated guarded blocks. The runner keeps the identity, chain-position, and
+      scratchpad guards and delegates the apply to EF, which sends each operation separately. Demo
+      moved from 105 to 108 migrations; all 4,124 forms have annual targets, none precedes its
+      consumer's admission, and the scratchpad held 135 rows before and after. A second real run
+      changed nothing.
+- [x] Publish the Demo API. `artifacts/SatiApi-1.3.11-fx-x86.zip` is 10,068,671 bytes with 70
+      entries and SHA-256
+      `C34D74492CED89A40D49B29E9A093472020C5A0256F3950A0CF84F106400A870`, built from pushed source
+      `ca0db6c` with file version 1.3.11.0, no settings files, and no secret-like values. OneDeploy
+      to `sati-demo-api-satilogica` in `rg-sati-demo` reported Succeeded. Live and ready returned
+      200, `/health/version` reports Sati.Api 1.3.11 and contract `E18157FBC2D9`, which equals the
+      compiled client's revision, and anonymous Admin access returned 401.
+- [x] Build, accept, and publish both installers without overwriting. The embedded
+      `artifacts\Prerequisites\SqlLocalDB.msi` still carries a Valid Microsoft Authenticode
+      signature with SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`. Demo passed five
+      responsive 15-second launches, graceful closes, exact version 1.3.11.0, and cleanup;
+      `SatiDemoSetup-1.3.11.exe` is 102,842,368 bytes with SHA-256
+      `8E920DC2CAE1A367EB6D7FAABDA0944127B206EF2F4E5BF6F0DCA65510D3C137`. Local passed exact
+      version, `SatiProduction` agreement, integrated security, and cleanup;
+      `SatiLocalSetup-1.3.11.exe` is 204,858,409 bytes with SHA-256
+      `BA5F9C25042B6F52BA0405E92E2B565607A2DD7D49E1181E7ED2CCD986183369`. Both executables and their
+      checksum files were staged, hash-verified, and renamed into `Sati Desktop` and
+      `SatiLogica Demo Files`; no staging file remains. Acceptance ran on the development
+      workstation, not an external clean machine.
+- [ ] Confirm the temporary exact-IP Azure SQL firewall rule for the workstation is closed. The
+      release workflow never added, altered, or removed a firewall rule.
 
 ### Local Production machines
 
