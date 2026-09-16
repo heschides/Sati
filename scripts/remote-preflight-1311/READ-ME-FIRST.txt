@@ -1,0 +1,34 @@
+Before installing Sati 1.3.11 on this computer
+==============================================
+
+Version 1.3.11 changes how annual compliance work is identified. The first time you
+start it, Sati backs up your database and converts the existing annual forms.
+
+That conversion is deliberately cautious. If it meets a form it cannot place in a
+specific service year, it stops and changes nothing rather than guessing at a date
+that decides whether work is billable. Your records stay exactly as they are, but
+Sati will not open until the rows are sorted out.
+
+This folder tells you, in advance, whether that will happen here.
+
+WHAT TO DO
+----------
+1. Copy both files in this folder to your Desktop, or anywhere on your own computer.
+   Running them straight from the shared folder can be blocked.
+
+2. Double-click "Step 1 - CHECK ONLY". It changes nothing. It saves a small text file
+   to your Desktop called Sati-1311-readiness.txt.
+
+3. Read the last line of that file:
+
+     "RESULT: ready"      - install 1.3.11 whenever you like.
+     "RESULT: NOT ready"  - send the file to Josh and wait. Do not install yet.
+     anything else        - send the file to Josh.
+
+4. The file contains counts and form types only. It contains no consumer names,
+   notes, or other personal information.
+
+IF ANYTHING LOOKS WRONG
+-----------------------
+Close the window and send Josh whatever it printed. Nothing in this folder modifies
+the database, so there is nothing to undo.
