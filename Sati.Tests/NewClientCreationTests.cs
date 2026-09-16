@@ -49,6 +49,30 @@ public sealed class NewClientCreationTests
     }
 
     [Fact]
+    public void AClientChangedElsewhereIsReportedAsNotSaved()
+    {
+        var problem = ClientSaveProblem.FromException(
+            new PersonConcurrencyException(),
+            ClientSaveStage.SavingRecord, false, "test-reference");
+
+        Assert.False(problem.SaveStatusUnknown);
+        Assert.Equal("Client Changes Not Saved", problem.Title);
+        Assert.Contains("changed after you opened it", problem.Message);
+        Assert.Contains("re-enter your changes", problem.Message);
+    }
+
+    [Fact]
+    public void ARefusedClientEditIsReportedAsNotSaved()
+    {
+        var problem = ClientSaveProblem.FromException(
+            new PersonPersistenceException("refused", new InvalidOperationException("guard")),
+            ClientSaveStage.SavingRecord, false, "test-reference");
+
+        Assert.False(problem.SaveStatusUnknown);
+        Assert.Equal("Client Changes Not Saved", problem.Title);
+    }
+
+    [Fact]
     public void UnconfirmedEditDoesNotDescribeCreatingAClientOrAssumeAServer()
     {
         var problem = ClientSaveProblem.FromException(

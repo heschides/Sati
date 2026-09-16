@@ -131,8 +131,7 @@ namespace Sati.Data
                 throw new InvalidOperationException("Use the caseload transfer workflow to change the consumer's owner.");
             person.AgencyId = stored.AgencyId;
             if (person.Revision != stored.Revision)
-                throw new InvalidOperationException(
-                    "This Person was changed after you opened it. Reload the Person before saving.");
+                throw new PersonConcurrencyException();
             if (person.IsTestData != stored.IsTestData)
             {
                 throw new PersonValidationException(new Dictionary<string, string[]>
@@ -169,7 +168,25 @@ namespace Sati.Data
                 LocalAuditTrail.Record(context, actor, LocalAuditActions.PersonUpdated, "Person", person.Id);
             if ((stored.FirstName, stored.LastName, stored.Email) != (person.FirstName, person.LastName, person.Email))
                 await SignaturePersistenceMutations.RevokeOpenForSignerAsync(context, person.Id, null, actor.Id, DateTime.UtcNow);
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                person.Revision = stored.Revision;
+                throw new PersonConcurrencyException();
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or DbUpdateException)
+            {
+                // Nothing was written: the transaction is still open and is rolled back on
+                // disposal. The recorded revision bump is undone so the next attempt is not
+                // reported as a conflict with itself.
+                person.Revision = stored.Revision;
+                throw new PersonPersistenceException(
+                    "The database refused the client changes, so none of them were saved.",
+                    exception);
+            }
             await signatureChangeTransaction.CommitAsync();
             return person;
         }

@@ -134,8 +134,16 @@ correctly refused the rewrite. The transaction rolled back, so the client change
 - [x] Write only the client row and newly generated forms; regressions for editing after adding a
       waiver provider, not rewriting notes changed elsewhere, and still saving a new waiver's forms.
       The first two fail against the old code.
-- [ ] The dialog reports an `InvalidOperationException` raised before commit (including the stale
-      revision message) as "status unconfirmed"; a typed exception would let it say "not saved".
+- [x] Report a client changed elsewhere (`PersonConcurrencyException`) and a refused write
+      (`PersonPersistenceException`) as "not saved" instead of "status unconfirmed", and undo the
+      in-memory revision bump when a save fails so a retry is not reported as its own conflict.
+- [x] Audit for the same class of failure. Every other local service that accepts an entity from
+      the screen loads a fresh copy by id or clears navigations first; no other graph-wide
+      `Update`/`Attach` exists; the API builds entities from DTOs. Each 1.3.11-era append-only
+      guard was checked against its writers (release retirement, note overrides, published check
+      requests, form attestations) without finding another violation. `LocalWorkflowSweepTests`
+      runs everyday sequences on a client with release history, attestations, providers, and
+      notes, and fails against the old client save.
 
 ## Local Production compliance seed (2026-09-16)
 

@@ -141,6 +141,16 @@ public sealed record ClientSaveProblem(
             };
         }
 
+        if (exception is PersonConcurrencyException)
+        {
+            return Build(
+                creating,
+                saveStatusUnknown: false,
+                problem: "This client was changed after you opened it, so Sati did not save over those changes.",
+                bestFix: "Select the client again to load the saved details, then re-enter your changes.",
+                supportReference);
+        }
+
         if (exception is PersonPersistenceException or DbUpdateException)
         {
             return Build(

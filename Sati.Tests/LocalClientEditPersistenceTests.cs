@@ -45,6 +45,30 @@ public sealed class LocalClientEditPersistenceTests
     }
 
     [Fact]
+    public async Task AClientChangedElsewhereIsRefusedAndTheLocalCopyStaysRetryable()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        await PrepareAsync(fixture);
+        var people = fixture.PeopleAs(fixture.CaseManagerOne);
+        var first = (await people.GetAllPeopleAsync(fixture.CaseManagerOne.Id))
+            .Single(item => item.Id == fixture.PersonOneId);
+        var second = (await people.GetAllPeopleAsync(fixture.CaseManagerOne.Id))
+            .Single(item => item.Id == fixture.PersonOneId);
+
+        second.PhoneNumber = "207-555-0120";
+        await people.EditPersonAsync(second);
+
+        first.PhoneNumber = "207-555-0121";
+        var revision = first.Revision;
+        await Assert.ThrowsAsync<PersonConcurrencyException>(() => people.EditPersonAsync(first));
+        Assert.Equal(revision, first.Revision);
+
+        await using var db = fixture.Factory.CreateDbContext();
+        Assert.Equal("207-555-0120",
+            (await db.People.AsNoTracking().SingleAsync(item => item.Id == fixture.PersonOneId)).PhoneNumber);
+    }
+
+    [Fact]
     public async Task SavingAClientDoesNotRewriteItsNotes()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
