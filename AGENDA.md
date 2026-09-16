@@ -123,6 +123,20 @@ signature-never-attests items retained later as history.
 - [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
       No source-level result here is a deployment or Production-readiness claim.
 
+## Local client edits refused since 1.3.11 (2026-09-16)
+
+Saving any client whose release rows were loaded failed in local Production with "Client Save
+Status Unconfirmed" (reported after adding a shared living provider; the provider itself was saved
+by its own panel). `PersonService.EditPersonAsync` called `People.Update(person)`, which marks the
+whole loaded graph — notes, forms, release rows — as modified, and the 1.3.11 release-history guard
+correctly refused the rewrite. The transaction rolled back, so the client changes were not saved.
+
+- [x] Write only the client row and newly generated forms; regressions for editing after adding a
+      waiver provider, not rewriting notes changed elsewhere, and still saving a new waiver's forms.
+      The first two fail against the old code.
+- [ ] The dialog reports an `InvalidOperationException` raised before commit (including the stale
+      revision message) as "status unconfirmed"; a typed exception would let it say "not saved".
+
 ## Local Production compliance seed (2026-09-16)
 
 See the 2026-09-16 seeding decision. Not part of any release.

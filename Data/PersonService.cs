@@ -150,7 +150,15 @@ namespace Sati.Data
                 person,
                 person.Forms.Where(form => form.Id == 0),
                 settings);
-            context.People.Update(person);
+            // Only the client row and any newly generated forms are written. Update() would
+            // mark the whole loaded graph — every note, form, and release row — as modified,
+            // and the release history is correctly refused as a rewrite of retained records.
+            context.Entry(person).State = EntityState.Modified;
+            foreach (var form in person.Forms.Where(form => form.Id == 0))
+            {
+                form.PersonId = person.Id;
+                context.Forms.Add(form);
+            }
             context.Entry(person).Property(candidate => candidate.Revision).OriginalValue = stored.Revision;
             // CreatedAtUtc has no public setter, so an edit-built Person can only ever carry the
             // CLR default here rather than the real value — excluding it from the update keeps
