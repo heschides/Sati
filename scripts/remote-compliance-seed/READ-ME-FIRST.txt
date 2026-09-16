@@ -1,0 +1,37 @@
+Clearing old overdue items from Sati
+====================================
+
+Your Sati database is not the record of your work; your tracking sheet, Evergreen,
+and Credible are. This tool makes Sati agree with them: every compliance item that
+is already past due is recorded as done ON ITS OWN DUE DATE. Anything due today or
+later is left alone, so Sati can track what is coming due from here on.
+
+What it records, all due before today:
+  - PCPs, assessments, Reclasses, Safety Plans, Privacy Practices, and 90-day reviews
+  - DHHS, agency, and medical releases, including earlier years Sati never listed
+  - an opened date for any PCP or assessment past its open/start date
+  - any annual form rows Sati has not created yet (it would add them on opening)
+
+Every one of these is marked "Seeded ... to match the external tracking sheet; not a
+record of completion", so they can always be told apart from real entries. It never
+creates or changes notes, clients, or scratchpad entries. The client list's "Last
+contact" line still reflects only the visits, calls, and emails you have entered.
+
+WHAT TO DO
+----------
+1. Copy this whole folder to your Desktop. Running it from the shared folder can be
+   blocked.
+
+2. Double-click "Step 1 - CHECK ONLY". It changes nothing. It shows counts (no names)
+   and saves Sati-compliance-seed-check.txt to your Desktop. Note TOTAL CHANGES.
+
+   "Left alone, needs a look" lists items it will not touch because Sati's own rules
+   refuse the date, for example a Reclass whose assessment was actually finished
+   later. Those stay overdue; fix them by hand in Sati.
+
+3. Close Sati. Double-click "Step 2 - APPLY", type the TOTAL CHANGES number and YES.
+   It backs up your database, rehearses on a copy, then applies. It saves
+   Sati-compliance-seed-apply.txt to your Desktop.
+
+4. If it ends with DONE, start Sati. Otherwise send the file to Josh; your database
+   is unchanged, and the backup it names holds the database as it was.

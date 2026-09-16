@@ -4508,3 +4508,36 @@ counted scheduled notes. The compact client picker still shows names only.
 
 No migration is needed. The API must be deployed with or before a desktop build that offers the
 option, because an older API rejects the unknown requirement bit.
+
+## 2026-09-16 — the non-authoritative local Production database may be seeded to match external tracking
+
+Josh's local `SatiProduction` database is not the system of record; Evergreen, Credible, and his
+tracking sheet are, and real legal use will start from a clean database. Its compliance rows show
+years of work as overdue that was done on time. `tools/SatiComplianceSeed`, delivered as the
+`scripts/remote-compliance-seed` bundle, records every past-due item as completed on its own due
+date. Items due today or later are untouched.
+
+This is a deliberate, bounded exception to "generation creates obligations, never evidence." It is
+acceptable only because this database is not a record. It is not a product feature and must not be
+run against any database that is.
+
+- It runs Sati's own code: `Person.EnsureCurrentCycleForms` creates the rows Sati would create on
+  load, `FormAttestationRules` and `FormOpeningRules` accept or refuse each date, and missing
+  earlier-year releases come from `ExpectedBillingComplianceObligations.MissingReleasePlans`, the
+  same list the billing safety net projects (extracted for this purpose). Anything the rules refuse
+  is left overdue and listed, never forced.
+- Form completions are System attestations. Release attestations must name a person, so they name
+  the consumer's own case manager, who is the one asserting completion. Every seeded row carries
+  "Seeded <date> to match the external tracking sheet; not a record of completion" and an audit
+  event with a `compliance-seed-` correlation id.
+- PCPs and assessments past their open or start deadline get an opened date at that deadline (or
+  the completion date, if earlier), so the new renewal controls do not report them as late.
+- No notes are created. Monthly contact reflects only recorded visits, calls, and emails.
+- Apply requires the check's total to be typed back, refuses while Sati is open, backs up and
+  verifies, rehearses on a restored copy, applies only if the re-planned change set matches the
+  reviewed one, and then confirms nothing is left to change and clients, notes, and recent
+  scratchpad are byte-for-byte unchanged by checksum.
+
+**Rejected:** one completion date for every item (records everything as late and makes past service
+non-billable), direct SQL (a second copy of the attestation and release rules), fabricating contact
+notes, and shipping the tool inside the desktop app.

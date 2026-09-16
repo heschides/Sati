@@ -1,5 +1,8 @@
 namespace Sati.Contracts.V1;
 
+/// <summary>An expected release obligation with no stored row, and the provider link naming its recipient.</summary>
+public sealed record MissingReleasePlan(ReleaseObligationPlan Plan, ReleaseProviderLinkFact? Recipient);
+
 /// <summary>
 /// Completes the set of annual compliance facts before billing evaluates it.
 /// Billing must not interpret an absent database row as completed work.
@@ -116,18 +119,52 @@ public static class ExpectedBillingComplianceObligations
         ArgumentNullException.ThrowIfNull(providerLinks);
 
         var projected = storedObligations.ToList();
+        foreach (var missing in MissingReleasePlans(
+                     initialEffectiveDate,
+                     projected.Select(item => item.StableKey),
+                     asOfDate,
+                     providerLinks))
+        {
+            var plan = missing.Plan;
+            projected.Add(new ReleaseComplianceFact(
+                plan.StableKey,
+                plan.Category,
+                plan.DueOn,
+                plan.AppliesFromOn,
+                plan.RetiredOn,
+                [],
+                TargetEffectiveDate: plan.TargetEffectiveDate,
+                AvailableOn: plan.AvailableOn,
+                RecipientDisplayName: missing.Recipient?.RecipientDisplayName));
+        }
+
+        return projected;
+    }
+
+    /// <summary>
+    /// Every release obligation the consumer's plan years and provider assignments call
+    /// for whose row is not among <paramref name="storedKeys"/>, with the provider link
+    /// that names its recipient. The billing safety net projects these; maintenance that
+    /// creates the missing rows uses the same list, so the two cannot disagree.
+    /// </summary>
+    public static IReadOnlyList<MissingReleasePlan> MissingReleasePlans(
+        DateTime? initialEffectiveDate,
+        IEnumerable<string> storedKeys,
+        DateTime asOfDate,
+        IEnumerable<ReleaseProviderLinkFact> providerLinks)
+    {
+        ArgumentNullException.ThrowIfNull(storedKeys);
+        ArgumentNullException.ThrowIfNull(providerLinks);
         if (initialEffectiveDate is not DateTime effectiveDate)
-            return projected;
+            return [];
 
         var links = providerLinks.ToArray();
-        var existingKeys = projected
-            .Select(item => item.StableKey)
-            .ToHashSet(StringComparer.Ordinal);
-        var recipients = links.ToDictionary(
+        var existingKeys = storedKeys.ToHashSet(StringComparer.Ordinal);
+        var linksByKey = links.ToDictionary(
             link => ReleaseAssignmentResolution.AssignmentKey(link.LinkId),
-            link => link.RecipientDisplayName,
             StringComparer.Ordinal);
 
+        var missing = new List<MissingReleasePlan>();
         foreach (var target in ComplianceScheduleRules.TargetEffectiveDatesThroughNext(
                      effectiveDate, asOfDate, MaximumCycles))
         {
@@ -142,23 +179,16 @@ public static class ExpectedBillingComplianceObligations
                 if (!existingKeys.Add(plan.StableKey))
                     continue;
 
-                projected.Add(new ReleaseComplianceFact(
-                    plan.StableKey,
-                    plan.Category,
-                    plan.DueOn,
-                    plan.AppliesFromOn,
-                    plan.RetiredOn,
-                    [],
-                    TargetEffectiveDate: plan.TargetEffectiveDate,
-                    AvailableOn: plan.AvailableOn,
-                    RecipientDisplayName: plan.AssignmentKey is not null &&
-                                          recipients.TryGetValue(plan.AssignmentKey, out var recipient)
-                        ? recipient
+                missing.Add(new MissingReleasePlan(
+                    plan,
+                    plan.AssignmentKey is not null &&
+                    linksByKey.TryGetValue(plan.AssignmentKey, out var link)
+                        ? link
                         : null));
             }
         }
 
-        return projected;
+        return missing;
     }
 
     public static string MissingFormObligationId(string type, DateTime targetEffectiveDate)

@@ -123,6 +123,23 @@ signature-never-attests items retained later as history.
 - [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
       No source-level result here is a deployment or Production-readiness claim.
 
+## Local Production compliance seed (2026-09-16)
+
+See the 2026-09-16 seeding decision. Not part of any release.
+
+- [x] Build `tools/SatiComplianceSeed` and the `scripts/remote-compliance-seed` bundle; extract
+      `ExpectedBillingComplianceObligations.MissingReleasePlans` so the billing safety net and the
+      tool share one list.
+- [x] Rehearse end to end on a synthetic Production-marked LocalDB: row creation, form, opening, and
+      release seeding, older-year releases with and without a provider recipient, a Reclass left
+      alone by the prerequisite rule, refusals for a wrong total and a non-Production name, and
+      Sati's own gate passing afterwards for every seeded client.
+- [x] Publish the single-file tool to `Sati Desktop\compliance-seed` (SHA-256
+      `bf01c7c414f818b01f8b6bb4454e1fc5885d403328650707b2288d85bffe3143`).
+- [ ] Run Step 1 on the Joshu login and review the counts, then Step 2.
+- [ ] Before any real legal use, start from a clean database; seeded rows are marked but are not
+      records.
+
 ## Unreleased — monthly contact requirement (2026-09-16)
 
 See the 2026-09-16 monthly-contact decision. No migration; deploy the API with or before the desktop.
