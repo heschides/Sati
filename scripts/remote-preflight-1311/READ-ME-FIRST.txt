@@ -46,4 +46,6 @@ It does not change your client list, your notes, or your scratchpad. It checks a
 three before and after, and undoes the entire repair if any of them differ. It saves
 Sati-1311-repair.txt to your Desktop; keep that file.
 
-Afterwards, start Sati. It backs up your database and finishes the update itself.
+Afterwards, install Sati 1.3.11 (SatiLocalSetup-1.3.11.exe, in the Sati Desktop folder),
+then start it. It backs up your database and finishes the update itself. Starting your
+current version after the repair is harmless, but it will not finish the update.

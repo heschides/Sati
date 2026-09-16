@@ -239,7 +239,10 @@ DROP TABLE #fix;
         else {
             $transaction.Commit()
             $committed = $true
-            'DONE: compliance dates repaired. Start Sati to finish the update.'
+            'DONE: compliance dates repaired.'
+            'NEXT: install Sati 1.3.11, then start it. It backs up the database and'
+            '      finishes the update itself. Starting your current version first is'
+            '      harmless but does nothing.'
         }
     }
     finally {
