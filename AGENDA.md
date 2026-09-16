@@ -142,10 +142,18 @@ migration is required.
       fail against the old behavior.
 - [ ] Next step: the caseload matrix (`FormCellViewModel`) still shows only the current-cycle row
       and needs its own decision on presenting two years in one cell.
-- [ ] `UpcomingEventsService.ActionableFormsThroughUpcomingTarget` and
-      `CaseManagerDashboardViewModel.SelectBoardForm` compute the next target as
-      `currentTarget.AddYears(1)`, which misses a February 29 renewal row generated for a leap
-      year. Use `ComplianceScheduleRules.UpcomingTargetEffectiveDate`.
+- [x] Stop computing the next annual target as `currentTarget.AddYears(1)`. For a February 29
+      admission that is February 28 of a leap year, which no generated row carries: upcoming
+      events and the task board missed the leap-year renewal, and the desktop and API release
+      reconcilers would have created an extra, never-attested release cycle on February 28
+      that blocks billing. The first affected date is February 28, 2027, so no such rows exist
+      yet. All callers now use `ComplianceScheduleRules.CurrentAndUpcomingTargetEffectiveDates`
+      or `UpcomingTargetEffectiveDate`; a source guard refuses the old expression.
+- [ ] Cycle-end arithmetic that has only a target, not the admission date, is still one day off
+      for February 29 admissions: `FormAttestationRules.ResolveCycleForForm` and the Reclass
+      prerequisite window, and the overlap end in `ReleaseObligationRules.GenerateCycle` and
+      `ReleaseAssignmentResolution.Resolve`. Affects only a provider link or attestation dated
+      on the leap-year boundary day.
 - [ ] Confirm the 120-day assessment start with OADS guidance; it currently comes from the
       agency workbook.
 - [ ] Verify the renewal layout in the running app at the smallest supported profile width.

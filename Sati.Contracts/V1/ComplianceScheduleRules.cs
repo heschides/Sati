@@ -67,6 +67,20 @@ public static class ComplianceScheduleRules
     }
 
     /// <summary>
+    /// The two annual identities kept reconciled and actionable on
+    /// <paramref name="asOf"/>: the plan in force and the next renewal. Callers must
+    /// use this instead of adding a year to the current target, which turns a
+    /// February 29 renewal into February 28 of a leap year.
+    /// </summary>
+    public static IReadOnlyList<DateTime> CurrentAndUpcomingTargetEffectiveDates(
+        DateTime initialEffectiveDate,
+        DateTime asOf) =>
+    [
+        CurrentTargetEffectiveDate(initialEffectiveDate, asOf),
+        UpcomingTargetEffectiveDate(initialEffectiveDate, asOf)
+    ];
+
+    /// <summary>
     /// Whether a document type is renewed by a new version that is prepared while
     /// the previous one is still in force. Such a type can have two obligations
     /// worth showing at once: the one in force and the renewal being developed.

@@ -70,9 +70,8 @@ namespace Sati.Data
                 {
                     var today = DateTime.Today;
                     var nowUtc = DateTime.UtcNow;
-                    var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
-                        effectiveDate, today);
-                    foreach (var target in new[] { currentTarget, currentTarget.AddYears(1) })
+                    foreach (var target in ComplianceScheduleRules
+                                 .CurrentAndUpcomingTargetEffectiveDates(effectiveDate, today))
                     {
                         var resolution = await ReleaseObligationService.ResolveAssignmentsAsync(
                             context, person, target, today, CancellationToken.None);
@@ -693,9 +692,8 @@ namespace Sati.Data
                     if (person.EffectiveDate is not DateTime effectiveDate)
                         continue;
 
-                    var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
-                        effectiveDate, today);
-                    foreach (var target in new[] { currentTarget, currentTarget.AddYears(1) })
+                    foreach (var target in ComplianceScheduleRules
+                                 .CurrentAndUpcomingTargetEffectiveDates(effectiveDate, today))
                     {
                         var resolution = await ReleaseObligationService.ResolveAssignmentsAsync(
                             context, person, target, today, CancellationToken.None);

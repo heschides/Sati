@@ -252,9 +252,8 @@ internal static partial class ApiEndpoints
         if (person.EffectiveDate is not DateTime effectiveDate)
             return;
 
-        var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
-            effectiveDate, clock.Today);
-        foreach (var target in new[] { currentTarget, currentTarget.AddYears(1) })
+        foreach (var target in ComplianceScheduleRules
+                     .CurrentAndUpcomingTargetEffectiveDates(effectiveDate, clock.Today))
         {
             var resolution = await ResolveReleaseAssignmentsAsync(
                 db, person, actor.AgencyId, target, clock.Today, cancellationToken);

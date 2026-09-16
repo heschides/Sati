@@ -87,7 +87,8 @@ namespace Sati.Data
             DateTime asOf,
             DateTime currentTarget)
         {
-            var nextTarget = currentTarget.AddYears(1);
+            var nextTarget = ComplianceScheduleRules.UpcomingTargetEffectiveDate(
+                person.EffectiveDate!.Value, asOf);
             var returned = new HashSet<Form>();
 
             // A persisted target is the annual identity. Include every unfinished
@@ -136,7 +137,8 @@ namespace Sati.Data
         {
             var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
                 person.EffectiveDate!.Value, today);
-            var nextTarget = currentTarget.AddYears(1);
+            var nextTarget = ComplianceScheduleRules.UpcomingTargetEffectiveDate(
+                person.EffectiveDate!.Value, today);
 
             foreach (var obligation in person.ReleaseComplianceFacts
                          .Where(item => item.TargetEffectiveDate is DateTime target &&

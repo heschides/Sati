@@ -185,9 +185,10 @@ public partial class ReleaseObligationsViewModel(
             foreach (var historicalTarget in historicalTargets)
                 statuses.Add(await service.GetStatusAsync(person.Id, historicalTarget));
 
-            statuses.Add(await service.ReconcileAsync(person.Id, currentTarget));
-            statuses.Add(await service.ReconcileAsync(
-                person.Id, currentTarget.AddYears(1)));
+            foreach (var target in ComplianceScheduleRules
+                         .CurrentAndUpcomingTargetEffectiveDates(
+                             person.EffectiveDate.Value, DateTime.Today))
+                statuses.Add(await service.ReconcileAsync(person.Id, target));
 
             if (!_loads.IsCurrent(request) || _person?.Id != person.Id)
                 return false;

@@ -298,7 +298,8 @@ namespace Sati
                 return null;
 
             var cycleStart = ResolveCurrentTargetEffectiveDate(EffectiveDate.Value, today);
-            var cycleEnd = cycleStart.AddYears(1);
+            var cycleEnd = Contracts.V1.ComplianceScheduleRules.UpcomingTargetEffectiveDate(
+                EffectiveDate.Value, today);
             return (cycleStart, cycleEnd);
         }
 

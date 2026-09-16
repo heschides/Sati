@@ -231,9 +231,8 @@ namespace Sati.Data
                 return;
 
             var today = DateTime.Today;
-            var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
-                effectiveDate, today);
-            foreach (var target in new[] { currentTarget, currentTarget.AddYears(1) })
+            foreach (var target in ComplianceScheduleRules
+                         .CurrentAndUpcomingTargetEffectiveDates(effectiveDate, today))
             {
                 var resolution = await ReleaseObligationService.ResolveAssignmentsAsync(
                     context, person, target, today, CancellationToken.None);

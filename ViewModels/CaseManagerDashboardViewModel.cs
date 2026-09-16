@@ -548,7 +548,8 @@ CalendarViewModel calendarViewModel,
 
             var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
                 effectiveDate, today);
-            var nextTarget = currentTarget.AddYears(1);
+            var nextTarget = ComplianceScheduleRules.UpcomingTargetEffectiveDate(
+                effectiveDate, today);
             var explicitForm = person.Forms
                 .Where(form => form.Type == type &&
                                !form.IsSatisfiedAsOf(today) &&
@@ -598,7 +599,8 @@ CalendarViewModel calendarViewModel,
 
             var currentTarget = ComplianceScheduleRules.CurrentTargetEffectiveDate(
                 effectiveDate, today);
-            var nextTarget = currentTarget.AddYears(1);
+            var nextTarget = ComplianceScheduleRules.UpcomingTargetEffectiveDate(
+                effectiveDate, today);
             var facts = ((IEventSource)person).ReleaseComplianceFacts.ToArray();
             var reconciledTargets = facts
                 .Where(item => item.TargetEffectiveDate is DateTime target &&
