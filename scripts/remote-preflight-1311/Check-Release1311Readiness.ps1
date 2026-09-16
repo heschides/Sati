@@ -125,6 +125,29 @@ SELECT
     (SELECT COUNT(DISTINCT PersonId) FROM mismatch) AS ConsumersAffected,
     (SELECT COUNT_BIG(*) FROM witness) AS AnnualRowsMissingQ4Witness,
     (SELECT COUNT_BIG(*) FROM duplicates) AS DuplicateObligationGroups,
+    -- The conversion refuses a derived target before the consumer's effective date, which is
+    -- what a form due on or before admission produces.
+    (SELECT COUNT_BIG(*) FROM t
+      WHERE t.Target < t.Eff OR DATEDIFF(year, t.Eff, t.Target) >= 150) AS TargetsBeforeAdmission,
+    (SELECT COUNT_BIG(*) FROM t
+      WHERE (t.Target < t.Eff OR DATEDIFF(year, t.Eff, t.Target) >= 150)
+        AND (t.CompletedDate IS NOT NULL OR t.OpenedDate IS NOT NULL)) AS TargetsBeforeAdmissionWithEvidence,
+    -- The remaining guards the conversion enforces, so this check covers every one of them.
+    (SELECT COUNT_BIG(*) FROM dbo.Forms AS f INNER JOIN dbo.People AS p ON p.Id = f.PersonId
+      WHERE p.EffectiveDate < '1900-01-01' OR f.DueDate < '1900-01-01') AS DatesBefore1900,
+    (SELECT COUNT_BIG(*) FROM dbo.Forms AS f INNER JOIN dbo.People AS p ON p.Id = f.PersonId
+      WHERE (SELECT COUNT(*) FROM dbo.Settings AS s WHERE s.AgencyId = p.AgencyId) <> 1) AS FormsWithoutOneAgencySettingsRow,
+    (SELECT COUNT_BIG(*) FROM dbo.Settings AS s
+      WHERE s.Q4RDaysBeforeAnniversary NOT BETWEEN 0 AND 364
+         OR s.PcpDaysBeforeAnniversary NOT BETWEEN 0 AND 364
+         OR s.CompAssessmentDaysBeforeAnniversary NOT BETWEEN 0 AND 364
+         OR s.ReclassificationDaysBeforeAnniversary NOT BETWEEN 0 AND 364
+         OR s.SafetyPlanDaysBeforeAnniversary NOT BETWEEN 0 AND 364
+         OR s.PrivacyPracticesDaysBeforeAnniversary NOT BETWEEN 0 AND 364
+         OR s.ReleaseAgencyDaysBeforeAnniversary NOT BETWEEN 0 AND 364
+         OR s.ReleaseDhhsDaysBeforeAnniversary NOT BETWEEN 0 AND 364
+         OR s.ReleaseMedicalDaysBeforeAnniversary NOT BETWEEN 0 AND 364) AS AgencyOffsetsOutOfRange,
+    (SELECT COUNT_BIG(*) FROM t WHERE t.Target < '1900-01-01' OR t.Target >= '9999-01-01') AS TargetsUnrepresentable,
     (SELECT COUNT_BIG(*) FROM dbo.Forms WHERE [Type] NOT IN (N'Q1R',N'Q2R',N'Q3R',N'Q4R',N'PCP',
         N'ComprehensiveAssessment',N'Reclassification',N'SafetyPlan',N'PrivacyPractices',
         N'Release_Agency',N'Release_DHHS',N'Release_Medical')) AS UnknownFormTypes,
@@ -151,6 +174,11 @@ SELECT
              [int64]$values['DeadlinesUnattributable'] +
              [int64]$values['AnnualRowsMissingQ4Witness'] +
              [int64]$values['DuplicateObligationGroups'] +
+             [int64]$values['TargetsBeforeAdmission'] +
+             [int64]$values['DatesBefore1900'] +
+             [int64]$values['FormsWithoutOneAgencySettingsRow'] +
+             [int64]$values['AgencyOffsetsOutOfRange'] +
+             [int64]$values['TargetsUnrepresentable'] +
              [int64]$values['UnknownFormTypes'] +
              [int64]$values['OverrideReasonsTooLong'] +
              [int64]$values['LegacyOverrideNotes']) -eq 0) {

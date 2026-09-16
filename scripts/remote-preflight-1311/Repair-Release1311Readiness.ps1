@@ -23,6 +23,10 @@
         new rules require. The note itself, its narrative, status, and approval stay;
         only the override flag, reason, approver, and time are cleared.
       * A missing same-target quarterly review is added, open and uncompleted.
+      * Forms whose cycle began before the consumer's current effective date are removed,
+        with their attestations. The conversion has no cycle to put them in. This is the
+        one step that removes rows carrying recorded work; the database's owner has said
+        compliance history here is not authoritative, and the records live in Credible.
 
     Order matters. The offset moves first, so every later date is computed in the new
     shape; duplicates go next, because recomputing two rows of one obligation onto the
@@ -108,6 +112,36 @@ END;
 --    second pass is needed to bring existing quarterly rows along.
 UPDATE dbo.Settings SET Q4RDaysBeforeAnniversary = 5 WHERE Q4RDaysBeforeAnniversary = 1;
 DECLARE @offsets int = @@ROWCOUNT;
+
+-- 1b. Forms whose cycle falls before the consumer's current effective date. A form due
+--     on or before admission derives a target year that began before admission, and the
+--     conversion refuses it: the new model has no cycle to put it in. These are
+--     compliance rows from before the effective date was set where it is now, so they
+--     are removed, with their attestations, before any later step can recompute them or
+--     give them a quarterly row. Nothing else references either table.
+WITH pc AS (
+    SELECT f.Id, CAST(p.EffectiveDate AS date) AS Eff, CAST(f.DueDate AS date) AS DueDate,
+           DATEDIFF(year, CAST(p.EffectiveDate AS date), CAST(f.DueDate AS date)) AS N
+    FROM dbo.Forms AS f
+    INNER JOIN dbo.People AS p ON p.Id = f.PersonId
+    WHERE p.EffectiveDate IS NOT NULL
+), pa AS (
+    SELECT pc.*, DATEADD(year, pc.N, pc.Eff) AS Anniversary FROM pc
+), pt AS (
+    SELECT pa.Id, pa.Eff,
+           CASE WHEN pa.Anniversary >= pa.DueDate
+                THEN DATEADD(year, pa.N - 1, pa.Eff) ELSE pa.Anniversary END AS Target
+    FROM pa
+)
+SELECT Id INTO #preAdmission
+FROM pt
+WHERE Target < Eff OR DATEDIFF(year, Eff, Target) >= 150;
+
+DELETE fa FROM dbo.FormAttestations AS fa INNER JOIN #preAdmission AS x ON x.Id = fa.FormId;
+DECLARE @preAdmissionAttestations int = @@ROWCOUNT;
+DELETE f FROM dbo.Forms AS f INNER JOIN #preAdmission AS x ON x.Id = f.Id;
+DECLARE @preAdmissionForms int = @@ROWCOUNT;
+DROP TABLE #preAdmission;
 
 -- 2. Duplicate obligations. Two rows that resolve to one annual identity cannot both
 --    become that identity, and recomputing both onto one deadline would collide with
@@ -284,6 +318,7 @@ IF @padAfter <> @padBefore OR @padSumAfter <> @padSumBefore
 
 SELECT @deadlines AS DeadlinesRecomputed, @overrides AS OverridesCleared,
        @witnesses AS Q4WitnessRowsAdded, @offsets AS AgencyOffsetsCorrected,
+       @preAdmissionForms AS PreAdmissionFormsRemoved, @preAdmissionAttestations AS PreAdmissionAttestationsRemoved,
        @duplicatesRemoved AS DuplicateFormsRemoved, @duplicatesKept AS DuplicatesNeedingReview,
        @peopleBefore AS ClientsProtected, @recentNotesBefore AS NotesSinceSep1Protected,
        @padBefore AS ScratchpadEntriesLast30Days, @commentsBefore AS ScratchpadCommentsLast30Days;

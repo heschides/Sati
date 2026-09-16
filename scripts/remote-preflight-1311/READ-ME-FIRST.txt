@@ -49,9 +49,14 @@ Step 2 repairs compliance scheduling only:
   - two stored rows that are really the same annual obligation, where it keeps the
     row carrying the recorded work and removes its empty twin.
 
-It never deletes a row that has a recorded completion attached to it. If both rows
-of such a pair have one, it leaves both alone and says so at the end. That is not a
-failure; it means Josh has to look at those two by hand.
+  - compliance forms whose year began before the consumer's current effective date.
+    The update has nowhere to put those, so they are removed, including any recorded
+    completion on them. This is the one place Step 2 removes recorded work; it only
+    touches compliance history from before the current effective date.
+
+For duplicate pairs, it never deletes a row that has a recorded completion. If both
+rows of such a pair have one, it leaves both alone and says so at the end. That is not
+a failure; it means Josh has to look at those two by hand.
 
 It does not change your client list, your notes, or your scratchpad. It checks the
 contents of all three before and after, and undoes the entire repair if any of them
