@@ -168,11 +168,28 @@ open 1.3.11 against a database with the annual compliance update still pending.
       live column against both the target and the prior definition, and all analyzer and
       updater tests pass.
 - [x] Source fix committed as `98c176b` before this release pass began.
-- [ ] Complete coordinated 1.3.12 versioning, the full Release build, and all five test projects.
-- [ ] Publish the Demo API so the deployed service matches the released client. No schema
-      change, no migration, and no Azure SQL firewall rule is required.
-- [ ] Build, accept, and publish both installers and checksums without overwriting.
-- [ ] Record deployment, test, artifact, and workstation evidence.
+- [x] Complete coordinated 1.3.12 versioning, the full Release build, and all five test projects.
+      The Release build has zero errors. Desktop 2,157, API 820, signatures 119, portal 8, and
+      Carika 4 pass, with five opt-in SQL Server cases and two external checks skipped. Source
+      release `6446ca9` was pushed to `origin/master` before any artifact was produced.
+- [x] Deliberately skip the Demo API publication. This release changes no schema and no
+      contract: the deployed API stays at 1.3.11 with contract `E18157FBC2D9`, which the 1.3.12
+      client matches exactly. `/health/version` therefore reports 1.3.11 against 1.3.12 clients
+      until the next API-affecting release catches it up. This is a decision, not a failed
+      deployment. No Azure SQL firewall rule was needed or requested.
+- [x] Build, accept, and publish both installers without overwriting. The embedded
+      `SqlLocalDB.msi` still carries a Valid Microsoft Authenticode signature with SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`. Demo passed five
+      responsive 15-second launches, graceful closes, exact version 1.3.12.0, and cleanup;
+      `SatiDemoSetup-1.3.12.exe` is 102,834,176 bytes with SHA-256
+      `5BC9B040769564436440EE6F29C1DB93C94BC752A9E59FBA4C8E0C7C9EE55B0C`. Local passed exact
+      version, `SatiProduction` agreement, integrated security, and cleanup;
+      `SatiLocalSetup-1.3.12.exe` is 204,856,361 bytes with SHA-256
+      `74B13B1977776C259DE333BC38D5E720AD23D479EBA521C22B6ECC4E809D39AB`. Both executables and
+      their checksum files were staged, hash-verified, and renamed into `Sati Desktop` and
+      `SatiLogica Demo Files`; no staging file remains. Acceptance ran on the development
+      workstation, not an external clean machine.
+- [x] Record deployment, test, artifact, and workstation evidence here.
 
 ### Local Production machines
 
