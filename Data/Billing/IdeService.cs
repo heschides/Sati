@@ -144,7 +144,7 @@ namespace Sati.Edi
                 .ToListAsync();
             if (notes.Count != noteIds.Count)
                 throw new InvalidOperationException("The billing period contains a note outside the agency boundary or a missing source record.");
-            await ReleaseComplianceProjectionLoader.PopulateAsync(
+            await BillingComplianceProjectionLoader.PopulateAsync(
                 context, notes.Select(note => note.Person), actor.AgencyId);
             var compliancePolicy = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, actor.AgencyId);

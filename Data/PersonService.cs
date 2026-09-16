@@ -670,6 +670,7 @@ namespace Sati.Data
                 .OrderBy(p => p.LastName)
                 .AsSplitQuery()
                 .ToListAsync();
+            await BillingComplianceProjectionLoader.PopulateAsync(context, people, actor.AgencyId);
 
             // Generating missing cycle forms on load is the only thing keeping an
             // ongoing caseload supplied with compliance records; without it clients
@@ -756,7 +757,7 @@ namespace Sati.Data
                         await using var reread = _contextFactory.CreateDbContext();
                         await LocalTenantAccess.EnsureSessionAsync(reread, _sessionService);
                         await EnsureUserInScopeAsync(reread, actor, userId);
-                        return await reread.People
+                        var stored = await reread.People
                             .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
                             .Include(p => p.Notes.Where(note => note.AgencyId == actor.AgencyId))
                             .Include(p => p.Forms)
@@ -765,6 +766,9 @@ namespace Sati.Data
                             .OrderBy(p => p.LastName)
                             .AsSplitQuery()
                             .ToListAsync();
+                        await BillingComplianceProjectionLoader.PopulateAsync(
+                            reread, stored, actor.AgencyId);
+                        return stored;
                     }
                 }
             }

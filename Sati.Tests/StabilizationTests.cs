@@ -2072,7 +2072,7 @@ public sealed class StabilizationTests
         }
     }
 
-    private sealed class SmokeAssessmentService : IComprehensiveAssessmentService
+    internal sealed class SmokeAssessmentService : IComprehensiveAssessmentService
     {
         public Task<Models.Assessments.ComprehensiveAssessment?> GetLatestForAgendaAsync(
             int personId) =>
@@ -2094,13 +2094,13 @@ public sealed class StabilizationTests
             Models.Assessments.ComprehensiveAssessment assessment) => Task.CompletedTask;
     }
 
-    private sealed class SmokePlanSourceService : IPersonCenteredPlanSourceService
+    internal sealed class SmokePlanSourceService : IPersonCenteredPlanSourceService
     {
         public Task<PersonCenteredPlanSource?> GetSourceAsync(int personId, int preferredAuthorUserId) =>
             Task.FromResult<PersonCenteredPlanSource?>(null);
     }
 
-    private sealed class SmokeConsumerProviderService : IConsumerProviderService
+    internal sealed class SmokeConsumerProviderService : IConsumerProviderService
     {
         public Task<List<Models.PersonProvider>> GetByPersonAsync(int personId) =>
             Task.FromResult(new List<Models.PersonProvider>());
@@ -2110,7 +2110,7 @@ public sealed class StabilizationTests
         public Task RemoveAsync(int personId, int linkId) => Task.CompletedTask;
     }
 
-    private sealed class SmokeProviderService : IProviderService
+    internal sealed class SmokeProviderService : IProviderService
     {
         public Task<List<Models.Provider>> GetAllAsync() => Task.FromResult(new List<Models.Provider>());
         public Task<List<Models.Provider>> GetPassthroughProvidersAsync() =>

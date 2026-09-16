@@ -399,7 +399,7 @@ namespace Sati.Data
                 .Where(person => personIds.Contains(person.Id) &&
                                  person.AgencyId == agencyId)
                 .ToListAsync(cancellationToken);
-            await ReleaseComplianceProjectionLoader.PopulateAsync(
+            await BillingComplianceProjectionLoader.PopulateAsync(
                 context, people, agencyId, cancellationToken);
             var claims = await (from line in context.ClaimLines.AsNoTracking()
                                 join period in context.BillingPeriods.AsNoTracking()

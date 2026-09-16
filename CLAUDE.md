@@ -89,7 +89,7 @@ services repeat the same restrictions rather than relying on the API being the o
 
 Rules that decide permission, billability, approval, or record status belong in
 `Sati.Contracts.V1`, which both the desktop client and `Sati.Api` reference, so a rule cannot be
-enforced two different ways. Current owners: `BillingComplianceGate`, `BillingRules`,
+enforced two different ways. Current owners: `BillingComplianceGate`, `MonthlyContactRules`, `BillingRules`,
 `ServiceTimeline`, `AuditCsv`, `IncidentHealthScoring`, `JournalEntry`, `ChatAccess`. A second hand-written copy of one of these
 rules is a defect, not a convenience.
 

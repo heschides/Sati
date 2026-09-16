@@ -80,6 +80,11 @@ internal static class CloudContractMapper
         person.Revision = dto.Revision;
         person.Forms = dto.Forms.Select(ToForm).ToList();
         person.Notes = dto.Notes.Select(ToNoteSummary).ToList();
+        // The API returns every note for the consumer, so its contacts are the full history.
+        person.ContactFactsForCompliance = person.Notes
+            .Select(Person.ToContactFact)
+            .OfType<ContactFact>()
+            .ToList();
         person.ReleaseComplianceSnapshots = dto.ReleaseObligations?.ToList() ?? [];
         return person;
     }
@@ -499,7 +504,7 @@ internal static class CloudContractMapper
 
     private static Note ToNoteSummary(NoteSummaryDto dto)
     {
-        var note = Note.Rehydrate(0);
+        var note = Note.Rehydrate(dto.Id ?? 0);
         note.Status = ParseNullable<NoteStatus>(dto.Status);
         note.EventDate = dto.EventDate;
         note.NoteType = ParseNullable<NoteType>(dto.NoteType);

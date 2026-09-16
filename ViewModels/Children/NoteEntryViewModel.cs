@@ -1965,9 +1965,18 @@ namespace Sati.ViewModels.Children
                     var serviceDate = EventDate!.Value.Date;
                     var requirements = await ResolveBillingComplianceRequirementsAsync(
                         serviceDate);
+                    // The note being logged is itself a contact when it is a visit,
+                    // call, or email; its stored copy may still say Scheduled.
+                    var candidate = _editingNote is { Id: > 0 } editing
+                        ? Note.Rehydrate(editing.Id)
+                        : Note.Create(string.Empty, serviceDate, null, null, SelectedPerson!.Id);
+                    candidate.NoteType = SelectedNoteType;
+                    candidate.Status = NoteStatus.Logged;
+                    candidate.EventDate = serviceDate;
                     var windowReasons = SelectedPerson!.EvaluateBillingWindow(
                         serviceDate,
-                        requirements);
+                        requirements,
+                        contactCandidate: candidate);
 
                     if (windowReasons.Count > 0)
                     {

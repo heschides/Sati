@@ -23,6 +23,7 @@
                                          TrueWidth="8"
                                          FalseWidth="16" />
         <converters:PersonBillingComplianceConverter x:Key="PersonBillingComplianceConverter" />
+        <converters:PersonMonthlyContactConverter x:Key="PersonMonthlyContactConverter" />
         <!-- Dot-grid fill for the Journal. A DrawingBrush tiling a single 2px dot in
              the palette's border tone at a 16px pitch. Viewport is absolute (Viewport
              + ViewportUnits=Absolute), so the dot stays a fixed size and the grid
@@ -845,6 +846,42 @@
                                                             <Run Text="{Binding Waiver, Mode=OneWay}" />
                                             <Run Text=" · " />
                                                             <Run Text="{Binding EffectiveDate, Mode=OneWay, StringFormat={}{0:MM/dd/yyyy}}" />
+                                        </TextBlock>
+                                        <!-- Last visit, phone call, or email. Red, with
+                                             "overdue" in the text, once the monthly
+                                             contact clock has run out. -->
+                                        <TextBlock FontSize="11"
+                                                   Margin="0,2,0,0"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{StaticResource PersonMonthlyContactConverter}">
+                                                    <Binding />
+                                                    <Binding Path="DataContext.CompliancePresentationRevision"
+                                                             RelativeSource="{RelativeSource AncestorType=ListBox}" />
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                                    <Style.Triggers>
+                                                        <Trigger Property="Text" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </Trigger>
+                                                        <DataTrigger Value="True">
+                                                            <DataTrigger.Binding>
+                                                                <MultiBinding Converter="{StaticResource PersonMonthlyContactConverter}"
+                                                                              ConverterParameter="Overdue">
+                                                                    <Binding />
+                                                                    <Binding Path="DataContext.CompliancePresentationRevision"
+                                                                             RelativeSource="{RelativeSource AncestorType=ListBox}" />
+                                                                </MultiBinding>
+                                                            </DataTrigger.Binding>
+                                                            <Setter Property="Foreground" Value="{DynamicResource DangerStrongBrush}" />
+                                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
                                         </TextBlock>
                                         <TextBlock Text="Billing attention required"
                                                    FontSize="10"

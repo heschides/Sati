@@ -123,6 +123,23 @@ signature-never-attests items retained later as history.
 - [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
       No source-level result here is a deployment or Production-readiness claim.
 
+## Unreleased — monthly contact requirement (2026-09-16)
+
+See the 2026-09-16 monthly-contact decision. No migration; deploy the API with or before the desktop.
+
+- [x] Add `MonthlyContactRules` (rolling 30 days from each contact, first clock from the effective
+      date) and the off-by-default `MonthlyContact` policy option in Settings.
+- [x] Supply contact history to every desktop-local, cloud-client, and API billing decision, with a
+      named block when it was not loaded; count a note being saved as its own contact.
+- [x] Show the last contact date under each name in the client list, red with "overdue" when
+      overdue; align the profile's "Last contact" with the same rule.
+- [x] Rule, desktop, local-service, and API regressions, each confirmed to fail against a reverted
+      rule or wiring.
+- [ ] Verify the client-list line in the running app, including the dark theme's red.
+- [ ] Decide whether the dashboard matrix or daily agenda should surface overdue contact.
+- [ ] Confirm the 30-day interval and which note types qualify against the agency's program
+      rules; they come from the agency's request, not a cited OADS rule.
+
 ## Unreleased — annual forms show the renewal being prepared (2026-09-16)
 
 See the 2026-09-16 decision. The API must be deployed with or before this desktop build; no

@@ -127,7 +127,7 @@ namespace Sati.Services.Billing
 
             if (note.Person is null)
                 throw new InvalidOperationException($"Note {noteId} has no associated person.");
-            await ReleaseComplianceProjectionLoader.PopulateAsync(
+            await BillingComplianceProjectionLoader.PopulateAsync(
                 context, [note.Person], actor.AgencyId);
 
             if (note.Status != NoteStatus.Approved)
@@ -304,7 +304,7 @@ namespace Sati.Services.Billing
             if (notes.Count != noteIds.Length)
                 throw new InvalidOperationException(
                     "A draft claim line no longer has an accessible source note.");
-            await ReleaseComplianceProjectionLoader.PopulateAsync(
+            await BillingComplianceProjectionLoader.PopulateAsync(
                 context, notes.Select(note => note.Person), agencyId);
 
             var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
@@ -360,7 +360,7 @@ namespace Sati.Services.Billing
                          && !context.ClaimLines.Any(c => c.NoteId == n.Id))
                 .OrderBy(n => n.EventDate)
                 .ToListAsync();
-            await ReleaseComplianceProjectionLoader.PopulateAsync(
+            await BillingComplianceProjectionLoader.PopulateAsync(
                 context, notes.Select(note => note.Person), actor.AgencyId);
 
             var noteIds = notes.Select(note => note.Id).ToArray();
@@ -666,7 +666,9 @@ namespace Sati.Services.Billing
             var formsAndOpening = BillingComplianceGate.IncludeOpeningObligations(
                 withExpectedForms);
             return BillingComplianceRecoveryRules.FromComplianceSnapshots(
-                    person.Id, formsAndOpening)
+                    person.Id,
+                    formsAndOpening.Concat(MonthlyContactRules.BuildObligations(
+                        person.EffectiveDate, person.ContactFactsForCompliance)))
                 .Concat(ReleaseBillingRules.BuildRecoveryObligations(
                     person.Id,
                     releaseFacts))
@@ -703,7 +705,7 @@ namespace Sati.Services.Billing
 
             var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, agencyId, cancellationToken);
-            await ReleaseComplianceProjectionLoader.PopulateAsync(
+            await BillingComplianceProjectionLoader.PopulateAsync(
                 context, [person], agencyId, cancellationToken);
             var decisions = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
                 .Include(item => item.Obligations)

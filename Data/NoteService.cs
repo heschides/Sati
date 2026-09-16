@@ -295,12 +295,12 @@ public class NoteService(
             .Include(candidate => candidate.Forms).ThenInclude(form => form.Attestations)
             .SingleAsync(x =>
                 x.Id == note.PersonId && x.UserId == actor.Id && x.AgencyId == actor.AgencyId);
-        await ReleaseComplianceProjectionLoader.PopulateAsync(
+        await BillingComplianceProjectionLoader.PopulateAsync(
             context, [person], actor.AgencyId);
         var policy = await BillingCompliancePolicyContextLoader.LoadAsync(
             context, actor.AgencyId);
         var compliance = person.EvaluateBillingWindowDetailed(
-            serviceDate, policy.Resolve(serviceDate), policy.Schedule);
+            serviceDate, policy.Resolve(serviceDate), policy.Schedule, contactCandidate: note);
         if (compliance.Passed) return;
 
         var configurationInvalid = !BillingComplianceGate.IsSupported(policy.Resolve(serviceDate));

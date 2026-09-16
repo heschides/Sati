@@ -15,9 +15,10 @@ public enum BillingComplianceRequirements
     MedicalRelease = 1 << 8,
     PcpOpening = 1 << 9,
     ComprehensiveAssessmentOpening = 1 << 10,
+    MonthlyContact = 1 << 11,
     All = QuarterlyReviews | Pcp | ComprehensiveAssessment | Reclassification |
           SafetyPlan | PrivacyPractices | AgencyRelease | DhhsRelease | MedicalRelease |
-          PcpOpening | ComprehensiveAssessmentOpening
+          PcpOpening | ComprehensiveAssessmentOpening | MonthlyContact
 }
 
 public sealed record ComplianceFormSnapshot(
@@ -270,6 +271,8 @@ public static class BillingComplianceGate
         "ComprehensiveAssessment" => BillingComplianceRequirements.ComprehensiveAssessment,
         BillingComplianceObligationTypes.ComprehensiveAssessmentOpening =>
             BillingComplianceRequirements.ComprehensiveAssessmentOpening,
+        MonthlyContactRules.ObligationType or MonthlyContactRules.UnavailableObligationType =>
+            BillingComplianceRequirements.MonthlyContact,
         "Reclassification" => BillingComplianceRequirements.Reclassification,
         "SafetyPlan" => BillingComplianceRequirements.SafetyPlan,
         "PrivacyPractices" => BillingComplianceRequirements.PrivacyPractices,
@@ -286,6 +289,8 @@ public static class BillingComplianceGate
         "ComprehensiveAssessment" => "Comprehensive Assessment",
         BillingComplianceObligationTypes.ComprehensiveAssessmentOpening =>
             "Comprehensive Assessment start",
+        MonthlyContactRules.ObligationType => "Monthly contact",
+        MonthlyContactRules.UnavailableObligationType => "Monthly contact (contact history not loaded)",
         "Reclassification" => "Reclassification",
         "SafetyPlan" => "Safety Plan",
         "PrivacyPractices" => "Privacy Practices",

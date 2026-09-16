@@ -585,15 +585,16 @@ namespace Sati.ViewModels
         public string ContactEditorHeader => IsEditingContact ? "EDIT CONTACT" : "ADD CONTACT";
         public string ContactSaveButtonLabel => IsEditingContact ? "Save Contact" : "Add Contact";
 
-        // Derived, read-only: the most recent contact note's date for the selected
-        // client. A window over the already-loaded notes, not a stored field. Selecting
-        // into DateTime? before Max means an empty sequence yields null rather than
-        // throwing, and the detail panel renders null as a dash.
+        // Derived, read-only: the most recent visit, call, or email that actually took
+        // place, by the same rule as the client list and the monthly-contact gate. A
+        // window over the already-loaded notes, not a stored field; the detail panel
+        // renders null as a dash.
         public DateTime? LastContact =>
-                    SelectedPersonNotes
-                        .Where(n => n.NoteType is NoteType.Contact or NoteType.Phone or NoteType.Email)
-                        .Select(n => (DateTime?)n.EventDate)
-                        .Max();
+            MonthlyContactRules.Status(
+                    null,
+                    SelectedPersonNotes.Select(Person.ToContactFact).OfType<ContactFact>(),
+                    DateTime.Today)
+                .LastContactOn;
 
         // Latest doctor/dentist appointments for the selected client, loaded on
         // selection (LoadAppointmentsAsync) rather than stored on Person — so the

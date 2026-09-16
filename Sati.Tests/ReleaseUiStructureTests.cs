@@ -564,6 +564,7 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("ComplianceAgencyRelease", settings);
         Assert.Contains("CompliancePcpOpening", settings);
         Assert.Contains("ComplianceComprehensiveAssessmentOpening", settings);
+        Assert.Contains("ComplianceMonthlyContact", settings);
         Assert.Contains("ApplyBillingCompliancePolicyCommand", settings);
         Assert.Contains("CanManageAgencySettings", settings);
     }

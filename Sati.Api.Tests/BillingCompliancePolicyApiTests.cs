@@ -327,7 +327,7 @@ public sealed class BillingCompliancePolicyApiTests(SatiApiFactory factory)
             new AppendBillingCompliancePolicyRequest(
                 Guid.NewGuid(),
                 enforcement.AddDays(1),
-                (BillingComplianceRequirements)(1 << 11)));
+                (BillingComplianceRequirements)(1 << 12)));
         Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
     }
 

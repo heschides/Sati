@@ -49,6 +49,8 @@ internal static partial class ApiEndpoints
             db, personIds, cancellationToken);
         var providerLinksByPerson = await LoadReleaseProviderLinksByPersonAsync(
             db, actor.AgencyId, personIds, cancellationToken);
+        await PopulateContactHistoryAsync(
+            db, actor.AgencyId, sources.Select(row => row.Person), cancellationToken);
         var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
             db, actor.AgencyId, cancellationToken);
         var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(

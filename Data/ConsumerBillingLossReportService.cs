@@ -121,6 +121,8 @@ namespace Sati.Data
             var notesByPerson = notes
                 .GroupBy(n => n.PersonId)
                 .ToDictionary(g => g.Key, g => g.ToList());
+            var contactsByPerson = await BillingComplianceProjectionLoader.LoadContactFactsAsync(
+                context, personIds, agencyId);
 
             var rows = new List<ConsumerBillingLossRow>(people.Count);
             foreach (var person in people)
@@ -139,6 +141,8 @@ namespace Sati.Data
                     var personForms = formsByPerson.GetValueOrDefault(person.Id) ?? [];
                     var personReleases = releasesByPerson.GetValueOrDefault(person.Id) ?? [];
                     var personProviderLinks = providerLinksByPerson.GetValueOrDefault(person.Id) ?? [];
+                    var contactObligations = MonthlyContactRules.BuildObligations(
+                        person.EffectiveDate, contactsByPerson[person.Id]);
                     for (var date = activeStart; date <= end; date = date.AddDays(1))
                     {
                         var releaseFacts = ExpectedBillingComplianceObligations.IncludeMissingReleases(
@@ -169,7 +173,8 @@ namespace Sati.Data
                                 formObligations.Concat(
                                     ReleaseBillingRules.BuildComplianceSnapshots(
                                         releaseFacts,
-                                        date)),
+                                        date))
+                                    .Concat(contactObligations),
                                 date,
                                 policy.Resolve(date)).Count > 0)
                         {

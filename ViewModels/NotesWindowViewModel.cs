@@ -194,9 +194,14 @@ namespace Sati.ViewModels
                 {
                     var requirements = await NoteEntry
                         .ResolveBillingComplianceRequirementsAsync(eventDate.Date);
+                    var candidate = Note.Rehydrate(SelectedNote.Id);
+                    candidate.NoteType = SelectedNote.NoteType;
+                    candidate.Status = NoteStatus.Logged;
+                    candidate.EventDate = eventDate;
                     windowReasons = SelectedNote.Person.EvaluateBillingWindow(
                         eventDate,
-                        requirements);
+                        requirements,
+                        contactCandidate: candidate);
                 }
             }
             catch (Exception ex)

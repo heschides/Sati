@@ -4458,3 +4458,53 @@ could not say which record or which failure), keeping two controls until the ren
 controls for reviews, and treating the assessment start as a configurable lead time.
 
 The caseload matrix still reads the current-cycle row only; it is the next step.
+
+## 2026-09-16 — monthly contact is an optional rolling 30-day billing requirement
+
+Agencies can require a visit, phone call, or email with each consumer at least every 30 days. The
+requirement is `BillingComplianceRequirements.MonthlyContact`, off by default and enabled through an
+ordinary effective-dated policy version like every other gate.
+
+### A rolling clock, not a calendar month
+
+Each contact starts a 30-day clock; the plan's initial effective date starts the first one.
+Service dated after the clock runs out is blocked until the next contact, and the contact's own day
+is billable again. `MonthlyContactRules` expresses this as a chain of ordinary gate obligations
+(due 30 days after each anchor, completed by the next contact), so blocking, Supervisor exceptions,
+Admin recovery, loss reports, and policy-impact previews treat it exactly like a late form. A
+later contact never cures earlier service. The client list's red "overdue" line uses the same
+rule, so the sidebar and the gate cannot disagree.
+
+**Rejected:** a calendar-month requirement (billability of early-month work would stay unknown until
+the month's first contact) and starting the clock only at the first recorded contact (a new client
+could never be blocked).
+
+### What counts as a contact
+
+Visit, Phone, Email, and the retired combined Contact type, which recorded phone and email before
+they were split. The note must have happened: every status except Scheduled, Cancelled, Delayed,
+and Abandoned. A note with no status is legacy data of unknown meaning and does not count. Contacts
+on or before the effective date do not move the first clock. A test fails if a new note status is
+added without being classified.
+
+### History is an explicit input, and missing history is not "no contact"
+
+The rule never reads navigation properties that may or may not be loaded. The desktop's local
+services use `BillingComplianceProjectionLoader` (renamed from `ReleaseComplianceProjectionLoader`,
+which already ran at every local billing decision), the cloud client derives contacts from the
+person DTO's complete note summaries, and every API billing decision attaches contacts to
+`ServerPerson` first. Only dates, types, statuses, and IDs are read, never narratives. If history
+was not loaded and the requirement is on, the gate blocks with "Monthly contact (contact history not
+loaded)" rather than passing or silently treating the consumer as uncontacted. A consumer created
+in memory has a known-empty history.
+
+A note being saved replaces its stored copy in the history, on the desktop pre-checks, the local
+service, and the API. A visit being logged therefore counts toward its own service date, and a
+contact note edited into other work stops counting. `NoteSummaryDto` gained an optional `Id` so the
+cloud client can make that replacement.
+
+The client-profile "Last contact" detail now uses the same rule; it previously ignored visits and
+counted scheduled notes. The compact client picker still shows names only.
+
+No migration is needed. The API must be deployed with or before a desktop build that offers the
+option, because an older API rejects the unknown requirement bit.

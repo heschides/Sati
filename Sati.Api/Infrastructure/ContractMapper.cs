@@ -114,7 +114,8 @@ internal static class ContractMapper
         NullableNameAt(NoteStatusNames, note.Status),
         note.EventDate,
         NullableNameAt(NoteTypeNames, note.NoteType),
-        NullableNameAt(FormTypeNames, note.FormType));
+        NullableNameAt(FormTypeNames, note.FormType),
+        note.Id);
 
     public static NoteDto ToNote(
         ServerNote note,

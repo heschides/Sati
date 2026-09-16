@@ -700,6 +700,7 @@ namespace Sati.ViewModels
         [ObservableProperty] private bool compliancePcpOpening;
         [ObservableProperty] private bool complianceComprehensiveAssessment;
         [ObservableProperty] private bool complianceComprehensiveAssessmentOpening;
+        [ObservableProperty] private bool complianceMonthlyContact;
         [ObservableProperty] private bool complianceReclassification;
         [ObservableProperty] private bool complianceSafetyPlan;
         [ObservableProperty] private bool compliancePrivacyPractices;
@@ -724,6 +725,7 @@ namespace Sati.ViewModels
         partial void OnCompliancePcpOpeningChanged(bool value) => BillingPolicyDraftChanged();
         partial void OnComplianceComprehensiveAssessmentChanged(bool value) => BillingPolicyDraftChanged();
         partial void OnComplianceComprehensiveAssessmentOpeningChanged(bool value) => BillingPolicyDraftChanged();
+        partial void OnComplianceMonthlyContactChanged(bool value) => BillingPolicyDraftChanged();
         partial void OnComplianceReclassificationChanged(bool value) => BillingPolicyDraftChanged();
         partial void OnComplianceSafetyPlanChanged(bool value) => BillingPolicyDraftChanged();
         partial void OnCompliancePrivacyPracticesChanged(bool value) => BillingPolicyDraftChanged();
@@ -849,6 +851,7 @@ namespace Sati.ViewModels
             CompliancePcpOpening = compliance.HasFlag(BillingComplianceRequirements.PcpOpening);
             ComplianceComprehensiveAssessment = compliance.HasFlag(BillingComplianceRequirements.ComprehensiveAssessment);
             ComplianceComprehensiveAssessmentOpening = compliance.HasFlag(BillingComplianceRequirements.ComprehensiveAssessmentOpening);
+            ComplianceMonthlyContact = compliance.HasFlag(BillingComplianceRequirements.MonthlyContact);
             ComplianceReclassification = compliance.HasFlag(BillingComplianceRequirements.Reclassification);
             ComplianceSafetyPlan = compliance.HasFlag(BillingComplianceRequirements.SafetyPlan);
             CompliancePrivacyPractices = compliance.HasFlag(BillingComplianceRequirements.PrivacyPractices);
@@ -1244,6 +1247,7 @@ namespace Sati.ViewModels
             (CompliancePcpOpening ? BillingComplianceRequirements.PcpOpening : 0) |
             (ComplianceComprehensiveAssessment ? BillingComplianceRequirements.ComprehensiveAssessment : 0) |
             (ComplianceComprehensiveAssessmentOpening ? BillingComplianceRequirements.ComprehensiveAssessmentOpening : 0) |
+            (ComplianceMonthlyContact ? BillingComplianceRequirements.MonthlyContact : 0) |
             (ComplianceReclassification ? BillingComplianceRequirements.Reclassification : 0) |
             (ComplianceSafetyPlan ? BillingComplianceRequirements.SafetyPlan : 0) |
             (CompliancePrivacyPractices ? BillingComplianceRequirements.PrivacyPractices : 0) |
@@ -1259,6 +1263,7 @@ namespace Sati.ViewModels
             if (requirements.HasFlag(BillingComplianceRequirements.PcpOpening)) labels.Add("PCP opening");
             if (requirements.HasFlag(BillingComplianceRequirements.ComprehensiveAssessment)) labels.Add("Comprehensive Assessment");
             if (requirements.HasFlag(BillingComplianceRequirements.ComprehensiveAssessmentOpening)) labels.Add("Comprehensive Assessment start");
+            if (requirements.HasFlag(BillingComplianceRequirements.MonthlyContact)) labels.Add("Monthly contact");
             if (requirements.HasFlag(BillingComplianceRequirements.Reclassification)) labels.Add("Reclassification");
             if (requirements.HasFlag(BillingComplianceRequirements.SafetyPlan)) labels.Add("Safety Plan");
             if (requirements.HasFlag(BillingComplianceRequirements.PrivacyPractices)) labels.Add("Privacy Practices");

@@ -210,6 +210,15 @@ namespace Sati
                 ? ReleaseComplianceSnapshots
                 : ReleaseObligations.Select(item => item.ToComplianceFact()).ToArray();
         public List<Note> Notes { get; set; } = [];
+
+        /// <summary>
+        /// Every recorded visit, phone, and email contact, supplied by the billing
+        /// projection loader or the API. Null means it was not loaded; the gate then
+        /// reports that instead of treating the consumer as never contacted.
+        /// </summary>
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public List<Contracts.V1.ContactFact>? ContactFactsForCompliance { get; set; }
+
         public List<PersonContact> Contacts { get; set; } = [];
 
         // Explicit interface implementation: exposes the entity's Notes as the
@@ -242,7 +251,10 @@ namespace Sati
                 BirthDate = birthdate,
                 EffectiveDate = effective,
                 Waiver = waiver,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = DateTime.UtcNow,
+                // A consumer created here has no notes yet, so its contact history is
+                // known to be empty rather than unloaded.
+                ContactFactsForCompliance = []
             };
 
             if (effective is null)
@@ -646,24 +658,32 @@ namespace Sati
             DateTime noteDate,
             Contracts.V1.BillingComplianceRequirements requirements =
                 Contracts.V1.BillingComplianceGate.DefaultRequirements,
-            Contracts.V1.ComplianceScheduleSettings? schedule = null) =>
-            EvaluateBillingWindowDetailed(noteDate, requirements, schedule).Reasons;
+            Contracts.V1.ComplianceScheduleSettings? schedule = null,
+            Note? contactCandidate = null) =>
+            EvaluateBillingWindowDetailed(noteDate, requirements, schedule, contactCandidate).Reasons;
 
+        /// <param name="contactCandidate">
+        /// A note being saved. Its in-flight type and status replace the stored copy in
+        /// the contact history, so a visit counts toward its own service date.
+        /// </param>
         public Contracts.V1.BillingComplianceResult EvaluateBillingWindowDetailed(
             DateTime noteDate,
             Contracts.V1.BillingComplianceRequirements requirements =
                 Contracts.V1.BillingComplianceGate.DefaultRequirements,
-            Contracts.V1.ComplianceScheduleSettings? schedule = null) =>
+            Contracts.V1.ComplianceScheduleSettings? schedule = null,
+            Note? contactCandidate = null) =>
             Contracts.V1.BillingComplianceGate.EvaluateBillingWindowDetailed(
                 BillingComplianceSnapshots(
                     noteDate,
-                    schedule ?? new Contracts.V1.ComplianceScheduleSettings()),
+                    schedule ?? new Contracts.V1.ComplianceScheduleSettings(),
+                    contactCandidate),
                 noteDate,
                 requirements);
 
         private IReadOnlyList<Contracts.V1.ComplianceFormSnapshot> BillingComplianceSnapshots(
             DateTime asOfDate,
-            Contracts.V1.ComplianceScheduleSettings schedule)
+            Contracts.V1.ComplianceScheduleSettings schedule,
+            Note? contactCandidate = null)
         {
             var releaseFacts = Contracts.V1.ExpectedBillingComplianceObligations
                 .IncludeMissingReleases(
@@ -706,8 +726,39 @@ namespace Sati
                     Contracts.V1.ReleaseBillingRules.BuildComplianceSnapshots(
                         releaseFacts,
                         asOfDate))
+                .Concat(Contracts.V1.MonthlyContactRules.BuildObligations(
+                    EffectiveDate,
+                    ContactHistoryIncluding(contactCandidate)))
                 .ToArray();
         }
+
+        /// <summary>
+        /// Recorded contacts, with a note that is being saved replacing its stored copy.
+        /// Null when the history was not loaded for this instance.
+        /// </summary>
+        private IReadOnlyList<Contracts.V1.ContactFact>? ContactHistoryIncluding(Note? candidate) =>
+            ContactFactsForCompliance is null
+                ? null
+                : candidate is null
+                    ? ContactFactsForCompliance
+                    : Contracts.V1.MonthlyContactRules.WithCandidate(
+                        ContactFactsForCompliance,
+                        candidate.Id,
+                        ToContactFact(candidate));
+
+        public static Contracts.V1.ContactFact? ToContactFact(Note note) =>
+            Contracts.V1.MonthlyContactRules.ToFact(
+                note.NoteType?.ToString(),
+                note.Status?.ToString(),
+                note.EventDate,
+                note.Id);
+
+        /// <summary>Where this consumer stands against the monthly-contact requirement.</summary>
+        public Contracts.V1.MonthlyContactStatus? GetMonthlyContactStatus(DateTime today) =>
+            ContactFactsForCompliance is null
+                ? null
+                : Contracts.V1.MonthlyContactRules.Status(
+                    EffectiveDate, ContactFactsForCompliance, today);
 
         private static bool IsLegacyReleaseForm(FormType type) => type is
             FormType.Release_Agency or FormType.Release_DHHS or FormType.Release_Medical;

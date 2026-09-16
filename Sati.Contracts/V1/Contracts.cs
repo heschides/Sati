@@ -53,7 +53,8 @@ public sealed record NoteSummaryDto(
     string? Status,
     DateTime? EventDate,
     string? NoteType,
-    string? FormType = null);
+    string? FormType = null,
+    int? Id = null);
 
 public sealed record PersonDto(
     int Id,

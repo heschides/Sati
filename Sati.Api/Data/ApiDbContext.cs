@@ -105,6 +105,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
         {
             entity.ToTable("People");
             entity.HasKey(x => x.Id);
+            entity.Ignore(x => x.ContactFactsForCompliance);
             entity.Property(x => x.Revision).IsConcurrencyToken();
             // Must match the desktop model or the server writes a column it disagrees with.
             entity.Property(x => x.CredibleClientId).HasMaxLength(PersonSaveRules.CredibleClientIdMaxLength);
@@ -899,6 +900,13 @@ internal sealed class ServerPerson
     public string? SsnLastFour { get; set; }
 
     public List<ServerForm> Forms { get; set; } = [];
+
+    /// <summary>
+    /// Recorded contacts, attached by the billing endpoints before a compliance
+    /// decision. Not a column. Null means it was not loaded, which the monthly-contact
+    /// rule reports instead of treating the consumer as never contacted.
+    /// </summary>
+    public IReadOnlyList<Sati.Contracts.V1.ContactFact>? ContactFactsForCompliance { get; set; }
 }
 
 internal sealed class ServerPersonPhoto

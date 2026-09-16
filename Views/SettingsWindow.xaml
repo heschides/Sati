@@ -813,6 +813,11 @@
                               ToolTip="The assessment must be started 30 days before it is due, 120 days before the plan it informs."
                               IsChecked="{Binding ComplianceComprehensiveAssessmentOpening}"
                               Margin="0,0,22,10" />
+                    <CheckBox Content="Monthly contact"
+                              AutomationProperties.Name="Count monthly contact, a visit, phone call, or email at least every 30 days, for billing compliance"
+                              ToolTip="Service more than 30 days after the last visit, phone call, or email (or after the plan's effective date) is blocked until the next contact."
+                              IsChecked="{Binding ComplianceMonthlyContact}"
+                              Margin="0,0,22,10" />
                     <CheckBox Content="Reclassifications"
                               AutomationProperties.Name="Count reclassifications for billing compliance"
                               IsChecked="{Binding ComplianceReclassification}"

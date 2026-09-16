@@ -39,7 +39,7 @@ one transaction when the CA date must be supplied. A Supervisor cannot bypass th
 Billing policies are append-only, agency-owned, and selected by service date. Changes require an
 enforcement date; past dates are denied by default and require both a separately enabled agency
 setting and an explanation. The shared gate now treats the due day and completion day as billable.
-The default mask is reviews + PCP completion + CA, with PCP opening, assessment start, and every other supported type
+The default mask is reviews + PCP completion + CA, with PCP opening, assessment start, monthly contact, and every other supported type
 independently configurable. Supervisor exception requests require expected revision, explanation,
 confirmation, and exact current blocker IDs; the API derives actor/time and claim creation
 revalidates the selection so unrelated or newly appearing blockers still fail closed.

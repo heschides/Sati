@@ -62,8 +62,8 @@ date. There is no supervisor bypass and Sati does not model the Evergreen Reclas
 
 `BillingComplianceGate`, `BillingCompliancePolicyRules`, and
 `BillingComplianceExceptionRules` are the shared rule owners. The default blocking set is exactly
-PCP completion, Comprehensive Assessment, and all four reviews. PCP opening and Comprehensive
-Assessment start are separate optional requirements and are off by default. Reclassification, Safety Plan, Privacy Practices, and Agency,
+PCP completion, Comprehensive Assessment, and all four reviews. PCP opening, Comprehensive
+Assessment start, and monthly contact are separate optional requirements and are off by default. Reclassification, Safety Plan, Privacy Practices, and Agency,
 DHHS, and Medical releases remain selectable soft requirements; each can gate billing only when an
 administrator includes it in an effective-dated policy version.
 
@@ -84,6 +84,18 @@ PCP opening uses a fixed target-minus-90-day billing deadline and assessment sta
 target-minus-120-day one (30 days before the assessment is due); adjusting notification
 availability does not rewrite either historical boundary. `BillingComplianceGate.OpeningDeadline`
 is the single source for those dates, including the client profile's late-opening wording.
+
+`MonthlyContactRules` owns monthly contact. Each visit, phone, email, or legacy Contact note that
+actually happened (any status but Scheduled, Cancelled, Delayed, Abandoned, or none) starts a
+30-day clock, and the plan's initial effective date starts the first. The rule projects that chain
+as ordinary gate obligations, so blocking, exceptions, and recovery work as they do for forms.
+Contact history is an explicit input: `BillingComplianceProjectionLoader` supplies it on the
+desktop's local paths, the cloud mapper derives it from the person DTO's complete note summaries,
+and every API billing decision attaches it to `ServerPerson` first. A note being saved replaces its
+stored copy, so a visit counts toward its own service date. History that was never loaded is not
+read as "no contact": when the requirement is on, it blocks with a named reason. The client list
+shows the last contact date from the same rule, in red with "overdue" once the clock has run
+out.
 
 The client profile's annual forms show the obligation for the plan in force and, while it is being
 prepared, the renewal for the next target. `ComplianceScheduleRules` decides which types overlap,
@@ -1499,7 +1511,7 @@ Form→target: `Form.TargetEffectiveDate`.**
   identity.
 - `BillingComplianceRequirements` is stored in append-only, effective-dated agency policy versions.
   The Settings row retains only a compatibility fallback. Admins may enable or disable reviews,
-  PCP completion, PCP opening, Comprehensive Assessment, assessment start, Reclassification, Safety Plan, Privacy
+  PCP completion, PCP opening, Comprehensive Assessment, assessment start, monthly contact, Reclassification, Safety Plan, Privacy
   Practices, and each release category. The default is exactly reviews, PCP completion, and CA.
 - `beingCompleted` exempts only the newest overdue instance of that form type in the same action;
   an older overdue instance of the same type still blocks.
