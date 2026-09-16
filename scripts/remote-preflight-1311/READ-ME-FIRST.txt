@@ -4,8 +4,8 @@ Before installing the annual-compliance update on this computer
 The update changes how annual compliance work is identified. The first time you
 start it, Sati backs up your database and converts the existing annual forms.
 
-Install SatiLocalSetup-1.3.12.exe, not 1.3.11. They contain the same update; 1.3.11
-misread this database at startup and refused to convert it. 1.3.12 fixes that.
+Install SatiLocalSetup-1.3.13.exe. It contains the same update as 1.3.11 and 1.3.12; those
+misread this database at startup and refused to convert it. 1.3.13 fixes that.
 
 The conversion is deliberately cautious. If it meets a form it cannot place in a
 specific service year, it stops and changes nothing rather than guessing at a date
@@ -24,7 +24,7 @@ WHAT TO DO
 
 3. Read the last line of that file:
 
-     "RESULT: ready"      - install 1.3.12 whenever you like.
+     "RESULT: ready"      - install 1.3.13 whenever you like.
      "RESULT: NOT ready"  - send the file to Josh and wait. Do not install yet.
      anything else        - send the file to Josh.
 
@@ -57,7 +57,7 @@ It does not change your client list, your notes, or your scratchpad. It checks t
 contents of all three before and after, and undoes the entire repair if any of them
 differ. It saves Sati-1311-repair.txt to your Desktop; keep that file.
 
-Afterwards, run Step 1 again. When it says "ready", install SatiLocalSetup-1.3.12.exe
+Afterwards, run Step 1 again. When it says "ready", install SatiLocalSetup-1.3.13.exe
 from the Sati Desktop folder, then start Sati. It backs up your database and finishes
 the update itself. Starting your current version after the repair is harmless, but it
 will not finish the update.

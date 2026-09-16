@@ -6,11 +6,19 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Startup reads the update correctly";
-    public const string ReleaseDate = "September 15, 2026";
+    public const string ReleaseName = "Startup reads a rebuilt index correctly";
+    public const string ReleaseDate = "September 16, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Sati starts on a database that has not had the annual compliance update",
+            [
+                "1.3.12 could still stop at startup saying part of the update was already present, on a database where none of it had been applied.",
+                "The update rebuilds one existing index in place. The check that compares an update against the database recognised the old index as the new one, and read that as evidence the update had run.",
+                "An index an update drops and rebuilds under its own name looks the same before and after, so it is no longer treated as proof of anything. An index that is missing still counts.",
+                "Nothing was written during that refusal, and no records were affected. Everything delivered in 1.3.11 and 1.3.12 is unchanged and included."
+            ]),
         new(
             "Sati starts normally on a database that is simply due for the update",
             [

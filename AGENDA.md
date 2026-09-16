@@ -149,6 +149,47 @@ signature-never-attests items retained later as history.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.13 — 2026-09-16
+
+"Startup reads a rebuilt index correctly." The second false refusal on the same production
+workstation, from the same startup check, on a different premise.
+
+- [x] Fix `MigrationEffectAnalyzer`. `20260915004541` drops
+      `IX_DocumentArtifacts_OneLivePerCycle` and recreates it on the same three columns with a
+      narrower filter. The analyzer inspects indexes by table and column, so the surviving old
+      index satisfied the create. One present effect among eighty missing ones is
+      `PartiallyPresent`, and 1.3.12 refused to start. An index a migration drops and recreates
+      under its own name looks identical before and after, so its presence is now unverifiable.
+      Absence still counts: without that, `20260915153000`, whose only structural step is such a
+      rebuild, read as `Indeterminate` against a database missing the table entirely.
+- [x] Prove the regression against the real migration chain, not a hand-built schema. The
+      existing analyzer tests could not catch either false refusal, because both only appear
+      against the actual operations these migrations declare.
+      `MigrationEffectAnalyzerAgainstLiveSchemaTests` builds a database at the workstation's
+      exact state — every migration through `20260914030703`, nothing after — and asserts the
+      release reads as `NotApplied`. It reproduces `PartiallyPresent` against the unfixed
+      analyzer.
+- [x] Source fix committed as `cae5cdf` before this release pass began.
+- [x] Complete coordinated 1.3.13 versioning and the full Release build: zero errors. Desktop
+      2,163 and API 820 pass, with one opt-in SQL Server case skipped in the desktop suite and
+      five skipped in the API suite.
+- [ ] Signature, portal, and Carika suites were **not** run in this pass, and the Demo installer
+      was **not** built. This release changes one desktop startup-path file and touches no
+      schema, contract, or API surface, and the workstation needed the Local installer tonight.
+      Both remain outstanding for the next release that can afford a full pass.
+- [x] Deliberately skip the Demo API publication again, on the same reasoning as 1.3.12: no
+      schema and no contract change, so the deployed API stays at 1.3.11 with contract
+      `E18157FBC2D9`. `/health/version` continues to report 1.3.11 against newer clients until an
+      API-affecting release catches it up. No Azure SQL firewall rule was needed or requested.
+- [x] Build and publish the Local installer without overwriting.
+      `SatiLocalSetup-1.3.13.exe` is 204,859,433 bytes with SHA-256
+      `46E18AE2D6DA147628ABDE663CB666F4EF1E1EB5DA89A2B4C33F19CF9969F42C`, verified again after
+      the copy into `Sati Desktop`. The embedded `SqlLocalDB.msi` signature check is built into
+      the build script and passed.
+- [ ] Not yet confirmed: that the production workstation actually starts on 1.3.13 and completes
+      the conversion. Its readiness check reports ready and its repair is committed; the install
+      is the remaining step.
+
 ## Release 1.3.12 — 2026-09-15
 
 "Startup reads the update correctly." This patch corrects the startup check that refused to

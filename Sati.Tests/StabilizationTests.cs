@@ -649,11 +649,16 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.12", version);
+        Assert.Equal("1.3.13", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Startup reads the update correctly", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Startup reads a rebuilt index correctly", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         // The reason this patch exists, in the words staff will read.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Sati starts on a database that has not had the annual compliance update" &&
+            section.Items.Any(item => item.Contains("rebuilds one existing index", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("no records were affected", StringComparison.OrdinalIgnoreCase)));
+        // The patch before it stays described, because this release carries it too.
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Sati starts normally on a database that is simply due for the update" &&
             section.Items.Any(item => item.Contains("already present", StringComparison.OrdinalIgnoreCase)) &&
