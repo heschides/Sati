@@ -186,9 +186,13 @@ workstation, from the same startup check, on a different premise.
       `46E18AE2D6DA147628ABDE663CB666F4EF1E1EB5DA89A2B4C33F19CF9969F42C`, verified again after
       the copy into `Sati Desktop`. The embedded `SqlLocalDB.msi` signature check is built into
       the build script and passed.
-- [ ] Not yet confirmed: that the production workstation actually starts on 1.3.13 and completes
-      the conversion. Its readiness check reports ready and its repair is committed; the install
-      is the remaining step.
+- [x] The production workstation is converted and running 1.3.13 (2026-09-16). The update was
+      applied with `SatiUpdateReport --apply` after the repair also removed forms whose cycle
+      began before the consumer's effective date — a migration guard the readiness check had not
+      covered. The check now covers every data guard in the pending migrations.
+- [ ] Make the next conversion a dry run instead of a prediction: restore the workstation's own
+      backup to a scratch database on that login and apply the update there first. Every data
+      blocker this release hit was found by the migration, not by the hand-written check.
 - [ ] **Unexplained**: 1.3.13 still refuses on the production workstation with the same
       `PartiallyPresent` dialog. Established, not inferred: the installed `Sati.exe` is
       byte-identical to the shipped build (SHA-256 `0DAAFE5D…A21F`); that exact binary, pointed at
