@@ -649,22 +649,24 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.10", version);
+        Assert.Equal("1.3.11", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Safe Local startup restored", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Annual work by its own date", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "Local startup works with its safety checks intact" &&
-            section.Items.Any(item => item.Contains("SatiProduction", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("before opening", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Each annual obligation belongs to its own effective date" &&
+            section.Items.Any(item => item.Contains("effective date", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("missing", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "The Local installer now proves its startup configuration" &&
-            section.Items.Any(item => item.Contains("build", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("acceptance", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Completion is an attestation, with its real date" &&
+            section.Items.Any(item => item.Contains("actually happened", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("reclassification", StringComparison.OrdinalIgnoreCase)));
+        // The rule staff feel most: billability follows the service date, and a
+        // justification reaches review without releasing the billing.
         Assert.Contains(ProductReleaseNotes.Sections, section =>
-            section.Title == "No records or workflows changed" &&
-            section.Items.Any(item => item.Contains("migration", StringComparison.OrdinalIgnoreCase)) &&
-            section.Items.Any(item => item.Contains("1.3.9", StringComparison.OrdinalIgnoreCase)));
+            section.Title == "Billing follows the service date" &&
+            section.Items.Any(item => item.Contains("service date", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("justification", StringComparison.OrdinalIgnoreCase)));
 
         var loginView = File.ReadAllText(Path.Combine(
             directory!.FullName,

@@ -149,6 +149,52 @@ signature-never-attests items retained later as history.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.11 — 2026-09-15
+
+"Annual work by its own date." This release delivers the annual compliance and service-date
+billing correction: each obligation is identified by its annual effective date, completion is an
+explicit dated attestation, billing is judged by the note's own service date under append-only
+agency policy, and exceptions and administrative recovery are exact and immutable.
+
+- [x] Reconcile the correction branch with releases 1.3.8 through 1.3.10. Merge commit
+      `d60f4d0d8ddb1748b3d9cc6fc67e7257cf15bed2` records both parents; `master` fast-forwards to it
+      with no discarded work. No branch was deleted; the worktree-owned and divergent design
+      branches are retained.
+- [x] Resolve the overlapping rules in favor of the clarified 2026-09-14 decisions while keeping the
+      release-safeguard structure from 1.3.8: the note submission gate reads the service date only
+      and admits a justified submission into clinical review without releasing billing; the 837P
+      export gate re-checks the same service-date decision as claim creation, including exact
+      exceptions and recovery; supervisory approval keeps the service-time lock and overlap check.
+- [x] Correct the signature catalog for the two document kinds added in 1.3.9 so an authorized
+      representative cannot sign their own appointment or a referral packet's authorizations.
+- [x] Combine both migration chains in timestamp order: 108 migrations. A generated check migration
+      was empty, so the merged model and snapshot agree. None of the three 2026-09-15 migrations
+      references the scratchpad tables.
+- [x] Restore the model snapshot and give `20260915153000_AllowSupersedingBillingComplianceRecovery`
+      the `.Designer.cs` it was missing. Because that hand-written migration carried no target
+      model, `dotnet ef migrations remove` silently reverted the snapshot to an older model during
+      the merge check, dropping the recovery, policy, and release-obligation entities.
+      `StabilizationTests.EfModelMatchesLatestMigrationSnapshot` caught it before deployment; a
+      regenerated check migration is empty again and the chain is now self-describing.
+- [ ] Complete coordinated 1.3.11 versioning, the full Release build, and all five test projects.
+- [ ] Apply the three 2026-09-15 migrations to identity-validated Azure `SatiDemo` through a
+      guarded, transactional, rerunnable script: rollback-only dry run, real run, then a second real
+      run proving idempotency. The user adds and removes the temporary exact-IP firewall rule.
+- [ ] Publish the Demo API and verify liveness, readiness, release version, and contract revision
+      parity with the compiled client.
+- [ ] Build, accept, and publish the Demo and Local installers and checksums without overwriting.
+- [ ] Record deployment identifiers, hashes, test totals, and Local Production machine state.
+
+### Local Production machines
+
+This release adds migrations 106 through 108. Every Local `SatiProduction` database applies them
+only when that machine first launches the 1.3.11 Local client, which takes a verified backup first.
+
+- [ ] SatiLogica workstation: source is current; the installed Local client and its `SatiProduction`
+      migration state remain unverified for this release.
+- [ ] Joshu workstation: installed version and Local migration state unverified; treat it as behind
+      until 1.3.11 is installed and a successful Local startup is confirmed.
+
 ## Release 1.3.10 — 2026-09-14
 
 "Safe Local startup restored." This patch corrects the Local package configuration that made 1.3.9
