@@ -4401,3 +4401,60 @@ This is implemented source direction, not a claim of deployment or regulatory ac
 electronic-signature bridge remains synthetic-only and Local Production remains disabled. A
 controlled migration, reconciliation evidence, environment-specific testing, accessibility/legal
 review, and explicit release authorization are still required before operational use.
+
+## 2026-09-16 — annual forms show the plan in force and the renewal being prepared
+
+The client profile's annual checkboxes each showed one record, the one for the plan in force. The
+Comprehensive Assessment for the next plan is due 90 days before that plan starts, well inside the
+current plan year. The box therefore stayed checked on last year's completed assessment while the
+next one went overdue and blocked billing, and it switched to the new record only on the target
+date, 90 days late. Reclass (due 30 days before) and the PCP's opening deadline had the same blind
+spot. One control was being asked to report two records, and it could not say which one it meant.
+
+The agency's annual tracking workbook gives the timing: start the assessment 120 days before the
+plan, finish it by the PCP open date 90 days before, complete Reclass 30 days before, and the plan
+and Reclass take effect together on the target. That matches `ComplianceScheduleRules`.
+
+### Two controls, collapsing on the target date
+
+PCP, Comprehensive Assessment, Reclass, Safety Plan, and Privacy Practices each show the obligation
+for the plan in force. A second, indented control names the renewal for the next target and
+appears when the renewal's availability window opens, or earlier if it was already opened or
+completed. On the target date the renewal becomes the plan in force, whether or not it is finished,
+and the row returns to one control. There is no grace period, so keeping the old plan's checked box
+past its end would show coverage that no longer exists. A renewal completed early stays beside the
+current plan until its target date.
+
+`ComplianceScheduleRules.HasRenewalOverlap`, `UpcomingTargetEffectiveDate`, and
+`IsRenewalUnderway` own the timing. `AnnualFormSlots` in the desktop only chooses and words the
+records. Each slot names its exact row, and activating a renewal opens that row's attestation, never
+the type's current-cycle row. A missing renewal row is shown as missing, never borrowed from
+another year. The upcoming target is counted from the initial effective date so a February 29 start
+returns to February 29 in leap years, matching generation.
+
+Quarterly reviews keep one control each: a review never replaces an earlier review and their
+windows do not overlap. Releases stay in the Releases workspace, where each recipient already has
+its own obligation.
+
+### Assessment start is an agency-selectable billing gate
+
+`BillingComplianceRequirements.ComprehensiveAssessmentOpening` projects a separate
+`ComprehensiveAssessment_Opening` obligation due 30 days before the assessment's due date (120 days
+before the plan), exactly as PCP opening does at 90 days. It is off by default and an agency turns it
+on through an ordinary effective-dated policy version. The lead time is fixed, not the configurable
+availability window, so changing a notification setting cannot rewrite historical billability. The
+30 days come from the agency workbook, not from a cited OADS rule. The profile's late-start and
+late-open warnings use `BillingComplianceGate.OpeningDeadline`, so the warning and the gate cannot
+name different days. Whether a late opening blocks billing is reported by the gate's reasons, not
+by the checkbox.
+
+No migration is needed: the requirement mask is an integer column without a check constraint. The
+API must be deployed with or before a desktop that offers the new option, because an older API
+rejects the unknown bit.
+
+**Rejected:** one control that silently switches records before the target date (an unchecked box
+could not say which record or which failure), keeping two controls until the renewal is complete
+(shows an expired plan as current), a per-type list separate from the schedule rule, renewal
+controls for reviews, and treating the assessment start as a configurable lead time.
+
+The caseload matrix still reads the current-cycle row only; it is the next step.

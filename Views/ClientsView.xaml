@@ -2177,6 +2177,60 @@
                                    BasedOn="{StaticResource {x:Type CheckBox}}">
                                 <Setter Property="Margin" Value="0,0,0,1" />
                             </Style>
+                            <Style x:Key="AnnualFormStatusText" TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                <Setter Property="FontSize" Value="11" />
+                                <Setter Property="TextWrapping" Value="Wrap" />
+                                <Setter Property="Margin" Value="20,0,0,1" />
+                            </Style>
+                            <!-- One annual document type. The first checkbox is the plan in
+                                 force; the indented one appears only while the renewal is
+                                 being prepared and disappears on its target date. Each names
+                                 its exact record, and the status line says in words what
+                                 colour alone would otherwise carry. -->
+                            <DataTemplate x:Key="AnnualFormRowTemplate">
+                                <StackPanel>
+                                    <views:AttestationCheckBox Content="{Binding Label}"
+                                              AutomationProperties.Name="{Binding Current.AutomationName, FallbackValue={x:Null}}"
+                                              IsChecked="{Binding Current.IsComplete, Mode=OneWay, FallbackValue=False}"
+                                              IsEnabled="{Binding DataContext.IsFormsEditingUnlocked, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Command="{Binding DataContext.ToggleAnnualFormCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              CommandParameter="{Binding Current}" />
+                                    <TextBlock Text="{Binding Current.StatusText, FallbackValue={x:Null}}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock"
+                                                   BasedOn="{StaticResource AnnualFormStatusText}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Current.NeedsAttention}" Value="True">
+                                                        <Setter Property="Foreground" Value="{DynamicResource OverdueBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <StackPanel Margin="20,2,0,0"
+                                                Visibility="{Binding HasRenewal, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <views:AttestationCheckBox Content="{Binding Renewal.CheckBoxLabel}"
+                                                  AutomationProperties.Name="{Binding Renewal.AutomationName}"
+                                                  IsChecked="{Binding Renewal.IsComplete, Mode=OneWay, FallbackValue=False}"
+                                                  IsEnabled="{Binding DataContext.IsFormsEditingUnlocked, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  Command="{Binding DataContext.ToggleAnnualFormCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  CommandParameter="{Binding Renewal}" />
+                                        <TextBlock Text="{Binding Renewal.StatusText}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock"
+                                                       BasedOn="{StaticResource AnnualFormStatusText}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Renewal.NeedsAttention}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource OverdueBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
                         </Grid.Resources>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -2308,66 +2362,36 @@
                                            Text="Annual Forms"
                                            Style="{StaticResource SectionHeader}"
                                            Margin="0,0,0,2" />
-                                <StackPanel Grid.Row="1"
-                                            Grid.Column="2">
-                                    <views:AttestationCheckBox Content="PCP"
-                                              IsChecked="{Binding PcpCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
-                                              Command="{Binding ToggleFormCommand}"
-                                              CommandParameter="{x:Static local:FormType.PCP}" />
-                                    <TextBlock Text="{Binding PcpDueDate, StringFormat={}{0:MM/dd/yy}}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontSize="11"
-                                               Margin="20,0,0,1" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="2"
-                                            Grid.Column="2">
-                                    <views:AttestationCheckBox Content="Comp Assessment"
-                                              IsChecked="{Binding CompAssessmentCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
-                                              Command="{Binding ToggleFormCommand}"
-                                              CommandParameter="{x:Static local:FormType.ComprehensiveAssessment}" />
-                                    <TextBlock Text="{Binding CompAssessmentDueDate, StringFormat={}{0:MM/dd/yy}}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontSize="11"
-                                               Margin="20,0,0,1" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="3"
-                                            Grid.Column="2">
-                                    <views:AttestationCheckBox Content="Reclassification"
-                                              IsChecked="{Binding ReclassificationCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
-                                              Command="{Binding ToggleFormCommand}"
-                                              CommandParameter="{x:Static local:FormType.Reclassification}" />
-                                    <TextBlock Text="{Binding ReclassificationDueDate, StringFormat={}{0:MM/dd/yy}}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontSize="11"
-                                               Margin="20,0,0,1" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="4"
-                                            Grid.Column="2">
-                                    <views:AttestationCheckBox Content="Safety Plan"
-                                              IsChecked="{Binding SafetyPlanCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
-                                              Command="{Binding ToggleFormCommand}"
-                                              CommandParameter="{x:Static local:FormType.SafetyPlan}" />
-                                    <TextBlock Text="{Binding SafetyPlanDueDate, StringFormat={}{0:MM/dd/yy}}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontSize="11"
-                                               Margin="20,0,0,1" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="5"
-                                            Grid.Column="2">
-                                    <views:AttestationCheckBox Content="Privacy Practices"
-                                              IsChecked="{Binding PrivacyPracticesCompliant, Mode=OneWay}"
-                                              IsEnabled="{Binding IsFormsEditingUnlocked}"
-                                              Command="{Binding ToggleFormCommand}"
-                                              CommandParameter="{x:Static local:FormType.PrivacyPractices}" />
-                                    <TextBlock Text="{Binding PrivacyPracticesDueDate, StringFormat={}{0:MM/dd/yy}}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               FontSize="11"
-                                               Margin="20,0,0,1" />
-                                </StackPanel>
+                                <ContentControl Grid.Row="1"
+                                                Grid.Column="2"
+                                                Focusable="False"
+                                                IsTabStop="False"
+                                                Content="{Binding AnnualFormRows[0]}"
+                                                ContentTemplate="{StaticResource AnnualFormRowTemplate}" />
+                                <ContentControl Grid.Row="2"
+                                                Grid.Column="2"
+                                                Focusable="False"
+                                                IsTabStop="False"
+                                                Content="{Binding AnnualFormRows[1]}"
+                                                ContentTemplate="{StaticResource AnnualFormRowTemplate}" />
+                                <ContentControl Grid.Row="3"
+                                                Grid.Column="2"
+                                                Focusable="False"
+                                                IsTabStop="False"
+                                                Content="{Binding AnnualFormRows[2]}"
+                                                ContentTemplate="{StaticResource AnnualFormRowTemplate}" />
+                                <ContentControl Grid.Row="4"
+                                                Grid.Column="2"
+                                                Focusable="False"
+                                                IsTabStop="False"
+                                                Content="{Binding AnnualFormRows[3]}"
+                                                ContentTemplate="{StaticResource AnnualFormRowTemplate}" />
+                                <ContentControl Grid.Row="5"
+                                                Grid.Column="2"
+                                                Focusable="False"
+                                                IsTabStop="False"
+                                                Content="{Binding AnnualFormRows[4]}"
+                                                ContentTemplate="{StaticResource AnnualFormRowTemplate}" />
 
                                 <TextBlock Grid.Row="0"
                                            Grid.Column="4"

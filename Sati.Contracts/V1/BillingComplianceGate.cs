@@ -14,9 +14,10 @@ public enum BillingComplianceRequirements
     DhhsRelease = 1 << 7,
     MedicalRelease = 1 << 8,
     PcpOpening = 1 << 9,
+    ComprehensiveAssessmentOpening = 1 << 10,
     All = QuarterlyReviews | Pcp | ComprehensiveAssessment | Reclassification |
           SafetyPlan | PrivacyPractices | AgencyRelease | DhhsRelease | MedicalRelease |
-          PcpOpening
+          PcpOpening | ComprehensiveAssessmentOpening
 }
 
 public sealed record ComplianceFormSnapshot(
@@ -56,18 +57,29 @@ public static class BillingComplianceGate
     /// </summary>
     public const int PcpOpeningBillingLeadDays = 90;
 
+    /// <summary>
+    /// The Comprehensive Assessment must be started 30 days before it is due,
+    /// which is 120 days before the plan it informs. Fixed for the same reason as
+    /// <see cref="PcpOpeningBillingLeadDays"/>: the configurable availability lead
+    /// time must not rewrite historical billability. Taken from the agency's
+    /// annual tracking workbook, not from a cited OADS rule.
+    /// </summary>
+    public const int ComprehensiveAssessmentOpeningBillingLeadDays = 30;
+
     public const BillingComplianceRequirements DefaultRequirements =
         BillingComplianceRequirements.QuarterlyReviews |
         BillingComplianceRequirements.Pcp |
         BillingComplianceRequirements.ComprehensiveAssessment;
 
     /// <summary>
-    /// Projects the independently configurable PCP-opening obligation beside the
-    /// PCP-completion obligation. The opening deadline is the first day the plan
-    /// is available to open. It is deliberately a separate snapshot so turning
-    /// on the opening gate never changes the PCP's hard completion deadline.
+    /// Projects the independently configurable opening obligations beside the
+    /// completion obligations they belong to: the PCP must be opened on the first
+    /// day it is available, and the Comprehensive Assessment must be started
+    /// <see cref="ComprehensiveAssessmentOpeningBillingLeadDays"/> before it is due.
+    /// Each is deliberately a separate snapshot so turning on an opening gate never
+    /// changes the document's hard completion deadline.
     /// </summary>
-    public static IReadOnlyList<ComplianceFormSnapshot> IncludePcpOpeningObligations(
+    public static IReadOnlyList<ComplianceFormSnapshot> IncludeOpeningObligations(
         IEnumerable<ComplianceFormSnapshot> forms)
     {
         ArgumentNullException.ThrowIfNull(forms);
@@ -76,12 +88,13 @@ public static class BillingComplianceGate
         foreach (var form in forms)
         {
             projected.Add(form);
-            if (!string.Equals(form.Type, "PCP", StringComparison.Ordinal))
+            var opening = OpeningObligationFor(form.Type);
+            if (opening is null)
                 continue;
 
             projected.Add(new ComplianceFormSnapshot(
-                BillingComplianceObligationTypes.PcpOpening,
-                form.DueDate.Date.AddDays(-PcpOpeningBillingLeadDays),
+                opening.Value.Type,
+                form.DueDate.Date.AddDays(-opening.Value.LeadDays),
                 form.OpenedDate,
                 ObligationId: $"{ResolveObligationId(form)}/opening",
                 EvidenceId: form.OpenedEvidenceId));
@@ -89,6 +102,30 @@ public static class BillingComplianceGate
 
         return projected;
     }
+
+    /// <summary>
+    /// The date a document must be opened by, or null when the document type has
+    /// no opening obligation. Readers that warn about a late opening use this so
+    /// the warning and the gate cannot name different days.
+    /// </summary>
+    public static DateTime? OpeningDeadline(string formType, DateTime dueDate) =>
+        OpeningObligationFor(formType) is { } opening
+            ? dueDate.Date.AddDays(-opening.LeadDays)
+            : null;
+
+    /// <summary>The opening obligation type projected for a document type, if any.</summary>
+    public static string? OpeningObligationType(string formType) =>
+        OpeningObligationFor(formType)?.Type;
+
+    private static (string Type, int LeadDays)? OpeningObligationFor(string formType) =>
+        formType switch
+        {
+            "PCP" => (BillingComplianceObligationTypes.PcpOpening, PcpOpeningBillingLeadDays),
+            "ComprehensiveAssessment" => (
+                BillingComplianceObligationTypes.ComprehensiveAssessmentOpening,
+                ComprehensiveAssessmentOpeningBillingLeadDays),
+            _ => null
+        };
 
     public static BillingComplianceResult Evaluate(
         DateTime? effectiveDate,
@@ -231,6 +268,8 @@ public static class BillingComplianceGate
         "PCP" => BillingComplianceRequirements.Pcp,
         BillingComplianceObligationTypes.PcpOpening => BillingComplianceRequirements.PcpOpening,
         "ComprehensiveAssessment" => BillingComplianceRequirements.ComprehensiveAssessment,
+        BillingComplianceObligationTypes.ComprehensiveAssessmentOpening =>
+            BillingComplianceRequirements.ComprehensiveAssessmentOpening,
         "Reclassification" => BillingComplianceRequirements.Reclassification,
         "SafetyPlan" => BillingComplianceRequirements.SafetyPlan,
         "PrivacyPractices" => BillingComplianceRequirements.PrivacyPractices,
@@ -245,6 +284,8 @@ public static class BillingComplianceGate
         "PCP" => "PCP",
         BillingComplianceObligationTypes.PcpOpening => "PCP opening",
         "ComprehensiveAssessment" => "Comprehensive Assessment",
+        BillingComplianceObligationTypes.ComprehensiveAssessmentOpening =>
+            "Comprehensive Assessment start",
         "Reclassification" => "Reclassification",
         "SafetyPlan" => "Safety Plan",
         "PrivacyPractices" => "Privacy Practices",
@@ -262,4 +303,5 @@ public static class BillingComplianceGate
 public static class BillingComplianceObligationTypes
 {
     public const string PcpOpening = "PCP_Opening";
+    public const string ComprehensiveAssessmentOpening = "ComprehensiveAssessment_Opening";
 }

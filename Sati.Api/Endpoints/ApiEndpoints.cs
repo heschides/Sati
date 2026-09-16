@@ -5707,7 +5707,7 @@ internal static partial class ApiEndpoints
                                 TargetEffectiveDate: form.TargetEffectiveDate == default
                                     ? null
                                     : form.TargetEffectiveDate));
-                        var formObligations = BillingComplianceGate.IncludePcpOpeningObligations(
+                        var formObligations = BillingComplianceGate.IncludeOpeningObligations(
                             ExpectedBillingComplianceObligations.IncludeMissingForms(
                                 person.EffectiveDate, storedForms, date,
                                 compliancePolicy.Schedule));
@@ -8429,7 +8429,7 @@ internal static partial class ApiEndpoints
             formSnapshots,
             serviceDate,
             policy.Schedule);
-        var snapshots = BillingComplianceGate.IncludePcpOpeningObligations(
+        var snapshots = BillingComplianceGate.IncludeOpeningObligations(
                 withExpectedForms)
             .Concat(ReleaseBillingRules.BuildComplianceSnapshots(
                 releaseFacts,
@@ -8713,7 +8713,7 @@ internal static partial class ApiEndpoints
             formSnapshots,
             asOfDate,
             schedule);
-        var formsAndOpening = BillingComplianceGate.IncludePcpOpeningObligations(
+        var formsAndOpening = BillingComplianceGate.IncludeOpeningObligations(
             withExpectedForms);
         return BillingComplianceRecoveryRules.FromComplianceSnapshots(personId, formsAndOpening)
             .Concat(ReleaseBillingRules.BuildRecoveryObligations(

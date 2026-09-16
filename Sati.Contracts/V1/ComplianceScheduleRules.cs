@@ -51,6 +51,49 @@ public static class ComplianceScheduleRules
     }
 
     /// <summary>
+    /// Returns the annual effective date after the one in force on
+    /// <paramref name="asOf"/>. Counted from the initial date rather than by adding a
+    /// year to the current target: a February 29 start is February 28 in common
+    /// years and must come back to February 29, exactly as
+    /// <see cref="TargetEffectiveDatesThroughNext"/> generates it.
+    /// </summary>
+    public static DateTime UpcomingTargetEffectiveDate(
+        DateTime initialEffectiveDate,
+        DateTime asOf)
+    {
+        var current = CurrentTargetEffectiveDate(initialEffectiveDate, asOf);
+        var yearsElapsed = current.Year - initialEffectiveDate.Date.Year;
+        return initialEffectiveDate.Date.AddYears(yearsElapsed + 1);
+    }
+
+    /// <summary>
+    /// Whether a document type is renewed by a new version that is prepared while
+    /// the previous one is still in force. Such a type can have two obligations
+    /// worth showing at once: the one in force and the renewal being developed.
+    /// Quarterly reviews are excluded because a review never replaces an earlier
+    /// review, and releases are tracked per recipient in their own workspace.
+    /// </summary>
+    public static bool HasRenewalOverlap(string formType) => formType is
+        "PCP" or "ComprehensiveAssessment" or "Reclassification" or
+        "SafetyPlan" or "PrivacyPractices";
+
+    /// <summary>
+    /// Whether the renewal for the upcoming target is under way on
+    /// <paramref name="asOf"/>: its availability window has opened, or someone has
+    /// already opened or completed it early. The renewal stops being a separate
+    /// obligation on its own target date, when it becomes the one in force whether
+    /// or not it is finished; callers get that by resolving the targets again.
+    /// </summary>
+    public static bool IsRenewalUnderway(
+        DateTime renewalAvailableOn,
+        DateTime? openedOn,
+        DateTime? completedOn,
+        DateTime asOf) =>
+        asOf.Date >= renewalAvailableOn.Date ||
+        openedOn is not null ||
+        completedOn is not null;
+
+    /// <summary>
     /// Enumerates every annual identity from admission through the next renewal.
     /// An implausibly large range fails explicitly instead of silently omitting
     /// older obligations, because an omitted cycle would look satisfied to billing.

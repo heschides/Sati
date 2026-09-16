@@ -563,6 +563,7 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("ComplianceComprehensiveAssessment", settings);
         Assert.Contains("ComplianceAgencyRelease", settings);
         Assert.Contains("CompliancePcpOpening", settings);
+        Assert.Contains("ComplianceComprehensiveAssessmentOpening", settings);
         Assert.Contains("ApplyBillingCompliancePolicyCommand", settings);
         Assert.Contains("CanManageAgencySettings", settings);
     }
@@ -576,10 +577,17 @@ public sealed class ReleaseUiStructureTests
 
         // The three old category-level release checkboxes were removed. Release compliance is
         // now recipient-specific and is attested in ReleaseObligationsWorkspace.
-        Assert.Equal(9, System.Text.RegularExpressions.Regex.Matches(
+        // Four quarterly reviews, plus the annual row template's current and renewal
+        // checkboxes, which the five annual rows share. Every one is behind the lock.
+        Assert.Equal(6, System.Text.RegularExpressions.Regex.Matches(
             clients, "<views:AttestationCheckBox ").Count);
-        Assert.Equal(9, System.Text.RegularExpressions.Regex.Matches(
+        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(
             clients, "IsEnabled=\"{Binding IsFormsEditingUnlocked}\"").Count);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(
+            clients,
+            "IsEnabled=\"{Binding DataContext.IsFormsEditingUnlocked, RelativeSource={RelativeSource AncestorType=UserControl}}\"").Count);
+        Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(
+            clients, "ContentTemplate=\"{StaticResource AnnualFormRowTemplate}\"").Count);
         Assert.DoesNotContain("CommandParameter=\"{x:Static local:FormType.Release_", clients);
         Assert.Contains("ReleaseObligationsWorkspace", clients);
         Assert.Contains("Command=\"{Binding ToggleFormsEditingCommand}\"", clients);

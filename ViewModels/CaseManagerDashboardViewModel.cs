@@ -807,11 +807,6 @@ CalendarViewModel calendarViewModel,
         public bool Q2RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q2R)?.IsCompliant ?? false;
         public bool Q3RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q3R)?.IsCompliant ?? false;
         public bool Q4RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q4R)?.IsCompliant ?? false;
-        public bool PcpCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PCP)?.IsCompliant ?? false;
-        public bool CompAssessmentCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.ComprehensiveAssessment)?.IsCompliant ?? false;
-        public bool ReclassificationCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.IsCompliant ?? false;
-        public bool SafetyPlanCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.IsCompliant ?? false;
-        public bool PrivacyPracticesCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.IsCompliant ?? false;
         public bool ReleaseAgencyCompliant =>
             IsReleaseCategoryCompliant(ReleaseObligationCategory.Agency, DateTime.Today);
         public bool ReleaseDhhsCompliant =>
@@ -1519,11 +1514,6 @@ CalendarViewModel calendarViewModel,
             OnPropertyChanged(nameof(Q2RCompliant));
             OnPropertyChanged(nameof(Q3RCompliant));
             OnPropertyChanged(nameof(Q4RCompliant));
-            OnPropertyChanged(nameof(PcpCompliant));
-            OnPropertyChanged(nameof(CompAssessmentCompliant));
-            OnPropertyChanged(nameof(ReclassificationCompliant));
-            OnPropertyChanged(nameof(SafetyPlanCompliant));
-            OnPropertyChanged(nameof(PrivacyPracticesCompliant));
             OnPropertyChanged(nameof(ReleaseAgencyCompliant));
             OnPropertyChanged(nameof(ReleaseDhhsCompliant));
             OnPropertyChanged(nameof(ReleaseMedicalCompliant));

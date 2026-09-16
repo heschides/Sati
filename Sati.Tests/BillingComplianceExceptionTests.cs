@@ -80,7 +80,7 @@ public sealed class BillingComplianceExceptionTests
             ObligationId: "form:41");
 
         var result = BillingComplianceGate.EvaluateBillingWindowDetailed(
-            BillingComplianceGate.IncludePcpOpeningObligations([pcp]),
+            BillingComplianceGate.IncludeOpeningObligations([pcp]),
             new DateTime(2025, 12, 8),
             BillingComplianceRequirements.PcpOpening);
 

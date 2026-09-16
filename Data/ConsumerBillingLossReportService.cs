@@ -162,7 +162,7 @@ namespace Sati.Data
                                 TargetEffectiveDate: form.TargetEffectiveDate == default
                                     ? null
                                     : form.TargetEffectiveDate));
-                        var formObligations = BillingComplianceGate.IncludePcpOpeningObligations(
+                        var formObligations = BillingComplianceGate.IncludeOpeningObligations(
                             ExpectedBillingComplianceObligations.IncludeMissingForms(
                                 person.EffectiveDate, storedForms, date, policy.Schedule));
                         if (BillingComplianceGate.EvaluateBillingWindow(

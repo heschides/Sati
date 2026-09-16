@@ -191,6 +191,53 @@ public sealed class DashboardFormComplianceTests
     }
 
     [Fact]
+    public async Task ARenewalCheckboxOpensTheRenewalRecordNotThePlanInForce()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        var clients = harness.Dashboard.Clients;
+        // The plan in force started ten months ago; the renewal starts in sixty days,
+        // so its PCP has been available to open for thirty.
+        var upcomingTarget = DateTime.Today.AddDays(60);
+        var currentTarget = upcomingTarget.AddYears(-1);
+        var person = Person.CreatePerson(
+            fixture.CaseManagerOne.Id, "Renewal", "Routing", string.Empty,
+            new DateTime(1990, 1, 1), currentTarget, WaiverType.Section21, new Settings());
+        person.Forms.Clear();
+        var current = new Form(FormType.PCP, currentTarget,
+            completedOn: currentTarget, targetEffectiveDate: currentTarget);
+        var upcoming = new Form(FormType.PCP, upcomingTarget,
+            targetEffectiveDate: upcomingTarget);
+        person.Forms.AddRange([current, upcoming]);
+
+        clients.People.Add(person);
+        clients.SelectedPerson = person;
+        var row = clients.AnnualFormRow(FormType.PCP);
+
+        Assert.Same(current, row.Current!.Form);
+        Assert.True(row.HasRenewal);
+        Assert.Same(upcoming, row.Renewal!.Form);
+        Assert.False(clients.ToggleAnnualFormCommand.CanExecute(row.Renewal));
+
+        clients.ToggleFormsEditingCommand.Execute(null);
+        Assert.True(clients.ToggleAnnualFormCommand.CanExecute(row.Renewal));
+        await clients.ToggleAnnualFormCommand.ExecuteAsync(row.Renewal);
+
+        Assert.True(clients.Attestation.IsVisible);
+        Assert.Contains($"{upcomingTarget:MMM d, yyyy}", clients.Attestation.StatusText);
+        Assert.Contains("renewal for the plan starting", clients.Attestation.ContextLabel);
+
+        var completedOn = DateTime.Today;
+        clients.Attestation.CompletionDate = completedOn;
+        clients.Attestation.HasConfirmedEvergreenCompletion = true;
+        await clients.Attestation.CompleteAttestationCommand.ExecuteAsync(null);
+
+        Assert.Equal(completedOn, upcoming.CompletedDate);
+        Assert.Equal(currentTarget, current.CompletedDate);
+        Assert.True(clients.AnnualFormRow(FormType.PCP).Renewal!.IsComplete);
+    }
+
+    [Fact]
     public async Task PcpAndAssessmentRequireAnExplicitEvergreenAttestation()
     {
         var service = new RecordingFormService();

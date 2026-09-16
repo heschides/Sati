@@ -303,6 +303,35 @@ public sealed class BillingCompliancePolicyApiTests(SatiApiFactory factory)
     }
 
     [Fact]
+    public async Task AssessmentStartIsAnAcceptedPolicyChoiceAndUnknownBitsAreNot()
+    {
+        // The desktop can offer the assessment-start gate only if the API accepts it;
+        // an API one release behind would reject the policy as an unknown value.
+        using var admin = await factory.CreateAuthenticatedClientAsync("admin-one");
+        var enforcement = new DateTime(2197, 1, 1);
+
+        var accepted = await admin.PostAsJsonAsync(
+            "/api/v1/settings/billing-compliance-policies",
+            new AppendBillingCompliancePolicyRequest(
+                Guid.NewGuid(),
+                enforcement,
+                BillingComplianceRequirements.ComprehensiveAssessment |
+                BillingComplianceRequirements.ComprehensiveAssessmentOpening));
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        var version = await accepted.Content.ReadFromJsonAsync<BillingCompliancePolicyVersionDto>();
+        Assert.True(version!.Requirements.HasFlag(
+            BillingComplianceRequirements.ComprehensiveAssessmentOpening));
+
+        var unknown = await admin.PostAsJsonAsync(
+            "/api/v1/settings/billing-compliance-policies",
+            new AppendBillingCompliancePolicyRequest(
+                Guid.NewGuid(),
+                enforcement.AddDays(1),
+                (BillingComplianceRequirements)(1 << 11)));
+        Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
+    }
+
+    [Fact]
     public async Task PolicyHistoryIsAdminOnlyEffectiveDatedIdempotentAndTenantScoped()
     {
         // This collection deliberately shares one in-memory API. The service-date

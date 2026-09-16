@@ -13,7 +13,7 @@ public sealed class BillingComplianceGateTests
             new DateTime(2027, 3, 7),
             CompletedDate: null,
             OpenedDate: new DateTime(2026, 12, 12));
-        var obligations = BillingComplianceGate.IncludePcpOpeningObligations([pcp]);
+        var obligations = BillingComplianceGate.IncludeOpeningObligations([pcp]);
 
         Assert.Empty(BillingComplianceGate.EvaluateBillingWindow(
             obligations,
@@ -36,7 +36,7 @@ public sealed class BillingComplianceGateTests
     [Fact]
     public void PcpOpeningBillingDeadlineRemainsTheFixedNinetyDayRule()
     {
-        var obligations = BillingComplianceGate.IncludePcpOpeningObligations(
+        var obligations = BillingComplianceGate.IncludeOpeningObligations(
             [new ComplianceFormSnapshot("PCP", new DateTime(2027, 3, 7), null)]);
 
         var opening = Assert.Single(obligations, item =>
@@ -70,8 +70,64 @@ public sealed class BillingComplianceGateTests
         { "Release_Agency", BillingComplianceRequirements.AgencyRelease },
         { "Release_DHHS", BillingComplianceRequirements.DhhsRelease },
         { "Release_Medical", BillingComplianceRequirements.MedicalRelease },
-        { BillingComplianceObligationTypes.PcpOpening, BillingComplianceRequirements.PcpOpening }
+        { BillingComplianceObligationTypes.PcpOpening, BillingComplianceRequirements.PcpOpening },
+        {
+            BillingComplianceObligationTypes.ComprehensiveAssessmentOpening,
+            BillingComplianceRequirements.ComprehensiveAssessmentOpening
+        }
     };
+
+    [Fact]
+    public void AssessmentStartIsDueOneHundredTwentyDaysBeforeThePlan()
+    {
+        // Plan March 7, 2027; assessment due December 7, 2026 (90 days before);
+        // start due November 7, 2026 (120 days before), per the agency workbook.
+        var assessment = new ComplianceFormSnapshot(
+            "ComprehensiveAssessment", new DateTime(2026, 12, 7), null, ObligationId: "form:77");
+
+        var obligations = BillingComplianceGate.IncludeOpeningObligations([assessment]);
+
+        var start = Assert.Single(obligations, item =>
+            item.Type == BillingComplianceObligationTypes.ComprehensiveAssessmentOpening);
+        Assert.Equal(new DateTime(2026, 11, 7), start.DueDate);
+        Assert.Equal("form:77/opening", start.ObligationId);
+        Assert.Equal(
+            new DateTime(2026, 11, 7),
+            BillingComplianceGate.OpeningDeadline("ComprehensiveAssessment", assessment.DueDate));
+        Assert.Null(BillingComplianceGate.OpeningDeadline("Reclassification", assessment.DueDate));
+    }
+
+    [Fact]
+    public void AssessmentStartIsASeparateOptionalHistoricalGate()
+    {
+        var assessment = new ComplianceFormSnapshot(
+            "ComprehensiveAssessment",
+            new DateTime(2026, 12, 7),
+            CompletedDate: null,
+            OpenedDate: new DateTime(2026, 11, 12));
+        var obligations = BillingComplianceGate.IncludeOpeningObligations([assessment]);
+
+        // Off by default: a late start never blocks unless the agency chooses it.
+        Assert.Empty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations, new DateTime(2026, 11, 8), BillingComplianceGate.DefaultRequirements));
+        Assert.Empty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations, new DateTime(2026, 11, 7),
+            BillingComplianceRequirements.ComprehensiveAssessmentOpening));
+        Assert.NotEmpty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations, new DateTime(2026, 11, 8),
+            BillingComplianceRequirements.ComprehensiveAssessmentOpening));
+        Assert.Empty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations, new DateTime(2026, 11, 12),
+            BillingComplianceRequirements.ComprehensiveAssessmentOpening));
+
+        // Turning on the PCP opening gate does not turn on the assessment's.
+        Assert.Empty(BillingComplianceGate.EvaluateBillingWindow(
+            obligations, new DateTime(2026, 11, 8),
+            BillingComplianceRequirements.PcpOpening | BillingComplianceRequirements.Pcp));
+        Assert.False(BillingComplianceGate.IsRequired(
+            "ComprehensiveAssessment",
+            BillingComplianceRequirements.ComprehensiveAssessmentOpening));
+    }
 
     [Fact]
     public void DefaultRequirementsContainOnlyTheThreeConfirmedBillingGates()

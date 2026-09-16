@@ -62,8 +62,8 @@ date. There is no supervisor bypass and Sati does not model the Evergreen Reclas
 
 `BillingComplianceGate`, `BillingCompliancePolicyRules`, and
 `BillingComplianceExceptionRules` are the shared rule owners. The default blocking set is exactly
-PCP completion, Comprehensive Assessment, and all four reviews. PCP opening is a separate optional
-requirement and is off by default. Reclassification, Safety Plan, Privacy Practices, and Agency,
+PCP completion, Comprehensive Assessment, and all four reviews. PCP opening and Comprehensive
+Assessment start are separate optional requirements and are off by default. Reclassification, Safety Plan, Privacy Practices, and Agency,
 DHHS, and Medical releases remain selectable soft requirements; each can gate billing only when an
 administrator includes it in an effective-dated policy version.
 
@@ -80,8 +80,15 @@ save cannot silently rewrite the active mask.
 Policy impact calculation, version append, review flags, and Pending/ComplianceBlocked note-state
 refresh share a serializable transaction. Draft claim submission checks compliance again before
 locking the period, so a draft created before a policy or evidence change cannot bypass it.
-PCP opening uses a fixed target-minus-90-day billing deadline; adjusting notification availability
-does not rewrite that historical boundary.
+PCP opening uses a fixed target-minus-90-day billing deadline and assessment start a fixed
+target-minus-120-day one (30 days before the assessment is due); adjusting notification
+availability does not rewrite either historical boundary. `BillingComplianceGate.OpeningDeadline`
+is the single source for those dates, including the client profile's late-opening wording.
+
+The client profile's annual forms show the obligation for the plan in force and, while it is being
+prepared, the renewal for the next target. `ComplianceScheduleRules` decides which types overlap,
+the upcoming target, and when a renewal is under way; the desktop `AnnualFormSlots` only selects
+and words the exact rows, and each control attests the row it names.
 
 The desktop does not download policy history to make this decision. `ISettingsService` resolves the
 single `BillingComplianceRequirements` value for an exact service date: Local Production performs a
@@ -1492,7 +1499,7 @@ Form→target: `Form.TargetEffectiveDate`.**
   identity.
 - `BillingComplianceRequirements` is stored in append-only, effective-dated agency policy versions.
   The Settings row retains only a compatibility fallback. Admins may enable or disable reviews,
-  PCP completion, PCP opening, Comprehensive Assessment, Reclassification, Safety Plan, Privacy
+  PCP completion, PCP opening, Comprehensive Assessment, assessment start, Reclassification, Safety Plan, Privacy
   Practices, and each release category. The default is exactly reviews, PCP completion, and CA.
 - `beingCompleted` exempts only the newest overdue instance of that form type in the same action;
   an older overdue instance of the same type still blocks.

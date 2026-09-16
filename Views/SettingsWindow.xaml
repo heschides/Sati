@@ -808,6 +808,11 @@
                               AutomationProperties.Name="Count comprehensive assessments for billing compliance"
                               IsChecked="{Binding ComplianceComprehensiveAssessment}"
                               Margin="0,0,22,10" />
+                    <CheckBox Content="Comprehensive assessment start"
+                              AutomationProperties.Name="Count comprehensive assessment start, 120 days before the plan, for billing compliance"
+                              ToolTip="The assessment must be started 30 days before it is due, 120 days before the plan it informs."
+                              IsChecked="{Binding ComplianceComprehensiveAssessmentOpening}"
+                              Margin="0,0,22,10" />
                     <CheckBox Content="Reclassifications"
                               AutomationProperties.Name="Count reclassifications for billing compliance"
                               IsChecked="{Binding ComplianceReclassification}"

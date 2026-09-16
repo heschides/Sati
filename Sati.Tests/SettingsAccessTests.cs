@@ -111,9 +111,12 @@ public sealed class SettingsAccessTests
         Assert.Contains("Header=\"Classification\"", clients, StringComparison.Ordinal);
         Assert.Contains("Visibility=\"{Binding IsClassificationAuthoringEnabled", clients, StringComparison.Ordinal);
 
-        Assert.Contains("IsChecked=\"{Binding PcpCompliant, Mode=OneWay}\"", clients, StringComparison.Ordinal);
-        Assert.Contains("IsChecked=\"{Binding CompAssessmentCompliant, Mode=OneWay}\"", clients, StringComparison.Ordinal);
-        Assert.Contains("IsChecked=\"{Binding ReclassificationCompliant, Mode=OneWay}\"", clients, StringComparison.Ordinal);
+        // PCP, assessment, and Reclass attestations are the first three annual rows.
+        // They render from AnnualFormRows regardless of the authoring toggles.
+        for (var index = 0; index < 5; index++)
+            Assert.Contains($"Content=\"{{Binding AnnualFormRows[{index}]}}\"", clients, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding Current.IsComplete, Mode=OneWay, FallbackValue=False}\"", clients, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding Renewal.IsComplete, Mode=OneWay, FallbackValue=False}\"", clients, StringComparison.Ordinal);
     }
 
     [Fact]

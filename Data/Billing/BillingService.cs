@@ -663,7 +663,7 @@ namespace Sati.Services.Billing
                 formSnapshots,
                 asOfDate,
                 schedule);
-            var formsAndOpening = BillingComplianceGate.IncludePcpOpeningObligations(
+            var formsAndOpening = BillingComplianceGate.IncludeOpeningObligations(
                 withExpectedForms);
             return BillingComplianceRecoveryRules.FromComplianceSnapshots(
                     person.Id, formsAndOpening)

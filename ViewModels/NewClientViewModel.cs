@@ -42,7 +42,18 @@ namespace Sati.ViewModels
         public BillingComplianceRequirements BillingComplianceRequirements { get; private set; } =
             BillingComplianceGate.DefaultRequirements;
         public int PcpOpenDaysBefore { get; private set; } = 90;
+        private ComplianceScheduleSettings _complianceSchedule = new();
         private int _compliancePresentationRevision;
+
+        /// <summary>
+        /// PCP, assessment, Reclass, Safety Plan, and Privacy Practices, each showing the
+        /// obligation in force and, while it is being prepared, the renewal beside it.
+        /// </summary>
+        public IReadOnlyList<AnnualFormRowViewModel> AnnualFormRows { get; } =
+            AnnualFormSlots.Types.Select(type => new AnnualFormRowViewModel(type)).ToArray();
+
+        public AnnualFormRowViewModel AnnualFormRow(FormType type) =>
+            AnnualFormRows.Single(row => row.Type == type);
 
         /// <summary>
         /// Changes whenever a form mutation can change the billing-compliance presentation.
@@ -179,7 +190,10 @@ namespace Sati.ViewModels
             private set
             {
                 if (SetProperty(ref _isFormsEditingUnlocked, value))
+                {
                     ToggleFormCommand.NotifyCanExecuteChanged();
+                    ToggleAnnualFormCommand.NotifyCanExecuteChanged();
+                }
             }
         }
         [ObservableProperty]
@@ -358,6 +372,7 @@ namespace Sati.ViewModels
             LockFormsEditing();
             ToggleFormsEditingCommand.NotifyCanExecuteChanged();
             ToggleFormCommand.NotifyCanExecuteChanged();
+            ToggleAnnualFormCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(HasSelectedPerson));
             OnPropertyChanged(nameof(ShowClientWorkspace));
             OnPropertyChanged(nameof(SelectedPersonServices));
@@ -367,10 +382,6 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(Q2RDueDate));
             OnPropertyChanged(nameof(Q3RDueDate));
             OnPropertyChanged(nameof(Q4RDueDate));
-            OnPropertyChanged(nameof(PcpDueDate));
-            OnPropertyChanged(nameof(CompAssessmentDueDate));
-            OnPropertyChanged(nameof(ReclassificationDueDate));
-            OnPropertyChanged(nameof(SafetyPlanDueDate));
             RefreshComplianceFlags();
             _ = LoadSelectedPersonWorkspaceSafelyAsync(value, _workspaceLoads.Begin());
             SsnPanel?.SetPerson(value?.Id);
@@ -607,11 +618,7 @@ namespace Sati.ViewModels
         public DateTime? Q2RDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Q2R)?.DueDate;
         public DateTime? Q3RDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Q3R)?.DueDate;
         public DateTime? Q4RDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Q4R)?.DueDate;
-        public DateTime? PcpDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.PCP)?.DueDate;
-        public DateTime? CompAssessmentDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.ComprehensiveAssessment)?.DueDate;
-        public DateTime? ReclassificationDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.DueDate;
-        public DateTime? SafetyPlanDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.DueDate;
-        public DateTime? PrivacyPracticesDueDate => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.DueDate;
+        // Annual documents are in AnnualFormRows, which names each year's record exactly.
         // Release due dates are per recipient; see ReleaseObligations and ReleaseCellViewModel.
 
         // Compliance flags
@@ -619,11 +626,6 @@ namespace Sati.ViewModels
         public bool Q2RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q2R)?.IsCompliant ?? false;
         public bool Q3RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q3R)?.IsCompliant ?? false;
         public bool Q4RCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Q4R)?.IsCompliant ?? false;
-        public bool PcpCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PCP)?.IsCompliant ?? false;
-        public bool CompAssessmentCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.ComprehensiveAssessment)?.IsCompliant ?? false;
-        public bool ReclassificationCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.Reclassification)?.IsCompliant ?? false;
-        public bool SafetyPlanCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.SafetyPlan)?.IsCompliant ?? false;
-        public bool PrivacyPracticesCompliant => SelectedPerson?.GetCurrentCycleForm(FormType.PrivacyPractices)?.IsCompliant ?? false;
         public bool ReleaseAgencyCompliant =>
             IsReleaseCategoryCompliant(ReleaseObligationCategory.Agency, DateTime.Today);
         public bool ReleaseDhhsCompliant =>
@@ -1361,6 +1363,44 @@ namespace Sati.ViewModels
             await ToggleFormForAsync(person, type);
         }
 
+        private bool CanToggleAnnualForm(AnnualFormSlotViewModel? slot) =>
+            IsFormsEditingUnlocked && SelectedPerson is not null && slot?.Form is not null;
+
+        [RelayCommand(CanExecute = nameof(CanToggleAnnualForm))]
+        private async Task ToggleAnnualForm(AnnualFormSlotViewModel? slot)
+        {
+            var person = SelectedPerson;
+            if (!CanToggleAnnualForm(slot) || person is null)
+                return;
+            await ToggleAnnualFormForAsync(person, slot!);
+        }
+
+        /// <summary>
+        /// Opens attestation for the exact row the slot shows. Looking the type up again
+        /// by today's date would open the plan in force when the renewal was chosen.
+        /// </summary>
+        internal Task ToggleAnnualFormForAsync(Person person, AnnualFormSlotViewModel slot)
+        {
+            ArgumentNullException.ThrowIfNull(person);
+            ArgumentNullException.ThrowIfNull(slot);
+            if (slot.Form is not Form shown || person.EffectiveDate is not DateTime effectiveDate)
+                return Task.CompletedTask;
+
+            var form = person.Forms.FirstOrDefault(candidate => ReferenceEquals(candidate, shown)) ??
+                       (shown.Id > 0
+                           ? person.Forms.FirstOrDefault(candidate =>
+                               candidate.Id == shown.Id && candidate.Type == slot.Type)
+                           : null);
+            if (form is null)
+                return Task.CompletedTask;
+
+            Attestation.Begin(
+                form,
+                effectiveDate,
+                $"{Person.FormDisplayName(form.Type)}, {slot.PlanPhrase} — {person.FullName}");
+            return Task.CompletedTask;
+        }
+
         private void LockFormsEditing()
         {
             IsFormsEditingUnlocked = false;
@@ -1890,6 +1930,7 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(BillingComplianceRequirements));
             PcpOpenDaysBefore = settings.PcpOpenDaysBefore;
             OnPropertyChanged(nameof(PcpOpenDaysBefore));
+            _complianceSchedule = FormDueDateCalculator.ToSchedule(settings);
             IsComprehensiveAssessmentAuthoringEnabled = settings.IsComprehensiveAssessmentAuthoringEnabled;
             IsClassificationAuthoringEnabled = settings.IsClassificationAuthoringEnabled;
             IsPersonCenteredPlanAuthoringEnabled = settings.IsPersonCenteredPlanAuthoringEnabled;
@@ -1918,16 +1959,24 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(Q2RCompliant));
             OnPropertyChanged(nameof(Q3RCompliant));
             OnPropertyChanged(nameof(Q4RCompliant));
-            OnPropertyChanged(nameof(PcpCompliant));
-            OnPropertyChanged(nameof(CompAssessmentCompliant));
-            OnPropertyChanged(nameof(ReclassificationCompliant));
-            OnPropertyChanged(nameof(SafetyPlanCompliant));
-            OnPropertyChanged(nameof(PrivacyPracticesCompliant));
+            RefreshAnnualFormRows(DateTime.Today);
             OnPropertyChanged(nameof(ReleaseAgencyCompliant));
             OnPropertyChanged(nameof(ReleaseDhhsCompliant));
             OnPropertyChanged(nameof(ReleaseMedicalCompliant));
             OnPropertyChanged(nameof(SelectedPersonComplianceReasons));
             OnPropertyChanged(nameof(HasSelectedPersonComplianceIssues));
+        }
+
+        internal void RefreshAnnualFormRows(DateTime today)
+        {
+            foreach (var row in AnnualFormRows)
+            {
+                var (current, renewal) = AnnualFormSlots.Resolve(
+                    SelectedPerson, row.Type, today, _complianceSchedule);
+                row.Current = current;
+                row.Renewal = renewal;
+            }
+            ToggleAnnualFormCommand.NotifyCanExecuteChanged();
         }
 
         private bool MatchesConsumerFilter(object item) => item is Person person && SelectedConsumerFilter switch

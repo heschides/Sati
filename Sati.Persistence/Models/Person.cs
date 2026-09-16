@@ -700,7 +700,7 @@ namespace Sati
                     asOfDate,
                     schedule);
             var withOpening = Contracts.V1.BillingComplianceGate
-                .IncludePcpOpeningObligations(withExpectedForms);
+                .IncludeOpeningObligations(withExpectedForms);
             return withOpening.Concat(
                     Contracts.V1.ReleaseBillingRules.BuildComplianceSnapshots(
                         releaseFacts,

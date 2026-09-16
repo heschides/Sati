@@ -123,6 +123,33 @@ signature-never-attests items retained later as history.
 - [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
       No source-level result here is a deployment or Production-readiness claim.
 
+## Unreleased — annual forms show the renewal being prepared (2026-09-16)
+
+See the 2026-09-16 decision. The API must be deployed with or before this desktop build; no
+migration is required.
+
+- [x] Show the plan in force and, from its availability window until its target date, the renewal
+      for PCP, Comprehensive Assessment, Reclass, Safety Plan, and Privacy Practices. Reviews and
+      releases stay single.
+- [x] Route a renewal checkbox to that exact row's attestation; show a missing renewal row as
+      missing.
+- [x] Word late opening (PCP) and late start (assessment) from the gate's own deadline.
+- [x] Add the agency-selectable assessment-start billing gate (target − 120 days), off by default,
+      with a Settings option and API acceptance.
+- [x] Remove the dashboard view model's unbound annual `…Compliant` copies.
+- [x] Regressions for the overdue-renewal case, window edges, early completion, target-date
+      collapse, missing rows, February 29, command identity, and the new gate, each confirmed to
+      fail against the old behavior.
+- [ ] Next step: the caseload matrix (`FormCellViewModel`) still shows only the current-cycle row
+      and needs its own decision on presenting two years in one cell.
+- [ ] `UpcomingEventsService.ActionableFormsThroughUpcomingTarget` and
+      `CaseManagerDashboardViewModel.SelectBoardForm` compute the next target as
+      `currentTarget.AddYears(1)`, which misses a February 29 renewal row generated for a leap
+      year. Use `ComplianceScheduleRules.UpcomingTargetEffectiveDate`.
+- [ ] Confirm the 120-day assessment start with OADS guidance; it currently comes from the
+      agency workbook.
+- [ ] Verify the renewal layout in the running app at the smallest supported profile width.
+
 ## Unreleased — locked client-profile form attestations
 
 - [x] Make the client-profile Forms matrix lock per selected person. Selecting or switching a
