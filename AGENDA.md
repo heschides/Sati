@@ -245,15 +245,44 @@ migration is required.
 "Renewals in view and client edits that save." Releases the September 16 work below: the
 client-edit fix, renewal controls, monthly contact and assessment-start billing options, and the
 February 29 renewal lookup. No migration and no schema change; the contract gains the optional
-NoteSummaryDto.Id and two requirement bits, so the Demo API is published with this release.
+`NoteSummaryDto.Id` and two requirement bits, so the Demo API is published with this release.
 
-- [x] Merge nnual-renewal-controls into master (fast-forward).
-- [x] Coordinated 1.3.14 version and Settings release notes.
-- [ ] Release build and every test project.
-- [ ] Demo API publication and health, version, and contract verification.
-- [ ] Demo and Local installers, acceptance, and distribution.
-- [ ] Production workstation: install 1.3.14 so client edits save again. No database update is
-      pending for it; SatiComplianceSeed can run before or after.
+- [x] Merge `annual-renewal-controls` into `master` (fast-forward to `bb021ee`); source release
+      commit `3022d29`.
+- [x] Coordinated 1.3.14 version and Settings release notes. `Test-DemoReadiness.ps1` still
+      defaulted to 1.3.12 (1.3.13 skipped it) and was corrected in `5838610`.
+- [x] Release build: 0 errors. Desktop 2,228, API 824, signatures 119, portal 8, and Carika 4
+      pass. Nine skips, all opt-in: SQL Server concurrency and pipeline cases (five API, one
+      desktop), the two live-schema analyzer cases, and the local AI model check.
+- [x] Publish the Demo API. `artifacts/SatiApi-1.3.14-fx-x86.zip` is 10,077,747 bytes with 70
+      entries (the same file set as 1.3.11) and SHA-256
+      `805E087E7CE770CCBA739F3789A13378F63E88385476EBB0D3E3A4CD97A635E6`, file version 1.3.14.0,
+      no settings files, and no secret-like values. OneDeploy to `sati-demo-api-satilogica` in
+      `rg-sati-demo` succeeded (deployment `920668c5263f4f89a32648ccff1e5cf7`); the prior live API
+      was 1.3.11, whose package `SatiApi-1.3.11-fx-x86.zip` is retained. Live and ready return
+      200, `/health/version` reports Sati.Api 1.3.14 with contract `E18157FBC2D9` (unchanged,
+      because no route or listed contract shape changed), and anonymous Settings and billing
+      routes return 401. `Test-DemoReadiness.ps1 -HealthOnly` passed; its authenticated checks
+      need the synthetic Admin credential and were not run. No migration and no firewall rule.
+- [x] Build, accept, and publish both installers without overwriting. `SqlLocalDB.msi` carries a
+      Valid Microsoft signature, SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.14.exe` is 102,830,080 bytes, SHA-256
+      `28719CFD6AAF68F9AF6B0AC04D3B28EF06E9A07014FB0AD243E2F95F67FF7FBF`; five responsive
+      15-second launches with graceful closes, version 1.3.14.0, and cleanup passed; published to
+      `SatiLogica Demo Files`. `SatiLocalSetup-1.3.14.exe` is 204,871,209 bytes, SHA-256
+      `E664C3218355B033A20A7E3C38E0B01A8064A967F2740F7C4EBA5034B0260891`; version 1.3.14.0,
+      `SatiProduction`, integrated security, and cleanup passed; published to `Sati Desktop`. Both
+      copies and checksum files were verified after publication.
+- [x] Branches: deleted local `codex/clarify-project-notes` (d60f4d0) and local and remote
+      `annual-renewal-controls` (bb021ee), both fully merged. Retained `second-machine-setup`,
+      `team-chat-design`, `video-conferencing-design`, and remote
+      `claude/local-vs-github-workflow-dlcqpb` (unmerged, unrelated work);
+      `claude/cool-jang-f6b3c4` (checked out in a worktree); and remote `codex/annual-compliance`
+      and `codex/clarify-project-notes` (merged, but possibly tracked by the separate Codex clone).
+- [ ] Production workstation (Joshu login): still on 1.3.13. Install `SatiLocalSetup-1.3.14.exe`
+      so client edits save again. No database update is pending for it; `SatiComplianceSeed` can
+      run before or after.
 
 ## Release 1.3.13 — 2026-09-16
 
