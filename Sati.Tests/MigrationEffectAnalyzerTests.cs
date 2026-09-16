@@ -116,6 +116,99 @@ public sealed class MigrationEffectAnalyzerTests
     }
 
     [Fact]
+    public void AnIndexRebuiltInPlaceIsNotEvidenceThatAMigrationRan()
+    {
+        // CorrectAnnualComplianceAndBillingPolicy drops IX_DocumentArtifacts_OneLivePerCycle
+        // and recreates it on the same three columns with a narrower filter. Inspected by
+        // table and column the old index satisfies the create, so on the production
+        // workstation - which had none of the release - that one create read as present
+        // against every table, column and other index reading as missing. The verdict was
+        // PartiallyPresent and 1.3.12 refused to open the caseload.
+        //
+        // A drop and a create of one name in one migration look the same before and
+        // after. That is an absence of evidence, not evidence of application.
+        var schema = MigrationEffectAnalyzer.LiveSchema.ForTests(
+            new() { ["DocumentArtifacts"] = new() { ["PersonId"] = (false, null) } },
+            [("DocumentArtifacts", new[] { "PersonId", "Kind", "CycleStart" })]);
+
+        var finding = MigrationEffectAnalyzer.Classify(
+            "20260915004541_CorrectAnnualComplianceAndBillingPolicy",
+            [
+                new DropIndexOperation
+                {
+                    Table = "DocumentArtifacts", Name = "IX_DocumentArtifacts_OneLivePerCycle"
+                },
+                new CreateIndexOperation
+                {
+                    Table = "DocumentArtifacts", Name = "IX_DocumentArtifacts_OneLivePerCycle",
+                    Columns = ["PersonId", "Kind", "CycleStart"], IsUnique = true,
+                    Filter = "[ReleaseObligationId] IS NULL AND [SupersededByArtifactId] IS NULL"
+                },
+                new CreateTableOperation { Name = "ReleaseObligations" }
+            ],
+            schema);
+
+        Assert.Equal(MigrationEffectState.NotApplied, finding.State);
+        Assert.Empty(finding.PresentEffects);
+        Assert.Contains(
+            finding.UnverifiableSteps,
+            step => step.Contains("IX_DocumentArtifacts_OneLivePerCycle"));
+    }
+
+    [Fact]
+    public void AnAbsentIndexStillCountsEvenWhenTheMigrationRebuildsIt()
+    {
+        // Only presence is uninformative. AllowSupersedingBillingComplianceRecovery
+        // rebuilds one index and does nothing else structural, so excluding it either
+        // way left a database without the table reading as Indeterminate instead of
+        // NotApplied. An index that is not there was never rebuilt.
+        var schema = MigrationEffectAnalyzer.LiveSchema.ForTests(new());
+
+        var finding = MigrationEffectAnalyzer.Classify(
+            "20260915153000_AllowSupersedingBillingComplianceRecovery",
+            [
+                new DropIndexOperation
+                {
+                    Table = "BillingComplianceRecoveryNotes",
+                    Name = "IX_BillingComplianceRecoveryNotes_NoteId"
+                },
+                new CreateIndexOperation
+                {
+                    Table = "BillingComplianceRecoveryNotes",
+                    Name = "IX_BillingComplianceRecoveryNotes_NoteId",
+                    Columns = ["NoteId"]
+                }
+            ],
+            schema);
+
+        Assert.Equal(MigrationEffectState.NotApplied, finding.State);
+    }
+
+    [Fact]
+    public void AnIndexCreatedWithoutBeingDroppedStillCounts()
+    {
+        // The exclusion above is scoped to a name this migration drops. An ordinary
+        // create still reads as present when the index is there, or the analyzer would
+        // stop recognising a migration that genuinely ran.
+        var schema = MigrationEffectAnalyzer.LiveSchema.ForTests(
+            new() { ["DocumentArtifacts"] = new() { ["PersonId"] = (false, null) } },
+            [("DocumentArtifacts", new[] { "PersonId", "Kind", "CycleStart" })]);
+
+        var finding = MigrationEffectAnalyzer.Classify(
+            "test",
+            [
+                new CreateIndexOperation
+                {
+                    Table = "DocumentArtifacts", Name = "IX_DocumentArtifacts_OneLivePerCycle",
+                    Columns = ["PersonId", "Kind", "CycleStart"], IsUnique = true
+                }
+            ],
+            schema);
+
+        Assert.Equal(MigrationEffectState.AlreadyPresent, finding.State);
+    }
+
+    [Fact]
     public void AColumnWiderThanTheMigrationDeclaredStillCounts()
     {
         // Benign drift. The bound was applied; the column is merely roomier than this

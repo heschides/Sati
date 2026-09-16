@@ -118,6 +118,21 @@ public static class MigrationEffectAnalyzer
         List<string> missing = [];
         List<string> unverifiable = [];
 
+        // An index this migration drops and then recreates under the same name looks
+        // identical before and after to anything that inspects by table and column.
+        // CorrectAnnualComplianceAndBillingPolicy does exactly that to
+        // IX_DocumentArtifacts_OneLivePerCycle, rebuilding it on the same three columns
+        // with a narrower filter. The old index satisfied the create, so a database
+        // that had never seen the release reported one effect present against eighty
+        // missing, and 1.3.12 refused to start on it. Presence is evidence of nothing
+        // here, the same as a default-only alter, so the create is not counted.
+        HashSet<string> recreated = [];
+        foreach (var operation in operations)
+        {
+            if (operation is DropIndexOperation { Name: not null, Table: not null } dropped)
+                recreated.Add(dropped.Table + "." + dropped.Name);
+        }
+
         foreach (var operation in operations)
         {
             switch (operation)
@@ -196,6 +211,19 @@ public static class MigrationEffectAnalyzer
                         schema.HasColumn(alter.Table, alter.Name)
                         && schema.ColumnIsNullable(alter.Table, alter.Name) == alter.IsNullable
                         && boundApplied);
+                    break;
+
+                // Only presence is uninformative. An index that is absent was never
+                // rebuilt, so absence stays real evidence that the migration has not
+                // run - without that, a migration whose only structural step is a
+                // rebuild would report Indeterminate against a database missing the
+                // table entirely.
+                case CreateIndexOperation index
+                    when index.Name is not null
+                        && recreated.Contains(index.Table + "." + index.Name)
+                        && schema.HasIndex(index.Table, index.Columns):
+                    unverifiable.Add(
+                        $"index {index.Name} on {index.Table} is rebuilt in place by this migration");
                     break;
 
                 case CreateIndexOperation index:
