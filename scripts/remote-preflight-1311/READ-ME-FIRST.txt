@@ -1,10 +1,13 @@
-Before installing Sati 1.3.11 on this computer
-==============================================
+Before installing the annual-compliance update on this computer
+===============================================================
 
-Version 1.3.11 changes how annual compliance work is identified. The first time you
+The update changes how annual compliance work is identified. The first time you
 start it, Sati backs up your database and converts the existing annual forms.
 
-That conversion is deliberately cautious. If it meets a form it cannot place in a
+Install SatiLocalSetup-1.3.12.exe, not 1.3.11. They contain the same update; 1.3.11
+misread this database at startup and refused to convert it. 1.3.12 fixes that.
+
+The conversion is deliberately cautious. If it meets a form it cannot place in a
 specific service year, it stops and changes nothing rather than guessing at a date
 that decides whether work is billable. Your records stay exactly as they are, but
 Sati will not open until the rows are sorted out.
@@ -13,7 +16,7 @@ This folder tells you, in advance, whether that will happen here.
 
 WHAT TO DO
 ----------
-1. Copy both files in this folder to your Desktop, or anywhere on your own computer.
+1. Copy the files in this folder to your Desktop, or anywhere on your own computer.
    Running them straight from the shared folder can be blocked.
 
 2. Double-click "Step 1 - CHECK ONLY". It changes nothing. It saves a small text file
@@ -21,7 +24,7 @@ WHAT TO DO
 
 3. Read the last line of that file:
 
-     "RESULT: ready"      - install 1.3.11 whenever you like.
+     "RESULT: ready"      - install 1.3.12 whenever you like.
      "RESULT: NOT ready"  - send the file to Josh and wait. Do not install yet.
      anything else        - send the file to Josh.
 
@@ -30,22 +33,31 @@ WHAT TO DO
 
 IF ANYTHING LOOKS WRONG
 -----------------------
-Close the window and send Josh whatever it printed. Nothing in this folder modifies
-the database, so there is nothing to undo.
+Close the window and send Josh whatever it printed. Nothing in Step 1 modifies the
+database, so there is nothing to undo.
 
 IF STEP 1 SAYS "NOT ready"
 --------------------------
 Send the file to Josh first. If he says to go ahead, double-click
 "Step 2 - APPLY FIX" and type YES.
 
-Step 2 repairs compliance scheduling dates only: annual due dates that no longer
-match the schedule Sati can calculate, and old blanket billing overrides that the
-new version cannot interpret. It may also add missing quarterly-review rows.
+Step 2 repairs compliance scheduling only:
 
-It does not change your client list, your notes, or your scratchpad. It checks all
-three before and after, and undoes the entire repair if any of them differ. It saves
-Sati-1311-repair.txt to your Desktop; keep that file.
+  - annual due dates that no longer match the schedule Sati can calculate;
+  - old blanket billing overrides that the new version cannot interpret;
+  - missing quarterly-review rows;
+  - two stored rows that are really the same annual obligation, where it keeps the
+    row carrying the recorded work and removes its empty twin.
 
-Afterwards, install Sati 1.3.11 (SatiLocalSetup-1.3.11.exe, in the Sati Desktop folder),
-then start it. It backs up your database and finishes the update itself. Starting your
-current version after the repair is harmless, but it will not finish the update.
+It never deletes a row that has a recorded completion attached to it. If both rows
+of such a pair have one, it leaves both alone and says so at the end. That is not a
+failure; it means Josh has to look at those two by hand.
+
+It does not change your client list, your notes, or your scratchpad. It checks the
+contents of all three before and after, and undoes the entire repair if any of them
+differ. It saves Sati-1311-repair.txt to your Desktop; keep that file.
+
+Afterwards, run Step 1 again. When it says "ready", install SatiLocalSetup-1.3.12.exe
+from the Sati Desktop folder, then start Sati. It backs up your database and finishes
+the update itself. Starting your current version after the repair is harmless, but it
+will not finish the update.

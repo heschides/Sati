@@ -1,13 +1,20 @@
 <#
 .SYNOPSIS
-    Clears the two things that stop the 1.3.11 conversion on a Local SatiProduction
-    database: unattributable annual deadlines, and legacy blanket note overrides.
+    Clears everything that stops the 1.3.11 conversion on a Local SatiProduction
+    database: duplicate obligations, unattributable annual deadlines, legacy blanket
+    note overrides, and annual rows with no same-target quarterly review.
 
 .DESCRIPTION
     This is a compliance-scheduling repair for a pre-production database whose
     authoritative records live elsewhere. It deliberately changes compliance dates,
     which the conversion refuses to guess at on its own:
 
+      * The agency quarterly-review offset is moved off the old hard-coded one day,
+        because the conversion treats that value as evidence of the pre-June-2026 shape.
+      * Two stored rows that resolve to one annual obligation are reduced to one. The
+        row carrying evidence is kept and its twin is deleted. A row with attestations
+        is never deleted; a pair that both carry attestations is left alone and
+        reported, because choosing between two attested records is not a script's call.
       * Annual deadlines that do not match the documented legacy calculator are
         recomputed from that calculator. Completion, opening, and attestation evidence
         is not read or written; only Forms.DueDate moves.
@@ -15,10 +22,15 @@
         obligation, so it cannot become the attested, blocker-specific exception the
         new rules require. The note itself, its narrative, status, and approval stay;
         only the override flag, reason, approver, and time are cleared.
+      * A missing same-target quarterly review is added, open and uncompleted.
 
-    It never touches consumer profiles or the scratchpad. Counts for dbo.People,
-    dbo.Scratchpad, dbo.ScratchpadComments, and dbo.Notes are taken before and after
-    inside one transaction, and the whole repair rolls back if any of them move.
+    Order matters. The offset moves first, so every later date is computed in the new
+    shape; duplicates go next, because recomputing two rows of one obligation onto the
+    same deadline would collide with the unique (PersonId, Type, DueDate) index.
+
+    It never touches consumer profiles or the scratchpad. Contents of dbo.People,
+    dbo.Scratchpad, dbo.ScratchpadComments, and dbo.Notes are fingerprinted before and
+    after inside one transaction, and the whole repair rolls back if any of them move.
 
     Run the check first. Use -WhatIfOnly to see what would change without committing.
 #>
@@ -91,8 +103,59 @@ BEGIN
         N'@out bigint OUTPUT, @from datetime2', @out = @commentSumBefore OUTPUT, @from = @padFrom;
 END;
 
+-- 1. The conversion reads a one-day quarterly offset as the old hard-coded shape. Move
+--    it first, so every deadline computed below already lands in the new shape and no
+--    second pass is needed to bring existing quarterly rows along.
+UPDATE dbo.Settings SET Q4RDaysBeforeAnniversary = 5 WHERE Q4RDaysBeforeAnniversary = 1;
+DECLARE @offsets int = @@ROWCOUNT;
+
+-- 2. Duplicate obligations. Two rows that resolve to one annual identity cannot both
+--    become that identity, and recomputing both onto one deadline would collide with
+--    the unique (PersonId, Type, DueDate) index, so they are reduced before any date
+--    moves. Keep the row carrying evidence and delete its twin. A row with attestations
+--    is never deleted: the attestation foreign key restricts it, and that evidence is
+--    the reason to prefer that row in the first place.
+WITH c2 AS (
+    SELECT f.Id, f.PersonId, f.[Type], f.CompletedDate, f.OpenedDate,
+           CAST(f.DueDate AS date) AS DueDate, CAST(p.EffectiveDate AS date) AS Eff,
+           DATEDIFF(year, CAST(p.EffectiveDate AS date), CAST(f.DueDate AS date)) AS N,
+           (SELECT COUNT(*) FROM dbo.FormAttestations AS fa WHERE fa.FormId = f.Id) AS Attestations
+    FROM dbo.Forms AS f
+    INNER JOIN dbo.People AS p ON p.Id = f.PersonId
+    WHERE p.EffectiveDate IS NOT NULL
+), a2 AS (
+    SELECT c2.*, DATEADD(year, c2.N, c2.Eff) AS Anniversary FROM c2
+), t2 AS (
+    SELECT a2.*, CASE WHEN a2.Anniversary >= a2.DueDate
+                      THEN DATEADD(year, a2.N - 1, a2.Eff) ELSE a2.Anniversary END AS Target
+    FROM a2
+), ranked AS (
+    SELECT t2.*, ROW_NUMBER() OVER (
+        PARTITION BY t2.PersonId, t2.[Type], t2.Target
+        ORDER BY CASE WHEN t2.Attestations > 0 THEN 0 ELSE 1 END,
+                 CASE WHEN t2.CompletedDate IS NOT NULL THEN 0 ELSE 1 END,
+                 CASE WHEN t2.OpenedDate IS NOT NULL THEN 0 ELSE 1 END,
+                 t2.Id) AS Rank
+    FROM t2
+)
+SELECT Id, PersonId, [Type], Target, Attestations INTO #dupes FROM ranked WHERE Rank > 1;
+
+DELETE f FROM dbo.Forms AS f
+ INNER JOIN #dupes AS d ON d.Id = f.Id
+ WHERE d.Attestations = 0;
+DECLARE @duplicatesRemoved int = @@ROWCOUNT;
+
+-- What could not be reduced. Those groups are left exactly as they are, and their
+-- deadlines are not recomputed either, because moving both rows onto one date would
+-- fail. The check will still report them, which is the honest outcome.
+SELECT DISTINCT PersonId, [Type], Target INTO #stillDuplicated
+FROM #dupes WHERE Attestations > 0;
+DECLARE @duplicatesKept int = (SELECT COUNT(*) FROM #stillDuplicated);
+DROP TABLE #dupes;
+
+-- 3. Deadlines that do not match the documented legacy calculator.
 WITH c AS (
-    SELECT f.Id, f.[Type], CAST(f.DueDate AS date) AS DueDate,
+    SELECT f.Id, f.PersonId, f.[Type], CAST(f.DueDate AS date) AS DueDate,
            CAST(p.EffectiveDate AS date) AS Eff, p.AgencyId,
            DATEDIFF(year, CAST(p.EffectiveDate AS date), CAST(f.DueDate AS date)) AS N
     FROM dbo.Forms AS f
@@ -131,14 +194,19 @@ WITH c AS (
 )
 SELECT Id, Expected INTO #fix
 FROM f2
-WHERE ([Type] = N'ComprehensiveAssessment'
-        AND DueDate NOT IN (Expected, DATEADD(day, -60, NextAnniversary), DATEADD(day, -120, NextAnniversary)))
-   OR ([Type] <> N'ComprehensiveAssessment' AND DueDate <> Expected);
+WHERE (([Type] = N'ComprehensiveAssessment'
+         AND DueDate NOT IN (Expected, DATEADD(day, -60, NextAnniversary), DATEADD(day, -120, NextAnniversary)))
+    OR ([Type] <> N'ComprehensiveAssessment' AND DueDate <> Expected))
+  AND NOT EXISTS (SELECT 1 FROM #stillDuplicated AS sd
+                  WHERE sd.PersonId = f2.PersonId AND sd.[Type] = f2.[Type] AND sd.Target = f2.Target);
 
 UPDATE f SET f.DueDate = x.Expected
   FROM dbo.Forms AS f INNER JOIN #fix AS x ON x.Id = f.Id;
 DECLARE @deadlines int = @@ROWCOUNT;
+DROP TABLE #fix;
+DROP TABLE #stillDuplicated;
 
+-- 4. Legacy blanket note overrides.
 UPDATE dbo.Notes
    SET ComplianceOverride = 0,
        OverrideReason = NULL,
@@ -147,11 +215,8 @@ UPDATE dbo.Notes
  WHERE ComplianceOverride = 1;
 DECLARE @overrides int = @@ROWCOUNT;
 
--- The conversion also wants proof that annual rows carry the post-June-2026 shape: a
--- same-target Q4 review, under an agency offset that is not the old hard-coded one day.
-UPDATE dbo.Settings SET Q4RDaysBeforeAnniversary = 5 WHERE Q4RDaysBeforeAnniversary = 1;
-DECLARE @offsets int = @@ROWCOUNT;
-
+-- 5. The conversion also wants proof that annual rows carry the post-June-2026 shape:
+--    a same-target quarterly review. Add the missing ones, open and uncompleted.
 WITH c AS (
     SELECT f.PersonId, f.[Type], CAST(f.DueDate AS date) AS DueDate,
            CAST(p.EffectiveDate AS date) AS Eff, p.AgencyId,
@@ -219,18 +284,24 @@ IF @padAfter <> @padBefore OR @padSumAfter <> @padSumBefore
 
 SELECT @deadlines AS DeadlinesRecomputed, @overrides AS OverridesCleared,
        @witnesses AS Q4WitnessRowsAdded, @offsets AS AgencyOffsetsCorrected,
+       @duplicatesRemoved AS DuplicateFormsRemoved, @duplicatesKept AS DuplicatesNeedingReview,
        @peopleBefore AS ClientsProtected, @recentNotesBefore AS NotesSinceSep1Protected,
        @padBefore AS ScratchpadEntriesLast30Days, @commentsBefore AS ScratchpadCommentsLast30Days;
-
-DROP TABLE #fix;
 '@
         $reader = $command.ExecuteReader()
         if (-not $reader.Read()) { throw 'The repair summary row was not returned.' }
         $summary = [ordered]@{}
         for ($i = 0; $i -lt $reader.FieldCount; $i++) { $summary[$reader.GetName($i)] = $reader.GetValue($i) }
         $reader.Close()
-        foreach ($key in $summary.Keys) { "{0,-22}: {1}" -f $key, $summary[$key] }
+        foreach ($key in $summary.Keys) { "{0,-28}: {1}" -f $key, $summary[$key] }
         ""
+
+        if ([int]$summary['DuplicatesNeedingReview'] -gt 0) {
+            "NOTE: $($summary['DuplicatesNeedingReview']) duplicate obligation group(s) could not be reduced, because"
+            '      more than one row carries recorded attestations. Nothing was deleted for'
+            '      those, and the check will still report them. Send the check output to Josh.'
+            ''
+        }
 
         if ($WhatIfOnly) {
             $transaction.Rollback()
@@ -240,8 +311,8 @@ DROP TABLE #fix;
             $transaction.Commit()
             $committed = $true
             'DONE: compliance dates repaired.'
-            'NEXT: install Sati 1.3.11, then start it. It backs up the database and'
-            '      finishes the update itself. Starting your current version first is'
+            'NEXT: install the Sati setup Josh sent, then start it. It backs up the database'
+            '      and finishes the update itself. Starting your current version first is'
             '      harmless but does nothing.'
         }
     }

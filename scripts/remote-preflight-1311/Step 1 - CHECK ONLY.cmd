@@ -6,11 +6,11 @@ set "SCRIPT=%~dp0Check-Release1311Readiness.ps1"
 if not exist "%SCRIPT%" goto missing
 
 echo.
-echo Checking whether this computer's Sati database is ready for version 1.3.11.
+echo Checking whether this computer's Sati database is ready for the annual-compliance update.
 echo This makes NO changes to it.
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); if (-not $d -or -not (Test-Path $d)) { $d = $env:USERPROFILE }; $log = Join-Path $d 'Sati-1311-readiness.txt'; Unblock-File -LiteralPath '%SCRIPT%' -ErrorAction SilentlyContinue; & '%SCRIPT%' *>&1 | Tee-Object -FilePath $log; Write-Host ''; Write-Host '============================================================'; Write-Host (' Saved to: ' + $log); Write-Host ''; Write-Host ' Send that file to Josh BEFORE installing 1.3.11.'; Write-Host '============================================================'"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); if (-not $d -or -not (Test-Path $d)) { $d = $env:USERPROFILE }; $log = Join-Path $d 'Sati-1311-readiness.txt'; Unblock-File -LiteralPath '%SCRIPT%' -ErrorAction SilentlyContinue; & '%SCRIPT%' *>&1 | Tee-Object -FilePath $log; Write-Host ''; Write-Host '============================================================'; Write-Host (' Saved to: ' + $log); Write-Host ''; Write-Host ' Send that file to Josh BEFORE installing 1.3.12.'; Write-Host '============================================================'"
 
 echo.
 pause
