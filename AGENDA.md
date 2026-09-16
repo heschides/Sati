@@ -149,6 +149,42 @@ signature-never-attests items retained later as history.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.12 — 2026-09-15
+
+"Startup reads the update correctly." This patch corrects the startup check that refused to
+open 1.3.11 against a database with the annual compliance update still pending.
+
+- [x] Fix `MigrationEffectAnalyzer`. `20260915004541` alters
+      `Settings.BillingComplianceRequirements` only to change its default from 31 to 7, leaving
+      type, nullability and bound identical. The analyzer judged alters by nullability and
+      length, so that operation read as already applied on a database that had had none of the
+      migration; one present effect among many missing ones is `PartiallyPresent`, and startup
+      refused. An alter that changes neither nullability nor a bound is now unverifiable,
+      because it looks identical before and after. A live column that still disagrees with the
+      target remains proof the alter has not run.
+- [x] Prove the regression against the unfixed analyzer: it reports exactly the
+      `PartiallyPresent` verdict a workstation reported in the field. The first attempted fix
+      broke `NullabilityRemainsTheSignalWhenNoLengthIsDeclared`; the committed rule compares the
+      live column against both the target and the prior definition, and all analyzer and
+      updater tests pass.
+- [x] Source fix committed as `98c176b` before this release pass began.
+- [ ] Complete coordinated 1.3.12 versioning, the full Release build, and all five test projects.
+- [ ] Publish the Demo API so the deployed service matches the released client. No schema
+      change, no migration, and no Azure SQL firewall rule is required.
+- [ ] Build, accept, and publish both installers and checksums without overwriting.
+- [ ] Record deployment, test, artifact, and workstation evidence.
+
+### Local Production machines
+
+This release adds no migration. Databases still holding the pre-1.3.11 shape apply migrations
+106 through 108 when they first launch this client, after its verified backup.
+
+- [ ] SatiLogica workstation: its `SatiProduction` scaffold is already converted to 108.
+- [ ] Joshu workstation: holds the real working data, still at 105 migrations. Its readiness
+      check reported 15 unattributable deadlines across 2 consumers and 1 legacy blanket note
+      override, which are independent of this bug and must be reconciled through
+      `scripts/remote-preflight-1311/` before the conversion can succeed.
+
 ## Release 1.3.11 — 2026-09-15
 
 "Annual work by its own date." This release delivers the annual compliance and service-date

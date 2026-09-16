@@ -649,10 +649,15 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.11", version);
+        Assert.Equal("1.3.12", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Annual work by its own date", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Startup reads the update correctly", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
+        // The reason this patch exists, in the words staff will read.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Sati starts normally on a database that is simply due for the update" &&
+            section.Items.Any(item => item.Contains("already present", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("no records were affected", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Each annual obligation belongs to its own effective date" &&
             section.Items.Any(item => item.Contains("effective date", StringComparison.OrdinalIgnoreCase)) &&

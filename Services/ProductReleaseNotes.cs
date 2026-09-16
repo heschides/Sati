@@ -6,11 +6,19 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Annual work by its own date";
+    public const string ReleaseName = "Startup reads the update correctly";
     public const string ReleaseDate = "September 15, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Sati starts normally on a database that is simply due for the update",
+            [
+                "1.3.11 could stop at startup saying part of the update was already present, on a database where none of it had been applied.",
+                "The check that compares an update against the database now ignores a change it cannot observe, instead of reading it as evidence the update had run.",
+                "Nothing was ever written during that refusal, and no records were affected. This release lets the same database update normally.",
+                "Everything delivered in 1.3.11 is unchanged and included."
+            ]),
         new(
             "Each annual obligation belongs to its own effective date",
             [
