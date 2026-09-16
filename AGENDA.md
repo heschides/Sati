@@ -162,7 +162,7 @@ See the 2026-09-16 seeding decision. Not part of any release.
 - [ ] Before any real legal use, start from a clean database; seeded rows are marked but are not
       records.
 
-## Unreleased — monthly contact requirement (2026-09-16)
+## Monthly contact requirement (2026-09-16, released in 1.3.14)
 
 See the 2026-09-16 monthly-contact decision. No migration; deploy the API with or before the desktop.
 
@@ -179,7 +179,7 @@ See the 2026-09-16 monthly-contact decision. No migration; deploy the API with o
 - [ ] Confirm the 30-day interval and which note types qualify against the agency's program
       rules; they come from the agency's request, not a cited OADS rule.
 
-## Unreleased — annual forms show the renewal being prepared (2026-09-16)
+## Annual forms show the renewal being prepared (2026-09-16, released in 1.3.14)
 
 See the 2026-09-16 decision. The API must be deployed with or before this desktop build; no
 migration is required.
@@ -239,6 +239,21 @@ migration is required.
       day-after-due rule in the active September 14 section.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
+
+## Release 1.3.14 — 2026-09-16
+
+"Renewals in view and client edits that save." Releases the September 16 work below: the
+client-edit fix, renewal controls, monthly contact and assessment-start billing options, and the
+February 29 renewal lookup. No migration and no schema change; the contract gains the optional
+NoteSummaryDto.Id and two requirement bits, so the Demo API is published with this release.
+
+- [x] Merge nnual-renewal-controls into master (fast-forward).
+- [x] Coordinated 1.3.14 version and Settings release notes.
+- [ ] Release build and every test project.
+- [ ] Demo API publication and health, version, and contract verification.
+- [ ] Demo and Local installers, acceptance, and distribution.
+- [ ] Production workstation: install 1.3.14 so client edits save again. No database update is
+      pending for it; SatiComplianceSeed can run before or after.
 
 ## Release 1.3.13 — 2026-09-16
 

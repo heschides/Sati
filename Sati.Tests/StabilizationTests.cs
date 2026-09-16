@@ -649,11 +649,21 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.13", version);
+        Assert.Equal("1.3.14", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Startup reads a rebuilt index correctly", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Renewals in view and client edits that save", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
-        // The reason this patch exists, in the words staff will read.
+        // The reasons this release exists, in the words staff will read.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Client edits save again" &&
+            section.Items.Any(item => item.Contains("were not saved", StringComparison.OrdinalIgnoreCase)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Next year's documents appear before they are due" &&
+            section.Items.Any(item => item.Contains("renewal", StringComparison.OrdinalIgnoreCase)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Monthly contact" &&
+            section.Items.Any(item => item.Contains("off by default", StringComparison.OrdinalIgnoreCase)));
+        // Earlier patches stay described, because this release carries them too.
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Sati starts on a database that has not had the annual compliance update" &&
             section.Items.Any(item => item.Contains("rebuilds one existing index", StringComparison.OrdinalIgnoreCase)) &&

@@ -6,11 +6,40 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Startup reads a rebuilt index correctly";
+    public const string ReleaseName = "Renewals in view and client edits that save";
     public const string ReleaseDate = "September 16, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Client edits save again",
+            [
+                "Since 1.3.11, saving a client that had release records stopped with \"Client Save Status Unconfirmed\". The changes were not saved, although the message could not say so.",
+                "Saving a client now writes only that client's own details and any new forms, never the rest of the loaded record.",
+                "A client changed somewhere else after you opened it, or a change the database refuses, now says plainly that nothing was saved.",
+                "Provider assignments were never affected; they save from their own panel."
+            ]),
+        new(
+            "Next year's documents appear before they are due",
+            [
+                "PCP, Comp Assessment, Reclassification, Safety Plan, and Privacy Practices show the plan in force and, once next year's document is available, an indented renewal checkbox for it.",
+                "The renewal becomes the only checkbox on its plan's start date, finished or not. A renewal completed early stays beside the current plan until then.",
+                "Each line says in words whether it is complete, due, overdue, opened, or late to open or start; the assessment is started 120 days before the plan.",
+                "Quarterly reviews and releases are unchanged."
+            ]),
+        new(
+            "Monthly contact",
+            [
+                "The client list shows each client's last visit, phone call, or email, in red with \"overdue\" after 30 days. The client profile's Last contact uses the same rule and now counts visits.",
+                "An agency can choose to require monthly contact for billing. It is off by default: when on, service more than 30 days after the last contact, or after the plan's effective date, waits for the next contact, and the contact's own day is billable.",
+                "An agency can also choose to require the Comprehensive Assessment to be started 120 days before the plan. That is off by default too."
+            ]),
+        new(
+            "Leap-day plans",
+            [
+                "A client whose plan began on February 29 now has next year's renewal found on February 29 of a leap year, instead of a February 28 date no record carries.",
+                "No existing records were affected; the first affected date would have been February 28, 2027."
+            ]),
         new(
             "Sati starts on a database that has not had the annual compliance update",
             [
