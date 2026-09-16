@@ -66,6 +66,43 @@ public sealed class MigrationEffectAnalyzerAgainstLiveSchemaTests(ITestOutputHel
         }
     }
 
+    [LocalSqlFact]
+    public async Task TheStartupUpdaterDoesNotRefuseAReleaseThatHasNeverRun()
+    {
+        // The analyzer test above passes and the production workstation still refuses.
+        // This runs what startup runs - LocalDatabaseUpdater over SqlLocalDatabaseMaintenance,
+        // the pairing App.xaml.cs builds - rather than the analyzer alone, so any
+        // difference between the two paths shows up here instead of in the field.
+        var catalog = $"SatiStartupUpdater_{Guid.NewGuid():N}";
+        await CreateDatabaseAsync(catalog);
+        try
+        {
+            await using (var setup = Open(catalog))
+                await setup.GetService<IMigrator>().MigrateAsync(LastAppliedOnTheWorkstation);
+
+            await using var context = Open(catalog);
+            var result = await new LocalDatabaseUpdater(new SqlLocalDatabaseMaintenance(context))
+                .UpdateAsync();
+
+            output.WriteLine($"Outcome: {result.Outcome}");
+            foreach (var finding in result.Findings ?? [])
+            {
+                output.WriteLine($"  {finding.MigrationId}: {finding.State}");
+                foreach (var effect in finding.PresentEffects)
+                    output.WriteLine($"    PRESENT {effect}");
+            }
+            if (result.Failure is not null)
+                output.WriteLine($"Failure: {result.Failure}");
+
+            Assert.NotEqual(LocalDatabaseUpdateOutcome.NeedsRepair, result.Outcome);
+            Assert.NotEqual(LocalDatabaseUpdateOutcome.Failed, result.Outcome);
+        }
+        finally
+        {
+            await DropDatabaseAsync(catalog);
+        }
+    }
+
     private static string ConnectionTo(string catalog) => new SqlConnectionStringBuilder
     {
         DataSource = @"(localdb)\MSSQLLocalDB",

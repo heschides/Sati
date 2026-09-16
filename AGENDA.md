@@ -189,6 +189,21 @@ workstation, from the same startup check, on a different premise.
 - [ ] Not yet confirmed: that the production workstation actually starts on 1.3.13 and completes
       the conversion. Its readiness check reports ready and its repair is committed; the install
       is the remaining step.
+- [ ] **Unexplained**: 1.3.13 still refuses on the production workstation with the same
+      `PartiallyPresent` dialog. Established, not inferred: the installed `Sati.exe` is
+      byte-identical to the shipped build (SHA-256 `0DAAFE5D…A21F`); that exact binary, pointed at
+      a database at the workstation's migration state, converts cleanly on the development
+      machine; the real analyzer, run on the workstation against its own database
+      (`SatiUpdateReport`), finds nothing present; the installed connection string names the same
+      server and database; there is no single-instance handoff. No cause has been found, and
+      none should be written down until one is. As a first-principles workaround the update is
+      being applied directly with `SatiUpdateReport --apply` (Step 7), which re-runs the gate's
+      check, refuses on anything but a clean `NotApplied`, backs up and verifies, migrates, and
+      compares fingerprints of the client list, notes since 2026-09-01, and recent scratchpad.
+- [ ] Log the analyzer's findings when startup returns `NeedsRepair`. The dialog names the
+      migration but not the effects, and `RecordAndReport` is only called for exceptions, so a
+      refusal in the field leaves nothing to diagnose from. This is why the refusal above could
+      not be read directly.
 
 ## Release 1.3.12 — 2026-09-15
 
