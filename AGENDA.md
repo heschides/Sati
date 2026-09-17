@@ -123,6 +123,34 @@ signature-never-attests items retained later as history.
 - [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
       No source-level result here is a deployment or Production-readiness claim.
 
+## 1.3.14 production failures (2026-09-17)
+
+Three workstation logs from the Joshu login, all 1.3.14.
+
+- [x] `NullReferenceException` inside WPF layout (reference C00DD4583B60): the annual-form row
+      template gave `AutomationProperties.Name` a `{x:Null}` fallback, which that property rejects.
+      Fallbacks are now empty strings; `AnnualFormRowRenderTests` renders the real client profile
+      and fails against the old template. Under the old template every later layout pass threw
+      too, so the Clients panel stopped responding without closing (log 32440, 15:53 local).
+- [x] Unobserved `NotSupportedException` from the assessment and PCP workspaces on every client
+      selection when the agency has those workflows off: the hidden tabs still loaded. They now
+      load only while the workflow is enabled, and a failed load is recorded and shown on the
+      workspace instead of escaping. `ClientDocumentLoadFailureTests` fails against the old code.
+- [x] `ArgumentException` crash dialog when marking a pending note without goal progress Logged
+      from the notes log (reference D47EFC73EBA0). Any refusal is now shown on the notes log, and
+      the note's status (and justification, for Send to Supervisor and Hold) is put back.
+      `NotesLogStatusRefusalTests` fails against the old code.
+- [ ] Stack overflow (`0xC00000FD`, 11:13 local): cause unknown. Enable dump capture on that
+      workstation with `scripts/Set-SatiCrashDumpCapture.ps1 -Enable`, analyze the next dump
+      there, then `-Disable -RemoveDumps`. See the 2026-09-17 decision.
+- [ ] Give Sati's own refusals catalog codes (`LOGGING_DESIGN.md` §3). The notes crash record could
+      not say which of five validation messages fired, because messages are rightly never logged;
+      a code would have said so without the text.
+- [ ] Implement the breadcrumb tail on the run marker (`LOGGING_DESIGN.md` §5). The stack-overflow
+      session recorded only that it died, not which screen or command was active.
+- [ ] `NoteEntryViewModel.SubmitNote` still shows "Sati encountered an error saving your note" with
+      no reason and no support reference for any unexpected failure.
+
 ## Local client edits refused since 1.3.11 (2026-09-16)
 
 Saving any client whose release rows were loaded failed in local Production with "Client Save

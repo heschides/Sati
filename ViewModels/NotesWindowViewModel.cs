@@ -2,11 +2,13 @@
 using CommunityToolkit.Mvvm.Input;
 using Sati.Contracts.V1;
 using Sati.Data;
+using Sati.Data.Cloud;
 using Sati.Models;
 using Sati.Services;
 using Sati.ViewModels.Children;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Net;
 using System.Windows;
 using System.Windows.Data;
 
@@ -260,11 +262,19 @@ namespace Sati.ViewModels
         private async Task HoldForCompliance()
         {
             if (SelectedNote is null) return;
-            SelectedNote.Status = _dialogIsWindowBlock
+            var note = SelectedNote;
+            var previousStatus = note.Status;
+            note.Status = _dialogIsWindowBlock
                 ? NoteStatus.ComplianceBlocked
                 : NoteStatus.HeldForCompliance;
             _dialogIsWindowBlock = false;
-            if (!await TryUpdateNoteAsync(SelectedNote)) return;
+            if (!await TryUpdateNoteAsync(note))
+            {
+                note.Status = previousStatus;
+                IsComplianceDialogVisible = false;
+                RefreshView();
+                return;
+            }
             IsComplianceDialogVisible = false;
             PendingJustification = string.Empty;
             RefreshView();
@@ -280,9 +290,20 @@ namespace Sati.ViewModels
             if (SelectedNote is null) return;
             if (string.IsNullOrWhiteSpace(PendingJustification)) return;
 
-            SelectedNote.Status = NoteStatus.Logged;
-            SelectedNote.CaseManagerJustification = PendingJustification;
-            if (!await TryUpdateNoteAsync(SelectedNote)) return;
+            var note = SelectedNote;
+            var previousStatus = note.Status;
+            var previousJustification = note.CaseManagerJustification;
+            note.Status = NoteStatus.Logged;
+            note.CaseManagerJustification = PendingJustification;
+            if (!await TryUpdateNoteAsync(note))
+            {
+                note.Status = previousStatus;
+                note.CaseManagerJustification = previousJustification;
+                _dialogIsWindowBlock = false;
+                IsComplianceDialogVisible = false;
+                RefreshView();
+                return;
+            }
             _dialogIsWindowBlock = false;
             IsComplianceDialogVisible = false;
             PendingJustification = string.Empty;
@@ -427,11 +448,20 @@ namespace Sati.ViewModels
             return people;
         }
 
+        /// <summary>
+        /// Saves a status change made from the grid. Returns false when nothing was
+        /// saved; the caller then puts the note's in-memory values back, so the grid
+        /// never shows a status the database refused. No failure escapes: this runs
+        /// from commands, where an exception reaches the crash dialog (production
+        /// reference D47EFC73EBA0, a note without goal progress marked Logged).
+        /// </summary>
         private async Task<bool> TryUpdateNoteAsync(Note note)
         {
             try
             {
                 await _noteService.UpdateNoteAsync(note);
+                HasLoadError = false;
+                LoadErrorMessage = string.Empty;
                 return true;
             }
             catch (NoteSubmissionException ex)
@@ -450,7 +480,39 @@ namespace Sati.ViewModels
                     MessageBoxImage.Information);
                 return false;
             }
+            catch (Exception ex) when (ex is ArgumentException
+                                           or InvalidOperationException
+                                           or UnauthorizedAccessException
+                                           or CloudApiException { StatusCode: < HttpStatusCode.InternalServerError })
+            {
+                // The note services word these refusals for the case manager:
+                // missing goal progress, a supervisor-controlled status, overlapping
+                // service time, another caseload, an ended Demo session.
+                ShowStatusChangeRefusal(RefusalText(ex));
+                return false;
+            }
+            catch (Exception ex)
+            {
+                var reference = AppErrorLog.Record(ex, "notes-log.status-change");
+                ShowStatusChangeRefusal(
+                    $"Sati could not save the change. Try again. Support reference: {reference}.");
+                return false;
+            }
         }
+
+        private void ShowStatusChangeRefusal(string reason)
+        {
+            HasLoadError = true;
+            LoadErrorMessage = $"This note's status was not changed. {reason}";
+        }
+
+        // ArgumentException appends " (Parameter 'note')" to its message, which means
+        // nothing to a case manager.
+        private static string RefusalText(Exception ex) =>
+            ex is ArgumentException { ParamName: { } name } argument &&
+            argument.Message.EndsWith($" (Parameter '{name}')", StringComparison.Ordinal)
+                ? argument.Message[..^$" (Parameter '{name}')".Length]
+                : ex.Message;
 
         private void RefreshView()
         {

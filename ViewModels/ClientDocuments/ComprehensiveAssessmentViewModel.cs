@@ -4,6 +4,7 @@ using Sati.Data;
 using Sati.Contracts.V1;
 using Sati.Models;
 using Sati.Models.Assessments;
+using Sati.Services;
 using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.Text.Json;
@@ -104,9 +105,24 @@ public sealed partial class ComprehensiveAssessmentViewModel : ObservableObject
 
                 await LoadProviderOptionsAsync(person.Id);
 
-                var record = await _service.GetOrCreateDraftAsync(person.Id, user.Id);
-                var document = JsonSerializer.Deserialize<AssessmentDocument>(record.DocumentJson,
-                    new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? new();
+                ComprehensiveAssessment record;
+                AssessmentDocument document;
+                try
+                {
+                    record = await _service.GetOrCreateDraftAsync(person.Id, user.Id);
+                    document = JsonSerializer.Deserialize<AssessmentDocument>(record.DocumentJson,
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? new();
+                }
+                catch (Exception ex)
+                {
+                    // Callers start this load from selection changes without awaiting it,
+                    // so a failure left to escape surfaces only as an unobserved task.
+                    // Leave the workspace unloaded and read-only instead.
+                    var reference = AppErrorLog.Record(ex, "client-documents.assessment.load");
+                    CanEdit = false;
+                    SaveStatus = $"The assessment could not be loaded. Reference {reference}.";
+                    return;
+                }
 
                 _record = record;
                 _document = document;

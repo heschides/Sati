@@ -2224,16 +2224,19 @@
                                  force; the indented one appears only while the renewal is
                                  being prepared and disappears on its target date. Each names
                                  its exact record, and the status line says in words what
-                                 colour alone would otherwise carry. -->
+                                 colour alone would otherwise carry.
+                                 AutomationProperties.Name rejects null, and WPF reports a null
+                                 fallback there as a NullReferenceException during layout rather
+                                 than as a binding error. Fallbacks here are empty strings. -->
                             <DataTemplate x:Key="AnnualFormRowTemplate">
                                 <StackPanel>
                                     <views:AttestationCheckBox Content="{Binding Label}"
-                                              AutomationProperties.Name="{Binding Current.AutomationName, FallbackValue={x:Null}}"
+                                              AutomationProperties.Name="{Binding Current.AutomationName, FallbackValue=''}"
                                               IsChecked="{Binding Current.IsComplete, Mode=OneWay, FallbackValue=False}"
                                               IsEnabled="{Binding DataContext.IsFormsEditingUnlocked, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               Command="{Binding DataContext.ToggleAnnualFormCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               CommandParameter="{Binding Current}" />
-                                    <TextBlock Text="{Binding Current.StatusText, FallbackValue={x:Null}}">
+                                    <TextBlock Text="{Binding Current.StatusText, FallbackValue=''}">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock"
                                                    BasedOn="{StaticResource AnnualFormStatusText}">

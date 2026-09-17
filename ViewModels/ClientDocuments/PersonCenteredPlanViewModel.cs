@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Sati.Data;
 using Sati.Models;
 using Sati.Models.Assessments;
+using Sati.Services;
 using System.Collections.ObjectModel;
 
 namespace Sati.ViewModels.ClientDocuments;
@@ -66,7 +67,20 @@ public sealed partial class PersonCenteredPlanViewModel : ObservableObject
             if (person is null || user is null)
                 return;
 
-            var source = await _sourceService.GetSourceAsync(person.Id, person.UserId);
+            PersonCenteredPlanSource? source;
+            try
+            {
+                source = await _sourceService.GetSourceAsync(person.Id, person.UserId);
+            }
+            catch (Exception ex)
+            {
+                // Callers start this load from selection changes without awaiting it,
+                // so a failure left to escape surfaces only as an unobserved task.
+                var reference = AppErrorLog.Record(ex, "client-documents.pcp.load");
+                SourceNotice = $"The assessment source could not be loaded. Reference {reference}.";
+                return;
+            }
+
             if (source is null)
             {
                 SourceNotice = "Begin the Comprehensive Assessment first. Identified needs and person-centered answers will appear here automatically.";
