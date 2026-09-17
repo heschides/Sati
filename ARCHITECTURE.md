@@ -331,6 +331,20 @@ day, reached through `IServiceDayInclusionService` locally and `/api/v1/service-
 the API. Once a day's documentation window closes it counts regardless, so neither a forgotten
 decision nor a stale scheduled note can hold a real service day out of the average.
 
+The pace figures divide by every day this month's units can still land on: eligible workdays from
+today to month end, plus past eligible workdays whose documentation window is open and whose notes
+are not written yet (`PastWorkdaysStillToDocument`). A past day leaves that set the moment it is
+counted in the daily average, so no day is asked for its work twice. Dividing by future days alone
+assumed every remaining unit had to come from new service, which reads far too high for a case
+manager who documents in batches.
+
+A workday that produced nothing billable is marked from its calendar square. It counts in the
+average at zero — the month's requirement did not shrink because the day was empty — and it leaves
+the capacity set, so the pace tells the truth on the day rather than a week later when the window
+closes. Time off (`ExemptDate`) remains the separate idea that does lower the requirement.
+`UndocumentedDayPromptLauncher` warns at sign-in and shutdown about days whose window closes today
+or tomorrow, naming dates only.
+
 Future capacity uses `IIncentiveService.GetEligibleDaysAsync` for the agency-calendar window and
 then removes the signed-in user's eligible ExemptDates. This route already exists in the deployed
 API. `GetRemainingEligibleDaysAsync` remains temporarily for compatibility, but its corrected

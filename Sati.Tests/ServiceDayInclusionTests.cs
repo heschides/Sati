@@ -123,6 +123,40 @@ public sealed class ServiceDayInclusionTests
         Assert.Equal(ProductivityDayKind.CountedWithSecuredUnits, day.ProductivityKind);
     }
 
+    /// <summary>
+    /// A workday that produced nothing billable is the case the pace figures used to miss: it
+    /// sat in capacity pretending to be worth a day's work until its window closed a week later.
+    /// </summary>
+    [Fact]
+    public async Task AnEmptyWorkdayCanBeMarkedAsHavingNoBillableWork()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var empty = Today.AddDays(-6);  // Friday September 11, a workday with nothing on it
+        var notes = new FixedNotes(
+            Note.Create("Elsewhere.", Today.AddDays(-1), NoteStatus.Logged, 60, fixture.PersonOneId,
+                noteType: NoteType.Visit));
+        var inclusions = Service(fixture, fixture.CaseManagerOne);
+        var calendar = Calendar(fixture, notes, inclusions);
+        await calendar.InitializeAsync();
+
+        var day = Day(calendar, empty);
+        Assert.Equal(ProductivityDayKind.NotCounted, day.ProductivityKind);
+        Assert.True(day.CanChooseCounted);
+        Assert.Contains("no billable work", day.CountedToggleLabel);
+
+        await calendar.ToggleCountedDayCommand.ExecuteAsync(day);
+
+        var marked = Day(calendar, empty);
+        Assert.Equal(ProductivityDayKind.CountedWithoutBillableWork, marked.ProductivityKind);
+        Assert.Equal("In average · no billable work", marked.ProductivityLabel);
+        Assert.True(Assert.Single(await inclusions.GetByYearAsync(fixture.CaseManagerOne.Id, 2026)).IsIncluded);
+
+        // And it stops being work waiting to be written up.
+        Assert.DoesNotContain(empty, ProductivityForecast.PastWorkdaysStillToDocument(
+            [empty], notes.Facts(), Today, 7,
+            CalendarViewModel.ChoicesByDate(await inclusions.GetByYearAsync(fixture.CaseManagerOne.Id, 2026))));
+    }
+
     private static ServiceDayInclusionService Service(NoteEntryFixture fixture, User actor)
     {
         var session = new SessionService();
@@ -154,6 +188,9 @@ public sealed class ServiceDayInclusionTests
 
     private sealed class FixedNotes(params Note[] notes) : INoteService
     {
+        public IEnumerable<ProductivityNoteFact> Facts() => notes.Select(note =>
+            new ProductivityNoteFact(note.EventDate, note.Status?.ToString(), note.Minutes));
+
         public Task<List<Note>> GetByYearAsync(int userId, int year) =>
             Task.FromResult(notes.Where(note => note.EventDate?.Year == year).ToList());
 

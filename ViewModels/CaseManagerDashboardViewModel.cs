@@ -373,7 +373,7 @@ CalendarViewModel calendarViewModel,
                 var today = DateTime.Today;
                 return CalendarViewModel.BuildMonth(
                     today.Year, today.Month, _monthlyNotes, _exemptDatesForMonth, today,
-                    DocumentationWindowDays, _serviceDayInclusionsForMonth);
+                    DocumentationWindowDays, _serviceDayInclusionsForMonth, _settings);
             }
         }
 
@@ -394,16 +394,33 @@ CalendarViewModel calendarViewModel,
             }
         }
 
-        /// <summary>"6 days · 2 still open", under the average, so the divisor is never a mystery.</summary>
+        /// <summary>"7 days incl. 1 with no billable work", so the divisor is never a mystery.</summary>
         public string DailyAverageBasis
         {
             get
             {
                 var days = ProductivityMonth.Cells.OfType<CalendarDay>().ToList();
                 var counted = days.Count(day => day.CountsTowardAverage);
+                var zero = days.Count(day => day.CountsWithoutBillableWork);
                 var open = days.Count(day => day.IsOpenUntilDocumented);
-                var dayText = $"{counted} {(counted == 1 ? "day" : "days")}";
-                return open == 0 ? dayText : $"{dayText} · {open} still open";
+                var text = $"{counted} {(counted == 1 ? "day" : "days")}";
+                if (zero > 0)
+                    text += $" incl. {zero} with no billable work";
+                return open == 0 ? text : $"{text} · {open} still open";
+            }
+        }
+
+        /// <summary>Every day this month's units can still land on.</summary>
+        public int PaceCapacityDays => _remainingEligibleDays + DaysStillToDocument.Count;
+
+        /// <summary>"10 ahead · 4 to write up", under the day count.</summary>
+        public string PaceCapacityBasis
+        {
+            get
+            {
+                var toDocument = DaysStillToDocument.Count;
+                var text = $"{_remainingEligibleDays} ahead";
+                return toDocument == 0 ? text : $"{text} · {toDocument} to write up";
             }
         }
 
@@ -779,7 +796,63 @@ CalendarViewModel calendarViewModel,
             _eligibleDaysAfterToday,
             DateTime.Today,
             DocumentationWindowDays,
-            ProductivityNoteFacts());
+            ProductivityNoteFacts(),
+            DaysStillToDocument.Count,
+            DaysStillToDocument.Count(date =>
+                !Sati.Contracts.V1.ProductivityForecast.IsDocumentationWindowClosed(
+                    date, DateTime.Today.AddDays(1), DocumentationWindowDays)));
+
+        /// <summary>
+        /// Past workdays this month whose work can still be written up and billed. They are
+        /// capacity alongside the days ahead: a case manager who documents in batches has real
+        /// units waiting on them, and leaving them out made the required pace read far too high.
+        /// </summary>
+        public IReadOnlyList<DateTime> DaysStillToDocument =>
+            Sati.Contracts.V1.ProductivityForecast.PastWorkdaysStillToDocument(
+                PastEligibleWorkdaysThisMonth(),
+                ProductivityNoteFacts(),
+                DateTime.Today,
+                DocumentationWindowDays,
+                CalendarViewModel.ChoicesByDate(_serviceDayInclusionsForMonth));
+
+        /// <summary>
+        /// Undocumented workdays whose documentation window closes today or tomorrow. After that
+        /// their units are gone and the required pace steps up, so the reminder has to arrive
+        /// while the case manager can still write them.
+        /// </summary>
+        public IReadOnlyList<DateTime> DaysNearingTheirDocumentationDeadline =>
+            Sati.Contracts.V1.ProductivityForecast.DaysNearingTheirDocumentationDeadline(
+                PastEligibleWorkdaysThisMonth(),
+                ProductivityNoteFacts(),
+                DateTime.Today,
+                DocumentationWindowDays,
+                CalendarViewModel.ChoicesByDate(_serviceDayInclusionsForMonth));
+
+        /// <summary>The agency's documentation window, for wording a reminder.</summary>
+        public int DocumentationWindowDaysForDisplay => DocumentationWindowDays;
+
+        /// <summary>
+        /// This month's workdays before today, by the same calendar the incentive target uses:
+        /// weekends out, the agency's excluded weekdays and holidays out through
+        /// <see cref="WorkdayHelper"/>, and the case manager's own time off out.
+        /// </summary>
+        private IReadOnlyList<DateTime> PastEligibleWorkdaysThisMonth()
+        {
+            var today = DateTime.Today;
+            var days = new List<DateTime>();
+            for (var date = new DateTime(today.Year, today.Month, 1); date < today; date = date.AddDays(1))
+            {
+                if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                    continue;
+                if (_settings is not null && WorkdayHelper.IsAlwaysExcludedWorkday(date, _settings))
+                    continue;
+                if (_exemptDatesForMonth.Any(exempt => exempt.Date.Date == date))
+                    continue;
+                days.Add(date);
+            }
+
+            return days;
+        }
 
         private IEnumerable<ProductivityNoteFact> ProductivityNoteFacts() =>
             _monthlyNotes.Select(note => new ProductivityNoteFact(
@@ -843,6 +916,10 @@ CalendarViewModel calendarViewModel,
             OnPropertyChanged(nameof(ProductivityMonthSummary));
             OnPropertyChanged(nameof(DailyAverageBasis));
             OnPropertyChanged(nameof(RemainingEligibleDays));
+            OnPropertyChanged(nameof(PaceCapacityDays));
+            OnPropertyChanged(nameof(PaceCapacityBasis));
+            OnPropertyChanged(nameof(DaysStillToDocument));
+            OnPropertyChanged(nameof(DaysNearingTheirDocumentationDeadline));
             OnPropertyChanged(nameof(UnitsPerRemainingDay));
         }
 

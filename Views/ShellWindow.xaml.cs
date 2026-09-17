@@ -28,6 +28,7 @@ namespace Sati.Views
         private readonly TextShortcutHook _textShortcutHook;
         private readonly DailyAgendaLauncher _dailyAgendaLauncher;
         private readonly CheckRequestPromptLauncher _checkRequestPromptLauncher;
+        private readonly UndocumentedDayPromptLauncher _undocumentedDayPromptLauncher;
         private readonly ScratchpadView _workAgendaView;
         private ContentControl? _overviewAgendaHost;
         private ContentControl? _workAgendaParent;
@@ -60,8 +61,10 @@ namespace Sati.Views
             TextShortcutHook textShortcutHook,
             DailyAgendaLauncher dailyAgendaLauncher,
             CheckRequestPromptLauncher checkRequestPromptLauncher,
+            UndocumentedDayPromptLauncher undocumentedDayPromptLauncher,
             SessionKeepAlive? sessionKeepAlive = null)
         {
+            _undocumentedDayPromptLauncher = undocumentedDayPromptLauncher;
             InitializeComponent();
             _shellViewModel = shellViewModel;
             _caseManagerDashboardViewModel = caseManagerDashboardViewModel;
@@ -94,6 +97,8 @@ namespace Sati.Views
                 await _checkRequestPromptLauncher.TryShowDayBeforeTimeOffAsync(
                     this, _shellViewModel);
                 await _dailyAgendaLauncher.TryShowAsync(this, _shellViewModel);
+                await _undocumentedDayPromptLauncher.TryShowAsync(
+                    this, _caseManagerDashboardViewModel, UndocumentedDayPromptReason.SignIn);
             };
 
             _databaseActivity.PropertyChanged += OnDatabaseActivityPropertyChanged;
@@ -178,6 +183,13 @@ namespace Sati.Views
 
                 if (!await _checkRequestPromptLauncher.TryShowAsync(
                         this, _shellViewModel, CheckRequestPromptReason.Shutdown))
+                    return;
+
+                // A day whose window closes tonight cannot be billed tomorrow, so this is the
+                // last moment the warning is worth anything. Choosing to write them cancels
+                // the close.
+                if (!await _undocumentedDayPromptLauncher.TryShowAsync(
+                        this, _caseManagerDashboardViewModel, UndocumentedDayPromptReason.Shutdown))
                     return;
 
                 _isSavingOnClose = true;

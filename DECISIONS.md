@@ -4614,3 +4614,33 @@ against the case manager, the behaviour this panel deliberately moved away from.
 
 **Not evidence.** An inclusion row is a preference about a forecast. It changes no note status, no
 billability, and not the monthly requirement, which time off (`ExemptDate`) still governs.
+
+## 2026-09-17 — the pace divides by every day units can still land on, and a zero day says so
+
+Two corrections to the productivity forecast, both from the same observation: on the 17th the
+panel asked for 26.7 units a day while the case manager's own documented days were running at
+21.7, and the gap was days with nothing written up, not slow days.
+
+**Past days are capacity.** The pace divided by future eligible workdays only, so it assumed every
+remaining unit had to come from new service. A past workday inside its documentation window can
+still contribute: the work happened, and writing it up produces units without spending a future
+day. `PastWorkdaysStillToDocument` names those days and `Calculate` divides by them as well.
+A day leaves that set as soon as it is counted in the daily average, so nothing is asked of the
+same day twice. On the reported month the divisor moved from 10 to 14 and the projection from
+26.7 to about 19.1, which is where the case manager's own arithmetic put it.
+
+**A zero day is a real zero.** A workday that produced nothing billable does not lower the
+month's requirement, so the remaining days have to make it up. The case manager can mark such a
+day from its calendar square: it counts in the daily average at zero units and leaves the capacity
+set. Without that, an empty day sat in capacity pretending to be worth a day's work until its
+window closed a week later, and the required pace jumped with no warning.
+
+**The warning is a modal, deliberately.** At sign-in and again at shutdown, undocumented workdays
+whose window closes today or tomorrow are named, with dates only and no client information.
+Shutdown offers to stay open and write them. After the window closes the units are gone for good,
+so a quiet indicator would be too late to act on; this is the one case where interrupting is the
+honest choice.
+
+**Rejected:** treating scheduled rows as evidence of delivered work, which would let a plan
+inflate the forecast — `ARCHITECTURE.md` keeps that line. Also rejected: adding past days to the
+divisor without a way to mark a zero day, which reads low exactly when a case manager is behind.

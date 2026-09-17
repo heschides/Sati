@@ -113,6 +113,7 @@ namespace Sati
                         services.AddSingleton<DailyAgendaCoordinator>();
                         services.AddSingleton<DailyAgendaLauncher>();
                         services.AddSingleton<CheckRequestPromptLauncher>();
+                        services.AddSingleton<UndocumentedDayPromptLauncher>();
                         services.AddSingleton<ThemeService>();
                         services.AddSingleton<TextShortcutService>();
                         services.AddSingleton<DailyAgendaPreferenceService>();
@@ -180,6 +181,7 @@ namespace Sati
                         services.AddTransient<SettingsWindow>();
                         services.AddTransient<DailyAgendaWindow>();
                         services.AddTransient<CheckRequestPromptWindow>();
+                        services.AddTransient<Sati.Views.UndocumentedDayPromptWindow>();
                         services.AddTransient<TimeOffCheckRequestPromptWindow>();
                         services.AddSingleton<NotesWindowViewModel>();
                         services.AddTransient<ComplianceReviewViewModel>();
@@ -235,6 +237,8 @@ namespace Sati
                         });
                         services.AddTransient<Func<SettingsWindow>>(sp => () => sp.GetRequiredService<SettingsWindow>());
                         services.AddTransient<Func<DailyAgendaWindow>>(sp => () => sp.GetRequiredService<DailyAgendaWindow>());
+                        services.AddTransient<Func<Sati.Views.UndocumentedDayPromptWindow>>(sp =>
+                            () => sp.GetRequiredService<Sati.Views.UndocumentedDayPromptWindow>());
                         services.AddTransient<Func<CheckRequestPromptWindow>>(sp =>
                             () => sp.GetRequiredService<CheckRequestPromptWindow>());
                         services.AddTransient<Func<TimeOffCheckRequestPromptWindow>>(sp =>

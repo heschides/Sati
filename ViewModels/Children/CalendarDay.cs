@@ -21,7 +21,11 @@ public sealed class CalendarDay
     public ProductivityDayKind ProductivityKind { get; init; }
     public bool CountsWithSecuredUnits => ProductivityKind == ProductivityDayKind.CountedWithSecuredUnits;
     public bool CountsWithoutSecuredUnits => ProductivityKind == ProductivityDayKind.CountedWithoutSecuredUnits;
-    public bool CountsTowardAverage => CountsWithSecuredUnits || CountsWithoutSecuredUnits;
+    /// <summary>A workday marked as finished with nothing billable on it; in the average at zero.</summary>
+    public bool CountsWithoutBillableWork => ProductivityKind == ProductivityDayKind.CountedWithoutBillableWork;
+
+    public bool CountsTowardAverage =>
+        CountsWithSecuredUnits || CountsWithoutSecuredUnits || CountsWithoutBillableWork;
 
     /// <summary>Documented in part, but held out of the average until the day is finished.</summary>
     public bool IsOpenUntilDocumented => ProductivityKind == ProductivityDayKind.OpenUntilDocumented;
@@ -35,9 +39,12 @@ public sealed class CalendarDay
     /// <summary>The case manager has decided this day rather than leaving it to Sati.</summary>
     public bool HasCaseManagerChoice { get; init; }
 
-    public string CountedToggleLabel => CountsTowardAverage
-        ? $"Leave {Date:MMMM d} out of the daily average until it is finished"
-        : $"Count {Date:MMMM d} in the daily average";
+    public string CountedToggleLabel => (CountsTowardAverage, HasUnits) switch
+    {
+        (true, _) => $"Leave {Date:MMMM d} out of the daily average until it is finished",
+        (false, false) => $"Mark {Date:MMMM d} finished with no billable work",
+        _ => $"Count {Date:MMMM d} in the daily average"
+    };
 
     public int TotalUnits => Notes.Sum(note => note.Units ?? 0);
     public bool HasUnits => TotalUnits > 0;
@@ -58,6 +65,7 @@ public sealed class CalendarDay
         ProductivityDayKind.OpenUntilDocumented => HasCaseManagerChoice
             ? "Not counted yet · your choice"
             : "Not counted yet · work still scheduled",
+        ProductivityDayKind.CountedWithoutBillableWork => "In average · no billable work",
         _ => string.Empty
     };
 
@@ -85,6 +93,8 @@ public sealed class CalendarDay
                     ", left out of the daily average by you until it is finished",
                 ProductivityDayKind.OpenUntilDocumented =>
                     ", not in the daily average yet because work is still scheduled on it",
+                ProductivityDayKind.CountedWithoutBillableWork =>
+                    ", marked finished with no billable work, counted in the daily average as zero",
                 _ => string.Empty
             };
             return $"{Date:dddd, MMMM d, yyyy}, {noteText}{unitText}{outlookText}{exemptText}{productivityText}";

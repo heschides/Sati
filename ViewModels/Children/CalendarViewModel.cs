@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Contracts.V1;
 using Sati.Data;
+using Sati.Helpers;
 using Sati.Models;
 using Sati.Services;
 using System.Diagnostics;
@@ -32,6 +33,7 @@ public partial class CalendarViewModel : ObservableObject
     private List<ImportedOutlookEvent> _yearOutlookEvents = [];
     private List<ServiceDayInclusion> _serviceDayInclusions = [];
     private int _documentationWindowDays = ProductivityForecast.DefaultDocumentationWindowDays;
+    private Settings? _settings;
 
     // The dashboard refresh is part of the calendar operation, so it is a Task
     // rather than an async-void EventHandler. Each subscriber is awaited and
@@ -407,14 +409,16 @@ public partial class CalendarViewModel : ObservableObject
             var notesTask = _noteService.GetByYearAsync(user.Id, year);
             var outlookTask = LoadOutlookEventsAsync(user.Id, year);
             var inclusionsTask = LoadServiceDayInclusionsAsync(user.Id, year);
-            var windowTask = LoadDocumentationWindowAsync();
-            await Task.WhenAll(exemptDatesTask, notesTask, outlookTask, inclusionsTask, windowTask);
+            var settingsTask = LoadCalendarSettingsAsync();
+            await Task.WhenAll(exemptDatesTask, notesTask, outlookTask, inclusionsTask, settingsTask);
 
             if (!_yearLoadRequests.IsCurrent(request) || CurrentYear != year)
                 return;
 
             _serviceDayInclusions = await inclusionsTask;
-            _documentationWindowDays = await windowTask;
+            _settings = await settingsTask;
+            _documentationWindowDays = ProductivityForecast.NormalizeDocumentationWindowDays(
+                _settings?.AbandonedAfterDays);
             _exemptDates = await exemptDatesTask;
             _yearNotes = await notesTask;
             var outlookResult = await outlookTask;
@@ -479,7 +483,7 @@ public partial class CalendarViewModel : ObservableObject
         {
             result.Add(BuildMonth(
                 CurrentYear, month, notesByDate, exemptByDate, outlookByDate,
-                today, _documentationWindowDays, choices));
+                today, _documentationWindowDays, choices, _settings));
         }
 
         Months = result;
@@ -504,7 +508,8 @@ public partial class CalendarViewModel : ObservableObject
         IEnumerable<ExemptDate> exemptDates,
         DateTime today,
         int documentationWindowDays = ProductivityForecast.DefaultDocumentationWindowDays,
-        IEnumerable<ServiceDayInclusion>? serviceDayInclusions = null)
+        IEnumerable<ServiceDayInclusion>? serviceDayInclusions = null,
+        Settings? settings = null)
     {
         var notesByDate = notes
             .Where(note => note.EventDate is DateTime date && date.Year == year && date.Month == month)
@@ -517,7 +522,7 @@ public partial class CalendarViewModel : ObservableObject
             .ToDictionary(group => group.Key, group => group.First());
         return BuildMonth(year, month, notesByDate, exemptByDate,
             new Dictionary<DateTime, List<ImportedOutlookEvent>>(), today,
-            documentationWindowDays, ChoicesByDate(serviceDayInclusions));
+            documentationWindowDays, ChoicesByDate(serviceDayInclusions), settings);
     }
 
     /// <summary>The stored decisions as the shared rule reads them.</summary>
@@ -537,7 +542,8 @@ public partial class CalendarViewModel : ObservableObject
         IReadOnlyDictionary<DateTime, List<ImportedOutlookEvent>> outlookByDate,
         DateTime today,
         int documentationWindowDays,
-        IReadOnlyDictionary<DateTime, bool> choices)
+        IReadOnlyDictionary<DateTime, bool> choices,
+        Settings? settings)
     {
         var firstDay = new DateTime(year, month, 1);
         var daysInMonth = DateTime.DaysInMonth(year, month);
@@ -566,7 +572,10 @@ public partial class CalendarViewModel : ObservableObject
                 ProductivityKind = ProductivityForecast.ClassifyDay(
                     date, facts, today, documentationWindowDays, choice),
                 CanChooseCounted = ProductivityForecast.CanChooseDailyAverageDay(
-                    date, facts, today, documentationWindowDays),
+                    date, facts, today, documentationWindowDays,
+                    isEligibleWorkday: date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) &&
+                                       exemptEntry is null &&
+                                       (settings is null || !WorkdayHelper.IsAlwaysExcludedWorkday(date, settings))),
                 CountsByDefault = ProductivityForecast.CountsInDailyAverage(
                     date, facts, today, documentationWindowDays, caseManagerChoice: null),
                 HasCaseManagerChoice = choice is not null
@@ -671,20 +680,23 @@ public partial class CalendarViewModel : ObservableObject
         }
     }
 
-    private async Task<int> LoadDocumentationWindowAsync()
+    /// <summary>
+    /// The agency's documentation window and workday calendar. Both decide which squares offer a
+    /// decision, so a failure leaves the defaults rather than refusing to show the year.
+    /// </summary>
+    private async Task<Settings?> LoadCalendarSettingsAsync()
     {
         if (_settingsService is null)
-            return ProductivityForecast.DefaultDocumentationWindowDays;
+            return null;
 
         try
         {
-            var settings = await _settingsService.LoadAsync();
-            return ProductivityForecast.NormalizeDocumentationWindowDays(settings.AbandonedAfterDays);
+            return await _settingsService.LoadAsync();
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"CalendarViewModel.LoadDocumentationWindow failed: {ex.GetType().Name}");
-            return ProductivityForecast.DefaultDocumentationWindowDays;
+            Debug.WriteLine($"CalendarViewModel.LoadCalendarSettings failed: {ex.GetType().Name}");
+            return null;
         }
     }
 

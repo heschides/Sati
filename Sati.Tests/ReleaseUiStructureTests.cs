@@ -35,7 +35,9 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("RECOVERABLE", dashboard);
         Assert.Contains("SECURED", dashboard);
         Assert.Contains("PROJECTED / DAY", dashboard);
-        Assert.Contains("FUTURE DAYS", dashboard);
+        // Renamed when past days still to write up joined the pace divisor.
+        Assert.Contains("DAYS TO CAPTURE", dashboard);
+        Assert.Contains("PaceCapacityBasis", dashboard);
         Assert.Contains("Documentation deadline warning", dashboard);
         Assert.DoesNotContain("Past days without notes are included", dashboard);
     }

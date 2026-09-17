@@ -184,7 +184,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="2">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="FUTURE DAYS"
+                            <TextBlock Text="DAYS TO CAPTURE"
                                        Style="{StaticResource LabelStyle}" />
                             <TextBlock Text="ⓘ"
                                        FontSize="12"
@@ -194,20 +194,24 @@
                                        Cursor="Help">
                                 <TextBlock.ToolTip>
                                     <ToolTip>
-                                        <TextBlock MaxWidth="220"
+                                        <TextBlock MaxWidth="240"
                                                    TextWrapping="Wrap">
-                                            <Run Text="Eligible workdays from today through the end of the month." />
+                                            <Run Text="Every day this month's units can still land on: eligible workdays from today to month end, plus past workdays whose notes are not written yet and whose documentation window is still open." />
                                             <LineBreak />
                                             <LineBreak />
-                                            <Run Text="Excludes weekends, holidays, and days marked exempt in the calendar. Past days are represented only by recoverable pending notes; they are never counted as new work capacity." />
+                                            <Run Text="Excludes weekends, holidays, and days marked exempt. A past day leaves this count once you write it up or mark it as having no billable work." />
                                         </TextBlock>
                                     </ToolTip>
                                 </TextBlock.ToolTip>
                             </TextBlock>
                         </StackPanel>
-                        <TextBlock Text="{Binding RemainingEligibleDays}"
+                        <TextBlock Text="{Binding PaceCapacityDays}"
                                    FontSize="20"
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="{Binding PaceCapacityBasis}"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
                     </StackPanel>
                 </Grid>
 

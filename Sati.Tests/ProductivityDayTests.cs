@@ -163,6 +163,105 @@ public sealed class ProductivityDayTests
         Assert.Equal(2m, ProductivityForecast.DailyAverageUnits(notes, Today, Window));
     }
 
+    /// <summary>
+    /// A workday that produced nothing billable does not lower the month's requirement, so it
+    /// counts in the average at zero and the remaining days have to make it up.
+    /// </summary>
+    [Fact]
+    public void AWorkdayMarkedWithNoBillableWorkCountsAsAZero()
+    {
+        var empty = Today.AddDays(-4);
+        var notes = new ProductivityNoteFact[] { new(Today.AddDays(-1), "Logged", 120) };
+        var marked = new Dictionary<DateTime, bool> { [empty] = true };
+
+        Assert.Equal(
+            ProductivityDayKind.NotCounted,
+            ProductivityForecast.ClassifyDay(empty, notes, Today, Window, caseManagerChoice: null));
+        Assert.Equal(
+            ProductivityDayKind.CountedWithoutBillableWork,
+            ProductivityForecast.ClassifyDay(empty, notes, Today, Window, caseManagerChoice: true));
+
+        // 8 units over the one service day; 4.0 once the empty day is counted beside it.
+        Assert.Equal(8m, ProductivityForecast.DailyAverageUnits(notes, Today, Window));
+        Assert.Equal(4m, ProductivityForecast.DailyAverageUnits(notes, Today, Window, marked));
+    }
+
+    [Fact]
+    public void AnEmptyWorkdayCanBeMarkedButAWeekendOrSettledDayCannot()
+    {
+        var empty = Today.AddDays(-4);
+        var settled = Today.AddDays(-9);
+
+        Assert.True(ProductivityForecast.CanChooseDailyAverageDay(empty, [], Today, Window));
+        Assert.False(ProductivityForecast.CanChooseDailyAverageDay(
+            empty, [], Today, Window, isEligibleWorkday: false));
+        Assert.False(ProductivityForecast.CanChooseDailyAverageDay(settled, [], Today, Window));
+    }
+
+    /// <summary>
+    /// The pace divisor is every day units can still land on. A past workday whose notes are not
+    /// written yet is capacity: the work happened, and writing it up still produces units.
+    /// </summary>
+    [Fact]
+    public void PastWorkdaysStillToDocumentAreCapacityUntilTheyAreWrittenOrSettled()
+    {
+        var eligible = new[]
+        {
+            Today.AddDays(-9),  // settled: outside the window, nothing more can be billed
+            Today.AddDays(-5),  // documented and counted
+            Today.AddDays(-4),  // nothing written yet
+            Today.AddDays(-2)   // partly written, work still scheduled
+        };
+        var notes = new ProductivityNoteFact[]
+        {
+            new(Today.AddDays(-9), "Logged", 60),
+            new(Today.AddDays(-5), "Logged", 60),
+            new(Today.AddDays(-2), "Logged", 15),
+            new(Today.AddDays(-2), "Scheduled", 60)
+        };
+
+        Assert.Equal(
+            [Today.AddDays(-4), Today.AddDays(-2)],
+            ProductivityForecast.PastWorkdaysStillToDocument(eligible, notes, Today, Window));
+
+        // Marked as a zero day, it is finished rather than waiting, so it leaves capacity.
+        var marked = new Dictionary<DateTime, bool> { [Today.AddDays(-4)] = true };
+        Assert.Equal(
+            [Today.AddDays(-2)],
+            ProductivityForecast.PastWorkdaysStillToDocument(eligible, notes, Today, Window, marked));
+    }
+
+    [Fact]
+    public void ThePaceDividesByFutureDaysAndPastDaysStillToWriteUp()
+    {
+        var notes = new ProductivityNoteFact[] { new(Today.AddDays(-1), "Logged", 120) };
+
+        var withoutPast = ProductivityForecast.Calculate(100, 10, 9, Today, Window, notes);
+        var withPast = ProductivityForecast.Calculate(
+            100, 10, 9, Today, Window, notes,
+            pastDaysStillToDocument: 4, pastDaysStillToDocumentAfterToday: 4);
+
+        // 92 units still needed: over 10 days that is 9.2, over 14 it is 6.6.
+        Assert.Equal(9.2m, withoutPast.SecuredPace);
+        Assert.Equal(6.6m, withPast.SecuredPace);
+        Assert.Equal(10, withPast.FutureEligibleDays);
+    }
+
+    [Fact]
+    public void ADayIsFlaggedWhileItsDeadlineCanStillBeMet()
+    {
+        var eligible = new[] { Today.AddDays(-7), Today.AddDays(-6), Today.AddDays(-3) };
+
+        // Seven days back: its last documentable day is today. Six days back: tomorrow.
+        Assert.Equal(
+            [Today.AddDays(-7), Today.AddDays(-6)],
+            ProductivityForecast.DaysNearingTheirDocumentationDeadline(eligible, [], Today, Window));
+        Assert.Equal(
+            [Today.AddDays(-7)],
+            ProductivityForecast.DaysNearingTheirDocumentationDeadline(
+                eligible, [], Today, Window, noticeDays: 0));
+    }
+
     [Fact]
     public void TheAverageIsZeroBeforeTheMonthHasAnyCountedDay()
     {

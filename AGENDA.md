@@ -123,6 +123,25 @@ signature-never-attests items retained later as history.
 - [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
       No source-level result here is a deployment or Production-readiness claim.
 
+## Unreleased — the pace counts days still to write up (2026-09-17)
+
+See the 2026-09-17 decision on capacity and zero days. No schema change; it reuses the
+`ServiceDayInclusion` table from the section below.
+
+- [x] `ProductivityForecast` divides the pace by future eligible workdays plus past eligible
+      workdays whose window is open and whose notes are unwritten. On the reported month that
+      moved the divisor from 10 to 14 and the projection from 26.7 to 19.1.
+- [x] A workday with nothing billable can be marked from its calendar square: zero in the average,
+      out of the capacity set. Marked days appear in the average basis line.
+- [x] `UndocumentedDayPromptLauncher` and `UndocumentedDayPromptWindow` warn at sign-in and
+      shutdown about days whose window closes today or tomorrow. Dates only, no client
+      information; shutdown offers to stay open and write them.
+- [x] "FUTURE DAYS" becomes "DAYS TO CAPTURE", with "10 ahead · 4 to write up" beneath it.
+- [x] Rule, service, and calendar regressions; 2,288 desktop tests pass.
+- [ ] Verify the two modals in the running app, including the shutdown path that cancels the close.
+- [ ] Decide whether a day marked with no billable work should be visible to a supervisor
+      reviewing productivity, or stay a case manager's own annotation.
+
 ## Unreleased — a day counts once it is finished (2026-09-17)
 
 See the 2026-09-17 decision on when a day joins the daily average. **Adds a schema change**: the
