@@ -349,8 +349,30 @@ the Demo API ships with this desktop build.
       IndexCreated, HistoryWritten all false, MigrationCount 109).
 - [x] Release build: 0 errors. Desktop 2,282, API 826, signatures 119, portal 8, and Carika 4 pass.
       Nine opt-in skips. The API sign-in timing guard passed in the solution-wide run this time.
-- [ ] Push; publish the Demo API and verify health, version, and contract revision.
-- [ ] Build, accept, and publish both installers.
+- [x] Source release commit `f86bd51` pushed to `origin/master`.
+- [x] Publish the Demo API. `artifacts/SatiApi-1.3.17-fx-x86.zip` is 10,097,676 bytes, SHA-256
+      `5542A55507C880D2708B8466BBACB00FAA4C1A00E0FABBDD65D180C06F6DB20B`, the same 68 files as
+      1.3.16, file version 1.3.17.0, no settings files, and no secret-like values. OneDeploy to
+      `sati-demo-api-satilogica` in `rg-sati-demo` succeeded (deployment
+      `a9b54379a3f84c02a43241390fc27dc7`); the 1.3.16 package is retained. Live and ready return
+      200, and readiness is the real confirmation that the migration satisfied the deployed model,
+      because `SchemaDriftHealthCheck` compares the model against the database.
+      `/health/version` reports Sati.Api 1.3.17 with contract `3A4B6F084C12` — changed from
+      `E18157FBC2D9`, as expected for three new routes — equal to `ApiSurface.Revision` from this
+      build. Anonymous Settings and the new inclusions route both return 401.
+      `Test-DemoReadiness.ps1 -HealthOnly` passed; authenticated checks were not run.
+- [x] Build, accept, and publish both installers without overwriting. `SqlLocalDB.msi` is Valid
+      Microsoft-signed, SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.17.exe` is 102,871,040 bytes, SHA-256
+      `5991E4D3268EC791BFF301A73645F3826750AF6E4D1697678D5FFB8D054CEB70`; five responsive
+      15-second launches with graceful closes, version 1.3.17.0, and cleanup passed; published to
+      `SatiLogica Demo Files`. `SatiLocalSetup-1.3.17.exe` is 204,899,369 bytes, SHA-256
+      `A2EC984576D48713D2128888BDBC66C14E48E223547637AAACA1EE73A5A062F3`; version 1.3.17.0,
+      `SatiProduction`, integrated security, and cleanup passed; published to `Sati Desktop`. Both
+      copies and checksum files were verified after publication, on the build workstation rather
+      than a clean machine.
+- [x] Branches: deleted local `counted-service-days` (6b0197e, fully merged, never pushed).
+      Retained the same branches as 1.3.16, for the same reasons.
 - [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.17.exe`, which
       carries 1.3.15 and 1.3.16 as well. The desktop applies `AddServiceDayInclusions` to local
       `SatiProduction` at that first launch; no other database work is pending for it.
