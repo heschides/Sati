@@ -140,6 +140,15 @@ Three workstation logs from the Joshu login, all 1.3.14.
       from the notes log (reference D47EFC73EBA0). Any refusal is now shown on the notes log, and
       the note's status (and justification, for Send to Supervisor and Hold) is put back.
       `NotesLogStatusRefusalTests` fails against the old code.
+- [x] Note-grid context menus (Mark Note Logged in the notes log, Delete Note on the dashboard)
+      opened over the column header, and stayed open when keeping an unsaved draft put the old
+      selection back; both then acted on a note the case manager did not point at.
+      `RowContextMenu.SelectsRow` opens the menu only when the row under the pointer is the
+      selected note. The stock grid does select the right-clicked row, so this was not why
+      repeated right-clicks "did nothing" on 2026-09-17; that was the refused note's repeat
+      exception being suppressed, fixed above. `NoteGridContextMenuTests` fails without it.
+- [ ] Delete Note on the dashboard deletes without asking, and a refused delete (a submitted
+      note) reaches the crash dialog.
 - [ ] Stack overflow (`0xC00000FD`, 11:13 local): cause unknown. Enable dump capture on that
       workstation with `scripts/Set-SatiCrashDumpCapture.ps1 -Enable`, analyze the next dump
       there, then `-Disable -RemoveDumps`. See the 2026-09-17 decision.

@@ -1,6 +1,7 @@
 <UserControl x:Class="Sati.Views.NotesPanelView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:Sati.Helpers"
              TextElement.FontFamily="{StaticResource AppFont}">
 
     <!-- The filter bar and notes grid remain one stable Overview workspace while
@@ -55,6 +56,7 @@
             <Grid>
             <DataGrid AutomationProperties.Name="Notes" ItemsSource="{Binding NotesView}"
                       SelectedItem="{Binding SelectedNote, Mode=TwoWay}"
+                      helpers:RowContextMenu.SelectsRow="True"
                       MouseDoubleClick="DataGrid_MouseDoubleClick"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"

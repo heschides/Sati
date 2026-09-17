@@ -355,6 +355,7 @@
                 CornerRadius="6">
             <DataGrid AutomationProperties.Name="Notes" ItemsSource="{Binding NotesView}"
                       SelectedItem="{Binding SelectedNote, Mode=TwoWay}"
+                      helpers:RowContextMenu.SelectsRow="True"
                       MouseDoubleClick="DataGrid_MouseDoubleClick"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
