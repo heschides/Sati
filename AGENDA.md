@@ -147,6 +147,14 @@ Three workstation logs from the Joshu login, all 1.3.14.
       selected note. The stock grid does select the right-clicked row, so this was not why
       repeated right-clicks "did nothing" on 2026-09-17; that was the refused note's repeat
       exception being suppressed, fixed above. `NoteGridContextMenuTests` fails without it.
+- [ ] A 9/9/2026 visit note is refused for "Q1 Review was due Sep 6, 2026" while the profile
+      shows Quarter 1 due 06/05/26 and complete. The gate checks every form row; the profile
+      shows only the plan year from the current effective date, and a 9/6 Q1 implies a plan
+      year starting about 6/8, not the client's 3/7. Run
+      `scripts/Diagnose-OffCycleComplianceForms.sql` on the Joshu login to see the rows and
+      when they were made before deciding on a repair.
+- [ ] `scripts/Diagnose-BillingGateDisagreement.sql` still reads `Forms.IsCompliant`, which
+      no longer exists.
 - [ ] Delete Note on the dashboard deletes without asking, and a refused delete (a submitted
       note) reaches the crash dialog.
 - [ ] Stack overflow (`0xC00000FD`, 11:13 local): cause unknown. Enable dump capture on that
