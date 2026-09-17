@@ -4541,3 +4541,22 @@ run against any database that is.
 **Rejected:** one completion date for every item (records everything as late and makes past service
 non-billable), direct SQL (a second copy of the attestation and release rules), fabricating contact
 notes, and shipping the tool inside the desktop app.
+
+## 2026-09-17 — crash dumps may be captured on one workstation, by hand, to diagnose a stack overflow
+
+Release 1.3.14 stopped with `0xC00000FD` on the Joshu login. The run marker and Windows readback
+identified the crash, but a stack overflow leaves no managed trace and the dump WER made for its
+own report was deleted, so the cause cannot be named. This is the separate decision the 2026-09-10
+entry required before LocalDumps could be enabled.
+
+- `scripts/Set-SatiCrashDumpCapture.ps1` turns capture on for one executable (`Sati.exe` by
+  default), for full dumps, keeping three. An administrator runs it by hand on the affected machine;
+  Sati never enables it and no installer does.
+- Dumps are written to `%LOCALAPPDATA%\SatiLogica\Sati\CrashDumps`, expanded for the user whose Sati
+  crashed, so each login's dumps stay in that login's profile.
+- A dump is protected health information. It is analyzed on that machine only, never copied,
+  emailed, uploaded, or attached to an incident, and deleted with `-Disable -RemoveDumps` when the
+  analysis is done. Capture is turned off at the same time.
+
+**Rejected:** minidumps (too little of the managed runtime state to walk a managed stack), enabling
+capture for every Sati process on install, and a machine-wide dump folder readable by other logins.
