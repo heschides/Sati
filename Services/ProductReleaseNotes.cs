@@ -6,11 +6,25 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "See the days your average counts";
+    public const string ReleaseName = "A day counts once you have finished it";
     public const string ReleaseDate = "September 17, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Writing up one note no longer drags your average down",
+            [
+                "Documenting a single 15-minute review on Monday used to put Monday into your Documented Avg at one unit, and it stayed low until you wrote up the rest of that day.",
+                "A day now joins the average once it looks finished: it has documented work and nothing left on its schedule. Until then it shows plainly on the calendar and says \"Not counted yet\".",
+                "Each open day's square has a tick box. Tick it to count that day now, or clear it to hold a day back. The tick is only offered while the day is still inside its 7-day documentation window.",
+                "After that window closes the day counts on its own, whatever is left scheduled on it, so a tick you forget cannot hold a real service day out of your average.",
+                "Under Documented Avg the panel now says what it divided by, for example \"6 days · 2 still open\"."
+            ]),
+        new(
+            "Right-click a day in Month view to schedule time off",
+            [
+                "The Month view now takes the same right-click as the Year view: it marks a day as time off, or restores it. Time off still lowers your monthly requirement, and is separate from whether a day counts toward your average."
+            ]),
         new(
             "The calendar shows which days count toward your average",
             [

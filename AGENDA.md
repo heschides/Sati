@@ -327,6 +327,34 @@ migration is required.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.17 — 2026-09-17
+
+"A day counts once you have finished it." Releases the counted-service-days section above: a day
+joins the documented daily average when it has documented work and nothing left on its schedule,
+the calendar tick that decides an open day, and right-click time off in the Month view.
+
+**Schema change.** `20260917203349_AddServiceDayInclusions` creates one table and its unique
+index and alters nothing existing. The contract gains three routes, so the fingerprint changes and
+the Demo API ships with this desktop build.
+
+- [x] Merge `counted-service-days` into `master` (fast-forward to `6b0197e`).
+- [x] Coordinated 1.3.17 version and Settings release notes.
+- [x] Apply the Demo migration. The user authorized it and added the temporary exact-IP rule
+      `temp-workstation-1317` for 72.95.106.10, then removed it when told the migration was done;
+      this workflow never touched a firewall rule. `scripts/Apply-ServiceDayInclusionsMigration.ps1`
+      fails closed on database name and the Demo identity marker, guards every statement on the
+      real schema, and verifies column types, the cascading foreign key, and index uniqueness
+      rather than names alone. Rollback-only dry run predicted the table, the index, and history
+      row 109; the real run created all three; the third run changed nothing (TableCreated,
+      IndexCreated, HistoryWritten all false, MigrationCount 109).
+- [x] Release build: 0 errors. Desktop 2,282, API 826, signatures 119, portal 8, and Carika 4 pass.
+      Nine opt-in skips. The API sign-in timing guard passed in the solution-wide run this time.
+- [ ] Push; publish the Demo API and verify health, version, and contract revision.
+- [ ] Build, accept, and publish both installers.
+- [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.17.exe`, which
+      carries 1.3.15 and 1.3.16 as well. The desktop applies `AddServiceDayInclusions` to local
+      `SatiProduction` at that first launch; no other database work is pending for it.
+
 ## Release 1.3.16 — 2026-09-17
 
 "See the days your average counts." Releases the productivity-days section above: the calendar
