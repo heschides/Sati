@@ -347,6 +347,23 @@ public sealed class CloudExemptDateService(CloudApiClient api) : IExemptDateServ
     public Task RemoveAsync(int id) => api.DeleteAsync($"/api/v1/exempt-dates/{id}");
 }
 
+public sealed class CloudServiceDayInclusionService(CloudApiClient api) : IServiceDayInclusionService
+{
+    public async Task<List<ServiceDayInclusion>> GetByYearAsync(int userId, int year) =>
+        (await api.GetAsync<List<ServiceDayInclusionDto>>($"/api/v1/service-day-inclusions/{year}"))
+        .Select(dto => CloudContractMapper.ToServiceDayInclusion(dto, userId)).ToList();
+
+    public async Task<ServiceDayInclusion> SetAsync(int userId, DateTime date, bool isIncluded) =>
+        CloudContractMapper.ToServiceDayInclusion(
+            await api.PutAsync<SetServiceDayInclusionRequest, ServiceDayInclusionDto>(
+                "/api/v1/service-day-inclusions",
+                new SetServiceDayInclusionRequest(date.Date, isIncluded)),
+            userId);
+
+    public Task ClearAsync(int userId, DateTime date) =>
+        api.DeleteAsync($"/api/v1/service-day-inclusions/{date:yyyy-MM-dd}");
+}
+
 public sealed class CloudIncentiveService(CloudApiClient api) : IIncentiveService
 {
     public async Task<(Incentive incentive, bool wasCreated)> GetOrCreateAsync(int userId, int month, int year)

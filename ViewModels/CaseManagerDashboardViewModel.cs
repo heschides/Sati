@@ -33,6 +33,7 @@ namespace Sati.ViewModels
         private readonly IUpcomingEventService _upcomingEventService;
         private readonly IFormService _formService;
         private readonly IExemptDateService _exemptDateService;
+        private readonly IServiceDayInclusionService? _serviceDayInclusionService;
         private readonly IFormOpeningPrompt? _formOpeningPrompt;
         private readonly ConsumerPickerSortPreferenceService? _consumerPickerSortPreferences;
         private Settings? _settings;
@@ -42,6 +43,7 @@ namespace Sati.ViewModels
         private int _remainingEligibleDays;
         private int _eligibleDaysAfterToday;
         private List<ExemptDate> _exemptDatesForMonth = [];
+        private List<ServiceDayInclusion> _serviceDayInclusionsForMonth = [];
         private readonly LatestRequestTracker _notesLoadRequests = new();
         private readonly LatestRequestTracker _upcomingEventLoadRequests = new();
         private readonly LatestRequestTracker _peopleLoadRequests = new();
@@ -74,9 +76,11 @@ CalendarViewModel calendarViewModel,
             HelperReferenceViewModel reference,
             IAnnualDocumentService? annualDocuments = null,
             ConsumerPickerSortPreferenceService? consumerPickerSortPreferences = null,
-            IFormOpeningPrompt? formOpeningPrompt = null
+            IFormOpeningPrompt? formOpeningPrompt = null,
+            IServiceDayInclusionService? serviceDayInclusionService = null
             )
         {
+            _serviceDayInclusionService = serviceDayInclusionService;
             _personService = personService;
             _noteService = noteService;
             _settingsService = settingsService;
@@ -368,7 +372,8 @@ CalendarViewModel calendarViewModel,
             {
                 var today = DateTime.Today;
                 return CalendarViewModel.BuildMonth(
-                    today.Year, today.Month, _monthlyNotes, _exemptDatesForMonth, today);
+                    today.Year, today.Month, _monthlyNotes, _exemptDatesForMonth, today,
+                    DocumentationWindowDays, _serviceDayInclusionsForMonth);
             }
         }
 
@@ -379,13 +384,34 @@ CalendarViewModel calendarViewModel,
                 var days = ProductivityMonth.Cells.OfType<CalendarDay>().ToList();
                 var secured = days.Count(day => day.CountsWithSecuredUnits);
                 var pendingOnly = days.Count(day => day.CountsWithoutSecuredUnits);
+                var open = days.Count(day => day.IsOpenUntilDocumented);
+                var openText = open == 0
+                    ? string.Empty
+                    : $" {open} {(open == 1 ? "day is" : "days are")} still open and not counted yet.";
                 return $"This month: {secured + pendingOnly} days in the daily average, " +
-                       $"{secured} with logged or approved units and {pendingOnly} with pending notes only.";
+                       $"{secured} with logged or approved units and {pendingOnly} with pending notes only." +
+                       openText;
             }
         }
 
-        public double DailyAverageUnits =>(double)Sati.Contracts.V1.ProductivityForecast.DailyAverageUnits(
-            ProductivityForecast, ProductivityNoteFacts(), DateTime.Today);
+        /// <summary>"6 days · 2 still open", under the average, so the divisor is never a mystery.</summary>
+        public string DailyAverageBasis
+        {
+            get
+            {
+                var days = ProductivityMonth.Cells.OfType<CalendarDay>().ToList();
+                var counted = days.Count(day => day.CountsTowardAverage);
+                var open = days.Count(day => day.IsOpenUntilDocumented);
+                var dayText = $"{counted} {(counted == 1 ? "day" : "days")}";
+                return open == 0 ? dayText : $"{dayText} · {open} still open";
+            }
+        }
+
+        public double DailyAverageUnits => (double)Sati.Contracts.V1.ProductivityForecast.DailyAverageUnits(
+            ProductivityNoteFacts(),
+            DateTime.Today,
+            DocumentationWindowDays,
+            CalendarViewModel.ChoicesByDate(_serviceDayInclusionsForMonth));
         public ICollectionView NotesView { get; }
 
         public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
@@ -815,6 +841,7 @@ CalendarViewModel calendarViewModel,
             OnPropertyChanged(nameof(DailyAverageUnits));
             OnPropertyChanged(nameof(ProductivityMonth));
             OnPropertyChanged(nameof(ProductivityMonthSummary));
+            OnPropertyChanged(nameof(DailyAverageBasis));
             OnPropertyChanged(nameof(RemainingEligibleDays));
             OnPropertyChanged(nameof(UnitsPerRemainingDay));
         }
@@ -1556,6 +1583,29 @@ CalendarViewModel calendarViewModel,
             _exemptDatesForMonth = allExempt
                 .Where(e => e.Date.Month == DateTime.Now.Month)
                 .ToList();
+            await LoadServiceDayInclusionsAsync();
+        }
+
+        /// <summary>
+        /// The case manager's decisions about which open days count. A failure leaves every day
+        /// on Sati's own reading rather than emptying the panel.
+        /// </summary>
+        private async Task LoadServiceDayInclusionsAsync()
+        {
+            if (LoggedInUser is null || _serviceDayInclusionService is null) return;
+            try
+            {
+                var all = await _serviceDayInclusionService.GetByYearAsync(
+                    LoggedInUser.Id, DateTime.Now.Year);
+                _serviceDayInclusionsForMonth = all
+                    .Where(inclusion => inclusion.Date.Month == DateTime.Now.Month)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"LoadServiceDayInclusions failed: {ex.GetType().Name}");
+                _serviceDayInclusionsForMonth = [];
+            }
         }
 
         public async Task RefreshIncentiveAsync()

@@ -33,7 +33,14 @@ public enum ProductivityDayKind
     CountedWithSecuredUnits,
 
     /// <summary>In the average only through pending notes; nothing on it is secured yet.</summary>
-    CountedWithoutSecuredUnits
+    CountedWithoutSecuredUnits,
+
+    /// <summary>
+    /// Documented in part, but still open: work remains on its schedule, or the case manager
+    /// has set it aside. Counting it now would divide a finished day's units by an unfinished
+    /// day. Its own documentation window settles it either way.
+    /// </summary>
+    OpenUntilDocumented
 }
 
 public static class ProductivityForecast
@@ -41,57 +48,145 @@ public static class ProductivityForecast
     public const int DefaultDocumentationWindowDays = 7;
 
     private const string Pending = "Pending";
+    private const string Scheduled = "Scheduled";
     private static readonly string[] SecuredStatuses = ["Logged", "Approved"];
     private static readonly string[] AverageStatuses = ["Pending", "Logged", "Approved"];
 
     /// <summary>
-    /// The service days the documented daily average divides by: days of <paramref name="today"/>'s
-    /// month, up to and including today, that carry a pending, logged, or approved note. A future
-    /// day is never in the average, even when a pending note is already scheduled on it.
+    /// Whether a day can be in the average at all: a day of <paramref name="today"/>'s month, up
+    /// to and including today, carrying a pending, logged, or approved note. A future day is never
+    /// in the average, even when a pending note is already scheduled on it.
     /// </summary>
+    private static bool IsDocumentedServiceDay(
+        DateTime date,
+        IEnumerable<ProductivityNoteFact> notesOnDate,
+        DateTime today) =>
+        date.Date.Year == today.Date.Year && date.Date.Month == today.Date.Month &&
+        date.Date <= today.Date &&
+        notesOnDate.Any(note => note.EventDate?.Date == date.Date &&
+                                AverageStatuses.Contains(note.Status, StringComparer.OrdinalIgnoreCase));
+
+    /// <summary>A day is settled once its documentation window has closed; nothing can be added late.</summary>
+    public static bool IsDocumentationWindowClosed(DateTime date, DateTime today, int documentationWindowDays) =>
+        date.Date.AddDays(NormalizeDocumentationWindowDays(documentationWindowDays)) < today.Date;
+
+    /// <summary>Work planned on this day that has not been documented yet.</summary>
+    private static bool HasScheduledWork(
+        DateTime date,
+        IEnumerable<ProductivityNoteFact> notesOnDate) =>
+        notesOnDate.Any(note => note.EventDate?.Date == date.Date &&
+                                string.Equals(note.Status, Scheduled, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Whether the average divides by <paramref name="date"/>.
+    /// <para>
+    /// A day still inside its documentation window is only counted once it looks finished — it has
+    /// documented work and nothing left on its schedule — or the case manager says so with
+    /// <paramref name="caseManagerChoice"/>. That keeps a day documented one note at a time from
+    /// dragging the average down while the rest of it is still being written up.
+    /// </para>
+    /// <para>
+    /// Once the window closes the day counts on its own, so a choice that was never made, or was
+    /// made and forgotten, cannot hold a real service day out of the average forever.
+    /// </para>
+    /// </summary>
+    public static bool CountsInDailyAverage(
+        DateTime date,
+        IEnumerable<ProductivityNoteFact> notesOnDate,
+        DateTime today,
+        int documentationWindowDays,
+        bool? caseManagerChoice)
+    {
+        ArgumentNullException.ThrowIfNull(notesOnDate);
+        if (!IsDocumentedServiceDay(date, notesOnDate, today))
+            return false;
+        if (IsDocumentationWindowClosed(date, today, documentationWindowDays))
+            return true;
+        return caseManagerChoice ?? !HasScheduledWork(date, notesOnDate);
+    }
+
+    /// <summary>Whether the case manager can still decide this day; a settled day is no longer theirs to hold.</summary>
+    public static bool CanChooseDailyAverageDay(
+        DateTime date,
+        IEnumerable<ProductivityNoteFact> notesOnDate,
+        DateTime today,
+        int documentationWindowDays)
+    {
+        ArgumentNullException.ThrowIfNull(notesOnDate);
+        return IsDocumentedServiceDay(date, notesOnDate, today) &&
+               !IsDocumentationWindowClosed(date, today, documentationWindowDays);
+    }
+
+    /// <summary>The service days the average divides by.</summary>
     public static IReadOnlySet<DateTime> DailyAverageDays(
         IEnumerable<ProductivityNoteFact> notes,
-        DateTime today)
+        DateTime today,
+        int documentationWindowDays,
+        IReadOnlyDictionary<DateTime, bool>? caseManagerChoices = null)
     {
         ArgumentNullException.ThrowIfNull(notes);
-        today = today.Date;
-        return notes
-            .Where(note => note.EventDate is DateTime date &&
-                           date.Year == today.Year && date.Month == today.Month &&
-                           date.Date <= today &&
-                           AverageStatuses.Contains(note.Status, StringComparer.OrdinalIgnoreCase))
+        var all = notes.ToList();
+        return all
+            .Where(note => note.EventDate is not null)
             .Select(note => note.EventDate!.Value.Date)
+            .Distinct()
+            .Where(date => CountsInDailyAverage(
+                date, all, today, documentationWindowDays, Choice(caseManagerChoices, date)))
             .ToHashSet();
     }
 
     /// <summary>
-    /// Secured plus recoverable units per day in <see cref="DailyAverageDays"/>, to one decimal.
-    /// Zero when no day qualifies yet.
+    /// Secured plus recoverable units on the counted days, per counted day, to one decimal. Units
+    /// on a day the average does not divide by are left out of both halves, so an open day neither
+    /// raises nor lowers it. Zero when no day qualifies yet.
     /// </summary>
     public static decimal DailyAverageUnits(
-        ProductivityForecastResult forecast,
         IEnumerable<ProductivityNoteFact> notes,
-        DateTime today)
+        DateTime today,
+        int documentationWindowDays,
+        IReadOnlyDictionary<DateTime, bool>? caseManagerChoices = null)
     {
-        ArgumentNullException.ThrowIfNull(forecast);
-        var days = DailyAverageDays(notes, today).Count;
-        return days == 0
-            ? 0
-            : Math.Round((forecast.SecuredUnits + forecast.RecoverableUnits) / days, 1);
+        ArgumentNullException.ThrowIfNull(notes);
+        var all = notes.ToList();
+        var days = DailyAverageDays(all, today, documentationWindowDays, caseManagerChoices);
+        if (days.Count == 0)
+            return 0;
+
+        var window = NormalizeDocumentationWindowDays(documentationWindowDays);
+        var units = all
+            .Where(note => note.EventDate is DateTime date && days.Contains(date.Date))
+            .Sum(note => CountableUnits(note, today, window));
+        return Math.Round(units / days.Count, 1);
     }
+
+    /// <summary>Secured units, or recoverable pending units; anything else contributes nothing.</summary>
+    private static decimal CountableUnits(ProductivityNoteFact note, DateTime today, int window)
+    {
+        if (SecuredStatuses.Contains(note.Status, StringComparer.OrdinalIgnoreCase))
+            return CalculateUnits(note.Minutes);
+        if (!string.Equals(note.Status, Pending, StringComparison.OrdinalIgnoreCase) ||
+            note.EventDate is not DateTime date || date.Date > today.Date)
+            return 0;
+        return date.Date.AddDays(window) < today.Date ? 0 : CalculateUnits(note.Minutes);
+    }
+
+    private static bool? Choice(IReadOnlyDictionary<DateTime, bool>? choices, DateTime date) =>
+        choices is not null && choices.TryGetValue(date.Date, out var choice) ? choice : null;
 
     /// <summary>Where <paramref name="date"/> stands in the average, given the notes dated on it.</summary>
     public static ProductivityDayKind ClassifyDay(
         DateTime date,
         IEnumerable<ProductivityNoteFact> notesOnDate,
-        DateTime today)
+        DateTime today,
+        int documentationWindowDays,
+        bool? caseManagerChoice)
     {
         ArgumentNullException.ThrowIfNull(notesOnDate);
-        var onDate = notesOnDate
-            .Where(note => note.EventDate?.Date == date.Date)
-            .ToList();
-        if (!DailyAverageDays(onDate, today).Contains(date.Date))
+        var onDate = notesOnDate.Where(note => note.EventDate?.Date == date.Date).ToList();
+        if (!IsDocumentedServiceDay(date, onDate, today))
             return ProductivityDayKind.NotCounted;
+        if (!CountsInDailyAverage(date, onDate, today, documentationWindowDays, caseManagerChoice))
+            return ProductivityDayKind.OpenUntilDocumented;
 
         return onDate.Any(note => SecuredStatuses.Contains(note.Status, StringComparer.OrdinalIgnoreCase))
             ? ProductivityDayKind.CountedWithSecuredUnits

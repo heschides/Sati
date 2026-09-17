@@ -246,7 +246,11 @@
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </DataTrigger>
                 <!-- After IsToday: today is tinted only when the average already counts it.
-                     ProductivityForecast.ClassifyDay decides; a future day never counts. -->
+                     ProductivityForecast.ClassifyDay decides; a future day never counts, and a
+                     day still being written up waits until it is finished or its window closes. -->
+                <DataTrigger Binding="{Binding IsOpenUntilDocumented}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding CountsWithSecuredUnits}" Value="True">
                     <Setter Property="Background" Value="{DynamicResource ProductivityDayFillBrush}" />
                 </DataTrigger>
@@ -626,6 +630,14 @@
                                                     CommandParameter="{Binding}"
                                                     AutomationProperties.Name="{Binding AccessibleLabel}"
                                                     ToolTip="{Binding AccessibleLabel}">
+                                                <!-- Right-click schedules or restores time off, the same gesture
+                                                     the year view has always had. -->
+                                                <Button.InputBindings>
+                                                    <MouseBinding MouseAction="RightClick"
+                                                                  Command="{Binding DataContext.ToggleExemptCommand,
+                                                                      RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                  CommandParameter="{Binding}" />
+                                                </Button.InputBindings>
                                                 <Grid>
                                                     <TextBlock Text="{Binding Date.Day}" FontSize="14" FontWeight="SemiBold"
                                                                HorizontalAlignment="Left" VerticalAlignment="Top" />
@@ -640,7 +652,7 @@
                                                         <TextBlock Text="{Binding ProductivityLabel}"
                                                                    FontSize="11" TextWrapping="Wrap"
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
-                                                                   Visibility="{Binding CountsTowardAverage, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                                   Visibility="{Binding HasProductivityLabel, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                         <TextBlock Text="{Binding NoteCount, StringFormat={}{0} scheduled}"
                                                                    FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -648,6 +660,21 @@
                                                                    FontSize="11" Foreground="{DynamicResource AccentBrush}"
                                                                    Visibility="{Binding HasOutlookEvents, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                     </StackPanel>
+                                                    <!-- Counts this day in the documented daily average. Only
+                                                         offered while the day is still open; once its
+                                                         documentation window closes the day counts on its own
+                                                         and the box disappears. -->
+                                                    <CheckBox HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                              Margin="0,0,2,2"
+                                                              Focusable="True"
+                                                              IsChecked="{Binding CountsTowardAverage, Mode=OneWay}"
+                                                              AutomationProperties.Name="{Binding CountedToggleLabel}"
+                                                              ToolTip="{Binding CountedToggleLabel}"
+                                                              Command="{Binding DataContext.ToggleCountedDayCommand,
+                                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              CommandParameter="{Binding}"
+                                                              Visibility="{Binding CanChooseCounted,
+                                                                  Converter={StaticResource BoolToVisibilityConverter}}" />
                                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                                                                 VerticalAlignment="Top" Margin="0,4,3,0">
                                                         <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}"

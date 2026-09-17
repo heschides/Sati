@@ -123,6 +123,27 @@ signature-never-attests items retained later as history.
 - [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
       No source-level result here is a deployment or Production-readiness claim.
 
+## Unreleased — a day counts once it is finished (2026-09-17)
+
+See the 2026-09-17 decision on when a day joins the daily average. **Adds a schema change**: the
+first since 1.3.10, so the next release needs the controlled Demo migration and a temporary
+exact-IP firewall rule the user adds and removes.
+
+- [x] `ProductivityForecast` decides counted, open, or settled, and owns the case manager's
+      choice; a day documented one note at a time no longer drags the average down while its
+      other work is still scheduled.
+- [x] `ServiceDayInclusion` (migration `20260917203349_AddServiceDayInclusions`, one new table,
+      unique per user per day), `IServiceDayInclusionService` locally, `CloudServiceDayInclusionService`,
+      and three API routes gated on the validated actor with no user id in the request.
+- [x] The month square carries a tick for any still-open day; ticking counts it, clearing it holds
+      it, and returning it to Sati's own reading deletes the row. Open days draw plainly and say
+      why, and the panel shows what the average divided by.
+- [x] Right-click now schedules time off from the Month view as well as the Year view.
+- [x] Rule, service, calendar, rendered-view, and API regressions; 2,286 desktop and 831 API tests
+      pass.
+- [ ] Verify against real data on the Joshu workstation, including a dark theme.
+- [ ] Decide whether the supervisor's monthly productivity view should read the same way.
+
 ## Unreleased — productivity days on the calendar (2026-09-17)
 
 See the 2026-09-17 daily-average decision.

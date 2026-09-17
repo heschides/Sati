@@ -5447,6 +5447,72 @@ internal static partial class ApiEndpoints
             var count = await db.ExemptDates.Where(x => x.Id == id && x.UserId == actor.UserId).ExecuteDeleteAsync(cancellationToken);
             return count == 0 ? TypedResults.NotFound() : TypedResults.NoContent();
         });
+
+        // Whether the documented daily average divides by one of the actor's own days. Never
+        // another user's: the row is keyed to the validated actor server-side, and the request
+        // carries no user id to trust.
+        api.MapGet("/service-day-inclusions/{year:int}", async (
+            int year,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            var first = new DateTime(year, 1, 1);
+            var end = first.AddYears(1);
+            return await db.ServiceDayInclusions.AsNoTracking()
+                .Where(x => x.UserId == actor.UserId && x.Date >= first && x.Date < end)
+                .OrderBy(x => x.Date)
+                .Select(x => new ServiceDayInclusionDto(x.Id, x.Date, x.IsIncluded))
+                .ToListAsync(cancellationToken);
+        });
+
+        api.MapPut("/service-day-inclusions", async (
+            SetServiceDayInclusionRequest request,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            var day = request.Date.Date;
+            var existing = await db.ServiceDayInclusions
+                .SingleOrDefaultAsync(x => x.UserId == actor.UserId && x.Date == day, cancellationToken);
+            if (existing is null)
+            {
+                existing = new ServerServiceDayInclusion
+                {
+                    UserId = actor.UserId,
+                    Date = day,
+                    IsIncluded = request.IsIncluded
+                };
+                db.ServiceDayInclusions.Add(existing);
+            }
+            else
+            {
+                existing.IsIncluded = request.IsIncluded;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(new ServiceDayInclusionDto(existing.Id, existing.Date, existing.IsIncluded));
+        });
+
+        api.MapDelete("/service-day-inclusions/{date}", async Task<Results<NoContent, BadRequest<string>>> (
+            string date,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            if (!DateTime.TryParse(date, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsed))
+                return TypedResults.BadRequest("A calendar date is required.");
+
+            var actor = Actor.From(principal);
+            var day = parsed.Date;
+            await db.ServiceDayInclusions
+                .Where(x => x.UserId == actor.UserId && x.Date == day)
+                .ExecuteDeleteAsync(cancellationToken);
+            return TypedResults.NoContent();
+        });
     }
 
     private static void MapIncentives(RouteGroupBuilder api)

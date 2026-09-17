@@ -131,6 +131,11 @@
                         <TextBlock Text="{Binding DailyAverageUnits, StringFormat={}{0:F1}}"
                                    FontSize="20"
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <!-- What the average divided by, so an open day is never a mystery. -->
+                        <TextBlock Text="{Binding DailyAverageBasis}"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
                     </StackPanel>
                 </Grid>
 

@@ -466,6 +466,10 @@ public sealed record AddJournalReminderRequest(string Text);
 public sealed record ExemptDateDto(int Id, DateTime Date, string? Reason);
 public sealed record AddExemptDateRequest(DateTime Date, string? Reason);
 
+/// <summary>One case manager's decision about whether their documented daily average divides by a day.</summary>
+public sealed record ServiceDayInclusionDto(int Id, DateTime Date, bool IsIncluded);
+public sealed record SetServiceDayInclusionRequest(DateTime Date, bool IsIncluded);
+
 public sealed record IncentiveDto(
     int Id,
     int UserId,

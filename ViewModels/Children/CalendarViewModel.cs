@@ -20,6 +20,8 @@ public partial class CalendarViewModel : ObservableObject
     private readonly IExemptDateService _exemptDateService;
     private readonly INoteService _noteService;
     private readonly ISessionService _sessionService;
+    private readonly IServiceDayInclusionService? _serviceDayInclusionService;
+    private readonly ISettingsService? _settingsService;
     private readonly IOutlookCalendarService? _outlookCalendarService;
     private readonly IOutlookCalendarFilePicker? _outlookCalendarFilePicker;
     private readonly LatestRequestTracker _yearLoadRequests = new();
@@ -28,6 +30,8 @@ public partial class CalendarViewModel : ObservableObject
     private List<ExemptDate> _exemptDates = [];
     private List<Note> _yearNotes = [];
     private List<ImportedOutlookEvent> _yearOutlookEvents = [];
+    private List<ServiceDayInclusion> _serviceDayInclusions = [];
+    private int _documentationWindowDays = ProductivityForecast.DefaultDocumentationWindowDays;
 
     // The dashboard refresh is part of the calendar operation, so it is a Task
     // rather than an async-void EventHandler. Each subscriber is awaited and
@@ -58,6 +62,9 @@ public partial class CalendarViewModel : ObservableObject
 
     [ObservableProperty]
     private bool isUpdatingExemptDate;
+
+    [ObservableProperty]
+    private bool isUpdatingServiceDay;
 
     [ObservableProperty]
     private bool isImportingOutlookCalendar;
@@ -118,9 +125,13 @@ public partial class CalendarViewModel : ObservableObject
         ISessionService sessionService,
         IOutlookCalendarService? outlookCalendarService = null,
         IOutlookCalendarFilePicker? outlookCalendarFilePicker = null,
-        Func<DateTime>? today = null)
+        Func<DateTime>? today = null,
+        IServiceDayInclusionService? serviceDayInclusionService = null,
+        ISettingsService? settingsService = null)
     {
         _today = today ?? (() => DateTime.Today);
+        _serviceDayInclusionService = serviceDayInclusionService;
+        _settingsService = settingsService;
         _exemptDateService = exemptDateService;
         _noteService = noteService;
         _sessionService = sessionService;
@@ -297,6 +308,62 @@ public partial class CalendarViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Includes or excludes one open day from the documented daily average. Returning a day to
+    /// Sati's own reading (documented work, nothing still scheduled) clears the row rather than
+    /// storing the same answer, so a later change of schedule is still followed.
+    /// </summary>
+    [RelayCommand]
+    private async Task ToggleCountedDay(CalendarDay? day)
+    {
+        if (day is null || _serviceDayInclusionService is null || IsUpdatingServiceDay)
+            return;
+        if (!day.CanChooseCounted)
+            return;
+
+        var user = _sessionService.CurrentUser;
+        if (user is null)
+        {
+            StatusMessage = "Sign in again before changing which days count.";
+            return;
+        }
+
+        IsUpdatingServiceDay = true;
+        var date = day.Date.Date;
+        var wanted = !day.CountsTowardAverage;
+        try
+        {
+            if (wanted == day.CountsByDefault)
+            {
+                await _serviceDayInclusionService.ClearAsync(user.Id, date);
+                _serviceDayInclusions.RemoveAll(inclusion => inclusion.Date.Date == date);
+            }
+            else
+            {
+                var saved = await _serviceDayInclusionService.SetAsync(user.Id, date, wanted);
+                _serviceDayInclusions.RemoveAll(inclusion => inclusion.Date.Date == date);
+                _serviceDayInclusions.Add(saved);
+            }
+
+            BuildMonths();
+            StatusMessage = string.Empty;
+            if (!await NotifyExemptDateChangedAsync())
+            {
+                StatusMessage =
+                    "The calendar changed, but the productivity summary could not be refreshed. Refresh it before relying on its average.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"CalendarViewModel.ToggleCountedDay failed: {ex.Message}");
+            StatusMessage = "That day could not be changed. Please try again.";
+        }
+        finally
+        {
+            IsUpdatingServiceDay = false;
+        }
+    }
+
     [RelayCommand]
     private async Task PreviousYear()
     {
@@ -339,11 +406,15 @@ public partial class CalendarViewModel : ObservableObject
             var exemptDatesTask = _exemptDateService.GetByYearAsync(user.Id, year);
             var notesTask = _noteService.GetByYearAsync(user.Id, year);
             var outlookTask = LoadOutlookEventsAsync(user.Id, year);
-            await Task.WhenAll(exemptDatesTask, notesTask, outlookTask);
+            var inclusionsTask = LoadServiceDayInclusionsAsync(user.Id, year);
+            var windowTask = LoadDocumentationWindowAsync();
+            await Task.WhenAll(exemptDatesTask, notesTask, outlookTask, inclusionsTask, windowTask);
 
             if (!_yearLoadRequests.IsCurrent(request) || CurrentYear != year)
                 return;
 
+            _serviceDayInclusions = await inclusionsTask;
+            _documentationWindowDays = await windowTask;
             _exemptDates = await exemptDatesTask;
             _yearNotes = await notesTask;
             var outlookResult = await outlookTask;
@@ -402,9 +473,14 @@ public partial class CalendarViewModel : ObservableObject
             .ToDictionary(group => group.Key, group => group.First());
 
         var today = _today();
+        var choices = ChoicesByDate(_serviceDayInclusions);
         var result = new List<CalendarMonth>();
         for (var month = 1; month <= 12; month++)
-            result.Add(BuildMonth(CurrentYear, month, notesByDate, exemptByDate, outlookByDate, today));
+        {
+            result.Add(BuildMonth(
+                CurrentYear, month, notesByDate, exemptByDate, outlookByDate,
+                today, _documentationWindowDays, choices));
+        }
 
         Months = result;
         SelectedDay = selectedDate.HasValue && selectedDate.Value.Year == CurrentYear
@@ -426,7 +502,9 @@ public partial class CalendarViewModel : ObservableObject
         int month,
         IEnumerable<Note> notes,
         IEnumerable<ExemptDate> exemptDates,
-        DateTime today)
+        DateTime today,
+        int documentationWindowDays = ProductivityForecast.DefaultDocumentationWindowDays,
+        IEnumerable<ServiceDayInclusion>? serviceDayInclusions = null)
     {
         var notesByDate = notes
             .Where(note => note.EventDate is DateTime date && date.Year == year && date.Month == month)
@@ -438,8 +516,18 @@ public partial class CalendarViewModel : ObservableObject
             .GroupBy(entry => entry.Date.Date)
             .ToDictionary(group => group.Key, group => group.First());
         return BuildMonth(year, month, notesByDate, exemptByDate,
-            new Dictionary<DateTime, List<ImportedOutlookEvent>>(), today);
+            new Dictionary<DateTime, List<ImportedOutlookEvent>>(), today,
+            documentationWindowDays, ChoicesByDate(serviceDayInclusions));
     }
+
+    /// <summary>The stored decisions as the shared rule reads them.</summary>
+    internal static IReadOnlyDictionary<DateTime, bool> ChoicesByDate(
+        IEnumerable<ServiceDayInclusion>? inclusions) =>
+        inclusions is null
+            ? new Dictionary<DateTime, bool>()
+            : inclusions
+                .GroupBy(inclusion => inclusion.Date.Date)
+                .ToDictionary(group => group.Key, group => group.Last().IsIncluded);
 
     private static CalendarMonth BuildMonth(
         int year,
@@ -447,7 +535,9 @@ public partial class CalendarViewModel : ObservableObject
         IReadOnlyDictionary<DateTime, List<CalendarNoteItem>> notesByDate,
         IReadOnlyDictionary<DateTime, ExemptDate> exemptByDate,
         IReadOnlyDictionary<DateTime, List<ImportedOutlookEvent>> outlookByDate,
-        DateTime today)
+        DateTime today,
+        int documentationWindowDays,
+        IReadOnlyDictionary<DateTime, bool> choices)
     {
         var firstDay = new DateTime(year, month, 1);
         var daysInMonth = DateTime.DaysInMonth(year, month);
@@ -463,6 +553,8 @@ public partial class CalendarViewModel : ObservableObject
             notesByDate.TryGetValue(date, out var notes);
             outlookByDate.TryGetValue(date, out var outlookEvents);
             notes ??= [];
+            var facts = notes.Select(note => note.ProductivityFact).ToList();
+            var choice = choices.TryGetValue(date, out var stored) ? stored : (bool?)null;
             cells.Add(new CalendarDay
             {
                 Date = date,
@@ -472,7 +564,12 @@ public partial class CalendarViewModel : ObservableObject
                 Notes = notes,
                 OutlookEvents = outlookEvents ?? [],
                 ProductivityKind = ProductivityForecast.ClassifyDay(
-                    date, notes.Select(note => note.ProductivityFact), today)
+                    date, facts, today, documentationWindowDays, choice),
+                CanChooseCounted = ProductivityForecast.CanChooseDailyAverageDay(
+                    date, facts, today, documentationWindowDays),
+                CountsByDefault = ProductivityForecast.CountsInDailyAverage(
+                    date, facts, today, documentationWindowDays, caseManagerChoice: null),
+                HasCaseManagerChoice = choice is not null
             });
         }
 
@@ -551,6 +648,43 @@ public partial class CalendarViewModel : ObservableObject
             {
                 Debug.WriteLine($"CalendarViewModel.TimeOffScheduled subscriber failed: {ex.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// The case manager's own decisions about open days. A failure here leaves the calendar
+    /// showing Sati's default for each day rather than refusing to load the year.
+    /// </summary>
+    private async Task<List<ServiceDayInclusion>> LoadServiceDayInclusionsAsync(int userId, int year)
+    {
+        if (_serviceDayInclusionService is null)
+            return [];
+
+        try
+        {
+            return await _serviceDayInclusionService.GetByYearAsync(userId, year);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"CalendarViewModel.LoadServiceDayInclusions failed: {ex.GetType().Name}");
+            return [];
+        }
+    }
+
+    private async Task<int> LoadDocumentationWindowAsync()
+    {
+        if (_settingsService is null)
+            return ProductivityForecast.DefaultDocumentationWindowDays;
+
+        try
+        {
+            var settings = await _settingsService.LoadAsync();
+            return ProductivityForecast.NormalizeDocumentationWindowDays(settings.AbandonedAfterDays);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"CalendarViewModel.LoadDocumentationWindow failed: {ex.GetType().Name}");
+            return ProductivityForecast.DefaultDocumentationWindowDays;
         }
     }
 

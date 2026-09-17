@@ -219,6 +219,9 @@ incentives are separate own-user information, not an extension of consumer casel
 | Exempt dates | `GET /exempt-dates/{year}` | Exempt date `UserId` | Own user only. |
 | Exempt dates | `POST /exempt-dates` | Exempt date `UserId` | Created for actor server-side. |
 | Exempt dates | `DELETE /exempt-dates/{id}` | Exempt date `UserId` | Own user only. |
+| Counted service days | `GET /service-day-inclusions/{year}` | Inclusion `UserId` | Own user only. |
+| Counted service days | `PUT /service-day-inclusions` | Inclusion `UserId` | Upserted for actor server-side; the request carries no user id. |
+| Counted service days | `DELETE /service-day-inclusions/{date}` | Inclusion `UserId` | Own user only; deletes by date, never by another user's row id. |
 | Incentives | `GET /incentives/{year}/{month}` | Incentive user's `AgencyId` | Accessible case manager only. |
 | Incentives | `GET /incentives/history` | Incentive `UserId` | Own user only. |
 | Incentives | `PUT /incentives/{id}` | Incentive `UserId` | Own user only. |

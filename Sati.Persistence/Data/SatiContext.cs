@@ -52,6 +52,7 @@ namespace Sati.Data
         public DbSet<RemittanceClaimOutcome> RemittanceClaimOutcomes { get; set; }
         public DbSet<RemittanceDeposit> RemittanceDeposits { get; set; }
         public DbSet<ExemptDate> ExemptDates { get; set; }
+        public DbSet<ServiceDayInclusion> ServiceDayInclusions { get; set; }
         public DbSet<ReviewItem> ReviewItems { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
         public DbSet<ATRequest> ATRequests { get; set; }
@@ -657,6 +658,22 @@ namespace Sati.Data
                     PublishedByUserId = (int?)null,
                     RetiredAtUtc = (DateTime?)null
                 });
+            });
+
+            // One decision per case manager per day. The unique index is what stops a
+            // double click, or two windows, from leaving two contradictory rows for the
+            // same square; the writer upserts against it.
+            modelBuilder.Entity<ServiceDayInclusion>(entity =>
+            {
+                entity.HasKey(inclusion => inclusion.Id);
+                entity.Property(inclusion => inclusion.Date).HasColumnType("date");
+                entity.HasIndex(inclusion => new { inclusion.UserId, inclusion.Date })
+                      .IsUnique()
+                      .HasDatabaseName("IX_ServiceDayInclusions_UserId_Date");
+                entity.HasOne(inclusion => inclusion.User)
+                      .WithMany()
+                      .HasForeignKey(inclusion => inclusion.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<ReviewItem>(entity =>

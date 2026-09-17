@@ -4582,3 +4582,35 @@ gained the rule and the dashboard's own copy was deleted.
   border is measured against 3:1 non-text contrast in every theme.
 - The tint covers the current month only, because that is the month the totals measure. A day
   whose notes are all abandoned, cancelled, or otherwise outside the workflow is not counted.
+
+## 2026-09-17 — a day joins the daily average when it is finished, not when it is first written
+
+Documenting one 15-minute review on Monday put Monday into the average's divisor at one unit and
+dragged the number down until the rest of Monday was written up, often days later. The cause is
+that the divisor asked only "does this day carry a pending, logged, or approved note", which is a
+question about documentation order rather than about the work.
+
+`ProductivityForecast` now decides a day three ways, and the calendar draws what it decides:
+
+- **Counted** when the day has documented work and nothing left on its schedule. Green, as before.
+- **Open** when it is documented in part but work is still scheduled on it, or the case manager
+  has set it aside. Its units are excluded from both halves of the average, so an unfinished day
+  neither raises nor lowers it.
+- **Settled** once the documentation window closes: the day counts whatever is left scheduled and
+  whatever was chosen. A decision nobody revisited cannot hold a real service day out for good,
+  and the exposure is bounded by the window rather than by anyone's memory.
+
+A case manager can decide any still-open day from the calendar square. Choosing what Sati already
+reads clears the row instead of storing it, so a later change of schedule is still followed.
+`ServiceDayInclusion` stores those decisions per user per day, behind
+`IServiceDayInclusionService` locally and `/api/v1/service-day-inclusions` in the API.
+
+**Rejected:** letting a case manager revert Logged to Pending, which does not fix this at all —
+a pending day is already in the divisor — and would weaken a submitted record for a display
+problem. Also rejected: measuring only settled days, which is honest but reports nothing about
+the current week and so cannot answer "should I pick up the pace"; and dividing by elapsed
+eligible workdays, which is immune to documentation order but counts a genuinely blank day
+against the case manager, the behaviour this panel deliberately moved away from.
+
+**Not evidence.** An inclusion row is a preference about a forecast. It changes no note status, no
+billability, and not the monthly requirement, which time off (`ExemptDate`) still governs.

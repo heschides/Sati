@@ -493,6 +493,7 @@ namespace Sati
             services.AddTransient<IBillingService, BillingService>();
             services.AddTransient<IEdiService, EdiService>();
             services.AddTransient<IExemptDateService, ExemptDateService>();
+            services.AddTransient<IServiceDayInclusionService, ServiceDayInclusionService>();
             services.AddTransient<IConsumerBillingLossReportService, ConsumerBillingLossReportService>();
             services.AddTransient<IProductivityReportService, ProductivityReportService>();
             services.AddTransient<IReviewItemService, ReviewItemService>();
@@ -553,6 +554,7 @@ namespace Sati
             services.AddTransient<IScratchpadService, CloudScratchpadService>();
             services.AddSingleton<IChatService, CloudChatService>();
             services.AddTransient<IExemptDateService, CloudExemptDateService>();
+            services.AddTransient<IServiceDayInclusionService, CloudServiceDayInclusionService>();
             services.AddTransient<IIncentiveService, CloudIncentiveService>();
             services.AddTransient<IFormService, CloudFormService>();
             services.AddTransient<IUserService, CloudUserService>();

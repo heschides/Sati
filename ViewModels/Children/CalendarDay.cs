@@ -21,7 +21,23 @@ public sealed class CalendarDay
     public ProductivityDayKind ProductivityKind { get; init; }
     public bool CountsWithSecuredUnits => ProductivityKind == ProductivityDayKind.CountedWithSecuredUnits;
     public bool CountsWithoutSecuredUnits => ProductivityKind == ProductivityDayKind.CountedWithoutSecuredUnits;
-    public bool CountsTowardAverage => ProductivityKind != ProductivityDayKind.NotCounted;
+    public bool CountsTowardAverage => CountsWithSecuredUnits || CountsWithoutSecuredUnits;
+
+    /// <summary>Documented in part, but held out of the average until the day is finished.</summary>
+    public bool IsOpenUntilDocumented => ProductivityKind == ProductivityDayKind.OpenUntilDocumented;
+
+    /// <summary>The case manager can still decide this day; a settled day always counts.</summary>
+    public bool CanChooseCounted { get; init; }
+
+    /// <summary>What Sati reads on its own, before any decision by the case manager.</summary>
+    public bool CountsByDefault { get; init; }
+
+    /// <summary>The case manager has decided this day rather than leaving it to Sati.</summary>
+    public bool HasCaseManagerChoice { get; init; }
+
+    public string CountedToggleLabel => CountsTowardAverage
+        ? $"Leave {Date:MMMM d} out of the daily average until it is finished"
+        : $"Count {Date:MMMM d} in the daily average";
 
     public int TotalUnits => Notes.Sum(note => note.Units ?? 0);
     public bool HasUnits => TotalUnits > 0;
@@ -39,8 +55,13 @@ public sealed class CalendarDay
     {
         ProductivityDayKind.CountedWithSecuredUnits => "In average",
         ProductivityDayKind.CountedWithoutSecuredUnits => "In average · none logged",
+        ProductivityDayKind.OpenUntilDocumented => HasCaseManagerChoice
+            ? "Not counted yet · your choice"
+            : "Not counted yet · work still scheduled",
         _ => string.Empty
     };
+
+    public bool HasProductivityLabel => ProductivityLabel.Length > 0;
 
     public string AccessibleLabel
     {
@@ -60,6 +81,10 @@ public sealed class CalendarDay
                     ", counts toward this month's daily average",
                 ProductivityDayKind.CountedWithoutSecuredUnits =>
                     ", counts toward this month's daily average, nothing logged or approved yet",
+                ProductivityDayKind.OpenUntilDocumented when HasCaseManagerChoice =>
+                    ", left out of the daily average by you until it is finished",
+                ProductivityDayKind.OpenUntilDocumented =>
+                    ", not in the daily average yet because work is still scheduled on it",
                 _ => string.Empty
             };
             return $"{Date:dddd, MMMM d, yyyy}, {noteText}{unitText}{outlookText}{exemptText}{productivityText}";

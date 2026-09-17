@@ -1,4 +1,6 @@
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Sati.Contracts.V1;
 using Sati.Data;
@@ -86,6 +88,43 @@ public sealed class CalendarProductivityDayTests
                 .Select(text => text.Text).ToList();
             Assert.Contains("4 units", lines);
             Assert.Contains("In average", lines);
+        });
+    }
+
+    [Fact]
+    public async Task OnlyAnOpenDayOffersTheCountedTickAndEverySquareTakesRightClickTimeOff()
+    {
+        var open = Note.Create("Review.", Today.AddDays(-2), NoteStatus.Logged, 15, 1,
+            noteType: NoteType.Form);
+        var stillScheduled = Note.Create("Visit to write up.", Today.AddDays(-2), NoteStatus.Scheduled, 60, 1,
+            noteType: NoteType.Visit);
+        var settled = Note.Create("Settled.", Today.AddDays(-9), NoteStatus.Logged, 60, 1,
+            noteType: NoteType.Contact);
+        var viewModel = await LoadAsync(open, stillScheduled, settled);
+
+        WpfUiHarness.Run(() =>
+        {
+            var view = new CalendarView { DataContext = viewModel };
+            WpfUiHarness.Realize(view, 1400, 900);
+
+            var openSquare = SquareFor(view, Today.AddDays(-2));
+            var tick = WpfUiHarness.Descendants(openSquare).OfType<CheckBox>().Single();
+            Assert.Equal(Visibility.Visible, tick.Visibility);
+            Assert.False(tick.IsChecked);
+            Assert.Equal(
+                viewModel.ToggleCountedDayCommand,
+                ((System.Windows.Controls.Primitives.ButtonBase)tick).Command);
+
+            // A settled day is no longer the case manager's to hold, so it offers no tick.
+            var settledSquare = SquareFor(view, Today.AddDays(-9));
+            Assert.Equal(
+                Visibility.Collapsed,
+                WpfUiHarness.Descendants(settledSquare).OfType<CheckBox>().Single().Visibility);
+
+            // Right-click schedules time off from the month view, as it already did in the year view.
+            var binding = Assert.Single(openSquare.InputBindings.OfType<MouseBinding>()
+                .Where(item => item.MouseAction == MouseAction.RightClick));
+            Assert.Equal(viewModel.ToggleExemptCommand, binding.Command);
         });
     }
 

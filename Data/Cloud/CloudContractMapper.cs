@@ -261,6 +261,14 @@ internal static class CloudContractMapper
         Content = dto.Content
     };
 
+    public static ServiceDayInclusion ToServiceDayInclusion(ServiceDayInclusionDto dto, int userId) => new()
+    {
+        Id = dto.Id,
+        UserId = userId,
+        Date = dto.Date,
+        IsIncluded = dto.IsIncluded
+    };
+
     public static ExemptDate ToExemptDate(ExemptDateDto dto, int userId) => new()
     {
         Id = dto.Id,

@@ -39,6 +39,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerScratchpad> Scratchpads => Set<ServerScratchpad>();
     public DbSet<ServerScratchpadComment> ScratchpadComments => Set<ServerScratchpadComment>();
     public DbSet<ServerExemptDate> ExemptDates => Set<ServerExemptDate>();
+    public DbSet<ServerServiceDayInclusion> ServiceDayInclusions => Set<ServerServiceDayInclusion>();
     public DbSet<ServerIncentive> Incentives => Set<ServerIncentive>();
     public DbSet<ServerPersonContact> PersonContacts => Set<ServerPersonContact>();
     public DbSet<ServerPersonProvider> PersonProviders => Set<ServerPersonProvider>();
@@ -338,6 +339,16 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
         {
             entity.ToTable("ExemptDates");
             entity.HasKey(x => x.Id);
+        });
+
+        modelBuilder.Entity<ServerServiceDayInclusion>(entity =>
+        {
+            entity.ToTable("ServiceDayInclusions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Date).HasColumnType("date");
+            entity.HasIndex(x => new { x.UserId, x.Date })
+                  .IsUnique()
+                  .HasDatabaseName("IX_ServiceDayInclusions_UserId_Date");
         });
 
         modelBuilder.Entity<ServerIncentive>(entity =>
@@ -1120,6 +1131,14 @@ internal sealed class ServerExemptDate
     public int UserId { get; set; }
     public DateTime Date { get; set; }
     public string? Reason { get; set; }
+}
+
+internal sealed class ServerServiceDayInclusion
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public DateTime Date { get; set; }
+    public bool IsIncluded { get; set; }
 }
 
 internal sealed class ServerIncentive

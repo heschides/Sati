@@ -126,6 +126,76 @@ public sealed class CalendarApiTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    /// <summary>
+    /// The decision about whether a day counts toward the documented daily average belongs to the
+    /// case manager whose day it is. The request carries no user id, so the route cannot be asked
+    /// to write or read somebody else's calendar.
+    /// </summary>
+    [Fact]
+    public async Task ServiceDayInclusionsAreNormalizedPerUserAndCannotCrossUsers()
+    {
+        using var owner = await _factory.CreateAuthenticatedClientAsync("case-manager-two");
+        using var otherUser = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var requested = new DateTime(2097, 4, 9, 13, 20, 0);
+
+        var setResponse = await owner.PutAsJsonAsync(
+            "/api/v1/service-day-inclusions",
+            new SetServiceDayInclusionRequest(requested, true));
+        setResponse.EnsureSuccessStatusCode();
+        var created = await setResponse.Content.ReadFromJsonAsync<ServiceDayInclusionDto>();
+        Assert.NotNull(created);
+        Assert.Equal(requested.Date, created.Date);
+        Assert.True(created.IsIncluded);
+
+        // One row per day: setting the same day again answers with the same record.
+        var changeResponse = await owner.PutAsJsonAsync(
+            "/api/v1/service-day-inclusions",
+            new SetServiceDayInclusionRequest(requested.Date, false));
+        changeResponse.EnsureSuccessStatusCode();
+        var changed = await changeResponse.Content.ReadFromJsonAsync<ServiceDayInclusionDto>();
+        Assert.Equal(created.Id, changed!.Id);
+        Assert.False(changed.IsIncluded);
+
+        var ownerDays = await owner.GetFromJsonAsync<List<ServiceDayInclusionDto>>(
+            "/api/v1/service-day-inclusions/2097");
+        var otherDays = await otherUser.GetFromJsonAsync<List<ServiceDayInclusionDto>>(
+            "/api/v1/service-day-inclusions/2097");
+        Assert.Contains(ownerDays!, item => item.Id == created.Id);
+        Assert.DoesNotContain(otherDays!, item => item.Id == created.Id);
+
+        // Another user's delete reaches only their own rows, so the owner's survives.
+        var foreignDelete = await otherUser.DeleteAsync(
+            $"/api/v1/service-day-inclusions/{requested:yyyy-MM-dd}");
+        Assert.Equal(HttpStatusCode.NoContent, foreignDelete.StatusCode);
+        ownerDays = await owner.GetFromJsonAsync<List<ServiceDayInclusionDto>>(
+            "/api/v1/service-day-inclusions/2097");
+        Assert.Contains(ownerDays!, item => item.Id == created.Id);
+
+        var ownerDelete = await owner.DeleteAsync(
+            $"/api/v1/service-day-inclusions/{requested:yyyy-MM-dd}");
+        Assert.Equal(HttpStatusCode.NoContent, ownerDelete.StatusCode);
+        ownerDays = await owner.GetFromJsonAsync<List<ServiceDayInclusionDto>>(
+            "/api/v1/service-day-inclusions/2097");
+        Assert.DoesNotContain(ownerDays!, item => item.Id == created.Id);
+
+        var malformed = await owner.DeleteAsync("/api/v1/service-day-inclusions/not-a-date");
+        Assert.Equal(HttpStatusCode.BadRequest, malformed.StatusCode);
+    }
+
+    [Fact]
+    public async Task ServiceDayInclusionsRefuseAnonymousCallers()
+    {
+        using var anonymous = _factory.CreateClient();
+
+        var read = await anonymous.GetAsync("/api/v1/service-day-inclusions/2097");
+        var write = await anonymous.PutAsJsonAsync(
+            "/api/v1/service-day-inclusions",
+            new SetServiceDayInclusionRequest(new DateTime(2097, 4, 9), true));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, read.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, write.StatusCode);
+    }
+
     [Fact]
     public async Task ExemptDateLifecycleIsNormalizedAndCannotCrossUsers()
     {

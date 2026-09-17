@@ -317,11 +317,19 @@ instead of inventing units. Scheduled rows are plans, not proof that work occurr
 never enter recoverable backlog.
 
 The same owner decides which calendar days the documented daily average counts, so the number and
-the calendar's tint cannot drift apart. `DailyAverageDays` is the divisor — days of the current
-month, through today, carrying a Pending, Logged, or Approved note — and `ClassifyDay` separates a
-day with secured units from one held only by pending notes. The month and year calendars tint those
-days, and the Overview shows the same month as a read-only thumbnail. A future day is never in the
-divisor, so a visit scheduled for next week no longer lowers today's average.
+the calendar's tint cannot drift apart. `DailyAverageDays` is the divisor and `ClassifyDay`
+separates a day with secured units from one held only by pending notes. The month and year
+calendars tint those days, and the Overview shows the same month as a read-only thumbnail. A future
+day is never in the divisor, so a visit scheduled for next week no longer lowers today's average.
+
+A day of the current month through today, carrying a Pending, Logged, or Approved note, is in the
+average once it looks finished: documented work with nothing left on its schedule. While work
+remains scheduled on it, the day is open, and its units stay out of both halves of the average
+rather than dividing a finished day's units by an unfinished day. The case manager can decide any
+open day from its calendar square; those decisions are `ServiceDayInclusion` rows, per user per
+day, reached through `IServiceDayInclusionService` locally and `/api/v1/service-day-inclusions` in
+the API. Once a day's documentation window closes it counts regardless, so neither a forgotten
+decision nor a stale scheduled note can hold a real service day out of the average.
 
 Future capacity uses `IIncentiveService.GetEligibleDaysAsync` for the agency-calendar window and
 then removes the signed-in user's eligible ExemptDates. This route already exists in the deployed
