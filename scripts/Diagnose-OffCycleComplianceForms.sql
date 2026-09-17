@@ -91,17 +91,69 @@ GROUP BY PersonId
 ORDER BY PersonId;
 
 --------------------------------------------------------------------------------
--- 2. The reported client: its PersonId and current effective date.
+-- 1b. Caseload-wide: does each client have stored rows for the plan year in
+--     force today? Missing ones are not ignored by billing:
+--     ExpectedBillingComplianceObligations adds each as an incomplete item, and
+--     the profile has no row to attest. Mirrors
+--     ComplianceScheduleRules.CurrentTargetEffectiveDate.
 --------------------------------------------------------------------------------
+DECLARE @Expected TABLE (Type nvarchar(40) PRIMARY KEY);
+INSERT INTO @Expected (Type) VALUES
+    (N'Q1R'), (N'Q2R'), (N'Q3R'), (N'Q4R'), (N'PCP'), (N'ComprehensiveAssessment'),
+    (N'Reclassification'), (N'SafetyPlan'), (N'PrivacyPractices');
+
+;WITH Anchor AS (
+    SELECT p.Id AS PersonId, CAST(p.EffectiveDate AS date) AS EffectiveDate,
+           DATEADD(year, DATEDIFF(year, p.EffectiveDate, @Today), CAST(p.EffectiveDate AS date)) AS Candidate
+    FROM dbo.People AS p
+    WHERE p.EffectiveDate IS NOT NULL
+), CurrentTarget AS (
+    SELECT PersonId, EffectiveDate,
+           CASE WHEN @Today < EffectiveDate THEN EffectiveDate
+                WHEN Candidate > @Today THEN DATEADD(year, -1, Candidate)
+                ELSE Candidate END AS CurrentTarget
+    FROM Anchor
+)
+SELECT N'1b-current-year-missing-rows' AS Result, ct.PersonId, ct.EffectiveDate, ct.CurrentTarget,
+       COUNT(*) AS MissingTypes,
+       STRING_AGG(e.Type, N',') AS Missing
+FROM CurrentTarget AS ct
+CROSS JOIN @Expected AS e
+WHERE NOT EXISTS (
+    SELECT 1 FROM dbo.Forms AS f
+    WHERE f.PersonId = ct.PersonId AND f.Type = e.Type
+      AND f.TargetEffectiveDate = ct.CurrentTarget)
+GROUP BY ct.PersonId, ct.EffectiveDate, ct.CurrentTarget
+ORDER BY ct.PersonId;
+
+--------------------------------------------------------------------------------
+-- 1c. Every stored review due 2026-09-06, the date in the refusal.
+--------------------------------------------------------------------------------
+SELECT N'1c-stored-rows-due-2026-09-06' AS Result, FormId, PersonId, Type,
+       CAST(TargetEffectiveDate AS date) AS TargetEffectiveDate,
+       CAST(CompletedDate AS date) AS CompletedDate, PersonEffectiveDate, CycleFit
+FROM #FormCycle
+WHERE CAST(DueDate AS date) = '2026-09-06'
+ORDER BY PersonId, Type;
+
+--------------------------------------------------------------------------------
+-- 2. The reported client: its PersonId and current effective date. Names are
+--    matched ignoring case and surrounding spaces; every match is listed.
+--------------------------------------------------------------------------------
+SELECT N'2-name-matches' AS Result, Id AS PersonId, CAST(EffectiveDate AS date) AS EffectiveDate
+FROM dbo.People
+WHERE LTRIM(RTRIM(FirstName)) = LTRIM(RTRIM(@FirstName))
+  AND LTRIM(RTRIM(LastName)) = LTRIM(RTRIM(@LastName))
+ORDER BY Id;
+
 DECLARE @PersonId int =
     (SELECT TOP (1) Id FROM dbo.People
-     WHERE FirstName = @FirstName AND LastName = @LastName
+     WHERE LTRIM(RTRIM(FirstName)) = LTRIM(RTRIM(@FirstName))
+       AND LTRIM(RTRIM(LastName)) = LTRIM(RTRIM(@LastName))
      ORDER BY Id);
 
 SELECT N'2-client' AS Result, @PersonId AS PersonId,
-       (SELECT CAST(EffectiveDate AS date) FROM dbo.People WHERE Id = @PersonId) AS EffectiveDate,
-       (SELECT COUNT(*) FROM dbo.People
-        WHERE FirstName = @FirstName AND LastName = @LastName) AS PeopleWithThatName;
+       NULLIF(LEN(@FirstName) + LEN(@LastName), 0) AS NameLengthEntered;
 
 --------------------------------------------------------------------------------
 -- 3. Every form row for that client, oldest plan year first. FormId order is
