@@ -287,6 +287,26 @@ migration is required.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.15 — 2026-09-17
+
+"The client profile and notes log keep working." Releases the 1.3.14 production failures
+section above: the Clients panel layout crash, notes-log refusals, hidden-tab loads, and note-grid
+context menus, plus the crash-dump capture script and off-cycle diagnostic (not shipped in the
+app). No migration, no schema change, and no API or contract change; the Demo API is published
+only so its reported version matches.
+
+- [x] Merge `fix/1.3.14-production-failures` into `master` (fast-forward to `47e1749`).
+- [x] Coordinated 1.3.15 version and Settings release notes.
+- [x] Release build: 0 errors. Desktop 2,237, API 824, signatures 119, portal 8, and Carika 4 pass.
+      Nine opt-in skips (SQL Server concurrency and pipeline, live-schema analyzer, local AI
+      model). In the solution-wide run the API timing guard
+      `SignInSpendsTheSameWorkWhetherOrNotTheAccountExists` failed once under concurrent load;
+      it passed three times alone and in a full API-project rerun, and no API code changed.
+- [ ] Push; publish the Demo API and verify health, version, and contract revision.
+- [ ] Build, accept, and publish both installers.
+- [ ] Production workstation (Joshu login): on 1.3.14 (every 2026-09-17 log reports 1.3.14.0).
+      Install `SatiLocalSetup-1.3.15.exe`. No database update is pending for it.
+
 ## Release 1.3.14 — 2026-09-16
 
 "Renewals in view and client edits that save." Releases the September 16 work below: the
@@ -327,7 +347,7 @@ February 29 renewal lookup. No migration and no schema change; the contract gain
       `claude/local-vs-github-workflow-dlcqpb` (unmerged, unrelated work);
       `claude/cool-jang-f6b3c4` (checked out in a worktree); and remote `codex/annual-compliance`
       and `codex/clarify-project-notes` (merged, but possibly tracked by the separate Codex clone).
-- [ ] Production workstation (Joshu login): still on 1.3.13. Install `SatiLocalSetup-1.3.14.exe`
+- [x] Production workstation (Joshu login): installed `SatiLocalSetup-1.3.14.exe` (its 2026-09-17 logs report 1.3.14.0)
       so client edits save again. No database update is pending for it; `SatiComplianceSeed` can
       run before or after.
 

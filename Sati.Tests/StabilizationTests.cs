@@ -649,11 +649,18 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.14", version);
+        Assert.Equal("1.3.15", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Renewals in view and client edits that save", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("The client profile and notes log keep working", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         // The reasons this release exists, in the words staff will read.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "The Clients panel no longer stops responding" &&
+            section.Items.Any(item => item.Contains("restarted", StringComparison.OrdinalIgnoreCase)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Mark Note Logged says why it cannot" &&
+            section.Items.Any(item => item.Contains("goal progress", StringComparison.OrdinalIgnoreCase)));
+        // 1.3.14's reasons stay described, because this release carries them too.
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Client edits save again" &&
             section.Items.Any(item => item.Contains("were not saved", StringComparison.OrdinalIgnoreCase)));

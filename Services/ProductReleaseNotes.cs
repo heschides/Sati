@@ -6,11 +6,35 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Renewals in view and client edits that save";
-    public const string ReleaseDate = "September 16, 2026";
+    public const string ReleaseName = "The client profile and notes log keep working";
+    public const string ReleaseDate = "September 17, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "The Clients panel no longer stops responding",
+            [
+                "In 1.3.14, the annual forms area could fail while drawing, with an \"unexpected problem\" message. After that the Clients panel stopped responding until Sati was restarted.",
+                "The panel now draws normally, including for a client with no current annual forms."
+            ]),
+        new(
+            "Mark Note Logged says why it cannot",
+            [
+                "When a note cannot be marked Logged, for example because it has no goal progress, the notes log now says why instead of showing an \"unexpected problem\" message.",
+                "The note keeps its previous status on screen, because nothing was saved. Choose a goal progress in the note (None is allowed) and mark it Logged again.",
+                "Hold for Compliance and Send to Supervisor behave the same way when a change is refused."
+            ]),
+        new(
+            "Note menus act on the note you point at",
+            [
+                "Right-clicking the notes log or the dashboard notes list opens Mark Note Logged or Delete Note only over a note, never over the column headings.",
+                "If you choose to keep an unsaved edit when right-clicking another note, the menu does not open, so it cannot act on the note you were editing."
+            ]),
+        new(
+            "Hidden assessment and plan tabs stay quiet",
+            [
+                "When an agency has the Comprehensive Assessment or Person-Centered Plan workflow turned off, Sati no longer tries to load it in the background each time a client is selected."
+            ]),
         new(
             "Client edits save again",
             [
