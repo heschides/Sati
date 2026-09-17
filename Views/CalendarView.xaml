@@ -638,7 +638,7 @@
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    Visibility="{Binding HasUnits, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                         <TextBlock Text="{Binding ProductivityLabel}"
-                                                                   FontSize="11"
+                                                                   FontSize="11" TextWrapping="Wrap"
                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    Visibility="{Binding CountsTowardAverage, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                         <TextBlock Text="{Binding NoteCount, StringFormat={}{0} scheduled}"
