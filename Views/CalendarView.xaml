@@ -91,6 +91,19 @@
             <Setter Property="Cursor"
                     Value="Hand" />
             <Style.Triggers>
+                <!-- Before IsToday: the year view keeps today's accent fill. -->
+                <DataTrigger Binding="{Binding CountsWithSecuredUnits}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource ProductivityDayFillBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding CountsWithoutSecuredUnits}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource ProductivityPendingDayFillBrush}" />
+                    <Setter Property="BorderBrush"
+                            Value="{DynamicResource ProductivityPendingDayBorderBrush}" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsToday}"
                              Value="True">
                     <Setter Property="Background"
@@ -231,6 +244,16 @@
                 <DataTrigger Binding="{Binding IsToday}" Value="True">
                     <Setter Property="Background" Value="{DynamicResource HoverStrongBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </DataTrigger>
+                <!-- After IsToday: today is tinted only when the average already counts it.
+                     ProductivityForecast.ClassifyDay decides; a future day never counts. -->
+                <DataTrigger Binding="{Binding CountsWithSecuredUnits}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ProductivityDayFillBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding CountsWithoutSecuredUnits}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ProductivityPendingDayFillBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource ProductivityPendingDayBorderBrush}" />
+                    <Setter Property="BorderThickness" Value="2" />
                 </DataTrigger>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
@@ -607,6 +630,17 @@
                                                     <TextBlock Text="{Binding Date.Day}" FontSize="14" FontWeight="SemiBold"
                                                                HorizontalAlignment="Left" VerticalAlignment="Top" />
                                                     <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                                                        <TextBlock Text="{Binding UnitsLabel}"
+                                                                   FontSize="12" FontWeight="SemiBold"
+                                                                   Visibility="{Binding HasUnits, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        <TextBlock Text="{Binding UnitsByStatusLabel}"
+                                                                   FontSize="11" TextWrapping="Wrap"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   Visibility="{Binding HasUnits, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        <TextBlock Text="{Binding ProductivityLabel}"
+                                                                   FontSize="11"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   Visibility="{Binding CountsTowardAverage, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                         <TextBlock Text="{Binding NoteCount, StringFormat={}{0} scheduled}"
                                                                    FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
                                                                    Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibilityConverter}}" />

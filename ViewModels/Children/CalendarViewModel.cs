@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
 using Sati.Services;
@@ -22,6 +23,7 @@ public partial class CalendarViewModel : ObservableObject
     private readonly IOutlookCalendarService? _outlookCalendarService;
     private readonly IOutlookCalendarFilePicker? _outlookCalendarFilePicker;
     private readonly LatestRequestTracker _yearLoadRequests = new();
+    private readonly Func<DateTime> _today;
 
     private List<ExemptDate> _exemptDates = [];
     private List<Note> _yearNotes = [];
@@ -115,8 +117,10 @@ public partial class CalendarViewModel : ObservableObject
         INoteService noteService,
         ISessionService sessionService,
         IOutlookCalendarService? outlookCalendarService = null,
-        IOutlookCalendarFilePicker? outlookCalendarFilePicker = null)
+        IOutlookCalendarFilePicker? outlookCalendarFilePicker = null,
+        Func<DateTime>? today = null)
     {
+        _today = today ?? (() => DateTime.Today);
         _exemptDateService = exemptDateService;
         _noteService = noteService;
         _sessionService = sessionService;
@@ -397,41 +401,10 @@ public partial class CalendarViewModel : ObservableObject
             .GroupBy(entry => entry.Date.Date)
             .ToDictionary(group => group.Key, group => group.First());
 
+        var today = _today();
         var result = new List<CalendarMonth>();
         for (var month = 1; month <= 12; month++)
-        {
-            var firstDay = new DateTime(CurrentYear, month, 1);
-            var daysInMonth = DateTime.DaysInMonth(CurrentYear, month);
-            var cells = new List<CalendarDay?>();
-
-            for (var index = 0; index < (int)firstDay.DayOfWeek; index++)
-                cells.Add(null);
-
-            for (var dayNumber = 1; dayNumber <= daysInMonth; dayNumber++)
-            {
-                var date = new DateTime(CurrentYear, month, dayNumber);
-                exemptByDate.TryGetValue(date, out var exemptEntry);
-                notesByDate.TryGetValue(date, out var notes);
-                outlookByDate.TryGetValue(date, out var outlookEvents);
-                cells.Add(new CalendarDay
-                {
-                    Date = date,
-                    IsExempt = exemptEntry is not null,
-                    ExemptDateId = exemptEntry?.Id,
-                    IsWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday,
-                    Notes = notes ?? [],
-                    OutlookEvents = outlookEvents ?? []
-                });
-            }
-
-            result.Add(new CalendarMonth
-            {
-                Name = firstDay.ToString("MMMM", CultureInfo.CurrentCulture),
-                Month = month,
-                Year = CurrentYear,
-                Cells = cells
-            });
-        }
+            result.Add(BuildMonth(CurrentYear, month, notesByDate, exemptByDate, outlookByDate, today));
 
         Months = result;
         SelectedDay = selectedDate.HasValue && selectedDate.Value.Year == CurrentYear
@@ -441,6 +414,75 @@ public partial class CalendarViewModel : ObservableObject
             IsDayFocused = false;
 
         NotifyCalendarComputedProperties();
+    }
+
+    /// <summary>
+    /// A read-only month of the signed-in case manager's notes and exempt days, classified
+    /// against <paramref name="today"/> the same way the full calendar is. The Overview
+    /// thumbnail uses this with the dashboard's already-loaded month.
+    /// </summary>
+    public static CalendarMonth BuildMonth(
+        int year,
+        int month,
+        IEnumerable<Note> notes,
+        IEnumerable<ExemptDate> exemptDates,
+        DateTime today)
+    {
+        var notesByDate = notes
+            .Where(note => note.EventDate is DateTime date && date.Year == year && date.Month == month)
+            .Select(note => new CalendarNoteItem(note))
+            .GroupBy(note => note.EventDate.Date)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var exemptByDate = exemptDates
+            .Where(entry => entry.Date.Year == year && entry.Date.Month == month)
+            .GroupBy(entry => entry.Date.Date)
+            .ToDictionary(group => group.Key, group => group.First());
+        return BuildMonth(year, month, notesByDate, exemptByDate,
+            new Dictionary<DateTime, List<ImportedOutlookEvent>>(), today);
+    }
+
+    private static CalendarMonth BuildMonth(
+        int year,
+        int month,
+        IReadOnlyDictionary<DateTime, List<CalendarNoteItem>> notesByDate,
+        IReadOnlyDictionary<DateTime, ExemptDate> exemptByDate,
+        IReadOnlyDictionary<DateTime, List<ImportedOutlookEvent>> outlookByDate,
+        DateTime today)
+    {
+        var firstDay = new DateTime(year, month, 1);
+        var daysInMonth = DateTime.DaysInMonth(year, month);
+        var cells = new List<CalendarDay?>();
+
+        for (var index = 0; index < (int)firstDay.DayOfWeek; index++)
+            cells.Add(null);
+
+        for (var dayNumber = 1; dayNumber <= daysInMonth; dayNumber++)
+        {
+            var date = new DateTime(year, month, dayNumber);
+            exemptByDate.TryGetValue(date, out var exemptEntry);
+            notesByDate.TryGetValue(date, out var notes);
+            outlookByDate.TryGetValue(date, out var outlookEvents);
+            notes ??= [];
+            cells.Add(new CalendarDay
+            {
+                Date = date,
+                IsExempt = exemptEntry is not null,
+                ExemptDateId = exemptEntry?.Id,
+                IsWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday,
+                Notes = notes,
+                OutlookEvents = outlookEvents ?? [],
+                ProductivityKind = ProductivityForecast.ClassifyDay(
+                    date, notes.Select(note => note.ProductivityFact), today)
+            });
+        }
+
+        return new CalendarMonth
+        {
+            Name = firstDay.ToString("MMMM", CultureInfo.CurrentCulture),
+            Month = month,
+            Year = year,
+            Cells = cells
+        };
     }
 
     private CalendarDay? FindDay(DateTime date) =>

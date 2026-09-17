@@ -22,6 +22,7 @@
     <!-- Dark-surface semantic variants. -->
     <SolidColorBrush x:Key="OverdueBrush" Color="#FFADA3"/><SolidColorBrush x:Key="OverdueBorderBrush" Color="#94575E"/><SolidColorBrush x:Key="OverdueFillBrush" Color="#493034"/>
     <SolidColorBrush x:Key="CompliantBrush" Color="#A8DDA6"/><SolidColorBrush x:Key="CompliantFillBrush" Color="#29432F"/>
+    <SolidColorBrush x:Key="ProductivityDayFillBrush" Color="#2A4531"/><SolidColorBrush x:Key="ProductivityPendingDayFillBrush" Color="#27392D"/><SolidColorBrush x:Key="ProductivityPendingDayBorderBrush" Color="#E595B0"/>
     <SolidColorBrush x:Key="WarningBrush" Color="#F0D07B"/><SolidColorBrush x:Key="WarningFillBrush" Color="#493D22"/><SolidColorBrush x:Key="WarningSoftBrush" Color="#4E4228"/>
     <SolidColorBrush x:Key="InfoBrush" Color="#9BCDF5"/><SolidColorBrush x:Key="InfoFillBrush" Color="#263E52"/>
     <SolidColorBrush x:Key="SuccessStrongBrush" Color="#A6D69C"/><SolidColorBrush x:Key="OnSuccessStrongBrush" Color="#132613"/><SolidColorBrush x:Key="SuccessDarkBrush" Color="#B7E0AE"/><SolidColorBrush x:Key="SuccessBorderBrush" Color="#648967"/><SolidColorBrush x:Key="SuccessSoftBrush" Color="#304834"/>

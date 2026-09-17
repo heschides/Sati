@@ -123,6 +123,25 @@ signature-never-attests items retained later as history.
 - [ ] Complete separate legal/accessibility/operations review and an explicitly authorized release.
       No source-level result here is a deployment or Production-readiness claim.
 
+## Unreleased — productivity days on the calendar (2026-09-17)
+
+See the 2026-09-17 daily-average decision.
+
+- [x] Move the documented daily average into `ProductivityForecast` (`DailyAverageDays`,
+      `DailyAverageUnits`, `ClassifyDay`) and delete the dashboard's copy. A future day with a
+      scheduled pending note no longer enlarges the divisor, so the reported average can change
+      for a case manager who schedules ahead.
+- [x] Tint counted days in the month and year calendars: green with logged or approved units,
+      paler green with a pink border when counted through pending notes only. Each square lists
+      its units by status and says which case it is in; accessible names say the same.
+- [x] Add a read-only month thumbnail to the Overview productivity panel, named for screen
+      readers with the counts it shows.
+- [x] Three new theme tokens, overridden in the five dark themes, with the pending border
+      measured against 3:1 non-text contrast in every theme.
+- [x] Rule, calendar, rendered-view, and thumbnail regressions; 2,274 desktop tests pass.
+- [ ] Verify the tint in the running app against real data, including a dark theme.
+- [ ] Decide whether the supervisor's monthly productivity view should use the same tint.
+
 ## 1.3.14 production failures (2026-09-17)
 
 Three workstation logs from the Joshu login, all 1.3.14.

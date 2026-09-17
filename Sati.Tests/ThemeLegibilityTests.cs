@@ -76,7 +76,37 @@ public sealed class ThemeLegibilityTests
         ("OnAiAccentBrush", "AiAccentBrush"), ("OnAiAccentBrush", "AiAccentHoverBrush"),
         ("OnAiAccentBrush", "AiAccentPressedBrush"),
         ("AiPanelTextBrush", "AiAccentSoftBrush"),
+        // Calendar day squares keep their date and unit lines on these fills.
+        ("TextPrimaryBrush", "ProductivityDayFillBrush"),
+        ("TextSecondaryBrush", "ProductivityDayFillBrush"),
+        ("TextPrimaryBrush", "ProductivityPendingDayFillBrush"),
+        ("TextSecondaryBrush", "ProductivityPendingDayFillBrush"),
     ];
+
+    /// <summary>
+    /// A calendar day counted only through pending notes is told apart by its pink border,
+    /// so that border has to be visible (WCAG non-text contrast, 3:1) against the square it
+    /// outlines and the page around it.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EveryTheme))]
+    public void ThePendingProductivityBorderIsVisibleOnItsSquareAndThePage(string theme)
+    {
+        WpfUiHarness.Run(() =>
+        {
+            using var _ = ThemeSwap.To(theme);
+            var border = Application.Current.TryFindResource("ProductivityPendingDayBorderBrush") as Brush;
+            Assert.NotNull(border);
+            foreach (var ground in new[] { "ProductivityPendingDayFillBrush", "SurfaceBrush", "WindowBackgroundBrush" })
+            {
+                var fill = Application.Current.TryFindResource(ground) as Brush;
+                Assert.NotNull(fill);
+                var ratio = ThemeContrast.WorstRatio(border, fill, Colors.Black);
+                Assert.True(ratio is null or >= ThemeContrast.LargeTextMinimum,
+                    $"{theme}: the pending-day border is {ratio:N2}:1 on {ground}.");
+            }
+        });
+    }
 
     /// <summary>
     /// Read from disk rather than from <c>ThemeService</c>: xUnit enumerates theory

@@ -30,6 +30,14 @@ public sealed class CalendarNoteItem
     public int? StartTime => _note.StartTime;
     public bool IsReminder => _note.NoteType == NoteType.Reminder;
     public string NoteTypeLabel => _note.NoteType?.ToString() ?? "Unclassified note";
+
+    /// <summary>The note as the shared productivity rules read it.</summary>
+    public ProductivityNoteFact ProductivityFact =>
+        new(_note.EventDate, _note.Status?.ToString(), _note.Minutes);
+
+    /// <summary>Sorts statuses in their declared order; a missing status sorts last.</summary>
+    internal int StatusOrder => _note.Status is NoteStatus status ? (int)status : int.MaxValue;
+
     public string StatusLabel => _note.Status switch
     {
         NoteStatus.HeldForCompliance => "Held for compliance",

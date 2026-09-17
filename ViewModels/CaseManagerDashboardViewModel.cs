@@ -358,21 +358,34 @@ CalendarViewModel calendarViewModel,
         public ObservableCollection<PendingAttestation> PendingAttestations { get; } = [];
         public bool HasPendingAttestations => PendingAttestations.Count > 0;
         public record EffectiveDateGroup(string Label, bool IsCurrent, List<string> ClientNames);
-        public double DailyAverageUnits
+        /// <summary>
+        /// This month as the calendar tints it, for the read-only Overview thumbnail. Built
+        /// from the notes and exempt days the productivity totals already use.
+        /// </summary>
+        public CalendarMonth ProductivityMonth
         {
             get
             {
-                var billedDays = _monthlyNotes
-                    .Where(n => n.Status is NoteStatus.Pending or NoteStatus.Logged or NoteStatus.Approved
-                             && n.EventDate.HasValue)
-                    .Select(n => n.EventDate!.Value.Date)
-                    .Distinct()
-                    .Count();
-                if (billedDays <= 0) return 0;
-                var total = RecoverableUnits + SecuredUnits;
-                return Math.Round((double)total / billedDays, 1);
+                var today = DateTime.Today;
+                return CalendarViewModel.BuildMonth(
+                    today.Year, today.Month, _monthlyNotes, _exemptDatesForMonth, today);
             }
         }
+
+        public string ProductivityMonthSummary
+        {
+            get
+            {
+                var days = ProductivityMonth.Cells.OfType<CalendarDay>().ToList();
+                var secured = days.Count(day => day.CountsWithSecuredUnits);
+                var pendingOnly = days.Count(day => day.CountsWithoutSecuredUnits);
+                return $"This month: {secured + pendingOnly} days in the daily average, " +
+                       $"{secured} with logged or approved units and {pendingOnly} with pending notes only.";
+            }
+        }
+
+        public double DailyAverageUnits =>(double)Sati.Contracts.V1.ProductivityForecast.DailyAverageUnits(
+            ProductivityForecast, ProductivityNoteFacts(), DateTime.Today);
         public ICollectionView NotesView { get; }
 
         public static Array NoteStatusOptions => Enum.GetValues(typeof(NoteStatus));
@@ -740,10 +753,13 @@ CalendarViewModel calendarViewModel,
             _eligibleDaysAfterToday,
             DateTime.Today,
             DocumentationWindowDays,
+            ProductivityNoteFacts());
+
+        private IEnumerable<ProductivityNoteFact> ProductivityNoteFacts() =>
             _monthlyNotes.Select(note => new ProductivityNoteFact(
                 note.EventDate,
                 note.Status?.ToString(),
-                note.Minutes)));
+                note.Minutes));
 
         public decimal RecoverableUnits => ProductivityForecast.RecoverableUnits;
         public decimal SecuredUnits => ProductivityForecast.SecuredUnits;
@@ -797,6 +813,8 @@ CalendarViewModel calendarViewModel,
             OnPropertyChanged(nameof(Threshold));
             OnPropertyChanged(nameof(SafeThreshold));
             OnPropertyChanged(nameof(DailyAverageUnits));
+            OnPropertyChanged(nameof(ProductivityMonth));
+            OnPropertyChanged(nameof(ProductivityMonthSummary));
             OnPropertyChanged(nameof(RemainingEligibleDays));
             OnPropertyChanged(nameof(UnitsPerRemainingDay));
         }

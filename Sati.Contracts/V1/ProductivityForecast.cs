@@ -23,12 +23,80 @@ public sealed record ProductivityForecastResult(
     decimal? ProjectedPace,
     decimal? PaceIfDueTodayExpires);
 
+/// <summary>How one calendar day stands in the current month's documented daily average.</summary>
+public enum ProductivityDayKind
+{
+    /// <summary>Outside the current month, after today, or without a pending, logged, or approved note.</summary>
+    NotCounted,
+
+    /// <summary>In the average, with at least one logged or approved note.</summary>
+    CountedWithSecuredUnits,
+
+    /// <summary>In the average only through pending notes; nothing on it is secured yet.</summary>
+    CountedWithoutSecuredUnits
+}
+
 public static class ProductivityForecast
 {
     public const int DefaultDocumentationWindowDays = 7;
 
     private const string Pending = "Pending";
     private static readonly string[] SecuredStatuses = ["Logged", "Approved"];
+    private static readonly string[] AverageStatuses = ["Pending", "Logged", "Approved"];
+
+    /// <summary>
+    /// The service days the documented daily average divides by: days of <paramref name="today"/>'s
+    /// month, up to and including today, that carry a pending, logged, or approved note. A future
+    /// day is never in the average, even when a pending note is already scheduled on it.
+    /// </summary>
+    public static IReadOnlySet<DateTime> DailyAverageDays(
+        IEnumerable<ProductivityNoteFact> notes,
+        DateTime today)
+    {
+        ArgumentNullException.ThrowIfNull(notes);
+        today = today.Date;
+        return notes
+            .Where(note => note.EventDate is DateTime date &&
+                           date.Year == today.Year && date.Month == today.Month &&
+                           date.Date <= today &&
+                           AverageStatuses.Contains(note.Status, StringComparer.OrdinalIgnoreCase))
+            .Select(note => note.EventDate!.Value.Date)
+            .ToHashSet();
+    }
+
+    /// <summary>
+    /// Secured plus recoverable units per day in <see cref="DailyAverageDays"/>, to one decimal.
+    /// Zero when no day qualifies yet.
+    /// </summary>
+    public static decimal DailyAverageUnits(
+        ProductivityForecastResult forecast,
+        IEnumerable<ProductivityNoteFact> notes,
+        DateTime today)
+    {
+        ArgumentNullException.ThrowIfNull(forecast);
+        var days = DailyAverageDays(notes, today).Count;
+        return days == 0
+            ? 0
+            : Math.Round((forecast.SecuredUnits + forecast.RecoverableUnits) / days, 1);
+    }
+
+    /// <summary>Where <paramref name="date"/> stands in the average, given the notes dated on it.</summary>
+    public static ProductivityDayKind ClassifyDay(
+        DateTime date,
+        IEnumerable<ProductivityNoteFact> notesOnDate,
+        DateTime today)
+    {
+        ArgumentNullException.ThrowIfNull(notesOnDate);
+        var onDate = notesOnDate
+            .Where(note => note.EventDate?.Date == date.Date)
+            .ToList();
+        if (!DailyAverageDays(onDate, today).Contains(date.Date))
+            return ProductivityDayKind.NotCounted;
+
+        return onDate.Any(note => SecuredStatuses.Contains(note.Status, StringComparer.OrdinalIgnoreCase))
+            ? ProductivityDayKind.CountedWithSecuredUnits
+            : ProductivityDayKind.CountedWithoutSecuredUnits;
+    }
 
     /// <summary>
     /// Treats a missing or non-positive legacy setting as the seven-calendar-day policy.

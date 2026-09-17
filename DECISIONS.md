@@ -4560,3 +4560,25 @@ entry required before LocalDumps could be enabled.
 
 **Rejected:** minidumps (too little of the managed runtime state to walk a managed stack), enabling
 capture for every Sati process on install, and a machine-wide dump folder readable by other logins.
+
+## 2026-09-17 — the documented daily average owns which calendar days are green
+
+The calendar now tints the days the monthly average counts, and the Overview carries a
+read-only thumbnail of the same month. A second hand-written definition of "counts" would
+have let the tint and the number disagree, so `ProductivityForecast` in `Sati.Contracts.V1`
+gained the rule and the dashboard's own copy was deleted.
+
+- `DailyAverageDays` is the divisor: days of this month, up to and including today, carrying a
+  pending, logged, or approved note. `DailyAverageUnits` is secured plus recoverable over that
+  count. `ClassifyDay` returns `CountedWithSecuredUnits` when the day has a logged or approved
+  note, `CountedWithoutSecuredUnits` when it is in the average through pending notes alone, and
+  `NotCounted` otherwise.
+- **This corrects the average.** The old expression divided by every day with a pending note,
+  including days still in the future, so a visit scheduled for next week lowered the reported
+  average today. A future day is now never in the divisor, which is also what makes "no green on
+  a future day" true rather than a presentational exception.
+- Colour is not the only carrier: each square states its units by status and says "In average"
+  or "In average · none logged", and the day's accessible name says the same. The pending-only
+  border is measured against 3:1 non-text contrast in every theme.
+- The tint covers the current month only, because that is the month the totals measure. A day
+  whose notes are all abandoned, cancelled, or otherwise outside the workflow is not counted.

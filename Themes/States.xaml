@@ -16,6 +16,13 @@
     <SolidColorBrush x:Key="CompliantBrush"     Color="#3F6B43" />
     <SolidColorBrush x:Key="CompliantFillBrush" Color="#D4EDD4" />
 
+    <!-- Calendar days in this month's documented daily average. Gentle by design:
+         green for a day with logged or approved units, a paler green with a pink
+         border for one counted only through pending notes. -->
+    <SolidColorBrush x:Key="ProductivityDayFillBrush"          Color="#E4F2E0" />
+    <SolidColorBrush x:Key="ProductivityPendingDayFillBrush"   Color="#F1F8EE" />
+    <SolidColorBrush x:Key="ProductivityPendingDayBorderBrush" Color="#B05B78" />
+
     <!-- Warning / amber -->
     <SolidColorBrush x:Key="WarningBrush"     Color="#6B4C00" />
     <SolidColorBrush x:Key="WarningFillBrush" Color="#F5DFB0" />

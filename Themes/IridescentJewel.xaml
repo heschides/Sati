@@ -69,6 +69,7 @@
     <SolidColorBrush x:Key="OverdueFillBrush" Color="#49313E" />
     <SolidColorBrush x:Key="CompliantBrush" Color="#A8DDA6" />
     <SolidColorBrush x:Key="CompliantFillBrush" Color="#2D493F" />
+    <SolidColorBrush x:Key="ProductivityDayFillBrush" Color="#2A4531"/><SolidColorBrush x:Key="ProductivityPendingDayFillBrush" Color="#27392D"/><SolidColorBrush x:Key="ProductivityPendingDayBorderBrush" Color="#E595B0"/>
     <SolidColorBrush x:Key="WarningBrush" Color="#F0D07B" />
     <SolidColorBrush x:Key="WarningFillBrush" Color="#4B4029" /><SolidColorBrush x:Key="WarningSoftBrush" Color="#52472F" />
     <SolidColorBrush x:Key="InfoBrush" Color="#9BCDF5" />

@@ -118,7 +118,7 @@
                                     <ToolTip>
                                         <TextBlock MaxWidth="220"
                                                    TextWrapping="Wrap">
-                                            <Run Text="Average known units on service days that already have pending, logged, or approved notes."/>
+                                            <Run Text="Average known units on this month's service days, through today, that already have pending, logged, or approved notes. The calendar tints those days green."/>
                                             <LineBreak />
                                             <LineBreak />
                                             <Run Text="A blank past day is not silently treated as future capacity. Recoverable pending notes and future workdays are shown separately below." />
@@ -148,6 +148,14 @@
                              Foreground="{DynamicResource AccentBrush}"
                              Background="{DynamicResource BorderBrush}"
                              BorderThickness="0" />
+
+                <views:ProductivityCalendarThumbnail DataContext="{Binding ProductivityMonth}"
+                                                     Margin="0,0,0,10"
+                                                     MaxWidth="280"
+                                                     HorizontalAlignment="Left"
+                                                     AutomationProperties.Name="{Binding DataContext.ProductivityMonthSummary,
+                                                         RelativeSource={RelativeSource AncestorType=UserControl, AncestorLevel=1}}"
+                                                     ToolTip="Green: logged or approved units counted in the daily average. Pale with a pink border: counted through pending notes only." />
 
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>

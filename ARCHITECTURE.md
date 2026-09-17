@@ -316,6 +316,13 @@ a Pending note with no duration) has no knowable unit value. The UI calls that i
 instead of inventing units. Scheduled rows are plans, not proof that work occurred, and therefore
 never enter recoverable backlog.
 
+The same owner decides which calendar days the documented daily average counts, so the number and
+the calendar's tint cannot drift apart. `DailyAverageDays` is the divisor — days of the current
+month, through today, carrying a Pending, Logged, or Approved note — and `ClassifyDay` separates a
+day with secured units from one held only by pending notes. The month and year calendars tint those
+days, and the Overview shows the same month as a read-only thumbnail. A future day is never in the
+divisor, so a visit scheduled for next week no longer lowers today's average.
+
 Future capacity uses `IIncentiveService.GetEligibleDaysAsync` for the agency-calendar window and
 then removes the signed-in user's eligible ExemptDates. This route already exists in the deployed
 API. `GetRemainingEligibleDaysAsync` remains temporarily for compatibility, but its corrected
