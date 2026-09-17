@@ -321,10 +321,32 @@ this release.
       Nine opt-in skips. The API timing guard `SignInSpendsTheSameWorkWhetherOrNotTheAccountExists`
       again failed once under solution-wide load and passed in a full API-project rerun; the only
       API change in this release is the version.
-- [ ] Push; publish the Demo API and verify health, version, and contract revision.
-- [ ] Build, accept, and publish both installers.
+- [x] Source release commit `fcaad88` pushed to `origin/master`.
+- [x] Publish the Demo API. `artifacts/SatiApi-1.3.16-fx-x86.zip` is 10,079,959 bytes, SHA-256
+      `5790BBD4A867CA713B04C6C70739D741A6DB9A6B3408CCE419CE0700F70B7063`, the same 68 files as
+      1.3.15, file version 1.3.16.0, no settings files, and no secret-like values. OneDeploy to
+      `sati-demo-api-satilogica` in `rg-sati-demo` succeeded (deployment
+      `18abb1e6fbf34f5caef38fef5ee611d1`); the 1.3.15 package is retained. Live and ready return
+      200, `/health/version` reports Sati.Api 1.3.16 with contract `E18157FBC2D9`, equal to
+      `ApiSurface.Revision` from this build and unchanged because no route changed, and anonymous
+      Settings returns 401. `Test-DemoReadiness.ps1 -HealthOnly` passed; authenticated checks were
+      not run. No migration and no firewall rule.
+- [x] Build, accept, and publish both installers without overwriting. `SqlLocalDB.msi` is Valid
+      Microsoft-signed, SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.16.exe` is 102,854,656 bytes, SHA-256
+      `7FBC65151493E0F167714513794C03AE30A554E6688ED91980F02C832DCF9D46`; five responsive
+      15-second launches with graceful closes, version 1.3.16.0, and cleanup passed; published to
+      `SatiLogica Demo Files`. `SatiLocalSetup-1.3.16.exe` is 204,878,889 bytes, SHA-256
+      `7676E1654E154081C8FF888131E331ADB13AB1D37BA70B0A3187C85916561B03`; version 1.3.16.0,
+      `SatiProduction`, integrated security, and cleanup passed; published to `Sati Desktop`. Both
+      copies and checksum files were verified after publication, on the build workstation rather
+      than a clean machine.
+- [x] Branches: deleted local `calendar-productivity-days` (6db19bf, fully merged, never pushed).
+      Retained the same branches as 1.3.15, for the same reasons.
 - [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.16.exe`, which
       carries the 1.3.15 fixes as well. No database update is pending for it.
+- [ ] Verify the calendar tint against real data on that workstation, including a dark theme.
+      Only synthetic notes and rendered previews have been seen so far.
 
 ## Release 1.3.15 — 2026-09-17
 
