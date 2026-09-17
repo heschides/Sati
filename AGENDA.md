@@ -306,6 +306,26 @@ migration is required.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.16 — 2026-09-17
+
+"See the days your average counts." Releases the productivity-days section above: the calendar
+tint, the per-day unit breakdown, the Overview thumbnail, and the corrected documented daily
+average. No migration, no schema change, and no route change; `Sati.Contracts` gains
+`ProductivityDayKind` and three `ProductivityForecast` members, so the Demo API is published with
+this release.
+
+- [x] Merge `calendar-productivity-days` into `master` (fast-forward to `6db19bf`).
+- [x] Coordinated 1.3.16 version and Settings release notes, including the plain-words warning
+      that Documented Avg reads higher for anyone who schedules notes ahead.
+- [x] Release build: 0 errors. Desktop 2,274, API 824, signatures 119, portal 8, and Carika 4 pass.
+      Nine opt-in skips. The API timing guard `SignInSpendsTheSameWorkWhetherOrNotTheAccountExists`
+      again failed once under solution-wide load and passed in a full API-project rerun; the only
+      API change in this release is the version.
+- [ ] Push; publish the Demo API and verify health, version, and contract revision.
+- [ ] Build, accept, and publish both installers.
+- [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.16.exe`, which
+      carries the 1.3.15 fixes as well. No database update is pending for it.
+
 ## Release 1.3.15 — 2026-09-17
 
 "The client profile and notes log keep working." Releases the 1.3.14 production failures

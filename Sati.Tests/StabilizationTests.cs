@@ -649,11 +649,19 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.15", version);
+        Assert.Equal("1.3.16", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("The client profile and notes log keep working", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("See the days your average counts", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         // The reasons this release exists, in the words staff will read.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "The calendar shows which days count toward your average" &&
+            section.Items.Any(item => item.Contains("pink border", StringComparison.OrdinalIgnoreCase)));
+        // A number staff already watch changes value, so the note says so outright.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Documented Avg no longer counts days that have not happened" &&
+            section.Items.Any(item => item.Contains("will read higher", StringComparison.OrdinalIgnoreCase)));
+        // 1.3.15's reasons stay described, because this release carries them too.
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "The Clients panel no longer stops responding" &&
             section.Items.Any(item => item.Contains("restarted", StringComparison.OrdinalIgnoreCase)));

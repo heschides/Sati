@@ -6,11 +6,27 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "The client profile and notes log keep working";
+    public const string ReleaseName = "See the days your average counts";
     public const string ReleaseDate = "September 17, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "The calendar shows which days count toward your average",
+            [
+                "A day counts once it carries a pending, logged, or approved note, from the first of this month through today. Those days are tinted light green in the month and year calendars.",
+                "A day counted only through pending notes is a paler green with a pink border: it is in the average, but nothing on it is logged or approved yet.",
+                "Future days are never tinted, because they are not in the average yet. Today is tinted only once it has a note of its own.",
+                "Each day square now lists its units and the statuses they are in, for example \"6 units · Pending 2 · Logged 4\".",
+                "Overview shows the same month as a small read-only picture under your productivity bar."
+            ]),
+        new(
+            "Documented Avg no longer counts days that have not happened",
+            [
+                "The average divided your units by every day carrying a pending note, including days still in the future. A visit scheduled for next week therefore lowered the average you saw today.",
+                "It now divides only by days through today. If you schedule notes ahead, your Documented Avg will read higher than it did before this release.",
+                "Nothing about billing, incentives, or note status changed. Secured, Recoverable, and the pace figures are unchanged."
+            ]),
         new(
             "The Clients panel no longer stops responding",
             [
