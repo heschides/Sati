@@ -302,8 +302,29 @@ only so its reported version matches.
       model). In the solution-wide run the API timing guard
       `SignInSpendsTheSameWorkWhetherOrNotTheAccountExists` failed once under concurrent load;
       it passed three times alone and in a full API-project rerun, and no API code changed.
-- [ ] Push; publish the Demo API and verify health, version, and contract revision.
-- [ ] Build, accept, and publish both installers.
+- [x] Source release commit `f8867c4` pushed to `origin/master`.
+- [x] Publish the Demo API. `artifacts/SatiApi-1.3.15-fx-x86.zip` is 10,079,137 bytes, SHA-256
+      `A518E67D25072D93F847C05528F4B195C32677818A61ACE364111A50F4F26909`, with the same 68 files
+      as 1.3.14, file version 1.3.15.0, no settings files, and no secret-like values. Unlike the
+      1.3.14 zip it uses forward-slash entry names with explicit folder entries (85 entries).
+      OneDeploy to `sati-demo-api-satilogica` in `rg-sati-demo` succeeded (deployment
+      `2c03bbb3a9164bcd827842f881d48108`); the prior 1.3.14 package is retained. Live and ready
+      return 200, `/health/version` reports Sati.Api 1.3.15 with contract `E18157FBC2D9`, equal to
+      `ApiSurface.Revision` from this build, and anonymous Settings returns 401.
+      `Test-DemoReadiness.ps1 -HealthOnly` passed; authenticated checks were not run. No migration
+      and no firewall rule.
+- [x] Build, accept, and publish both installers without overwriting. `SqlLocalDB.msi` is Valid
+      Microsoft-signed, SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.15.exe` is 102,830,080 bytes, SHA-256
+      `6258C6D4A8D8825330F288D79FE051A84B35262C09B31EE201AE14D9370A380A`; five responsive
+      15-second launches with graceful closes, version 1.3.15.0, and cleanup passed; published to
+      `SatiLogica Demo Files`. `SatiLocalSetup-1.3.15.exe` is 204,875,305 bytes, SHA-256
+      `BF594ADB6347EAA11ACDC432A56DB7C4A90385C6BB5CE845C7F7FF373A776688`; version 1.3.15.0,
+      `SatiProduction`, integrated security, and cleanup passed; published to `Sati Desktop`. Both
+      copies and checksum files were verified after publication. Both acceptance runs were on the
+      build workstation, not a clean machine.
+- [x] Branches: deleted local `fix/1.3.14-production-failures` (47e1749, fully merged, never
+      pushed). Retained the same branches as 1.3.14, for the same reasons.
 - [ ] Production workstation (Joshu login): on 1.3.14 (every 2026-09-17 log reports 1.3.14.0).
       Install `SatiLocalSetup-1.3.15.exe`. No database update is pending for it.
 
