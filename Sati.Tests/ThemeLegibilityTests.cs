@@ -134,6 +134,16 @@ public sealed class ThemeLegibilityTests
     /// resolves inside the Sati application, so building one here throws.
     /// </summary>
     [Fact]
+    public void ThemeResourcesNeverNameTheDesktopAssembly()
+    {
+        // The Demo build's assembly is Sati.Demo, not Sati. A theme or States.xaml resource
+        // written as /Sati;component/... loads at startup and throws FileNotFoundException there,
+        // which stopped the 1.3.19 Demo installer at "Sati Could Not Start".
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "Themes"), "*.xaml"))
+            Assert.DoesNotContain("/Sati;component/", File.ReadAllText(file), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ThemePickerOffersEveryThemeThatShipped()
     {
         var source = File.ReadAllText(

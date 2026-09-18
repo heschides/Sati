@@ -350,27 +350,55 @@ migration is required.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
-## Release 1.3.19 — 2026-09-18
+## Release 1.3.20 — 2026-09-18
 
 "Unfinished plans move on at the end of the day." Closing Sati now resolves Scheduled notes dated
 today or earlier, item by item: move to the next workday (the default) or delete, through the
 existing note update and delete paths. Adds the Legacy theme, and makes the leaf image, window
 icon, and interface font theme resources. Both decisions are in `DECISIONS.md` (2026-09-18).
+Supersedes 1.3.19 below, whose Demo installer failed acceptance, and carries its fix.
 
 **No migration and no contract change.** No new route or DTO; the contract revision should remain
 `256F0E82D4B8`. The Demo API ships only to keep its version equal to the desktop's.
 
-- [x] Coordinated 1.3.19 version and Settings release notes.
-- [x] Release build: 0 errors. Desktop 2,300, API 827, signatures 119, portal 8, and Carika 4 pass.
+- [x] Coordinated 1.3.20 version. Settings release notes unchanged from 1.3.19, which never reached
+      anyone.
+- [x] Fix: `Themes/States.xaml` and `Themes/Legacy.xaml` load the leaf and icon by relative
+      `/images/...` URIs, which resolve against whichever assembly compiled the dictionary.
+      `ThemeResourcesNeverNameTheDesktopAssembly` fails against the 1.3.19 files and passes now.
+      A Demo-configuration build reached "Sati — DEMO — Sign in" under both Sunlit Shell and
+      Legacy before commit.
+- [x] Release build: 0 errors. Desktop 2,301, API 827, signatures 119, portal 8, and Carika 4 pass.
       Nine opt-in skips.
 - [ ] Source release commit pushed to `origin/master`.
 - [ ] Publish the Demo API and verify health, version, and contract revision.
 - [ ] Build, accept, and publish both installers without overwriting.
 - [x] Branches: none created for this work. Retained the same branches as 1.3.18, for the same
       reasons.
-- [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.19.exe`, which
+- [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.20.exe`, which
       carries 1.3.15 through 1.3.18 as well, including the `AddServiceDayInclusions` migration the
       desktop applies at that first launch.
+
+## Release 1.3.19 — 2026-09-18 — failed Demo acceptance, not distributed
+
+Source commit `5cb2e00` was pushed and the Demo API was deployed, but the Demo installer never
+reached anyone. Superseded by 1.3.20.
+
+- [x] Release build and every test project passed: desktop 2,300, API 827, signatures 119,
+      portal 8, Carika 4; nine opt-in skips.
+- [x] Demo API published. `artifacts/SatiApi-1.3.19-fx-x86.zip` is 10,097,851 bytes, SHA-256
+      `DA6076FDD4F1D40F2A162802CD22281C843CE7993822F4EF9D767310AB975B0C`, 68 files as in 1.3.18,
+      file version 1.3.19.0, no settings files or secret-like values. OneDeploy deployment
+      `0f74221be58f49a096268a8bc29b6566` succeeded; live and ready 200, version 1.3.19, contract
+      `256F0E82D4B8`, anonymous Settings 401, `Test-DemoReadiness.ps1 -HealthOnly` passed. It was
+      healthy; the fault was desktop-only. Replaced by the 1.3.20 deployment.
+- [x] `SatiDemoSetup-1.3.19.exe` (102,912,000 bytes, SHA-256
+      `10297B31C8A96A7AAB12214BFD0C9A604E9F6F73789A32BF49307B6ED1933222`) **failed acceptance** on
+      the first launch with "Sati Could Not Start". The startup log (reference `B3DC5A0D3FCD`) shows
+      `XamlParseException` in `SplashScreenWindow` with an inner `FileNotFoundException`: the new
+      theme resources named `/Sati;component/...`, and the Demo assembly is `Sati.Demo`. The test
+      suite runs as `Sati`, which is why it passed there. The installer is kept in `artifacts` as
+      evidence and was never copied to a distribution folder. No Local installer was built.
 
 ## Release 1.3.18 — 2026-09-18
 

@@ -5,8 +5,8 @@
          nothing reads sallow. Type follows the original splash: Palatino throughout. -->
 
     <!-- Brand: the original leaf, window icon, and serif. -->
-    <BitmapImage x:Key="BrandLeafImage" UriSource="pack://application:,,,/Sati;component/images/leaf.png" />
-    <ImageSource x:Key="AppWindowIcon">pack://application:,,,/Sati;component/images/leaf.ico</ImageSource>
+    <BitmapImage x:Key="BrandLeafImage" UriSource="/images/leaf.png" />
+    <ImageSource x:Key="AppWindowIcon">/images/leaf.ico</ImageSource>
     <FontFamily x:Key="AppFont">Palatino Linotype, Book Antiqua, Georgia</FontFamily>
     <FontFamily x:Key="DisplayFont">Palatino Linotype, Book Antiqua, Georgia</FontFamily>
 
