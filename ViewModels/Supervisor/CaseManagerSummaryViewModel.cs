@@ -46,6 +46,32 @@ namespace Sati.ViewModels.Supervisor
             DelayedCount = monthlyNotes.Count(n => n.Status == NoteStatus.Delayed);
         }
 
+        /// <summary>
+        /// Days this case manager marked as having produced nothing billable, once their
+        /// documentation window has closed. Before that the mark is a working annotation they can
+        /// still change by writing the day up, so a supervisor would be asking too early.
+        /// </summary>
+        public IReadOnlyList<DateTime> SettledDaysWithoutBillableWork { get; private set; } = [];
+
+        public bool HasSettledDaysWithoutBillableWork => SettledDaysWithoutBillableWork.Count > 0;
+
+        public string SettledDaysWithoutBillableWorkLabel =>
+            SettledDaysWithoutBillableWork.Count == 1
+                ? "1 day with no billable work"
+                : $"{SettledDaysWithoutBillableWork.Count} days with no billable work";
+
+        public string SettledDaysWithoutBillableWorkDetail =>
+            string.Join(" · ", SettledDaysWithoutBillableWork.Select(day => day.ToString("MMM d")));
+
+        public void SetSettledDaysWithoutBillableWork(IReadOnlyList<DateTime> days)
+        {
+            SettledDaysWithoutBillableWork = days;
+            OnPropertyChanged(nameof(SettledDaysWithoutBillableWork));
+            OnPropertyChanged(nameof(HasSettledDaysWithoutBillableWork));
+            OnPropertyChanged(nameof(SettledDaysWithoutBillableWorkLabel));
+            OnPropertyChanged(nameof(SettledDaysWithoutBillableWorkDetail));
+        }
+
         public string DisplayName { get; }
         public string Initials { get; }
         public int ClientCount { get; }

@@ -138,9 +138,13 @@ See the 2026-09-17 decision on capacity and zero days. No schema change; it reus
       information; shutdown offers to stay open and write them.
 - [x] "FUTURE DAYS" becomes "DAYS TO CAPTURE", with "10 ahead · 4 to write up" beneath it.
 - [x] Rule, service, and calendar regressions; 2,288 desktop tests pass.
+- [x] Surface a day marked with no billable work to the supervisor once its documentation window
+      has closed, with the dates behind the count. Reading crosses users through
+      `TenantAccess.CanAccessUserAsync`; writing stays the case manager's own. See the
+      2026-09-17 supervisor-visibility decision.
 - [ ] Verify the two modals in the running app, including the shutdown path that cancels the close.
-- [ ] Decide whether a day marked with no billable work should be visible to a supervisor
-      reviewing productivity, or stay a case manager's own annotation.
+- [ ] Decide whether the supervisor should also see days that are still open, as a workload
+      signal rather than a question about a settled day. Deliberately not built yet.
 
 ## Unreleased — a day counts once it is finished (2026-09-17)
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Sati.Contracts.V1;
 using Xunit;
 
@@ -180,6 +181,40 @@ public sealed class CalendarApiTests
 
         var malformed = await owner.DeleteAsync("/api/v1/service-day-inclusions/not-a-date");
         Assert.Equal(HttpStatusCode.BadRequest, malformed.StatusCode);
+    }
+
+    /// <summary>
+    /// The read takes a user id so a reviewer can see a case manager's settled zero days. It is
+    /// gated before it reaches the query, so it cannot be pointed at somebody else's calendar.
+    /// </summary>
+    [Fact]
+    public async Task AReadForAnotherUsersServiceDaysIsRefused()
+    {
+        using var owner = await _factory.CreateAuthenticatedClientAsync("case-manager-two");
+        using var otherUser = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var requested = new DateTime(2096, 3, 6);
+
+        (await owner.PutAsJsonAsync(
+            "/api/v1/service-day-inclusions",
+            new SetServiceDayInclusionRequest(requested, true))).EnsureSuccessStatusCode();
+        var mine = await owner.GetFromJsonAsync<List<ServiceDayInclusionDto>>(
+            "/api/v1/service-day-inclusions/2096");
+        var ownerId = Assert.Single(mine!).Id;
+
+        // An id the actor cannot reach is refused, whether it is nobody or another case manager.
+        var unknown = await owner.GetAsync("/api/v1/service-day-inclusions/2096?userId=0");
+        var foreign = await otherUser.GetAsync(
+            $"/api/v1/service-day-inclusions/2096?userId={await UserIdOfAsync(owner)}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode);
+        Assert.NotEqual(0, ownerId);
+    }
+
+    private static async Task<int> UserIdOfAsync(HttpClient client)
+    {
+        var me = await client.GetFromJsonAsync<Dictionary<string, JsonElement>>("/api/v1/me");
+        return me!["id"].GetInt32();
     }
 
     [Fact]

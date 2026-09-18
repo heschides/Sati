@@ -5451,20 +5451,28 @@ internal static partial class ApiEndpoints
         // Whether the documented daily average divides by one of the actor's own days. Never
         // another user's: the row is keyed to the validated actor server-side, and the request
         // carries no user id to trust.
-        api.MapGet("/service-day-inclusions/{year:int}", async (
+        // A reviewer may read the days of a case manager they can reach, so a settled day marked
+        // as having produced nothing billable can be asked about. The id is never trusted: it is
+        // gated before it reaches the query, and writing stays the case manager's own.
+        api.MapGet("/service-day-inclusions/{year:int}", async Task<Results<Ok<List<ServiceDayInclusionDto>>, ForbidHttpResult>> (
             int year,
+            int? userId,
             ClaimsPrincipal principal,
             ApiDbContext db,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            var targetUserId = userId ?? actor.UserId;
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, targetUserId, cancellationToken))
+                return TypedResults.Forbid();
+
             var first = new DateTime(year, 1, 1);
             var end = first.AddYears(1);
-            return await db.ServiceDayInclusions.AsNoTracking()
-                .Where(x => x.UserId == actor.UserId && x.Date >= first && x.Date < end)
+            return TypedResults.Ok(await db.ServiceDayInclusions.AsNoTracking()
+                .Where(x => x.UserId == targetUserId && x.Date >= first && x.Date < end)
                 .OrderBy(x => x.Date)
                 .Select(x => new ServiceDayInclusionDto(x.Id, x.Date, x.IsIncluded))
-                .ToListAsync(cancellationToken);
+                .ToListAsync(cancellationToken));
         });
 
         api.MapPut("/service-day-inclusions", async (

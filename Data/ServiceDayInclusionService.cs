@@ -14,9 +14,14 @@ namespace Sati.Data
     {
         public async Task<List<ServiceDayInclusion>> GetByYearAsync(int userId, int year)
         {
-            EnsureCurrentUser(userId);
+            var actor = CurrentActor();
             await using var context = contextFactory.CreateDbContext();
             await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+            // Reading may cross to a case manager a reviewer can reach; writing never does.
+            if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, userId))
+                throw new UnauthorizedAccessException(
+                    "You may read counted service days only for your own caseload.");
+
             return await context.ServiceDayInclusions
                 .Where(inclusion => inclusion.UserId == userId && inclusion.Date.Year == year)
                 .OrderBy(inclusion => inclusion.Date)

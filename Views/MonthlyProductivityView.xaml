@@ -231,6 +231,23 @@
                     <DataGridTextColumn Header="Abandoned"
                                         Binding="{Binding AbandonedCount}"
                                         Width="80" />
+                    <!-- Days the case manager marked as producing nothing billable, shown only
+                         once their documentation window has closed: before that they can still
+                         write the day up, and asking would be premature. -->
+                    <DataGridTemplateColumn Header="No billable work"
+                                            Width="120">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Margin="8,6"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           Text="{Binding SettledDaysWithoutBillableWork.Count}"
+                                           ToolTip="{Binding SettledDaysWithoutBillableWorkDetail}"
+                                           AutomationProperties.Name="{Binding SettledDaysWithoutBillableWorkLabel}"
+                                           Visibility="{Binding HasSettledDaysWithoutBillableWork,
+                                               Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="Progress"
                                             Width="140">
                         <DataGridTemplateColumn.CellTemplate>

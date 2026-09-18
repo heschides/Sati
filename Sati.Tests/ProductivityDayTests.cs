@@ -262,6 +262,31 @@ public sealed class ProductivityDayTests
                 eligible, [], Today, Window, noticeDays: 0));
     }
 
+    /// <summary>
+    /// A supervisor sees a zero day only once it is settled. While the window is open the mark is
+    /// a working annotation the case manager can still overturn by writing the day up.
+    /// </summary>
+    [Fact]
+    public void OnlySettledZeroDaysAreVisibleForReview()
+    {
+        var settled = Today.AddDays(-9);
+        var stillOpen = Today.AddDays(-2);
+        var writtenUpAfterAll = Today.AddDays(-10);
+        var choices = new Dictionary<DateTime, bool>
+        {
+            [settled] = true,
+            [stillOpen] = true,
+            [writtenUpAfterAll] = true,
+            [Today.AddDays(-8)] = false
+        };
+        var notes = new ProductivityNoteFact[] { new(writtenUpAfterAll, "Logged", 60) };
+
+        Assert.Equal(
+            [settled],
+            ProductivityForecast.SettledDaysWithoutBillableWork(notes, Today, Window, choices));
+        Assert.Empty(ProductivityForecast.SettledDaysWithoutBillableWork(notes, Today, Window, null));
+    }
+
     [Fact]
     public void TheAverageIsZeroBeforeTheMonthHasAnyCountedDay()
     {

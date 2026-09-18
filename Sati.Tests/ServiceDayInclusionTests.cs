@@ -52,6 +52,45 @@ public sealed class ServiceDayInclusionTests
         Assert.Empty(await db.ServiceDayInclusions.ToListAsync());
     }
 
+    /// <summary>
+    /// A supervisor may read the days of a case manager they can reach, so a settled zero day can
+    /// be asked about, but the decision itself stays the case manager's to make.
+    /// </summary>
+    [Fact]
+    public async Task ASupervisorCanReadTheirCaseManagersDaysButNotWriteThem()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var day = new DateTime(2026, 9, 11);
+        await Service(fixture, fixture.CaseManagerOne).SetAsync(fixture.CaseManagerOne.Id, day, true);
+
+        var supervisor = await AddSupervisorAsync(fixture, fixture.CaseManagerOne);
+        var theirs = Service(fixture, supervisor);
+
+        var read = await theirs.GetByYearAsync(fixture.CaseManagerOne.Id, 2026);
+        Assert.True(Assert.Single(read).IsIncluded);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            theirs.SetAsync(fixture.CaseManagerOne.Id, day, false));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            theirs.ClearAsync(fixture.CaseManagerOne.Id, day));
+
+        // The other agency's case manager stays out of reach either way.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            theirs.GetByYearAsync(fixture.CaseManagerTwo.Id, 2026));
+    }
+
+    private static async Task<User> AddSupervisorAsync(NoteEntryFixture fixture, User supervisee)
+    {
+        await using var db = fixture.Factory.CreateDbContext();
+        var supervisor = User.Create(41, "supervisor-one", "Supervisor One", "hash", "salt",
+            UserRole.Supervisor, null, supervisee.AgencyId);
+        db.Users.Add(supervisor);
+        var managed = await db.Users.SingleAsync(user => user.Id == supervisee.Id);
+        managed.SupervisorId = supervisor.Id;
+        await db.SaveChangesAsync();
+        return supervisor;
+    }
+
     [Fact]
     public async Task TheCalendarCountsAnOpenDayWhenTheCaseManagerTicksIt()
     {

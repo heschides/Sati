@@ -350,7 +350,8 @@ public sealed class CloudExemptDateService(CloudApiClient api) : IExemptDateServ
 public sealed class CloudServiceDayInclusionService(CloudApiClient api) : IServiceDayInclusionService
 {
     public async Task<List<ServiceDayInclusion>> GetByYearAsync(int userId, int year) =>
-        (await api.GetAsync<List<ServiceDayInclusionDto>>($"/api/v1/service-day-inclusions/{year}"))
+        (await api.GetAsync<List<ServiceDayInclusionDto>>(
+            $"/api/v1/service-day-inclusions/{year}?userId={userId}"))
         .Select(dto => CloudContractMapper.ToServiceDayInclusion(dto, userId)).ToList();
 
     public async Task<ServiceDayInclusion> SetAsync(int userId, DateTime date, bool isIncluded) =>

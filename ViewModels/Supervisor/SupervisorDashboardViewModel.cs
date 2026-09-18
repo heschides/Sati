@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
+using Sati.Models;
 using Sati.Services;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -22,6 +23,7 @@ namespace Sati.ViewModels.Supervisor
         private readonly ISettingsService _settingsService;
         private readonly IUpcomingEventService _upcomingEventService;
         private readonly IUserService _userService;
+        private readonly IServiceDayInclusionService? _serviceDayInclusions;
         private readonly LatestRequestTracker _accountLoads = new();
 
         // -------------------------------------------------------------------------
@@ -55,8 +57,10 @@ namespace Sati.ViewModels.Supervisor
             PendingApprovalsViewModel pendingApprovalsViewModel,
             CheckRequestApprovalsViewModel checkRequestApprovalsViewModel,
             CaseloadDistributionViewModel caseloadDistributionViewModel,
-            CaseloadImportViewModel caseloadImportViewModel)
+            CaseloadImportViewModel caseloadImportViewModel,
+            IServiceDayInclusionService? serviceDayInclusions = null)
         {
+            _serviceDayInclusions = serviceDayInclusions;
             _sessionService = sessionService;
             _personService = personService;
             _noteService = noteService;
@@ -306,6 +310,8 @@ namespace Sati.ViewModels.Supervisor
                         $">>> GetOrCreate for {user.DisplayName}: {incentiveSw.ElapsedMilliseconds} ms");
 
                     summary.SetThreshold(incentive?.Threshold ?? 0);
+                    summary.SetSettledDaysWithoutBillableWork(
+                        await LoadSettledDaysWithoutBillableWorkAsync(user.Id, monthlyNotes, settings));
                     return summary;
                 });
 
@@ -344,6 +350,39 @@ namespace Sati.ViewModels.Supervisor
                 Debug.WriteLine($"SupervisorDashboardViewModel.InitializeAsync failed: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Days this case manager said produced nothing billable, and whose documentation window
+        /// has closed. A failure here leaves the list empty rather than emptying the dashboard:
+        /// it is context for a conversation, not a number the team relies on.
+        /// </summary>
+        private async Task<IReadOnlyList<DateTime>> LoadSettledDaysWithoutBillableWorkAsync(
+            int userId,
+            IReadOnlyList<Note> monthlyNotes,
+            Settings settings)
+        {
+            if (_serviceDayInclusions is null)
+                return [];
+
+            try
+            {
+                var inclusions = await _serviceDayInclusions.GetByYearAsync(userId, DateTime.Today.Year);
+                return Contracts.V1.ProductivityForecast.SettledDaysWithoutBillableWork(
+                    monthlyNotes.Select(note => new Contracts.V1.ProductivityNoteFact(
+                        note.EventDate, note.Status?.ToString(), note.Minutes)),
+                    DateTime.Today,
+                    Contracts.V1.ProductivityForecast.NormalizeDocumentationWindowDays(
+                        settings.AbandonedAfterDays),
+                    Children.CalendarViewModel.ChoicesByDate(inclusions));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"SupervisorDashboard.LoadSettledDaysWithoutBillableWork failed: {ex.GetType().Name}");
+                return [];
+            }
+        }
+
 
         public void ClearForAccountSwitch()
         {

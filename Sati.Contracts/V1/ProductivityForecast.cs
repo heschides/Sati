@@ -77,6 +77,13 @@ public static class ProductivityForecast
     public static bool IsDocumentationWindowClosed(DateTime date, DateTime today, int documentationWindowDays) =>
         date.Date.AddDays(NormalizeDocumentationWindowDays(documentationWindowDays)) < today.Date;
 
+    /// <summary>Any pending, logged, or approved note dated on this day, whatever month it is in.</summary>
+    private static bool HasDocumentedWork(
+        DateTime date,
+        IEnumerable<ProductivityNoteFact> notes) =>
+        notes.Any(note => note.EventDate?.Date == date.Date &&
+                          AverageStatuses.Contains(note.Status, StringComparer.OrdinalIgnoreCase));
+
     /// <summary>Work planned on this day that has not been documented yet.</summary>
     private static bool HasScheduledWork(
         DateTime date,
@@ -194,6 +201,32 @@ public static class ProductivityForecast
             .Where(date => CountsInDailyAverage(
                 date, all, today, documentationWindowDays, Choice(caseManagerChoices, date)))
             .ToHashSet();
+    }
+
+    /// <summary>
+    /// Days the case manager marked as having produced nothing billable, and whose documentation
+    /// window has since closed. Only these reach a supervisor: while the window is open the mark
+    /// is a working annotation the case manager can still change by writing the day up, and a
+    /// supervisor asking about a day that is still being documented would be asking too early.
+    /// </summary>
+    public static IReadOnlyList<DateTime> SettledDaysWithoutBillableWork(
+        IEnumerable<ProductivityNoteFact> notes,
+        DateTime today,
+        int documentationWindowDays,
+        IReadOnlyDictionary<DateTime, bool>? caseManagerChoices)
+    {
+        ArgumentNullException.ThrowIfNull(notes);
+        if (caseManagerChoices is null)
+            return [];
+
+        var all = notes.ToList();
+        return caseManagerChoices
+            .Where(choice => choice.Value)
+            .Select(choice => choice.Key.Date)
+            .Where(date => IsDocumentationWindowClosed(date, today, documentationWindowDays) &&
+                           !HasDocumentedWork(date, all))
+            .OrderBy(date => date)
+            .ToList();
     }
 
     /// <summary>

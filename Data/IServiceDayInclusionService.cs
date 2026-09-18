@@ -9,6 +9,11 @@ namespace Sati.Data
     /// </summary>
     public interface IServiceDayInclusionService
     {
+        /// <summary>
+        /// One case manager's decisions. A reviewer who can reach that caseload may read them, so
+        /// a settled day marked as having produced nothing billable can be asked about; only the
+        /// case manager whose calendar it is may write.
+        /// </summary>
         Task<List<ServiceDayInclusion>> GetByYearAsync(int userId, int year);
 
         /// <summary>Records a decision for one day, replacing any earlier one.</summary>

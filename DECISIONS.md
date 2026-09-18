@@ -4644,3 +4644,27 @@ honest choice.
 **Rejected:** treating scheduled rows as evidence of delivered work, which would let a plan
 inflate the forecast — `ARCHITECTURE.md` keeps that line. Also rejected: adding past days to the
 divisor without a way to mark a zero day, which reads low exactly when a case manager is behind.
+
+## 2026-09-17 — a settled day with no billable work is visible to a supervisor
+
+A day the case manager marked as having produced nothing billable reaches their supervisor, but
+only once its documentation window has closed. Until then the mark is a working annotation they
+can still overturn by writing the day up, and a supervisor asking about a day still being
+documented would be asking too early. After it settles the day is a fact about the month, and the
+supervisor may reasonably want to know what happened.
+
+`ProductivityForecast.SettledDaysWithoutBillableWork` decides which days qualify, so the case
+manager's calendar and the supervisor's column cannot disagree. The supervisor's monthly
+productivity grid shows the count per case manager, with the dates behind it; it carries no client
+information, because the mark records the absence of billable work rather than anything about a
+consumer.
+
+Reading crosses users, writing does not. `GET /service-day-inclusions/{year}` takes an optional
+`userId` gated by `TenantAccess.CanAccessUserAsync` before the value reaches the query, matching
+every other reviewer read; `PUT` and `DELETE` remain keyed to the validated actor and accept no id
+at all. The local service applies the same split.
+
+**Rejected:** showing open days to supervisors, which would put a supervisor in the middle of a
+week the case manager is still writing up; and inferring zero days without the mark, which cannot
+tell "nothing happened" from "not written up yet" — the distinction this whole feature exists to
+make.
