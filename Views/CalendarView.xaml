@@ -4,7 +4,7 @@
              xmlns:children="clr-namespace:Sati.ViewModels.Children"
              xmlns:services="clr-namespace:Sati.Services"
              Background="{DynamicResource WindowBackgroundBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}">
+             TextElement.FontFamily="{DynamicResource AppFont}">
 
     <UserControl.Resources>
         <DataTemplate x:Key="CalendarNoteTemplate"

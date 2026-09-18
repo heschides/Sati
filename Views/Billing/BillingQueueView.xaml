@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:billing="clr-namespace:Sati.ViewModels.Billing"
              Background="{DynamicResource WindowBackgroundBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}">
+             TextElement.FontFamily="{DynamicResource AppFont}">
 
     <Grid Margin="24,24,24,12">
         <Grid.RowDefinitions>

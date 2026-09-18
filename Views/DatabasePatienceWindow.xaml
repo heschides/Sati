@@ -11,7 +11,7 @@
         ShowInTaskbar="False"
         ShowActivated="False"
         WindowStartupLocation="CenterOwner"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         AutomationProperties.Name="Sati is retrieving information">
     <Border Margin="18"
             Padding="30,26"
@@ -40,7 +40,7 @@
                     Background="#FFF8FBF7"
                     BorderBrush="#4476B8A4"
                     BorderThickness="1">
-                <Image Source="pack://application:,,,/Sati;component/images/sati-watercolor-leaf.png"
+                <Image Source="{DynamicResource BrandLeafImage}"
                        Width="74"
                        Height="74"
                        Stretch="Uniform"

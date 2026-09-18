@@ -4,6 +4,14 @@
     <!-- Individual branded themes may opt into a shell logo. -->
     <Visibility x:Key="BrandLogoVisibility">Collapsed</Visibility>
 
+    <!-- Brand defaults: the watercolor leaf, its icon, and Inter. A theme may replace any of
+         them (Legacy restores the original copper leaf and Palatino). Kept here rather than in
+         App.xaml because an application-level key would outrank every theme dictionary. -->
+    <BitmapImage x:Key="BrandLeafImage" UriSource="pack://application:,,,/Sati;component/images/sati-watercolor-leaf.png" />
+    <ImageSource x:Key="AppWindowIcon">pack://application:,,,/Sati;component/images/sati.ico</ImageSource>
+    <FontFamily x:Key="AppFont">Inter</FontFamily>
+    <FontFamily x:Key="DisplayFont">Palatino Linotype</FontFamily>
+
     <!-- STATE / STATUS COLORS — semantic meaning is fixed. Dark themes override
          luminance (not hue/meaning) so foreground and fill pairs stay legible. -->
 

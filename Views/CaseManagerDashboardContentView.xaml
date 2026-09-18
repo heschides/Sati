@@ -6,7 +6,7 @@
              xmlns:views="clr-namespace:Sati.Views"
              xmlns:models="clr-namespace:Sati.Models;assembly=Sati.Persistence"
              Background="{DynamicResource WindowBackgroundBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}">
+             TextElement.FontFamily="{DynamicResource AppFont}">
 
     <!-- Escape returns the note panel to a blank New Note and drops the notes
          grid's highlight with it. The selected CLIENT survives — it scopes this

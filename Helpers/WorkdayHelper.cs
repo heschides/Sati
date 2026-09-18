@@ -27,6 +27,32 @@ namespace Sati.Helpers
             return IsExcludedHoliday(date, settings);
         }
 
+        /// <summary>
+        /// The first day after <paramref name="after"/> the case manager is expected to work:
+        /// not a weekend, not an agency-excluded weekday or holiday, and not one of their own
+        /// days off. Null when nothing qualifies within a year, which only happens when every
+        /// weekday is excluded; the caller must not invent a date in that case.
+        /// </summary>
+        public static DateTime? NextWorkday(
+            DateTime after,
+            Settings settings,
+            IEnumerable<DateTime> timeOff)
+        {
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(timeOff);
+            var off = timeOff.Select(date => date.Date).ToHashSet();
+            for (var date = after.Date.AddDays(1); date <= after.Date.AddYears(1); date = date.AddDays(1))
+            {
+                if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                    continue;
+                if (IsAlwaysExcludedWorkday(date, settings) || off.Contains(date))
+                    continue;
+                return date;
+            }
+
+            return null;
+        }
+
         private static bool IsExcludedHoliday(DateTime date, Settings settings)
         {
             var m = date.Month;

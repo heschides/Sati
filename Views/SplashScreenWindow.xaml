@@ -6,7 +6,8 @@
         Background="Transparent"
         WindowStartupLocation="CenterScreen"
         SizeToContent="WidthAndHeight"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        TextElement.FontFamily="{DynamicResource AppFont}">
 
     <Border Width="760"
             Height="480"
@@ -27,7 +28,7 @@
 
             <Image Grid.Row="0"
                    Grid.Column="0"
-                   Source="pack://application:,,,/images/sati-watercolor-leaf.png"
+                   Source="{DynamicResource BrandLeafImage}"
                    Width="240"
                    Height="330"
                    Stretch="Uniform"
@@ -38,7 +39,7 @@
                         Grid.Column="2"
                         VerticalAlignment="Center">
                 <TextBlock Text="Sati"
-                           FontFamily="Palatino Linotype"
+                           FontFamily="{DynamicResource DisplayFont}"
                            FontSize="64"
                            FontWeight="Bold"
                            Foreground="{DynamicResource TextPrimaryBrush}" />

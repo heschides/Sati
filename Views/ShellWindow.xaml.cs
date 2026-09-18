@@ -29,6 +29,7 @@ namespace Sati.Views
         private readonly DailyAgendaLauncher _dailyAgendaLauncher;
         private readonly CheckRequestPromptLauncher _checkRequestPromptLauncher;
         private readonly UndocumentedDayPromptLauncher _undocumentedDayPromptLauncher;
+        private readonly LeftoverScheduledWorkPromptLauncher _leftoverScheduledWorkPromptLauncher;
         private readonly ScratchpadView _workAgendaView;
         private ContentControl? _overviewAgendaHost;
         private ContentControl? _workAgendaParent;
@@ -62,8 +63,10 @@ namespace Sati.Views
             DailyAgendaLauncher dailyAgendaLauncher,
             CheckRequestPromptLauncher checkRequestPromptLauncher,
             UndocumentedDayPromptLauncher undocumentedDayPromptLauncher,
+            LeftoverScheduledWorkPromptLauncher leftoverScheduledWorkPromptLauncher,
             SessionKeepAlive? sessionKeepAlive = null)
         {
+            _leftoverScheduledWorkPromptLauncher = leftoverScheduledWorkPromptLauncher;
             _undocumentedDayPromptLauncher = undocumentedDayPromptLauncher;
             InitializeComponent();
             _shellViewModel = shellViewModel;
@@ -190,6 +193,11 @@ namespace Sati.Views
                 // the close.
                 if (!await _undocumentedDayPromptLauncher.TryShowAsync(
                         this, _caseManagerDashboardViewModel, UndocumentedDayPromptReason.Shutdown))
+                    return;
+
+                // Last of the prompts on purpose: moving or deleting planned work ends the day,
+                // so it must not happen and then be followed by a choice to stay open.
+                if (!await _leftoverScheduledWorkPromptLauncher.TryShowAsync(this))
                     return;
 
                 _isSavingOnClose = true;

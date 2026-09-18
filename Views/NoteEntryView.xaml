@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sati="clr-namespace:Sati"
              xmlns:services="clr-namespace:Sati.Services"
-             TextElement.FontFamily="{StaticResource AppFont}"
+             TextElement.FontFamily="{DynamicResource AppFont}"
              SizeChanged="NoteEntryView_SizeChanged">
 
     <!-- Escape returns the panel to a blank New Note, the same command the New

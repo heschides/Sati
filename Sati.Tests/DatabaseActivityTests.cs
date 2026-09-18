@@ -232,7 +232,7 @@ public sealed class DatabaseActivityTests
         var shellCode = File.ReadAllText(Path.Combine(root, "Views", "ShellWindow.xaml.cs"));
         var app = File.ReadAllText(Path.Combine(root, "App.xaml.cs"));
 
-        Assert.Contains("sati-watercolor-leaf.png", shell, StringComparison.Ordinal);
+        Assert.Contains("{DynamicResource BrandLeafImage}", shell, StringComparison.Ordinal);
         Assert.Contains("MinHeight=\"60\"", shell, StringComparison.Ordinal);
         Assert.Contains("Duration=\"0:0:0.42\"", shell, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Retrieving information from Sati\"", shell, StringComparison.Ordinal);

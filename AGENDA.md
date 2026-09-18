@@ -350,6 +350,28 @@ migration is required.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.19 — 2026-09-18
+
+"Unfinished plans move on at the end of the day." Closing Sati now resolves Scheduled notes dated
+today or earlier, item by item: move to the next workday (the default) or delete, through the
+existing note update and delete paths. Adds the Legacy theme, and makes the leaf image, window
+icon, and interface font theme resources. Both decisions are in `DECISIONS.md` (2026-09-18).
+
+**No migration and no contract change.** No new route or DTO; the contract revision should remain
+`256F0E82D4B8`. The Demo API ships only to keep its version equal to the desktop's.
+
+- [x] Coordinated 1.3.19 version and Settings release notes.
+- [x] Release build: 0 errors. Desktop 2,300, API 827, signatures 119, portal 8, and Carika 4 pass.
+      Nine opt-in skips.
+- [ ] Source release commit pushed to `origin/master`.
+- [ ] Publish the Demo API and verify health, version, and contract revision.
+- [ ] Build, accept, and publish both installers without overwriting.
+- [x] Branches: none created for this work. Retained the same branches as 1.3.18, for the same
+      reasons.
+- [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.19.exe`, which
+      carries 1.3.15 through 1.3.18 as well, including the `AddServiceDayInclusions` migration the
+      desktop applies at that first launch.
+
 ## Release 1.3.18 — 2026-09-18
 
 "The pace counts the days you still have to write up." Releases the two September 17 sections

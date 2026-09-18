@@ -601,7 +601,7 @@
                                 CornerRadius="33"
                                 Background="#1F3E8F83"
                                 VerticalAlignment="Top">
-                            <Image Source="pack://application:,,,/Sati;component/images/sati-watercolor-leaf.png"
+                            <Image Source="{DynamicResource BrandLeafImage}"
                                    Width="52"
                                    Height="52"
                                    Stretch="Uniform"

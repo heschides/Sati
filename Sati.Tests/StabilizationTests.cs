@@ -649,11 +649,17 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.18", version);
+        Assert.Equal("1.3.19", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("The pace counts the days you still have to write up", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Unfinished plans move on at the end of the day", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         // The reasons this release exists, in the words staff will read.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Closing Sati tidies up scheduled work that did not get done" &&
+            section.Items.Any(item => item.Contains("never loses anything", StringComparison.Ordinal)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "A Legacy theme with the original leaf");
+        // 1.3.18's reasons stay described, because this release carries them too.
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Projected and Secured per day now count past days you can still write up" &&
             section.Items.Any(item => item.Contains("DAYS TO CAPTURE", StringComparison.Ordinal)));
@@ -746,12 +752,13 @@ public sealed class StabilizationTests
         Assert.DoesNotContain("DialogResult = success;\n                Close();", loginCodeBehind);
         Assert.Contains("IsSigningIn", loginViewModel);
         Assert.DoesNotContain("ReleaseVersion", loginViewModel);
-        Assert.Contains("sati-watercolor-leaf.png", loginView);
-        Assert.Contains("sati-watercolor-leaf.png", splashView);
-        Assert.Contains("pack://application:,,,/images/sati-watercolor-leaf.png", loginView);
-        Assert.Contains("pack://application:,,,/images/sati-watercolor-leaf.png", splashView);
-        Assert.DoesNotContain("/Sati;component/", loginView);
-        Assert.DoesNotContain("/Sati;component/", splashView);
+        // The leaf comes from the active theme, so Legacy can restore the original one.
+        // The watercolor leaf remains the default every other theme inherits.
+        var states = File.ReadAllText(Path.Combine(directory.FullName, "Themes", "States.xaml"));
+        Assert.Contains("Source=\"{DynamicResource BrandLeafImage}\"", loginView);
+        Assert.Contains("Source=\"{DynamicResource BrandLeafImage}\"", splashView);
+        Assert.Contains("x:Key=\"BrandLeafImage\"", states);
+        Assert.Contains("images/sati-watercolor-leaf.png", states);
         Assert.True(File.Exists(Path.Combine(
             directory.FullName,
             "images",

@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:billingViews="clr-namespace:Sati.Views.Billing"
              Background="{DynamicResource WindowBackgroundBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}">
+             TextElement.FontFamily="{DynamicResource AppFont}">
     <UserControl.Resources>
         <Style x:Key="AdminMetricCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />

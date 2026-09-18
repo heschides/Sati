@@ -4,7 +4,7 @@
              xmlns:sati="clr-namespace:Sati"
              xmlns:vm="clr-namespace:Sati.ViewModels"
              Background="{DynamicResource WindowBackgroundBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}">
+             TextElement.FontFamily="{DynamicResource AppFont}">
 
     <UserControl.Resources>
 

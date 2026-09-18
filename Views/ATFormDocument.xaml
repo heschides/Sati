@@ -4,7 +4,7 @@
              Width="816"
              Background="{DynamicResource SurfaceBrush}"
              TextElement.Foreground="{DynamicResource TextPrimaryBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}"
+             TextElement.FontFamily="{DynamicResource AppFont}"
              AutomationProperties.Name="Live AT request preview">
     <UserControl.Resources>
         <Style x:Key="Cell"

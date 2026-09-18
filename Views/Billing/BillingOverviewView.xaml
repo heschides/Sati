@@ -4,7 +4,7 @@
              xmlns:oxy="http://oxyplot.org/wpf"
              xmlns:billingViews="clr-namespace:Sati.Views.Billing"
              Background="{DynamicResource WindowBackgroundBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}">
+             TextElement.FontFamily="{DynamicResource AppFont}">
     <UserControl.Resources>
         <Style x:Key="BillingMetricCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />

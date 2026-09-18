@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Sati.Views"
-        Icon="/images/sati.ico"
+        Icon="{DynamicResource AppWindowIcon}"
         mc:Ignorable="d"
         Title="Sati"
         Height="640"
@@ -125,7 +125,7 @@
             <StackPanel VerticalAlignment="Center">
 
             <!-- Watercolor Bodhi leaf from the Sati application mark -->
-            <Image Source="pack://application:,,,/images/sati-watercolor-leaf.png"
+            <Image Source="{DynamicResource BrandLeafImage}"
                    Height="78"
                    Width="64"
                    HorizontalAlignment="Center"

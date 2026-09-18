@@ -353,7 +353,7 @@ public sealed class ReleaseUiStructureTests
                  {
                      "PineCoast", "BlueberryMist", "BlueGrayPearl", "CedarGrove", "HarborNight",
                      "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
-                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor", "UmberFacets"
+                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor", "UmberFacets", "Legacy"
                  })
         {
             var supplied = ResourceKeys(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -376,6 +376,7 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("Redwood Blush", service);
         Assert.Contains("Bodhi Watercolor", service);
         Assert.Contains("Umber Facets", service);
+        Assert.Contains("\"Legacy\"", service);
     }
 
     [Fact]

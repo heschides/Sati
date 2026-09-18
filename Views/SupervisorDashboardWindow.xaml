@@ -4,7 +4,7 @@
              xmlns:helpers="clr-namespace:Sati.Helpers"
              xmlns:sati="clr-namespace:Sati"
              Background="{DynamicResource WindowBackgroundBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}">
+             TextElement.FontFamily="{DynamicResource AppFont}">
 
     <UserControl.Resources>
 

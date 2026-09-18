@@ -4,7 +4,7 @@
              xmlns:chat="clr-namespace:Sati.ViewModels.Children"
              AutomationProperties.Name="Team chat workspace"
              Background="{DynamicResource WindowBackgroundBrush}"
-             TextElement.FontFamily="{StaticResource AppFont}">
+             TextElement.FontFamily="{DynamicResource AppFont}">
 
     <!-- =================================================================== -->
     <!-- TEAM CHAT                                                            -->

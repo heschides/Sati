@@ -4668,3 +4668,41 @@ at all. The local service applies the same split.
 week the case manager is still writing up; and inferring zero days without the mark, which cannot
 tell "nothing happened" from "not written up yet" — the distinction this whole feature exists to
 make.
+
+## 2026-09-18 — planned work left undone is resolved at shutdown, not left on its day
+
+Closing Sati lists every Scheduled note dated today or earlier and asks, item by item, whether to
+move it to the next workday or delete it. A Scheduled note on a finished day records nothing: it
+clutters the calendar, and `ProductivityForecast` reads scheduled work as a day still being written
+up, so a forgotten plan also held that day out of the daily average.
+
+Every item defaults to moving, so pressing Enter never loses planned work. "Keep Sati open" cancels
+the close and changes nothing. The prompt runs after the other shutdown prompts so that no later
+choice can keep Sati open after work has already been moved. A load failure lets Sati close; a
+refused write leaves that item where it was, and it is offered again next time.
+
+The next workday comes from `WorkdayHelper.NextWorkday`: weekends, the agency's excluded weekdays
+and holidays, and the case manager's own time off are skipped. When every weekday is excluded there
+is no answer, and the prompt is skipped rather than inventing a date.
+
+Writes go through the existing `INoteService` update and delete, so ownership, workflow,
+concurrency, and audit rules are unchanged and no new API route exists. Moving a note to a future
+date passes through `NoteSchedulingPolicy`, which clears any start time. Only Scheduled notes are
+offered, and the status is checked again before each write so a note started meanwhile is never
+deleted.
+
+**Rejected:** rolling items forward silently, which only moves the clutter; and a "leave as is"
+button, which would keep the backlog this feature exists to clear.
+
+## 2026-09-18 — the leaf, window icon, and interface font belong to the theme
+
+A theme may now replace `BrandLeafImage`, `AppWindowIcon`, `AppFont`, and `DisplayFont`, the same
+way Woodfords already opts into `BrandLogoVisibility`. The defaults (the watercolor leaf,
+`sati.ico`, Inter, Palatino for display) live in `States.xaml`, not `App.xaml`: an
+application-level key outranks every merged dictionary, so a theme could never override it there.
+Views read all four as `DynamicResource`, so switching themes updates them without a restart.
+
+The Legacy theme uses this to restore the original copper leaf, `leaf.ico`, and Palatino. Its
+creams lean rose rather than yellow so nothing reads sallow, and it passes the same AA contrast
+audit as every other theme. The installed program's shortcut and taskbar-pin icon is still the
+executable's embedded `sati.ico`; only the open window's icon follows the theme.

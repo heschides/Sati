@@ -9,7 +9,7 @@
         ResizeMode="NoResize"
         ShowInTaskbar="True"
         Background="{DynamicResource SurfaceBrush}"
-        FontFamily="{StaticResource AppFont}">
+        FontFamily="{DynamicResource AppFont}">
 
     <Window.Resources>
         <Style x:Key="EnvironmentChoiceButton" TargetType="Button">

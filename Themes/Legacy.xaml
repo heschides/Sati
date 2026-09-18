@@ -1,0 +1,69 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- LEGACY: the original Sati identity. Blush-cream paper, the copper bodhi leaf, warm
+         charcoal ink, and a cranberry note for autumn. Creams lean rose rather than yellow so
+         nothing reads sallow. Type follows the original splash: Palatino throughout. -->
+
+    <!-- Brand: the original leaf, window icon, and serif. -->
+    <BitmapImage x:Key="BrandLeafImage" UriSource="pack://application:,,,/Sati;component/images/leaf.png" />
+    <ImageSource x:Key="AppWindowIcon">pack://application:,,,/Sati;component/images/leaf.ico</ImageSource>
+    <FontFamily x:Key="AppFont">Palatino Linotype, Book Antiqua, Georgia</FontFamily>
+    <FontFamily x:Key="DisplayFont">Palatino Linotype, Book Antiqua, Georgia</FontFamily>
+
+    <LinearGradientBrush x:Key="WindowBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFFDF7F3" Offset="0" />
+        <GradientStop Color="#FFFBF0EA" Offset="0.45" />
+        <GradientStop Color="#FFF7EAE3" Offset="0.78" />
+        <GradientStop Color="#FFFCF4EF" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="NavBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFF6E7DE" Offset="0" />
+        <GradientStop Color="#FFF0DCD1" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="SurfaceBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FFFFFFFF" Offset="0" />
+        <GradientStop Color="#FFFFFAF7" Offset="0.5" />
+        <GradientStop Color="#FFF9EFE9" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#F5E7DE" />
+    <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#EDDBCF" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FFFCF9" />
+    <SolidColorBrush x:Key="SurfaceAlpha70Brush" Color="#B3FFFAF7" />
+    <SolidColorBrush x:Key="SurfaceAlpha25Brush" Color="#40FFFAF7" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#E2CBBB" />
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#C7A58F" />
+    <SolidColorBrush x:Key="DividerBrush" Color="#EAD8CC" />
+
+    <!-- Copper, taken from the leaf's midrib and deepened for type. -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#8C4A22" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#7A3F1C" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#633216" />
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AccentButtonBrush" Color="#9E5A2C" />
+    <SolidColorBrush x:Key="AccentButtonHoverBrush" Color="#844820" />
+    <SolidColorBrush x:Key="AccentButtonPressedBrush" Color="#6A3818" />
+    <SolidColorBrush x:Key="OnAccentButtonBrush" Color="#FFFFFF" />
+
+    <!-- Local AI: cranberry, the autumn companion to the copper. -->
+    <Color x:Key="AiGlowColor">#FFB86A7C</Color>
+    <SolidColorBrush x:Key="AiAccentBrush" Color="#7F3446" />
+    <SolidColorBrush x:Key="AiAccentHoverBrush" Color="#6C2B3B" />
+    <SolidColorBrush x:Key="AiAccentPressedBrush" Color="#56212F" />
+    <SolidColorBrush x:Key="AiAccentSoftBrush" Color="#F7E6E8" />
+    <SolidColorBrush x:Key="AiAccentBorderBrush" Color="#D9ADB6" />
+    <SolidColorBrush x:Key="OnAiAccentBrush" Color="#FFFAFB" />
+    <SolidColorBrush x:Key="AiPanelTextBrush" Color="#5A2533" />
+
+    <SolidColorBrush x:Key="HoverBrush" Color="#F3E0D4" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#EFDBCE" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#3F3532" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#584A44" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#5B4C45" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#5B4C45" />
+    <SolidColorBrush x:Key="NarrativeTextBrush" Color="#5A4136" />
+    <SolidColorBrush x:Key="PersonGroupBrush" Color="#FFF9F5" />
+    <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#F6E8E0" />
+    <Color x:Key="SurfaceAltColor">#FFF5E7DE</Color>
+    <Color x:Key="SurfaceRaisedColor">#FFFFFCF9</Color>
+    <Color x:Key="TextSubtleColor">#FF5B4C45</Color>
+</ResourceDictionary>

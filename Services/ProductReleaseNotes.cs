@@ -6,11 +6,26 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "The pace counts the days you still have to write up";
+    public const string ReleaseName = "Unfinished plans move on at the end of the day";
     public const string ReleaseDate = "September 18, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Closing Sati tidies up scheduled work that did not get done",
+            [
+                "When you close Sati, any scheduled item dated today or earlier that is still only scheduled is listed, with its client and type.",
+                "For each one, choose to move it to your next workday or delete it. Moving is already selected, so pressing Enter never loses anything. \"Move all\" and \"Delete all\" set every item at once.",
+                "The next workday skips weekends, agency holidays and excluded weekdays, and your own time off.",
+                "Keep Sati open changes nothing. Notes you have started, logged, or had approved are never listed, and paperwork that is still due returns on the daily agenda even if you delete its plan.",
+                "The first time you close after updating, the list may include older plans left on past days. Clearing them also stops those days being held open in Documented Avg."
+            ]),
+        new(
+            "A Legacy theme with the original leaf",
+            [
+                "Settings now offers Legacy: the original copper leaf and window icon, warm blush-cream colors, and Palatino type throughout, including the splash and sign-in screens.",
+                "Every other theme keeps the watercolor leaf. The desktop shortcut's icon does not change."
+            ]),
         new(
             "Projected and Secured per day now count past days you can still write up",
             [

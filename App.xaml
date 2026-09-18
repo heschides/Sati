@@ -26,7 +26,6 @@
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Fonts -->
-            <FontFamily x:Key="AppFont">Inter</FontFamily>
             <FontFamily x:Key="NarrativeFont">Cambria</FontFamily>
 
             <!-- Global styles -->
