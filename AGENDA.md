@@ -366,8 +366,30 @@ ships with this desktop build.
       change said plainly to the case managers it describes.
 - [x] Release build: 0 errors. Desktop 2,290, API 827, signatures 119, portal 8, and Carika 4 pass.
       Nine opt-in skips.
-- [ ] Push; publish the Demo API and verify health, version, and contract revision.
-- [ ] Build, accept, and publish both installers.
+- [x] Source release commit `f1a2930` pushed to `origin/master`.
+- [x] Publish the Demo API. `artifacts/SatiApi-1.3.18-fx-x86.zip` is 10,099,185 bytes, SHA-256
+      `E1EC5D7F1C135B0FCB58E0E38D6FF044E325E1B4A26A2D2EF50DC551EFD88476`, the same 68 files as
+      1.3.17, file version 1.3.18.0, no settings files, and no secret-like values. OneDeploy to
+      `sati-demo-api-satilogica` in `rg-sati-demo` succeeded (deployment
+      `3c8eac7510354ba3921bad428626dd20`); the 1.3.17 package is retained. Live and ready return
+      200, `/health/version` reports Sati.Api 1.3.18 with contract `256F0E82D4B8` — changed from
+      `3A4B6F084C12` for the new contract shape — equal to `ApiSurface.Revision` from this build.
+      The inclusions route refuses anonymous callers. `Test-DemoReadiness.ps1 -HealthOnly` passed;
+      authenticated checks were not run. No migration and no firewall rule.
+- [x] Build, accept, and publish both installers without overwriting. `SqlLocalDB.msi` is Valid
+      Microsoft-signed. `SatiDemoSetup-1.3.18.exe` is 102,866,944 bytes, SHA-256
+      `D63C891B5A75193B659911D133CE58EF92641C734408AAB5323C7BECC5AC8F70`; five responsive
+      15-second launches with graceful closes, version 1.3.18.0, and cleanup passed; published to
+      `SatiLogica Demo Files`. `SatiLocalSetup-1.3.18.exe` is 204,908,073 bytes, SHA-256
+      `C3BE48091390DEFE869CBBFF426DBEDE5895D6983ACE87A02221171B171D8D39`; version 1.3.18.0,
+      `SatiProduction`, integrated security, and cleanup passed; published to `Sati Desktop`.
+      The Local build failed twice with a transient lock on its own staged `Sati.exe`
+      (`CompressArchiveUnauthorizedAccessError`) and succeeded unchanged on the third run; no
+      stale build directory and no Sati process of this login was involved. Both copies and
+      checksum files were verified after publication, on the build workstation rather than a
+      clean machine.
+- [x] Branches: deleted local `capture-days-and-zero-days` (ddfb085, fully merged, never pushed).
+      Retained the same branches as 1.3.17, for the same reasons.
 - [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.18.exe`, which
       carries 1.3.15 through 1.3.17 as well, including the `AddServiceDayInclusions` migration the
       desktop applies at that first launch.
