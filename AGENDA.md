@@ -370,9 +370,26 @@ Supersedes 1.3.19 below, whose Demo installer failed acceptance, and carries its
       Legacy before commit.
 - [x] Release build: 0 errors. Desktop 2,301, API 827, signatures 119, portal 8, and Carika 4 pass.
       Nine opt-in skips.
-- [ ] Source release commit pushed to `origin/master`.
-- [ ] Publish the Demo API and verify health, version, and contract revision.
-- [ ] Build, accept, and publish both installers without overwriting.
+- [x] Source release commit `e60969a` pushed to `origin/master`.
+- [x] Publish the Demo API. `artifacts/SatiApi-1.3.20-fx-x86.zip` is 10,097,811 bytes, SHA-256
+      `A33DB3E22208512F033C4761ACF495D6DA9A8A6BBBA312FF2CC5CF02771E4ADE`, the same 68 files as
+      1.3.19, file version 1.3.20.0, no settings files, and no secret-like values. OneDeploy to
+      `sati-demo-api-satilogica` in `rg-sati-demo` succeeded (deployment
+      `636239e68b1a4b1e9d9af0791c00124c`); the 1.3.19 and 1.3.18 packages are retained. Live and
+      ready return 200, `/health/version` reports Sati.Api 1.3.20 with contract `256F0E82D4B8`,
+      unchanged since 1.3.18 because no contract source changed. Anonymous Settings returns 401.
+      `Test-DemoReadiness.ps1 -HealthOnly` passed; authenticated checks were not run. No migration
+      and no firewall rule.
+- [x] Build, accept, and publish both installers without overwriting. `SqlLocalDB.msi` is Valid
+      Microsoft-signed, SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.20.exe` is 102,907,904 bytes, SHA-256
+      `440DE5EEF310E9DD0E47277FA34AB0021F02E38D49C1D54CD0A6D5C3BC2BB826`; five responsive
+      15-second launches with graceful closes, version 1.3.20.0, and cleanup passed; published to
+      `SatiLogica Demo Files`. `SatiLocalSetup-1.3.20.exe` is 204,943,401 bytes, SHA-256
+      `043C547573ECECD1B57174F2F6E2B581A391359C6BCBA91901E646422161C6EB`; version 1.3.20.0,
+      `SatiProduction`, integrated security, and cleanup passed; published to `Sati Desktop`. Both
+      copies and checksum files were verified after publication, on the build workstation rather
+      than a clean machine.
 - [x] Branches: none created for this work. Retained the same branches as 1.3.18, for the same
       reasons.
 - [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.20.exe`, which
