@@ -350,6 +350,28 @@ migration is required.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.18 — 2026-09-18
+
+"The pace counts the days you still have to write up." Releases the two September 17 sections
+above: the corrected pace divisor, days marked as having no billable work, the sign-in and
+shutdown reminders, and supervisor visibility of settled zero days.
+
+**No migration.** The marks reuse `ServiceDayInclusions` from 1.3.17. The contract gains
+`service-day-inclusion-review-v1`, because the read now sends a `userId` an older server would
+ignore while answering with the actor's own rows, so the fingerprint changes and the Demo API
+ships with this desktop build.
+
+- [x] Merge `capture-days-and-zero-days` into `master` (fast-forward to `ddfb085`).
+- [x] Coordinated 1.3.18 version and Settings release notes, including the supervisor-visible
+      change said plainly to the case managers it describes.
+- [x] Release build: 0 errors. Desktop 2,290, API 827, signatures 119, portal 8, and Carika 4 pass.
+      Nine opt-in skips.
+- [ ] Push; publish the Demo API and verify health, version, and contract revision.
+- [ ] Build, accept, and publish both installers.
+- [ ] Production workstation (Joshu login): on 1.3.14. Install `SatiLocalSetup-1.3.18.exe`, which
+      carries 1.3.15 through 1.3.17 as well, including the `AddServiceDayInclusions` migration the
+      desktop applies at that first launch.
+
 ## Release 1.3.17 — 2026-09-17
 
 "A day counts once you have finished it." Releases the counted-service-days section above: a day

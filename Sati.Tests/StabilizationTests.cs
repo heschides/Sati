@@ -649,11 +649,21 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.17", version);
+        Assert.Equal("1.3.18", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("A day counts once you have finished it", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("The pace counts the days you still have to write up", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         // The reasons this release exists, in the words staff will read.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Projected and Secured per day now count past days you can still write up" &&
+            section.Items.Any(item => item.Contains("DAYS TO CAPTURE", StringComparison.Ordinal)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Marking a day with no billable work" &&
+            section.Items.Any(item => item.Contains("counts in Documented Avg as a zero", StringComparison.OrdinalIgnoreCase)));
+        // A supervisor seeing something new about a case manager is said plainly, to them.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Supervisors see settled days with no billable work");
+        // 1.3.17's reasons stay described, because this release carries them too.
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Writing up one note no longer drags your average down" &&
             section.Items.Any(item => item.Contains("tick", StringComparison.OrdinalIgnoreCase)) &&

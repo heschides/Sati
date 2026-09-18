@@ -6,11 +6,39 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "A day counts once you have finished it";
-    public const string ReleaseDate = "September 17, 2026";
+    public const string ReleaseName = "The pace counts the days you still have to write up";
+    public const string ReleaseDate = "September 18, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Projected and Secured per day now count past days you can still write up",
+            [
+                "These figures divided only by the days ahead, so they assumed every remaining unit had to come from new service. If you document in batches, that read far too high.",
+                "They now also divide by past workdays whose notes are not written yet and whose documentation window is still open. The work happened; writing it up still produces units.",
+                "FUTURE DAYS is now DAYS TO CAPTURE, and shows the split, for example \"14 days · 10 ahead · 4 to write up\".",
+                "A past day leaves that count as soon as you write it up or mark it as having no billable work."
+            ]),
+        new(
+            "Marking a day with no billable work",
+            [
+                "Some workdays produce nothing billable and are not time off. Tick such a day on the calendar and it counts in Documented Avg as a zero, which is honest: the month still requires the same units, so the remaining days have to make them up.",
+                "It also stops being counted as work waiting to be written, so the pace tells the truth that day rather than a week later.",
+                "Time off is still separate, and still right-click. Time off lowers the monthly requirement; a day with no billable work does not."
+            ]),
+        new(
+            "A reminder before a day falls out of the billing window",
+            [
+                "At sign-in and again when closing Sati, any workday with nothing documented whose window closes today or tomorrow is named, with the last day you can still document it.",
+                "Closing Sati offers to stay open so you can write them. The reminder lists dates only.",
+                "After that window closes the day cannot be billed, its units are gone, and the pace needed for every remaining day goes up."
+            ]),
+        new(
+            "Supervisors see settled days with no billable work",
+            [
+                "Your supervisor's monthly productivity list shows how many days you marked as having no billable work, and which dates, once each day's documentation window has closed.",
+                "While a day is still inside its window it stays yours: you can still write it up, and it is not shown."
+            ]),
         new(
             "Writing up one note no longer drags your average down",
             [

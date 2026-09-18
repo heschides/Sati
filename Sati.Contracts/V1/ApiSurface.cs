@@ -91,7 +91,12 @@ public static class ApiSurface
         "case-note-goal-progress-v1",
         "cwic-referral-packet-v1",
         "housing-support-funds-v1",
-        "person-photo-v1"
+        "person-photo-v1",
+        // The counted-service-day read gained a userId, so a reviewer can see a case manager's
+        // settled days with no billable work. An older server ignores the parameter and answers
+        // with the actor's own rows, which would show a supervisor their own days under a case
+        // manager's name.
+        "service-day-inclusion-review-v1"
     ];
 
     /// <summary>
