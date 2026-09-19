@@ -6811,7 +6811,11 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
       adjudicated claim citing the payer's claim number, in a correction-only 837P.
 - [x] Store per-claim 277CA verdicts and the 835 payer claim control number, which nothing
       retained before.
-- [ ] Apply migration `20260919212417_AddEftDepositsAndClaimCorrections` to Demo. It adds four
+- [ ] Apply migration `20260919212417_AddEftDepositsAndClaimCorrections` to Demo with
+      `scripts/Apply-EftDepositsAndClaimCorrectionsMigration.ps1` (`-WhatIfOnly` first, then twice).
+      Rehearsed 2026-09-19 against a scratch LocalDB copy of the schema at the previous
+      migration: the dry run rolled back clean, the apply was idempotent, and the resulting
+      schema is identical to the one `dotnet ef database update` produces. It adds four
       tables plus `RemittanceClaimOutcomes.PayerClaimControlNumber` and `EdiGenerations.IsCorrection`;
       it is additive only. Needs the temporary SQL firewall rule.
 - [ ] Confirm against the MaineCare/Office Ally 837P companion guide that frequency 7 and 8 with
