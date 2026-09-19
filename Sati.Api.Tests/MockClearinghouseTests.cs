@@ -89,14 +89,7 @@ public sealed class MockClearinghouseTests
     /// declaration rather than from configuration.
     /// </summary>
     [Theory]
-    [InlineData(MockClearinghouseScenario.Accepted)]
-    [InlineData(MockClearinghouseScenario.SyntaxRejected)]
-    [InlineData(MockClearinghouseScenario.ClaimsRejected)]
-    [InlineData(MockClearinghouseScenario.PartiallyAccepted)]
-    [InlineData(MockClearinghouseScenario.PartialPayment)]
-    [InlineData(MockClearinghouseScenario.Denied)]
-    [InlineData(MockClearinghouseScenario.ProviderLevelAdjustment)]
-    [InlineData(MockClearinghouseScenario.Reversal)]
+    [MemberData(nameof(EveryScenario))]
     public void EveryDocumentTheMockEmitsIsATestInterchange(MockClearinghouseScenario scenario)
     {
         var documents = MockClearinghouse.Respond(TestClaim(), scenario, GeneratedAt);
@@ -230,4 +223,92 @@ public sealed class MockClearinghouseTests
         Assert.Equal(375m, remittance.RemittancePaymentAmount);
         Assert.NotEqual(remittance.ClaimPaymentTotal, remittance.RemittancePaymentAmount);
     }
+
+    public static TheoryData<MockClearinghouseScenario> EveryScenario()
+    {
+        var data = new TheoryData<MockClearinghouseScenario>();
+        foreach (var scenario in Enum.GetValues<MockClearinghouseScenario>())
+            data.Add(scenario);
+        return data;
+    }
+
+    /// <summary>
+    /// Every scenario the mock offers produces documents the permanent reader accepts,
+    /// with the 835's claim payments, adjustments, and deposit balancing. A scenario the
+    /// reader refused would reach the Demo screen as an ingestion error, not as the state
+    /// it was added to show.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EveryScenario))]
+    public void EveryScenarioIsReadableAndBalances(MockClearinghouseScenario scenario)
+    {
+        var documents = MockClearinghouse.Respond(TestClaim(claimCount: 4), scenario, GeneratedAt);
+
+        ClaimResponseReader.ReadAcknowledgement(documents.FunctionalAcknowledgement);
+        if (documents.ClaimAcknowledgement is not null)
+            ClaimResponseReader.ReadAcknowledgement(documents.ClaimAcknowledgement);
+        if (documents.RemittanceAdvice is null)
+            return;
+
+        var remittance = ClaimResponseReader.ReadRemittance(documents.RemittanceAdvice);
+        Assert.All(remittance.Claims, claim =>
+            Assert.Equal(claim.BilledAmount - claim.PaidAmount, claim.AdjustmentAmount));
+        Assert.Equal(remittance.ClaimPaymentTotal - remittance.ProviderLevelAdjustment,
+            remittance.RemittancePaymentAmount);
+    }
+
+    [Theory]
+    [InlineData(MockClearinghouseScenario.Denied, "29")]
+    [InlineData(MockClearinghouseScenario.DeniedDuplicate, "18")]
+    [InlineData(MockClearinghouseScenario.DeniedCoverageEnded, "27")]
+    [InlineData(MockClearinghouseScenario.DeniedNoAuthorization, "197")]
+    [InlineData(MockClearinghouseScenario.DeniedMissingInformation, "16")]
+    [InlineData(MockClearinghouseScenario.DeniedNotCovered, "96")]
+    [InlineData(MockClearinghouseScenario.DeniedBenefitMaximum, "119")]
+    public void EachDenialCarriesItsOwnReasonAndPaysNothing(MockClearinghouseScenario scenario, string reason)
+    {
+        var documents = MockClearinghouse.Respond(TestClaim(), scenario, GeneratedAt);
+
+        Assert.Equal(BillingSubmissionStage.ClaimAccepted,
+            ClaimResponseReader.ReadAcknowledgement(documents.ClaimAcknowledgement!).Stage);
+        var remittance = ClaimResponseReader.ReadRemittance(documents.RemittanceAdvice!);
+        Assert.All(remittance.Claims, claim =>
+        {
+            Assert.Equal(RemittanceClaimStatus.Denied, claim.Status);
+            Assert.Equal("CO", claim.GroupCode);
+            Assert.Equal(reason, claim.ReasonCode);
+            Assert.Equal(0m, claim.PaidAmount);
+            Assert.Equal(claim.BilledAmount, claim.AdjustmentAmount);
+        });
+        Assert.Equal(0m, remittance.RemittancePaymentAmount);
+        // The worklist can say why, not only that it was denied.
+        Assert.DoesNotContain("needs review", ClaimAdjustmentReasonCatalog.Humanize(reason));
+    }
+
+    [Fact]
+    public void MixedOutcomesPutsEveryKindOfResultInOneRemittance()
+    {
+        var documents = MockClearinghouse.Respond(
+            TestClaim(claimCount: 4), MockClearinghouseScenario.MixedOutcomes, GeneratedAt);
+        var remittance = ClaimResponseReader.ReadRemittance(documents.RemittanceAdvice!);
+
+        Assert.Equal(
+            [RemittanceClaimStatus.Paid, RemittanceClaimStatus.PartiallyPaid,
+             RemittanceClaimStatus.Denied, RemittanceClaimStatus.Denied],
+            remittance.Claims.Select(claim => claim.Status));
+        Assert.Equal([null, "45", "16", "18"], remittance.Claims.Select(claim => claim.ReasonCode));
+        Assert.Equal(360m, remittance.ClaimPaymentTotal);
+        Assert.Equal(360m, remittance.RemittancePaymentAmount);
+    }
+
+    [Theory]
+    [InlineData("29", "Reason 29 — The time limit for filing has expired.")]
+    [InlineData("CO-29", "Provider responsibility — the time limit for filing has expired.")]
+    [InlineData("pr-2", "Patient responsibility — coinsurance amount.")]
+    public void AStoredReasonCodeIsExplainedWithOrWithoutItsGroup(string code, string expected) =>
+        Assert.Equal(expected, ClaimAdjustmentReasonCatalog.Humanize(code));
+
+    [Fact]
+    public void AnUnknownReasonFallsBackToThePayersExplanation() =>
+        Assert.Equal("Payer said so.", ClaimAdjustmentReasonCatalog.Humanize("999", "Payer said so."));
 }

@@ -48,5 +48,34 @@ namespace Sati.Data.Billing
                 new NotSupportedException("The mock clearinghouse is available only in Demo."));
         Task<IReadOnlyList<RemittanceClaimOutcomeDto>> GetRemittanceOutcomesAsync(AgencyActor actor);
         Task<IReadOnlyList<RemittanceDepositDto>> GetRemittanceDepositsAsync(AgencyActor actor);
+
+        // Recording a bank deposit and correcting a sent claim both depend on responses the
+        // payer sent, which only the API ingests. The local path has no such records, so it
+        // says so rather than pretending to have a half of the workflow.
+        bool SupportsClaimCorrections => false;
+
+        Task<IReadOnlyList<EftDepositRecordDto>> GetEftDepositRecordsAsync(AgencyActor actor, long depositId) =>
+            Task.FromException<IReadOnlyList<EftDepositRecordDto>>(new NotSupportedException(
+                "Recording a bank deposit requires an API connection."));
+
+        Task<RemittanceDepositDto> RecordEftDepositAsync(
+            AgencyActor actor, long depositId, RecordEftDepositRequest request) =>
+            Task.FromException<RemittanceDepositDto>(new NotSupportedException(
+                "Recording a bank deposit requires an API connection."));
+
+        Task<IReadOnlyList<BillingClaimStatusDto>> GetBillingPeriodClaimsAsync(AgencyActor actor, int billingPeriodId) =>
+            Task.FromException<IReadOnlyList<BillingClaimStatusDto>>(new NotSupportedException(
+                "Claim corrections require an API connection."));
+
+        Task<ClaimCorrectionDto> CreateClaimCorrectionAsync(
+            AgencyActor actor, int billingPeriodId, CreateClaimCorrectionRequest request) =>
+            Task.FromException<ClaimCorrectionDto>(new NotSupportedException(
+                "Claim corrections require an API connection."));
+
+        // Returns the saved correction file's path.
+        Task<string> GenerateCorrectionEdiAsync(
+            AgencyActor actor, int billingPeriodId, bool isTest, string idempotencyKey) =>
+            Task.FromException<string>(new NotSupportedException(
+                "Claim corrections require an API connection."));
     }
 }

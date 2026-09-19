@@ -4761,3 +4761,70 @@ it counts on what was documented. The case manager can still hold such a day out
 unticking it while its documentation window is open. Today's Scheduled work is live and still holds
 today open. `ServiceTimeline` is unchanged: a lapsed Scheduled note that carries a start time still
 reserves that time until it is resolved.
+
+## 2026-09-19 — the mock clearinghouse denies for named reasons, and the worklist says why
+
+The Demo mock clearinghouse gains one scenario per common whole-claim denial (CO-18, CO-27,
+CO-197, CO-16, CO-96, CO-119, alongside the existing CO-29) and a mixed-outcome remittance that
+pays, partially pays, and denies in one 835. Scenarios are appended to the enum, never inserted,
+because the value takes part in the mock's control numbers and can cross the wire as a number.
+
+These are common published reason codes chosen to exercise the worklist and remittance screens.
+They are not a model of MaineCare adjudication and prove nothing about what MaineCare would deny;
+that evidence still has to come from clearinghouse sandbox acceptance.
+
+Building them exposed a display defect: ingestion stores the bare CARC (`29`) but
+`ClaimAdjustmentReasonCatalog` was keyed `CO-29`, so no stored denial was ever explained and every
+one read the same generic sentence. The catalog is now keyed by CARC, with the group prefix
+optional. Stored rows are unchanged.
+
+## 2026-09-19 — a recorded bank deposit is an entry, not a field
+
+Reconciliation needed the one figure Sati never had: what the bank actually received. It is now
+recorded as an append-only `EftDepositRecords` row — amount, deposit date, optional bank trace,
+who recorded it, and, for a correction, why. The latest entry is the current one.
+
+**Not a column on the deposit.** `RemittanceDeposit` is append-only billing evidence, and a
+mistyped amount is a normal event. A mutable field would have destroyed the earlier figure and
+left the correction invisible. Entries also carry the corrector's name and reason, which a column
+cannot.
+
+**The caller names the entry it saw.** A request carries `PreviousRecordId`; anything else is a
+409. Otherwise two people reconciling the same payment would each append a figure and the last
+writer would silently win. A filtered unique index on `SupersedesRecordId` enforces the same race
+in the database.
+
+**Reconciled is derived, never stored.** A batch reads `Reconciled` when every deposit that paid
+it matches to the penny, computed on each read of the submission history. The submission trail is
+append-only and ranks `Reconciled` above every other stage, so a stored Reconciled event could
+never be withdrawn when a mistyped deposit was corrected an hour later. The rank table stays as it
+is and the screen still tells the truth.
+
+## 2026-09-19 — a sent claim is corrected by frequency code, not by editing it
+
+Claims can now be sent again. `ClaimCorrectionRules` owns which correction a claim allows, from
+its own history rather than from a stored status:
+
+- Turned away before review (999 or 277CA rejection) — never adjudicated, so it is **resent** as a
+  new claim (frequency 1). A second new claim for an adjudicated service would be a duplicate.
+- Paid or partially paid — **replaced** (7) or **voided** (8), citing the payer claim number
+  (CLP07) the 835 gave.
+- Denied — **replaced** only. There is no payment to take back.
+- Reversed — nothing stands with the payer, so the service is billed again as a new claim.
+- Anything else (awaiting an answer, a status nobody can classify) — no correction, because the
+  payer has not finished speaking.
+
+**Nothing is edited.** The original claim line, every retained 837P, and every recorded answer stay
+as they were. A correction is an append-only `ClaimCorrections` row carrying its own claim snapshot,
+and it travels in its own correction 837P alongside the originals it does not touch.
+
+**A resend or replacement is rebuilt from current records; a void is not.** Fixing the client's
+MaineCare ID or diagnosis is usually the point, so a resend or replacement takes the identity
+fields as they stand now and must pass the same candidate and readiness checks as a new claim line.
+The service date, procedure, units, and charge stay the original's: the service did not change. A
+void repeats the adjudicated claim exactly, because it asks the payer to withdraw that claim.
+
+**Two things this needs before real use.** Per-claim 277CA verdicts are now stored
+(`ClaimAcknowledgementOutcomes`) so a rejected claim can be found; answers imported before this
+release have no per-claim verdict and read as unanswered. And whether MaineCare accepts frequency
+7 and 8 as written here is a companion-guide question the rule does not answer.

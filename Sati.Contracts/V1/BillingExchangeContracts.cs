@@ -115,7 +115,16 @@ public sealed record RemittanceDepositDto(
     string Status,
     decimal? Difference,
     string StatusExplanation,
-    bool IsSynthetic);
+    bool IsSynthetic)
+{
+    /// <summary>The date on the latest recorded bank deposit entry, when there is one.</summary>
+    public DateTime? EftDepositDate { get; init; }
+
+    /// <summary>The latest recorded entry. A correction must name it, so two people cannot both "correct" the same figure.</summary>
+    public long? CurrentEftRecordId { get; init; }
+
+    public int EftRecordCount { get; init; }
+}
 
 /// <summary>
 /// Owns the arithmetic that decides whether an 835 and its EFT can be treated as reconciled.
@@ -153,24 +162,48 @@ public static class DepositReconciliationRules
 /// </summary>
 public static class ClaimAdjustmentReasonCatalog
 {
+    // Keyed by the CARC alone. The meaning of a reason code does not depend on its group; the
+    // group says who bears the amount. Remittance outcomes are stored with the bare code (the
+    // 835's CAS02), so a catalog keyed "CO-29" never matched a stored denial.
     private static readonly IReadOnlyDictionary<string, string> Reasons =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["CO-16"] = "Provider responsibility — information is missing or invalid.",
-            ["CO-18"] = "Provider responsibility — this appears to be a duplicate claim or service.",
-            ["CO-45"] = "Provider responsibility — contractual write-off; the charge exceeded the allowed amount.",
-            ["CO-96"] = "Provider responsibility — the service is not covered under the payer's rules.",
-            ["PR-1"] = "Patient responsibility — deductible amount.",
-            ["PR-2"] = "Patient responsibility — coinsurance amount.",
-            ["PR-3"] = "Patient responsibility — copayment amount.",
-            ["OA-23"] = "Other adjustment — prior payer payment or adjustment affected this amount."
+            ["1"] = "deductible amount.",
+            ["2"] = "coinsurance amount.",
+            ["3"] = "copayment amount.",
+            ["16"] = "information on the claim is missing or invalid.",
+            ["18"] = "this appears to be a duplicate claim or service.",
+            ["23"] = "prior payer payment or adjustment affected this amount.",
+            ["27"] = "the service was after the member's coverage ended.",
+            ["29"] = "the time limit for filing has expired.",
+            ["45"] = "contractual write-off; the charge exceeded the allowed amount.",
+            ["96"] = "the service is not covered under the payer's rules.",
+            ["119"] = "the benefit maximum for this period has already been reached.",
+            ["197"] = "the required authorization or notification was absent."
         };
 
+    private static readonly IReadOnlyDictionary<string, string> Groups =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CO"] = "Provider responsibility",
+            ["PR"] = "Patient responsibility",
+            ["OA"] = "Other adjustment",
+            ["PI"] = "Payer-initiated reduction"
+        };
+
+    /// <param name="code">A CARC, alone ("29") or with its group ("CO-29").</param>
     public static string Humanize(string? code, string? payerExplanation = null)
     {
         var normalized = (code ?? string.Empty).Trim().ToUpperInvariant();
-        if (Reasons.TryGetValue(normalized, out var explanation))
-            return explanation;
+        var separator = normalized.IndexOf('-');
+        var group = separator > 0 ? normalized[..separator] : null;
+        var reason = separator > 0 ? normalized[(separator + 1)..] : normalized;
+        if (Reasons.TryGetValue(reason, out var description) &&
+            (group is null || Groups.ContainsKey(group)))
+        {
+            var sentence = char.ToUpperInvariant(description[0]) + description[1..];
+            return group is null ? $"Reason {reason} — {sentence}" : $"{Groups[group]} — {description}";
+        }
         if (!string.IsNullOrWhiteSpace(payerExplanation))
             return payerExplanation.Trim();
         return string.IsNullOrEmpty(normalized)

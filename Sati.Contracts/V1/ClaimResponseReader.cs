@@ -26,6 +26,9 @@ public sealed record RemittanceClaimResult(
 {
     public string ClaimStatusCode { get; init; } = string.Empty;
     public IReadOnlyList<string> ServiceLineReferences { get; init; } = [];
+
+    /// <summary>The payer's own claim number (CLP07), cited when the claim is later replaced or voided.</summary>
+    public string? PayerClaimControlNumber { get; init; }
 }
 
 /// <summary>ProviderLevelAdjustment is the raw signed PLB sum: positive reduces the payment.
@@ -90,7 +93,10 @@ public static class ClaimResponseReader
                 if (detail[0] == "REF" && detail.Length > 1 && detail[1] == "6R")
                     AddUnique(lines, Required(detail, 2, 50));
             }
-            claims.Add(new(reference, amount, lines));
+            var composite = segment.Length > 5 ? segment[5].Split(document.ComponentSeparator) : [];
+            var frequency = composite.Length > 2 && composite[2].Length > 0 ? composite[2] : "1";
+            Require(frequency is "1" or "7" or "8", "The retained claim frequency is unsupported.");
+            claims.Add(new(reference, amount, lines) { FrequencyCode = frequency });
             Require(claims.Count <= 5000, "The retained submission contains too many claims.");
         }
         Require(claims.Count > 0, "The retained submission has no claim references.");
@@ -393,7 +399,11 @@ public static class ClaimResponseReader
                     RemittanceClaimStatus.Reversed => "This advice reverses a prior payment; the prior evidence remains retained.",
                     _ => paid > billed ? "The reported payment exceeds billed charges; review the retained adjustment detail."
                         : "The payer processed the claim with no payment; review its adjustment detail."
-                }) { ClaimStatusCode = code, ServiceLineReferences = lineReferences });
+                }) {
+                ClaimStatusCode = code, ServiceLineReferences = lineReferences,
+                PayerClaimControlNumber = segment.Length > 7 && segment[7].Length is > 0 and <= ClaimCorrectionRules.PayerClaimControlNumberMaxLength
+                    ? segment[7] : null
+            });
             Require(claims.Count <= 5000, "The remittance has too many claims.");
         }
         Require(claims.Count > 0, "Provider-only remittances require separate handling because no retained claim can be matched.");

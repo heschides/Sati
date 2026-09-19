@@ -13,5 +13,8 @@ public sealed class EdiGeneration
     public string Content { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
+    // A correction file carries only the claims being resent, replaced, or voided.
+    public bool IsCorrection { get; set; }
+
     public BillingPeriod BillingPeriod { get; set; } = null!;
 }

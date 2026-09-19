@@ -224,9 +224,24 @@ internal sealed class ClaimResponseIngestion(
                         PaymentDate = remittance.PaymentDate, Status = claim.Status, BilledAmount = claim.BilledAmount,
                         AllowedAmount = null, PaidAmount = claim.PaidAmount, AdjustmentAmount = claim.AdjustmentAmount,
                         PatientResponsibilityAmount = claim.PatientResponsibilityAmount, ReasonCode = claim.ReasonCode,
-                        Explanation = claim.Explanation, PaymentReference = remittance.PaymentReference, IsSynthetic = receipt.IsTest
+                        Explanation = claim.Explanation, PaymentReference = remittance.PaymentReference, IsSynthetic = receipt.IsTest,
+                        PayerClaimControlNumber = claim.PayerClaimControlNumber
                     });
                 receipt.ClaimOutcomesRecorded += groupClaims.Count;
+            }
+            // Kept per claim so a rejected claim can be found and resent; the submission event
+            // below only records how the batch fared as a whole.
+            foreach (var acknowledged in parsed.ClaimAcknowledgements.Where(claim =>
+                         group.Any(match => match.ClaimReference == claim.ClaimReference)))
+            {
+                db.ClaimAcknowledgementOutcomes.Add(new ClaimAcknowledgementOutcome
+                {
+                    AgencyId = receipt.AgencyId, BillingPeriodId = generation.BillingPeriodId,
+                    EdiGenerationId = generation.Id, ResponseId = receipt.Id,
+                    ClaimReference = acknowledged.ClaimReference, Disposition = acknowledged.Disposition,
+                    CategoryCode = acknowledged.CategoryCode, StatusCode = acknowledged.StatusCode,
+                    ReceivedAtUtc = receipt.ReceivedAtUtc, IsSynthetic = receipt.IsTest
+                });
             }
             db.BillingSubmissionEvents.Add(new ServerBillingSubmissionEvent
             {

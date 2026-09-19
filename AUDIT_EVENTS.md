@@ -46,6 +46,8 @@ for content; the audit event is only its activity index.
 - `billing-compliance-recovery.recorded`
 - `scratchpad.updated`
 - `billing-claim-line.created`, `billing-period.submitted`, `billing-edi.generated`
+- `billing-eft-deposit.recorded`, `billing-claim-correction.created`,
+  `billing-correction-edi.generated`
 - `at-request.published`, `at-request.reopened`
 - `check-request.published`, `check-request.submitted`, `check-request.approved`,
   `check-request.returned`, `check-request.released`, `check-request.receipt-acknowledged`

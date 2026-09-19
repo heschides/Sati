@@ -35,7 +35,11 @@ public sealed record ParsedClaimResponse(
 public sealed record SubmittedClaimReference(
     string ClaimReference,
     decimal BilledAmount,
-    IReadOnlyList<string> ServiceLineReferences);
+    IReadOnlyList<string> ServiceLineReferences)
+{
+    /// <summary>CLM05-3: 1 an original claim, 7 a replacement, 8 a void.</summary>
+    public string FrequencyCode { get; init; } = "1";
+}
 
 /// <summary>Correlation facts extracted from the exact retained outbound 837P.</summary>
 public sealed record ParsedClaimSubmission(

@@ -1988,6 +1988,8 @@ rather than in either client.
 | `IncidentHealthScoring` | The versioned operational health score. |
 | `JournalEntry` | The stamp format, the length ceiling, and the newest-first placement of an application-written journal entry (top of the first page in a paged journal). |
 | `JournalDocument` | The stored journal shape — named pages of text runs with bold/italic/underline and checkboxes — and reading every pre-pages plain-text journal as one page. |
+| `ClaimCorrectionRules` | Where a sent claim stands with the payer, and which correction (resend, replace, void) its own history allows. |
+| `EftDepositRules` | What a recorded bank deposit may say, including that a correction must explain itself. |
 
 ---
 

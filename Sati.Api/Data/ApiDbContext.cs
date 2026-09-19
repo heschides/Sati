@@ -53,6 +53,10 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerBillingSubmissionEvent> BillingSubmissionEvents => Set<ServerBillingSubmissionEvent>();
     public DbSet<ServerRemittanceClaimOutcome> RemittanceClaimOutcomes => Set<ServerRemittanceClaimOutcome>();
     public DbSet<ServerRemittanceDeposit> RemittanceDeposits => Set<ServerRemittanceDeposit>();
+    public DbSet<EftDepositRecord> EftDepositRecords => Set<EftDepositRecord>();
+    public DbSet<ClaimAcknowledgementOutcome> ClaimAcknowledgementOutcomes => Set<ClaimAcknowledgementOutcome>();
+    public DbSet<ClaimCorrection> ClaimCorrections => Set<ClaimCorrection>();
+    public DbSet<ClaimCorrectionSubmission> ClaimCorrectionSubmissions => Set<ClaimCorrectionSubmission>();
     public DbSet<ServerReviewItem> ReviewItems => Set<ServerReviewItem>();
     public DbSet<ServerAppointment> Appointments => Set<ServerAppointment>();
     public DbSet<ServerComprehensiveAssessment> ComprehensiveAssessments => Set<ServerComprehensiveAssessment>();
@@ -78,6 +82,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ClearinghousePersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration>(modelBuilder);
+        BillingCorrectionPersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration, ServerClaimLine, ServerRemittanceDeposit>(modelBuilder);
         modelBuilder.Entity<ServerDatabaseIdentity>(entity =>
         {
             entity.ToTable("SatiDatabaseIdentity");
@@ -484,6 +489,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(item => item.ReasonCode).HasMaxLength(30);
             entity.Property(item => item.Explanation).HasMaxLength(500);
             entity.Property(item => item.PaymentReference).HasMaxLength(80);
+            entity.Property(item => item.PayerClaimControlNumber).HasMaxLength(ClaimCorrectionRules.PayerClaimControlNumberMaxLength);
             entity.Property(item => item.BilledAmount).HasColumnType("decimal(18,2)");
             entity.Property(item => item.AllowedAmount).HasColumnType("decimal(18,2)");
             entity.Property(item => item.PaidAmount).HasColumnType("decimal(18,2)");
@@ -763,6 +769,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     private void EnsureAuditEventsAreAppendOnly()
     {
         ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
+        BillingCorrectionPersistenceModel.ProtectWrites(ChangeTracker);
         ReleaseObligationPersistenceModel.ProtectWrites(ChangeTracker);
         BillingComplianceRecoveryPersistenceModel.ProtectWrites(ChangeTracker);
         BillingCompliancePolicyReviewPersistenceModel.ProtectWrites(ChangeTracker);
@@ -1262,6 +1269,7 @@ internal sealed class ServerEdiGeneration
     public string FileName { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public bool IsCorrection { get; set; }
 }
 
 internal sealed class ServerBillingSubmissionEvent
@@ -1299,6 +1307,7 @@ internal sealed class ServerRemittanceClaimOutcome
     public string? ReasonCode { get; set; }
     public string? Explanation { get; set; }
     public string? PaymentReference { get; set; }
+    public string? PayerClaimControlNumber { get; set; }
     public bool IsSynthetic { get; set; }
     public Guid? ResponseId { get; set; }
     public long? EdiGenerationId { get; set; }

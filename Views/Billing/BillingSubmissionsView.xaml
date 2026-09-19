@@ -293,6 +293,56 @@
         </StackPanel>
 
         <StackPanel Grid.Row="5">
+            <!-- CORRECTING A CLAIM — what the payer said about each claim of the selected
+                 batch, and the corrections its answer allows. The list of allowed actions
+                 comes from the API, which enforces the same rule on the way back in. -->
+            <StackPanel Visibility="{Binding ShowsCorrections, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Margin="0,0,0,16">
+                <TextBlock Text="CLAIMS IN THE SELECTED BATCH" Style="{StaticResource LabelStyle}" />
+                <TextBlock Text="A claim turned away before review is resent as a new claim. One the payer adjudicated is replaced or voided, citing the payer's claim number. Corrections are sent in their own 837P file."
+                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                           TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left" Margin="0,0,0,8" />
+                <DataGrid ItemsSource="{Binding PeriodClaims}"
+                          SelectedItem="{Binding SelectedClaim, Mode=TwoWay}"
+                          AutomationProperties.Name="Claims in the selected batch"
+                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                          HeadersVisibility="Column" SelectionMode="Single" MaxHeight="150" Margin="0,0,0,8">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="SERVICE DATE" Width="110"
+                                            Binding="{Binding DateOfService, StringFormat={}{0:MMM d, yyyy}}" />
+                        <DataGridTextColumn Header="CLIENT" Binding="{Binding ClientName}" Width="150" />
+                        <DataGridTextColumn Header="CHARGE" Width="80"
+                                            Binding="{Binding ChargeAmount, StringFormat={}{0:C}}" />
+                        <DataGridTextColumn Header="WHERE IT STANDS" Binding="{Binding StateLabel}" Width="150" />
+                        <DataGridTextColumn Header="PAYER CLAIM #" Binding="{Binding PayerClaimControlNumber}" Width="120" />
+                        <DataGridTextColumn Header="SENT" Binding="{Binding SubmissionCount}" Width="55" />
+                    </DataGrid.Columns>
+                </DataGrid>
+                <TextBlock Text="{Binding CorrectionGuidance}" TextWrapping="Wrap" FontSize="12"
+                           MaxWidth="760" HorizontalAlignment="Left"
+                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                <WrapPanel>
+                    <ComboBox ItemsSource="{Binding AvailableCorrections}"
+                              SelectedItem="{Binding SelectedCorrection, Mode=TwoWay}"
+                              MinWidth="150" Margin="0,0,10,6"
+                              AutomationProperties.Name="Correction to make" />
+                    <TextBox Text="{Binding CorrectionReason, UpdateSourceTrigger=PropertyChanged}"
+                             Width="300" Margin="0,0,10,6" MaxLength="500"
+                             AutomationProperties.Name="Why this claim is being corrected" />
+                    <Button Content="Record correction" Command="{Binding CreateCorrectionCommand}"
+                            Style="{StaticResource SmallButton}" Margin="0,0,10,6"
+                            AutomationProperties.Name="Record claim correction" />
+                    <Button Content="Generate correction file" Command="{Binding GenerateCorrectionFileCommand}"
+                            Style="{StaticResource PrimaryButton}" Height="28" Padding="12,0" Margin="0,0,0,6"
+                            AutomationProperties.Name="Generate correction 837P file" />
+                </WrapPanel>
+                <TextBlock Text="{Binding CorrectionProblem}" TextWrapping="Wrap" FontSize="12"
+                           Visibility="{Binding HasCorrectionProblem, Converter={StaticResource BoolToVisibilityConverter}}"
+                           Foreground="{DynamicResource DangerStrongBrush}"
+                           AutomationProperties.LiveSetting="Assertive"
+                           AutomationProperties.Name="Claim correction problem" />
+            </StackPanel>
+
             <StackPanel Visibility="{Binding ShowsResponseImport, Converter={StaticResource BoolToVisibilityConverter}}"
                         Margin="0,0,0,16">
                 <TextBlock Text="CLEARINGHOUSE RESPONSES" Style="{StaticResource LabelStyle}" />

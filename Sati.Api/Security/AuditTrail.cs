@@ -74,6 +74,9 @@ internal static class AuditActions
     public const string BillingClaimLineCreated = "billing-claim-line.created";
     public const string BillingEdiGenerated = "billing-edi.generated";
     public const string BillingEdiTransmitted = "billing-edi.transmitted";
+    public const string BillingEftDepositRecorded = "billing-eft-deposit.recorded";
+    public const string BillingClaimCorrectionCreated = "billing-claim-correction.created";
+    public const string BillingCorrectionEdiGenerated = "billing-correction-edi.generated";
     public const string BillingConfigurationUpdated = "billing-configuration.updated";
     public const string BillingCompliancePolicyAppended = "billing-compliance-policy.appended";
     public const string BillingComplianceRecoveryRecorded = "billing-compliance-recovery.recorded";

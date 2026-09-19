@@ -64,16 +64,13 @@ internal static class MockClearinghouse
         {
             if (scenario == MockClearinghouseScenario.PartiallyAccepted && i % 2 == 1) continue;
             var claim = submission.Claims[i];
-            var (code, billed, paid, reason) = scenario switch
-            {
-                MockClearinghouseScenario.Denied => ("4", claim.BilledAmount, 0m, "29"),
-                MockClearinghouseScenario.Reversal => ("22", -claim.BilledAmount, -claim.BilledAmount, (string?)null),
-                MockClearinghouseScenario.PartialPayment =>
-                    ("1", claim.BilledAmount, decimal.Round(claim.BilledAmount * .8m, 2, MidpointRounding.AwayFromZero), "45"),
-                _ => ("1", claim.BilledAmount, claim.BilledAmount, (string?)null)
-            };
+            // A void (frequency 8) is answered by taking the original payment back, whatever
+            // the scenario: that is what a void asks the payer to do.
+            var (code, billed, paid, reason) = claim.FrequencyCode == "8"
+                ? ("22", -claim.BilledAmount, -claim.BilledAmount, (string?)null)
+                : Outcome(scenario, claim.BilledAmount, i);
             paidTotal += paid;
-            rows.Append($"LX*{i + 1}~\nCLP*{claim.ClaimReference}*{code}*{Money(billed)}*{Money(paid)}*0*MC*MOCK{i + 1:D6}*11*1~\n");
+            rows.Append($"LX*{i + 1}~\nCLP*{claim.ClaimReference}*{code}*{Money(billed)}*{Money(paid)}*0*MC*MOCK{submission.Envelope.ControlNumber}{i + 1:D3}*11*1~\n");
             if (billed != paid)
                 rows.Append($"CAS*CO*{reason}*{Money(billed - paid)}~\n");
             rows.Append("NM1*QC*1*EXAMPLE*SYNTHETIC****MI*TESTMEMBER~\n")
@@ -96,6 +93,47 @@ internal static class MockClearinghouse
             body.Append($"PLB*{submission.BillingProviderNpi}*{stamp}*{(paidTotal < 0 ? "FB" : "WO")}:MOCKREF*{Money(providerAdjustment)}~\n");
         return Wrap(submission, scenario, "835", "0003", body.ToString(), stamp, time);
     }
+
+    // The CARC each single-reason denial scenario carries. Every one is a whole-claim denial
+    // (CLP02 4, nothing paid) with the full charge adjusted under group CO. These are common
+    // published reason codes chosen to exercise the worklist, not a model of how MaineCare
+    // adjudicates; RARCs are not emitted because the reader does not retain them yet.
+    private static readonly IReadOnlyDictionary<MockClearinghouseScenario, string> DenialReasons =
+        new Dictionary<MockClearinghouseScenario, string>
+        {
+            [MockClearinghouseScenario.Denied] = "29",
+            [MockClearinghouseScenario.DeniedDuplicate] = "18",
+            [MockClearinghouseScenario.DeniedCoverageEnded] = "27",
+            [MockClearinghouseScenario.DeniedNoAuthorization] = "197",
+            [MockClearinghouseScenario.DeniedMissingInformation] = "16",
+            [MockClearinghouseScenario.DeniedNotCovered] = "96",
+            [MockClearinghouseScenario.DeniedBenefitMaximum] = "119"
+        };
+
+    /// <summary>The CLP02 status, signed billed and paid amounts, and CO reason for one claim.</summary>
+    private static (string Code, decimal Billed, decimal Paid, string? Reason) Outcome(
+        MockClearinghouseScenario scenario, decimal billed, int claimIndex)
+    {
+        if (DenialReasons.TryGetValue(scenario, out var denial))
+            return ("4", billed, 0m, denial);
+
+        return scenario switch
+        {
+            MockClearinghouseScenario.Reversal => ("22", -billed, -billed, null),
+            MockClearinghouseScenario.PartialPayment => ("1", billed, EightyPercent(billed), "45"),
+            MockClearinghouseScenario.MixedOutcomes => (claimIndex % 4) switch
+            {
+                0 => ("1", billed, billed, null),
+                1 => ("1", billed, EightyPercent(billed), "45"),
+                2 => ("4", billed, 0m, "16"),
+                _ => ("4", billed, 0m, "18")
+            },
+            _ => ("1", billed, billed, null)
+        };
+    }
+
+    private static decimal EightyPercent(decimal billed) =>
+        decimal.Round(billed * .8m, 2, MidpointRounding.AwayFromZero);
 
     private static string Wrap(ParsedClaimSubmission submission, MockClearinghouseScenario scenario,
         string type, string transactionControl, string body, string stamp, string time)

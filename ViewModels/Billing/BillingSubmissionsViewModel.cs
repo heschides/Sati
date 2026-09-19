@@ -175,6 +175,151 @@ namespace Sati.ViewModels.Billing
             OnPropertyChanged(nameof(CanSubmitPeriod));
             OnPropertyChanged(nameof(CanGenerateEdi));
             OnPropertyChanged(nameof(SubmitAvailabilityMessage));
+            SelectedClaim = null;
+            PeriodClaims.Clear();
+            CorrectionProblem = null;
+            if (value is not null && ShowsCorrections)
+                _ = LoadPeriodClaimsAsync(value.Id);
+        }
+
+        // ---------------------------------------------------------------------
+        // Correcting a claim the payer has already answered
+        // ---------------------------------------------------------------------
+
+        public ObservableCollection<BillingClaimStatusDto> PeriodClaims { get; } = [];
+        public ObservableCollection<ClaimCorrectionAction> AvailableCorrections { get; } = [];
+
+        public bool ShowsCorrections => _billingService.SupportsClaimCorrections;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CreateCorrectionCommand))]
+        private BillingClaimStatusDto? selectedClaim;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CreateCorrectionCommand))]
+        private ClaimCorrectionAction? selectedCorrection;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CreateCorrectionCommand))]
+        private string? correctionReason;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CreateCorrectionCommand))]
+        [NotifyCanExecuteChangedFor(nameof(GenerateCorrectionFileCommand))]
+        private bool isCorrecting;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasCorrectionProblem))]
+        private string? correctionProblem;
+
+        public bool HasCorrectionProblem => !string.IsNullOrWhiteSpace(CorrectionProblem);
+
+        public bool HasCorrectionsWaiting =>
+            PeriodClaims.Any(claim => claim.State == nameof(ClaimLifecycleState.CorrectionWaitingToSend));
+
+        public string CorrectionGuidance => SelectedClaim is null
+            ? "Select a claim to see where it stands with the payer."
+            : SelectedClaim.Explanation;
+
+        partial void OnSelectedClaimChanged(BillingClaimStatusDto? value)
+        {
+            CorrectionProblem = null;
+            CorrectionReason = null;
+            AvailableCorrections.Clear();
+            foreach (var action in value?.AllowedActions ?? [])
+            {
+                if (Enum.TryParse<ClaimCorrectionAction>(action, out var parsed))
+                    AvailableCorrections.Add(parsed);
+            }
+            SelectedCorrection = AvailableCorrections.Count == 1 ? AvailableCorrections[0] : null;
+            OnPropertyChanged(nameof(CorrectionGuidance));
+        }
+
+        private async Task LoadPeriodClaimsAsync(int periodId)
+        {
+            try
+            {
+                var claims = await _billingService.GetBillingPeriodClaimsAsync(CurrentActor(), periodId);
+                if (SelectedPeriod?.Id != periodId)
+                    return;
+                PeriodClaims.Clear();
+                foreach (var claim in claims)
+                    PeriodClaims.Add(claim);
+                OnPropertyChanged(nameof(HasCorrectionsWaiting));
+                GenerateCorrectionFileCommand.NotifyCanExecuteChanged();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Period claims load failed: {ex.Message}");
+                if (SelectedPeriod?.Id == periodId)
+                    CorrectionProblem = "The payer's answers for this batch could not be loaded.";
+            }
+        }
+
+        private bool CanCreateCorrection() =>
+            ShowsCorrections && !IsCorrecting && SelectedPeriod is not null && SelectedClaim is not null &&
+            SelectedCorrection is not null &&
+            ClaimCorrectionRules.ValidateReason(CorrectionReason) is null;
+
+        [RelayCommand(CanExecute = nameof(CanCreateCorrection))]
+        private async Task CreateCorrection()
+        {
+            if (SelectedPeriod is not { } period || SelectedClaim is not { } claim ||
+                SelectedCorrection is not { } action)
+                return;
+
+            IsCorrecting = true;
+            CorrectionProblem = null;
+            try
+            {
+                await _billingService.CreateClaimCorrectionAsync(CurrentActor(), period.Id,
+                    new CreateClaimCorrectionRequest(claim.ClaimLineId, action, CorrectionReason!.Trim()));
+                StatusMessage = $"{ClaimCorrectionRules.Describe(action)} recorded for {claim.ClientName}. " +
+                    "Generate the correction file to send it.";
+                CorrectionReason = null;
+                await LoadPeriodClaimsAsync(period.Id);
+                SelectedClaim = PeriodClaims.FirstOrDefault(row => row.ClaimLineId == claim.ClaimLineId);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Claim correction failed: {ex.Message}");
+                CorrectionProblem = $"The correction was not recorded: {ex.Message}";
+            }
+            finally
+            {
+                IsCorrecting = false;
+            }
+        }
+
+        private bool CanGenerateCorrectionFile() =>
+            ShowsCorrections && !IsCorrecting && !IsGenerating && SelectedPeriod is not null && HasCorrectionsWaiting;
+
+        [RelayCommand(CanExecute = nameof(CanGenerateCorrectionFile))]
+        private async Task GenerateCorrectionFile()
+        {
+            if (SelectedPeriod is not { } period)
+                return;
+
+            IsCorrecting = true;
+            CorrectionProblem = null;
+            try
+            {
+                var path = await _billingService.GenerateCorrectionEdiAsync(
+                    CurrentActor(), period.Id, IsTestMode, Guid.NewGuid().ToString("N"));
+                LastGeneratedPath = path;
+                StatusMessage = $"Correction 837P written to {path}.";
+                await LoadPeriodClaimsAsync(period.Id);
+                await RefreshSubmissionHistoryAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Correction file generation failed: {ex.Message}");
+                CorrectionProblem = $"The correction file was not generated: {ex.Message}";
+            }
+            finally
+            {
+                IsCorrecting = false;
+            }
         }
 
         partial void OnLastGeneratedPathChanged(string? value)
@@ -823,7 +968,14 @@ namespace Sati.ViewModels.Billing
             new(MockClearinghouseScenario.ClaimsRejected, "Claims rejected", "999 accepts the file; 277CA rejects every claim."),
             new(MockClearinghouseScenario.PartiallyAccepted, "Partially accepted", "277CA accepts some claims and rejects others."),
             new(MockClearinghouseScenario.PartialPayment, "Partially paid", "835 pays less than billed and records a contractual adjustment."),
-            new(MockClearinghouseScenario.Denied, "Denied on remittance", "Claims are accepted, then denied with a reason code on the 835."),
+            new(MockClearinghouseScenario.Denied, "Denied — timely filing (CO-29)", "Claims are accepted, then denied on the 835 because the filing limit has passed."),
+            new(MockClearinghouseScenario.DeniedDuplicate, "Denied — duplicate (CO-18)", "Claims are accepted, then denied on the 835 as duplicates of claims already processed."),
+            new(MockClearinghouseScenario.DeniedCoverageEnded, "Denied — coverage ended (CO-27)", "Claims are accepted, then denied on the 835 because the member's coverage had ended."),
+            new(MockClearinghouseScenario.DeniedNoAuthorization, "Denied — no authorization (CO-197)", "Claims are accepted, then denied on the 835 because the required authorization was absent."),
+            new(MockClearinghouseScenario.DeniedMissingInformation, "Denied — missing information (CO-16)", "Claims are accepted, then denied on the 835 for missing or invalid claim information."),
+            new(MockClearinghouseScenario.DeniedNotCovered, "Denied — not covered (CO-96)", "Claims are accepted, then denied on the 835 as a non-covered service."),
+            new(MockClearinghouseScenario.DeniedBenefitMaximum, "Denied — benefit maximum (CO-119)", "Claims are accepted, then denied on the 835 because the period's benefit maximum was reached."),
+            new(MockClearinghouseScenario.MixedOutcomes, "Mixed outcomes", "One 835 pays, partially pays, and denies claims in rotation (CO-45, CO-16, CO-18)."),
             new(MockClearinghouseScenario.ProviderLevelAdjustment, "Provider-level adjustment", "835 includes an adjustment that changes the deposit total."),
             new(MockClearinghouseScenario.Reversal, "Payment reversed", "835 reverses a previously paid claim."),
         ];

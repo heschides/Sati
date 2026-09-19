@@ -704,15 +704,40 @@ public sealed class CloudBillingService(CloudApiClient api) : IBillingService
 
     public async Task<IReadOnlyList<RemittanceDepositDto>> GetRemittanceDepositsAsync(AgencyActor actor) =>
         await api.GetAsync<List<RemittanceDepositDto>>("/api/v1/billing/remittance-deposits");
+
+    public bool SupportsClaimCorrections => true;
+
+    public async Task<IReadOnlyList<EftDepositRecordDto>> GetEftDepositRecordsAsync(AgencyActor actor, long depositId) =>
+        await api.GetAsync<List<EftDepositRecordDto>>(
+            $"/api/v1/billing/remittance-deposits/{depositId}/eft");
+
+    public async Task<RemittanceDepositDto> RecordEftDepositAsync(
+        AgencyActor actor, long depositId, RecordEftDepositRequest request) =>
+        await api.PostAsync<RecordEftDepositRequest, RemittanceDepositDto>(
+            $"/api/v1/billing/remittance-deposits/{depositId}/eft", request);
+
+    public async Task<IReadOnlyList<BillingClaimStatusDto>> GetBillingPeriodClaimsAsync(
+        AgencyActor actor, int billingPeriodId) =>
+        await api.GetAsync<List<BillingClaimStatusDto>>(
+            $"/api/v1/billing/periods/{billingPeriodId}/claims");
+
+    public async Task<ClaimCorrectionDto> CreateClaimCorrectionAsync(
+        AgencyActor actor, int billingPeriodId, CreateClaimCorrectionRequest request) =>
+        await api.PostAsync<CreateClaimCorrectionRequest, ClaimCorrectionDto>(
+            $"/api/v1/billing/periods/{billingPeriodId}/corrections", request);
+
+    public async Task<string> GenerateCorrectionEdiAsync(
+        AgencyActor actor, int billingPeriodId, bool isTest, string idempotencyKey) =>
+        await CloudEdiFiles.SaveAsync(await api.PostAsync<GenerateEdiRequest, EdiFileDto>(
+            $"/api/v1/billing/periods/{billingPeriodId}/corrections/edi",
+            new GenerateEdiRequest(isTest, idempotencyKey)));
 }
 
-public sealed class CloudEdiService(CloudApiClient api) : IEdiService
+/// <summary>Where a file the Demo API generated is written, and the one check on its name.</summary>
+internal static class CloudEdiFiles
 {
-    public async Task<string> GenerateAndSaveAsync(int billingPeriodId, bool isTest, string idempotencyKey)
+    public static async Task<string> SaveAsync(EdiFileDto file)
     {
-        var file = await api.PostAsync<GenerateEdiRequest, EdiFileDto>(
-            $"/api/v1/billing/periods/{billingPeriodId}/edi",
-            new GenerateEdiRequest(isTest, idempotencyKey));
         var safeName = Path.GetFileName(file.FileName);
         if (!string.Equals(safeName, file.FileName, StringComparison.Ordinal) ||
             !safeName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
@@ -725,6 +750,17 @@ public sealed class CloudEdiService(CloudApiClient api) : IEdiService
         var path = Path.Combine(root, safeName);
         await File.WriteAllTextAsync(path, file.Content);
         return path;
+    }
+}
+
+public sealed class CloudEdiService(CloudApiClient api) : IEdiService
+{
+    public async Task<string> GenerateAndSaveAsync(int billingPeriodId, bool isTest, string idempotencyKey)
+    {
+        var file = await api.PostAsync<GenerateEdiRequest, EdiFileDto>(
+            $"/api/v1/billing/periods/{billingPeriodId}/edi",
+            new GenerateEdiRequest(isTest, idempotencyKey));
+        return await CloudEdiFiles.SaveAsync(file);
     }
 }
 

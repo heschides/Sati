@@ -18,7 +18,41 @@ internal static class ServerEdiGenerator
         string controlNumber)
     {
         ClaimSubmissionIdentity.RequireControlNumber(controlNumber);
-        var rows = ReadAndValidateRows(period);
+        var rows = ReadAndValidateRows(period.Year, period.Month, Originals(period));
+        return Compose(period.Id, rows, isTest, generatedAt, controlNumber);
+    }
+
+    /// <summary>
+    /// A correction file: only the claims being resent (frequency 1), replaced (7), or voided
+    /// (8). A replacement or void cites the payer's claim number in REF*F8, as the 837P requires.
+    /// </summary>
+    public static string GenerateCorrections(
+        ServerBillingPeriod period,
+        IReadOnlyList<EdiClaim> claims,
+        bool isTest,
+        DateTime generatedAt,
+        string controlNumber)
+    {
+        ClaimSubmissionIdentity.RequireControlNumber(controlNumber);
+        if (claims.Count == 0)
+            throw new InvalidOperationException("There are no corrections waiting to be sent for this billing period.");
+        if (claims.Any(claim => claim.FrequencyCode is not ("1" or "7" or "8") ||
+                (claim.FrequencyCode is "7" or "8" && string.IsNullOrWhiteSpace(claim.PayerClaimControlNumber))))
+            throw new InvalidOperationException("A replacement or void claim must cite the payer's claim number.");
+        var rows = ReadAndValidateRows(period.Year, period.Month, claims);
+        return Compose(period.Id, rows, isTest, generatedAt, controlNumber);
+    }
+
+    private static IEnumerable<EdiClaim> Originals(ServerBillingPeriod period) =>
+        period.Lines.Select(line => new EdiClaim(line, "1", null));
+
+    private static string Compose(
+        int periodId,
+        List<EdiRow> rows,
+        bool isTest,
+        DateTime generatedAt,
+        string controlNumber)
+    {
         var envelope = rows[0].Snapshot;
         var submitterId = envelope.SubmitterId;
         var date = generatedAt.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
@@ -59,14 +93,17 @@ internal static class ServerEdiGenerator
             var lineNumber = 1;
             foreach (var row in group)
             {
-                var line = row.Line;
+                var line = row.Claim.Line;
                 var units = BillingRules.FormatDecimal(line.Units);
                 var charge = BillingRules.FormatDecimal(line.ChargeAmount);
                 var procedure = $"HC{SubSep}{line.ProcedureCode}" +
                     (string.IsNullOrWhiteSpace(line.ProcedureModifier) ? string.Empty : $"{SubSep}{line.ProcedureModifier}");
-                builder.AppendLine(Segment("CLM", ClaimSubmissionIdentity.ClaimReference(controlNumber, period.Id, line.NoteId), charge, "", "",
-                    $"{line.PlaceOfService:D2}{SubSep}{SubSep}1", "Y", "A", "Y", "I"));
+                builder.AppendLine(Segment("CLM", ClaimSubmissionIdentity.ClaimReference(controlNumber, periodId, line.NoteId), charge, "", "",
+                    $"{line.PlaceOfService:D2}{SubSep}{SubSep}{row.Claim.FrequencyCode}", "Y", "A", "Y", "I"));
                 builder.AppendLine(Segment("DTP", "472", "D8", line.DateOfService.ToString("yyyyMMdd", CultureInfo.InvariantCulture)));
+                // 2300 REF*F8 precedes HI: the payer's number for the claim being replaced or voided.
+                if (row.Claim.PayerClaimControlNumber is { Length: > 0 } payerClaimNumber)
+                    builder.AppendLine(Segment("REF", "F8", payerClaimNumber));
                 builder.AppendLine(Segment("HI", $"ABK{SubSep}{line.DiagnosisCode}"));
                 builder.AppendLine(Segment("LX", lineNumber++.ToString(CultureInfo.InvariantCulture)));
                 builder.AppendLine(Segment("SV1", procedure, charge, "UN", units,
@@ -89,24 +126,28 @@ internal static class ServerEdiGenerator
     /// safely produce an 837P. Generation calls the same method so the two paths cannot drift.
     /// </summary>
     public static void ValidatePeriod(ServerBillingPeriod period) =>
-        _ = ReadAndValidateRows(period);
+        _ = ReadAndValidateRows(period.Year, period.Month, Originals(period));
 
-    private static List<EdiRow> ReadAndValidateRows(ServerBillingPeriod period)
+    private static List<EdiRow> ReadAndValidateRows(int year, int month, IEnumerable<EdiClaim> claims)
     {
+        var list = claims.ToList();
         var readiness = ProfessionalClaimReadiness.EvaluatePeriod(
-            period.Year,
-            period.Month,
-            period.Lines.Select(ContractMapper.ToReadinessFacts));
+            year,
+            month,
+            list.Select(claim => ContractMapper.ToReadinessFacts(claim.Line)));
         if (!readiness.IsReady)
             throw new InvalidOperationException(readiness.ExplainFailure());
 
-        return period.Lines.Select(line => new EdiRow(
-            line,
-            ProfessionalClaimSnapshotCodec.Deserialize(line.ClaimSnapshotJson))).ToList();
+        return list.Select(claim => new EdiRow(
+            claim,
+            ProfessionalClaimSnapshotCodec.Deserialize(claim.Line.ClaimSnapshotJson))).ToList();
     }
 
     private static string Segment(string id, params string[] elements) =>
         id + "*" + string.Join("*", elements) + "~";
 
-    private sealed record EdiRow(ServerClaimLine Line, ProfessionalClaimSnapshot Snapshot);
+    private sealed record EdiRow(EdiClaim Claim, ProfessionalClaimSnapshot Snapshot);
 }
+
+/// <summary>One claim to write: its billing line, CLM05-3 frequency, and, for 7 or 8, the payer's claim number.</summary>
+internal sealed record EdiClaim(ServerClaimLine Line, string FrequencyCode, string? PayerClaimControlNumber);

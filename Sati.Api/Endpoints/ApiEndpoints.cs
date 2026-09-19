@@ -5990,6 +5990,7 @@ internal static partial class ApiEndpoints
                                   item.Reference, item.ResponseType, item.ResponseCode,
                                   item.Explanation, item.IsSynthetic)
                               { EdiGenerationId = item.EdiGenerationId, ResponseId = item.ResponseId }).ToListAsync(cancellationToken);
+            rows.AddRange(await DeriveReconciledRowsAsync(db, actor.AgencyId, rows, cancellationToken));
             return Results.Ok(rows);
         });
 
@@ -6029,22 +6030,18 @@ internal static partial class ApiEndpoints
                 .Where(item => item.AgencyId == actor.AgencyId)
                 .OrderByDescending(item => item.ReceivedAtUtc)
                 .ToListAsync(cancellationToken);
+            var records = await db.EftDepositRecords.AsNoTracking()
+                .Where(item => item.AgencyId == actor.AgencyId)
+                .ToListAsync(cancellationToken);
             return Results.Ok(deposits.Select(item =>
             {
-                var status = DepositReconciliationRules.GetStatus(
-                    item.ClaimPaymentAmount, item.ProviderLevelAdjustmentAmount,
-                    item.RemittancePaymentAmount, item.EftDepositAmount);
-                return new RemittanceDepositDto(
-                    item.Id, item.PaymentReference, item.PayerName, item.ReceivedAtUtc,
-                    item.PaymentDate, item.ClaimPaymentAmount, item.ProviderLevelAdjustmentAmount,
-                    item.ProviderLevelAdjustmentSummary, item.RemittancePaymentAmount,
-                    item.EftDepositAmount, status.ToString(),
-                    item.EftDepositAmount - item.RemittancePaymentAmount,
-                    DepositReconciliationRules.Explain(status), item.IsSynthetic);
+                var entries = records.Where(record => record.RemittanceDepositId == item.Id).ToList();
+                return ToDepositDto(item, entries.MaxBy(record => record.Id), entries.Count);
             }).ToList());
         });
 
         MapClaimResponseIntake(api);
+        MapBillingCorrections(api);
 
         // Drive the mock clearinghouse. Scaffolding: it fabricates responses and then hands
         // them to the same ingestion path above, rather than writing rows directly, so the

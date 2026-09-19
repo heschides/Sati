@@ -6788,3 +6788,35 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
 - [ ] Before storing real consumer photographs, adopt agency-approved consent/notice, minimum-use,
       retention/legal-hold, export and deletion procedures. The feature supplies technical access
       controls; it does not decide those policies.
+
+## Unreleased — mock clearinghouse denial scenarios (2026-09-19)
+
+- [x] Add Demo-only mock scenarios for common whole-claim denials — duplicate (CO-18), coverage
+      ended (CO-27), no authorization (CO-197), missing information (CO-16), not covered (CO-96),
+      benefit maximum (CO-119) — alongside timely filing (CO-29), plus a mixed-outcome 835.
+- [x] Explain stored denial reasons in the billing worklist: the reason catalog now matches the
+      bare CARC that ingestion stores, with or without a group prefix.
+- [ ] Retain RARCs (835 `LQ`) and every CAS reason, not only the first. The reader accepts `LQ`
+      but discards it, and outcomes keep one reason code, so the mock emits no RARCs and each of
+      its denials carries a single reason. Needs a reader change and a schema change.
+- [ ] Service-line-level denials and multi-line claims. The mock still supports one service line
+      per claim and adjusts at claim level only.
+
+## Unreleased — bank deposits and claim corrections (2026-09-19)
+
+- [x] Record the bank deposit behind a remittance as append-only entries, with optimistic
+      concurrency, a required reason for a correction, and reconciliation derived from the latest
+      entry. `Reconciled` is computed on read, never stored.
+- [x] Correct a sent claim: resend (frequency 1) after a rejection, or replace (7) or void (8) an
+      adjudicated claim citing the payer's claim number, in a correction-only 837P.
+- [x] Store per-claim 277CA verdicts and the 835 payer claim control number, which nothing
+      retained before.
+- [ ] Apply migration `20260919212417_AddEftDepositsAndClaimCorrections` to Demo. It adds four
+      tables plus `RemittanceClaimOutcomes.PayerClaimControlNumber` and `EdiGenerations.IsCorrection`;
+      it is additive only. Needs the temporary SQL firewall rule.
+- [ ] Confirm against the MaineCare/Office Ally 837P companion guide that frequency 7 and 8 with
+      `REF*F8` are accepted as written, and whether a void must repeat the original charge exactly.
+- [ ] Corrections are Demo-only in effect: response import is enabled only in Demo, so a claim in
+      local Production has no recorded answers and offers no correction.
+- [ ] Answers imported before this release have no per-claim 277CA verdict, so their claims read as
+      awaiting an answer rather than rejected.

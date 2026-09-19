@@ -190,6 +190,30 @@ public sealed class ClaimExchangeLoopTests
     }
 
     /// <summary>
+    /// The added denial scenarios travel the same permanent ingestion path as the first one
+    /// and arrive in the worklist carrying their own reason code.
+    /// </summary>
+    [Theory]
+    [InlineData(MockClearinghouseScenario.DeniedNoAuthorization, "197")]
+    [InlineData(MockClearinghouseScenario.DeniedCoverageEnded, "27")]
+    public async Task EachDenialScenarioReachesTheWorklistWithItsReason(
+        MockClearinghouseScenario scenario, string reason)
+    {
+        using var admin = await _factory.CreateAuthenticatedClientAsync("admin-two");
+
+        var result = await RunAsync(admin, scenario);
+
+        Assert.Equal(1, result.ClaimOutcomesRecorded);
+        var remittances = await admin.GetFromJsonAsync<List<RemittanceClaimOutcomeDto>>(
+            "/api/v1/billing/remittances");
+        Assert.NotNull(remittances);
+        Assert.Contains(remittances, row =>
+            row.BillingPeriodId == SubmittedPeriodId &&
+            row.Status == nameof(RemittanceClaimStatus.Denied) &&
+            row.ReasonCode == reason);
+    }
+
+    /// <summary>
     /// A rejected file never reaches the payer, so no claim outcome and no deposit should
     /// appear from it. Recording a payment for a batch the clearinghouse refused would be
     /// worse than recording nothing.

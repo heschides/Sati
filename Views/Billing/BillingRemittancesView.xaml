@@ -3,6 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource WindowBackgroundBrush}"
              TextElement.FontFamily="{DynamicResource AppFont}">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -10,8 +13,10 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="2*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+
 
         <TextBlock Grid.Row="0" Text="835 REMITTANCE CLAIM OUTCOMES"
                    FontSize="11" FontWeight="SemiBold"
@@ -27,6 +32,7 @@
                    TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,7"
                    Foreground="{DynamicResource TextPrimaryBrush}" />
         <DataGrid Grid.Row="4" ItemsSource="{Binding Deposits}"
+                  SelectedItem="{Binding SelectedDeposit, Mode=TwoWay}"
                   AutomationProperties.Name="835 and EFT deposit reconciliation"
                   AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
                   HeadersVisibility="Column" SelectionMode="Single" MinHeight="130" Margin="0,0,0,14">
@@ -45,7 +51,65 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <DataGrid Grid.Row="5" ItemsSource="{Binding Outcomes}"
+        <!-- RECORDING THE BANK DEPOSIT — every entry is kept; a correction is a new entry
+             beside the old one, never a rewrite. -->
+        <Border Grid.Row="5"
+                Visibility="{Binding CanRecordDeposits, Converter={StaticResource BoolToVisibility}}"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1" CornerRadius="4" Padding="12,10" Margin="0,0,0,14">
+            <StackPanel>
+                <TextBlock Text="{Binding DepositEntryHeading}" FontWeight="SemiBold"
+                           TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" />
+                <WrapPanel Margin="0,8,0,0" IsEnabled="{Binding IsDepositSelected}">
+                    <TextBlock Text="Amount" VerticalAlignment="Center" Margin="0,0,6,6"
+                               Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding DepositAmount, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+                             Width="90" Margin="0,0,14,6"
+                             AutomationProperties.Name="Bank deposit amount" />
+                    <TextBlock Text="Deposit date" VerticalAlignment="Center" Margin="0,0,6,6"
+                               Style="{StaticResource LabelStyle}" />
+                    <DatePicker SelectedDate="{Binding DepositDate}" Width="130" Margin="0,0,14,6"
+                                AutomationProperties.Name="Bank deposit date" />
+                    <TextBlock Text="Bank trace" VerticalAlignment="Center" Margin="0,0,6,6"
+                               Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding DepositBankTrace, UpdateSourceTrigger=PropertyChanged}"
+                             Width="120" Margin="0,0,14,6" MaxLength="80"
+                             AutomationProperties.Name="Bank trace number" />
+                    <TextBlock Text="Why (required to correct)" VerticalAlignment="Center" Margin="0,0,6,6"
+                               Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding DepositNote, UpdateSourceTrigger=PropertyChanged}"
+                             Width="220" Margin="0,0,14,6" MaxLength="500"
+                             AutomationProperties.Name="Reason for this deposit entry" />
+                    <Button Content="Record deposit" Command="{Binding RecordDepositCommand}"
+                            Style="{StaticResource PrimaryButton}" Height="28" Padding="12,0" Margin="0,0,0,6"
+                            AutomationProperties.Name="Record bank deposit" />
+                </WrapPanel>
+                <TextBlock Text="{Binding DepositProblem}" TextWrapping="Wrap" Margin="0,2,0,0"
+                           Visibility="{Binding HasDepositProblem, Converter={StaticResource BoolToVisibility}}"
+                           Foreground="{DynamicResource DangerStrongBrush}"
+                           AutomationProperties.LiveSetting="Assertive"
+                           AutomationProperties.Name="Deposit entry problem" />
+                <ItemsControl ItemsSource="{Binding SelectedDepositHistory}" Margin="0,8,0,0"
+                              AutomationProperties.Name="Recorded deposit entries">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}">
+                                <Run Text="{Binding Amount, StringFormat={}{0:C}, Mode=OneWay}" />
+                                <Run Text="on" />
+                                <Run Text="{Binding DepositDate, StringFormat={}{0:MMM d, yyyy}, Mode=OneWay}" />
+                                <Run Text="·" />
+                                <Run Text="{Binding RecordedBy, Mode=OneWay}" />
+                                <Run Text="{Binding Note, Mode=OneWay}" />
+                            </TextBlock>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <DataGrid Grid.Row="6" ItemsSource="{Binding Outcomes}"
                   AutomationProperties.Name="Remittance claim outcomes"
                   AutoGenerateColumns="False" IsReadOnly="True"
                   CanUserAddRows="False" HeadersVisibility="Column"

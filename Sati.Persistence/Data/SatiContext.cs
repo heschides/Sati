@@ -51,6 +51,10 @@ namespace Sati.Data
         public DbSet<BillingSubmissionEvent> BillingSubmissionEvents { get; set; }
         public DbSet<RemittanceClaimOutcome> RemittanceClaimOutcomes { get; set; }
         public DbSet<RemittanceDeposit> RemittanceDeposits { get; set; }
+        public DbSet<EftDepositRecord> EftDepositRecords { get; set; }
+        public DbSet<ClaimAcknowledgementOutcome> ClaimAcknowledgementOutcomes { get; set; }
+        public DbSet<ClaimCorrection> ClaimCorrections { get; set; }
+        public DbSet<ClaimCorrectionSubmission> ClaimCorrectionSubmissions { get; set; }
         public DbSet<ExemptDate> ExemptDates { get; set; }
         public DbSet<ServiceDayInclusion> ServiceDayInclusions { get; set; }
         public DbSet<ReviewItem> ReviewItems { get; set; }
@@ -100,6 +104,7 @@ namespace Sati.Data
         private void EnsureAuditEventsAreAppendOnly()
         {
             ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
+            BillingCorrectionPersistenceModel.ProtectWrites(ChangeTracker);
             ReleaseObligationPersistenceModel.ProtectWrites(ChangeTracker);
             BillingComplianceRecoveryPersistenceModel.ProtectWrites(ChangeTracker);
             BillingCompliancePolicyReviewPersistenceModel.ProtectWrites(ChangeTracker);
@@ -153,6 +158,7 @@ namespace Sati.Data
         {
             base.OnModelCreating(modelBuilder);
             ClearinghousePersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration>(modelBuilder);
+            BillingCorrectionPersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration, ClaimLine, RemittanceDeposit>(modelBuilder);
             SignaturePersistenceModel.Configure(modelBuilder);
             SignaturePersistenceModel.ConfigureClinicalRelationships<DocumentArtifact, Agency, User, Person, PersonContact, FormAttestation>(modelBuilder);
             ChatPersistenceModel.Configure<ChatRoom, ChatRoomMember, ChatMessage, ChatChange, ChatReadMarker,
@@ -1028,6 +1034,7 @@ namespace Sati.Data
                 entity.Property(item => item.ReasonCode).HasMaxLength(30);
                 entity.Property(item => item.Explanation).HasMaxLength(500);
                 entity.Property(item => item.PaymentReference).HasMaxLength(80);
+                entity.Property(item => item.PayerClaimControlNumber).HasMaxLength(ClaimCorrectionRules.PayerClaimControlNumberMaxLength);
                 entity.Property(item => item.BilledAmount).HasColumnType("decimal(18,2)");
                 entity.Property(item => item.AllowedAmount).HasColumnType("decimal(18,2)");
                 entity.Property(item => item.PaidAmount).HasColumnType("decimal(18,2)");
