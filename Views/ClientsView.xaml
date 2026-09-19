@@ -2585,36 +2585,13 @@
                                            AutomationProperties.Name="Journal cloud save warning" />
                             </StackPanel>
 
-                            <!-- Pattern layer sits UNDER the TextBox in the same cell:
-                                 the dot brush fills a Border, the TextBox draws over it
-                                 with the theme's translucent SurfaceAlpha70Brush so the
-                                 dots read faintly through the fill without dimming text.
-                                 The Border carries the visible frame now, so the TextBox
-                                 drops its own border to avoid a double edge. -->
-                            <Border Grid.Row="1"
-                                    Background="{StaticResource JournalDotBrush}"
-                                    BorderBrush="{DynamicResource BorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="2" />
-
-                            <!-- UpdateSourceTrigger=PropertyChanged so the debounce
-                                 timer sees each keystroke; without it the VM's Journal
-                                 wouldn't update until focus loss and the 2s save
-                                 wouldn't fire mid-typing. Indefinitely long: wraps and
-                                 scrolls vertically, no height cap of its own — the row's
-                                 * share bounds it and the ScrollViewer takes overflow. -->
-                            <TextBox AutomationProperties.Name="Journal" Grid.Row="1"
-                                     MinHeight="180"
-                                     Text="{Binding Journal, UpdateSourceTrigger=PropertyChanged}"
-                                     IsEnabled="{Binding CanEditJournal}"
-                                     AcceptsReturn="True"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     SpellCheck.IsEnabled="True"
-                                     FontFamily="{StaticResource NarrativeFont}"
-                                     Background="{DynamicResource SurfaceAlpha25Brush}"
-                                     BorderThickness="0"
-                                     Padding="8" />
+                            <!-- Pages, formatting, and checkboxes. Every edit is written
+                                 straight into the VM's Journal (as a JournalDocument), so the
+                                 2s debounced save and the switch/shutdown flush see each
+                                 change exactly as they saw typing in the old TextBox. The row's
+                                 * share bounds the height; the editor scrolls inside it. -->
+                            <views:JournalEditor Grid.Row="1"
+                                                 MinHeight="240" />
                         </Grid>
                     </Grid>
                             </Grid>

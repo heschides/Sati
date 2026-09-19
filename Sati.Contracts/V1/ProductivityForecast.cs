@@ -84,12 +84,18 @@ public static class ProductivityForecast
         notes.Any(note => note.EventDate?.Date == date.Date &&
                           AverageStatuses.Contains(note.Status, StringComparer.OrdinalIgnoreCase));
 
-    /// <summary>Work planned on this day that has not been documented yet.</summary>
+    /// <summary>
+    /// Work planned on this day that has not been documented yet. Scheduled work on a day that
+    /// has already passed is lapsed (<see cref="NoteSchedulingPolicy.IsLapsedScheduled"/>) and no
+    /// longer holds the day open.
+    /// </summary>
     private static bool HasScheduledWork(
         DateTime date,
-        IEnumerable<ProductivityNoteFact> notesOnDate) =>
+        IEnumerable<ProductivityNoteFact> notesOnDate,
+        DateTime today) =>
         notesOnDate.Any(note => note.EventDate?.Date == date.Date &&
-                                string.Equals(note.Status, Scheduled, StringComparison.OrdinalIgnoreCase));
+                                string.Equals(note.Status, Scheduled, StringComparison.OrdinalIgnoreCase) &&
+                                !NoteSchedulingPolicy.IsLapsedScheduled(note.Status, note.EventDate, today));
 
     /// <summary>
     /// Whether the average divides by <paramref name="date"/>.
@@ -122,7 +128,7 @@ public static class ProductivityForecast
 
         if (IsDocumentationWindowClosed(date, today, documentationWindowDays))
             return true;
-        return caseManagerChoice ?? !HasScheduledWork(date, notesOnDate);
+        return caseManagerChoice ?? !HasScheduledWork(date, notesOnDate, today);
     }
 
     private static bool IsInAverageScope(DateTime date, DateTime today) =>

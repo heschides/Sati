@@ -447,8 +447,10 @@ public partial class CalendarViewModel : ObservableObject
     private void BuildMonths()
     {
         var selectedDate = SelectedDay?.Date.Date;
+        var today = _today();
         var notesByDate = _yearNotes
-            .Where(note => note.EventDate.HasValue && note.EventDate.Value.Year == CurrentYear)
+            .Where(note => note.EventDate.HasValue && note.EventDate.Value.Year == CurrentYear &&
+                           !IsLapsedScheduled(note, today))
             .Select(note => new CalendarNoteItem(note))
             .GroupBy(note => note.EventDate.Date)
             .ToDictionary(
@@ -476,7 +478,6 @@ public partial class CalendarViewModel : ObservableObject
             .GroupBy(entry => entry.Date.Date)
             .ToDictionary(group => group.Key, group => group.First());
 
-        var today = _today();
         var choices = ChoicesByDate(_serviceDayInclusions);
         var result = new List<CalendarMonth>();
         for (var month = 1; month <= 12; month++)
@@ -512,7 +513,8 @@ public partial class CalendarViewModel : ObservableObject
         Settings? settings = null)
     {
         var notesByDate = notes
-            .Where(note => note.EventDate is DateTime date && date.Year == year && date.Month == month)
+            .Where(note => note.EventDate is DateTime date && date.Year == year && date.Month == month &&
+                           !IsLapsedScheduled(note, today))
             .Select(note => new CalendarNoteItem(note))
             .GroupBy(note => note.EventDate.Date)
             .ToDictionary(group => group.Key, group => group.ToList());
@@ -524,6 +526,11 @@ public partial class CalendarViewModel : ObservableObject
             new Dictionary<DateTime, List<ImportedOutlookEvent>>(), today,
             documentationWindowDays, ChoicesByDate(serviceDayInclusions), settings);
     }
+
+    // Scheduled work whose day has passed is not shown and does not reach the day's
+    // productivity facts. NoteSchedulingPolicy owns what "lapsed" means.
+    private static bool IsLapsedScheduled(Note note, DateTime today) =>
+        NoteSchedulingPolicy.IsLapsedScheduled(note.Status?.ToString(), note.EventDate, today);
 
     /// <summary>The stored decisions as the shared rule reads them.</summary>
     internal static IReadOnlyDictionary<DateTime, bool> ChoicesByDate(

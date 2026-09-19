@@ -59,6 +59,16 @@ public static class JournalEntry
     /// </summary>
     public static string Prepend(string? existingJournal, string entry)
     {
+        // A paged journal takes the entry at the top of its first page. A plain-text
+        // journal stays plain text: it becomes a document only when the editor saves
+        // it, so a reminder never changes a journal's format behind the reader's back.
+        if (JournalDocument.IsDocument(existingJournal))
+        {
+            return JournalDocument.Parse(existingJournal)
+                .PrependToFirstPage(entry.Split("\r\n"))
+                .Serialize();
+        }
+
         var existing = Normalize(existingJournal ?? string.Empty).TrimStart('\r', '\n');
         return existing.Length == 0 ? entry : $"{entry}\r\n\r\n{existing}";
     }

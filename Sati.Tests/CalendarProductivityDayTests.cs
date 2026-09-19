@@ -110,7 +110,9 @@ public sealed class CalendarProductivityDayTests
             var openSquare = SquareFor(view, Today.AddDays(-2));
             var tick = WpfUiHarness.Descendants(openSquare).OfType<CheckBox>().Single();
             Assert.Equal(Visibility.Visible, tick.Visibility);
-            Assert.False(tick.IsChecked);
+            // The visit left Scheduled on a past day has lapsed, so the day counts by
+            // default; the tick is still offered so the case manager can hold it out.
+            Assert.True(tick.IsChecked);
             Assert.Equal(
                 viewModel.ToggleCountedDayCommand,
                 ((System.Windows.Controls.Primitives.ButtonBase)tick).Command);

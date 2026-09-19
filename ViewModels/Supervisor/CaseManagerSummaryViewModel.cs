@@ -41,7 +41,10 @@ namespace Sati.ViewModels.Supervisor
             LoggedCount = monthlyNotes.Count(n => n.Status == NoteStatus.Logged);
             PendingCount = monthlyNotes.Count(n => n.Status == NoteStatus.Pending);
             AbandonedCount = monthlyNotes.Count(n => n.Status == NoteStatus.Abandoned);
-            ScheduledCount = monthlyNotes.Count(n => n.Status == NoteStatus.Scheduled);
+            // Lapsed Scheduled work (its day has passed) is disregarded, as on the calendar.
+            ScheduledCount = monthlyNotes.Count(n => n.Status == NoteStatus.Scheduled &&
+                !Sati.Contracts.V1.NoteSchedulingPolicy.IsLapsedScheduled(
+                    n.Status.ToString(), n.EventDate, DateTime.Today));
             CancelledCount = monthlyNotes.Count(n => n.Status == NoteStatus.Cancelled);
             DelayedCount = monthlyNotes.Count(n => n.Status == NoteStatus.Delayed);
         }

@@ -1,0 +1,359 @@
+<UserControl x:Class="Sati.Views.JournalEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:children="clr-namespace:Sati.ViewModels.Children"
+             x:Name="Root">
+    <!-- DataContext is the client page's NewClientViewModel: pages are
+         JournalPages, the reminder question is JournalCheckPrompt, and the whole
+         editor follows CanEditJournal. Converting the rich text to the stored
+         JournalDocument shape happens in code-behind (JournalFlowDocument). -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <Style x:Key="JournalToolButton"
+               TargetType="Button"
+               BasedOn="{StaticResource IconButton}">
+            <Setter Property="Width"
+                    Value="28" />
+            <Setter Property="Height"
+                    Value="26" />
+            <Setter Property="Margin"
+                    Value="0,0,2,0" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="FontSize"
+                    Value="13" />
+        </Style>
+
+        <Style x:Key="JournalTabStyle"
+               TargetType="ListBoxItem">
+            <Setter Property="AutomationProperties.Name"
+                    Value="{Binding Name, StringFormat=Journal page {0}}" />
+            <Setter Property="AutomationProperties.HelpText"
+                    Value="Double-click or press F2 to rename this page." />
+            <Setter Property="Margin"
+                    Value="0,0,2,2" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="TabBorder"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1,1,1,0"
+                                CornerRadius="4,4,0,0"
+                                Padding="10,3">
+                            <Grid>
+                                <Border x:Name="SelectedMark"
+                                        Height="2"
+                                        Margin="-10,0,-10,-3"
+                                        VerticalAlignment="Bottom"
+                                        Background="{DynamicResource AccentBrush}"
+                                        Visibility="Collapsed" />
+                                <ContentPresenter />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="TabBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource HoverBrush}" />
+                            </Trigger>
+                            <!-- Selection is shown by weight and an underline bar,
+                                 not by colour alone. -->
+                            <Trigger Property="IsSelected"
+                                     Value="True">
+                                <Setter TargetName="TabBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource SurfaceBrush}" />
+                                <Setter TargetName="SelectedMark"
+                                        Property="Visibility"
+                                        Value="Visible" />
+                                <Setter Property="FontWeight"
+                                        Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin"
+                                     Value="True">
+                                <Setter TargetName="TabBorder"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid IsEnabled="{Binding CanEditJournal}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- PAGES — tabs across the top; + adds a page and opens its name. -->
+        <DockPanel Grid.Row="0">
+            <Button DockPanel.Dock="Right"
+                    VerticalAlignment="Top"
+                    Style="{StaticResource JournalToolButton}"
+                    Command="{Binding JournalPages.AddPageCommand}"
+                    Content="+"
+                    FontSize="16"
+                    FontWeight="Bold"
+                    ToolTip="Add a page"
+                    AutomationProperties.Name="Add journal page" />
+            <ListBox x:Name="PageTabs"
+                     ItemsSource="{Binding JournalPages.Pages}"
+                     SelectedItem="{Binding JournalPages.SelectedPage}"
+                     ItemContainerStyle="{StaticResource JournalTabStyle}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Padding="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     KeyboardNavigation.DirectionalNavigation="Cycle"
+                     AutomationProperties.Name="Journal pages"
+                     PreviewKeyDown="PageTabs_PreviewKeyDown">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type children:JournalPageViewModel}">
+                        <Grid MouseLeftButtonDown="PageTab_MouseLeftButtonDown"
+                              Tag="{Binding DataContext.JournalPages, RelativeSource={RelativeSource AncestorType=ListBox}}">
+                            <Grid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Rename page"
+                                              InputGestureText="F2"
+                                              Command="{Binding PlacementTarget.Tag.BeginRenameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <MenuItem Header="Delete page"
+                                              ToolTip="Only an empty page can be deleted. Clear its text first."
+                                              ToolTipService.ShowOnDisabled="True"
+                                              Command="{Binding PlacementTarget.Tag.DeletePageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                </ContextMenu>
+                            </Grid.ContextMenu>
+                            <TextBlock Text="{Binding Name}"
+                                       FontSize="12"
+                                       MaxWidth="160"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       ToolTip="{Binding Name}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRenaming}"
+                                                         Value="True">
+                                                <Setter Property="Visibility"
+                                                        Value="Hidden" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBox Text="{Binding EditingName, UpdateSourceTrigger=PropertyChanged}"
+                                     Visibility="{Binding IsRenaming, Converter={StaticResource BoolToVisibility}}"
+                                     MaxLength="40"
+                                     MinWidth="70"
+                                     FontSize="12"
+                                     Padding="2,0"
+                                     Margin="-4,-2"
+                                     AutomationProperties.Name="Page name"
+                                     IsVisibleChanged="RenameBox_IsVisibleChanged"
+                                     PreviewKeyDown="RenameBox_PreviewKeyDown"
+                                     LostKeyboardFocus="RenameBox_LostKeyboardFocus" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- FORMATTING — the standard editing commands carry their own shortcuts
+             (Ctrl+B / Ctrl+I / Ctrl+U); the checkmark is Ctrl+Shift+C. -->
+        <Border Grid.Row="1"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1,1,1,0"
+                Background="{DynamicResource SurfaceBrush}"
+                Padding="4,2">
+            <StackPanel Orientation="Horizontal">
+                <Button Style="{StaticResource JournalToolButton}"
+                        Command="EditingCommands.ToggleBold"
+                        CommandTarget="{Binding ElementName=Editor}"
+                        Content="B"
+                        FontWeight="Bold"
+                        ToolTip="Bold (Ctrl+B)"
+                        AutomationProperties.Name="Bold"
+                        AutomationProperties.AcceleratorKey="Ctrl+B" />
+                <Button Style="{StaticResource JournalToolButton}"
+                        Command="EditingCommands.ToggleItalic"
+                        CommandTarget="{Binding ElementName=Editor}"
+                        Content="I"
+                        FontStyle="Italic"
+                        FontFamily="Georgia"
+                        ToolTip="Italic (Ctrl+I)"
+                        AutomationProperties.Name="Italic"
+                        AutomationProperties.AcceleratorKey="Ctrl+I" />
+                <Button Style="{StaticResource JournalToolButton}"
+                        Command="EditingCommands.ToggleUnderline"
+                        CommandTarget="{Binding ElementName=Editor}"
+                        ToolTip="Underline (Ctrl+U)"
+                        AutomationProperties.Name="Underline"
+                        AutomationProperties.AcceleratorKey="Ctrl+U">
+                    <TextBlock Text="U"
+                               TextDecorations="Underline" />
+                </Button>
+                <Border Width="1"
+                        Margin="4,4"
+                        Background="{DynamicResource DividerBrush}" />
+                <Button Style="{StaticResource JournalToolButton}"
+                        Click="CheckButton_Click"
+                        Content="✓"
+                        FontWeight="Bold"
+                        ToolTip="Check the selected text and choose whether to put it on the calendar (Ctrl+Shift+C)"
+                        AutomationProperties.Name="Add checkbox"
+                        AutomationProperties.AcceleratorKey="Ctrl+Shift+C" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2"
+              x:Name="EditorArea">
+            <!-- Dot pattern under the editor; the editor's translucent fill lets it read
+                 faintly through. JournalDotBrush lives in the client page's resources,
+                 so it is resolved dynamically once this control is in that tree. -->
+            <Border Background="{DynamicResource JournalDotBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="0,0,2,2" />
+
+            <!-- IsDocumentEnabled lets the checkboxes inside the text be clicked.
+                 Pasting is reduced to plain text in code-behind: the stored journal
+                 keeps bold, italic, underline, and checkboxes, and nothing else. -->
+            <RichTextBox x:Name="Editor"
+                         MinHeight="150"
+                         AcceptsReturn="True"
+                         IsDocumentEnabled="True"
+                         VerticalScrollBarVisibility="Auto"
+                         SpellCheck.IsEnabled="True"
+                         FontFamily="{StaticResource NarrativeFont}"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         CaretBrush="{DynamicResource TextPrimaryBrush}"
+                         Background="{DynamicResource SurfaceAlpha25Brush}"
+                         BorderThickness="0"
+                         Padding="6"
+                         AutomationProperties.Name="Journal"
+                         AutomationProperties.HelpText="Ctrl+B bold, Ctrl+I italic, Ctrl+U underline, Ctrl+Shift+C check the selected text."
+                         TextChanged="Editor_TextChanged"
+                         PreviewKeyDown="Editor_PreviewKeyDown" />
+
+            <!-- Sparkles are drawn here, above the text, and never take the mouse. -->
+            <Canvas x:Name="SparkleLayer"
+                    IsHitTestVisible="False"
+                    ClipToBounds="True" />
+
+            <!-- REMINDER QUESTION — appears over the bottom of the page after text is
+                 checked. Declining leaves only the checkbox. -->
+            <Border x:Name="CheckPrompt"
+                    DataContext="{Binding JournalCheckPrompt}"
+                    Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}"
+                    IsVisibleChanged="CheckPrompt_IsVisibleChanged"
+                    PreviewKeyDown="CheckPrompt_PreviewKeyDown"
+                    VerticalAlignment="Bottom"
+                    Margin="10"
+                    Padding="12,10"
+                    Background="{DynamicResource SurfaceRaisedBrush}"
+                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    KeyboardNavigation.TabNavigation="Cycle"
+                    AutomationProperties.Name="Assign a reminder date">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="12"
+                                      ShadowDepth="2"
+                                      Opacity="0.25" />
+                </Border.Effect>
+                <Border.RenderTransformOrigin>0.5,1</Border.RenderTransformOrigin>
+                <Border.RenderTransform>
+                    <ScaleTransform x:Name="PromptScale" />
+                </Border.RenderTransform>
+                <StackPanel>
+                    <TextBlock Text="✦ Assign a reminder date?"
+                               FontWeight="SemiBold"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <TextBlock Text="{Binding TextPreview}"
+                               Margin="0,4,0,8"
+                               FontStyle="Italic"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               MaxHeight="48"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+
+                    <DockPanel Margin="0,0,0,6">
+                        <TextBlock Text="Date"
+                                   Width="44"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource LabelStyle}"
+                                   Margin="0" />
+                        <DatePicker x:Name="PromptDate"
+                                    SelectedDate="{Binding ReminderDate}"
+                                    DisplayDateStart="{Binding Today, Mode=OneWay}"
+                                    AutomationProperties.Name="Reminder date" />
+                    </DockPanel>
+
+                    <WrapPanel Margin="44,0,0,6">
+                        <RadioButton Content="Reminder"
+                                     GroupName="JournalCheckKind"
+                                     IsChecked="{Binding IsReminder}"
+                                     Margin="0,0,12,4"
+                                     VerticalAlignment="Center"
+                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                     ToolTip="A dated Reminder on the calendar. It carries no service time and never reaches billing." />
+                        <RadioButton Content="Scheduled"
+                                     GroupName="JournalCheckKind"
+                                     IsChecked="{Binding IsScheduled}"
+                                     Margin="0,0,6,4"
+                                     VerticalAlignment="Center"
+                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                     ToolTip="Planned work on the calendar, as though scheduled from the note panel." />
+                        <ComboBox ItemsSource="{Binding ScheduledNoteTypes}"
+                                  SelectedItem="{Binding ScheduledNoteType}"
+                                  IsEnabled="{Binding IsScheduled}"
+                                  MinWidth="80"
+                                  Margin="0,0,0,4"
+                                  AutomationProperties.Name="Scheduled work type" />
+                    </WrapPanel>
+
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Visibility="{Binding HasErrorMessage, Converter={StaticResource BoolToVisibility}}"
+                               Foreground="{DynamicResource DangerStrongBrush}"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,6"
+                               AutomationProperties.LiveSetting="Assertive"
+                               AutomationProperties.Name="Reminder error" />
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Content="Add to calendar"
+                                Style="{StaticResource PrimaryButton}"
+                                Command="{Binding AssignCommand}"
+                                Height="28"
+                                Padding="12,0"
+                                Margin="0,0,6,0"
+                                AutomationProperties.Name="Add reminder to calendar" />
+                        <Button Content="No thanks"
+                                Style="{StaticResource SmallButton}"
+                                Command="{Binding DeclineCommand}"
+                                AutomationProperties.Name="Keep the checkbox only" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

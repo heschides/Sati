@@ -95,7 +95,9 @@ public sealed class ServiceDayInclusionTests
     public async Task TheCalendarCountsAnOpenDayWhenTheCaseManagerTicksIt()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
-        var monday = Today.AddDays(-3);
+        // Today, so the visit still Scheduled on it is live and holds the day open. (Left
+        // Scheduled on a day that has passed, it would have lapsed and the day would count.)
+        var monday = Today;
         var notes = new FixedNotes(
             Note.Create("Review.", monday, NoteStatus.Logged, 15, fixture.PersonOneId,
                 noteType: NoteType.Form),

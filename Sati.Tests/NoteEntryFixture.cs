@@ -100,6 +100,33 @@ internal sealed class NoteEntryFixture : IAsyncDisposable
     public INoteService NotesFromAnotherSession() =>
         new NoteService(Factory, SessionFor(CaseManagerOne));
 
+    /// <summary>
+    /// The client page as Case Manager One, with only the person and note services real —
+    /// enough for the journal, which touches nothing else. No client is selected.
+    /// </summary>
+    public NewClientViewModel ClientsPage(User? actor = null) => new(
+        PeopleAs(actor ?? CaseManagerOne),
+        SessionFor(actor ?? CaseManagerOne),
+        new NoteService(Factory, SessionFor(actor ?? CaseManagerOne)),
+        null!,
+        new StubSettingsService(),
+        null!,
+        null!,
+        null!,
+        new SilentIncidentReporter(),
+        null!,
+        null!,
+        null!,
+        null!,
+        null!,
+        null!);
+
+    private sealed class SilentIncidentReporter : IIncidentReporter
+    {
+        public Task ReportAsync(Exception exception, string operation, string reference,
+            string severity = "Error", CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     private static ISessionService SessionFor(User user)
     {
         var session = new SessionService();

@@ -4706,3 +4706,58 @@ The Legacy theme uses this to restore the original copper leaf, `leaf.ico`, and 
 creams lean rose rather than yellow so nothing reads sallow, and it passes the same AA contrast
 audit as every other theme. The installed program's shortcut and taskbar-pin icon is still the
 executable's embedded `sati.ico`; only the open window's icon follows the theme.
+
+## 2026-09-19 — the journal is stored as pages of marked text, and plain text stays valid
+
+The consumer journal now has named pages, bold/italic/underline, and checkboxes.
+`Sati.Contracts.V1.JournalDocument` owns the stored shape: versioned JSON of pages → paragraphs →
+text runs with three marks, or checkboxes. It is written into the same `Person.Journal` column, so
+the existing save, debounce, flush, revision, audit, and `PersonVersion` paths are unchanged.
+
+**Why not XAML or RTF.** The column is read by the API when it prepends a reminder, and anything
+stored there is data from a client. A closed set of marks cannot carry anything the editor would
+execute or render beyond those marks, and the server can place an entry without a WPF dependency.
+Pasted rich content is reduced to plain text in the editor, and the RichTextBox shortcuts for
+alignment, font size, lists, and indentation are switched off, so nothing appears on screen that
+the next load would silently drop.
+
+**Plain text is still a journal.** Every journal written before this reads as one page named
+"Journal", one paragraph per line. Only a value that parses as the document, version marker
+included, is treated as one. A reminder written to a plain journal keeps it plain; the journal
+becomes a document only when the case manager edits it. A reminder written to a paged journal goes
+to the top of the first page. An older desktop reading a paged journal would show its JSON, which
+is one more reason the runbook deploys client and API together.
+
+**Deleting a page.** Only an empty page, and never the last, can be deleted, so removing a page
+cannot remove anything written on it; clearing the text is the deliberate act.
+
+## 2026-09-19 — checking journal text can put it on the calendar
+
+Selecting text and checking it (toolbar ✓ or Ctrl+Shift+C) puts a checkbox in front of it and asks
+whether to assign a date. Declining leaves only the checkbox. Accepting writes one ordinary note
+through `INoteService.AddNoteAsync` — the same tenancy check, `NoteSchedulingPolicy`
+normalization, audit, and API route as the note panel — with the checked text as the narrative:
+either a dated Reminder (`NoteType.Reminder`, status Scheduled) or Scheduled work of a chosen type.
+The status column shows Scheduled for both, because Reminder is a note type, not a status.
+
+The client is fixed when the text is checked, not when the question is answered, and the question
+is withdrawn when the selected client changes, so a note cannot land on whoever happens to be on
+screen. A past date is refused, because the note would be lapsed (below) the moment it was written.
+The journal's pending edit, including the new checkbox, is flushed before the note is written.
+
+## 2026-09-19 — Scheduled work whose day has passed is disregarded
+
+Refines 2026-08-26 ("the reminder remains Scheduled after its date arrives"). The row still is not
+changed — no job turns planned work into anything else, and the leftover-work prompt still offers
+it for documenting, rescheduling, or deleting. But
+`NoteSchedulingPolicy.IsLapsedScheduled` now marks a Scheduled note dated before today as lapsed,
+and lapsed notes are left off the calendar and the Overview thumbnail, out of the supervisor's
+Scheduled count, and out of `ProductivityForecast`.
+
+**This reverses one earlier productivity rule.** A past day documented one note at a time used to
+stay "open until documented" while any of its work was still Scheduled, so a half-written Monday
+did not drag the average down. Leftover Scheduled work on a past day no longer holds the day open:
+it counts on what was documented. The case manager can still hold such a day out of the average by
+unticking it while its documentation window is open. Today's Scheduled work is live and still holds
+today open. `ServiceTimeline` is unchanged: a lapsed Scheduled note that carries a start time still
+reserves that time until it is resolved.

@@ -35,9 +35,37 @@ public sealed class ProductivityDayTests
     }
 
     [Fact]
-    public void ADayStillCarryingScheduledWorkWaitsUntilItIsDocumented()
+    public void TodayStillCarryingScheduledWorkWaitsUntilItIsDocumented()
     {
-        // Monday: the 90-day review has been written up, the day's visits have not.
+        // This morning's review has been written up; this afternoon's visit has not happened.
+        var notes = new ProductivityNoteFact[]
+        {
+            new(Today, "Logged", 15),
+            new(Today, "Scheduled", 60)
+        };
+
+        Assert.Equal(
+            ProductivityDayKind.OpenUntilDocumented,
+            ProductivityForecast.ClassifyDay(Today, notes, Today, Window, caseManagerChoice: null));
+        Assert.Empty(ProductivityForecast.DailyAverageDays(notes, Today, Window));
+
+        // Once the visit is written up, the day counts with everything on it.
+        var documented = new ProductivityNoteFact[]
+        {
+            new(Today, "Logged", 15),
+            new(Today, "Logged", 60)
+        };
+        Assert.Equal(
+            ProductivityDayKind.CountedWithSecuredUnits,
+            ProductivityForecast.ClassifyDay(Today, documented, Today, Window, caseManagerChoice: null));
+        Assert.Equal(5m, ProductivityForecast.DailyAverageUnits(documented, Today, Window));
+    }
+
+    [Fact]
+    public void ScheduledWorkLeftOnAPastDayNoLongerHoldsTheDayOpen()
+    {
+        // Monday is over. Its visit is still Scheduled, so it lapsed: the day counts on what
+        // was documented, as though the lapsed row were not there.
         var monday = Today.AddDays(-3);
         var notes = new ProductivityNoteFact[]
         {
@@ -46,20 +74,13 @@ public sealed class ProductivityDayTests
         };
 
         Assert.Equal(
-            ProductivityDayKind.OpenUntilDocumented,
-            ProductivityForecast.ClassifyDay(monday, notes, Today, Window, caseManagerChoice: null));
-        Assert.Empty(ProductivityForecast.DailyAverageDays(notes, Today, Window));
-
-        // Once the visit is written up, the day counts with everything on it.
-        var documented = new ProductivityNoteFact[]
-        {
-            new(monday, "Logged", 15),
-            new(monday, "Logged", 60)
-        };
-        Assert.Equal(
             ProductivityDayKind.CountedWithSecuredUnits,
-            ProductivityForecast.ClassifyDay(monday, documented, Today, Window, caseManagerChoice: null));
-        Assert.Equal(5m, ProductivityForecast.DailyAverageUnits(documented, Today, Window));
+            ProductivityForecast.ClassifyDay(monday, notes, Today, Window, caseManagerChoice: null));
+        Assert.Equal(1m, ProductivityForecast.DailyAverageUnits(notes, Today, Window));
+        // The case manager can still hold it out while its window is open.
+        Assert.Equal(
+            ProductivityDayKind.OpenUntilDocumented,
+            ProductivityForecast.ClassifyDay(monday, notes, Today, Window, caseManagerChoice: false));
     }
 
     [Fact]
@@ -128,8 +149,9 @@ public sealed class ProductivityDayTests
     [Fact]
     public void AnOpenDayNeitherRaisesNorLowersTheAverage()
     {
-        // Three finished days at 8 units, and a Monday documented one review deep with its
-        // visits still scheduled. The average stays 8 until Monday is finished.
+        // Three finished days at 8 units, and a Monday documented one review deep. Its visit is
+        // still Scheduled, but Monday has passed, so that row has lapsed and no longer holds the
+        // day open: Monday counts at its one unit unless the case manager holds it out.
         var monday = Today.AddDays(-3);
         var notes = new List<ProductivityNoteFact>
         {
@@ -140,12 +162,13 @@ public sealed class ProductivityDayTests
             new(monday, "Scheduled", 60)
         };
 
-        Assert.Equal(8m, ProductivityForecast.DailyAverageUnits(notes, Today, Window));
-        Assert.Equal(3, ProductivityForecast.DailyAverageDays(notes, Today, Window).Count);
+        Assert.Equal(6.2m, ProductivityForecast.DailyAverageUnits(notes, Today, Window));
+        Assert.Equal(4, ProductivityForecast.DailyAverageDays(notes, Today, Window).Count);
 
-        // Counting it by hand includes its one unit, which is the case manager's call.
-        var choice = new Dictionary<DateTime, bool> { [monday] = true };
-        Assert.Equal(6.2m, ProductivityForecast.DailyAverageUnits(notes, Today, Window, choice));
+        // Held open by hand, it neither raises nor lowers the average.
+        var hold = new Dictionary<DateTime, bool> { [monday] = false };
+        Assert.Equal(8m, ProductivityForecast.DailyAverageUnits(notes, Today, Window, hold));
+        Assert.Equal(3, ProductivityForecast.DailyAverageDays(notes, Today, Window, hold).Count);
     }
 
     [Fact]
@@ -210,7 +233,7 @@ public sealed class ProductivityDayTests
             Today.AddDays(-9),  // settled: outside the window, nothing more can be billed
             Today.AddDays(-5),  // documented and counted
             Today.AddDays(-4),  // nothing written yet
-            Today.AddDays(-2)   // partly written, work still scheduled
+            Today.AddDays(-2)   // partly written; its leftover Scheduled row has lapsed
         };
         var notes = new ProductivityNoteFact[]
         {
@@ -220,12 +243,19 @@ public sealed class ProductivityDayTests
             new(Today.AddDays(-2), "Scheduled", 60)
         };
 
+        // The lapsed Scheduled row no longer holds day -2 open, so it counts and is not capacity.
         Assert.Equal(
-            [Today.AddDays(-4), Today.AddDays(-2)],
+            [Today.AddDays(-4)],
             ProductivityForecast.PastWorkdaysStillToDocument(eligible, notes, Today, Window));
 
+        // Held open by the case manager, it is still waiting to be written up.
+        var held = new Dictionary<DateTime, bool> { [Today.AddDays(-2)] = false };
+        Assert.Equal(
+            [Today.AddDays(-4), Today.AddDays(-2)],
+            ProductivityForecast.PastWorkdaysStillToDocument(eligible, notes, Today, Window, held));
+
         // Marked as a zero day, it is finished rather than waiting, so it leaves capacity.
-        var marked = new Dictionary<DateTime, bool> { [Today.AddDays(-4)] = true };
+        var marked = new Dictionary<DateTime, bool> { [Today.AddDays(-4)] = true, [Today.AddDays(-2)] = false };
         Assert.Equal(
             [Today.AddDays(-2)],
             ProductivityForecast.PastWorkdaysStillToDocument(eligible, notes, Today, Window, marked));

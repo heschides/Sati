@@ -137,6 +137,10 @@ CalendarViewModel calendarViewModel,
             // pending-attestation suggestions from persisted evidence.
             noteEntryViewModel.NoteSaved += async (s, e) => await OnNoteSavedAsync();
 
+            // A passage checked in the journal can become a Reminder or Scheduled note
+            // without the note panel. It is a note like any other from here on.
+            newClientViewModel.JournalNoteCreated += async (s, e) => await OnNoteSavedAsync();
+
             // Journal reminders. Either note-entry instance can write one — this
             // VM's own module, or the one inside the notes log — and both write the
             // same column the client page's journal box is bound to. Wiring lives

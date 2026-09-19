@@ -14,6 +14,17 @@ public static class NoteSchedulingPolicy
     public static bool IsFutureDate(DateTime? eventDate, DateTime today) =>
         eventDate?.Date > today.Date;
 
+    /// <summary>
+    /// A Scheduled note whose date has passed. The row is not changed: it stays Scheduled until
+    /// the case manager documents, reschedules, or deletes it, and the leftover-work prompt still
+    /// offers it for that. But planned work that did not happen on its day is not a fact about
+    /// that day, so the calendar and every calculation built on it disregard the note. Today's
+    /// Scheduled work is still live.
+    /// </summary>
+    public static bool IsLapsedScheduled(string? status, DateTime? eventDate, DateTime today) =>
+        string.Equals(status, ScheduledStatus, StringComparison.OrdinalIgnoreCase) &&
+        eventDate?.Date < today.Date;
+
     public static NoteSchedulingValues Normalize(
         DateTime? eventDate,
         DateTime today,

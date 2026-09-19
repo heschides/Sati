@@ -119,6 +119,19 @@ namespace Sati.ViewModels
         [NotifyPropertyChangedFor(nameof(CanEditJournal))]
         private bool isJournalLoading;
         public bool CanEditJournal => !IsJournalLoading && _journalPersonId is not null;
+
+        // Journal stays the serialized column the save path has always written; the
+        // pages are its editable form. _journalFromPages marks a Journal assignment
+        // that came FROM the pages, so it is saved but not loaded back into them.
+        private bool _journalFromPages;
+        public JournalPagesViewModel JournalPages { get; } = new();
+        public JournalCheckPromptViewModel JournalCheckPrompt { get; }
+
+        /// <summary>
+        /// Raised after a checked journal passage became a note. The host treats it as any
+        /// other saved note: calendar, dashboard, and lists reload.
+        /// </summary>
+        public event EventHandler? JournalNoteCreated;
         // -------------------------------------------------------------------------
         // Events
         // -------------------------------------------------------------------------
@@ -357,6 +370,7 @@ namespace Sati.ViewModels
             // acceptable: the write is a single-column UPDATE and the timer is stopped
             // so it can't also fire.
             _journalSaveTimer?.Stop();
+            JournalCheckPrompt.Close();
             if (_journalPersonId is int leavingId &&
                 !_suppressJournalSave &&
                 _journalDraftTracker.IsDirty(leavingId, Journal))
@@ -696,7 +710,9 @@ namespace Sati.ViewModels
             ConsumerProviders = consumerProviders;
             ConsumerImport = consumerImport;
             PersonPhoto = new PersonPhotoViewModel(personPhotoService, session);
-            Attestation = new FormAttestationViewModel(formService)
+            JournalPages.DocumentEdited += (_, _) => ApplyJournalPagesEdit();
+            JournalCheckPrompt = new JournalCheckPromptViewModel(CreateNoteFromJournalAsync);
+            Attestation =new FormAttestationViewModel(formService)
             {
                 AttestationChangedAsync = AfterAttestationChangedAsync
             };
@@ -1722,6 +1738,8 @@ namespace Sati.ViewModels
         // spins one up.
         partial void OnJournalChanged(string? value)
         {
+            if (!_journalFromPages)
+                JournalPages.Load(value);
             if (_suppressJournalSave)
                 return;
             if (_journalPersonId is not int personId)
@@ -1735,6 +1753,55 @@ namespace Sati.ViewModels
             _journalSaveTimer ??= CreateJournalTimer();
             _journalSaveTimer.Stop();
             _journalSaveTimer.Start();
+        }
+
+        /// <summary>
+        /// Called by the journal editor after text is checked: asks whether the passage should
+        /// also become a dated note for the client whose journal is on screen.
+        /// </summary>
+        public void OpenJournalCheckPrompt(string? checkedText)
+        {
+            if (_journalPersonId is int personId && CanEditJournal)
+                JournalCheckPrompt.Open(personId, checkedText);
+        }
+
+        // A page edit becomes the journal's new serialized text, which starts the same
+        // debounced save typing always has. With no client's journal loaded there is
+        // nothing to write to, so the pages are put back as the journal stands.
+        private void ApplyJournalPagesEdit()
+        {
+            if (_journalPersonId is null)
+            {
+                JournalPages.Load(Journal);
+                return;
+            }
+
+            _journalFromPages = true;
+            try
+            {
+                Journal = JournalPages.Serialize();
+            }
+            finally
+            {
+                _journalFromPages = false;
+            }
+        }
+
+        // The checkbox that prompted this is already in the journal; committing it
+        // first means a note never exists for a check the journal lost. The note is
+        // then an ordinary Scheduled row through the ordinary note service, which
+        // applies the tenancy check and NoteSchedulingPolicy itself.
+        internal async Task CreateNoteFromJournalAsync(JournalCheckNoteRequest request)
+        {
+            var personId = request.PersonId;
+            await FlushJournalIfCurrentAsync(personId);
+            var note = Note.Create(request.Text, request.Date, NoteStatus.Scheduled, null,
+                personId, noteType: request.NoteType);
+            await _noteService.AddNoteAsync(note);
+
+            if (SelectedPerson?.Id == personId)
+                await LoadSelectedPersonNotesAsync(SelectedPerson);
+            JournalNoteCreated?.Invoke(this, EventArgs.Empty);
         }
 
         private DispatcherTimer CreateJournalTimer()

@@ -1976,7 +1976,7 @@ rather than in either client.
 | `ReleaseAttestationRules` / `ReleaseSigningRules` / `ReleaseAuthorizationRules` | Separate release completion, guardian-or-consumer signer capacity, and prospective withdrawal. |
 | `BillingRules` | Payer-neutral unit arithmetic, charge rounding, NPI and procedure-code format. |
 | `NoteWorkflow` | Which note status may become which, for the case manager, the supervisor, and the overdue sweep — and therefore which notes can reach approval and billing at all. |
-| `NoteSchedulingPolicy` | Future work becomes non-billable Scheduled work, retaining its type, estimated minutes, and optional form type while clearing actual start time, visit facts, and justification. Reminder remains a separate non-service shape. |
+| `NoteSchedulingPolicy` | Future work becomes non-billable Scheduled work, retaining its type, estimated minutes, and optional form type while clearing actual start time, visit facts, and justification. Reminder remains a separate non-service shape. `IsLapsedScheduled`: Scheduled work dated before today, which the calendar and productivity calculations disregard. |
 | `ServiceTimeline` | The 7:00 AM – 7:00 PM service day, the no-double-claimed-minute rule, and earliest available start calculation. |
 | `AuditCsv` | The audit export's header, column order, escaping, and spreadsheet neutralization. |
 | `AtRequestPublication` | Whether an AT request is complete enough to publish, what the case manager attests to, and whether a published request may still be edited. |
@@ -1986,7 +1986,8 @@ rather than in either client.
 | `ConsumerProviderRules` | What a consumer's provider list accepts, what "current" means, the at-most-one-primary-care and one-current-link-per-provider rules, the display order, and the runaway guard that is explicitly not a clinical limit. |
 | `LegacyProviderLinking` | Matching the pre-directory free-text provider fields to directory entries — exact only, ambiguity refused rather than resolved — and what to tell the case manager for each outcome. Proposes; never writes. |
 | `IncidentHealthScoring` | The versioned operational health score. |
-| `JournalEntry` | The stamp format, the length ceiling, and the newest-first placement of an application-written journal entry. |
+| `JournalEntry` | The stamp format, the length ceiling, and the newest-first placement of an application-written journal entry (top of the first page in a paged journal). |
+| `JournalDocument` | The stored journal shape — named pages of text runs with bold/italic/underline and checkboxes — and reading every pre-pages plain-text journal as one page. |
 
 ---
 
