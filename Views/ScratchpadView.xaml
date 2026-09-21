@@ -15,9 +15,11 @@
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="TabBackground"
                                 Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="2"
                                 CornerRadius="6"
                                 Margin="2"
-                                Padding="8,7">
+                                Padding="6,5">
                             <ContentPresenter ContentSource="Header"
                                               HorizontalAlignment="Center" />
                         </Border>
@@ -32,6 +34,11 @@
                                 <Setter Property="Foreground"
                                         Value="{DynamicResource AccentPressedBrush}" />
                             </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="TabBackground" Property="BorderBrush"
+                                        Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -39,6 +46,11 @@
         </Style>
 
         <Style x:Key="AgendaTabControlStyle" TargetType="TabControl">
+            <!-- The strip supplies focus on each header. Framework-wide focus and
+                 validation adorners surround the entire editor and look like a
+                 document error, even though tab selection is not form input. -->
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Validation.ErrorTemplate" Value="{x:Null}" />
             <Setter Property="ItemsPanel">
                 <Setter.Value>
                     <ItemsPanelTemplate>

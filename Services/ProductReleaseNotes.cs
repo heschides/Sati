@@ -6,11 +6,18 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Annual Forms follow one clear path";
+    public const string ReleaseName = "Today's Work no longer looks like an error";
     public const string ReleaseDate = "September 20, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Today's Work has a clear focus cue",
+            [
+                "The red outline that could surround the whole Today's Work panel was misleading focus decoration, not an error. It has been removed.",
+                "Real loading and saving problems still appear as labeled messages with an action to try again.",
+                "Keyboard navigation remains visible: the focused tab now has an accent outline and a bold label."
+            ]),
         new(
             "Annual Forms is one clear workspace",
             [

@@ -649,9 +649,9 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.21", version);
+        Assert.Equal("1.3.22", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Annual Forms follow one clear path", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Today's Work no longer looks like an error", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Annual Forms is one clear workspace" &&

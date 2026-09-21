@@ -86,6 +86,43 @@ public sealed class ScratchpadThemeTests
     }
 
     [Fact]
+    public void AgendaTabsOwnTheirFocusAndValidationChrome()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            var view = new ScratchpadView { IsHistoryAvailable = true };
+            WpfUiHarness.Realize(view, 820, 700);
+
+            var tabs = Assert.Single(
+                WpfUiHarness.Descendants(view).OfType<TabControl>());
+            Assert.Null(tabs.FocusVisualStyle);
+            Assert.Null(Validation.GetErrorTemplate(tabs));
+
+            var firstTab = Assert.IsType<TabItem>(tabs.Items[0]);
+            firstTab.ApplyTemplate();
+            var tabBackground = Assert.IsType<Border>(
+                firstTab.Template.FindName("TabBackground", firstTab));
+            Assert.Equal(new Thickness(2), tabBackground.BorderThickness);
+            Assert.Equal(Colors.Transparent,
+                Assert.IsType<SolidColorBrush>(tabBackground.BorderBrush).Color);
+
+            var focusTrigger = Assert.Single(
+                firstTab.Template.Triggers.OfType<Trigger>(),
+                trigger => trigger.Property == UIElement.IsKeyboardFocusedProperty &&
+                           Equals(trigger.Value, true));
+            Assert.Contains(
+                focusTrigger.Setters.OfType<Setter>(),
+                setter => setter.TargetName == "TabBackground" &&
+                          setter.Property == Border.BorderBrushProperty);
+            Assert.Contains(
+                focusTrigger.Setters.OfType<Setter>(),
+                setter => string.IsNullOrEmpty(setter.TargetName) &&
+                          setter.Property == Control.FontWeightProperty &&
+                          Equals(setter.Value, FontWeights.Bold));
+        });
+    }
+
+    [Fact]
     public void BothScratchpadEditorsUseTheDarkThemesPrimaryTextAndCaretColors()
     {
         WpfUiHarness.Run(() =>

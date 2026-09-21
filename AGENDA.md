@@ -350,6 +350,40 @@ migration is required.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.22 — 2026-09-20
+
+“Today's Work no longer looks like an error.” This patch removes the misleading red whole-panel
+focus/validation outline from Today's Work while preserving a clear accent outline and bold label
+on the individual tab reached by keyboard. Real load/save failures remain explicit labeled messages
+with recovery actions.
+
+**No schema or API contract change.** The release changes one WPF style and its regression coverage.
+It does not require a Demo migration, firewall access, or Local Production schema tracking beyond
+the existing workstation-version note.
+
+- [x] Preflight: `master` matched `origin/master` after fetch; only the two reviewed Today's Work
+      files were modified; 1.3.22 had no local or distributed artifacts; no migration, contract,
+      database, or security-setting change was present. Retain every non-master branch: the Claude
+      branch owns an active linked worktree, the setup/chat/video and remote Claude branches have
+      unique or historical/design work, and the two remote Codex branches are merged but remote-only
+      and not proven disposable. No branch was merged or deleted.
+- [x] Coordinate 1.3.22 versions, installer/readiness defaults, Settings release notes, examples,
+      and this release record.
+- [x] Complete Release build and every solution test project under the signed-in Windows profile.
+      The final build has zero warnings and zero errors. Desktop: 2,378 passed, with one documented
+      opt-in local-AI skip and three documented opt-in SQL Server skips; API: 874 passed with five
+      documented opt-in SQL Server skips; signatures: 119 passed; portal: 8 passed; Carika: 4
+      passed. Focused Today's Work theme/render coverage passed 5/5, and the generated QA image was
+      inspected with no whole-panel error outline, clipping, or layout regression.
+- [ ] Commit and push the verified source normally; record the source commit.
+- [ ] Publish only the matching Demo API; record package size/hash, deployment identifier,
+      liveness, readiness, release version, and unchanged contract revision.
+- [ ] Build, accept, and publish non-overwriting Demo and Local installers plus checksums; record
+      sizes, hashes, cleanup, and verified distribution paths.
+- [ ] Production workstation (Joshu login): known to remain on 1.3.14 until a newer Local installer
+      is installed and launched. This release has no new migration; do not claim the workstation has
+      received prior migrations until its launch is actually observed.
+
 ## Release 1.3.21 — 2026-09-20
 
 “Annual Forms follow one clear path.” This release brings the related annual-form workflows under
