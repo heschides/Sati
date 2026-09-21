@@ -1,7 +1,6 @@
 <UserControl x:Class="Sati.Views.ClientDocuments.AgencyReleaseWorkspace"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Sati.Views.ClientDocuments"
              Background="{DynamicResource WindowBackgroundBrush}"
              DataContextChanged="OnDataContextChanged">
     <UserControl.Resources>
@@ -51,6 +50,11 @@
                     <TextBlock Text="{Binding WorkspaceDescription}"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Margin="0,6,0,0"
+                               Text="This screen collects the release information; it is not a document preview. Generate and save the PDF before reviewing or signing it."
+                               TextWrapping="Wrap"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
                     <TextBlock Text="Release type" Style="{StaticResource LabelStyle}" Margin="0,7,0,0" />
                     <ComboBox ItemsSource="{Binding ReleaseKindChoices}"
                               SelectedItem="{Binding SelectedReleaseKind}"
@@ -73,13 +77,7 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*" MinWidth="480" />
-                <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="2*" MinWidth="330" />
-            </Grid.ColumnDefinitions>
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                       AutomationProperties.Name="Agency release entry form">
             <StackPanel>
                 <Border Style="{StaticResource ReleaseCard}"
@@ -336,17 +334,6 @@
                 </Border>
             </StackPanel>
         </ScrollViewer>
-            <Border Grid.Column="2" Background="{DynamicResource PersonGroupAltBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                    CornerRadius="7" Padding="10">
-                <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="8" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                    <TextBlock Text="LIVE PREVIEW" FontSize="11" FontWeight="Bold"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                    <local:AgencyReleaseDocument Grid.Row="2" />
-                </Grid>
-            </Border>
-        </Grid>
 
         <Border Grid.Row="4" Padding="12" CornerRadius="7"
                 Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">

@@ -350,6 +350,54 @@ migration is required.
 - [x] Add shared-rule, desktop-pipeline, API-pipeline, and real suggestion-source regressions for
       the September 4 service / September 6 due-date case and specific scheduled form labels.
 
+## Release 1.3.21 — 2026-09-20
+
+“Annual Forms follow one clear path.” This release brings the related annual-form workflows under
+one profile tab, makes directions visually distinct from explanatory detail, and removes WPF
+facsimiles that could be mistaken for the official external document. It also carries profile-photo
+cropping/preparation, paged formatted journals with checked-item reminders, correct handling of
+lapsed Scheduled work, and the already-merged Demo billing deposit/claim-correction slice.
+
+**Additive Demo migration and API contract change.** Migration
+`20260919212417_AddEftDepositsAndClaimCorrections` adds four tables plus
+`RemittanceClaimOutcomes.PayerClaimControlNumber` and `EdiGenerations.IsCorrection`. The billing
+correction routes/DTOs change the client/API contract revision. Claim replacement/void acceptance
+by MaineCare/Office Ally remains a companion-guide question and is not presented as Production-ready.
+
+- [x] Coordinated 1.3.21 versions, installer/readiness defaults, Settings release notes, and
+      installer examples. Candidate API and installer artifact paths were confirmed absent before
+      the version was claimed.
+- [x] Apply the controlled Demo migration with explicit user authorization. The guarded runner
+      confirmed database `SatiDemo` and environment `Demo`; its rollback-only dry run, real apply,
+      and second real/idempotency pass all succeeded. Each pass reported the six expected schema
+      objects already present with the expected shape, migration count 110, zero deposit-entry rows,
+      and zero correction rows. The temporary exact-IP rule for `72.95.106.10` was user-created and
+      user-removed; a post-removal Azure listing contains only Demo API and reset-service outbound
+      rules.
+- [x] Branch audit: safely deleted local `billing-deposits-and-corrections` at `28e87e3` and
+      `journal-pages-and-lapsed-scheduled` at `fc4ad90` only after proving both had zero unique
+      commits, were contained by `origin/master`, and owned no worktree. Retained
+      `claude/cool-jang-f6b3c4` (active linked worktree), `second-machine-setup`,
+      `team-chat-design`, `video-conferencing-design`, and the three non-master remote-only branches
+      because they are active, unique, design/history, or otherwise not proven disposable.
+- [x] Complete Release build and every solution test project under the signed-in Windows profile.
+      The final build has zero errors. Desktop: 2,377 passed and four documented opt-in SQL Server
+      skips; API: 874 passed and five documented opt-in SQL Server skips; signatures: 119 passed;
+      portal: 8 passed; Carika: 4 passed. The first API pass caught one stale 1.3.20 expectation in
+      the version-contract test; after coordinating it to 1.3.21, the whole API project passed.
+      Focused annual-workflow/theme coverage had already passed 48/48 and 26/26, respectively.
+      Diff and staged-whitespace review remain part of the source-commit gate below.
+- [ ] Commit and push the verified source release to `origin/master` without rewriting history.
+- [ ] Publish only the Demo API, verify deployment identifier, live/ready/version/contract health,
+      and record API ZIP path, byte size, and SHA-256. Retain 1.3.20 as the prior known-healthy
+      package/deployment.
+- [ ] Build and accept the new Demo and Local installers, then publish the exact accepted bytes and
+      checksum files to `SatiLogica Demo Files` and `Sati Desktop` without overwriting.
+- [ ] Production workstation (Joshu login): known to remain on 1.3.14 until its next Local install
+      and launch. Installing 1.3.21 will also carry all intervening migrations, including
+      `AddServiceDayInclusions` and `AddEftDepositsAndClaimCorrections`; do not mark that machine
+      migrated until the launch is actually observed.
+
 ## Release 1.3.20 — 2026-09-18
 
 "Unfinished plans move on at the end of the day." Closing Sati now resolves Scheduled notes dated
@@ -1002,7 +1050,11 @@ desktop installation remain separate facts.
       work. The remaining rules are the permanent Demo API outbound rules and refresh-function
       outbound rules; the migration runner did not alter firewall settings.
 
-## Unreleased — live form draft previews
+## Superseded 2026-09-19 — live form draft previews
+
+This completed experiment is retained as history. The later Annual Forms/document-display decision
+removes separately drawn previews for externally owned forms and retains only faithful previews of
+Sati-owned output.
 
 - [x] Keep a document-shaped live preview beside every currently editable form workspace: AT
       Request, Check Request, Agency Release, DHHS forms, Safety Plan, Privacy Practices, CWIC
@@ -1093,7 +1145,7 @@ desktop installation remain separate facts.
 ## Unreleased — clearer annual-document workflow
 
 - [x] Replace the unexplained “Load cycle” wording in Safety Plan and Annual Documents with
-      “Open selected period,” explain that the period is the consumer's service year beginning on
+      “View selected year,” explain that the period is the consumer's service year beginning on
       the effective-date anniversary, and state that opening it does not change historical records.
 - [x] Give the date selectors and open-period controls specific accessible names and retain the
       existing read-only reload behavior behind the clearer wording.
@@ -1113,7 +1165,7 @@ desktop installation remain separate facts.
 ## Unreleased — Housing Support Funds application
 
 - [x] Embed the exact fillable three-page Maine DHHS OADS application dated June 30, 2025,
-      preserve the form fields, and expose one live entry/preview workspace from Clients and
+      preserve the form fields, and expose one entry workspace with exact PDF generation from Clients and
       Documents navigation.
 - [x] Prefill authoritative consumer, waiver, Shared Living, guardian, assigned case manager and
       provider facts while keeping application-specific contact, landlord, payee, amount and
@@ -1133,7 +1185,7 @@ desktop installation remain separate facts.
 ## Unreleased — CWIC / Benefits Counseling referral packet
 
 - [x] Reproduce MaineHealth's currently linked ten-page BCS referral packet from the exact
-      supplied PDF, with a live WPF entry preview and one packet workflow in both Clients and
+      supplied PDF, with one clear entry workspace and one packet workflow in both Clients and
       Documents navigation.
 - [x] Prefill identity, age, address/contact, guardian, employment, MaineCare and VR facts that
       Sati already knows while keeping every answer editable and leaving signatures blank.
@@ -6811,16 +6863,34 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
       adjudicated claim citing the payer's claim number, in a correction-only 837P.
 - [x] Store per-claim 277CA verdicts and the 835 payer claim control number, which nothing
       retained before.
-- [ ] Apply migration `20260919212417_AddEftDepositsAndClaimCorrections` to Demo with
+- [x] Apply migration `20260919212417_AddEftDepositsAndClaimCorrections` to Demo with
       `scripts/Apply-EftDepositsAndClaimCorrectionsMigration.ps1` (`-WhatIfOnly` first, then twice).
       Rehearsed 2026-09-19 against a scratch LocalDB copy of the schema at the previous
       migration: the dry run rolled back clean, the apply was idempotent, and the resulting
       schema is identical to the one `dotnet ef database update` produces. It adds four
       tables plus `RemittanceClaimOutcomes.PayerClaimControlNumber` and `EdiGenerations.IsCorrection`;
-      it is additive only. Needs the temporary SQL firewall rule.
+      it is additive only. Applied under explicit authorization on 2026-09-20: the guarded Demo
+      dry run, apply, and second apply all succeeded, and the user removed the temporary exact-IP
+      firewall rule afterward. Full evidence is in the 1.3.21 release section above.
 - [ ] Confirm against the MaineCare/Office Ally 837P companion guide that frequency 7 and 8 with
       `REF*F8` are accepted as written, and whether a void must repeat the original charge exactly.
 - [ ] Corrections are Demo-only in effect: response import is enabled only in Demo, so a claim in
       local Production has no recorded answers and offers no correction.
 - [ ] Answers imported before this release have no per-claim 277CA verdict, so their claims read as
       awaiting an answer rather than rejected.
+
+## Unreleased — Annual Forms workflow and faithful document display (2026-09-19)
+
+- [x] Replace the separate client-level Releases, DHHS Forms, Safety Plan, and Annual Documents
+      tabs with one compact Annual Forms tab containing Overview, Releases, DHHS Documents, Safety
+      Plan, and Privacy Practices.
+- [x] Make Overview the clear starting point: show the complete service-year range, explain that
+      changing/selecting a year does not modify records, report successful loads, and give each
+      workflow row a direct action into the correct inner tab.
+- [x] Remove separately drawn “live document” facsimiles for externally owned DHHS, CWIC, and
+      Housing forms and label their screens as entry workspaces. Generation continues to fill the
+      retained source PDFs; those PDFs, not a WPF approximation, are the review/submission output.
+- [x] Retain live previews only for Sati-owned documents whose preview faithfully represents the
+      generated output (currently AT and Check Requests).
+- [ ] Optional: embed an actual generated-PDF viewer if the added dependency and accessibility
+      behavior are justified. It must display the same bytes Sati saves, never a second rendering.

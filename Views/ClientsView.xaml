@@ -2617,22 +2617,9 @@
                             <clientDocuments:ClassificationWorkspace />
                         </TabItem>
 
-                        <TabItem Header="DHHS Forms"
+                        <TabItem Header="Annual Forms"
                                  Style="{StaticResource ClientWorkspaceTabItemStyle}">
-                            <clientDocuments:DhhsFormsWorkspace DataContext="{Binding DhhsForms}" />
-                        </TabItem>
-
-                        <TabItem Header="Releases"
-                                 Style="{StaticResource ClientWorkspaceTabItemStyle}">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <StackPanel Margin="16">
-                                    <clientDocuments:ReleaseObligationsWorkspace
-                                        DataContext="{Binding ReleaseObligations}" />
-                                    <Separator Margin="0,12" />
-                                    <clientDocuments:AgencyReleaseWorkspace
-                                        DataContext="{Binding AgencyRelease}" />
-                                </StackPanel>
-                            </ScrollViewer>
+                            <clientDocuments:AnnualDocumentsWorkspace />
                         </TabItem>
 
                         <TabItem Header="CWIC Packet"
@@ -2643,13 +2630,6 @@
                         <TabItem Header="Housing Funds"
                                  Style="{StaticResource ClientWorkspaceTabItemStyle}">
                             <clientDocuments:HousingSupportFundsWorkspace DataContext="{Binding HousingSupportFunds}" />
-                        </TabItem>
-
-                        <TabItem Header="Safety Plan" Style="{StaticResource ClientWorkspaceTabItemStyle}">
-                            <clientDocuments:SafetyPlanWorkspace DataContext="{Binding SafetyPlan}" />
-                        </TabItem>
-                        <TabItem Header="Annual Documents" Style="{StaticResource ClientWorkspaceTabItemStyle}">
-                            <clientDocuments:AnnualDocumentsWorkspace DataContext="{Binding AnnualDocuments}" />
                         </TabItem>
 
                         <TabItem Header="Check Requests" Style="{StaticResource ClientWorkspaceTabItemStyle}">

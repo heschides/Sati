@@ -23,8 +23,8 @@ namespace Sati.ViewModels
 {
     public partial class NewClientViewModel : ObservableValidator
     {
-        internal const int ReleasesWorkspaceTabIndex = 5;
-        public const int CheckRequestsTabIndex = 10;
+        internal const int AnnualFormsWorkspaceTabIndex = 4;
+        public const int CheckRequestsTabIndex = 7;
 
         // -------------------------------------------------------------------------
         // Services
@@ -231,6 +231,8 @@ namespace Sati.ViewModels
         private bool isTestData;
         [ObservableProperty]
         private int clientWorkspaceTabIndex;
+        [ObservableProperty]
+        private int annualFormsTabIndex;
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasClientSaveError))]
         private string clientSaveErrorMessage = string.Empty;
@@ -924,13 +926,21 @@ namespace Sati.ViewModels
             Guid obligationId,
             DateTime? targetEffectiveDate = null)
         {
-            ClientWorkspaceTabIndex = ReleasesWorkspaceTabIndex;
+            ClientWorkspaceTabIndex = AnnualFormsWorkspaceTabIndex;
+            AnnualFormsTabIndex = (int)AnnualFormsSection.Releases;
             if (ReleaseObligations is null)
                 return false;
 
             return await ReleaseObligations.OpenForAttestationAsync(
                 obligationId,
                 targetEffectiveDate);
+        }
+
+        [RelayCommand]
+        private void OpenAnnualFormsSection(AnnualFormsSection section)
+        {
+            ClientWorkspaceTabIndex = AnnualFormsWorkspaceTabIndex;
+            AnnualFormsTabIndex = (int)section;
         }
 
         // -------------------------------------------------------------------------

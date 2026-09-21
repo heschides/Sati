@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
 using Sati.Contracts.V1;
+using Sati.ViewModels;
 using Sati.ViewModels.ClientDocuments;
 
 namespace Sati.Views.ClientDocuments;
@@ -12,14 +13,22 @@ public partial class AnnualDocumentsWorkspace : UserControl
     public AnnualDocumentsWorkspace() => InitializeComponent();
     private void OnContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (e.OldValue is AnnualDocumentsViewModel old) { old.FileReady -= Save; old.ChooseVerificationFileAsync = null; }
-        if (e.NewValue is AnnualDocumentsViewModel current) { current.FileReady += Save; current.ChooseVerificationFileAsync = Choose; }
+        if (e.OldValue is NewClientViewModel { AnnualDocuments: { } old })
+        {
+            old.FileReady -= Save;
+            old.ChooseVerificationFileAsync = null;
+        }
+        if (e.NewValue is NewClientViewModel { AnnualDocuments: { } current })
+        {
+            current.FileReady += Save;
+            current.ChooseVerificationFileAsync = Choose;
+        }
     }
     private async void Save(AgencyReleaseResult result)
     {
         if (!result.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
         { await PdfFileSaver.SaveAsync("Save privacy notice", result.FileName, result.Pdf, "Privacy notice saved."); return; }
-        var dialog = new SaveFileDialog { Title = "Save annual documents", FileName = result.FileName, DefaultExt = ".zip",
+        var dialog = new SaveFileDialog { Title = "Save annual forms package", FileName = result.FileName, DefaultExt = ".zip",
             Filter = "ZIP archives (*.zip)|*.zip", AddExtension = true, OverwritePrompt = true };
         if (dialog.ShowDialog() != true) return;
         try { await File.WriteAllBytesAsync(dialog.FileName, result.Pdf); }

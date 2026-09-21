@@ -60,6 +60,8 @@ public sealed class ReleaseUiStructureTests
         var section = File.ReadAllText(Path.Combine(Root, "Views", "CaseManagementView.xaml"));
         var dashboard = File.ReadAllText(Path.Combine(Root, "Views", "CaseManagerDashboardView.xaml"));
         var clients = File.ReadAllText(Path.Combine(Root, "Views", "ClientsView.xaml"));
+        var annualForms = File.ReadAllText(Path.Combine(
+            Root, "Views", "ClientDocuments", "AnnualDocumentsWorkspace.xaml"));
         var hub = File.ReadAllText(Path.Combine(
             Root, "Views", "ClientDocuments", "ClientDocumentHubView.xaml"));
 
@@ -88,9 +90,15 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("NavigateToHousingSupportFundsCommand", dashboard);
         Assert.Contains("HorizontalScrollBarVisibility=\"Auto\"", dashboard);
 
-        Assert.Contains("Header=\"DHHS Forms\"", clients);
-        Assert.Contains("Header=\"Releases\"", clients);
-        Assert.Contains("ReleaseObligationsWorkspace", clients);
+        Assert.Contains("Header=\"Annual Forms\"", clients);
+        Assert.DoesNotContain("Header=\"DHHS Forms\"", clients);
+        Assert.DoesNotContain("Header=\"Releases\"", clients);
+        Assert.Contains("Header=\"Overview\"", annualForms);
+        Assert.Contains("Header=\"Releases\"", annualForms);
+        Assert.Contains("Header=\"DHHS Documents\"", annualForms);
+        Assert.Contains("Header=\"Safety Plan\"", annualForms);
+        Assert.Contains("Header=\"Privacy Practices\"", annualForms);
+        Assert.Contains("ReleaseObligationsWorkspace", annualForms);
         Assert.Contains("Header=\"AT Requests\"", clients);
         Assert.Contains("Clients.DhhsForms", hub);
         Assert.Contains("Clients.AgencyRelease", hub);
@@ -147,7 +155,8 @@ public sealed class ReleaseUiStructureTests
             Root, "Views", "ClientDocuments", "AgencyReleaseWorkspace.xaml"));
         var obligations = File.ReadAllText(Path.Combine(
             Root, "Views", "ClientDocuments", "ReleaseObligationsWorkspace.xaml"));
-        var clients = File.ReadAllText(Path.Combine(Root, "Views", "ClientsView.xaml"));
+        var annualForms = File.ReadAllText(Path.Combine(
+            Root, "Views", "ClientDocuments", "AnnualDocumentsWorkspace.xaml"));
         var app = File.ReadAllText(Path.Combine(Root, "App.xaml.cs"));
 
         Assert.Contains("ItemsSource=\"{Binding ReleaseObligationChoices}\"", editor);
@@ -161,8 +170,8 @@ public sealed class ReleaseUiStructureTests
             "services.AddTransient<ViewModels.ClientDocuments.ReleaseObligationsViewModel>();",
             app);
 
-        var tracker = clients.IndexOf("ReleaseObligationsWorkspace", StringComparison.Ordinal);
-        var generator = clients.IndexOf("AgencyReleaseWorkspace", StringComparison.Ordinal);
+        var tracker = annualForms.IndexOf("ReleaseObligationsWorkspace", StringComparison.Ordinal);
+        var generator = annualForms.IndexOf("AgencyReleaseWorkspace", StringComparison.Ordinal);
         Assert.True(tracker >= 0 && generator > tracker,
             "The exact obligation tracker must be presented before the release generator.");
     }
@@ -576,6 +585,8 @@ public sealed class ReleaseUiStructureTests
     public void ClientProfileFormsUseAPerPersonLockAndCommandOnlyAttestationCheckboxes()
     {
         var clients = File.ReadAllText(Path.Combine(Root, "Views", "ClientsView.xaml"));
+        var annualForms = File.ReadAllText(Path.Combine(
+            Root, "Views", "ClientDocuments", "AnnualDocumentsWorkspace.xaml"));
         var viewModel = File.ReadAllText(Path.Combine(Root, "ViewModels", "NewClientViewModel.cs"));
         var checkBox = File.ReadAllText(Path.Combine(Root, "Views", "AttestationCheckBox.cs"));
 
@@ -593,7 +604,7 @@ public sealed class ReleaseUiStructureTests
         Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(
             clients, "ContentTemplate=\"{StaticResource AnnualFormRowTemplate}\"").Count);
         Assert.DoesNotContain("CommandParameter=\"{x:Static local:FormType.Release_", clients);
-        Assert.Contains("ReleaseObligationsWorkspace", clients);
+        Assert.Contains("ReleaseObligationsWorkspace", annualForms);
         Assert.Contains("Command=\"{Binding ToggleFormsEditingCommand}\"", clients);
         Assert.Contains("Locked — use the lock icon to edit", clients);
         Assert.DoesNotContain("AllowComplianceOverride", clients);

@@ -121,18 +121,31 @@ public partial class SafetyPlanViewModel(
         }
         NotifyState();
     }
-    private async Task Run(Func<int, DateTime, Task<SafetyPlanDto?>> operation)
+    private async Task Run(
+        Func<int, DateTime, Task<SafetyPlanDto?>> operation,
+        Func<DateTime, string>? successMessage = null)
     {
         if (IsBusy) return;
         if (person is null || CycleStart is null) { Message = "Select a consumer with an effective date."; return; }
         var id = person.Id; var cycle = CycleStart.Value.Date; var ticket = requests.Begin();
         IsBusy = true; Message = "";
-        try { var value = await operation(id, cycle); if (requests.IsCurrent(ticket)) Apply(value); }
+        try
+        {
+            var value = await operation(id, cycle);
+            if (requests.IsCurrent(ticket))
+            {
+                Apply(value);
+                if (successMessage is not null)
+                    Message = successMessage(cycle);
+            }
+        }
         catch (SafetyPlanWorkflowException error) { if (requests.IsCurrent(ticket)) Message = error.Message; }
         catch (Exception) { if (requests.IsCurrent(ticket)) Message = "The operation could not be completed. Check the cycle and permissions, then reload to check the latest version."; }
         finally { if (requests.IsCurrent(ticket)) IsBusy = false; }
     }
-    [RelayCommand] private Task ReloadAsync() => Run(service.GetAsync);
+    [RelayCommand] private Task ReloadAsync() => Run(
+        service.GetAsync,
+        cycle => $"Safety-plan status loaded for the service year beginning {cycle:MMMM d, yyyy}.");
     [RelayCommand] private Task StartAsync() => Run(async (id, cycle) => await service.StartAsync(id, cycle));
     [RelayCommand] private Task SaveAsync() => Change("save");
     [RelayCommand] private Task SubmitAsync() => Change("submit");
@@ -164,7 +177,5 @@ public partial class SafetyPlanSectionViewModel(string id, string text) : Observ
     public string Id { get; } = id;
     public string Title => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Id.Replace('-', ' '));
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PreviewText))]
     private string text = text;
-    public string PreviewText => string.IsNullOrWhiteSpace(Text) ? "[Not yet completed]" : Text.Trim();
 }

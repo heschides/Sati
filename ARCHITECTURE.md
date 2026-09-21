@@ -201,20 +201,18 @@ a 2026-09-14 anchor and all 56 tables. A complete reset inside an outer transact
 row counts and trusted constraints, then rolled back to the exact pre-rehearsal live identity and
 date state.
 
-## Live form draft previews
+## Form entry and document preview policy
 
-Every currently editable document workspace presents a document-shaped preview driven by the same
-in-memory draft as its entry controls. Text bindings use `UpdateSourceTrigger=PropertyChanged`;
-numeric fields that would otherwise react badly to transient input use a short delay and retain the
-last valid typed value. The preview therefore follows deliberate entries without requiring the user
-to leave each field.
+An entry workspace must not present a WPF facsimile as though it were the official document. For
+externally owned forms — including Maine DHHS, CWIC, and Housing Support Funds documents — the
+entry screen collects and validates data, while the explicit generation command fills the retained
+source PDF. The generated PDF is the document to review, sign, retain, or submit.
 
-This is presentation behavior, not publication. A preview mutation cannot update an already
-published request, a generated `DocumentArtifact`, or an immutable `DocumentTemplate` version.
-The separate generation/publish command still validates, freezes, audits, and versions the output.
-PCP, Comprehensive Assessment, and Classification authoring are not counted as editable Sati forms:
-their agency gates are off and current PCP/assessment compliance is recorded through timestamped
-Evergreen attestations.
+A live preview is retained only where it faithfully renders the same Sati-owned document output,
+currently AT and Check Requests. Any future in-app preview of a state or agency form must display
+the actual generated PDF bytes, not a separately maintained visual approximation. Preview or entry
+changes remain non-destructive and cannot update an already published request, a generated
+`DocumentArtifact`, or an immutable `DocumentTemplate` version.
 
 ## Housing Support Funds application
 
@@ -2622,7 +2620,7 @@ model. Review scope is the assigned user's authorized supervision scope, not jus
 
 ## Annual packet and receipt boundary — 2026-09-03
 
-`IAnnualDocumentService` feeds the Annual Documents workspace and read-time profile/dashboard
+`IAnnualDocumentService` feeds the Annual Forms workspace and read-time profile/dashboard
 reminders. Local implementations use short-lived contexts; Demo uses HTTP services. Shared
 `AnnualPacketWindow`, `DocumentAcknowledgmentRules`, `DocumentVerification`, `RecordsRecipient`
 and `AnnualDocumentReminder` own their respective policy calculations in `Sati.Contracts.V1`.
@@ -2639,11 +2637,15 @@ or external releases are listed for retrieval from their original saved/signed c
 reconstructed. Medical requests are downloads only; there is no sending service or scheduled
 packet job.
 
-The Annual Documents screen now projects the live artifacts into separate, fixed workflow rows for
-the three releases, Safety Plan, Privacy Practices, and the once-only DHHS Authorized Representative
-appointment. Preparation labels are presentation only; `DocumentArtifact.Origin`, immutable signer
-requests, and form attestations remain the authoritative records. The signing grid maps Issued and
-Viewed to Pending and Declined to Denied for staff readability without changing persisted states.
+The Clients screen exposes one Annual Forms workspace with nested Overview, Releases, DHHS
+Documents, Safety Plan, and Privacy Practices tabs. Overview projects the live artifacts into
+separate, fixed workflow rows for the three releases, Safety Plan, Privacy Practices, and the
+once-only DHHS Authorized Representative appointment; each row navigates directly to the matching
+inner tab. The selected service year is displayed as a complete date range, and “View selected
+year” is a read-only refresh with explicit status feedback. Preparation labels and tab selection are
+presentation only; `DocumentArtifact.Origin`, immutable signer requests, and form attestations
+remain the authoritative records. The signing grid maps Issued and Viewed to Pending and Declined
+to Denied for staff readability without changing persisted states.
 
 `DhhsAuthorizedRepresentative` is a distinct document kind. Generating that state form records a
 Draft or review-ready artifact but does not claim that a signed appointment is on file. The assigned
@@ -2696,6 +2698,16 @@ case manager may replace or remove it. Writes recheck ownership in a serializabl
 an expected revision, and append PHI-free update/removal audit actions. The desktop clears the old
 image as soon as selection changes and uses `LatestRequestTracker`, so a delayed response cannot
 place one consumer's portrait on another profile. The view displays the original image without
-an opacity feather and exposes named keyboard-accessible change and remove actions. Migration
+an opacity feather and exposes named keyboard-accessible change and remove actions.
+
+Before upload, `ProfilePhotoPreparer` decodes a selected image of up to 40 MB, honors EXIF
+orientation, flattens transparency onto white, and gives `PhotoCropWindow` an upright working image.
+`PhotoCropViewModel` owns the bounded square crop geometry. The selected crop is re-encoded as a
+512-pixel JPEG at quality 90, which removes camera metadata such as GPS coordinates, then passes
+through the unchanged shared `PersonPhotoRules` and ordinary local/cloud photo service. Preparation
+is a desktop presentation concern; server authorization, revision, size, dimension, audit, and media
+validation remain authoritative.
+
+Migration
 `20260912053013_AddPersonPhotos` creates the storage; it was generated
 and tested here but was not applied to a real database or deployment.

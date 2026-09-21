@@ -649,10 +649,24 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.20", version);
+        Assert.Equal("1.3.21", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Unfinished plans move on at the end of the day", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Annual Forms follow one clear path", ProductReleaseNotes.ReleaseName);
         Assert.NotEmpty(ProductReleaseNotes.Sections);
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Annual Forms is one clear workspace" &&
+            section.Items.Any(item => item.Contains("Next step", StringComparison.Ordinal)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "The document you generate is the document you submit" &&
+            section.Items.Any(item => item.Contains("retained source document", StringComparison.Ordinal)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Profile photos are cropped and made safe to store" &&
+            section.Items.Any(item => item.Contains("GPS location", StringComparison.Ordinal)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "The client journal has pages, formatting, and checkboxes");
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Demo billing can record deposits and prepare claim corrections" &&
+            section.Items.Any(item => item.Contains("Local Production", StringComparison.Ordinal)));
         // The reasons this release exists, in the words staff will read.
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Closing Sati tidies up scheduled work that did not get done" &&

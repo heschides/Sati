@@ -12,17 +12,18 @@ namespace Sati.Tests;
 public sealed class LiveFormPreviewTests
 {
     [Fact]
-    public void EveryExistingEditableDocumentWorkspaceCarriesALivePreview()
+    public void OnlyWorkspacesWithFaithfulDocumentViewsPresentALivePreview()
     {
         var root = RepositoryRoot();
         AssertPreview(root, "Views/ATRequestView.xaml", "<views:ATFormDocument");
         AssertPreview(root, "Views/ClientDocuments/CheckRequestsWorkspace.xaml", "LIVE PREVIEW");
-        AssertPreview(root, "Views/ClientDocuments/AgencyReleaseWorkspace.xaml", "AgencyReleaseDocument");
-        AssertPreview(root, "Views/ClientDocuments/DhhsFormsWorkspace.xaml", "DhhsFormEntryPreview");
-        AssertPreview(root, "Views/ClientDocuments/SafetyPlanWorkspace.xaml", "SafetyPlanDocument");
-        AssertPreview(root, "Views/ClientDocuments/AnnualDocumentsWorkspace.xaml", "DocumentTemplatePreview");
-        AssertPreview(root, "Views/ClientDocuments/CwicPacketWorkspace.xaml", "Live CWIC packet preview");
-        AssertPreview(root, "Views/ClientDocuments/HousingSupportFundsWorkspace.xaml", "Live Housing Support Funds application preview");
+
+        AssertNoPreview(root, "Views/ClientDocuments/AgencyReleaseWorkspace.xaml", "AgencyReleaseDocument");
+        AssertNoPreview(root, "Views/ClientDocuments/DhhsFormsWorkspace.xaml", "DhhsFormEntryPreview");
+        AssertNoPreview(root, "Views/ClientDocuments/SafetyPlanWorkspace.xaml", "SafetyPlanDocument");
+        AssertNoPreview(root, "Views/ClientDocuments/AnnualDocumentsWorkspace.xaml", "DocumentTemplatePreview");
+        AssertNoPreview(root, "Views/ClientDocuments/CwicPacketWorkspace.xaml", "Live CWIC packet preview");
+        AssertNoPreview(root, "Views/ClientDocuments/HousingSupportFundsWorkspace.xaml", "Live Housing Support Funds application preview");
 
         var assessment = File.ReadAllText(Path.Combine(root,
             "Views", "ClientDocuments", "ComprehensiveAssessmentWorkspace.xaml"));
@@ -30,7 +31,7 @@ public sealed class LiveFormPreviewTests
     }
 
     [Fact]
-    public void EditablePreviewFieldsSendTextToTheDraftWhileTheUserIsTyping()
+    public void EditableDocumentFieldsSendTextToTheDraftWhileTheUserIsTyping()
     {
         var root = RepositoryRoot();
         var workspaces = new[]
@@ -62,39 +63,13 @@ public sealed class LiveFormPreviewTests
     }
 
     [Fact]
-    public void EveryEditablePreviewCanBeRealizedByTheDesktop()
+    public void RemainingFaithfulDocumentPreviewsCanBeRealizedByTheDesktop()
     {
         WpfUiHarness.Run(() =>
         {
             AssertRendersLivePreview(new ATRequestView(), "Live AT request preview");
             AssertRendersLivePreview(new CheckRequestsWorkspace(), "Live check request preview");
-            AssertRendersLivePreview(new AgencyReleaseWorkspace(), "Live release document preview");
-            AssertRendersLivePreview(new DhhsFormsWorkspace(), "Live DHHS form entry preview");
-            AssertRendersLivePreview(new SafetyPlanWorkspace(), "Live safety plan preview");
-            AssertRendersLivePreview(new CwicPacketWorkspace(), "Live CWIC packet preview");
-            AssertRendersLivePreview(new HousingSupportFundsWorkspace(), "Live Housing Support Funds application preview");
-
-            var annual = new AnnualDocumentsWorkspace();
-            WpfUiHarness.Realize(annual, 1200, 900);
-            var templateEditor = WpfUiHarness.Descendants(annual).OfType<Expander>()
-                .Single(x => Equals(x.Header, "Agency privacy template (administrators)"));
-            templateEditor.IsExpanded = true;
-            annual.UpdateLayout();
-            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(
-                annual, "Live privacy template preview"));
         });
-    }
-
-    [Fact]
-    public void SafetyPreviewUsesAnHonestPlaceholderUntilTextIsEntered()
-    {
-        var section = new SafetyPlanSectionViewModel("warning-signs", "");
-
-        Assert.Equal("[Not yet completed]", section.PreviewText);
-
-        section.Text = "The person asks for quiet space and calls a trusted supporter.";
-
-        Assert.Equal("The person asks for quiet space and calls a trusted supporter.", section.PreviewText);
     }
 
     [Fact]
@@ -114,6 +89,14 @@ public sealed class LiveFormPreviewTests
         var content = File.ReadAllText(Path.Combine(root,
             relativePath.Replace('/', Path.DirectorySeparatorChar)));
         Assert.Contains(marker, content, StringComparison.Ordinal);
+    }
+
+    private static void AssertNoPreview(string root, string relativePath, string marker)
+    {
+        var content = File.ReadAllText(Path.Combine(root,
+            relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        Assert.DoesNotContain(marker, content, StringComparison.Ordinal);
+        Assert.DoesNotContain("LIVE PREVIEW", content, StringComparison.Ordinal);
     }
 
     private static void AssertRendersLivePreview(FrameworkElement workspace, string automationName)

@@ -6,11 +6,52 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Unfinished plans move on at the end of the day";
-    public const string ReleaseDate = "September 18, 2026";
+    public const string ReleaseName = "Annual Forms follow one clear path";
+    public const string ReleaseDate = "September 20, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Annual Forms is one clear workspace",
+            [
+                "The client profile now keeps Overview, Releases, DHHS Documents, Safety Plan, and Privacy Practices together under Annual Forms.",
+                "Overview is the starting point. It shows the complete service-year range, tells you when that year has loaded, and gives every workflow row a direct Next step button to the right tab.",
+                "Viewing a different year only loads its saved work. It does not change historical records."
+            ]),
+        new(
+            "The document you generate is the document you submit",
+            [
+                "State and agency forms are now plainly labeled as entry workspaces instead of showing a second, approximate drawing of the form.",
+                "Generate PDF fills the retained source document. That generated PDF is the copy to review, sign, save, and submit.",
+                "A live preview remains only where Sati owns the document and the preview faithfully represents the generated output."
+            ]),
+        new(
+            "Profile photos are cropped and made safe to store",
+            [
+                "After choosing a phone photo, you can position a square crop before saving it.",
+                "Sati turns rotated photos upright, makes a compact 512-pixel JPEG, and removes camera metadata such as GPS location.",
+                "Large phone photos and motion photos can now be prepared without weakening the upload limits that protect the database and API."
+            ]),
+        new(
+            "The client journal has pages, formatting, and checkboxes",
+            [
+                "A journal can now have named pages, bold, italic, and underlined text, plus checkboxes for items you want to track.",
+                "Existing plain-text journals still open normally and become a paged journal only after you edit them in the new editor.",
+                "Checking an item can put its text on the calendar for a future date after you confirm it; cancelling leaves the journal item unchanged."
+            ]),
+        new(
+            "Old scheduled items no longer distort today's calendar",
+            [
+                "A Scheduled item dated before today is treated as lapsed and stays off the calendar, the Overview thumbnail, supervisor workload, and productivity forecasts.",
+                "The item is not deleted. The existing close-time cleanup still lets you move it to the next workday or remove it."
+            ]),
+        new(
+            "Demo billing can record deposits and prepare claim corrections",
+            [
+                "A remittance can now record the bank deposit that funded it, and a correction keeps the earlier entry while requiring a reason.",
+                "In Demo, imported payer responses can identify a rejected or adjudicated claim and prepare a resend, replacement, or void without changing the original claim.",
+                "Local Production does not import those responses, so claim corrections are not available there. Payer companion-guide acceptance must still be confirmed before real submission."
+            ]),
         new(
             "Closing Sati tidies up scheduled work that did not get done",
             [

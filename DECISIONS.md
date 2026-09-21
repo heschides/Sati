@@ -4707,6 +4707,28 @@ creams lean rose rather than yellow so nothing reads sallow, and it passes the s
 audit as every other theme. The installed program's shortcut and taskbar-pin icon is still the
 executable's embedded `sati.ico`; only the open window's icon follows the theme.
 
+## 2026-09-18 — a profile photo is prepared on the desktop, then validated as before
+
+Phone photos are routinely refused by `PersonPhotoRules`: over 5 MB, over 4,096 pixels, or — for
+motion photos — carrying a video after the JPEG's end marker, which the deliberately strict parser
+treats as malformed. Loosening the rules would store large, unrotated originals with their
+metadata. Instead the desktop decodes the picked file (up to 40 MB), turns it upright from its EXIF
+orientation, lets the case manager choose a square in `PhotoCropWindow`, and re-encodes that square
+as a 512-pixel JPEG. The rules and the API are unchanged and still validate every upload; the
+prepared photo simply passes them.
+
+Re-encoding drops the camera's metadata, including GPS location, which does not belong on a
+consumer's record. Transparency is blended onto white, because a JPEG has none.
+
+The pipeline is pure imaging (crop, WIC scale, encode), not a render pass: `RenderTargetBitmap`
+depends on the machine's composition state and was observed returning a blank bitmap, which would
+have saved a black square as someone's photo. The tests check output pixels, not only dimensions,
+for that reason.
+
+The crop geometry lives in `PhotoCropViewModel`, which keeps the square square and inside the
+photo whatever the input. The default is the largest square, centred across and a quarter of the
+way down a tall photo, where faces usually are.
+
 ## 2026-09-19 — the journal is stored as pages of marked text, and plain text stays valid
 
 The consumer journal now has named pages, bold/italic/underline, and checkboxes.
@@ -4828,3 +4850,19 @@ void repeats the adjudicated claim exactly, because it asks the payer to withdra
 (`ClaimAcknowledgementOutcomes`) so a rejected claim can be found; answers imported before this
 release have no per-claim verdict and read as unanswered. And whether MaineCare accepts frequency
 7 and 8 as written here is a companion-guide question the rule does not answer.
+
+## 2026-09-19 — Annual Forms is one workflow, and a facsimile is not a document preview
+
+The consumer profile now has one **Annual Forms** tab with Overview, Releases, DHHS Documents,
+Safety Plan, and Privacy Practices inside it. Overview names the full service-year date range,
+explains that selecting a year is read-only, and gives each outstanding item a direct action into
+the appropriate tab. This replaces separate top-level destinations that made related work appear
+unconnected and made a successful reload look like no action occurred.
+
+For externally owned documents, Sati's editing controls are explicitly data-entry workspaces. The
+WPF facsimiles are removed because their appearance could diverge from the form actually submitted.
+The retained source PDF and the generated PDF remain the document authority. An eventual in-app
+preview is acceptable only if it displays those same generated PDF bytes. Faithful previews of
+Sati-owned outputs may remain. This supersedes the 2026-09-13 decision to require a separately drawn
+live preview in every editable form workspace; it does not change validation, artifact, signature,
+audit, or publication rules.

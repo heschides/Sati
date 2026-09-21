@@ -1632,7 +1632,7 @@ CalendarViewModel calendarViewModel,
             }
             catch (Exception)
             {
-                if (_annualReminderRequests.IsCurrent(ticket)) AnnualDocumentReminderText = "Annual document status could not be checked. Open Annual Documents to reload it.";
+                if (_annualReminderRequests.IsCurrent(ticket)) AnnualDocumentReminderText = "Annual-form status could not be checked. Open Annual Forms to reload it.";
             }
         }
 

@@ -1,5 +1,6 @@
 ﻿using Sati.ViewModels;
 using Sati.ViewModels.Children;
+using Sati.Services;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -118,8 +119,30 @@ namespace Sati.Views
 
             try
             {
+                if (new FileInfo(dialog.FileName).Length > ProfilePhotoPreparer.MaximumInputBytes)
+                {
+                    ShowPersonPhotoProblem(this, new PersonPhotoProblemEventArgs(
+                        "Photo not saved", "That file is larger than 40 MB. Choose a smaller photo."));
+                    return;
+                }
+
                 var bytes = await File.ReadAllBytesAsync(dialog.FileName);
-                await _viewModel.PersonPhoto.SaveSelectedAsync(bytes);
+                // Any size, shape, or orientation is made upright, cropped square by the case
+                // manager, and re-encoded at 512 pixels before it reaches the photo rules.
+                var upright = ProfilePhotoPreparer.LoadUpright(bytes, out var problem);
+                if (upright is null)
+                {
+                    ShowPersonPhotoProblem(this, new PersonPhotoProblemEventArgs(
+                        "Photo not saved", problem ?? "Sati could not open that image."));
+                    return;
+                }
+
+                var crop = new PhotoCropWindow { Owner = Window.GetWindow(this) };
+                crop.Configure(upright);
+                if (crop.ShowDialog() != true || crop.PreparedPhoto is not { } prepared)
+                    return;
+
+                await _viewModel.PersonPhoto.SaveSelectedAsync(prepared);
             }
             catch (Exception exception)
             {

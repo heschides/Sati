@@ -41,27 +41,17 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         : "";
     public string ReceiptStatus => status?.Artifacts.FirstOrDefault(x => x.Kind == "PrivacyPractices") is { } notice &&
         status.AcknowledgedArtifactIds.Contains(notice.Id) ? "Receipt or good-faith effort is recorded for the current notice." : "Receipt or good-faith effort has not been recorded for the current notice.";
-    public DocumentTemplateRenderContext TemplatePreviewContext
+    public string PeriodTitle
     {
         get
         {
-            var start = CycleStart?.Date ?? DateTime.Today;
-            var effective = person?.EffectiveDate;
-            var end = effective is DateTime effectiveDate && CycleStart is DateTime cycle
-                ? AnnualDocumentCycle.EndInclusive(effectiveDate, cycle.Date)
-                : start.AddYears(1).AddDays(-1);
-            var agency = person?.Agency;
-            var actor = session.CurrentUser;
-            return new(
-                agency?.Name,
-                ComposeAddress(agency?.Street, agency?.City, agency?.State, agency?.Zip),
-                agency?.EdiContactPhone,
-                person?.FullName,
-                person is null ? null : person.BirthDate,
-                start,
-                end,
-                actor?.DisplayName,
-                actor?.Role.ToString());
+            if (CycleStart is not DateTime start)
+                return "Select a service year to review its annual forms.";
+
+            var end = person?.EffectiveDate is DateTime effective
+                ? AnnualDocumentCycle.EndInclusive(effective, start.Date)
+                : start.Date.AddYears(1).AddDays(-1);
+            return $"Service year: {start:MMMM d, yyyy} - {end:MMMM d, yyyy}";
         }
     }
     public string TemplateValidationMessage
@@ -69,7 +59,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         get
         {
             if (string.IsNullOrWhiteSpace(TemplateBody))
-                return "Enter template content to see the live document preview.";
+                return "Enter template content to validate it before publishing a new version.";
             var errors = DocumentTemplateRules.Validate(AnnualDocumentKind.PrivacyPractices, TemplateBody);
             return errors.Count == 0
                 ? "Template is valid and ready to publish as a new version."
@@ -88,8 +78,8 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         Signatures?.SetContext(person?.Id ?? 0, []);
         ReceivedOn = null; GoodFaithEffortReason = ""; VerificationArtifactId = 0;
         AuthorizedRepresentativeOnFileNote = "";
-        Reminder = ""; WindowDescription = ""; Message = "Open the selected annual period to view its documents and signature activity.";
-        RebuildDocumentWorkflow(); OnPropertyChanged(nameof(TemplatePreviewContext)); NotifyState();
+        Reminder = ""; WindowDescription = ""; Message = "Select View selected year to load its form and signature status.";
+        RebuildDocumentWorkflow(); OnPropertyChanged(nameof(PeriodTitle)); NotifyState();
     }
     partial void OnTemplateBodyChanged(string value)
     {
@@ -116,7 +106,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         Message = ""; Reminder = ""; WindowDescription = "";
         // No suggestion until the agency's packet window loads; InitializeAsync selects it.
         CycleStart = null;
-        RebuildDocumentWorkflow(); OnPropertyChanged(nameof(TemplatePreviewContext)); NotifyState(); _ = InitializeAsync();
+        RebuildDocumentWorkflow(); NotifyState(); _ = InitializeAsync();
     }
     private async Task InitializeAsync()
     {
@@ -134,9 +124,10 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
                 try { CycleStart = cycle; }
                 finally { applyingCycle = false; }
                 Apply(result);
+                Message = $"Annual-form status loaded for the service year beginning {cycle:MMMM d, yyyy}.";
             }
         }
-        catch (Exception) { if (requests.IsCurrent(ticket)) Message = "Annual documents could not be loaded. Check the effective date and try again."; }
+        catch (Exception) { if (requests.IsCurrent(ticket)) Message = "Annual forms could not be loaded. Check the effective date and try again."; }
         finally { if (requests.IsCurrent(ticket)) IsBusy = false; }
     }
     private void Apply(AnnualDocumentsStatusDto value)
@@ -144,7 +135,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         status = value; Artifacts.Clear(); foreach (var artifact in value.Artifacts) Artifacts.Add(artifact);
         Signatures?.SetContext(person?.Id ?? 0, value.Artifacts);
         WindowDescription = value.Window.IsOpen ? $"Packet available through {value.Window.EndsOn:d}." : $"Packet opens {value.Window.OpensOn:d}.";
-        Reminder = value.Reminder; RebuildDocumentWorkflow(); NotifyState();
+        Reminder = value.Reminder; RebuildDocumentWorkflow(); OnPropertyChanged(nameof(PeriodTitle)); NotifyState();
     }
     private async Task Run(Func<int, DateTime, Task<string?>> operation)
     {
@@ -159,7 +150,8 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         catch (Exception) { if (requests.IsCurrent(ticket)) Message = "The operation could not be completed. Check the dates and required fields, then reload."; }
         finally { if (requests.IsCurrent(ticket)) IsBusy = false; }
     }
-    [RelayCommand] private Task ReloadAsync() => Run((_, _) => Task.FromResult<string?>(null));
+    [RelayCommand] private Task ReloadAsync() => Run((_, cycle) =>
+        Task.FromResult<string?>($"Annual-form status refreshed for the service year beginning {cycle:MMMM d, yyyy}."));
     [RelayCommand] private Task GenerateNoticeAsync()
     {
         var ticket = 0;
@@ -210,18 +202,6 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         catch (Exception) { Message = "The template was not published. Check its text and supported tokens."; }
     }
 
-    private static string? ComposeAddress(string? street, string? city, string? state, string? zip)
-    {
-        var locality = string.Join(", ", new[] { city?.Trim(), state?.Trim() }
-            .Where(value => !string.IsNullOrWhiteSpace(value)));
-        if (!string.IsNullOrWhiteSpace(zip))
-            locality = string.IsNullOrWhiteSpace(locality) ? zip.Trim() : $"{locality} {zip.Trim()}";
-        var lines = new[] { street?.Trim(), locality }
-            .Where(value => !string.IsNullOrWhiteSpace(value));
-        var result = string.Join(Environment.NewLine, lines);
-        return result.Length == 0 ? null : result;
-    }
-
     private void RebuildDocumentWorkflow()
     {
         DocumentWorkflow.Clear();
@@ -231,11 +211,16 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
                 .Where(item => item.Kind == definition.Kind.ToString())
                 .OrderByDescending(item => item.GeneratedAtUtc)
                 .FirstOrDefault();
-            var preparationStatus = status is null ? "Open an annual period" : DescribeArtifact(artifact);
+            var preparationStatus = status is null ? "Select View selected year" : DescribeArtifact(artifact);
             if (definition.Kind == AnnualDocumentKind.PrivacyPractices && artifact is not null &&
                 status!.AcknowledgedArtifactIds.Contains(artifact.Id))
                 preparationStatus = "Receipt recorded";
-            DocumentWorkflow.Add(new(definition.DisplayName, preparationStatus, definition.Instructions));
+            DocumentWorkflow.Add(new(
+                definition.DisplayName,
+                preparationStatus,
+                definition.Instructions,
+                definition.Section,
+                definition.ActionLabel));
         }
 
         if (NeedsAuthorizedRepresentative)
@@ -247,7 +232,9 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
             DocumentWorkflow.Add(new(
                 "DHHS Authorized Representative",
                 DescribeArtifact(artifact),
-                "This appointment is required only once. Prepare it in Authorized Rep; after a signed physical copy is retained through the agency's approved process, record that fact below."));
+                "This appointment is required only once. Prepare the official form in DHHS Documents; after a signed physical copy is retained through the agency's approved process, record that fact there.",
+                AnnualFormsSection.DhhsDocuments,
+                "Open DHHS Documents"));
         }
     }
 
@@ -261,14 +248,29 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         _ => "Not started"
     };
 
-    private static readonly (AnnualDocumentKind Kind, string DisplayName, string Instructions)[] AnnualWorkflowDefinitions =
+    private static readonly (AnnualDocumentKind Kind, string DisplayName, string Instructions,
+        AnnualFormsSection Section, string ActionLabel)[] AnnualWorkflowDefinitions =
     [
-        (AnnualDocumentKind.ReleaseDhhs, "DHHS release", "Prepare the authorization in Releases, then submit the completed saved PDF for review and signature."),
-        (AnnualDocumentKind.ReleaseMedical, "Medical Provider Release", "Prepare the medical release in Releases, then submit the completed saved PDF for review and signature."),
-        (AnnualDocumentKind.ReleaseAgency, "Agency Release", "Prepare the agency release in Releases, then submit the completed saved PDF for review and signature."),
-        (AnnualDocumentKind.SafetyPlan, "Safety Plan", "Complete the plan in Safety Plan and obtain supervisor approval before requesting the consumer or guardian's review."),
-        (AnnualDocumentKind.PrivacyPractices, "Privacy Practices", "Generate the current notice here, then record receipt or a good-faith delivery effort. Electronic acknowledgment remains a separate signer action.")
+        (AnnualDocumentKind.ReleaseDhhs, "DHHS release", "Complete the official state authorization, save the actual state PDF, and then handle review and signature separately.", AnnualFormsSection.DhhsDocuments, "Open DHHS Documents"),
+        (AnnualDocumentKind.ReleaseMedical, "Medical Provider Release", "Choose the exact provider obligation, prepare the release, and save the generated PDF for review and signature.", AnnualFormsSection.Releases, "Open Releases"),
+        (AnnualDocumentKind.ReleaseAgency, "Agency Release", "Choose the exact agency obligation, prepare the release, and save the generated PDF for review and signature.", AnnualFormsSection.Releases, "Open Releases"),
+        (AnnualDocumentKind.SafetyPlan, "Safety Plan", "Complete the saved plan and obtain supervisor approval before requesting the consumer or guardian's review.", AnnualFormsSection.SafetyPlan, "Open Safety Plan"),
+        (AnnualDocumentKind.PrivacyPractices, "Privacy Practices", "Generate the current approved notice, then record receipt or a good-faith delivery effort. Electronic acknowledgment remains separate.", AnnualFormsSection.PrivacyPractices, "Open Privacy Practices")
     ];
 }
 
-public sealed record AnnualDocumentWorkflowItem(string DisplayName, string Status, string Instructions);
+public enum AnnualFormsSection
+{
+    Overview,
+    Releases,
+    DhhsDocuments,
+    SafetyPlan,
+    PrivacyPractices
+}
+
+public sealed record AnnualDocumentWorkflowItem(
+    string DisplayName,
+    string Status,
+    string Instructions,
+    AnnualFormsSection Section,
+    string ActionLabel);

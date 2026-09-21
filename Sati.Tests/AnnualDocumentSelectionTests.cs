@@ -108,6 +108,14 @@ public sealed class AnnualDocumentSelectionTests
         Assert.Equal(
             ["DHHS release", "Medical Provider Release", "Agency Release", "Safety Plan", "Privacy Practices", "DHHS Authorized Representative"],
             vm.DocumentWorkflow.Select(item => item.DisplayName).ToArray());
+        Assert.Equal(
+            [AnnualFormsSection.DhhsDocuments, AnnualFormsSection.Releases, AnnualFormsSection.Releases,
+                AnnualFormsSection.SafetyPlan, AnnualFormsSection.PrivacyPractices, AnnualFormsSection.DhhsDocuments],
+            vm.DocumentWorkflow.Select(item => item.Section).ToArray());
+        Assert.Equal(
+            ["Open DHHS Documents", "Open Releases", "Open Releases", "Open Safety Plan",
+                "Open Privacy Practices", "Open DHHS Documents"],
+            vm.DocumentWorkflow.Select(item => item.ActionLabel).ToArray());
         Assert.All(vm.DocumentWorkflow, item => Assert.Equal("Not started", item.Status));
 
         service.AuthorizedRepresentativeOnFile = true;

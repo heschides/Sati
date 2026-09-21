@@ -1,111 +1,240 @@
 <UserControl x:Class="Sati.Views.ClientDocuments.AnnualDocumentsWorkspace"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
- xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" DataContextChanged="OnContextChanged"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:local="clr-namespace:Sati.Views.ClientDocuments"
- Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}">
- <ScrollViewer VerticalScrollBarVisibility="Auto">
-  <StackPanel Margin="18">
-   <TextBlock Text="Annual documents" FontSize="20" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"/>
-   <WrapPanel Margin="0,12,0,0">
-    <TextBlock Text="Annual period begins" VerticalAlignment="Center" Margin="0,0,8,0"/>
-    <DatePicker SelectedDate="{Binding CycleStart}" AutomationProperties.Name="Annual document period beginning"/>
-    <Button Content="Open selected period" Command="{Binding ReloadCommand}" Margin="8,0"
-            AutomationProperties.Name="Open selected annual document period"
-            ToolTip="Loads document status for this annual period without changing historical records."/>
-    <Button Content="Save Annual Documents Locally" Command="{Binding SavePacketCommand}" IsEnabled="{Binding CanSavePacket}"/>
-   </WrapPanel>
-   <TextBlock Text="An annual period is the consumer's service year beginning on their effective-date anniversary. Opening a period shows its saved documents and signature activity; it does not change historical records."
-              TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,12"/>
-   <TextBlock Text="{Binding WindowDescription}" TextWrapping="Wrap"/>
-   <TextBlock Text="{Binding Reminder}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
-   <TextBlock Text="{Binding Message}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
-   <TextBlock Text="The ZIP includes available drafts and a manifest. Completed releases already recorded in Sati must be retrieved from their saved or signed copies." TextWrapping="Wrap" Margin="0,8"/>
-   <TextBlock Text="Document workflow" FontSize="18" FontWeight="SemiBold" Margin="0,12,0,4"
-              AutomationProperties.HeadingLevel="Level2"/>
-   <ItemsControl ItemsSource="{Binding DocumentWorkflow}" AutomationProperties.Name="Annual document workflow by type">
-    <ItemsControl.ItemTemplate>
-     <DataTemplate>
-      <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6"
-              Background="{DynamicResource PersonGroupAltBrush}" Padding="12" Margin="0,4">
-       <Grid>
-        <Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-        <TextBlock Grid.Column="1" Text="{Binding Status}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="12,0"/>
-        <TextBlock Grid.Column="2" Text="{Binding Instructions}" TextWrapping="Wrap"/>
-       </Grid>
-      </Border>
-     </DataTemplate>
-    </ItemsControl.ItemTemplate>
-   </ItemsControl>
-   <TextBlock Text="{Binding AuthorizedRepresentativeRecordedMessage}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
-   <StackPanel Margin="0,4,0,12" AutomationProperties.Name="Record DHHS Authorized Representative form already on file">
-    <StackPanel.Style>
-     <Style TargetType="StackPanel">
-      <Setter Property="Visibility" Value="Visible"/>
-      <Style.Triggers><DataTrigger Binding="{Binding NeedsAuthorizedRepresentative}" Value="False"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers>
-     </Style>
-    </StackPanel.Style>
-    <TextBlock Text="If the signed once-only DHHS Authorized Representative form is already retained outside Sati, describe where or how you verified it. Sati records the fact and audit trail, not the document bytes." TextWrapping="Wrap"/>
-    <TextBox Text="{Binding AuthorizedRepresentativeOnFileNote, UpdateSourceTrigger=PropertyChanged}" MaxLength="1000"
-             AcceptsReturn="True" TextWrapping="Wrap" MinHeight="52" Margin="0,6"
-             AutomationProperties.Name="DHHS Authorized Representative on-file verification note"/>
-    <Button Content="Record signed form already on file" Command="{Binding RecordAuthorizedRepresentativeOnFileCommand}"
-            IsEnabled="{Binding CanRecordAuthorizedRepresentativeOnFile}" HorizontalAlignment="Left"/>
+ DataContextChanged="OnContextChanged"
+ Background="{DynamicResource SurfaceBrush}"
+ Foreground="{DynamicResource TextPrimaryBrush}">
+ <UserControl.Resources>
+  <Style x:Key="AnnualWorkflowDirectionLabel" TargetType="TextBlock">
+   <Setter Property="FontSize" Value="11"/>
+   <Setter Property="FontWeight" Value="Bold"/>
+   <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+  </Style>
+  <Style x:Key="AnnualWorkflowDirectionText" TargetType="TextBlock">
+   <Setter Property="FontSize" Value="14"/>
+   <Setter Property="FontWeight" Value="SemiBold"/>
+   <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+   <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+ </UserControl.Resources>
+ <Grid Margin="12">
+  <Grid.RowDefinitions>
+   <RowDefinition Height="Auto" MinHeight="94"/>
+   <RowDefinition Height="10"/>
+   <RowDefinition Height="*"/>
+  </Grid.RowDefinitions>
+
+  <Border Padding="14" CornerRadius="8" BorderThickness="1"
+          BorderBrush="{DynamicResource BorderBrush}"
+          Background="{DynamicResource SurfaceBrush}">
+   <StackPanel>
+   <TextBlock Text="Annual Forms" FontSize="20" FontWeight="SemiBold"
+               AutomationProperties.HeadingLevel="Level1"/>
+    <Border Margin="0,8,0,0" Padding="12,9" CornerRadius="6"
+            BorderBrush="{DynamicResource AccentBrush}" BorderThickness="4,1,1,1"
+            Background="{DynamicResource PersonGroupAltBrush}"
+            AutomationProperties.Name="Annual Forms workflow directions">
+     <StackPanel>
+      <TextBlock Text="START HERE" Style="{StaticResource AnnualWorkflowDirectionLabel}"/>
+      <TextBlock Margin="0,3,0,0" Style="{StaticResource AnnualWorkflowDirectionText}"
+                 Text="Confirm the service year on Overview. Then use the Next step action beside each form that needs attention."/>
+     </StackPanel>
+    </Border>
+    <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" FontSize="12"
+               Foreground="{DynamicResource TextSecondaryBrush}"
+               Text="Entry screens collect information. The saved PDF is the document to review, sign, retain, or submit."/>
    </StackPanel>
-   <GroupBox Header="Privacy notice" Margin="0,12">
-    <StackPanel Margin="12">
-     <Button Content="Generate privacy notice PDF" Command="{Binding GenerateNoticeCommand}" HorizontalAlignment="Left"/>
-     <TextBlock Text="{Binding ReceiptStatus}" TextWrapping="Wrap" Margin="0,8"/>
-     <TextBlock Text="Receipt date (leave blank if recording an effort to provide it)"/>
-     <DatePicker SelectedDate="{Binding ReceivedOn}" AutomationProperties.Name="Privacy notice received on"/>
-     <TextBlock Text="Good-faith effort explanation" Margin="0,8,0,0"/>
-     <TextBox Text="{Binding GoodFaithEffortReason, UpdateSourceTrigger=PropertyChanged}" MaxLength="1000" AcceptsReturn="True"
-      TextWrapping="Wrap" MinHeight="60" AutomationProperties.Name="Privacy notice good-faith effort"/>
-     <Button Content="Record receipt or effort" Command="{Binding AcknowledgeCommand}" IsEnabled="{Binding CanRecordReceipt}" HorizontalAlignment="Left" Margin="0,8"/>
-    </StackPanel>
-   </GroupBox>
-   <TextBlock Text="Current document records" FontSize="18" FontWeight="SemiBold" Margin="0,12,0,4"
-              AutomationProperties.HeadingLevel="Level2"/>
-   <DataGrid ItemsSource="{Binding Artifacts}" AutoGenerateColumns="False" IsReadOnly="True" MaxHeight="240" AutomationProperties.Name="Current document records">
-    <DataGrid.Columns>
-     <DataGridTextColumn Header="Artifact ID" Binding="{Binding Id}"/>
-     <DataGridTextColumn Header="Document" Binding="{Binding Kind}"/>
-     <DataGridTextColumn Header="Preparation" Binding="{Binding Origin}"/>
-     <DataGridTextColumn Header="Generated" Binding="{Binding GeneratedAtUtc}"/>
-    </DataGrid.Columns>
-   </DataGrid>
-   <WrapPanel Margin="0,12">
-    <TextBlock Text="Artifact ID to verify" VerticalAlignment="Center" Margin="0,0,8,0"/>
-    <TextBox Text="{Binding VerificationArtifactId, UpdateSourceTrigger=PropertyChanged}" Width="90" AutomationProperties.Name="Artifact ID to verify"/>
-    <Button Content="Choose file and verify" Command="{Binding VerifyCommand}" Margin="8,0"/>
-   </WrapPanel>
-   <TextBlock Text="Verification compares the file's fingerprint with the original record. The file contents are not uploaded." TextWrapping="Wrap"/>
-   <local:SignatureRequestsWorkspace DataContext="{Binding Signatures}" Margin="0,24"/>
-   <Expander Header="Agency privacy template (administrators)" IsEnabled="{Binding CanManageTemplates}" Margin="0,18">
-    <StackPanel>
-     <TextBlock Text="Publish a new version after agency review. Existing versions remain unchanged. Supported tokens are listed in DOCUMENT_TEMPLATES.md." TextWrapping="Wrap"/>
-     <Button Content="Load current template" Command="{Binding LoadTemplateCommand}" HorizontalAlignment="Left"/>
-     <Grid Margin="0,8,0,0">
-      <Grid.ColumnDefinitions>
-       <ColumnDefinition Width="3*" MinWidth="330"/>
-       <ColumnDefinition Width="16"/>
-       <ColumnDefinition Width="2*" MinWidth="360"/>
-      </Grid.ColumnDefinitions>
+  </Border>
+
+  <TabControl Grid.Row="2"
+              SelectedIndex="{Binding AnnualFormsTabIndex, Mode=TwoWay}"
+              AutomationProperties.Name="Annual forms sections">
+   <TabItem Header="Overview" AutomationProperties.Name="Annual forms overview">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+     <StackPanel Margin="18" DataContext="{Binding AnnualDocuments}">
+      <TextBlock Text="Service-year overview" FontSize="18" FontWeight="SemiBold"
+                 AutomationProperties.HeadingLevel="Level2"/>
+      <TextBlock Text="{Binding PeriodTitle}" FontSize="15" FontWeight="SemiBold" Margin="0,8,0,0"
+                 AutomationProperties.Name="Selected annual forms service year"/>
+      <WrapPanel Margin="0,10,0,0">
+       <TextBlock Text="Service year begins" VerticalAlignment="Center" Margin="0,0,8,0"/>
+       <DatePicker SelectedDate="{Binding CycleStart}"
+                   AutomationProperties.Name="Annual forms service year beginning"/>
+       <Button Content="View selected year" Command="{Binding ReloadCommand}" Margin="8,0"
+               AutomationProperties.Name="View selected annual forms service year"
+               ToolTip="Loads saved form, document, and signature status for the selected service year without changing any record."/>
+       <Button Content="Save Annual Forms Package" Command="{Binding SavePacketCommand}"
+               IsEnabled="{Binding CanSavePacket}"/>
+      </WrapPanel>
+      <TextBlock Text="Changing the date does not create, edit, or complete a form. Select View selected year to load that year's status."
+                 TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,10"/>
+      <TextBlock Text="{Binding WindowDescription}" TextWrapping="Wrap"/>
+      <TextBlock Text="{Binding Reminder}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
+      <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontWeight="SemiBold"
+                 AutomationProperties.LiveSetting="Polite"/>
+      <TextBlock Text="The package includes available drafts and a manifest. Retrieve completed releases from their exact saved or signed copies; Sati does not reconstruct them from metadata."
+                 TextWrapping="Wrap" Margin="0,8"/>
+
+      <TextBlock Text="What needs attention" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,4"
+                 AutomationProperties.HeadingLevel="Level2"/>
+      <ItemsControl ItemsSource="{Binding DocumentWorkflow}"
+                    AutomationProperties.Name="Annual form workflow by type">
+       <ItemsControl.ItemTemplate>
+        <DataTemplate>
+         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6"
+                 Background="{DynamicResource PersonGroupAltBrush}" Padding="12" Margin="0,4">
+          <Grid>
+           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+           </Grid.ColumnDefinitions>
+           <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{Binding DisplayName}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding Status}" FontWeight="SemiBold" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+           </StackPanel>
+           <Border Grid.Column="1" Margin="14,0" Padding="11,8" CornerRadius="5"
+                   Background="{DynamicResource SurfaceBrush}"
+                   BorderBrush="{DynamicResource AccentBrush}" BorderThickness="4,1,1,1"
+                   AutomationProperties.Name="{Binding DisplayName, StringFormat=Next step for {0}}">
+            <StackPanel>
+             <TextBlock Text="NEXT STEP" Style="{StaticResource AnnualWorkflowDirectionLabel}"/>
+             <TextBlock Text="{Binding Instructions}" Margin="0,3,0,0"
+                        Style="{StaticResource AnnualWorkflowDirectionText}"/>
+            </StackPanel>
+           </Border>
+           <Button Grid.Column="2" Content="{Binding ActionLabel}" CommandParameter="{Binding Section}"
+                   Command="{Binding DataContext.OpenAnnualFormsSectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   VerticalAlignment="Center" AutomationProperties.Name="{Binding ActionLabel}"/>
+          </Grid>
+         </Border>
+        </DataTemplate>
+       </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Text="{Binding AuthorizedRepresentativeRecordedMessage}" TextWrapping="Wrap"
+                 FontWeight="SemiBold" Margin="0,8"/>
+
+      <TextBlock Text="Current document records" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,4"
+                 AutomationProperties.HeadingLevel="Level2"/>
+      <DataGrid ItemsSource="{Binding Artifacts}" AutoGenerateColumns="False" IsReadOnly="True"
+                MaxHeight="240" AutomationProperties.Name="Current annual form document records">
+       <DataGrid.Columns>
+        <DataGridTextColumn Header="Record" Binding="{Binding Id}"/>
+        <DataGridTextColumn Header="Document" Binding="{Binding Kind}"/>
+        <DataGridTextColumn Header="Preparation" Binding="{Binding Origin}"/>
+        <DataGridTextColumn Header="Generated" Binding="{Binding GeneratedAtUtc}"/>
+       </DataGrid.Columns>
+      </DataGrid>
+      <WrapPanel Margin="0,12">
+       <TextBlock Text="Document record to verify" VerticalAlignment="Center" Margin="0,0,8,0"/>
+       <TextBox Text="{Binding VerificationArtifactId, UpdateSourceTrigger=PropertyChanged}" Width="90"
+                AutomationProperties.Name="Annual form document record to verify"/>
+       <Button Content="Choose file and verify" Command="{Binding VerifyCommand}" Margin="8,0"/>
+      </WrapPanel>
+      <TextBlock Text="Verification compares the selected file's fingerprint with the recorded generated document. The file contents are not uploaded."
+                 TextWrapping="Wrap"/>
+      <local:SignatureRequestsWorkspace DataContext="{Binding Signatures}" Margin="0,24"/>
+     </StackPanel>
+    </ScrollViewer>
+   </TabItem>
+
+   <TabItem Header="Releases" AutomationProperties.Name="Annual form releases">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+     <StackPanel Margin="16">
+      <TextBlock Text="Releases" FontSize="18" FontWeight="SemiBold"
+                 AutomationProperties.HeadingLevel="Level2"/>
+      <TextBlock Text="First confirm the exact recipient and service year below. Then prepare the matching medical or agency release. For Maine DHHS's state release, use DHHS Documents."
+                 TextWrapping="Wrap" Margin="0,6,0,12"/>
+      <local:ReleaseObligationsWorkspace DataContext="{Binding ReleaseObligations}"/>
+      <Separator Margin="0,12"/>
+      <local:AgencyReleaseWorkspace DataContext="{Binding AgencyRelease}"/>
+     </StackPanel>
+    </ScrollViewer>
+   </TabItem>
+
+   <TabItem Header="DHHS Documents" AutomationProperties.Name="Annual DHHS documents">
+    <Grid>
+     <Grid.RowDefinitions>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+     </Grid.RowDefinitions>
+     <local:DhhsFormsWorkspace DataContext="{Binding DhhsForms}"/>
+     <Border Grid.Row="1" Margin="16,0,16,16" Padding="12" CornerRadius="7"
+             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+             Background="{DynamicResource PersonGroupAltBrush}"
+             DataContext="{Binding AnnualDocuments}"
+             AutomationProperties.Name="Record DHHS Authorized Representative form already on file">
       <StackPanel>
-       <TextBlock Text="Template source" FontWeight="SemiBold" Margin="0,0,0,4"/>
-       <TextBox Text="{Binding TemplateBody, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
-        MinHeight="360" MaxHeight="620" MaxLength="100000" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Agency privacy template source"/>
+       <StackPanel.Style>
+        <Style TargetType="StackPanel">
+         <Setter Property="Visibility" Value="Visible"/>
+         <Style.Triggers>
+          <DataTrigger Binding="{Binding NeedsAuthorizedRepresentative}" Value="False">
+           <Setter Property="Visibility" Value="Collapsed"/>
+          </DataTrigger>
+         </Style.Triggers>
+        </Style>
+       </StackPanel.Style>
+       <TextBlock Text="Already have the signed Authorized Representative form? Describe where the agency-approved copy is retained or how you verified it. This records the fact and audit trail, not the PDF bytes."
+                  TextWrapping="Wrap"/>
+       <TextBox Text="{Binding AuthorizedRepresentativeOnFileNote, UpdateSourceTrigger=PropertyChanged}"
+                MaxLength="1000" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="52" Margin="0,6"
+                AutomationProperties.Name="DHHS Authorized Representative on-file verification note"/>
+       <Button Content="Record signed form already on file"
+               Command="{Binding RecordAuthorizedRepresentativeOnFileCommand}"
+               IsEnabled="{Binding CanRecordAuthorizedRepresentativeOnFile}"
+               HorizontalAlignment="Left"/>
       </StackPanel>
-      <StackPanel Grid.Column="2">
-       <local:DocumentTemplatePreview Source="{Binding TemplateBody}" Context="{Binding TemplatePreviewContext}" MinHeight="360" MaxHeight="620"/>
-       <TextBlock Text="Bracketed preview placeholders identify information that is not available in this screen; generated PDFs leave those fields blank."
-        TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,5,0,0"/>
-      </StackPanel>
-     </Grid>
-     <TextBlock Text="{Binding TemplateValidationMessage}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
-     <Button Content="Publish new template version" Command="{Binding PublishTemplateCommand}" IsEnabled="{Binding CanPublishTemplate}" HorizontalAlignment="Left"/>
-    </StackPanel>
-   </Expander>
-  </StackPanel>
- </ScrollViewer>
+     </Border>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Safety Plan" AutomationProperties.Name="Annual safety plan">
+    <local:SafetyPlanWorkspace DataContext="{Binding SafetyPlan}"/>
+   </TabItem>
+
+   <TabItem Header="Privacy Practices" AutomationProperties.Name="Annual privacy practices">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+     <StackPanel Margin="18" DataContext="{Binding AnnualDocuments}">
+      <TextBlock Text="Privacy Practices" FontSize="18" FontWeight="SemiBold"
+                 AutomationProperties.HeadingLevel="Level2"/>
+      <TextBlock Text="Generate only the agency-approved notice. Generating a PDF does not record delivery, receipt, acknowledgment, or signature."
+                 TextWrapping="Wrap" Margin="0,6,0,12"/>
+      <Button Content="Generate privacy notice PDF" Command="{Binding GenerateNoticeCommand}"
+              HorizontalAlignment="Left"/>
+      <TextBlock Text="{Binding ReceiptStatus}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,10"/>
+      <TextBlock Text="Receipt date (leave blank when recording a good-faith effort instead)"/>
+      <DatePicker SelectedDate="{Binding ReceivedOn}"
+                  AutomationProperties.Name="Privacy notice received on"/>
+      <TextBlock Text="Good-faith effort explanation" Margin="0,8,0,0"/>
+      <TextBox Text="{Binding GoodFaithEffortReason, UpdateSourceTrigger=PropertyChanged}"
+               MaxLength="1000" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
+               AutomationProperties.Name="Privacy notice good-faith effort"/>
+      <Button Content="Record receipt or effort" Command="{Binding AcknowledgeCommand}"
+              IsEnabled="{Binding CanRecordReceipt}" HorizontalAlignment="Left" Margin="0,8"/>
+
+      <Expander Header="Agency privacy template (administrators)" IsEnabled="{Binding CanManageTemplates}" Margin="0,18">
+       <StackPanel>
+        <TextBlock Text="Publish a new version only after agency review. Existing versions remain unchanged. This editor is source text, not a visual preview of the generated PDF. Supported tokens are listed in DOCUMENT_TEMPLATES.md."
+                   TextWrapping="Wrap"/>
+        <Button Content="Load current template" Command="{Binding LoadTemplateCommand}"
+                HorizontalAlignment="Left" Margin="0,8,0,0"/>
+        <TextBlock Text="Template source" FontWeight="SemiBold" Margin="0,10,0,4"/>
+        <TextBox Text="{Binding TemplateBody, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="360" MaxHeight="620"
+                 MaxLength="100000" VerticalScrollBarVisibility="Auto"
+                 AutomationProperties.Name="Agency privacy template source"/>
+        <TextBlock Text="{Binding TemplateValidationMessage}" TextWrapping="Wrap" Margin="0,8,0,0"
+                   AutomationProperties.LiveSetting="Polite"/>
+        <Button Content="Publish new template version" Command="{Binding PublishTemplateCommand}"
+                IsEnabled="{Binding CanPublishTemplate}" HorizontalAlignment="Left"/>
+       </StackPanel>
+      </Expander>
+     </StackPanel>
+    </ScrollViewer>
+   </TabItem>
+  </TabControl>
+ </Grid>
 </UserControl>
