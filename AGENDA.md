@@ -386,13 +386,27 @@ by MaineCare/Office Ally remains a companion-guide question and is not presented
       portal: 8 passed; Carika: 4 passed. The first API pass caught one stale 1.3.20 expectation in
       the version-contract test; after coordinating it to 1.3.21, the whole API project passed.
       Focused annual-workflow/theme coverage had already passed 48/48 and 26/26, respectively.
-      Diff and staged-whitespace review remain part of the source-commit gate below.
-- [ ] Commit and push the verified source release to `origin/master` without rewriting history.
-- [ ] Publish only the Demo API, verify deployment identifier, live/ready/version/contract health,
-      and record API ZIP path, byte size, and SHA-256. Retain 1.3.20 as the prior known-healthy
-      package/deployment.
-- [ ] Build and accept the new Demo and Local installers, then publish the exact accepted bytes and
-      checksum files to `SatiLogica Demo Files` and `Sati Desktop` without overwriting.
+      The complete diff and staged scope were reviewed, and staged whitespace validation passed.
+- [x] Source release commit `db7b956` pushed normally to `origin/master`; the remote contained the
+      exact commit before deployment artifacts were produced.
+- [x] Publish only the Demo API. `artifacts/SatiApi-1.3.21-fx-x86.zip` is 10,303,378 bytes,
+      SHA-256 `9350E512588CD83D0AAD1133F051DBFFCDD3A524369CF79AD696158B38368B8A`, with the same
+      68-file inventory as 1.3.20, file version 1.3.21.0, no settings files, and no secret-like
+      configuration values. OneDeploy to `sati-demo-api-satilogica` in `rg-sati-demo` succeeded
+      (deployment `19a1fe57b0fe4837a4156ed125650e6e`). Live and ready return 200;
+      `/health/version` reports Sati.Api 1.3.21 with contract `08C5B7028546`; anonymous Settings
+      returns 401. `Test-DemoReadiness.ps1 -HealthOnly` passed; authenticated checks were not run.
+      The 1.3.20 ZIP and deployment remain the prior known-healthy release.
+- [x] Build, accept, and publish both installers without overwriting. `SqlLocalDB.msi` is Valid
+      Microsoft-signed, SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.21.exe` is 102,948,864 bytes, SHA-256
+      `D46354F3CA28133027966FE8F032430F27DC9829A1DD192B74124596A8F98E0E`; five responsive
+      15-second launches with graceful closes, version 1.3.21.0, and cleanup passed; published with
+      its checksum to `SatiLogica Demo Files`. `SatiLocalSetup-1.3.21.exe` is 205,280,809 bytes,
+      SHA-256 `6E93C8A642C80AD7032A6554EAB5949A9A0457C96ABA91CA8A39EEE0FC26E3CD`;
+      version 1.3.21.0, `SatiProduction`, integrated security, and cleanup passed; published with
+      its checksum to `Sati Desktop`. Final distribution hashes match the accepted artifacts. These
+      were build-workstation acceptance runs, not a clean external-machine attestation.
 - [ ] Production workstation (Joshu login): known to remain on 1.3.14 until its next Local install
       and launch. Installing 1.3.21 will also carry all intervening migrations, including
       `AddServiceDayInclusions` and `AddEftDepositsAndClaimCorrections`; do not mark that machine
