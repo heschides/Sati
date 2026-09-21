@@ -375,11 +375,31 @@ the existing workstation-version note.
       documented opt-in SQL Server skips; signatures: 119 passed; portal: 8 passed; Carika: 4
       passed. Focused Today's Work theme/render coverage passed 5/5, and the generated QA image was
       inspected with no whole-panel error outline, clipping, or layout regression.
-- [ ] Commit and push the verified source normally; record the source commit.
-- [ ] Publish only the matching Demo API; record package size/hash, deployment identifier,
-      liveness, readiness, release version, and unchanged contract revision.
-- [ ] Build, accept, and publish non-overwriting Demo and Local installers plus checksums; record
-      sizes, hashes, cleanup, and verified distribution paths.
+- [x] Commit and push the verified source normally. Source commit `2d7433c` is present on
+      `origin/master`; no force or history rewrite was used.
+- [x] Publish only the matching Demo API. `artifacts/SatiApi-1.3.22-fx-x86.zip` is 10,303,357
+      bytes, SHA-256 `9ADE4C3A7A6D133368AE55F625F07E61FC39978ACDF21540CA71286F073B1916`,
+      with file/assembly version 1.3.22.0, the same 68-file inventory as 1.3.21, no settings files,
+      and no secret-like configuration. OneDeploy to `sati-demo-api-satilogica` in `rg-sati-demo`
+      succeeded (deployment `04cd1ecf165c4bae95b24ebc463548de`). Live and ready return 200;
+      `/health/version` reports Sati.Api 1.3.22 with deployed/local contract revision
+      `08C5B7028546`. `Test-DemoReadiness.ps1 -HealthOnly` passed and wrote
+      `artifacts/release-1.3.22-demo-readiness.json`; authenticated checks were not run. The
+      1.3.21 package and deployment remain the prior known-healthy release.
+- [x] Build, accept, and publish both installers without overwriting. The embedded prerequisite
+      source `SqlLocalDB.msi` is Valid Microsoft-signed, SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.22.exe` is 102,952,960 bytes, SHA-256
+      `9009EC38DB585ED019B8A2D27F4B72944AD2E647BD3FB1A0FA512BB78990A8DB`; five responsive
+      15-second launches, graceful closes, version 1.3.22.0, and cleanup passed; it and its
+      checksum were verified in `SatiLogica Demo Files`. `SatiLocalSetup-1.3.22.exe` is
+      205,000,233 bytes, SHA-256
+      `13B821860ED58C6A8727D35F7A74E2F058ECA5ADDEFB5477BA16B7D7C18AC79F`; version
+      1.3.22.0, `SatiProduction`, integrated security, and cleanup passed; it and its checksum were
+      verified in `Sati Desktop`. These were build-workstation acceptance runs, not a clean
+      external-machine attestation.
+- [x] Commit and push this final evidence normally; the resulting evidence commit is reported in
+      the release handoff, and the clean local/remote equality check follows the push.
 - [ ] Production workstation (Joshu login): known to remain on 1.3.14 until a newer Local installer
       is installed and launched. This release has no new migration; do not claim the workstation has
       received prior migrations until its launch is actually observed.
