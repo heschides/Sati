@@ -385,8 +385,8 @@
                                         Binding="{Binding Status}"
                                         Width="80" />
                     <DataGridTextColumn Header="Type"
-                                        Binding="{Binding NoteType}"
-                                        Width="80" />
+                                        Binding="{Binding ActivityLabel}"
+                                        Width="150" />
                     <DataGridTextColumn Header="Units"
                                         Binding="{Binding Units}"
                                         Width="50" />

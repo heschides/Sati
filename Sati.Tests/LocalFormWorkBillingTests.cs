@@ -26,6 +26,19 @@ public sealed class LocalFormWorkBillingTests
     }
 
     [Fact]
+    public void MixedVisitAndLateFormBlocksTheWholeNote()
+    {
+        var note = ReviewNote(Due.AddDays(1), Due.AddDays(1));
+        note.Activities = NoteActivity.Visit | NoteActivity.Form;
+
+        var result = BillingService.ValidateNoteForBilling(
+            note, BillingCompliancePolicyContext.Default());
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, reason => reason.Contains("after its", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void RevokedAttestationBlocksLinkedNote()
     {
         var note = ReviewNote(Due, null);

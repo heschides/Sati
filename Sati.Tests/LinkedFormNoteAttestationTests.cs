@@ -226,5 +226,7 @@ public sealed class LinkedFormNoteAttestationTests
         Assert.NotNull(FormNoteLinkRules.Validate("Form", "Q1R", "Logged", null, null));
         Assert.Null(FormNoteLinkRules.Validate("Form", "Q1R", "Pending", null, null));
         Assert.Null(FormNoteLinkRules.Validate("Form", "Release_DHHS", "Logged", null, null));
+        Assert.NotNull(FormNoteLinkRules.Validate("Visit", "Q1R", "Logged", null, null,
+            (int)(NoteActivity.Visit | NoteActivity.Form)));
     }
 }

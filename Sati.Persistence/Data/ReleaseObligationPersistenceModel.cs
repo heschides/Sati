@@ -109,7 +109,8 @@ public static class ReleaseObligationPersistenceModel
     public static void ProtectWrites(ChangeTracker changeTracker)
     {
         if (changeTracker.Entries<ReleaseObligationAttestation>()
-                .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+                .Any(entry => entry.State == EntityState.Deleted ||
+                    entry.State == EntityState.Modified && !IsFirstRevocation(entry)) ||
             changeTracker.Entries<ReleaseAuthorizationEvent>()
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             changeTracker.Entries<ReleaseObligation>()
@@ -137,5 +138,23 @@ public static class ReleaseObligationPersistenceModel
                     "A release obligation can only receive its first prospective retirement.");
             }
         }
+    }
+
+    private static bool IsFirstRevocation(EntityEntry<ReleaseObligationAttestation> entry)
+    {
+        var allowed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(ReleaseObligationAttestation.RevokedAtUtc),
+            nameof(ReleaseObligationAttestation.RevokedByUserId),
+            nameof(ReleaseObligationAttestation.RevocationReason)
+        };
+        return entry.Properties.Where(property => property.IsModified)
+                   .All(property => allowed.Contains(property.Metadata.Name)) &&
+               entry.OriginalValues.GetValue<DateTime?>(nameof(ReleaseObligationAttestation.RevokedAtUtc)) is null &&
+               entry.CurrentValues.GetValue<DateTime?>(nameof(ReleaseObligationAttestation.RevokedAtUtc)) is not null &&
+               entry.OriginalValues.GetValue<int?>(nameof(ReleaseObligationAttestation.RevokedByUserId)) is null &&
+               entry.CurrentValues.GetValue<int?>(nameof(ReleaseObligationAttestation.RevokedByUserId)) is > 0 &&
+               entry.OriginalValues.GetValue<string?>(nameof(ReleaseObligationAttestation.RevocationReason)) is null &&
+               !string.IsNullOrWhiteSpace(entry.CurrentValues.GetValue<string?>(nameof(ReleaseObligationAttestation.RevocationReason)));
     }
 }

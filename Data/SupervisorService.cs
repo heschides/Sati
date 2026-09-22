@@ -155,8 +155,12 @@ public sealed class SupervisorService(
             ?? throw new InvalidOperationException($"Note {noteId} was not found in your review scope.");
 
         EnsureCurrentRevision(note, expectedRevision);
-        if (!NoteWorkflow.CanSupervisorTransition((int?)note.Status, NoteWorkflow.Returned))
-            throw new InvalidOperationException("Only logged notes can be returned.");
+        var hasClaimLine = await context.ClaimLines.AsNoTracking().AnyAsync(
+            line => line.NoteId == noteId);
+        if (!NoteWorkflow.CanSupervisorReturnForCorrection((int?)note.Status, hasClaimLine,
+                note.FormId is not null || note.ReleaseObligationId is not null))
+            throw new InvalidOperationException(
+                "Only logged or unclaimed approved notes can be returned. A claimed note needs Admin correction.");
 
         note.Status = NoteStatus.Returned;
         note.ReturnedById = actor.Id;
@@ -181,7 +185,11 @@ public sealed class SupervisorService(
             ? toDate.Date.AddDays(1)
             : (DateTime?)null;
         var query = context.Notes.AsNoTracking().Where(note =>
-            note.Status == NoteStatus.Logged && note.AgencyId == actor.AgencyId && note.Person.AgencyId == actor.AgencyId &&
+            (note.Status == NoteStatus.Logged ||
+             (note.Status == NoteStatus.Approved &&
+              (note.FormId != null || note.ReleaseObligationId != null) &&
+              !context.ClaimLines.Any(line => line.NoteId == note.Id))) &&
+            note.AgencyId == actor.AgencyId && note.Person.AgencyId == actor.AgencyId &&
             (!appliedFilter.UserId.HasValue || note.Person.UserId == appliedFilter.UserId.Value) &&
             (!appliedFilter.PersonId.HasValue || note.PersonId == appliedFilter.PersonId.Value) &&
             (!fromDate.HasValue || note.EventDate >= fromDate.Value) &&

@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Sati.Api.Data;
 using Sati.Contracts.V1;
 using Xunit;
 
@@ -38,6 +41,16 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
             Assert.Equal(
                 assessmentOn,
                 forms.Single(form => form.Id == assessmentId).CompletedDate);
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var assessmentDraft = await db.Notes.AsNoTracking()
+                .SingleAsync(note => note.FormId == assessmentId);
+            var reclassificationDraft = await db.Notes.AsNoTracking()
+                .SingleAsync(note => note.FormId == reclassificationId);
+            Assert.Equal(assessmentOn.Date, assessmentDraft.EventDate);
+            Assert.Equal(reclassificationOn.Date, reclassificationDraft.EventDate);
+            Assert.Equal(NoteWorkflow.Pending, assessmentDraft.Status);
+            Assert.Equal(NoteWorkflow.Pending, reclassificationDraft.Status);
         }
         finally
         {
@@ -71,7 +84,7 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
             $"/api/v1/people/{person.Id}/forms/{form.Type}/attestation",
             new { FormId = form.Id, CompletedOn = completedOn, EvidenceNoteId = (int?)null });
 
-        response.EnsureSuccessStatusCode();
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         var saved = await response.Content.ReadFromJsonAsync<FormDto>();
         Assert.NotNull(saved);
         Assert.Equal(completedOn.Date, saved.CompletedDate);
@@ -92,6 +105,13 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
         Assert.Equal(completedOn.Date, attested.CompletedOn);
         Assert.Equal("case-manager-one", attested.ActorDisplayName);
         Assert.Equal("CaseManager", attested.ActorKind);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var draft = await db.Notes.AsNoTracking().SingleAsync(note =>
+                note.FormId == form.Id && note.EventDate == completedOn.Date);
+            Assert.Equal(NoteWorkflow.Pending, draft.Status);
+        }
         Assert.True(attested.RecordedAtUtc > DateTime.UtcNow.AddMinutes(-1));
 
         var revoke = await owner.PostAsJsonAsync(
@@ -192,7 +212,17 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
         var person = people!.Single(candidate => candidate.Id == 102);
         var form = person.Forms.First(candidate => !candidate.IsCompliant);
         var path = $"/api/v1/people/{person.Id}/forms/{form.Type}/attestation";
-        var payload = new AttestFormRequest(form.Id, DateTime.Today.AddDays(-3));
+        // Another test may have revoked this form while retaining its linked
+        // draft. Reuse that draft's activity date so this test isolates the
+        // concurrent attestation rule rather than a genuine date conflict.
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var linkedDate = await db.Notes.AsNoTracking()
+            .Where(note => note.FormId == form.Id)
+            .Select(note => note.EventDate)
+            .SingleOrDefaultAsync();
+        var payload = new AttestFormRequest(form.Id,
+            linkedDate ?? DateTime.Today.AddDays(-3));
 
         var responses = await Task.WhenAll(
             firstClient.PostAsJsonAsync(path, payload),
@@ -200,7 +230,10 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
 
         try
         {
-            Assert.Single(responses, response => response.StatusCode == HttpStatusCode.OK);
+            var responseDetails = await Task.WhenAll(responses.Select(async response =>
+                $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}"));
+            Assert.True(responses.Count(response => response.StatusCode == HttpStatusCode.OK) == 1,
+                string.Join(" | ", responseDetails));
             var conflict = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
             var error = await conflict.Content.ReadFromJsonAsync<ApiErrorDto>();
             Assert.Equal("form_attestation_changed", error?.Code);

@@ -8,7 +8,7 @@ public sealed record FormAttestationChangeReviewFlagDto(
     Guid FlagId,
     int PersonId,
     int NoteId,
-    int FormId,
+    int? FormId,
     int? ClaimLineId,
     DateTime? NoteActivityDate,
     DateTime DueDate,
@@ -18,7 +18,8 @@ public sealed record FormAttestationChangeReviewFlagDto(
     bool RequiresSupervisorAttention,
     bool RequiresBillingAttention,
     FormAttestationBillingHoldReason BillingHoldReasons,
-    DateTime CreatedAtUtc)
+    DateTime CreatedAtUtc,
+    long? ReleaseObligationId = null)
 {
     public bool MustHoldBilling => BillingHoldReasons != FormAttestationBillingHoldReason.None;
 }

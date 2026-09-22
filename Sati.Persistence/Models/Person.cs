@@ -751,7 +751,8 @@ namespace Sati
                 note.NoteType?.ToString(),
                 note.Status?.ToString(),
                 note.EventDate,
-                note.Id);
+                note.Id,
+                (int?)note.Activities);
 
         /// <summary>Where this consumer stands against the monthly-contact requirement.</summary>
         public Contracts.V1.MonthlyContactStatus? GetMonthlyContactStatus(DateTime today) =>

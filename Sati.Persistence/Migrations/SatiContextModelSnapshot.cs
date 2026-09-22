@@ -2033,7 +2033,7 @@ namespace Sati.Migrations
                     b.Property<Guid>("FlagId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("FormId")
+                    b.Property<int?>("FormId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("NoteActivityDate")
@@ -2051,6 +2051,9 @@ namespace Sati.Migrations
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("ReleaseObligationId")
+                        .HasColumnType("bigint");
 
                     b.Property<bool>("RequiresBillingAttention")
                         .HasColumnType("bit");
@@ -2074,13 +2077,18 @@ namespace Sati.Migrations
 
                     b.HasIndex("PersonId");
 
+                    b.HasIndex("ReleaseObligationId");
+
                     b.HasIndex("AgencyId", "CreatedAtUtc");
 
                     b.HasIndex("AgencyId", "RequiresBillingAttention", "CreatedAtUtc");
 
                     b.HasIndex("AgencyId", "RequiresSupervisorAttention", "CreatedAtUtc");
 
-                    b.ToTable("FormAttestationChangeReviewFlags", (string)null);
+                    b.ToTable("FormAttestationChangeReviewFlags", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FormAttestationChangeReviewFlags_OneSource", "([FormId] IS NOT NULL AND [ReleaseObligationId] IS NULL) OR ([FormId] IS NULL AND [ReleaseObligationId] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Sati.Models.FrozenSignatureDocument", b =>
@@ -2330,6 +2338,9 @@ namespace Sati.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("Activities")
+                        .HasColumnType("int");
+
                     b.Property<int?>("AgencyId")
                         .HasColumnType("int");
 
@@ -2391,6 +2402,9 @@ namespace Sati.Migrations
                     b.Property<int>("PersonId")
                         .HasColumnType("int");
 
+                    b.Property<long?>("ReleaseObligationId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("ReturnReason")
                         .HasColumnType("nvarchar(max)");
 
@@ -2420,6 +2434,8 @@ namespace Sati.Migrations
                     b.HasIndex("FormId");
 
                     b.HasIndex("PersonId");
+
+                    b.HasIndex("ReleaseObligationId");
 
                     b.ToTable("Notes");
                 });
@@ -2922,6 +2938,9 @@ namespace Sati.Migrations
                     b.Property<DateTime>("CompletedOn")
                         .HasColumnType("date");
 
+                    b.Property<int?>("EvidenceNoteId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Reason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -2931,6 +2950,15 @@ namespace Sati.Migrations
 
                     b.Property<long>("ReleaseObligationId")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("RevocationReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RevokedByUserId")
+                        .HasColumnType("int");
 
                     b.Property<int?>("SignatureCompletionId")
                         .HasColumnType("int");
@@ -5059,8 +5087,7 @@ namespace Sati.Migrations
                     b.HasOne("Sati.Models.Form", null)
                         .WithMany()
                         .HasForeignKey("FormId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Sati.Models.Note", null)
                         .WithMany()
@@ -5073,6 +5100,11 @@ namespace Sati.Migrations
                         .HasForeignKey("PersonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Sati.Models.ReleaseObligation", null)
+                        .WithMany()
+                        .HasForeignKey("ReleaseObligationId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Sati.Models.FrozenSignatureDocument", b =>
@@ -5166,6 +5198,11 @@ namespace Sati.Migrations
                         .HasForeignKey("PersonId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Sati.Models.ReleaseObligation", null)
+                        .WithMany()
+                        .HasForeignKey("ReleaseObligationId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Agency");
 

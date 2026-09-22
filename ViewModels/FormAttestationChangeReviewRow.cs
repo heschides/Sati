@@ -6,8 +6,10 @@ namespace Sati.ViewModels;
 public sealed class FormAttestationChangeReviewRow(FormAttestationChangeReviewFlagDto flag)
 {
     public int NoteId => flag.NoteId;
-    public int FormId => flag.FormId;
-    public string RecordLabel => $"Client #{flag.PersonId} · Note #{flag.NoteId} · Form #{flag.FormId}";
+    public int? FormId => flag.FormId;
+    public string RecordLabel => flag.ReleaseObligationId is long releaseId
+        ? $"Client #{flag.PersonId} · Note #{flag.NoteId} · Release #{releaseId}"
+        : $"Client #{flag.PersonId} · Note #{flag.NoteId} · Form #{flag.FormId}";
     public string DateLabel =>
         $"Completion {Format(flag.PreviousCompletedOn)} → {Format(flag.RevisedCompletedOn)}; " +
         $"due {flag.DueDate:MM/dd/yy}; note activity {Format(flag.NoteActivityDate)}";
@@ -15,7 +17,9 @@ public sealed class FormAttestationChangeReviewRow(FormAttestationChangeReviewFl
     public string ClaimLabel => flag.ClaimLineId is int claimLineId
         ? $"Claim line #{claimLineId}"
         : "No claim line recorded";
-    public string HoldLabel => flag.MustHoldBilling
+    public string HoldLabel => flag.ReleaseObligationId is not null
+        ? "Release date change; review the linked claim"
+        : flag.MustHoldBilling
         ? "Billing hold: " + flag.BillingHoldReasons
         : "No current form-date billing hold";
     public string RecordedLabel => $"Change recorded {flag.CreatedAtUtc.ToLocalTime():MM/dd/yy h:mm tt}";
@@ -24,7 +28,7 @@ public sealed class FormAttestationChangeReviewRow(FormAttestationChangeReviewFl
     public static IReadOnlyList<FormAttestationChangeReviewRow> Latest(
         IReadOnlyList<FormAttestationChangeReviewFlagDto> flags) =>
         flags.OrderByDescending(flag => flag.CreatedAtUtc)
-            .GroupBy(flag => (flag.NoteId, flag.FormId))
+            .GroupBy(flag => (flag.NoteId, flag.FormId, flag.ReleaseObligationId))
             .Select(group => new FormAttestationChangeReviewRow(group.First()))
             .ToArray();
 

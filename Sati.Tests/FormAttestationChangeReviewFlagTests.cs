@@ -62,7 +62,7 @@ public sealed class FormAttestationChangeReviewFlagTests
         var entity = context.Model.FindEntityType(typeof(FormAttestationChangeReviewFlag));
         Assert.NotNull(entity);
         Assert.Equal("FormAttestationChangeReviewFlags", entity!.GetTableName());
-        Assert.Equal(5, entity.GetForeignKeys().Count());
+        Assert.Equal(6, entity.GetForeignKeys().Count());
 
         var due = new DateTime(2026, 9, 3);
         var impact = FormAttestationImpactRules.Evaluate(

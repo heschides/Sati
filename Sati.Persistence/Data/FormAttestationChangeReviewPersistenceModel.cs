@@ -37,6 +37,12 @@ public static class FormAttestationChangeReviewPersistenceModel
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<TForm>().WithMany().HasForeignKey(item => item.FormId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ReleaseObligation>().WithMany()
+                .HasForeignKey(item => item.ReleaseObligationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_FormAttestationChangeReviewFlags_OneSource",
+                "([FormId] IS NOT NULL AND [ReleaseObligationId] IS NULL) OR ([FormId] IS NULL AND [ReleaseObligationId] IS NOT NULL)"));
             entity.HasOne<TClaimLine>().WithMany().HasForeignKey(item => item.ClaimLineId)
                 .OnDelete(DeleteBehavior.Restrict);
         });

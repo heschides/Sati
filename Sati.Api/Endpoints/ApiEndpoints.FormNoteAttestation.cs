@@ -12,7 +12,7 @@ internal static partial class ApiEndpoints
 {
     private static bool IsNonReleaseLoggedFormNote(SaveNoteRequest request) =>
         string.Equals(request.Status, "Logged", StringComparison.Ordinal) &&
-        string.Equals(request.NoteType, "Form", StringComparison.Ordinal) &&
+        NoteActivityRules.Has(request.Activities, request.NoteType, NoteActivity.Form) &&
         request.FormId is > 0 &&
         !FormNoteLinkRules.IsRelease(request.FormType);
 
@@ -32,7 +32,8 @@ internal static partial class ApiEndpoints
             (allowApprovedForAdminCorrection && actor.HasAdminPermissions &&
              note.Status == (int)NoteStatus.Approved);
         if (!allowedStatus ||
-            note.NoteType != (int)NoteType.Form ||
+            !NoteActivityRules.Has(note.Activities,
+                ContractMapper.NoteTypeName(note.NoteType), NoteActivity.Form) ||
             note.FormType is not int formType ||
             FormNoteLinkRules.IsRelease(((FormType)formType).ToString()))
             return null;

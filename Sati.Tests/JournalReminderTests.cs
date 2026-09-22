@@ -140,6 +140,25 @@ public sealed class JournalReminderTests
     // -------------------------------------------------------------------------
 
     [Fact]
+    public async Task ActivityCheckboxesKeepIndependentSelectionsAndReminderClearsThem()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var viewModel = fixture.NoteEntry();
+
+        viewModel.IsPhoneSelected = true;
+        viewModel.IsFormSelected = true;
+        Assert.True(viewModel.IsPhoneSelected);
+        Assert.True(viewModel.IsFormSelected);
+        Assert.Equal(NoteType.Form, viewModel.SelectedNoteType);
+
+        viewModel.IsReminderSelected = true;
+        Assert.True(viewModel.IsReminderSelected);
+        Assert.False(viewModel.IsPhoneSelected);
+        Assert.False(viewModel.IsFormSelected);
+        Assert.Equal(NoteType.Reminder, viewModel.SelectedNoteType);
+    }
+
+    [Fact]
     public async Task ChoosingAFutureDatePreservesTheWorkTypeAndMakesItScheduled()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();

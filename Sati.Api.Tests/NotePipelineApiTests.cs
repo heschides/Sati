@@ -258,6 +258,86 @@ public sealed class NotePipelineApiTests
     }
 
     [Fact]
+    public async Task SupervisorCanReturnAnUnclaimedApprovedLinkedFormNote()
+    {
+        using var supervisor = await _factory.CreateAuthenticatedClientAsync("supervisor-one");
+        var formId = await _factory.CreateOutstandingFormAsync(101, "ComprehensiveAssessment");
+        var noteId = await _factory.CreateNoteInStatusAsync(Approved);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var note = await db.Notes.SingleAsync(candidate => candidate.Id == noteId);
+            note.FormId = formId;
+            await db.SaveChangesAsync();
+        }
+
+        var (_, revision) = await _factory.GetNoteStateAsync(noteId);
+        var response = await supervisor.PostAsJsonAsync(
+            $"/api/v1/supervisor/notes/{noteId}/return",
+            new SupervisorNoteActionRequest("Correct the linked form date.", revision));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(Returned, (await _factory.GetNoteStateAsync(noteId)).Status);
+    }
+
+    [Fact]
+    public async Task SupervisorCannotReturnAClaimedApprovedLinkedFormNote()
+    {
+        using var supervisor = await _factory.CreateAuthenticatedClientAsync("supervisor-one");
+        var formId = await _factory.CreateOutstandingFormAsync(101, "ComprehensiveAssessment");
+        var noteId = await _factory.CreateNoteInStatusAsync(Approved);
+        int claimLineId;
+        int periodId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var note = await db.Notes.SingleAsync(candidate => candidate.Id == noteId);
+            note.FormId = formId;
+            var period = new ServerBillingPeriod
+            {
+                UserId = 12, Month = 12, Year = 2099, Status = 1
+            };
+            db.BillingPeriods.Add(period);
+            await db.SaveChangesAsync();
+            periodId = period.Id;
+            var line = new ServerClaimLine
+            {
+                NoteId = noteId,
+                BillingPeriodId = periodId,
+                DateOfService = note.EventDate!.Value,
+                ProcedureCode = "T1016",
+                Units = 1,
+                ChargeAmount = 1,
+                ClientMaineCareId = "synthetic",
+                RenderingProviderNpi = "1999999984",
+                DiagnosisCode = "F89",
+                PlaceOfService = 11
+            };
+            db.ClaimLines.Add(line);
+            await db.SaveChangesAsync();
+            claimLineId = line.Id;
+        }
+
+        try
+        {
+            var (_, revision) = await _factory.GetNoteStateAsync(noteId);
+            var response = await supervisor.PostAsJsonAsync(
+                $"/api/v1/supervisor/notes/{noteId}/return",
+                new SupervisorNoteActionRequest("Correct the linked form date.", revision));
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            Assert.Equal(Approved, (await _factory.GetNoteStateAsync(noteId)).Status);
+        }
+        finally
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            db.ClaimLines.Remove(await db.ClaimLines.SingleAsync(line => line.Id == claimLineId));
+            db.BillingPeriods.Remove(await db.BillingPeriods.SingleAsync(period => period.Id == periodId));
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
     public async Task DeletionIsAllowedOnlyForUnsubmittedWork()
     {
         using var client = await _factory.CreateAuthenticatedClientAsync("case-manager-one");

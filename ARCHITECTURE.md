@@ -2,6 +2,16 @@
 
 *Living document. Updated during structured review sessions. Last updated: 2026-09-21.*
 
+## Multi-activity notes — September 22 (unreleased)
+
+`NoteActivityRules` in `Sati.Contracts.V1` owns activity flags and the historical
+single-type fallback. `Notes.Activities` is nullable for existing records. The note
+editor stores the selected combination and a compatible primary `NoteType`; local
+persistence and the API validate both. Exact-form attestation, form-work billing,
+and monthly-contact evidence inspect the activity flags. Reminder has no activity
+flag and cannot be combined with service work. The nullable-column migration is
+generated but has not been applied to Demo or Production.
+
 ## Annual compliance and service-date billing — September 14 correction (unreleased)
 
 This section is the authoritative description of annual compliance in the current source. It

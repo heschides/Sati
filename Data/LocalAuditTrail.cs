@@ -57,6 +57,7 @@ internal static class LocalAuditActions
     public const string NoteApprovalOverridden = "note.approval-overridden";
     public const string NoteReturned = "note.returned";
     public const string NoteFormDateCorrected = "note.form-date-corrected";
+    public const string NoteReleaseDateCorrected = "note.release-date-corrected";
     public const string BillingClaimLineCreated = "billing-claim-line.created";
     public const string BillingPeriodSubmitted = "billing-period.submitted";
     public const string BillingPeriodReturnedToDraft = "billing-period.returned-to-draft";
@@ -90,6 +91,7 @@ internal static class LocalAuditActions
     public const string FormPrerequisiteOverridden = "form.prerequisite-overridden";
     public const string ReleaseObligationsReconciled = "release-obligations.reconciled";
     public const string ReleaseObligationAttested = "release-obligation.attested";
+    public const string ReleaseObligationAttestationRevoked = "release-obligation.attestation-revoked";
     public const string ReleaseAuthorizationWithdrawn = "release-authorization.withdrawn";
     public const string DocumentGenerated = "document.generated";
     public const string DocumentRecordedExternal = "document.recorded-external";

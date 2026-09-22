@@ -175,6 +175,53 @@ namespace Sati.ViewModels.Children
         [ObservableProperty] private NoteStatus? status;
         [ObservableProperty] private GoalProgressLevel? goalProgress;
         [ObservableProperty] private NoteType? selectedNoteType;
+        private NoteActivity _selectedActivities;
+        private bool _synchronizingActivitySelection;
+        public bool IsVisitSelected { get => HasActivity(NoteActivity.Visit); set => SetActivity(NoteActivity.Visit, value); }
+        public bool IsPhoneSelected { get => HasActivity(NoteActivity.Phone); set => SetActivity(NoteActivity.Phone, value); }
+        public bool IsEmailSelected { get => HasActivity(NoteActivity.Email); set => SetActivity(NoteActivity.Email, value); }
+        public bool IsFormSelected { get => HasActivity(NoteActivity.Form); set => SetActivity(NoteActivity.Form, value); }
+        public bool IsOtherSelected { get => HasActivity(NoteActivity.Other); set => SetActivity(NoteActivity.Other, value); }
+        public bool IsReminderSelected
+        {
+            get => SelectedNoteType == NoteType.Reminder;
+            set
+            {
+                if (value) SetSelectedActivities(NoteActivity.None, reminder: true);
+                else if (IsReminderSelected) SetSelectedActivities(NoteActivity.None);
+            }
+        }
+
+        private bool HasActivity(NoteActivity activity) => (_selectedActivities & activity) != 0;
+
+        private void SetActivity(NoteActivity activity, bool selected) =>
+            SetSelectedActivities(selected ? _selectedActivities | activity : _selectedActivities & ~activity);
+
+        private void SetSelectedActivities(NoteActivity activities, bool reminder = false)
+        {
+            if (_selectedActivities == activities && IsReminderSelected == reminder) return;
+            _selectedActivities = activities;
+            _synchronizingActivitySelection = true;
+            try
+            {
+                SelectedNoteType = reminder ? NoteType.Reminder :
+                    Enum.TryParse<NoteType>(NoteActivityRules.PrimaryLegacyType(activities), out var primary)
+                        ? primary : null;
+            }
+            finally { _synchronizingActivitySelection = false; }
+            RefreshActivitySelection();
+        }
+
+        private void RefreshActivitySelection()
+        {
+            OnPropertyChanged(nameof(IsVisitSelected));
+            OnPropertyChanged(nameof(IsPhoneSelected));
+            OnPropertyChanged(nameof(IsEmailSelected));
+            OnPropertyChanged(nameof(IsFormSelected));
+            OnPropertyChanged(nameof(IsOtherSelected));
+            OnPropertyChanged(nameof(IsReminderSelected));
+            ApplyActivitySelectionEffects(SelectedNoteType);
+        }
         [ObservableProperty] private FormType? selectedFormType;
         private int? _selectedFormId;
         public ObservableCollection<FormObligationOption> FormObligations { get; } = [];
@@ -397,8 +444,8 @@ namespace Sati.ViewModels.Children
             _ => "Select a status to see where the note will go next."
         };
         public Array FormTypes => Enum.GetValues(typeof(FormType));
-        public bool IsFormNote => SelectedNoteType == NoteType.Form;
-        public bool IsVisitNote => SelectedNoteType == NoteType.Visit;
+        public bool IsFormNote => HasActivity(NoteActivity.Form);
+        public bool IsVisitNote => HasActivity(NoteActivity.Visit);
 
         // A reminder is not service documentation. It has no place in the review
         // workflow, no billable minutes, no service date, and no visit facts, so
@@ -649,6 +696,21 @@ namespace Sati.ViewModels.Children
 
         partial void OnSelectedNoteTypeChanged(NoteType? value)
         {
+            if (!_synchronizingActivitySelection)
+            {
+                _selectedActivities = NoteActivityRules.FromLegacy(value?.ToString());
+                OnPropertyChanged(nameof(IsVisitSelected));
+                OnPropertyChanged(nameof(IsPhoneSelected));
+                OnPropertyChanged(nameof(IsEmailSelected));
+                OnPropertyChanged(nameof(IsFormSelected));
+                OnPropertyChanged(nameof(IsOtherSelected));
+                OnPropertyChanged(nameof(IsReminderSelected));
+            }
+            ApplyActivitySelectionEffects(value);
+        }
+
+        private void ApplyActivitySelectionEffects(NoteType? value)
+        {
             InvalidateAiGeneration();
             MarkDirty();
             OnPropertyChanged(nameof(IsFormNote));
@@ -700,13 +762,13 @@ namespace Sati.ViewModels.Children
                 AiStatusMessage = string.Empty;
             }
 
-            if (value != NoteType.Form)
+            if (!IsFormNote)
             {
                 SelectedFormType = null;
                 FormDateCorrectionReason = string.Empty;
             }
 
-            if (value != NoteType.Visit)
+            if (!IsVisitNote)
                 ResetVisitDocumentation(clearAttendees: false);
             else
                 _ = LoadVisitAttendeesAsync(SelectedPerson);
@@ -1541,7 +1603,8 @@ namespace Sati.ViewModels.Children
                 NoteType.Reminder or null => NoteType.Other,
                 _ => note.NoteType
             };
-            SelectedFormType = SelectedNoteType == NoteType.Form ? note.FormType : null;
+            SetSelectedActivities(note.Activities ?? NoteActivityRules.FromLegacy(SelectedNoteType?.ToString()));
+            SelectedFormType = IsFormNote ? note.FormType : null;
             Narrative = BracketAgendaPrompt(note.Narrative);
 
             var scheduleLoaded = await RefreshServiceDayAsync();
@@ -1653,6 +1716,8 @@ namespace Sati.ViewModels.Children
                 Status = note.Status;
                 GoalProgress = note.GoalProgress;
                 SelectedNoteType = note.NoteType;
+                SetSelectedActivities(note.Activities ?? NoteActivityRules.FromLegacy(note.NoteType?.ToString()),
+                    reminder: note.NoteType == NoteType.Reminder);
                 SelectedFormType = note.FormType;
                 _selectedFormId = note.FormId;
                 RefreshFormObligations();
@@ -1985,7 +2050,7 @@ namespace Sati.ViewModels.Children
             if (SelectedNoteType is null) errors.Add("• Please select a note type.");
             if (Status == NoteStatus.Logged && GoalProgress is null)
                 errors.Add("• Please select goal progress. Choose None when no progress was made.");
-            if (SelectedNoteType == NoteType.Visit &&
+            if (IsVisitNote &&
                 (VisitAppearanceOptions.Any(option =>
                      option.IsSelected && option.Value == VisitAppearance.ConcernObserved) ||
                  VisitSafetyObservationOptions.Any(option =>
@@ -2023,6 +2088,7 @@ namespace Sati.ViewModels.Children
                         ? Note.Rehydrate(editing.Id)
                         : Note.Create(string.Empty, serviceDate, null, null, SelectedPerson!.Id);
                     candidate.NoteType = SelectedNoteType;
+                    candidate.Activities = _selectedActivities;
                     candidate.Status = NoteStatus.Logged;
                     candidate.EventDate = serviceDate;
                     var windowReasons = SelectedPerson!.EvaluateBillingWindow(
@@ -2172,6 +2238,7 @@ namespace Sati.ViewModels.Children
                 note.StartTime = SelectedStartTime?.Minutes;
                 note.Status = Status;
                 note.NoteType = SelectedNoteType;
+                note.Activities = _selectedActivities;
                 note.FormType = SelectedFormType;
                 note.FormId = _selectedFormId;
                 note.FormDateCorrectionReason = string.IsNullOrWhiteSpace(FormDateCorrectionReason)
@@ -2204,6 +2271,7 @@ namespace Sati.ViewModels.Children
             {
                 var note = Note.Create(Narrative!, EventDate, Status, Minutes,
                     SelectedPerson!.Id, SelectedFormType, SelectedNoteType, _selectedFormId);
+                note.Activities = _selectedActivities;
                 note.StartTime = SelectedStartTime?.Minutes;
                 note.FormDateCorrectionReason = string.IsNullOrWhiteSpace(FormDateCorrectionReason)
                     ? null : FormDateCorrectionReason.Trim();

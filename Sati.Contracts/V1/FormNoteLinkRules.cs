@@ -12,12 +12,13 @@ public static class FormNoteLinkRules
         string? formType,
         string? status,
         int? formId,
-        string? correctionReason)
+        string? correctionReason,
+        int? activities = null)
     {
         if (correctionReason?.Length > 1_000)
             return "A form date correction explanation cannot exceed 1,000 characters.";
 
-        if (!string.Equals(noteType, "Form", StringComparison.Ordinal))
+        if (!NoteActivityRules.Has(activities, noteType, NoteActivity.Form))
             return formId is null ? null : "Only a Form note may select a form obligation.";
 
         if (string.IsNullOrWhiteSpace(formType))

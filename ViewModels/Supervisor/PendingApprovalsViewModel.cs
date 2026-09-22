@@ -369,7 +369,8 @@ namespace Sati.ViewModels.Supervisor
                     foreach (var note in page.Notes)
                     {
                         if (!_loads.IsCurrent(generation) || _sessionService.CurrentUser != actor) return;
-                        if (note.ComplianceFailureReasons.Count != 0)
+                        if (note.Status != NoteStatus.Logged ||
+                            note.ComplianceFailureReasons.Count != 0)
                         {
                             skipped++;
                             continue;
@@ -414,6 +415,7 @@ namespace Sati.ViewModels.Supervisor
         [RelayCommand]
         private async Task Approve(PendingNoteViewModel note)
         {
+            if (!note.CanApprove) return;
             try
             {
                 var supervisor = _sessionService.CurrentUser!;
@@ -692,6 +694,8 @@ namespace Sati.ViewModels.Supervisor
         public int Revision { get; }
         public int? FormId { get; }
         public bool CanAdminCorrectSourceDate { get; }
+        public bool CanApprove { get; }
+        public bool IsCorrectionOnly => !CanApprove;
         public string ClientName { get; }
         public int PersonId { get; }
         public int CaseManagerUserId { get; }
@@ -705,15 +709,16 @@ namespace Sati.ViewModels.Supervisor
         public bool HasComplianceFailures => ComplianceFailureReasons.Count > 0;
         public bool HasHardFormWorkHold =>
             ComplianceFailureReasons.Any(FormWorkBillingRules.IsFormWorkReason);
-        public bool CanOverrideOrdinaryBlockers => ComplianceBlockers.Count > 0;
+        public bool CanOverrideOrdinaryBlockers => CanApprove && ComplianceBlockers.Count > 0;
         public bool IsComplianceException => false; // set by non-compliant queue context
 
         public PendingNoteViewModel(Note note, string? caseManagerName = null, bool isAdmin = false)
         {
             NoteId = note.Id;
             Revision = note.Revision;
+            CanApprove = note.Status == NoteStatus.Logged;
             FormId = note.FormId;
-            CanAdminCorrectSourceDate = isAdmin && note.NoteType == global::Sati.NoteType.Form &&
+            CanAdminCorrectSourceDate = isAdmin && NoteActivityRules.Has(note.Activities, note.NoteType?.ToString(), NoteActivity.Form) &&
                 note.FormId is > 0 && note.FormType is FormType formType &&
                 !FormWorkBillingRules.IsRelease(formType.ToString());
             ClientName = note.Person.FullName;

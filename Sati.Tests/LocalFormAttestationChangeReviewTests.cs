@@ -10,7 +10,7 @@ namespace Sati.Tests;
 public sealed class LocalFormAttestationChangeReviewTests
 {
     [Fact]
-    public async Task RevokingAndCorrectingSubmittedReviewLeavesTwoAuditableSupervisorFlags()
+    public async Task RevokingAndAdminCorrectingSubmittedReviewLeavesTwoAuditableSupervisorFlags()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var due = DateTime.Today.AddDays(-2);
@@ -34,18 +34,18 @@ public sealed class LocalFormAttestationChangeReviewTests
                 first.BillingHoldReasons);
         }
 
-        await service.AttestAsync(detached, due.AddDays(1));
+        await CorrectRevokedNoteAsAdminAsync(fixture, noteId, due.AddDays(1),
+            "Actual review date was the following day.");
 
         await using var verification = fixture.Factory.CreateDbContext();
         var flags = await verification.FormAttestationChangeReviewFlags.AsNoTracking()
             .OrderBy(flag => flag.Id).ToListAsync();
         Assert.Equal(2, flags.Count);
         var correction = flags[1];
-        Assert.Null(correction.PreviousCompletedOn);
+        Assert.Equal(due, correction.PreviousCompletedOn);
         Assert.Equal(due.AddDays(1), correction.RevisedCompletedOn);
         Assert.Equal("Actual review date was the following day.", correction.Reason);
-        Assert.Equal(FormAttestationBillingHoldReason.ActivityDateMismatch |
-                     FormAttestationBillingHoldReason.CompletedAfterDueDate,
+        Assert.Equal(FormAttestationBillingHoldReason.CompletedAfterDueDate,
             correction.BillingHoldReasons);
         Assert.Equal(due.AddDays(1),
             (await verification.Forms.AsNoTracking().SingleAsync(form => form.Id == detached.Id)).CompletedDate);
@@ -56,14 +56,16 @@ public sealed class LocalFormAttestationChangeReviewTests
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var due = DateTime.Today.AddDays(-2);
+        var prior = due.AddDays(-1);
         var (detached, noteId) = await SeedLinkedFormNoteAsync(
-            fixture, due, NoteStatus.Logged, noteDate: due);
+            fixture, due, NoteStatus.Logged, noteDate: prior);
         var service = FormServiceFor(fixture);
 
-        await service.AttestAsync(detached, due.AddDays(-1));
+        await service.AttestAsync(detached, prior);
         await service.RevokeAttestationAsync(detached,
             "Correcting the activity date to the documented review date.");
-        await service.AttestAsync(detached, due);
+        await CorrectRevokedNoteAsAdminAsync(fixture, noteId, due,
+            "Correcting the activity date to the documented review date.");
 
         await using var db = fixture.Factory.CreateDbContext();
         var flags = await db.FormAttestationChangeReviewFlags.AsNoTracking()
@@ -72,7 +74,7 @@ public sealed class LocalFormAttestationChangeReviewTests
         Assert.Equal(2, flags.Count);
         Assert.True(flags[0].MustHoldBilling);
         Assert.False(flags[1].MustHoldBilling);
-        Assert.Null(flags[1].PreviousCompletedOn);
+        Assert.Equal(prior, flags[1].PreviousCompletedOn);
         Assert.Equal(due, flags[1].RevisedCompletedOn);
         Assert.Equal("Correcting the activity date to the documented review date.",
             flags[1].Reason);
@@ -135,7 +137,7 @@ public sealed class LocalFormAttestationChangeReviewTests
             fixture, due, NoteStatus.Pending, noteDate);
         var service = FormServiceFor(fixture);
 
-        await Assert.ThrowsAsync<ArgumentException>(() =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.AttestAsync(detached, noteDate.AddDays(1), noteId));
         await using (var db = fixture.Factory.CreateDbContext())
         {
@@ -152,6 +154,24 @@ public sealed class LocalFormAttestationChangeReviewTests
         var session = new SessionService();
         session.SetUser(fixture.CaseManagerOne);
         return new FormService(fixture.Factory, session);
+    }
+
+    private static async Task CorrectRevokedNoteAsAdminAsync(
+        NoteEntryFixture fixture, int noteId, DateTime corrected, string reason)
+    {
+        var admin = User.Create(79, "review-date-admin", "Review Date Admin",
+            "hash", "salt", UserRole.Admin, null, fixture.CaseManagerOne.AgencyId);
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            db.Users.Add(admin);
+            await db.SaveChangesAsync();
+        }
+        var session = new SessionService();
+        session.SetUser(admin);
+        var correction = new AdminFormNoteCorrectionService(fixture.Factory, session);
+        var target = await correction.GetTargetAsync(noteId);
+        Assert.NotNull(target);
+        await correction.CorrectAsync(noteId, target.Revision, corrected, reason, true);
     }
 
     private static async Task<(Form Form, int NoteId)> SeedLinkedFormNoteAsync(

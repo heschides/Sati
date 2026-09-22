@@ -6,7 +6,7 @@ using Sati.Models;
 
 namespace Sati.Data;
 
-public sealed class ReleaseObligationService(
+public sealed partial class ReleaseObligationService(
     IDbContextFactory<SatiContext> contextFactory,
     ISessionService sessionService) : IReleaseObligationService
 {
@@ -83,6 +83,8 @@ public sealed class ReleaseObligationService(
         var actor = CurrentActor();
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService, cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
         var person = await LoadAccessiblePersonAsync(context, actor, personId, cancellationToken);
         var row = await LoadRowAsync(context, personId, obligationId, cancellationToken);
         if (row.CompletedOn is not null)
@@ -90,6 +92,50 @@ public sealed class ReleaseObligationService(
         if (completedOn.Date < row.AvailableOn.Date)
             throw new ArgumentOutOfRangeException(nameof(completedOn),
                 $"This release obligation becomes available on {row.AvailableOn:yyyy-MM-dd}.");
+
+        var linkedNotes = await context.Notes.AsNoTracking()
+            .Where(note => note.PersonId == personId && note.AgencyId == actor.AgencyId &&
+                note.ReleaseObligationId == row.Id)
+            .Select(note => new { note.Id, note.EventDate, note.Status })
+            .ToListAsync(cancellationToken);
+        if (linkedNotes.Count > 1)
+            throw new InvalidOperationException(
+                "Several notes are linked to this release. Have a supervisor review the exact evidence before attesting.");
+        int evidenceNoteId;
+        if (linkedNotes.Count == 1)
+        {
+            var linked = linkedNotes[0];
+            var conflict = ManualAttestationNoteRules.Conflict(
+                completedOn, linked.EventDate, (int?)linked.Status,
+                await context.ClaimLines.AsNoTracking().AnyAsync(
+                    line => line.NoteId == linked.Id, cancellationToken));
+            if (conflict is not null)
+                throw new InvalidOperationException(conflict);
+            evidenceNoteId = linked.Id;
+        }
+        else
+        {
+            var releaseFormType = Enum.Parse<FormType>(ReleaseNoteLinkRules.FormTypeName(row.Category));
+            var legacyCandidateExists = await context.Notes.AsNoTracking().AnyAsync(note =>
+                note.PersonId == personId && note.AgencyId == actor.AgencyId &&
+                note.ReleaseObligationId == null && note.FormType == releaseFormType &&
+                note.EventDate != null && note.EventDate.Value.Date == completedOn.Date,
+                cancellationToken);
+            if (legacyCandidateExists)
+                throw new InvalidOperationException(
+                    "An unlinked release note may already document this work. Review it and select the exact recipient before attesting; Sati will not create a duplicate by guessing.");
+            var draft = Note.Create(
+                $"Draft: document the {row.Category} release for {row.RecipientDisplayName ?? "DHHS"}.",
+                completedOn.Date, NoteStatus.Pending, null, personId,
+                releaseFormType, NoteType.Form);
+            draft.Activities = NoteActivity.Form;
+            draft.ReleaseObligationId = row.Id;
+            draft.AgencyId = actor.AgencyId;
+            context.Notes.Add(draft);
+            LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteCreated, "Note");
+            await context.SaveChangesAsync(cancellationToken);
+            evidenceNoteId = draft.Id;
+        }
 
         var actorKind = actor.Id == person.UserId
             ? AttestationActorKind.CaseManager
@@ -100,7 +146,8 @@ public sealed class ReleaseObligationService(
             actorKind,
             actor.Id,
             DateTime.UtcNow,
-            reason);
+            reason,
+            evidenceNoteId);
         LocalAuditTrail.Record(
             context,
             actor,
@@ -109,6 +156,7 @@ public sealed class ReleaseObligationService(
             personId,
             AuditMetadata(row, completedOn, reason));
         await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return ToDto(row, DateTime.Today);
     }
 
@@ -132,6 +180,46 @@ public sealed class ReleaseObligationService(
             "Person",
             personId,
             AuditMetadata(row, withdrawnOn, reason));
+        await context.SaveChangesAsync(cancellationToken);
+        return ToDto(row, DateTime.Today);
+    }
+
+    public async Task<ReleaseObligationDto> RevokeAttestationAsync(
+        int personId,
+        Guid obligationId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var actor = CurrentActor();
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService, cancellationToken);
+        await LoadAccessiblePersonAsync(context, actor, personId, cancellationToken);
+        var row = await LoadRowAsync(context, personId, obligationId, cancellationToken);
+        var linkedNoteId = row.Attestations.SingleOrDefault(item => item.RevokedAtUtc is null)?.EvidenceNoteId;
+        if (linkedNoteId is int noteId)
+        {
+            var hasClaimLine = await context.ClaimLines.AsNoTracking().AnyAsync(
+                line => line.NoteId == noteId, cancellationToken);
+            if (hasClaimLine && !actor.HasAdminPermissions)
+                throw new UnauthorizedAccessException(
+                    "A billing claim line exists for this note. Contact an Admin to correct the release attestation.");
+            var status = await context.Notes.AsNoTracking()
+                .Where(note => note.Id == noteId)
+                .Select(note => (NoteStatus?)note.Status)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (!hasClaimLine && status is NoteStatus.Logged or NoteStatus.Approved &&
+                !actor.HasSupervisorPermissions)
+                throw new UnauthorizedAccessException(
+                    "This note has reached a supervisor. Ask a supervisor to correct the release attestation.");
+        }
+        row.RevokeManualAttestation(actor.Id, DateTime.UtcNow, reason);
+        LocalAuditTrail.Record(
+            context,
+            actor,
+            LocalAuditActions.ReleaseObligationAttestationRevoked,
+            "Person",
+            personId,
+            AuditMetadata(row, DateTime.Today, reason));
         await context.SaveChangesAsync(cancellationToken);
         return ToDto(row, DateTime.Today);
     }
@@ -369,7 +457,11 @@ public sealed class ReleaseObligationService(
                     item.SignerCapacity?.ToString(),
                     item.SignatureCompletionId,
                     item.RecordedAtUtc,
-                    item.Reason))
+                    item.Reason,
+                    item.EvidenceNoteId,
+                    item.RevokedAtUtc,
+                    item.RevokedByUserId,
+                    item.RevocationReason))
                 .ToArray());
 
     private static string AuditMetadata(

@@ -12,6 +12,37 @@ namespace Sati.Api.Tests;
 public sealed class ApiFormNoteAttestationTests(SatiApiFactory factory)
 {
     [Fact]
+    public async Task LoggingMixedFormAndPhonePersistsBothAndAttestsTheForm()
+    {
+        using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var (personId, formId) = await CreateReviewAsync(DateTime.Today, completedOn: null);
+        var activityDate = DateTime.Today.AddDays(-1);
+        var activities = (int)(NoteActivity.Form | NoteActivity.Phone);
+
+        try
+        {
+            using var response = await client.PostAsJsonAsync("/api/v1/notes", new SaveNoteRequest(
+                "Completed the review and called the client.", activityDate, "Logged", 15, null,
+                personId, "Q3R", "Form", "Submitted for review.", null,
+                GoalProgress: "None", FormId: formId, Activities: activities));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var note = (await response.Content.ReadFromJsonAsync<NoteDto>())!;
+            Assert.Equal(activities, note.Activities);
+
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            Assert.Equal(activities, (await db.Notes.AsNoTracking()
+                .SingleAsync(row => row.Id == note.Id)).Activities);
+            Assert.Equal(activityDate.Date, (await db.Forms.AsNoTracking()
+                .SingleAsync(row => row.Id == formId)).CompletedDate);
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
     public async Task LoggingAFormNoteAttestsItsExactFormOnTheActivityDate()
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");

@@ -44,7 +44,8 @@ namespace Sati.Services
             new("Redwood Blush", "RedwoodBlush"),
             new("Bodhi Watercolor", "BodhiWatercolor"),
             new("Umber Facets", "UmberFacets"),
-            new("Legacy", "Legacy")
+            new("Legacy", "Legacy"),
+            new("Legacy Dark", "LegacyDark")
         ];
 
         public ThemeOption CurrentTheme { get; private set; }

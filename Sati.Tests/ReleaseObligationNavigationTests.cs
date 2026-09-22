@@ -114,6 +114,15 @@ public sealed class ReleaseObligationNavigationTests
     private sealed class StubReleaseObligationService(
         ReleaseObligationDto historical) : IReleaseObligationService
     {
+        public Task<AdminReleaseNoteCorrectionTargetDto?> GetAdminCorrectionTargetAsync(
+            int noteId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<AdminReleaseNoteCorrectionTargetDto?>(null);
+
+        public Task CorrectNoteDateAsAdminAsync(
+            int noteId, int expectedRevision, DateTime correctedActivityDate,
+            string reason, bool attestationConfirmed,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
         private readonly object sync = new();
         public List<DateTime> StatusTargets { get; } = [];
 
@@ -150,6 +159,13 @@ public sealed class ReleaseObligationNavigationTests
             int requestedPersonId,
             Guid obligationId,
             DateTime withdrawnOn,
+            string reason,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ReleaseObligationDto> RevokeAttestationAsync(
+            int requestedPersonId,
+            Guid obligationId,
             string reason,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

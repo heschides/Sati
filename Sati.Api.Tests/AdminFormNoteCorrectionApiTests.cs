@@ -134,9 +134,10 @@ public sealed class AdminFormNoteCorrectionApiTests(SatiApiFactory factory)
     }
 
     [Fact]
-    public async Task ApprovedCorrectionRaisesBillingFlagAndExistingClaimBlocksAnotherEdit()
+    public async Task AdminCanCorrectClaimedNoteAndFlagsTheRetainedClaimForBilling()
     {
         using var admin = await factory.CreateAuthenticatedClientAsync("admin-one");
+        using var caseManager = await factory.CreateAuthenticatedClientAsync("case-manager-one");
         var (personId, formId, noteId, priorDate) = await CreateSubmittedReviewAsync(6);
         var correctedDate = priorDate.AddDays(1);
         int? periodId = null;
@@ -191,15 +192,31 @@ public sealed class AdminFormNoteCorrectionApiTests(SatiApiFactory factory)
                 await db.SaveChangesAsync();
             }
 
-            using var blocked = await admin.PostAsJsonAsync(
+            using var denied = await caseManager.PostAsJsonAsync(
                 $"/api/v1/admin/notes/{noteId}/correct-form-date",
                 new AdminCorrectFormNoteDateRequest(2, correctedDate.AddDays(1),
-                    "A second date edit after claim submission must be blocked.", true));
-            Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+                    "A case manager cannot correct a claimed note.", true));
+            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+            using var changed = await admin.PostAsJsonAsync(
+                $"/api/v1/admin/notes/{noteId}/correct-form-date",
+                new AdminCorrectFormNoteDateRequest(2, correctedDate.AddDays(1),
+                    "The source record confirms the review occurred on its due date.", true));
+            Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
             await using var verificationScope = factory.Services.CreateAsyncScope();
             var verification = verificationScope.ServiceProvider.GetRequiredService<ApiDbContext>();
-            Assert.Equal(correctedDate, (await verification.Notes.AsNoTracking()
+            Assert.Equal(correctedDate.AddDays(1), (await verification.Notes.AsNoTracking()
                 .SingleAsync(row => row.Id == noteId)).EventDate);
+            Assert.Equal(correctedDate.AddDays(1), (await verification.Forms.AsNoTracking()
+                .SingleAsync(row => row.Id == formId)).CompletedDate);
+            var retainedClaim = await verification.ClaimLines.AsNoTracking()
+                .SingleAsync(row => row.NoteId == noteId);
+            Assert.Equal(correctedDate, retainedClaim.DateOfService);
+            var billingFlag = await verification.FormAttestationChangeReviewFlags.AsNoTracking()
+                .Where(row => row.NoteId == noteId && row.ClaimLineId == retainedClaim.Id)
+                .OrderByDescending(row => row.Id).FirstAsync();
+            Assert.True(billingFlag.RequiresBillingAttention);
+            Assert.Equal(correctedDate, billingFlag.PreviousCompletedOn);
+            Assert.Equal(correctedDate.AddDays(1), billingFlag.RevisedCompletedOn);
         }
         finally
         {
@@ -265,11 +282,11 @@ public sealed class AdminFormNoteCorrectionApiTests(SatiApiFactory factory)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        await db.FormAttestationChangeReviewFlags.Where(row => row.NoteId == noteId)
+            .ExecuteDeleteAsync();
         await db.ClaimLines.Where(row => row.NoteId == noteId).ExecuteDeleteAsync();
         if (periodId is int id)
             await db.BillingPeriods.Where(row => row.Id == id).ExecuteDeleteAsync();
-        await db.FormAttestationChangeReviewFlags.Where(row => row.NoteId == noteId)
-            .ExecuteDeleteAsync();
         var formIds = await db.Forms.Where(row => row.PersonId == personId)
             .Select(row => row.Id).ToListAsync();
         await db.FormAttestations.Where(row => formIds.Contains(row.FormId))

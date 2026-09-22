@@ -531,6 +531,10 @@ namespace Sati.Data
                       .WithMany()
                       .HasForeignKey(n => n.FormId)
                       .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<ReleaseObligation>()
+                      .WithMany()
+                      .HasForeignKey(n => n.ReleaseObligationId)
+                      .OnDelete(DeleteBehavior.Restrict);
                 entity.HasOne(n => n.Agency)
                       .WithMany()
                       .HasForeignKey(n => n.AgencyId)

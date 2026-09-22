@@ -36,6 +36,7 @@ internal static class AuditActions
     public const string NoteReturned = "note.returned";
     public const string NoteFormDateCorrected = "note.form-date-corrected";
     public const string NoteReassigned = "note.reassigned";
+    public const string NoteDraftCreatedFromAttestation = "note.draft-created-from-attestation";
     public const string AssessmentCreated = "assessment.created";
     public const string AssessmentUpdated = "assessment.updated";
     public const string AssessmentSubmitted = "assessment.submitted";
@@ -102,6 +103,8 @@ internal static class AuditActions
     public const string FormPrerequisiteOverridden = "form.prerequisite-overridden";
     public const string ReleaseObligationsReconciled = "release-obligations.reconciled";
     public const string ReleaseObligationAttested = "release-obligation.attested";
+    public const string ReleaseObligationAttestationRevoked = "release-obligation.attestation-revoked";
+    public const string NoteReleaseDateCorrected = "note.release-date-corrected";
     public const string ReleaseAuthorizationWithdrawn = "release-authorization.withdrawn";
     public const string DocumentGenerated = "document.generated";
     public const string DocumentRecordedExternal = "document.recorded-external";

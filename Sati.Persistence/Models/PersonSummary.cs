@@ -44,6 +44,8 @@ namespace Sati
         public NoteStatus? Status { get; set; }
         public DateTime? EventDate { get; set; }
         public NoteType? NoteType { get; set; }
+        public Sati.Contracts.V1.NoteActivity? Activities { get; set; }
+        public long? ReleaseObligationId { get; set; }
         public FormType? FormType { get; set; }
     }
 }

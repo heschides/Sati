@@ -115,7 +115,9 @@ internal static class ContractMapper
         note.EventDate,
         NullableNameAt(NoteTypeNames, note.NoteType),
         NullableNameAt(FormTypeNames, note.FormType),
-        note.Id);
+        note.Id,
+        note.Activities,
+        note.ReleaseObligationId);
 
     public static NoteDto ToNote(
         ServerNote note,
@@ -151,7 +153,9 @@ internal static class ContractMapper
         note.OverrideAttestationConfirmed,
         NullableNameAt(GoalProgressNames, note.GoalProgress),
         note.FormId,
-        note.FormDateCorrectionReason);
+        note.FormDateCorrectionReason,
+        note.Activities,
+        note.ReleaseObligationId);
 
     private static IReadOnlyList<string> ParseStringArray(string? json)
     {

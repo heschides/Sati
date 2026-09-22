@@ -225,8 +225,10 @@ public class NoteService(
         target.StartTime = source.StartTime;
         target.FormType = source.FormType;
         target.FormId = source.FormId;
+        target.ReleaseObligationId = source.ReleaseObligationId;
         target.FormDateCorrectionReason = source.FormDateCorrectionReason;
         target.NoteType = source.NoteType;
+        target.Activities = source.Activities;
         target.GoalProgress = source.GoalProgress;
         target.CaseManagerJustification = source.CaseManagerJustification;
         target.VisitDocumentationJson = source.VisitDocumentationJson;
@@ -251,9 +253,13 @@ public class NoteService(
     {
         var formLinkError = FormNoteLinkRules.Validate(
             note.NoteType?.ToString(), note.FormType?.ToString(),
-            note.Status?.ToString(), note.FormId, note.FormDateCorrectionReason);
+            note.Status?.ToString(), note.FormId, note.FormDateCorrectionReason,
+            (int?)note.Activities);
         if (formLinkError is not null)
             throw new ArgumentException(formLinkError, nameof(note));
+        var activityError = NoteActivityRules.Validate((int?)note.Activities, note.NoteType?.ToString());
+        if (activityError is not null)
+            throw new ArgumentException(activityError, nameof(note));
         if (note.Narrative is null || note.Narrative.Length > 1_000_000)
             throw new ArgumentException("Narrative is required and must not exceed 1,000,000 characters.", nameof(note));
         if (note.PersonId <= 0) throw new ArgumentException("A valid person is required.", nameof(note));
@@ -300,7 +306,8 @@ public class NoteService(
     private static async Task<bool> AttestLinkedFormAsync(
         SatiContext context, User actor, Note note, DateTime today)
     {
-        if (note.NoteType != NoteType.Form || note.Status != NoteStatus.Logged ||
+        if (!NoteActivityRules.Has(note.Activities, note.NoteType?.ToString(), NoteActivity.Form) ||
+            note.Status != NoteStatus.Logged ||
             FormNoteLinkRules.IsRelease(note.FormType?.ToString()))
             return false;
 
@@ -431,6 +438,22 @@ public class NoteService(
 
     private static async Task EnsureExactFormLinkAsync(SatiContext context, Note note)
     {
+        if (note.ReleaseObligationId is long releaseId)
+        {
+            var release = await context.ReleaseObligations.AsNoTracking()
+                .Include(row => row.Attestations)
+                .SingleOrDefaultAsync(row => row.Id == releaseId &&
+                    row.PersonId == note.PersonId && row.AgencyId == note.AgencyId);
+            if (release is null || note.FormId is not null ||
+                note.FormType?.ToString() != ReleaseNoteLinkRules.FormTypeName(release.Category))
+                throw new ArgumentException(
+                    "The selected release obligation does not match this client and release type.",
+                    nameof(note));
+            if (release.CompletedOn is DateTime attestedOn &&
+                note.EventDate?.Date != attestedOn.Date)
+                throw new InvalidOperationException(
+                    "This release is attested for a different date. Revoke that attestation with a reason before correcting the linked note.");
+        }
         if (note.FormId is not int formId)
             return;
 

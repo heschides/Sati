@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
+using Sati.Contracts.V1;
 
 namespace Sati.Models
 {
@@ -18,8 +19,15 @@ namespace Sati.Models
         public FormType? FormType { get; set; }
         // Exact annual or quarterly obligation. Older notes remain unlinked.
         public int? FormId { get; set; }
+        // Exact recipient-specific release obligation for a release-work note.
+        public long? ReleaseObligationId { get; set; }
         public string? FormDateCorrectionReason { get; set; }
         public NoteType? NoteType { get; set; }
+        // Null means this is a historical single-type note. New notes store the
+        // independent checked activities while keeping NoteType for old readers.
+        public NoteActivity? Activities { get; set; }
+        [NotMapped]
+        public string ActivityLabel => NoteActivityRules.DisplayLabel((int?)Activities, NoteType?.ToString());
         public GoalProgressLevel? GoalProgress { get; set; }
         public int? AgencyId { get; set; }
         public Agency? Agency { get; set; }

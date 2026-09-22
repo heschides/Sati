@@ -289,6 +289,10 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .WithMany()
                 .HasForeignKey(x => x.FormId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ReleaseObligation>()
+                .WithMany()
+                .HasForeignKey(x => x.ReleaseObligationId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ServerSettings>(entity =>
@@ -1032,8 +1036,10 @@ internal sealed class ServerNote
     public int PersonId { get; set; }
     public int? FormType { get; set; }
     public int? FormId { get; set; }
+    public long? ReleaseObligationId { get; set; }
     public string? FormDateCorrectionReason { get; set; }
     public int? NoteType { get; set; }
+    public int? Activities { get; set; }
     public int? GoalProgress { get; set; }
     public int? AgencyId { get; set; }
     public string? ReturnReason { get; set; }

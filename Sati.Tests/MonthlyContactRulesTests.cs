@@ -16,6 +16,16 @@ public sealed class MonthlyContactRulesTests
     private const BillingComplianceRequirements Contact = BillingComplianceRequirements.MonthlyContact;
 
     [Fact]
+    public void MixedFormAndPhoneCountsAsOneCompletedContact()
+    {
+        var fact = MonthlyContactRules.ToFact("Form", "Logged", new DateTime(2026, 9, 4), 17,
+            (int)(NoteActivity.Form | NoteActivity.Phone));
+
+        Assert.Equal(new DateTime(2026, 9, 4), fact?.OccurredOn);
+        Assert.Equal("note:17", fact?.EvidenceId);
+    }
+
+    [Fact]
     public void EachContactStartsAThirtyDayClock()
     {
         var obligations = MonthlyContactRules.BuildObligations(

@@ -51,14 +51,159 @@ public sealed class ReleaseObligationApiTests(SatiApiFactory factory)
 
         Assert.Equal(target, completed.CompletedOn);
         Assert.Single(completed.Attestations);
+        var evidenceNoteId = Assert.IsType<int>(completed.Attestations[0].EvidenceNoteId);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var draft = await db.Notes.AsNoTracking().SingleAsync(note => note.Id == evidenceNoteId);
+            Assert.Equal(medicalObligation.Id, draft.ReleaseObligationId);
+            Assert.Equal(NoteWorkflow.Pending, draft.Status);
+            Assert.Equal(target, draft.EventDate);
+        }
         Assert.Equal(target, withdrawn.CompletedOn);
         Assert.Equal(target.AddDays(1), withdrawn.WithdrawnOn);
         Assert.False(withdrawn.IsAuthorizationActive);
+
+        var revoked = await PostAsync<RevokeReleaseAttestationRequest, ReleaseObligationDto>(
+            client,
+            $"/api/v1/people/101/release-obligations/{medicalObligation.ObligationId:D}/attestation/revoke",
+            new RevokeReleaseAttestationRequest("The completion date needs correction."));
+        Assert.Null(revoked.CompletedOn);
+        Assert.NotNull(revoked.Attestations[0].RevokedAtUtc);
+        Assert.Equal("The completion date needs correction.",
+            revoked.Attestations[0].RevocationReason);
+
+        var conflicting = await client.PostAsJsonAsync(
+            $"/api/v1/people/101/release-obligations/{medicalObligation.ObligationId:D}/attest",
+            new AttestReleaseObligationRequest(target.AddDays(2)));
+        Assert.Equal(HttpStatusCode.Conflict, conflicting.StatusCode);
+        Assert.Equal("release_note_date_conflict",
+            (await conflicting.Content.ReadFromJsonAsync<ApiErrorDto>())?.Code);
+
+        var reattested = await PostAsync<AttestReleaseObligationRequest, ReleaseObligationDto>(
+            client,
+            $"/api/v1/people/101/release-obligations/{medicalObligation.ObligationId:D}/attest",
+            new AttestReleaseObligationRequest(target));
+        Assert.Equal(evidenceNoteId, reattested.Attestations.Last().EvidenceNoteId);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            Assert.Equal(1, await db.Notes.CountAsync(note =>
+                note.ReleaseObligationId == medicalObligation.Id));
+        }
 
         var read = await client.GetFromJsonAsync<ReleaseObligationStatusDto>(
             $"/api/v1/people/101/release-obligations?targetEffectiveDate={target:yyyy-MM-dd}");
         Assert.NotNull(read);
         Assert.Null(read.Obligations.Single(item => item.Category == "Agency").CompletedOn);
+        Assert.Equal(target,
+            read.Obligations.Single(item => item.Category == "Medical").CompletedOn);
+    }
+
+    [Fact]
+    public async Task AdminCorrectsClaimedReleaseNoteAndFlagsTheRetainedClaim()
+    {
+        var personId = await factory.CreateBillingWorkflowPersonAsync();
+        var targetDate = DateTime.Today.AddMonths(-1).Date;
+        using var caseManager = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        using var admin = await factory.CreateAuthenticatedClientAsync("admin-one");
+        var status = await PostAsync<ReconcileReleaseObligationsRequest, ReleaseObligationStatusDto>(
+            caseManager,
+            $"/api/v1/people/{personId}/release-obligations/reconcile",
+            new ReconcileReleaseObligationsRequest(targetDate));
+        var dhhs = Assert.Single(status.Obligations, item => item.Category == "Dhhs");
+        var completed = await PostAsync<AttestReleaseObligationRequest, ReleaseObligationDto>(
+            caseManager,
+            $"/api/v1/people/{personId}/release-obligations/{dhhs.ObligationId:D}/attest",
+            new AttestReleaseObligationRequest(targetDate));
+        var noteId = Assert.IsType<int>(Assert.Single(completed.Attestations).EvidenceNoteId);
+        int? createdPeriodId = null;
+        try
+        {
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+                var note = await db.Notes.SingleAsync(item => item.Id == noteId);
+                note.Status = NoteWorkflow.Approved;
+                var period = await db.BillingPeriods.SingleOrDefaultAsync(item =>
+                    item.UserId == 12 && item.Month == targetDate.Month &&
+                    item.Year == targetDate.Year);
+                if (period is null)
+                {
+                    period = new ServerBillingPeriod
+                    {
+                        UserId = 12,
+                        Month = targetDate.Month,
+                        Year = targetDate.Year,
+                        Status = 1,
+                        SubmittedAt = DateTime.UtcNow
+                    };
+                    db.BillingPeriods.Add(period);
+                    await db.SaveChangesAsync();
+                    createdPeriodId = period.Id;
+                }
+                db.ClaimLines.Add(new ServerClaimLine
+                {
+                    NoteId = noteId,
+                    BillingPeriodId = period.Id,
+                    DateOfService = targetDate,
+                    ProcedureCode = "T1016",
+                    Units = 1,
+                    ChargeAmount = 1,
+                    ClientMaineCareId = "synthetic",
+                    RenderingProviderNpi = "1999999984",
+                    DiagnosisCode = "F89",
+                    PlaceOfService = 11
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var path = $"/api/v1/admin/notes/{noteId}/release-date-correction-target";
+            using var forbidden = await caseManager.GetAsync(path);
+            Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+            var source = await admin.GetFromJsonAsync<AdminReleaseNoteCorrectionTargetDto>(path);
+            Assert.NotNull(source);
+            Assert.Equal(dhhs.Id, source.ReleaseObligationId);
+            Assert.True(source.HasClaimRecord);
+            var correctedDate = targetDate.AddDays(1);
+            var request = new AdminCorrectReleaseNoteDateRequest(
+                source.Revision, correctedDate,
+                "The source record confirms the release was completed the next day.", true);
+            using var denied = await caseManager.PostAsJsonAsync(
+                $"/api/v1/admin/notes/{noteId}/correct-release-date", request);
+            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+            using var changed = await admin.PostAsJsonAsync(
+                $"/api/v1/admin/notes/{noteId}/correct-release-date", request);
+            Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+
+            await using var verificationScope = factory.Services.CreateAsyncScope();
+            var verify = verificationScope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            Assert.Equal(correctedDate, (await verify.Notes.AsNoTracking()
+                .SingleAsync(item => item.Id == noteId)).EventDate);
+            var release = await verify.ReleaseObligations.AsNoTracking()
+                .Include(item => item.Attestations)
+                .SingleAsync(item => item.Id == dhhs.Id);
+            Assert.Equal(correctedDate, release.CompletedOn);
+            Assert.Equal(2, release.Attestations.Count);
+            var retainedClaim = await verify.ClaimLines.AsNoTracking()
+                .SingleAsync(item => item.NoteId == noteId);
+            Assert.Equal(targetDate, retainedClaim.DateOfService);
+            var flag = await verify.FormAttestationChangeReviewFlags.AsNoTracking()
+                .SingleAsync(item => item.NoteId == noteId);
+            Assert.Equal(dhhs.Id, flag.ReleaseObligationId);
+            Assert.Equal(retainedClaim.Id, flag.ClaimLineId);
+            Assert.True(flag.RequiresBillingAttention);
+        }
+        finally
+        {
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            await db.FormAttestationChangeReviewFlags.Where(item => item.NoteId == noteId)
+                .ExecuteDeleteAsync();
+            await db.ClaimLines.Where(item => item.NoteId == noteId).ExecuteDeleteAsync();
+            if (createdPeriodId is int periodId)
+                await db.BillingPeriods.Where(item => item.Id == periodId).ExecuteDeleteAsync();
+        }
     }
 
     [Fact]

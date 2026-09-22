@@ -25,7 +25,7 @@ internal static partial class ApiEndpoints
             .Where(note => personIds.Contains(note.PersonId) &&
                            note.AgencyId == agencyId &&
                            note.EventDate != null)
-            .Select(note => new { note.Id, note.PersonId, note.EventDate, note.NoteType, note.Status })
+            .Select(note => new { note.Id, note.PersonId, note.EventDate, note.NoteType, note.Activities, note.Status })
             .ToListAsync(cancellationToken);
         return notes
             .Select(note => new
@@ -35,7 +35,8 @@ internal static partial class ApiEndpoints
                     ContractMapper.NoteTypeName(note.NoteType),
                     ContractMapper.NoteStatusName(note.Status),
                     note.EventDate,
-                    note.Id)
+                    note.Id,
+                    note.Activities)
             })
             .Where(item => item.Fact is not null)
             .ToLookup(item => item.PersonId, item => item.Fact!);
@@ -66,7 +67,8 @@ internal static partial class ApiEndpoints
             ContractMapper.NoteTypeName(note.NoteType),
             ContractMapper.NoteStatusName(note.Status),
             note.EventDate,
-            note.Id);
+            note.Id,
+            note.Activities);
 
     /// <summary>
     /// The consumer's contact history with the note under evaluation replacing its

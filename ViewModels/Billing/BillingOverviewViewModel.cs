@@ -25,6 +25,7 @@ public partial class BillingOverviewViewModel : ObservableObject
     private readonly ISessionService _sessionService;
     private readonly IFormAttestationChangeReviewService? _formChangeReviews;
     private readonly IAdminFormNoteCorrectionService? _adminFormCorrections;
+    private readonly IReleaseObligationService? _releaseObligations;
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private readonly LatestRequestTracker _accountLoads = new();
     private IReadOnlyList<BillingMonthPoint> _revenueMonths = [];
@@ -36,12 +37,14 @@ public partial class BillingOverviewViewModel : ObservableObject
         ThemeService? themeService = null,
         BillingComplianceRecoveryViewModel? complianceRecovery = null,
         IFormAttestationChangeReviewService? formChangeReviews = null,
-        IAdminFormNoteCorrectionService? adminFormCorrections = null)
+        IAdminFormNoteCorrectionService? adminFormCorrections = null,
+        IReleaseObligationService? releaseObligations = null)
     {
         _billingService = billingService;
         _sessionService = sessionService;
         _formChangeReviews = formChangeReviews;
         _adminFormCorrections = adminFormCorrections;
+        _releaseObligations = releaseObligations;
         ComplianceRecovery = complianceRecovery;
 
         // OxyPlot colors are copied into a PlotModel, so rebuild the lightweight models when
@@ -80,10 +83,11 @@ public partial class BillingOverviewViewModel : ObservableObject
     public ObservableCollection<BillingPolicyReviewRow> BillingPolicyReviewFlags { get; } = [];
     public ObservableCollection<FormAttestationChangeReviewRow> FormChangeReviewFlags { get; } = [];
     [ObservableProperty] private string formChangeReviewSummary =
-        "No form completion date changes need billing review.";
+        "No form or release date changes need billing review.";
     [ObservableProperty] private bool canAdminCorrectFormDate;
     [ObservableProperty] private string correctionNoteIdText = string.Empty;
     [ObservableProperty] private AdminFormNoteCorrectionTargetDto? correctionTarget;
+    [ObservableProperty] private AdminReleaseNoteCorrectionTargetDto? releaseCorrectionTarget;
     [ObservableProperty] private bool hasCorrectionTarget;
     [ObservableProperty] private string correctionTargetSummary = string.Empty;
     [ObservableProperty] private DateTime? correctedActivityDate;
@@ -106,8 +110,10 @@ public partial class BillingOverviewViewModel : ObservableObject
         try
         {
             IsBusy = true;
-            CanAdminCorrectFormDate = account?.HasAdminPermissions == true && _adminFormCorrections is not null;
+            CanAdminCorrectFormDate = account?.HasAdminPermissions == true &&
+                (_adminFormCorrections is not null || _releaseObligations is not null);
             CorrectionTarget = null;
+            ReleaseCorrectionTarget = null;
             HasCorrectionTarget = false;
             CorrectionTargetSummary = string.Empty;
             var actor = account?.ToAgencyActor()
@@ -184,15 +190,15 @@ public partial class BillingOverviewViewModel : ObservableObject
             FormChangeReviewFlags.Clear();
             foreach (var flag in current) FormChangeReviewFlags.Add(flag);
             FormChangeReviewSummary = current.Count == 0
-                ? "No form completion date changes need billing review."
-                : $"{current.Count} form-work note{(current.Count == 1 ? "" : "s")} changed after submission; " +
+                ? "No form or release date changes need billing review."
+                : $"{current.Count} form or release note{(current.Count == 1 ? "" : "s")} changed after submission; " +
                   $"{current.Count(flag => flag.MustHoldBilling)} currently held for billing.";
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Billing form change reviews failed: {ex.Message}");
             if (_accountLoads.IsCurrent(request) && ReferenceEquals(_sessionService.CurrentUser, account))
-                FormChangeReviewSummary = "Form completion date change notices are temporarily unavailable.";
+                FormChangeReviewSummary = "Form and release date change notices are temporarily unavailable.";
         }
     }
 
@@ -200,7 +206,7 @@ public partial class BillingOverviewViewModel : ObservableObject
     private async Task FindFormDateCorrectionTarget()
     {
         if (IsFormDateCorrectionBusy) return;
-        if (!CanAdminCorrectFormDate || _adminFormCorrections is null) return;
+        if (!CanAdminCorrectFormDate) return;
         if (!int.TryParse(CorrectionNoteIdText, out var noteId) || noteId <= 0)
         {
             CorrectionStatusMessage = "Enter a valid note ID.";
@@ -213,27 +219,49 @@ public partial class BillingOverviewViewModel : ObservableObject
     private async Task ReviewFormDateFlag(int noteId)
     {
         if (IsFormDateCorrectionBusy) return;
-        if (!CanAdminCorrectFormDate || _adminFormCorrections is null) return;
+        if (!CanAdminCorrectFormDate) return;
         CorrectionNoteIdText = noteId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         await OpenFormDateCorrectionTargetAsync(noteId);
     }
 
     private async Task OpenFormDateCorrectionTargetAsync(int noteId)
     {
-        if (_adminFormCorrections is null) return;
+        if (!CanAdminCorrectFormDate) return;
         IsFormDateCorrectionBusy = true;
         CorrectionStatusMessage = string.Empty;
         CorrectionTarget = null;
+        ReleaseCorrectionTarget = null;
         HasCorrectionTarget = false;
         try
         {
             var account = _sessionService.CurrentUser;
-            var target = await _adminFormCorrections.GetTargetAsync(noteId);
+            var target = _adminFormCorrections is null
+                ? null : await _adminFormCorrections.GetTargetAsync(noteId);
             if (!ReferenceEquals(_sessionService.CurrentUser, account)) return;
             if (target is null)
             {
-                CorrectionStatusMessage =
-                    "No eligible linked non-release form note was found in this agency.";
+                var releaseTarget = _releaseObligations is null
+                    ? null : await _releaseObligations.GetAdminCorrectionTargetAsync(noteId);
+                if (!ReferenceEquals(_sessionService.CurrentUser, account)) return;
+                if (releaseTarget is null)
+                {
+                    CorrectionStatusMessage =
+                        "No eligible linked form or release note was found in this agency.";
+                    return;
+                }
+                ReleaseCorrectionTarget = releaseTarget;
+                HasCorrectionTarget = true;
+                CorrectedActivityDate = releaseTarget.ActivityDate;
+                CorrectionReason = string.Empty;
+                CorrectionEvidenceConfirmed = false;
+                CorrectionTargetSummary =
+                    $"Note #{releaseTarget.NoteId}, {releaseTarget.Recipient} release #{releaseTarget.ReleaseObligationId}, {releaseTarget.Status}; " +
+                    $"activity {releaseTarget.ActivityDate:MM/dd/yyyy}, completion " +
+                    $"{releaseTarget.CurrentCompletedOn?.ToString("MM/dd/yyyy") ?? "revoked / no current completion"}, " +
+                    $"due {releaseTarget.DueDate:MM/dd/yyyy}.";
+                if (releaseTarget.HasClaimRecord)
+                    CorrectionStatusMessage =
+                        "The existing claim will be preserved and flagged for billing review after this Admin correction.";
                 return;
             }
             CorrectionTarget = target;
@@ -248,7 +276,7 @@ public partial class BillingOverviewViewModel : ObservableObject
                 $"due {target.DueDate:MM/dd/yyyy}.";
             if (target.HasClaimRecord)
                 CorrectionStatusMessage =
-                    "This note already has a claim record. Review that claim through the billing correction workflow before changing its source date.";
+                    "The existing claim will be preserved and flagged for billing review after this Admin correction.";
         }
         catch (Exception ex)
         {
@@ -265,17 +293,12 @@ public partial class BillingOverviewViewModel : ObservableObject
     private async Task SaveFormDateCorrection()
     {
         if (IsFormDateCorrectionBusy) return;
-        if (!CanAdminCorrectFormDate || _adminFormCorrections is null ||
-            CorrectionTarget is not { } target)
+        if (!CanAdminCorrectFormDate ||
+            (CorrectionTarget is null && ReleaseCorrectionTarget is null))
             return;
-        if (target.HasClaimRecord)
-        {
-            CorrectionStatusMessage =
-                "Review the existing claim through the billing correction workflow first.";
-            return;
-        }
+        var currentDate = CorrectionTarget?.ActivityDate ?? ReleaseCorrectionTarget!.ActivityDate;
         if (CorrectedActivityDate is not DateTime corrected ||
-            corrected.Date == target.ActivityDate.Date ||
+            corrected.Date == currentDate.Date ||
             string.IsNullOrWhiteSpace(CorrectionReason) || !CorrectionEvidenceConfirmed)
         {
             CorrectionStatusMessage =
@@ -283,15 +306,26 @@ public partial class BillingOverviewViewModel : ObservableObject
                 "The corrected date must differ from the current date.";
             return;
         }
+        if (ReleaseCorrectionTarget is not null && CorrectionReason.Trim().Length > 500)
+        {
+            CorrectionStatusMessage = "Keep the release correction explanation to 500 characters or fewer.";
+            return;
+        }
 
         IsFormDateCorrectionBusy = true;
         CorrectionStatusMessage = string.Empty;
         try
         {
-            await _adminFormCorrections.CorrectAsync(
-                target.NoteId, target.Revision, corrected.Date,
-                CorrectionReason.Trim(), CorrectionEvidenceConfirmed);
+            if (CorrectionTarget is { } target && _adminFormCorrections is not null)
+                await _adminFormCorrections.CorrectAsync(
+                    target.NoteId, target.Revision, corrected.Date,
+                    CorrectionReason.Trim(), CorrectionEvidenceConfirmed);
+            else if (ReleaseCorrectionTarget is { } releaseTarget && _releaseObligations is not null)
+                await _releaseObligations.CorrectNoteDateAsAdminAsync(
+                    releaseTarget.NoteId, releaseTarget.Revision, corrected.Date,
+                    CorrectionReason.Trim(), CorrectionEvidenceConfirmed);
             CorrectionTarget = null;
+            ReleaseCorrectionTarget = null;
             HasCorrectionTarget = false;
             CorrectionNoteIdText = string.Empty;
             CorrectedActivityDate = null;
@@ -386,7 +420,7 @@ public partial class BillingOverviewViewModel : ObservableObject
         HasBillingPolicyReviewFlags = false;
         BillingPolicyReviewSummary = "No unresolved billing-policy review flags.";
         FormChangeReviewFlags.Clear();
-        FormChangeReviewSummary = "No form completion date changes need billing review.";
+        FormChangeReviewSummary = "No form or release date changes need billing review.";
     }
 
     internal static BillingOverviewAnalytics CreateAnalytics(
@@ -579,6 +613,7 @@ public partial class BillingOverviewViewModel : ObservableObject
         CanAdminCorrectFormDate = false;
         CorrectionNoteIdText = string.Empty;
         CorrectionTarget = null;
+        ReleaseCorrectionTarget = null;
         HasCorrectionTarget = false;
         CorrectionTargetSummary = string.Empty;
         CorrectedActivityDate = null;

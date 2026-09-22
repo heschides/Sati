@@ -536,6 +536,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="20" />
@@ -544,67 +545,51 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="NOTE TYPE"
+                    <TextBlock Text="ACTIVITIES (SELECT ALL THAT APPLY)"
                                Style="{StaticResource LabelStyle}"
                                Grid.Row="0"
                                Grid.Column="0"
                                Grid.ColumnSpan="2" />
-                    <RadioButton Grid.Row="1"
+                    <CheckBox Grid.Row="1"
                                  Grid.Column="1"
                                  Content="Visit"
                                  Margin="0,0,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
-                                 GroupName="NoteEntryNoteType"
-                                 IsChecked="{Binding SelectedNoteType,
-                                     Converter={StaticResource EnumToBoolConverter},
-                                     ConverterParameter=Visit}" />
-                    <RadioButton Grid.Row="1"
+                                 IsChecked="{Binding IsVisitSelected, Mode=TwoWay}" />
+                    <CheckBox Grid.Row="1"
                                  Grid.Column="3"
                                  Content="Phone"
                                  Margin="0,0,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
-                                 GroupName="NoteEntryNoteType"
-                                 IsChecked="{Binding SelectedNoteType,
-                                     Converter={StaticResource EnumToBoolConverter},
-                                     ConverterParameter=Phone}" />
-                    <RadioButton Grid.Row="2"
+                                 IsChecked="{Binding IsPhoneSelected, Mode=TwoWay}" />
+                    <CheckBox Grid.Row="2"
                                  Grid.Column="1"
                                  Content="Email"
                                  Margin="0,0,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
-                                 GroupName="NoteEntryNoteType"
-                                 IsChecked="{Binding SelectedNoteType,
-                                     Converter={StaticResource EnumToBoolConverter},
-                                     ConverterParameter=Email}" />
-                    <RadioButton Grid.Row="2"
+                                 IsChecked="{Binding IsEmailSelected, Mode=TwoWay}" />
+                    <CheckBox Grid.Row="2"
                                  Grid.Column="3"
                                  Content="Form"
                                  Margin="0,0,8,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
-                                 GroupName="NoteEntryNoteType"
-                                 IsChecked="{Binding SelectedNoteType,
-                                     Converter={StaticResource EnumToBoolConverter},
-                                     ConverterParameter=Form}" />
-                    <RadioButton Grid.Row="3"
+                                 IsChecked="{Binding IsFormSelected, Mode=TwoWay}" />
+                    <CheckBox Grid.Row="3"
                                  Grid.Column="1"
                                  Content="Other"
                                  Margin="0,0,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
-                                 GroupName="NoteEntryNoteType"
-                                 IsChecked="{Binding SelectedNoteType,
-                                     Converter={StaticResource EnumToBoolConverter},
-                                     ConverterParameter=Other}" />
-                    <RadioButton Grid.Row="3"
+                                 IsChecked="{Binding IsOtherSelected, Mode=TwoWay}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,8,0,4"
+                               Text="OR" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <CheckBox Grid.Row="4"
                                  Grid.Column="3"
-                                 Content="Reminder"
-                                 Margin="0,0,12,4"
+                                 Content="Reminder (separate)"
+                                 Margin="0,8,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
-                                 GroupName="NoteEntryNoteType"
                                  ToolTip="Without a date, adds a journal reminder. Choosing a future date saves it on that calendar day. Never billable."
-                                 IsChecked="{Binding SelectedNoteType,
-                                     Converter={StaticResource EnumToBoolConverter},
-                                     ConverterParameter=Reminder}" />
-                    <ComboBox AutomationProperties.Name="Form Type" Grid.Row="4"
+                                 IsChecked="{Binding IsReminderSelected, Mode=TwoWay}" />
+                    <ComboBox AutomationProperties.Name="Form Type" Grid.Row="5"
                               Grid.ColumnSpan="4"
                               ItemsSource="{Binding FormTypes}"
                               SelectedItem="{Binding SelectedFormType, Mode=TwoWay}"
@@ -617,18 +602,18 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
                     <ComboBox AutomationProperties.Name="Exact form obligation and plan year"
-                              Grid.Row="5" Grid.ColumnSpan="4" Margin="0,6,0,0"
+                              Grid.Row="6" Grid.ColumnSpan="4" Margin="0,6,0,0"
                               ItemsSource="{Binding FormObligations}"
                               DisplayMemberPath="Label"
                               SelectedItem="{Binding SelectedFormObligation, Mode=TwoWay}"
                               Visibility="{Binding IsFormNote,
                                   Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <TextBlock Grid.Row="6" Grid.ColumnSpan="4" Margin="0,6,0,0"
+                    <TextBlock Grid.Row="7" Grid.ColumnSpan="4" Margin="0,6,0,0"
                                Text="Reason for changing a prior attested date (if applicable)"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Visibility="{Binding IsFormNote,
                                    Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <TextBox Grid.Row="7" Grid.ColumnSpan="4"
+                    <TextBox Grid.Row="8" Grid.ColumnSpan="4"
                              AutomationProperties.Name="Reason for form completion date correction"
                              MaxLength="1000"
                              Text="{Binding FormDateCorrectionReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"

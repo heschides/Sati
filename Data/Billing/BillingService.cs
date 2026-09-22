@@ -437,7 +437,7 @@ namespace Sati.Services.Billing
         internal static IReadOnlyList<string> EvaluateFormWorkBilling(Note note)
         {
             ArgumentNullException.ThrowIfNull(note);
-            if (note.NoteType != NoteType.Form)
+            if (!NoteActivityRules.Has(note.Activities, note.NoteType?.ToString(), NoteActivity.Form))
                 return [];
 
             var formType = note.FormType?.ToString() ?? string.Empty;

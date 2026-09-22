@@ -8,6 +8,13 @@ namespace Sati.Data;
 /// </summary>
 public interface IReleaseObligationService
 {
+    Task<AdminReleaseNoteCorrectionTargetDto?> GetAdminCorrectionTargetAsync(
+        int noteId, CancellationToken cancellationToken = default);
+
+    Task CorrectNoteDateAsAdminAsync(
+        int noteId, int expectedRevision, DateTime correctedActivityDate,
+        string reason, bool attestationConfirmed,
+        CancellationToken cancellationToken = default);
     Task<ReleaseObligationStatusDto> GetStatusAsync(
         int personId,
         DateTime targetEffectiveDate,
@@ -23,6 +30,12 @@ public interface IReleaseObligationService
         Guid obligationId,
         DateTime completedOn,
         string? reason = null,
+        CancellationToken cancellationToken = default);
+
+    Task<ReleaseObligationDto> RevokeAttestationAsync(
+        int personId,
+        Guid obligationId,
+        string reason,
         CancellationToken cancellationToken = default);
 
     Task<ReleaseObligationDto> WithdrawAsync(

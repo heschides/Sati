@@ -27,7 +27,7 @@ public sealed class AdminFormNoteCorrectionService(
                 cancellationToken);
         if (note is null ||
             note.Status is not (NoteStatus.Logged or NoteStatus.Approved) ||
-            note.NoteType != NoteType.Form ||
+            !NoteActivityRules.Has(note.Activities, note.NoteType?.ToString(), NoteActivity.Form) ||
             note.FormId is not int formId ||
             note.FormType is not FormType formType ||
             note.EventDate is not DateTime activityDate)
@@ -117,7 +117,7 @@ public sealed class AdminFormNoteCorrectionService(
         if (note.Revision != expectedRevision)
             throw new NoteConcurrencyException();
         if (note.Status is not (NoteStatus.Logged or NoteStatus.Approved) ||
-            note.NoteType != NoteType.Form || note.FormId is not int formId ||
+            !NoteActivityRules.Has(note.Activities, note.NoteType?.ToString(), NoteActivity.Form) || note.FormId is not int formId ||
             note.FormType is not FormType formType ||
             note.EventDate is not DateTime priorActivityDate)
             throw new InvalidOperationException(
@@ -150,11 +150,6 @@ public sealed class AdminFormNoteCorrectionService(
         var correctedDate = correctedActivityDate.Date;
         if (correctedDate == priorActivityDate.Date)
             throw new InvalidOperationException("Choose a date that differs from the current activity date.");
-        if (await context.ClaimLines.AsNoTracking().AnyAsync(line => line.NoteId == noteId,
-                cancellationToken))
-            throw new InvalidOperationException(
-                "This note already has a claim record. Review that claim through the billing correction workflow before changing its source date.");
-
         var effectiveDate = form.Person.EffectiveDate
             ?? throw new InvalidOperationException("The client has no effective date.");
         var cycle = FormAttestationRules.ResolveCycleForForm(
@@ -248,7 +243,7 @@ public sealed class AdminFormNoteCorrectionService(
         return note;
     }
 
-    private static async Task EnsureServiceTimeAvailableAsync(
+    internal static async Task EnsureServiceTimeAvailableAsync(
         SatiContext context, int ownerId, Note note, CancellationToken cancellationToken)
     {
         var candidate = ServiceTimeline.TryCreateBlock(

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
+using Sati.Models.Billing;
 using Xunit;
 
 namespace Sati.Tests;
@@ -115,13 +116,14 @@ public sealed class ReleaseObligationIntegrationTests
     }
 
     [Fact]
-    public async Task LocalServiceReconcilesEachRecipientAndKeepsWithdrawalSeparateFromCompletion()
+    public async Task LocalServiceReconcilesRecipientsAndAdminCorrectsAClaimedReleaseNote()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=True");
         await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<SatiContext>().UseSqlite(connection).Options;
         var factory = new TestContextFactory(options);
         User actor;
+        User admin;
         int personId;
         var target = new DateTime(2026, 3, 7);
         await using (var setup = factory.CreateDbContext())
@@ -131,7 +133,10 @@ public sealed class ReleaseObligationIntegrationTests
             actor = User.Create(
                 120, "release-integration-cm", "Release Integration CM", "", "",
                 UserRole.CaseManager, null, 30);
-            setup.Users.Add(actor);
+            admin = User.Create(
+                122, "release-integration-admin", "Release Integration Admin", "", "",
+                UserRole.Admin, null, 30);
+            setup.Users.AddRange(actor, admin);
             var person = Person.CreatePerson(
                 actor.Id,
                 "Synthetic",
@@ -180,6 +185,57 @@ public sealed class ReleaseObligationIntegrationTests
         Assert.Null((await service.GetStatusAsync(personId, target)).Obligations
             .Single(item => item.Category == "Medical" &&
                             item.ObligationId != firstMedical.ObligationId).CompletedOn);
+
+        var noteId = Assert.IsType<int>(Assert.Single(completed.Attestations).EvidenceNoteId);
+        int noteRevision;
+        await using (var db = factory.CreateDbContext())
+        {
+            var note = await db.Notes.SingleAsync(item => item.Id == noteId);
+            note.Status = NoteStatus.Approved;
+            noteRevision = note.Revision;
+            db.ClaimLines.Add(new ClaimLine
+            {
+                NoteId = noteId,
+                BillingPeriod = new BillingPeriod
+                {
+                    UserId = actor.Id,
+                    Month = target.Month,
+                    Year = target.Year,
+                    Status = BillingStatus.Submitted,
+                    SubmittedAt = DateTime.UtcNow
+                },
+                DateOfService = target.AddDays(-1),
+                ProcedureCode = "T1016",
+                ChargeAmount = 1,
+                PlaceOfService = 99
+            });
+            await db.SaveChangesAsync();
+        }
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.CorrectNoteDateAsAdminAsync(noteId, noteRevision, target,
+                "Corrected release work date.", true));
+        session.SetUser(admin);
+        var correctionTarget = await service.GetAdminCorrectionTargetAsync(noteId);
+        Assert.NotNull(correctionTarget);
+        Assert.True(correctionTarget.HasClaimRecord);
+        await service.CorrectNoteDateAsAdminAsync(noteId, noteRevision, target,
+            "The release work was completed on this date.", true);
+
+        await using var verified = factory.CreateDbContext();
+        Assert.Equal(target, (await verified.Notes.AsNoTracking()
+            .SingleAsync(item => item.Id == noteId)).EventDate);
+        Assert.Equal(target, (await verified.ReleaseObligations.AsNoTracking()
+            .Include(item => item.Attestations)
+            .SingleAsync(item => item.Id == firstMedical.Id)).CompletedOn);
+        var retainedClaim = await verified.ClaimLines.AsNoTracking()
+            .SingleAsync(item => item.NoteId == noteId);
+        Assert.Equal(target.AddDays(-1), retainedClaim.DateOfService);
+        var flag = await verified.FormAttestationChangeReviewFlags.AsNoTracking()
+            .SingleAsync(item => item.NoteId == noteId);
+        Assert.Equal(firstMedical.Id, flag.ReleaseObligationId);
+        Assert.Equal(retainedClaim.Id, flag.ClaimLineId);
+        Assert.True(flag.RequiresBillingAttention);
     }
 
     [Fact]

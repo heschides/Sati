@@ -14,7 +14,8 @@ public sealed class FormAttestationChangeReviewFlag
     public int AgencyId { get; private set; }
     public int PersonId { get; private set; }
     public int NoteId { get; private set; }
-    public int FormId { get; private set; }
+    public int? FormId { get; private set; }
+    public long? ReleaseObligationId { get; private set; }
     public int? ClaimLineId { get; private set; }
     public DateTime? NoteActivityDate { get; private set; }
     public DateTime DueDate { get; private set; }
@@ -35,7 +36,7 @@ public sealed class FormAttestationChangeReviewFlag
         FlagId, PersonId, NoteId, FormId, ClaimLineId, NoteActivityDate, DueDate,
         PreviousCompletedOn, RevisedCompletedOn, Reason,
         RequiresSupervisorAttention, RequiresBillingAttention, BillingHoldReasons,
-        DateTime.SpecifyKind(CreatedAtUtc, DateTimeKind.Utc));
+        DateTime.SpecifyKind(CreatedAtUtc, DateTimeKind.Utc), ReleaseObligationId);
 
     public static FormAttestationChangeReviewFlag Create(
         int agencyId,
@@ -82,6 +83,48 @@ public sealed class FormAttestationChangeReviewFlag
             RequiresSupervisorAttention = impact.RequiresSupervisorAttention,
             RequiresBillingAttention = impact.RequiresBillingAttention,
             BillingHoldReasons = impact.BillingHoldReasons,
+            CreatedAtUtc = createdAtUtc
+        };
+    }
+
+    public static FormAttestationChangeReviewFlag CreateRelease(
+        int agencyId,
+        int personId,
+        int noteId,
+        long releaseObligationId,
+        int? claimLineId,
+        DateTime? noteActivityDate,
+        DateTime dueDate,
+        DateTime? previousCompletedOn,
+        DateTime revisedCompletedOn,
+        string reason,
+        bool requiresSupervisorAttention,
+        DateTime createdAtUtc)
+    {
+        if (agencyId <= 0 || personId <= 0 || noteId <= 0 || releaseObligationId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(releaseObligationId));
+        if (claimLineId is <= 0 || dueDate == default || revisedCompletedOn == default)
+            throw new ArgumentOutOfRangeException(nameof(claimLineId));
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A correction reason is required.", nameof(reason));
+        if (createdAtUtc.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("The review-flag timestamp must be UTC.", nameof(createdAtUtc));
+        return new FormAttestationChangeReviewFlag
+        {
+            FlagId = Guid.NewGuid(),
+            AgencyId = agencyId,
+            PersonId = personId,
+            NoteId = noteId,
+            ReleaseObligationId = releaseObligationId,
+            ClaimLineId = claimLineId,
+            NoteActivityDate = noteActivityDate?.Date,
+            DueDate = dueDate.Date,
+            PreviousCompletedOn = previousCompletedOn?.Date,
+            RevisedCompletedOn = revisedCompletedOn.Date,
+            Reason = reason.Trim(),
+            RequiresSupervisorAttention = requiresSupervisorAttention,
+            RequiresBillingAttention = claimLineId is not null,
+            BillingHoldReasons = FormAttestationBillingHoldReason.None,
             CreatedAtUtc = createdAtUtc
         };
     }

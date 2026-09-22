@@ -29,7 +29,7 @@ public sealed class CalendarNoteItem
     public int? Units => _note.Units;
     public int? StartTime => _note.StartTime;
     public bool IsReminder => _note.NoteType == NoteType.Reminder;
-    public string NoteTypeLabel => _note.NoteType?.ToString() ?? "Unclassified note";
+    public string NoteTypeLabel => _note.ActivityLabel;
 
     /// <summary>The note as the shared productivity rules read it.</summary>
     public ProductivityNoteFact ProductivityFact =>

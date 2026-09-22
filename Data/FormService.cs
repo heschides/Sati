@@ -142,11 +142,18 @@ public sealed class FormService(
                         assessmentDateError);
                 }
 
+                var assessmentEvidenceNoteId = await ResolveManualAttestationNoteAsync(
+                    context, actor, assessment, cycle, assessmentCompletedOn, null);
+                int? citedAssessmentEvidenceNoteId = assessmentCompletedOn.Date < cycle.CycleEnd.Date
+                    ? assessmentEvidenceNoteId : null;
+                await EnsureEvidenceIsValidAsync(context, assessment, cycle,
+                    assessmentCompletedOn, citedAssessmentEvidenceNoteId);
                 impliedAssessmentAttestation = FormAttestation.Attested(
                     assessmentCompletedOn,
                     actorKind,
                     actor.Id,
                     DateTime.UtcNow,
+                    citedAssessmentEvidenceNoteId,
                     prerequisiteStateJson: FormAttestationRules.NoPrerequisitesStateJson);
                 assessment.Attest(impliedAssessmentAttestation);
                 formFacts = formFacts
@@ -188,7 +195,14 @@ public sealed class FormService(
                 decision.UnmetPrerequisites.Select(prerequisite => prerequisite.Message)));
         }
 
-        await EnsureEvidenceIsValidAsync(context, stored, cycle, completedOn, evidenceNoteId);
+        evidenceNoteId = await ResolveManualAttestationNoteAsync(
+            context, actor, stored, cycle, completedOn, evidenceNoteId);
+        // An overdue historical form can be completed after its cycle closes.
+        // The draft keeps the exact FormId link, but the older evidence contract
+        // only cites notes inside the cycle; do not widen that evidence rule.
+        var citedEvidenceNoteId = completedOn.Date < cycle.CycleEnd.Date
+            ? evidenceNoteId : null;
+        await EnsureEvidenceIsValidAsync(context, stored, cycle, completedOn, citedEvidenceNoteId);
 
         var recordedAtUtc = DateTime.UtcNow;
         var prerequisiteStateJson = assessment is null
@@ -203,7 +217,7 @@ public sealed class FormService(
             actorKind,
             actor.Id,
             recordedAtUtc,
-            evidenceNoteId,
+            citedEvidenceNoteId,
             prerequisiteStateJson);
         stored.Attest(attestation);
         if (!string.IsNullOrWhiteSpace(correctionReason))
@@ -250,7 +264,7 @@ public sealed class FormService(
             actorKind,
             actor.Id,
             recordedAtUtc,
-            evidenceNoteId,
+            citedEvidenceNoteId,
             prerequisiteStateJson));
     }
 
@@ -649,6 +663,59 @@ public sealed class FormService(
             }
         }
     }
+    private static async Task<int> ResolveManualAttestationNoteAsync(
+        SatiContext context,
+        User actor,
+        Form form,
+        (DateTime CycleStart, DateTime CycleEnd) cycle,
+        DateTime completedOn,
+        int? explicitEvidenceNoteId)
+    {
+        var linked = await context.Notes.AsNoTracking()
+            .Where(note => note.PersonId == form.PersonId && note.FormId == form.Id)
+            .Select(note => new { note.Id, note.EventDate, note.Status })
+            .ToListAsync();
+        if (linked.Count > 1)
+            throw new InvalidOperationException(
+                "Several notes are linked to this form. Have a supervisor review the exact evidence before attesting.");
+        if (linked.Count == 1)
+        {
+            var note = linked[0];
+            if (explicitEvidenceNoteId is int citedId && citedId != note.Id)
+                throw new InvalidOperationException(
+                    "The selected evidence note differs from the note already linked to this form.");
+            var conflict = ManualAttestationNoteRules.Conflict(
+                completedOn, note.EventDate, (int?)note.Status,
+                await context.ClaimLines.AsNoTracking().AnyAsync(line => line.NoteId == note.Id));
+            if (conflict is not null)
+                throw new InvalidOperationException(conflict);
+            return note.Id;
+        }
+
+        if (explicitEvidenceNoteId is int evidenceNoteId)
+            return evidenceNoteId;
+
+        var legacyCandidateExists = await context.Notes.AsNoTracking().AnyAsync(note =>
+            note.PersonId == form.PersonId && note.FormId == null &&
+            note.FormType == form.Type && note.EventDate != null &&
+            note.EventDate.Value.Date >= cycle.CycleStart.Date &&
+            note.EventDate.Value.Date < cycle.CycleEnd.Date);
+        if (legacyCandidateExists)
+            throw new InvalidOperationException(
+                "An older unlinked note may already document this form. Select and review that note before attesting; Sati will not create a duplicate by guessing.");
+
+        var draft = Note.Create(
+            $"Draft: document completion of {Person.FormDisplayName(form.Type)}.",
+            completedOn.Date, NoteStatus.Pending, null, form.PersonId,
+            form.Type, NoteType.Form, form.Id);
+        draft.Activities = NoteActivity.Form;
+        draft.AgencyId = actor.AgencyId;
+        context.Notes.Add(draft);
+        LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteCreated, "Note");
+        await context.SaveChangesAsync();
+        return draft.Id;
+    }
+
     private static async Task EnsureEvidenceIsValidAsync(
         SatiContext context,
         Form form,

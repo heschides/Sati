@@ -32,9 +32,10 @@ public sealed class ReleaseObligation
     public IReadOnlyCollection<ReleaseAuthorizationEvent> AuthorizationEvents =>
         _authorizationEvents;
 
-    public DateTime? CompletedOn => _attestations.Count == 0
-        ? null
-        : _attestations.Min(x => x.CompletedOn).Date;
+    public DateTime? CompletedOn => _attestations
+        .Where(x => x.RevokedAtUtc is null)
+        .Select(x => (DateTime?)x.CompletedOn.Date)
+        .Min();
 
     public DateTime? WithdrawnOn => _authorizationEvents
         .Where(x => x.Kind == ReleaseAuthorizationEventKind.Withdrawn)
@@ -121,8 +122,11 @@ public sealed class ReleaseObligation
         AttestationActorKind actorKind,
         int actorUserId,
         DateTime recordedAtUtc,
-        string? reason = null)
+        string? reason = null,
+        int? evidenceNoteId = null)
     {
+        if (CompletedOn is not null)
+            throw new InvalidOperationException("This release obligation is already attested.");
         if (actorKind == AttestationActorKind.System)
             throw new ArgumentException(
                 "A manual release attestation requires a human actor.", nameof(actorKind));
@@ -131,9 +135,19 @@ public sealed class ReleaseObligation
                 $"This release obligation becomes available on {AvailableOn:yyyy-MM-dd}.");
 
         var attestation = ReleaseObligationAttestation.CreateManual(
-            StableKey, completedOn, agencyToday, actorKind, actorUserId, recordedAtUtc, reason);
+            StableKey, completedOn, agencyToday, actorKind, actorUserId, recordedAtUtc, reason,
+            evidenceNoteId);
         _attestations.Add(attestation);
         return attestation;
+    }
+
+    public void RevokeManualAttestation(int actorUserId, DateTime recordedAtUtc, string reason)
+    {
+        var active = _attestations.Where(item => item.RevokedAtUtc is null).ToArray();
+        if (active.Length != 1 || active[0].Source != ReleaseAttestationSource.Manual)
+            throw new InvalidOperationException(
+                "Only one active manual release attestation can be corrected here. Electronic signatures require their own correction workflow.");
+        active[0].Revoke(actorUserId, recordedAtUtc, reason);
     }
 
     public ReleaseObligationAttestation AttestFromElectronicSignature(
@@ -202,7 +216,8 @@ public sealed class ReleaseObligation
             DueOn,
             AppliesFromOn,
             RetiredOn,
-            _attestations.Select(x => x.ToFact(StableKey)).ToArray(),
+            _attestations.Where(x => x.RevokedAtUtc is null)
+                .Select(x => x.ToFact(StableKey)).ToArray(),
             ObligationId,
             TargetEffectiveDate,
             AvailableOn,
@@ -231,8 +246,28 @@ public sealed class ReleaseObligationAttestation
     public int? SignatureCompletionId { get; private set; }
     public DateTime RecordedAtUtc { get; private set; }
     public string? Reason { get; private set; }
+    public int? EvidenceNoteId { get; private set; }
+    public DateTime? RevokedAtUtc { get; private set; }
+    public int? RevokedByUserId { get; private set; }
+    public string? RevocationReason { get; private set; }
 
     private ReleaseObligationAttestation() { }
+
+    internal void Revoke(int actorUserId, DateTime recordedAtUtc, string reason)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(actorUserId, 0);
+        if (recordedAtUtc.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("The recorded timestamp must be UTC.", nameof(recordedAtUtc));
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Explain why the release attestation is being revoked.", nameof(reason));
+        if (reason.Trim().Length > 500)
+            throw new ArgumentException("The explanation cannot exceed 500 characters.", nameof(reason));
+        if (RevokedAtUtc is not null)
+            throw new InvalidOperationException("This release attestation was already revoked.");
+        RevokedAtUtc = recordedAtUtc;
+        RevokedByUserId = actorUserId;
+        RevocationReason = reason.Trim();
+    }
 
     internal static ReleaseObligationAttestation CreateManual(
         string obligationKey,
@@ -241,7 +276,8 @@ public sealed class ReleaseObligationAttestation
         AttestationActorKind actorKind,
         int actorUserId,
         DateTime recordedAtUtc,
-        string? reason)
+        string? reason,
+        int? evidenceNoteId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(obligationKey);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(actorUserId, 0);
@@ -258,7 +294,8 @@ public sealed class ReleaseObligationAttestation
             ActorKind = actorKind,
             ActorUserId = actorUserId,
             RecordedAtUtc = recordedAtUtc,
-            Reason = Normalize(reason)
+            Reason = Normalize(reason),
+            EvidenceNoteId = evidenceNoteId
         };
     }
 

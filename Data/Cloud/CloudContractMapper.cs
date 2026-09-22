@@ -119,8 +119,10 @@ internal static class CloudContractMapper
         note.PersonId = dto.PersonId;
         note.FormType = ParseNullable<FormType>(dto.FormType);
         note.FormId = dto.FormId;
+        note.ReleaseObligationId = dto.ReleaseObligationId;
         note.FormDateCorrectionReason = dto.FormDateCorrectionReason;
         note.NoteType = ParseNullable<NoteType>(dto.NoteType);
+        note.Activities = dto.Activities is int activities ? (NoteActivity)activities : null;
         note.GoalProgress = ParseNullable<GoalProgressLevel>(dto.GoalProgress);
         note.AgencyId = dto.AgencyId;
         note.ReturnReason = dto.ReturnReason;
@@ -306,7 +308,9 @@ internal static class CloudContractMapper
         note.Revision,
         note.GoalProgress?.ToString(),
         note.FormId,
-        note.FormDateCorrectionReason);
+        note.FormDateCorrectionReason,
+        (int?)note.Activities,
+        note.ReleaseObligationId);
 
     public static SavePersonRequest ToSavePersonRequest(Person person) =>
         PersonContractMapper.ToSaveRequest(person);
@@ -520,6 +524,8 @@ internal static class CloudContractMapper
         note.Status = ParseNullable<NoteStatus>(dto.Status);
         note.EventDate = dto.EventDate;
         note.NoteType = ParseNullable<NoteType>(dto.NoteType);
+        note.Activities = dto.Activities is int activities ? (NoteActivity)activities : null;
+        note.ReleaseObligationId = dto.ReleaseObligationId;
         note.FormType = ParseNullable<FormType>(dto.FormType);
         return note;
     }
@@ -529,6 +535,8 @@ internal static class CloudContractMapper
         Status = ParseNullable<NoteStatus>(dto.Status),
         EventDate = dto.EventDate,
         NoteType = ParseNullable<NoteType>(dto.NoteType),
+        Activities = dto.Activities is int activities ? (NoteActivity)activities : null,
+        ReleaseObligationId = dto.ReleaseObligationId,
         FormType = ParseNullable<FormType>(dto.FormType)
     };
 

@@ -17,7 +17,8 @@ namespace Sati.Contracts.V1;
 /// <para>
 /// The invariants that matter for money and for the clinical record are:
 /// no case-manager move reaches <see cref="Approved"/>, <see cref="Returned"/>,
-/// or <see cref="Abandoned"/>; nothing at all leaves <see cref="Approved"/>;
+/// or <see cref="Abandoned"/>; an approved linked note can leave approval only
+/// through the supervisor correction route before a claim line exists;
 /// and the only way into <see cref="Approved"/> is a supervisor acting on a
 /// <see cref="Logged"/> note.
 /// </para>
@@ -123,6 +124,12 @@ public static class NoteWorkflow
         return SupervisorTransitions.TryGetValue(current, out var allowed) &&
             Array.IndexOf(allowed, target) >= 0;
     }
+
+    /// <summary>An approved linked note may be returned for correction until billing claims it.</summary>
+    public static bool CanSupervisorReturnForCorrection(
+        int? currentStatus, bool hasClaimLine, bool hasExactFormOrReleaseLink) =>
+        !hasClaimLine && (currentStatus == Logged ||
+            currentStatus == Approved && hasExactFormOrReleaseLink);
 
     /// <summary>
     /// Whether the system's overdue sweep may abandon a note. Only an unfinished

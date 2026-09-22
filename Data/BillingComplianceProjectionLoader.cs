@@ -69,7 +69,7 @@ internal static class BillingComplianceProjectionLoader
             .Where(note => personIds.Contains(note.PersonId) &&
                            note.AgencyId == agencyId &&
                            note.EventDate != null)
-            .Select(note => new { note.Id, note.PersonId, note.EventDate, note.NoteType, note.Status })
+            .Select(note => new { note.Id, note.PersonId, note.EventDate, note.NoteType, note.Activities, note.Status })
             .ToListAsync(cancellationToken);
 
         return notes
@@ -80,7 +80,8 @@ internal static class BillingComplianceProjectionLoader
                     note.NoteType?.ToString(),
                     note.Status?.ToString(),
                     note.EventDate,
-                    note.Id)
+                    note.Id,
+                    (int?)note.Activities)
             })
             .Where(item => item.Fact is not null)
             .ToLookup(item => item.PersonId, item => item.Fact!);

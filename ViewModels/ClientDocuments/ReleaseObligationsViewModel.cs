@@ -46,7 +46,19 @@ public partial class ReleaseObligationsViewModel(
     private ReleaseObligationItemViewModel? selectedForWithdrawal;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRevocationEditor))]
+    private ReleaseObligationItemViewModel? selectedForRevocation;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CompleteRevocationCommand))]
+    private string revocationReason = string.Empty;
+
+    [ObservableProperty]
+    private string revocationError = string.Empty;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompleteWithdrawalCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CompleteRevocationCommand))]
     private DateTime? withdrawalDate;
 
     [ObservableProperty]
@@ -71,6 +83,7 @@ public partial class ReleaseObligationsViewModel(
     public bool HasStatusMessage => StatusMessage.Length != 0;
     public bool HasAttestationEditor => SelectedForAttestation is not null;
     public bool HasWithdrawalEditor => SelectedForWithdrawal is not null;
+    public bool HasRevocationEditor => SelectedForRevocation is not null;
 
     public void SetPerson(Person? person)
     {
@@ -264,7 +277,8 @@ public partial class ReleaseObligationsViewModel(
             source.DueOn.Date,
             source.AppliesFromOn.Date,
             source.RetiredOn?.Date,
-            source.Attestations.Select(attestation => new ReleaseAttestationFact(
+            source.Attestations.Where(attestation => attestation.RevokedAtUtc is null)
+                .Select(attestation => new ReleaseAttestationFact(
                 source.StableKey,
                 attestation.CompletedOn.Date,
                 attestation.RecordedAtUtc,
@@ -282,6 +296,7 @@ public partial class ReleaseObligationsViewModel(
         if (item is null || !item.CanAttest)
             return;
         SelectedForWithdrawal = null;
+        SelectedForRevocation = null;
         WithdrawalDate = null;
         WithdrawalReason = string.Empty;
         WithdrawalError = string.Empty;
@@ -329,6 +344,7 @@ public partial class ReleaseObligationsViewModel(
         if (item is null || !item.CanWithdraw)
             return;
         SelectedForAttestation = null;
+        SelectedForRevocation = null;
         CompletionDate = null;
         CompletionDateError = string.Empty;
         SelectedForWithdrawal = item;
@@ -380,6 +396,36 @@ public partial class ReleaseObligationsViewModel(
     }
 
     [RelayCommand]
+    private void BeginRevocation(ReleaseObligationItemViewModel? item)
+    {
+        if (item is null || !item.CanRevokeAttestation)
+            return;
+        SelectedForAttestation = null;
+        SelectedForWithdrawal = null;
+        SelectedForRevocation = item;
+        RevocationReason = string.Empty;
+        RevocationError = string.Empty;
+    }
+
+    private bool CanCompleteRevocation() =>
+        !IsBusy && SelectedForRevocation is not null &&
+        !string.IsNullOrWhiteSpace(RevocationReason);
+
+    [RelayCommand(CanExecute = nameof(CanCompleteRevocation))]
+    private async Task CompleteRevocation()
+    {
+        if (_person is not { } person || SelectedForRevocation is not { } item)
+            return;
+        if (string.IsNullOrWhiteSpace(RevocationReason))
+        {
+            RevocationError = "Explain why the attestation is being revoked.";
+            return;
+        }
+        await RunMutationAsync(() => service.RevokeAttestationAsync(
+            person.Id, item.ObligationId, RevocationReason.Trim()));
+    }
+
+    [RelayCommand]
     private void CancelEditors() => CancelEditorsCore();
 
     private void CancelEditorsCore()
@@ -388,9 +434,12 @@ public partial class ReleaseObligationsViewModel(
         CompletionDate = null;
         CompletionDateError = string.Empty;
         SelectedForWithdrawal = null;
+        SelectedForRevocation = null;
         WithdrawalDate = null;
         WithdrawalReason = string.Empty;
         WithdrawalError = string.Empty;
+        RevocationReason = string.Empty;
+        RevocationError = string.Empty;
     }
 
     private async Task RunMutationAsync(Func<Task<ReleaseObligationDto>> mutation)
@@ -465,6 +514,8 @@ public sealed class ReleaseObligationItemViewModel
         IsAuthorizationActive = source.IsAuthorizationActive;
         CanAttest = CompletedOn is null && today.Date >= AvailableOn;
         CanWithdraw = CompletedOn is not null && IsAuthorizationActive;
+        CanRevokeAttestation = source.Attestations.Count(item => item.RevokedAtUtc is null) == 1 &&
+            source.Attestations.Any(item => item.RevokedAtUtc is null && item.Source == "Manual");
     }
 
     public Guid ObligationId { get; }
@@ -480,6 +531,7 @@ public sealed class ReleaseObligationItemViewModel
     public bool IsAuthorizationActive { get; }
     public bool CanAttest { get; }
     public bool CanWithdraw { get; }
+    public bool CanRevokeAttestation { get; }
 
     public string Name => Category switch
     {
@@ -501,6 +553,8 @@ public sealed class ReleaseObligationItemViewModel
     public string AttestAutomationName => $"Attest {Name} for {TargetEffectiveDate:MMM d, yyyy}";
     public string WithdrawAutomationName =>
         $"Withdraw authorization for {Name}, effective-date cycle {TargetEffectiveDate:MMM d, yyyy}";
+    public string RevokeAutomationName =>
+        $"Revoke manual attestation for {Name}, effective-date cycle {TargetEffectiveDate:MMM d, yyyy}";
     public string StatusLabel => CompletedOn is DateTime completed
         ? WithdrawnOn is DateTime withdrawn
             ? $"Attested {completed:MMM d, yyyy}; authorization withdrawn {withdrawn:MMM d, yyyy}."

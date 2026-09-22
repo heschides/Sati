@@ -266,7 +266,13 @@ public sealed record ReleaseObligationAttestationDto(
     string? SignerCapacity,
     int? SignatureCompletionId,
     DateTime RecordedAtUtc,
-    string? Reason);
+    string? Reason,
+    int? EvidenceNoteId = null,
+    DateTime? RevokedAtUtc = null,
+    int? RevokedByUserId = null,
+    string? RevocationReason = null);
+
+public sealed record RevokeReleaseAttestationRequest(string Reason);
 
 public sealed record ReleaseObligationDto(
     long Id,

@@ -108,6 +108,8 @@ internal static partial class ApiEndpoints
                     db, actor, personId, cancellationToken);
                 if (person is null)
                     return Results.NotFound();
+                await using var releaseWrite = await db.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable, cancellationToken);
                 var row = await LoadReleaseRowAsync(
                     db, actor.AgencyId, personId, obligationId, cancellationToken);
                 if (row is null)
@@ -121,6 +123,57 @@ internal static partial class ApiEndpoints
                     return ReleaseValidation("completedOn",
                         $"This release obligation becomes available on {row.AvailableOn:yyyy-MM-dd}.");
 
+                var linkedNotes = await db.Notes.AsNoTracking()
+                    .Where(note => note.PersonId == personId && note.AgencyId == actor.AgencyId &&
+                        note.ReleaseObligationId == row.Id)
+                    .Select(note => new { note.Id, note.EventDate, note.Status })
+                    .ToListAsync(cancellationToken);
+                if (linkedNotes.Count > 1)
+                    return Results.Conflict(new ApiErrorDto("ambiguous_release_note",
+                        "Several notes are linked to this release. Have a supervisor review the exact evidence before attesting.", string.Empty));
+                int evidenceNoteId;
+                if (linkedNotes.Count == 1)
+                {
+                    var linked = linkedNotes[0];
+                    var conflict = ManualAttestationNoteRules.Conflict(
+                        request.CompletedOn, linked.EventDate, linked.Status,
+                        await db.ClaimLines.AsNoTracking().AnyAsync(
+                            line => line.NoteId == linked.Id, cancellationToken));
+                    if (conflict is not null)
+                        return Results.Conflict(new ApiErrorDto("release_note_date_conflict",
+                            conflict, string.Empty));
+                    evidenceNoteId = linked.Id;
+                }
+                else
+                {
+                    var releaseFormType = (int)Enum.Parse<FormType>(
+                        ReleaseNoteLinkRules.FormTypeName(row.Category));
+                    var legacyCandidateExists = await db.Notes.AsNoTracking().AnyAsync(note =>
+                        note.PersonId == personId && note.AgencyId == actor.AgencyId &&
+                        note.ReleaseObligationId == null && note.FormType == releaseFormType &&
+                        note.EventDate != null && note.EventDate.Value.Date == request.CompletedOn.Date,
+                        cancellationToken);
+                    if (legacyCandidateExists)
+                        return Results.Conflict(new ApiErrorDto("unlinked_release_note",
+                            "An unlinked release note may already document this work. Review it and select the exact recipient before attesting; Sati will not create a duplicate by guessing.", string.Empty));
+                    var draft = new ServerNote
+                    {
+                        PersonId = personId,
+                        AgencyId = actor.AgencyId,
+                        Narrative = $"Draft: document the {row.Category} release for {row.RecipientDisplayName ?? "DHHS"}.",
+                        EventDate = request.CompletedOn.Date,
+                        Status = NoteWorkflow.Pending,
+                        NoteType = (int)NoteType.Form,
+                        Activities = (int)NoteActivity.Form,
+                        FormType = releaseFormType,
+                        ReleaseObligationId = row.Id
+                    };
+                    db.Notes.Add(draft);
+                    await db.SaveChangesAsync(cancellationToken);
+                    audit.Record(actor, AuditActions.NoteDraftCreatedFromAttestation, "Note", draft.Id);
+                    evidenceNoteId = draft.Id;
+                }
+
                 try
                 {
                     row.AttestManually(
@@ -131,7 +184,8 @@ internal static partial class ApiEndpoints
                             : AttestationActorKind.Supervisor,
                         actor.UserId,
                         clock.UtcNow.UtcDateTime,
-                        request.Reason);
+                        request.Reason,
+                        evidenceNoteId);
                 }
                 catch (ArgumentException exception)
                 {
@@ -144,6 +198,64 @@ internal static partial class ApiEndpoints
                     "Person",
                     personId,
                     ReleaseAuditMetadata(row, request.CompletedOn, request.Reason));
+                await db.SaveChangesAsync(cancellationToken);
+                await releaseWrite.CommitAsync(cancellationToken);
+                return Results.Ok(ToReleaseDto(row, clock.Today));
+            });
+
+        api.MapPost("/people/{personId:int}/release-obligations/{obligationId:guid}/attestation/revoke",
+            async Task<IResult> (
+                int personId,
+                Guid obligationId,
+                RevokeReleaseAttestationRequest request,
+                ClaimsPrincipal principal,
+                ApiDbContext db,
+                AuditTrail audit,
+                ApiClock clock,
+                CancellationToken cancellationToken) =>
+            {
+                var actor = Actor.From(principal);
+                if (await LoadReleasePersonAsync(db, actor, personId, cancellationToken) is null)
+                    return Results.NotFound();
+                var row = await LoadReleaseRowAsync(
+                    db, actor.AgencyId, personId, obligationId, cancellationToken);
+                if (row is null)
+                    return Results.NotFound();
+                var linkedNoteId = row.Attestations.SingleOrDefault(item => item.RevokedAtUtc is null)?.EvidenceNoteId;
+                if (linkedNoteId is int noteId)
+                {
+                    var hasClaimLine = await db.ClaimLines.AsNoTracking().AnyAsync(
+                        line => line.NoteId == noteId, cancellationToken);
+                    if (hasClaimLine && !actor.HasAdminPermissions)
+                        return Results.Conflict(new ApiErrorDto("release_correction_admin_required",
+                            "A billing claim line exists for this note. Contact an Admin to correct the release attestation.", string.Empty));
+                    var status = await db.Notes.AsNoTracking()
+                        .Where(note => note.Id == noteId)
+                        .Select(note => note.Status)
+                        .SingleOrDefaultAsync(cancellationToken);
+                    if (!hasClaimLine && status is NoteWorkflow.Logged or NoteWorkflow.Approved &&
+                        !actor.HasSupervisorPermissions)
+                        return Results.Conflict(new ApiErrorDto("release_correction_supervisor_required",
+                            "This note has reached a supervisor. Ask a supervisor to correct the release attestation.", string.Empty));
+                }
+                try
+                {
+                    row.RevokeManualAttestation(actor.UserId, clock.UtcNow.UtcDateTime,
+                        request.Reason);
+                }
+                catch (ArgumentException exception)
+                {
+                    return ReleaseValidation("reason", exception.Message);
+                }
+                catch (InvalidOperationException exception)
+                {
+                    return Results.Conflict(new ApiErrorDto(
+                        "release_attestation_correction_unavailable", exception.Message,
+                        string.Empty));
+                }
+                audit.Record(actor, AuditActions.ReleaseObligationAttestationRevoked,
+                    "Person", personId,
+                    ReleaseAuditMetadata(row, clock.Today, request.Reason));
                 await db.SaveChangesAsync(cancellationToken);
                 return Results.Ok(ToReleaseDto(row, clock.Today));
             });
@@ -520,7 +632,11 @@ internal static partial class ApiEndpoints
                     item.SignerCapacity?.ToString(),
                     item.SignatureCompletionId,
                     item.RecordedAtUtc,
-                    item.Reason))
+                    item.Reason,
+                    item.EvidenceNoteId,
+                    item.RevokedAtUtc,
+                    item.RevokedByUserId,
+                    item.RevocationReason))
                 .ToArray());
 
     private static string? ValidateReleaseTarget(

@@ -54,7 +54,9 @@ public sealed record NoteSummaryDto(
     DateTime? EventDate,
     string? NoteType,
     string? FormType = null,
-    int? Id = null);
+    int? Id = null,
+    int? Activities = null,
+    long? ReleaseObligationId = null);
 
 public sealed record PersonDto(
     int Id,
@@ -323,7 +325,9 @@ public sealed record NoteDto(
     bool OverrideAttestationConfirmed = false,
     string? GoalProgress = null,
     int? FormId = null,
-    string? FormDateCorrectionReason = null);
+    string? FormDateCorrectionReason = null,
+    int? Activities = null,
+    long? ReleaseObligationId = null);
 
 public sealed record SaveNoteRequest(
     string Narrative,
@@ -339,7 +343,9 @@ public sealed record SaveNoteRequest(
     int ExpectedRevision = 0,
     string? GoalProgress = null,
     int? FormId = null,
-    string? FormDateCorrectionReason = null);
+    string? FormDateCorrectionReason = null,
+    int? Activities = null,
+    long? ReleaseObligationId = null);
 
 public sealed record PersonReferenceDto(int Id, int UserId, string? FirstName, string? LastName);
 

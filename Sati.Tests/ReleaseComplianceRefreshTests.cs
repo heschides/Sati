@@ -145,6 +145,15 @@ public sealed class ReleaseComplianceRefreshTests
 
     private sealed class StubReleaseService : IReleaseObligationService
     {
+        public Task<AdminReleaseNoteCorrectionTargetDto?> GetAdminCorrectionTargetAsync(
+            int noteId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<AdminReleaseNoteCorrectionTargetDto?>(null);
+
+        public Task CorrectNoteDateAsAdminAsync(
+            int noteId, int expectedRevision, DateTime correctedActivityDate,
+            string reason, bool attestationConfirmed,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
         public HashSet<DateTime> CompletedTargets { get; } = [];
         public bool IncludeMedical { get; set; }
         private bool _withdrawn;
@@ -191,6 +200,13 @@ public sealed class ReleaseComplianceRefreshTests
             _withdrawn = true;
             return Task.FromResult(Status(personId, CurrentTarget).Obligations[0]);
         }
+
+        public Task<ReleaseObligationDto> RevokeAttestationAsync(
+            int personId,
+            Guid obligationId,
+            string reason,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
 
         private ReleaseObligationStatusDto Status(int personId, DateTime targetEffectiveDate)
         {

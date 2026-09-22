@@ -1,5 +1,53 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.24 — 2026-09-22
+
+“Notes and attestations agree.” This release lets one note describe several activities,
+ties manual form and release checkmarks to exact note evidence, gives Admin an audited
+source-date correction path after a claim line exists, and adds the Legacy Dark theme.
+
+**Schema and API contract change.** The four September 22 migrations are already applied
+to identity-checked `SatiDemo` under separate explicit authorization. The rollback rehearsal,
+live apply, idempotency rerun, and existing API readiness check passed. The temporary
+workstation firewall rule was removed and verified absent. Local Production receives these
+migrations only when its new client is installed and launched; the Joshu workstation was
+last known to be on 1.3.14 and has not been inspected from this login.
+
+- [x] Preflight: fetched `origin/master`, confirmed local `master` equals it at `68b8aee`,
+      reviewed the in-scope dirty worktree, and found no 1.3.24 artifact collision.
+      No branch was merged or deleted: the Claude worktree is active and the other
+      branches contain separate or uncertain work.
+- [x] Coordinate version 1.3.24 in desktop/API projects, installer defaults,
+      readiness expectations, Settings release notes, and installer examples.
+- [x] Full Release solution build passed with no warnings. Tests passed: Sati 2,449
+      (4 external opt-in skips), API 891 (5 external opt-in skips), Signatures 119,
+      Portal 8, Carika 4; 3,471 passed overall and 9 documented skips.
+- [ ] Commit and push verified source normally, with no force or history rewrite.
+- [ ] Publish only the matching Demo API; verify deployment identifier, health,
+      version, and contract revision. Preserve the 1.3.23 package information.
+- [ ] Build and accept new Demo and Local installers without overwriting, then publish
+      their installers and checksums to the exact distribution folders with matching hashes.
+- [ ] Commit and push final release evidence; confirm clean local/remote equality.
+- [ ] Local Production on the Joshu login: install and launch the new Local installer
+      when the operator chooses. Until then its version and pending schema remain unverified.
+
+## Included in 1.3.24 — Multi-activity notes (2026-09-22)
+
+- [x] Replace work-type radio buttons with independent Visit, Phone, Email, Form, and Other checkboxes; keep Reminder exclusive.
+- [x] Preserve historical note types while storing new activity flags in a nullable column and API contract.
+- [x] Apply exact-form attestation and late-form billing holds to an entire mixed note; count mixed contact notes once.
+- [x] Applied `20260922154932_AddMultiActivityNotes` to identity-checked `SatiDemo`
+      through the separately authorized, rehearsed release migration process.
+
+## Included in 1.3.24 — Checkmark attestation and existing-note reconciliation (2026-09-22)
+
+- [x] Before a manual form or recipient-specific release attestation, search for an exact linked note. A matching activity date links that note as evidence and creates no extra note; a date conflict blocks the checkmark and shows the correction route.
+- [x] If no note exists, save the manual attestation and a linked, nonbillable draft note atomically. A draft is not submitted to a supervisor or billing until the user finishes it.
+- [x] Preserve append-only correction history: revoke an incorrect attestation with a reason rather than deleting it. Never guess among multiple candidate notes.
+- [x] Permit a supervisor to return a submitted or approved note for correction only while no billing claim line exists; require an audited Admin/claim-correction path once a claim line exists.
+- [x] Add exact note-to-release-obligation identity and a release-attestation correction path. The existing withdrawal action records authorization ending; it is not a correction to an erroneous completion date.
+- [x] Cover local and API paths with matching, conflict, authorization, concurrency, audit, and billing tests before release.
+
 ## Release 1.3.23 — 2026-09-22
 
 “Form dates and billing follow the work recorded.” This patch makes annual assessment renewals
@@ -7047,3 +7095,32 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
       generated output (currently AT and Check Requests).
 - [ ] Optional: embed an actual generated-PDF viewer if the added dependency and accessibility
       behavior are justified. It must display the same bytes Sati saves, never a second rendering.
+
+## Unreleased — note activities and manual attestation links (2026-09-22)
+
+- [x] Let a work note document several selected activities; keep Reminder separate. A late form
+      on a mixed note holds the entire note from billing.
+- [x] Match manual form and recipient-specific release checkmarks to exact linked notes. Reuse
+      an agreeing note; stop on date conflict or ambiguous legacy evidence; create and link a
+      Pending draft when none exists. Reclassification's implied assessment gets its own draft.
+- [x] Preserve reasoned release attestation revocation and require a supervisor after note
+      submission or Admin once a claim line exists. Show unclaimed approved linked
+      notes in the supervisor return queue.
+- [x] Give Admin an audited source-date correction for claimed form and release notes.
+      Keep the original claim service date and flag its claim line for billing review.
+- [x] Add Legacy Dark with Legacy's typography, leaf, and gradient styling using the
+      supplied Black Bean, Sienna, Brown Sugar, Dun, and Bone palette.
+- [x] Build the solution, verify migration snapshot, and run focused desktop and API tests.
+- [x] Apply migrations `20260922154932_AddMultiActivityNotes`,
+      `20260922161704_LinkReleaseNotesToExactObligations`, and
+      `20260922162222_TrackReleaseAttestationRevocation`, plus
+      `20260922191918_SupportReleaseAttestationReviewFlags` to identity-checked `SatiDemo`
+      after explicit user approval. The guarded runner found the expected 112-row starting
+      boundary, completed a rollback-only rehearsal, verified the resulting 116-row schema,
+      and confirmed rollback restored the prior state. The live apply committed all four;
+      the second run verified the 116-row schema and made no changes. The existing Demo API
+      `/health/ready` returned `Healthy` afterward. The user removed the temporary
+      `datt-workstation-temp` firewall rule, and a read-only Azure allow-list query
+      verified it absent; the existing Demo API and refresh outbound rules remain.
+      Local Production has not been
+      migrated; its pending migrations run when the new Local client is installed and launched.

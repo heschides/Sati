@@ -78,8 +78,8 @@
                                         Binding="{Binding Units}"
                                         Width="50" />
                     <DataGridTextColumn Header="Type"
-                                        Binding="{Binding NoteType}"
-                                        Width="80" />
+                                        Binding="{Binding ActivityLabel}"
+                                        Width="150" />
                 </DataGrid.Columns>
                 <DataGrid.ContextMenu>
                     <ContextMenu>

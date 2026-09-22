@@ -49,8 +49,13 @@ public static class MonthlyContactRules
         string? noteType,
         string? status,
         DateTime? eventDate,
-        int? noteId) =>
-        eventDate is DateTime occurred && IsContactType(noteType) && HasOccurred(status)
+        int? noteId,
+        int? activities = null) =>
+        eventDate is DateTime occurred &&
+        (activities is null ? IsContactType(noteType) :
+            (NoteActivityRules.Effective(activities, noteType) &
+             (NoteActivity.Visit | NoteActivity.Phone | NoteActivity.Email)) != 0) &&
+        HasOccurred(status)
             ? new ContactFact(occurred.Date, EvidenceIdFor(noteId))
             : null;
 

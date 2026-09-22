@@ -1,4 +1,5 @@
 using Sati.Data;
+using Sati.Contracts.V1;
 using Sati.Models;
 
 namespace Sati.Services;
@@ -39,7 +40,10 @@ public sealed record WorkAgendaItem(Note Note)
         }
     }
 
-    public string TypeLabel => Note.NoteType switch
+    public string TypeLabel => Note.Activities is NoteActivity activities &&
+        activities != NoteActivity.None && (((int)activities & ((int)activities - 1)) != 0)
+        ? Note.ActivityLabel
+        : Note.NoteType switch
     {
         NoteType.Form when Note.FormType is FormType formType => Person.FormDisplayName(formType),
         NoteType.Contact => "Contact (legacy)",

@@ -52,6 +52,7 @@ internal static partial class ApiEndpoints
         MapAiContext(api);
         MapNotes(api);
         MapAdminFormNoteCorrections(api);
+        MapAdminReleaseNoteCorrections(api);
         MapSettings(api);
         MapScratchpads(api);
         MapExemptDates(api);
@@ -1553,7 +1554,10 @@ internal static partial class ApiEndpoints
             var query = (from note in db.Notes.AsNoTracking()
                               join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                               join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
-                              where note.Status == NoteWorkflow.Logged &&
+                              where (note.Status == NoteWorkflow.Logged ||
+                                     (note.Status == NoteWorkflow.Approved &&
+                                      (note.FormId != null || note.ReleaseObligationId != null) &&
+                                      !db.ClaimLines.Any(line => line.NoteId == note.Id))) &&
                                     note.AgencyId == actor.AgencyId &&
                                     person.AgencyId == actor.AgencyId &&
                                     caseManagerIds.Contains(person.UserId) &&
@@ -1881,8 +1885,13 @@ internal static partial class ApiEndpoints
                 return actor.HasSupervisorPermissions ? Results.NotFound() : Results.Forbid();
             if (request.ExpectedRevision != row.Note.Revision)
                 return StaleNoteConflict();
-            if (!NoteWorkflow.CanSupervisorTransition(row.Note.Status, NoteWorkflow.Returned))
-                return Results.Conflict(new ApiErrorDto("invalid_note_status", "Only logged notes can be returned.", string.Empty));
+            var hasClaimLine = await db.ClaimLines.AsNoTracking().AnyAsync(
+                line => line.NoteId == noteId, cancellationToken);
+            if (!NoteWorkflow.CanSupervisorReturnForCorrection(row.Note.Status, hasClaimLine,
+                    row.Note.FormId is not null || row.Note.ReleaseObligationId is not null))
+                return Results.Conflict(new ApiErrorDto("invalid_note_status",
+                    "Only logged or unclaimed approved notes can be returned. A claimed note needs Admin correction.",
+                    string.Empty));
 
             row.Note.Status = 7;
             row.Note.ReturnedById = actor.UserId;
@@ -4742,7 +4751,7 @@ internal static partial class ApiEndpoints
             if (!await TenantAccess.OwnsPersonAsync(db, actor, request.PersonId, cancellationToken))
                 return Results.NotFound();
 
-            var formLinkProblem = await FindFormLinkProblemAsync(db, request, cancellationToken);
+            var formLinkProblem = await FindFormLinkProblemAsync(db, actor, request, cancellationToken);
             if (formLinkProblem is not null)
                 return formLinkProblem;
 
@@ -4773,8 +4782,10 @@ internal static partial class ApiEndpoints
                 PersonId = request.PersonId,
                 FormType = formType,
                 FormId = request.FormId,
+                ReleaseObligationId = request.ReleaseObligationId,
                 FormDateCorrectionReason = request.FormDateCorrectionReason,
                 NoteType = noteType,
+                Activities = request.Activities,
                 GoalProgress = goalProgress,
                 AgencyId = actor.AgencyId,
                 CaseManagerJustification = request.CaseManagerJustification,
@@ -4850,7 +4861,7 @@ internal static partial class ApiEndpoints
                     return Results.NotFound();
             }
 
-            var formLinkProblem = await FindFormLinkProblemAsync(db, request, cancellationToken);
+            var formLinkProblem = await FindFormLinkProblemAsync(db, actor, request, cancellationToken);
             if (formLinkProblem is not null)
                 return formLinkProblem;
 
@@ -4879,8 +4890,10 @@ internal static partial class ApiEndpoints
             row.Note.PersonId = request.PersonId;
             row.Note.FormType = formType;
             row.Note.FormId = request.FormId;
+            row.Note.ReleaseObligationId = request.ReleaseObligationId;
             row.Note.FormDateCorrectionReason = request.FormDateCorrectionReason;
             row.Note.NoteType = noteType;
+            row.Note.Activities = request.Activities;
             row.Note.GoalProgress = goalProgress;
             row.Note.CaseManagerJustification = request.CaseManagerJustification;
             row.Note.VisitDocumentationJson = request.VisitDocumentationJson;
@@ -7525,6 +7538,59 @@ internal static partial class ApiEndpoints
                         }, statusCode: StatusCodes.Status422UnprocessableEntity);
                     }
 
+                    var assessmentLinkedNotes = await db.Notes.AsNoTracking()
+                        .Where(note => note.PersonId == personId && note.FormId == assessment.Id &&
+                            note.AgencyId == actor.AgencyId)
+                        .Select(note => new { note.Id, note.EventDate, note.Status })
+                        .ToListAsync(cancellationToken);
+                    if (assessmentLinkedNotes.Count > 1)
+                        return Results.Conflict(new ApiErrorDto("ambiguous_assessment_note",
+                            "Several notes are linked to this assessment. Have a supervisor review the exact evidence before attesting.", string.Empty));
+                    int assessmentEvidenceNoteId;
+                    if (assessmentLinkedNotes.Count == 1)
+                    {
+                        var linkedAssessment = assessmentLinkedNotes[0];
+                        var hasClaimLine = await db.ClaimLines.AsNoTracking().AnyAsync(
+                            line => line.NoteId == linkedAssessment.Id, cancellationToken);
+                        var conflict = ManualAttestationNoteRules.Conflict(
+                            assessmentCompletedOn, linkedAssessment.EventDate,
+                            linkedAssessment.Status, hasClaimLine);
+                        if (conflict is not null)
+                            return Results.Conflict(new ApiErrorDto(
+                                "assessment_note_date_conflict", conflict, string.Empty));
+                        assessmentEvidenceNoteId = linkedAssessment.Id;
+                    }
+                    else
+                    {
+                        var existingUnlinkedAssessment = await db.Notes.AsNoTracking().AnyAsync(note =>
+                            note.PersonId == personId && note.AgencyId == actor.AgencyId &&
+                            note.FormId == null && note.FormType == (int)FormType.ComprehensiveAssessment &&
+                            note.EventDate != null &&
+                            note.EventDate.Value.Date >= cycle.Value.CycleStart.Date &&
+                            note.EventDate.Value.Date < cycle.Value.CycleEnd.Date,
+                            cancellationToken);
+                        if (existingUnlinkedAssessment)
+                            return Results.Conflict(new ApiErrorDto("unlinked_assessment_note",
+                                "An unlinked assessment note may already document this work. Review it before attesting; Sati will not create a duplicate by guessing.", string.Empty));
+                        var assessmentDraft = new ServerNote
+                        {
+                            PersonId = personId,
+                            AgencyId = actor.AgencyId,
+                            Narrative = "Draft: document completion of Comprehensive Assessment.",
+                            EventDate = assessmentCompletedOn.Date,
+                            Status = NoteWorkflow.Pending,
+                            NoteType = (int)NoteType.Form,
+                            Activities = (int)NoteActivity.Form,
+                            FormType = (int)FormType.ComprehensiveAssessment,
+                            FormId = assessment.Id
+                        };
+                        db.Notes.Add(assessmentDraft);
+                        await db.SaveChangesAsync(cancellationToken);
+                        auditTrail.Record(actor, AuditActions.NoteDraftCreatedFromAttestation,
+                            "Note", assessmentDraft.Id);
+                        assessmentEvidenceNoteId = assessmentDraft.Id;
+                    }
+
                     assessment.ApplyAttestation(assessmentCompletedOn);
                     impliedAssessmentAttestation = new ServerFormAttestation
                     {
@@ -7534,6 +7600,8 @@ internal static partial class ApiEndpoints
                         ActorKind = actorKind.ToString(),
                         ActorUserId = actor.UserId,
                         RecordedAtUtc = clock.UtcNow.UtcDateTime,
+                        EvidenceNoteId = assessmentCompletedOn.Date < cycle.Value.CycleEnd.Date
+                            ? assessmentEvidenceNoteId : null,
                         PrerequisiteStateJson = FormAttestationRules.NoPrerequisitesStateJson
                     };
                     db.FormAttestations.Add(impliedAssessmentAttestation);
@@ -7590,7 +7658,66 @@ internal static partial class ApiEndpoints
                 }, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
 
-            if (request.EvidenceNoteId is int evidenceNoteId)
+            var linkedNotes = await db.Notes.AsNoTracking()
+                .Where(note => note.PersonId == personId && note.FormId == form.Id &&
+                    note.AgencyId == actor.AgencyId)
+                .Select(note => new { note.Id, note.EventDate, note.Status })
+                .ToListAsync(cancellationToken);
+            if (linkedNotes.Count > 1)
+                return Results.Conflict(new ApiErrorDto("ambiguous_form_note",
+                    "Several notes are linked to this form. Have a supervisor review the exact evidence before attesting.", string.Empty));
+            int? resolvedEvidenceNoteId = request.EvidenceNoteId;
+            if (linkedNotes.Count == 1)
+            {
+                var linked = linkedNotes[0];
+                if (resolvedEvidenceNoteId is int citedId && citedId != linked.Id)
+                    return Results.Conflict(new ApiErrorDto("form_note_mismatch",
+                        "The selected evidence note differs from the note already linked to this form.", string.Empty));
+                var hasClaimLine = await db.ClaimLines.AsNoTracking().AnyAsync(
+                    line => line.NoteId == linked.Id, cancellationToken);
+                var conflict = ManualAttestationNoteRules.Conflict(
+                    request.CompletedOn, linked.EventDate, linked.Status, hasClaimLine);
+                if (conflict is not null)
+                    return Results.Conflict(new ApiErrorDto("form_note_date_conflict", conflict, string.Empty));
+                resolvedEvidenceNoteId = linked.Id;
+            }
+            else if (resolvedEvidenceNoteId is null)
+            {
+                var legacyCandidateExists = await db.Notes.AsNoTracking().AnyAsync(note =>
+                    note.PersonId == personId && note.AgencyId == actor.AgencyId &&
+                    note.FormId == null &&
+                    note.FormType == (int)Enum.Parse<FormType>(form.Type) &&
+                    note.EventDate != null &&
+                    note.EventDate.Value.Date >= cycle.Value.CycleStart.Date &&
+                    note.EventDate.Value.Date < cycle.Value.CycleEnd.Date,
+                    cancellationToken);
+                if (legacyCandidateExists)
+                    return Results.Conflict(new ApiErrorDto("unlinked_form_note",
+                        "An older unlinked note may already document this form. Select and review that note before attesting; Sati will not create a duplicate by guessing.", string.Empty));
+                var draft = new ServerNote
+                {
+                    PersonId = personId,
+                    AgencyId = actor.AgencyId,
+                    Narrative = $"Draft: document completion of {form.Type}.",
+                    EventDate = request.CompletedOn.Date,
+                    Status = NoteWorkflow.Pending,
+                    NoteType = (int)NoteType.Form,
+                    Activities = (int)NoteActivity.Form,
+                    FormType = (int)Enum.Parse<FormType>(form.Type),
+                FormId = form.Id
+                };
+                db.Notes.Add(draft);
+                await db.SaveChangesAsync(cancellationToken);
+                auditTrail.Record(actor, AuditActions.NoteDraftCreatedFromAttestation, "Note", draft.Id);
+                resolvedEvidenceNoteId = draft.Id;
+            }
+
+            // An overdue historical form may be completed after its annual cycle.
+            // Keep the exact FormId on the note, while retaining the existing
+            // cycle limit for evidence IDs in the attestation ledger.
+            var citedEvidenceNoteId = request.CompletedOn.Date < cycle.Value.CycleEnd.Date
+                ? resolvedEvidenceNoteId : null;
+            if (citedEvidenceNoteId is int evidenceNoteId)
             {
                 var evidenceIsValid = await db.Notes.AsNoTracking().AnyAsync(note =>
                     note.Id == evidenceNoteId &&
@@ -7640,7 +7767,7 @@ internal static partial class ApiEndpoints
                 ActorKind = actorKind.ToString(),
                 ActorUserId = actor.UserId,
                 RecordedAtUtc = recordedAtUtc,
-                EvidenceNoteId = request.EvidenceNoteId,
+                EvidenceNoteId = citedEvidenceNoteId,
                 PrerequisiteStateJson = prerequisiteStateJson
             });
             if (impliedAssessmentAttestation is not null)
@@ -8542,8 +8669,28 @@ internal static partial class ApiEndpoints
     }
 
     private static async Task<IResult?> FindFormLinkProblemAsync(
-        ApiDbContext db, SaveNoteRequest request, CancellationToken cancellationToken)
+        ApiDbContext db, Actor actor, SaveNoteRequest request, CancellationToken cancellationToken)
     {
+        if (request.ReleaseObligationId is long releaseId)
+        {
+            var release = await db.ReleaseObligations.AsNoTracking()
+                .Include(row => row.Attestations)
+                .SingleOrDefaultAsync(row => row.Id == releaseId &&
+                    row.PersonId == request.PersonId && row.AgencyId == actor.AgencyId,
+                    cancellationToken);
+            if (release is null || request.FormId is not null ||
+                request.FormType != ReleaseNoteLinkRules.FormTypeName(release.Category))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["releaseObligationId"] =
+                        ["The selected release obligation does not match this client and release type."]
+                });
+            if (release.CompletedOn is DateTime attestedOn &&
+                request.EventDate?.Date != attestedOn.Date)
+                return Results.Conflict(new ApiErrorDto("release_note_date_conflict",
+                    "This release is attested for a different date. Revoke that attestation with a reason before correcting the linked note.",
+                    string.Empty));
+        }
         if (request.FormId is not int formId)
             return null;
 
@@ -8592,6 +8739,7 @@ internal static partial class ApiEndpoints
                 PersonId = person.Id,
                 EventDate = request.EventDate,
                 NoteType = noteType,
+                Activities = request.Activities,
                 Status = status
             },
             person, forms, releaseRows, policy, providerLinks);
@@ -8709,7 +8857,7 @@ internal static partial class ApiEndpoints
         ServerNote note,
         IReadOnlyList<ServerForm> forms)
     {
-        if (note.NoteType != (int)NoteType.Form)
+        if (!NoteActivityRules.Has(note.Activities, ContractMapper.NoteTypeName(note.NoteType), NoteActivity.Form))
             return [];
 
         var formType = note.FormType is int type
@@ -9856,9 +10004,12 @@ internal static partial class ApiEndpoints
             errors["formType"] = ["The form type is invalid."];
         if (!ContractMapper.TryParseNoteType(request.NoteType, out _))
             errors["noteType"] = ["The note type is invalid."];
+        var activityError = NoteActivityRules.Validate(request.Activities, request.NoteType);
+        if (activityError is not null)
+            errors["activities"] = [activityError];
         var formLinkError = FormNoteLinkRules.Validate(
             request.NoteType, request.FormType, request.Status, request.FormId,
-            request.FormDateCorrectionReason);
+            request.FormDateCorrectionReason, request.Activities);
         if (formLinkError is not null)
             errors["formId"] = [formLinkError];
         if (!ContractMapper.TryParseGoalProgress(request.GoalProgress, out _))

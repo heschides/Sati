@@ -4923,7 +4923,67 @@ completion corrections through reasoned revocation and reattestation.
 
 The Admin source-correction workflow changes a submitted Form note's activity date and
 its linked form completion together, with a reason, evidence confirmation, immutable
-audit history, and a revision check. It refuses notes that already have a claim record;
-those require billing claim correction. Existing effective-date editing does not recalculate
+audit history, and a revision check. If a claim line exists, the original claim service
+date is retained and a billing review flag is added; transmitted claims use the claim
+correction workflow. Existing effective-date editing does not recalculate
 stored form due dates, so changing a due/effective schedule needs a separate audited
 obligation reconciliation before any note can become billable from that change.
+
+## 2026-09-22 — One note may document several activities
+
+The note editor offers independent Visit, Phone, Email, Form, and Other checkboxes.
+Reminder remains exclusive and never billable. A new nullable `Notes.Activities` flags
+value records the chosen combination; null on an older note means its historical
+single `NoteType` is still authoritative. The existing `NoteType` ordinal remains as a
+primary display and compatibility value and must never be reinterpreted as flags.
+
+One note remains one service record and one billing unit. Selecting Form still requires
+one exact form obligation and uses the note's service date as its completion attestation
+when logged. If that form work is late, the whole mixed note is nonbillable, including
+any call or visit it also documents. A mixed note with Visit, Phone, or Email counts as
+one contact for the monthly-contact clock. Migration
+`20260922154932_AddMultiActivityNotes` adds only the nullable column; it has not been
+applied to Demo or Production.
+
+## 2026-09-22 — Manual checkmarks must reconcile note evidence
+
+A manual checkmark for a form or recipient-specific release must consult its exact
+linked note before writing completion evidence. If the note's activity date agrees,
+the attestation cites that note and creates no duplicate. If the dates differ, the
+operation stops and explains the correction route. With no note, the checkmark saves
+the attestation and a linked Pending note in one transaction; the draft cannot enter
+billing until completed and submitted. Multiple plausible notes require explicit
+review rather than an automatic guess.
+
+An incorrect completion is revoked with a reason, retaining its history; it is not
+physically deleted. A supervisor can return a note for correction while no claim
+line exists. Once a claim line exists, the case is routed to Admin for billing
+reconciliation. Release authorization withdrawal remains distinct from correcting a mistaken
+release attestation. The checkmark now searches exact form or recipient-specific
+release links, reuses a same-date note, and creates a linked Pending draft when no
+candidate exists. A different date stops the checkmark and explains the correction
+route. Reclassification also creates a separate linked assessment draft when its
+assessment is implied. A supervisor can return an approved linked note before a
+claim line exists; the review queue labels these records for correction and never
+offers them for approval again. Once a claim line exists, the supervisor return
+route refuses it. Release attestation revocation retains the original attestation,
+records actor, time, and reason, and allows reattestation against the same linked
+note after correction. The Admin source-date editor also accepts an exact linked
+release note, including one with a claim line, and corrects the note date and manual
+release attestation together. It retains the original claim service date and creates
+a billing review flag tied to the claim line. Electronic-signature evidence remains
+outside this manual correction path.
+
+The four additive migrations for this work, including the multi-activity note change,
+were applied to identity-checked Demo after a successful rollback rehearsal and explicit
+user approval. The rerun was a no-op, and the existing Demo API remained ready. Local
+Production has not received them; the code remains unreleased until the normal release
+procedure is completed. The user removed the temporary Demo SQL firewall rule after
+the migration, and a read-only allow-list check verified it absent.
+
+## 2026-09-22 — Legacy Dark theme
+
+Legacy Dark keeps Legacy's leaf artwork, Palatino typography, and gradient layout.
+Its surfaces use shaded Black Bean and Sienna; Bone and Dun provide readable text,
+while Brown Sugar accents the borders. Semantic status colors retain their meanings.
+The palette is selectable in Settings and stored with the existing per-user theme choice.

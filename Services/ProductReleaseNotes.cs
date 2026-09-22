@@ -6,11 +6,34 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Form dates and billing follow the work recorded";
+    public const string ReleaseName = "Notes and attestations agree";
     public const string ReleaseDate = "September 22, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "One note can describe several activities",
+            [
+                "Choose Visit, Phone, Email, Form, or Other together when they belong in one note. Reminder remains a separate, nonbillable item.",
+                "A note that includes late form work cannot be billed, even when it also describes a call or visit."
+            ]),
+        new(
+            "Checkmarks and notes use the same evidence",
+            [
+                "Checking a form or release creates a linked draft note when none exists. If the same work is already in a note with the same date, Sati uses that note instead.",
+                "If the dates disagree, Sati stops and explains how to correct the existing note and attestation. A supervisor handles a submitted note before a claim line exists; Admin handles it afterward."
+            ]),
+        new(
+            "Admin corrections keep billing history visible",
+            [
+                "An Admin can correct the source date of a claimed form or release note with an explanation and confirmed evidence. The old claim service date remains in the record and billing receives a review flag.",
+                "A genuinely late form note remains nonbillable unless its wrong source fact is corrected and the normal billing rule passes."
+            ]),
+        new(
+            "Legacy Dark joins the theme choices",
+            [
+                "Legacy Dark keeps Legacy's leaf, Palatino type, and gradient styling with the Black Bean, Sienna, Brown Sugar, Dun, and Bone palette. Choose it in Settings."
+            ]),
         new(
             "Annual form dates identify the right plan year",
             [

@@ -850,7 +850,7 @@ namespace Sati.Data
             var notesByPerson = (await context.Notes
                     .AsNoTracking()
                     .Where(n => personIds.Contains(n.PersonId) && n.AgencyId == actor.AgencyId)
-                    .Select(n => new { n.PersonId, n.Status, n.EventDate, n.NoteType, n.FormType })
+                    .Select(n => new { n.PersonId, n.Status, n.EventDate, n.NoteType, n.Activities, n.FormType, n.ReleaseObligationId })
                     .ToListAsync())
                 .GroupBy(n => n.PersonId)
                 .ToDictionary(
@@ -860,6 +860,8 @@ namespace Sati.Data
                         Status = n.Status,
                         EventDate = n.EventDate,
                         NoteType = n.NoteType,
+                        Activities = n.Activities,
+                        ReleaseObligationId = n.ReleaseObligationId,
                         FormType = n.FormType
                     }).ToList());
 

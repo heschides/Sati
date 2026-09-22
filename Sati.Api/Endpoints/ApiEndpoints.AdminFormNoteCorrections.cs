@@ -37,7 +37,7 @@ internal static partial class ApiEndpoints
             if (row is null ||
                 (row.Note.Status != (int)NoteStatus.Logged &&
                  row.Note.Status != (int)NoteStatus.Approved) ||
-                row.Note.NoteType != (int)NoteType.Form ||
+                !NoteActivityRules.Has(row.Note.Activities, ContractMapper.NoteTypeName(row.Note.NoteType), NoteActivity.Form) ||
                 row.Note.FormId is not int formId ||
                 row.Note.FormType is not int formType ||
                 row.Note.EventDate is not DateTime activityDate)
@@ -135,7 +135,7 @@ internal static partial class ApiEndpoints
                 return StaleNoteConflict();
             if ((row.Note.Status != (int)NoteStatus.Logged &&
                  row.Note.Status != (int)NoteStatus.Approved) ||
-                row.Note.NoteType != (int)NoteType.Form ||
+                !NoteActivityRules.Has(row.Note.Activities, ContractMapper.NoteTypeName(row.Note.NoteType), NoteActivity.Form) ||
                 row.Note.FormId is not int formId ||
                 row.Note.EventDate is not DateTime priorActivityDate ||
                 row.Note.FormType is not int)
@@ -170,11 +170,6 @@ internal static partial class ApiEndpoints
             if (correctedDate == priorActivityDate.Date)
                 return Results.Conflict(new ApiErrorDto("date_unchanged",
                     "Choose a corrected activity date that differs from the current date.", string.Empty));
-            if (await db.ClaimLines.AsNoTracking().AnyAsync(line => line.NoteId == noteId,
-                    cancellationToken))
-                return Results.Conflict(new ApiErrorDto("claim_correction_required",
-                    "This note already has a claim record. Review that claim through the billing correction workflow before changing its source date.", string.Empty));
-
             row.Note.EventDate = correctedDate;
             row.Note.FormDateCorrectionReason = reason;
             var timeConflict = await FindReviewServiceTimeProblemAsync(

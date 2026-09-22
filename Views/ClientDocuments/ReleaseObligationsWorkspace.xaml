@@ -82,6 +82,13 @@
                                         Margin="0,6,0,0"
                                         Padding="10,4"
                                         AutomationProperties.Name="{Binding WithdrawAutomationName}" />
+                                <Button Content="Correct attestation"
+                                        Command="{Binding DataContext.BeginRevocationCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        Visibility="{Binding CanRevokeAttestation, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        Margin="0,6,0,0"
+                                        Padding="10,4"
+                                        AutomationProperties.Name="{Binding RevokeAutomationName}" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -123,6 +130,46 @@
                             Command="{Binding CompleteAttestationCommand}"
                             Padding="10,5"
                             AutomationProperties.Name="Complete release attestation" />
+                    <Button Content="Cancel"
+                            Command="{Binding CancelEditorsCommand}"
+                            Padding="10,5"
+                            Margin="8,0,0,0" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Visibility="{Binding HasRevocationEditor, Converter={StaticResource BoolToVisibilityConverter}}"
+                Background="{DynamicResource SurfaceRaisedBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="10"
+                Margin="0,4,0,8">
+            <StackPanel>
+                <TextBlock Text="{Binding SelectedForRevocation.Name}"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                <TextBlock Text="Correcting an attestation retains the original date and reason in history. This does not withdraw the release authorization."
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="0,3,0,8" />
+                <TextBlock Text="WHY IS THIS ATTESTATION BEING REVOKED?" Style="{StaticResource LabelStyle}" />
+                <TextBox Text="{Binding RevocationReason, UpdateSourceTrigger=PropertyChanged}"
+                         MaxLength="500"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         MinHeight="52"
+                         AutomationProperties.Name="Release attestation revocation reason" />
+                <TextBlock Text="{Binding RevocationError}"
+                           Foreground="{DynamicResource DangerStrongBrush}"
+                           TextWrapping="Wrap"
+                           FontSize="11"
+                           Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button Content="Revoke attestation"
+                            Command="{Binding CompleteRevocationCommand}"
+                            Padding="10,5"
+                            AutomationProperties.Name="Revoke release attestation" />
                     <Button Content="Cancel"
                             Command="{Binding CancelEditorsCommand}"
                             Padding="10,5"
