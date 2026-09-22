@@ -10,8 +10,10 @@ source-date correction path after a claim line exists, and adds the Legacy Dark 
 to identity-checked `SatiDemo` under separate explicit authorization. The rollback rehearsal,
 live apply, idempotency rerun, and existing API readiness check passed. The temporary
 workstation firewall rule was removed and verified absent. Local Production receives these
-migrations only when its new client is installed and launched; the Joshu workstation was
-last known to be on 1.3.14 and has not been inspected from this login.
+migrations only when its new client is installed and launched. On this login the
+SatiLogica workstation's installed Local client is 1.3.2.0; the Joshu workstation was
+last known to be on 1.3.14.0 and has not been inspected from this login. Neither
+Local Production database is claimed to have received this release.
 
 - [x] Preflight: fetched `origin/master`, confirmed local `master` equals it at `68b8aee`,
       reviewed the in-scope dirty worktree, and found no 1.3.24 artifact collision.
@@ -22,14 +24,44 @@ last known to be on 1.3.14 and has not been inspected from this login.
 - [x] Full Release solution build passed with no warnings. Tests passed: Sati 2,449
       (4 external opt-in skips), API 891 (5 external opt-in skips), Signatures 119,
       Portal 8, Carika 4; 3,471 passed overall and 9 documented skips.
-- [ ] Commit and push verified source normally, with no force or history rewrite.
-- [ ] Publish only the matching Demo API; verify deployment identifier, health,
-      version, and contract revision. Preserve the 1.3.23 package information.
-- [ ] Build and accept new Demo and Local installers without overwriting, then publish
-      their installers and checksums to the exact distribution folders with matching hashes.
-- [ ] Commit and push final release evidence; confirm clean local/remote equality.
-- [ ] Local Production on the Joshu login: install and launch the new Local installer
-      when the operator chooses. Until then its version and pending schema remain unverified.
+- [x] Source commit `cf052df` pushed to `origin/master` normally. No branch was merged
+      or deleted. Retained `claude/cool-jang-f6b3c4` (active worktree),
+      `second-machine-setup`, `team-chat-design`, `video-conferencing-design`,
+      `origin/claude/local-vs-github-workflow-dlcqpb`, `origin/codex/annual-compliance`,
+      and `origin/codex/clarify-project-notes` (separate or uncertain work).
+- [x] Published only the matching Demo API. `artifacts/SatiApi-1.3.24-fx-x86.zip`
+      is 10,425,655 bytes, SHA-256
+      `715C5905A6B3D752E6166E7A91183CB5BC39E2F5C15BEFC9364ABE7646B6D14E`,
+      with 68 intended files, no private settings, and file version 1.3.24.0.
+      OneDeploy to existing `sati-demo-api-satilogica` in `rg-sati-demo` succeeded
+      (deployment `4d0edf3743e1446180b066da745cbe5c`). Live and ready returned
+      HTTP 200; `/health/version` reports Sati.Api 1.3.24 and contract revision
+      `A28B7894E416`, equal to this source's desktop `ApiSurface.Revision`.
+      Health-only readiness passed and wrote `artifacts/release-1.3.24-demo-readiness.json`;
+      authenticated checks were skipped because synthetic Admin credentials were not
+      configured. The 1.3.23 API package and deployment information remain retained.
+- [x] Built, accepted, and distributed new installers without overwriting. The embedded
+      `SqlLocalDB.msi` source has a Valid Microsoft signature and SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.24.exe` is 103,067,648 bytes, SHA-256
+      `34F5ACC0D6FFE7C98ADB566E442FF62EB6FAAD429F9F70202852CC76CF7F4700`;
+      five responsive 15-second launches, graceful closes, exact installed version
+      1.3.24.0, and cleanup passed. Acceptance evidence is in
+      `artifacts/release-1.3.24-demo-installer-acceptance.json`.
+      `SatiLocalSetup-1.3.24.exe` is 205,402,153 bytes, SHA-256
+      `20AEE2C3226BCC0AF6B64874A358288B52149BFDAA04103E546A387167019B24`;
+      version 1.3.24.0, `SatiProduction`, integrated security, signed embedded
+      LocalDB, and cleanup passed. These are build-workstation acceptance runs.
+      The installers and their `.sha256` files were published by verified temporary
+      copy and rename to `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`
+      and `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop`,
+      respectively. Win32 resolved-path checks confirmed both cloud-placeholder
+      directories remain within the named documents root; final hashes match.
+- [x] This final evidence commit was pushed normally; the commit identifier and
+      clean local/remote equality are confirmed in the DATT handoff.
+- [ ] Local Production: the SatiLogica login has installed client 1.3.2.0; the Joshu
+      login was last observed on 1.3.14.0. Install and launch 1.3.24 on each machine
+      when its operator chooses, then verify its local migration and readiness state.
 
 ## Included in 1.3.24 — Multi-activity notes (2026-09-22)
 
