@@ -1,4 +1,4 @@
-﻿using Sati.Models;
+using Sati.Models;
 
 namespace Sati.ViewModels
 {
@@ -34,7 +34,7 @@ namespace Sati.ViewModels
         public ReleaseCellViewModel ReleaseDhhs { get; }
         public ReleaseCellViewModel ReleaseMedical { get; }
 
-        public MatrixRowViewModel(Person person, DateTime today)
+        public MatrixRowViewModel(Person person, DateTime today, Contracts.V1.ComplianceScheduleSettings? schedule = null)
         {
             Person = person;
 
@@ -43,11 +43,11 @@ namespace Sati.ViewModels
             Q3R = new FormCellViewModel(person, FormType.Q3R, today);
             Q4R = new FormCellViewModel(person, FormType.Q4R, today);
 
-            Pcp = new FormCellViewModel(person, FormType.PCP, today);
-            CompAssessment = new FormCellViewModel(person, FormType.ComprehensiveAssessment, today);
-            Reclassification = new FormCellViewModel(person, FormType.Reclassification, today);
-            SafetyPlan = new FormCellViewModel(person, FormType.SafetyPlan, today);
-            PrivacyPractices = new FormCellViewModel(person, FormType.PrivacyPractices, today);
+            Pcp = new FormCellViewModel(person, FormType.PCP, today, schedule);
+            CompAssessment = new FormCellViewModel(person, FormType.ComprehensiveAssessment, today, schedule);
+            Reclassification = new FormCellViewModel(person, FormType.Reclassification, today, schedule);
+            SafetyPlan = new FormCellViewModel(person, FormType.SafetyPlan, today, schedule);
+            PrivacyPractices = new FormCellViewModel(person, FormType.PrivacyPractices, today, schedule);
             ReleaseAgency = new ReleaseCellViewModel(
                 person, Contracts.V1.ReleaseObligationCategory.Agency, today);
             ReleaseDhhs = new ReleaseCellViewModel(

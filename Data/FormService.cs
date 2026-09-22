@@ -77,7 +77,7 @@ public sealed class FormService(
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
-        await using var transaction = await context.Database.BeginTransactionAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         if (stored.CompletedDate is not null)
             throw new InvalidOperationException(
@@ -188,12 +188,16 @@ public sealed class FormService(
                 decision.UnmetPrerequisites.Select(prerequisite => prerequisite.Message)));
         }
 
-        await EnsureEvidenceIsValidAsync(context, stored, cycle, evidenceNoteId);
+        await EnsureEvidenceIsValidAsync(context, stored, cycle, completedOn, evidenceNoteId);
 
         var recordedAtUtc = DateTime.UtcNow;
         var prerequisiteStateJson = assessment is null
             ? FormAttestationRules.NoPrerequisitesStateJson
             : FormAttestationRules.AssessmentPrerequisiteStateJson(assessment.Id);
+        var precedingEntry = stored.Attestations.OrderByDescending(entry => entry.Id).FirstOrDefault();
+        var correctionReason = precedingEntry?.Kind == FormAttestationKind.Revoked
+            ? precedingEntry.Reason
+            : null;
         var attestation = FormAttestation.Attested(
             completedOn,
             actorKind,
@@ -202,6 +206,12 @@ public sealed class FormService(
             evidenceNoteId,
             prerequisiteStateJson);
         stored.Attest(attestation);
+        if (!string.IsNullOrWhiteSpace(correctionReason))
+        {
+            await RecordLinkedNoteImpactFlagsAsync(
+                context, stored, previousCompletedOn: null, revisedCompletedOn: completedOn,
+                correctionReason, recordedAtUtc);
+        }
 
         if (impliedAssessmentAttestation is not null)
         {
@@ -351,6 +361,7 @@ public sealed class FormService(
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
         await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var stored = await LoadOwnedFormAsync(context, actor, form.Id);
         if (stored.CompletedDate is null)
             return;
@@ -358,9 +369,13 @@ public sealed class FormService(
         var actorKind = actor.Id == stored.Person.UserId
             ? AttestationActorKind.CaseManager
             : AttestationActorKind.Supervisor;
+        var previousCompletedOn = stored.CompletedDate;
         var revocation = FormAttestation.Revoked(
             actorKind, actor.Id, DateTime.UtcNow, reason);
         stored.RevokeAttestation(revocation);
+        await RecordLinkedNoteImpactFlagsAsync(
+            context, stored, previousCompletedOn, revisedCompletedOn: null,
+            reason, revocation.RecordedAtUtc);
         LocalAuditTrail.Record(
             context,
             actor,
@@ -375,6 +390,7 @@ public sealed class FormService(
         try
         {
             await context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
         catch (DbUpdateConcurrencyException exception)
         {
@@ -571,20 +587,86 @@ public sealed class FormService(
             candidate.DueDate.Date <= cycle.CycleEnd.Date);
     }
 
+    internal static async Task RecordLinkedNoteImpactFlagsAsync(
+        SatiContext context,
+        Form form,
+        DateTime? previousCompletedOn,
+        DateTime? revisedCompletedOn,
+        string reason,
+        DateTime recordedAtUtc,
+        Note? changedNote = null)
+    {
+        // Release authorization has its own rules. A release completed after its
+        // due date must not acquire the form-work billing hold.
+        if (FormWorkBillingRules.IsRelease(form.Type.ToString()))
+            return;
+
+        var agencyId = form.Person.AgencyId ?? throw new InvalidOperationException("The form is not attached to an agency.");
+
+        var linkedNotes = await context.Notes.AsNoTracking()
+            .Where(note => note.FormId == form.Id &&
+                           note.PersonId == form.PersonId &&
+                           note.AgencyId == form.Person.AgencyId)
+            .ToListAsync();
+        if (changedNote is { Id: > 0 })
+        {
+            linkedNotes.RemoveAll(note => note.Id == changedNote.Id);
+            if (changedNote.FormId == form.Id &&
+                changedNote.PersonId == form.PersonId &&
+                changedNote.AgencyId == agencyId)
+                linkedNotes.Add(changedNote);
+        }
+        if (linkedNotes.Count == 0)
+            return;
+
+        var noteIds = linkedNotes.Select(note => note.Id).ToArray();
+        var claimLines = await context.ClaimLines.AsNoTracking()
+            .Where(line => noteIds.Contains(line.NoteId))
+            .Select(line => new { line.Id, line.NoteId })
+            .ToListAsync();
+        var claimsByNote = claimLines.ToLookup(line => line.NoteId);
+
+        foreach (var note in linkedNotes)
+        {
+            var claims = claimsByNote[note.Id].ToArray();
+            var impact = FormAttestationImpactRules.Evaluate(
+                (int?)note.Status, claims.Length > 0, note.EventDate,
+                previousCompletedOn, revisedCompletedOn, form.DueDate);
+            if (!impact.RequiresSupervisorAttention && !impact.RequiresBillingAttention)
+                continue;
+
+            var claimLineIds = claims.Length == 0
+                ? new int?[] { null }
+                : claims.Select(line => (int?)line.Id).ToArray();
+            foreach (var claimLineId in claimLineIds)
+            {
+                context.FormAttestationChangeReviewFlags.Add(
+                    FormAttestationChangeReviewFlag.Create(
+                        agencyId, form.PersonId, note.Id, form.Id,
+                        claimLineId, note.EventDate, form.DueDate,
+                        previousCompletedOn, revisedCompletedOn,
+                        reason, impact, recordedAtUtc));
+            }
+        }
+    }
     private static async Task EnsureEvidenceIsValidAsync(
         SatiContext context,
         Form form,
         (DateTime CycleStart, DateTime CycleEnd) cycle,
+        DateTime completedOn,
         int? evidenceNoteId)
     {
         if (evidenceNoteId is not int noteId)
             return;
 
+        var requiresExactCompletion = !FormWorkBillingRules.IsRelease(form.Type.ToString());
         var evidenceIsValid = await context.Notes.AsNoTracking().AnyAsync(note =>
             note.Id == noteId &&
             note.PersonId == form.PersonId &&
             note.FormType == form.Type &&
+            (!requiresExactCompletion || note.FormId == form.Id) &&
             note.EventDate != null &&
+            (!requiresExactCompletion || note.EventDate.Value.Date == completedOn.Date) &&
             note.EventDate.Value.Date >= cycle.CycleStart.Date &&
             note.EventDate.Value.Date < cycle.CycleEnd.Date &&
             (note.Status == NoteStatus.Pending ||

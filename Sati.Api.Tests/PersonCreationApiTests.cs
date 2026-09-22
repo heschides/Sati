@@ -116,6 +116,32 @@ public sealed class PersonCreationApiTests(SatiApiFactory factory)
         Assert.True(people!.Single(person => person.Id == created.Id).IsTestData);
     }
 
+    [Fact]
+    public async Task EffectiveDateCannotChangeAfterAnnualObligationsExist()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var before = (await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload"))!
+            .Single(person => person.Id == 101);
+        Assert.NotEmpty(before.Forms);
+        var newEffectiveDate = before.EffectiveDate!.Value.AddDays(1);
+
+        var response = await owner.PutAsJsonAsync(
+            "/api/v1/people/101",
+            ValidRequest() with
+            {
+                ExpectedRevision = before.Revision,
+                EffectiveDate = newEffectiveDate
+            });
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.True(problem.GetProperty("errors").TryGetProperty("effectiveDate", out _));
+        var after = (await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload"))!
+            .Single(person => person.Id == 101);
+        Assert.Equal(before.EffectiveDate, after.EffectiveDate);
+        Assert.Equal(before.Revision, after.Revision);
+    }
+
     // Foundation for the rule-3 deletion window (HANDOFF_CLIENT_DELETION_POLICY.md, A2).
     [Fact]
     public async Task CreatedAtUtcIsStampedOnCreationAndSurvivesAnOrdinaryEdit()

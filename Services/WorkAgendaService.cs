@@ -148,7 +148,8 @@ public sealed class WorkAgendaService(INoteService notes) : IWorkAgendaService
                 DefaultMinutes,
                 item.PersonId,
                 item.FormType,
-                NoteType.Form);
+                NoteType.Form,
+                formId: item.FormId);
             var saved = await notes.AddNoteAsync(note);
             day.Add(saved);
             added++;
@@ -167,5 +168,6 @@ public sealed class WorkAgendaService(INoteService notes) : IWorkAgendaService
         note.PersonId == item.PersonId &&
         note.NoteType == NoteType.Form &&
         note.FormType == item.FormType &&
+        note.FormId == item.FormId &&
         string.Equals(note.Narrative?.Trim(), narrative, StringComparison.Ordinal);
 }

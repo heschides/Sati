@@ -2230,7 +2230,7 @@
                                  than as a binding error. Fallbacks here are empty strings. -->
                             <DataTemplate x:Key="AnnualFormRowTemplate">
                                 <StackPanel>
-                                    <views:AttestationCheckBox Content="{Binding Label}"
+                                    <views:AttestationCheckBox Content="{Binding Current.CheckBoxLabel, FallbackValue=''}"
                                               AutomationProperties.Name="{Binding Current.AutomationName, FallbackValue=''}"
                                               IsChecked="{Binding Current.IsComplete, Mode=OneWay, FallbackValue=False}"
                                               IsEnabled="{Binding DataContext.IsFormsEditingUnlocked, RelativeSource={RelativeSource AncestorType=UserControl}}"

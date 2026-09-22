@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 
@@ -16,6 +16,9 @@ namespace Sati.Models
         public int PersonId { get; set; }
         public Person Person { get; set; } = null!;
         public FormType? FormType { get; set; }
+        // Exact annual or quarterly obligation. Older notes remain unlinked.
+        public int? FormId { get; set; }
+        public string? FormDateCorrectionReason { get; set; }
         public NoteType? NoteType { get; set; }
         public GoalProgressLevel? GoalProgress { get; set; }
         public int? AgencyId { get; set; }
@@ -77,7 +80,7 @@ namespace Sati.Models
 
         private protected Note() { }
 
-        public static Note Create(string narrative, DateTime? eventDate, NoteStatus? status, int? minutes, int personId, FormType? formType = null, NoteType? noteType = null)
+        public static Note Create(string narrative, DateTime? eventDate, NoteStatus? status, int? minutes, int personId, FormType? formType = null, NoteType? noteType = null, int? formId = null)
         {
             return new Note()
             {
@@ -87,6 +90,7 @@ namespace Sati.Models
                 Minutes = minutes,
                 PersonId = personId,
                 FormType = formType,
+                FormId = formId,
                 NoteType = noteType
             };
         }

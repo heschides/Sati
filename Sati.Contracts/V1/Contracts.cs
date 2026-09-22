@@ -321,7 +321,9 @@ public sealed record NoteDto(
     IReadOnlyList<BillingComplianceBlocker>? ComplianceBlockers = null,
     IReadOnlyList<string>? OverrideObligationIds = null,
     bool OverrideAttestationConfirmed = false,
-    string? GoalProgress = null);
+    string? GoalProgress = null,
+    int? FormId = null,
+    string? FormDateCorrectionReason = null);
 
 public sealed record SaveNoteRequest(
     string Narrative,
@@ -335,7 +337,9 @@ public sealed record SaveNoteRequest(
     string? CaseManagerJustification,
     string? VisitDocumentationJson,
     int ExpectedRevision = 0,
-    string? GoalProgress = null);
+    string? GoalProgress = null,
+    int? FormId = null,
+    string? FormDateCorrectionReason = null);
 
 public sealed record PersonReferenceDto(int Id, int UserId, string? FirstName, string? LastName);
 
@@ -909,7 +913,8 @@ public sealed record PendingAttestationDto(
     DateTime CycleEnd,
     DateTime DueDate,
     int EvidenceNoteId,
-    DateTime EvidenceDate);
+    DateTime EvidenceDate,
+    bool IsLegacyUnlinked = false);
 public sealed record DeleteFormsRequest(IReadOnlyList<int> FormIds);
 
 public sealed record ApiErrorDto(string Code, string Message, string CorrelationId);

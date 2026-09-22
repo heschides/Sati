@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Sati.Contracts.V1;
@@ -26,6 +26,8 @@ namespace Sati.ViewModels.Children
     // billing-window check, the ComplianceBlocked/HeldForCompliance fork, and
     // note persistence. Hosts learn about successful saves through NoteSaved.
     // A form-tagged note is evidence only and never changes compliance state.
+    public sealed record FormObligationOption(int FormId, string Label);
+
     public partial class NoteEntryViewModel : ObservableObject
     {
         // -------------------------------------------------------------------------
@@ -174,6 +176,10 @@ namespace Sati.ViewModels.Children
         [ObservableProperty] private GoalProgressLevel? goalProgress;
         [ObservableProperty] private NoteType? selectedNoteType;
         [ObservableProperty] private FormType? selectedFormType;
+        private int? _selectedFormId;
+        public ObservableCollection<FormObligationOption> FormObligations { get; } = [];
+        [ObservableProperty] private FormObligationOption? selectedFormObligation;
+        [ObservableProperty] private string formDateCorrectionReason = string.Empty;
         [ObservableProperty] private string? narrative;
         [ObservableProperty] private int? minutes;
         [ObservableProperty] private DateTime? eventDate;
@@ -560,6 +566,7 @@ namespace Sati.ViewModels.Children
         {
             if (oldValue?.Id == newValue?.Id)
             {
+                RefreshFormObligations();
                 _ = LoadVisitAttendeesAsync(newValue);
                 RefreshSuggestedFollowUp(newValue, resetAcceptance: false);
                 return;
@@ -597,6 +604,8 @@ namespace Sati.ViewModels.Children
                 }
 
                 MarkDirty();
+                _selectedFormId = null;
+                RefreshFormObligations();
                 _ = LoadVisitAttendeesAsync(newValue);
                 RefreshSuggestedFollowUp(newValue, resetAcceptance: true);
                 return;
@@ -611,6 +620,8 @@ namespace Sati.ViewModels.Children
             EventDate = null;
             SelectedNoteType = null;
             SelectedFormType = null;
+            _selectedFormId = null;
+            RefreshFormObligations();
             Minutes = null;
             SelectedStartTime = null;
             _pendingVisitDocumentation = null;
@@ -690,7 +701,10 @@ namespace Sati.ViewModels.Children
             }
 
             if (value != NoteType.Form)
+            {
                 SelectedFormType = null;
+                FormDateCorrectionReason = string.Empty;
+            }
 
             if (value != NoteType.Visit)
                 ResetVisitDocumentation(clearAttendees: false);
@@ -800,8 +814,43 @@ namespace Sati.ViewModels.Children
         partial void OnVisitObservationDetailsChanged(string? value) => VisitFactsChanged();
         partial void OnVisitAdditionalAttendeesChanged(string? value) => VisitFactsChanged();
 
+        partial void OnFormDateCorrectionReasonChanged(string value)
+        {
+            _ = value;
+            MarkDirty();
+        }
+
+        partial void OnSelectedFormObligationChanged(FormObligationOption? value)
+        {
+            _selectedFormId = value?.FormId;
+            MarkDirty();
+        }
+
+        private void RefreshFormObligations()
+        {
+            var selectedId = _selectedFormId;
+            FormObligations.Clear();
+            if (SelectedPerson is { } person && SelectedFormType is FormType type)
+            {
+                foreach (var form in person.Forms
+                    .Where(form => form.Type == type)
+                    .OrderByDescending(form => form.TargetEffectiveDate)
+                    .ThenByDescending(form => form.DueDate))
+                {
+                    var label = form.TargetEffectiveDate == default
+                        ? $"{Person.FormDisplayName(type)} — due {form.DueDate:M/d/yy}"
+                        : $"{Person.FormDisplayName(type)} — plan starting {form.TargetEffectiveDate:M/d/yy}; due {form.DueDate:M/d/yy}";
+                    FormObligations.Add(new FormObligationOption(form.Id, label));
+                }
+            }
+
+            SelectedFormObligation = FormObligations.FirstOrDefault(option => option.FormId == selectedId);
+        }
+
         partial void OnSelectedFormTypeChanged(FormType? value)
         {
+            _selectedFormId = null;
+            RefreshFormObligations();
             InvalidateAiGeneration();
             MarkDirty();
             if (value is null || SelectedPerson is null || !string.IsNullOrWhiteSpace(Narrative))
@@ -1605,6 +1654,9 @@ namespace Sati.ViewModels.Children
                 GoalProgress = note.GoalProgress;
                 SelectedNoteType = note.NoteType;
                 SelectedFormType = note.FormType;
+                _selectedFormId = note.FormId;
+                RefreshFormObligations();
+                FormDateCorrectionReason = note.FormDateCorrectionReason ?? string.Empty;
                 ApplyVisitDocumentation(note.VisitDocumentation);
             }
             finally
@@ -2121,6 +2173,9 @@ namespace Sati.ViewModels.Children
                 note.Status = Status;
                 note.NoteType = SelectedNoteType;
                 note.FormType = SelectedFormType;
+                note.FormId = _selectedFormId;
+                note.FormDateCorrectionReason = string.IsNullOrWhiteSpace(FormDateCorrectionReason)
+                    ? null : FormDateCorrectionReason.Trim();
                 note.GoalProgress = GoalProgress;
                 note.VisitDocumentation = BuildVisitDocumentation();
                 note.PersonId = selectedPerson.Id;
@@ -2148,8 +2203,10 @@ namespace Sati.ViewModels.Children
             else
             {
                 var note = Note.Create(Narrative!, EventDate, Status, Minutes,
-                    SelectedPerson!.Id, SelectedFormType, SelectedNoteType);
+                    SelectedPerson!.Id, SelectedFormType, SelectedNoteType, _selectedFormId);
                 note.StartTime = SelectedStartTime?.Minutes;
+                note.FormDateCorrectionReason = string.IsNullOrWhiteSpace(FormDateCorrectionReason)
+                    ? null : FormDateCorrectionReason.Trim();
                 note.VisitDocumentation = BuildVisitDocumentation();
                 note.GoalProgress = GoalProgress;
                 if (caseManagerJustification is not null)
@@ -2285,6 +2342,8 @@ namespace Sati.ViewModels.Children
             if (draft.Status != latest.Status) fields.Add("status");
             if (draft.NoteType != latest.NoteType) fields.Add("note type");
             if (draft.FormType != latest.FormType) fields.Add("form type");
+            if (draft.FormId != latest.FormId) fields.Add("form obligation");
+            if (draft.FormDateCorrectionReason != latest.FormDateCorrectionReason) fields.Add("form date correction reason");
             if (draft.GoalProgress != latest.GoalProgress) fields.Add("goal progress");
             if (draft.CaseManagerJustification != latest.CaseManagerJustification) fields.Add("justification");
             if (draft.VisitDocumentationJson != latest.VisitDocumentationJson) fields.Add("visit documentation");
@@ -2301,6 +2360,9 @@ namespace Sati.ViewModels.Children
             Narrative = string.Empty;
             EventDate = null;
             SelectedFormType = null;
+            _selectedFormId = null;
+            RefreshFormObligations();
+            FormDateCorrectionReason = string.Empty;
             SelectedNoteType = null;
             Minutes = null;
             SelectedStartTime = null;

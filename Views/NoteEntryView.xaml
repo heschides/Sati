@@ -533,6 +533,9 @@
                              is a calendar reminder. -->
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="20" />
@@ -613,6 +616,24 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
+                    <ComboBox AutomationProperties.Name="Exact form obligation and plan year"
+                              Grid.Row="5" Grid.ColumnSpan="4" Margin="0,6,0,0"
+                              ItemsSource="{Binding FormObligations}"
+                              DisplayMemberPath="Label"
+                              SelectedItem="{Binding SelectedFormObligation, Mode=TwoWay}"
+                              Visibility="{Binding IsFormNote,
+                                  Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <TextBlock Grid.Row="6" Grid.ColumnSpan="4" Margin="0,6,0,0"
+                               Text="Reason for changing a prior attested date (if applicable)"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Visibility="{Binding IsFormNote,
+                                   Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <TextBox Grid.Row="7" Grid.ColumnSpan="4"
+                             AutomationProperties.Name="Reason for form completion date correction"
+                             MaxLength="1000"
+                             Text="{Binding FormDateCorrectionReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Visibility="{Binding IsFormNote,
+                                 Converter={StaticResource BoolToVisibilityConverter}}" />
                 </Grid>
 
                         <Grid x:Name="NoteBodyGrid"

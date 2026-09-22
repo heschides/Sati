@@ -169,6 +169,11 @@ namespace Sati.Edi
                     context, actor.AgencyId, note.PersonId, note.Id);
                 var complianceErrors = BillingService.EvaluateBillingComplianceRelease(
                     note, compliancePolicy, recoveryDecisions);
+                // A claim exception may waive historical compliance blockers in
+                // BillingExportGate, but never the deadline for the form work that
+                // this exact note documents. Keep these errors outside that gate.
+                errors.AddRange(BillingService.EvaluateFormWorkBilling(note)
+                    .Select(error => $"Note {line.NoteId}: {error}"));
                 errors.AddRange(BillingExportGate.Evaluate(
                     ProfessionalClaimSnapshotCodec.Deserialize(line.ClaimSnapshotJson), actor.AgencyId,
                     line.DateOfService, line.IsComplianceException, line.ComplianceExceptionReason, facts,

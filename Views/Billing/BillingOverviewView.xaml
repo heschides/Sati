@@ -231,6 +231,85 @@
             </Grid>
 
             <Border Style="{StaticResource BillingMetricCard}" Padding="20,18" Margin="0,0,0,18"
+                    AutomationProperties.Name="Form completion date billing reviews">
+                <StackPanel>
+                    <TextBlock Text="FORM COMPLETION DATE CHANGES" Style="{StaticResource SectionHeader}" />
+                    <TextBlock Text="{Binding FormChangeReviewSummary}" Margin="0,6,0,10"
+                               TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <Border Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            CornerRadius="6" Padding="12" Margin="0,0,0,12"
+                            Visibility="{Binding CanAdminCorrectFormDate, Converter={StaticResource BoolToVisibilityConverter}}"
+                            AutomationProperties.Name="Admin form note source date correction">
+                        <StackPanel>
+                            <TextBlock Text="ADMIN SOURCE DATE CORRECTION" Style="{StaticResource SectionHeader}" />
+                            <TextBlock Text="Enter a note ID to inspect a linked form note, including an approved note that has no change notice. The correction updates the note activity date and form completion attestation together; it does not waive a late deadline."
+                                       TextWrapping="Wrap" Margin="0,4,0,8"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBox Text="{Binding CorrectionNoteIdText, UpdateSourceTrigger=PropertyChanged}"
+                                         Width="100" Height="30" Margin="0,0,8,0"
+                                         AutomationProperties.Name="Form note ID to correct" />
+                                <Button Content="Look up note" Command="{Binding FindFormDateCorrectionTargetCommand}"
+                                        AutomationProperties.Name="Look up form note source date" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding CorrectionStatusMessage}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource WarningBrush}"
+                                       AutomationProperties.LiveSetting="Polite" Margin="0,0,0,8" />
+                            <StackPanel Visibility="{Binding HasCorrectionTarget, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="{Binding CorrectionTargetSummary}" TextWrapping="Wrap"
+                                           FontWeight="SemiBold" Margin="0,0,0,8" />
+                                <TextBlock Text="Actual date the work was done" Margin="0,0,0,3"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <DatePicker SelectedDate="{Binding CorrectedActivityDate, Mode=TwoWay}"
+                                            AutomationProperties.Name="Corrected form note activity date"
+                                            Margin="0,0,0,8" />
+                                <TextBlock Text="Why was the source date wrong?" Margin="0,0,0,3"
+                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBox Text="{Binding CorrectionReason, UpdateSourceTrigger=PropertyChanged}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MaxLength="4000"
+                                         Height="72" Margin="0,0,0,8"
+                                         AutomationProperties.Name="Form note date correction reason" />
+                                <CheckBox Content="I checked the source record and confirm this is the actual date of work."
+                                          IsChecked="{Binding CorrectionEvidenceConfirmed, Mode=TwoWay}"
+                                          AutomationProperties.Name="Confirm source date correction evidence"
+                                          Margin="0,0,0,8" />
+                                <Button Content="Save source correction"
+                                        HorizontalAlignment="Left"
+                                        Command="{Binding SaveFormDateCorrectionCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding FormChangeReviewFlags}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource SurfaceBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                        CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding RecordLabel}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding DateLabel}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding ReasonLabel}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding ClaimLabel}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding HoldLabel}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding RecordedLabel}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <Button Content="Review source date (Admin)"
+                                                HorizontalAlignment="Left" Margin="0,6,0,0"
+                                                Visibility="{Binding DataContext.CanAdminCorrectFormDate, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                Command="{Binding DataContext.ReviewFormDateFlagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding NoteId}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource BillingMetricCard}" Padding="20,18" Margin="0,0,0,18"
                     AutomationProperties.Name="Unresolved billing policy review queue">
                 <StackPanel>
                     <TextBlock Text="POLICY CHANGE REVIEWS" Style="{StaticResource SectionHeader}" />

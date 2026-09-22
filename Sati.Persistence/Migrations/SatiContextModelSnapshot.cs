@@ -2007,6 +2007,82 @@ namespace Sati.Migrations
                     b.ToTable("FormAttestations");
                 });
 
+            modelBuilder.Entity("Sati.Models.FormAttestationChangeReviewFlag", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AgencyId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BillingHoldReasons")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ClaimLineId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("FlagId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("FormId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("NoteActivityDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("NoteId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PersonId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PreviousCompletedOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("RequiresBillingAttention")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequiresSupervisorAttention")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("RevisedCompletedOn")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClaimLineId");
+
+                    b.HasIndex("FlagId")
+                        .IsUnique();
+
+                    b.HasIndex("FormId");
+
+                    b.HasIndex("NoteId");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("AgencyId", "CreatedAtUtc");
+
+                    b.HasIndex("AgencyId", "RequiresBillingAttention", "CreatedAtUtc");
+
+                    b.HasIndex("AgencyId", "RequiresSupervisorAttention", "CreatedAtUtc");
+
+                    b.ToTable("FormAttestationChangeReviewFlags", (string)null);
+                });
+
             modelBuilder.Entity("Sati.Models.FrozenSignatureDocument", b =>
                 {
                     b.Property<int>("Id")
@@ -2272,6 +2348,13 @@ namespace Sati.Migrations
                     b.Property<DateTime?>("EventDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("FormDateCorrectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int?>("FormId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("FormType")
                         .HasColumnType("int");
 
@@ -2333,6 +2416,8 @@ namespace Sati.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AgencyId");
+
+                    b.HasIndex("FormId");
 
                     b.HasIndex("PersonId");
 
@@ -4958,6 +5043,38 @@ namespace Sati.Migrations
                     b.Navigation("Form");
                 });
 
+            modelBuilder.Entity("Sati.Models.FormAttestationChangeReviewFlag", b =>
+                {
+                    b.HasOne("Sati.Models.Agency", null)
+                        .WithMany()
+                        .HasForeignKey("AgencyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sati.Models.Billing.ClaimLine", null)
+                        .WithMany()
+                        .HasForeignKey("ClaimLineId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sati.Models.Form", null)
+                        .WithMany()
+                        .HasForeignKey("FormId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sati.Models.Note", null)
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sati.Person", null)
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Sati.Models.FrozenSignatureDocument", b =>
                 {
                     b.HasOne("Sati.Models.Agency", null)
@@ -5037,6 +5154,11 @@ namespace Sati.Migrations
                     b.HasOne("Sati.Models.Agency", "Agency")
                         .WithMany()
                         .HasForeignKey("AgencyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Sati.Models.Form", null)
+                        .WithMany()
+                        .HasForeignKey("FormId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Sati.Person", "Person")

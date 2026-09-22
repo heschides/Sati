@@ -71,6 +71,12 @@ public static class ApiSurface
         // revocation history behind the current form-compliance projection.
         "form-attestation-history-v1",
         "form-attestation-prerequisite-v1",
+        // Form notes carry an exact obligation ID and the Logged transition
+        // writes that form's completion evidence. An older server would ignore
+        // the ID and could permit a late note into billing.
+        "exact-form-note-attestation-v1",
+        "form-work-billing-v1",
+        "form-attestation-change-review-v1",
         "annual-document-artifact-v1",
         "document-template-v1",
         "safety-plan-v2",
@@ -120,6 +126,7 @@ public static class ApiSurface
         "GET /api/v1/admin/activity",
         "GET /api/v1/admin/incidents",
         "GET /api/v1/admin/legal-holds",
+        "GET /api/v1/admin/notes/{noteId:int}/form-date-correction-target",
         "GET /api/v1/admin/operations",
         "GET /api/v1/admin/overview",
         "GET /api/v1/admin/people",
@@ -152,6 +159,7 @@ public static class ApiSurface
         "GET /api/v1/check-requests/time-off-collisions",
         "GET /api/v1/check-requests/{id:int}",
         "GET /api/v1/exempt-dates/{year:int}",
+        "GET /api/v1/form-attestation-change-review-flags",
         "GET /api/v1/incentives/history",
         "GET /api/v1/incentives/{year:int}/{month:int}",
         "GET /api/v1/me",
@@ -216,6 +224,7 @@ public static class ApiSurface
         "POST /api/v1/admin/demo/seed-ssns",
         "POST /api/v1/admin/legal-holds",
         "POST /api/v1/admin/legal-holds/{legalHoldId:int}/release",
+        "POST /api/v1/admin/notes/{noteId:int}/correct-form-date",
         "POST /api/v1/admin/test-data/consumers/{personId:int}/delete",
         "POST /api/v1/agencies/{agencyId:int}/templates/{kind}",
         "POST /api/v1/assessments/{assessmentId:int}/submit",

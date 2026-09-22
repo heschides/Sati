@@ -498,6 +498,8 @@ namespace Sati
             services.AddTransient<ISettingsService, SettingsService>();
             services.AddTransient<FormBulkCompletion>();
             services.AddTransient<IFormService, FormService>();
+            services.AddTransient<IFormAttestationChangeReviewService, FormAttestationChangeReviewService>();
+            services.AddTransient<IAdminFormNoteCorrectionService, AdminFormNoteCorrectionService>();
             services.AddTransient<ISupervisorService, SupervisorService>();
             services.AddTransient<IBillingService, BillingService>();
             services.AddTransient<IEdiService, EdiService>();
@@ -566,6 +568,8 @@ namespace Sati
             services.AddTransient<IServiceDayInclusionService, CloudServiceDayInclusionService>();
             services.AddTransient<IIncentiveService, CloudIncentiveService>();
             services.AddTransient<IFormService, CloudFormService>();
+            services.AddTransient<IFormAttestationChangeReviewService, CloudFormAttestationChangeReviewService>();
+            services.AddTransient<IAdminFormNoteCorrectionService, CloudAdminFormNoteCorrectionService>();
             services.AddTransient<IUserService, CloudUserService>();
             services.AddTransient<IPersonContactService, CloudPersonContactService>();
             services.AddTransient<IConsumerProviderService, CloudConsumerProviderService>();

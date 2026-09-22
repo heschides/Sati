@@ -5,6 +5,7 @@ using Sati.Models;
 using Sati.Contracts.V1;
 using Sati.Services;
 using Sati.Data.Cloud;
+using Sati.ViewModels;
 using System.Net;
 using System.Collections.ObjectModel;
 using System.Configuration;
@@ -16,13 +17,19 @@ namespace Sati.ViewModels.Supervisor
     {
         private readonly ISupervisorService _supervisorService;
         private readonly ISessionService _sessionService;
+        private readonly IFormAttestationChangeReviewService? _formChangeReviews;
+        private readonly IAdminFormNoteCorrectionService? _adminFormCorrections;
 
         public PendingApprovalsViewModel(
             ISupervisorService supervisorService,
-            ISessionService sessionService)
+            ISessionService sessionService,
+            IFormAttestationChangeReviewService? formChangeReviews = null,
+            IAdminFormNoteCorrectionService? adminFormCorrections = null)
         {
             _supervisorService = supervisorService;
             _sessionService = sessionService;
+            _formChangeReviews = formChangeReviews;
+            _adminFormCorrections = adminFormCorrections;
         }
 
         // -------------------------------------------------------------------------
@@ -35,6 +42,7 @@ namespace Sati.ViewModels.Supervisor
         // Notes whose consumers fail the compliance gate — waiting for compliance
         // to be met, or for a supervisor override with written justification.
         public ObservableCollection<PendingNoteViewModel> NonCompliantNotes { get; } = [];
+        public ObservableCollection<FormAttestationChangeReviewRow> FormChangeReviewFlags { get; } = [];
         public ObservableCollection<NoteReviewCaseManagerOption> CaseManagerOptions { get; } = [];
         public ObservableCollection<NoteReviewClientOption> ClientOptions { get; } = [];
         private IReadOnlyList<NoteReviewClientOption> _allClientOptions = [];
@@ -53,6 +61,19 @@ namespace Sati.ViewModels.Supervisor
         [ObservableProperty] private string searchTerm = string.Empty;
         [ObservableProperty] private bool areFiltersAvailable = true;
         [ObservableProperty] private string filterStatusMessage = string.Empty;
+        [ObservableProperty] private string formChangeReviewSummary =
+            "No form completion date changes need supervisor review.";
+
+        // Admin correction updates the note date and linked form attestation together.
+        [ObservableProperty] private PendingNoteViewModel? correctionNote;
+        [ObservableProperty] private AdminFormNoteCorrectionTargetDto? correctionTarget;
+        [ObservableProperty] private string correctionTargetSummary = string.Empty;
+        [ObservableProperty] private DateTime? correctedActivityDate;
+        [ObservableProperty] private string correctionReason = string.Empty;
+        [ObservableProperty] private bool correctionEvidenceConfirmed;
+        [ObservableProperty] private bool isCorrectionDialogVisible;
+        [ObservableProperty] private bool isCorrectionBusy;
+        [ObservableProperty] private string correctionStatusMessage = string.Empty;
 
         // Override dialog state
         [ObservableProperty] private PendingNoteViewModel? overrideNote;
@@ -124,6 +145,7 @@ namespace Sati.ViewModels.Supervisor
             OverrideReason = null;
             OverrideAttestationConfirmed = false;
             OverrideBlockers.Clear();
+            ResetCorrectionDialog();
             SelectedCaseManager = null;
             SelectedClient = null;
             FromDate = null;
@@ -131,6 +153,8 @@ namespace Sati.ViewModels.Supervisor
             SearchTerm = string.Empty;
             PendingNotes.Clear();
             NonCompliantNotes.Clear();
+            FormChangeReviewFlags.Clear();
+            FormChangeReviewSummary = "No form completion date changes need supervisor review.";
             CaseManagerOptions.Clear();
             ClientOptions.Clear();
             _allClientOptions = [];
@@ -231,10 +255,37 @@ namespace Sati.ViewModels.Supervisor
             NonCompliantNotes.Clear();
             IsReturnDialogVisible = IsOverrideDialogVisible = false;
             SelectedNote = OverrideNote = null;
+            ResetCorrectionDialog();
             HasMore = true;
             StatusMessage = string.Empty;
             NotifyCounts();
             await FetchPageAsync(_generation);
+            await LoadFormChangeReviewsAsync(_generation);
+        }
+
+        private async Task LoadFormChangeReviewsAsync(int generation)
+        {
+            if (_formChangeReviews is null) return;
+            var actor = _sessionService.CurrentUser;
+            if (actor is null) return;
+            try
+            {
+                var flags = await _formChangeReviews.GetForSupervisorAsync();
+                if (!_loads.IsCurrent(generation) || _sessionService.CurrentUser != actor) return;
+                var current = FormAttestationChangeReviewRow.Latest(flags);
+                FormChangeReviewFlags.Clear();
+                foreach (var flag in current) FormChangeReviewFlags.Add(flag);
+                FormChangeReviewSummary = current.Count == 0
+                    ? "No form completion date changes need supervisor review."
+                    : $"{current.Count} form-work note{(current.Count == 1 ? "" : "s")} changed after submission; " +
+                      $"{current.Count(flag => flag.MustHoldBilling)} currently held for billing.";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Supervisor form change reviews failed: {ex.Message}");
+                if (_loads.IsCurrent(generation) && _sessionService.CurrentUser == actor)
+                    FormChangeReviewSummary = "Form completion date change notices are temporarily unavailable.";
+            }
         }
 
         [RelayCommand(CanExecute = nameof(CanLoadMore))]
@@ -254,7 +305,8 @@ namespace Sati.ViewModels.Supervisor
                     var target = note.ComplianceFailureReasons.Count == 0 ? PendingNotes : NonCompliantNotes;
                     if (!target.Any(existing => existing.NoteId == note.Id))
                         target.Add(new PendingNoteViewModel(note,
-                            CaseManagerOptions.FirstOrDefault(option => option.UserId == note.Person.UserId)?.DisplayName));
+                            CaseManagerOptions.FirstOrDefault(option => option.UserId == note.Person.UserId)?.DisplayName,
+                            actor.HasAdminPermissions && _adminFormCorrections is not null));
                 }
                 _throughId = page.ThroughId;
                 _nextAfterId = page.NextAfterId;
@@ -387,6 +439,7 @@ namespace Sati.ViewModels.Supervisor
         [RelayCommand]
         private void OpenOverrideDialog(PendingNoteViewModel note)
         {
+            if (!note.CanOverrideOrdinaryBlockers) return;
             OverrideNote = note;
             OverrideReason = string.Empty;
             OverrideAttestationConfirmed = false;
@@ -447,6 +500,120 @@ namespace Sati.ViewModels.Supervisor
         }
 
         // -------------------------------------------------------------------------
+        // Admin source-date correction
+        // -------------------------------------------------------------------------
+
+        [RelayCommand]
+        private async Task OpenCorrectionDialog(PendingNoteViewModel note)
+        {
+            if (IsCorrectionBusy) return;
+            var account = _sessionService.CurrentUser;
+            if (account?.HasAdminPermissions != true ||
+                _adminFormCorrections is null || !note.CanAdminCorrectSourceDate)
+                return;
+            IsCorrectionBusy = true;
+            try
+            {
+                var target = await _adminFormCorrections.GetTargetAsync(note.NoteId);
+                if (_sessionService.CurrentUser != account) return;
+                if (target is null)
+                {
+                    StatusMessage = "This linked form note is no longer eligible for source-date correction.";
+                    return;
+                }
+                CorrectionNote = note;
+                CorrectionTarget = target;
+                CorrectionTargetSummary =
+                    $"Note #{target.NoteId}, form #{target.FormId}, {target.Status}; " +
+                    $"activity {target.ActivityDate:MM/dd/yyyy}, completion " +
+                    $"{target.CurrentCompletedOn?.ToString("MM/dd/yyyy") ?? "revoked / no current completion"}, " +
+                    $"due {target.DueDate:MM/dd/yyyy}.";
+                CorrectedActivityDate = target.ActivityDate;
+                CorrectionReason = string.Empty;
+                CorrectionEvidenceConfirmed = false;
+                CorrectionStatusMessage = target.HasClaimRecord
+                    ? "This note already has a claim record. Review that claim before changing the source date."
+                    : string.Empty;
+                IsCorrectionDialogVisible = true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Admin form-note target lookup failed: {ex.Message}");
+                StatusMessage = ex.Message;
+            }
+            finally
+            {
+                IsCorrectionBusy = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task ConfirmCorrection()
+        {
+            if (IsCorrectionBusy) return;
+            if (_sessionService.CurrentUser?.HasAdminPermissions != true ||
+                _adminFormCorrections is null || CorrectionTarget is not { } target)
+                return;
+            if (target.HasClaimRecord)
+            {
+                CorrectionStatusMessage = "Review the existing claim before changing the source date.";
+                return;
+            }
+            if (CorrectedActivityDate is not DateTime corrected ||
+                corrected.Date == target.ActivityDate.Date ||
+                string.IsNullOrWhiteSpace(CorrectionReason) || !CorrectionEvidenceConfirmed)
+            {
+                CorrectionStatusMessage =
+                    "Choose the actual work date, explain the correction, and confirm the source evidence. " +
+                    "The corrected date must differ from the current date.";
+                return;
+            }
+
+            IsCorrectionBusy = true;
+            CorrectionStatusMessage = string.Empty;
+            try
+            {
+                await _adminFormCorrections.CorrectAsync(
+                    target.NoteId, target.Revision, corrected.Date,
+                    CorrectionReason.Trim(), CorrectionEvidenceConfirmed);
+                ResetCorrectionDialog();
+                await ReloadAsync();
+            }
+            catch (NoteConcurrencyException)
+            {
+                ResetCorrectionDialog();
+                await HandleNoteConflictAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Admin form-note date correction failed: {ex.Message}");
+                CorrectionStatusMessage = ex.Message;
+            }
+            finally
+            {
+                IsCorrectionBusy = false;
+            }
+        }
+
+        [RelayCommand]
+        private void CancelCorrection()
+        {
+            if (!IsCorrectionBusy) ResetCorrectionDialog();
+        }
+
+        private void ResetCorrectionDialog()
+        {
+            IsCorrectionDialogVisible = false;
+            CorrectionNote = null;
+            CorrectionTarget = null;
+            CorrectionTargetSummary = string.Empty;
+            CorrectedActivityDate = null;
+            CorrectionReason = string.Empty;
+            CorrectionEvidenceConfirmed = false;
+            CorrectionStatusMessage = string.Empty;
+        }
+
+        // -------------------------------------------------------------------------
         // Return commands
         // -------------------------------------------------------------------------
 
@@ -503,6 +670,7 @@ namespace Sati.ViewModels.Supervisor
         {
             IsOverrideDialogVisible = false;
             IsReturnDialogVisible = false;
+            ResetCorrectionDialog();
             OverrideNote = null;
             SelectedNote = null;
             await ReloadAsync();
@@ -522,6 +690,8 @@ namespace Sati.ViewModels.Supervisor
     {
         public int NoteId { get; }
         public int Revision { get; }
+        public int? FormId { get; }
+        public bool CanAdminCorrectSourceDate { get; }
         public string ClientName { get; }
         public int PersonId { get; }
         public int CaseManagerUserId { get; }
@@ -533,12 +703,19 @@ namespace Sati.ViewModels.Supervisor
         public IReadOnlyList<string> ComplianceFailureReasons { get; }
         public IReadOnlyList<BillingComplianceBlocker> ComplianceBlockers { get; }
         public bool HasComplianceFailures => ComplianceFailureReasons.Count > 0;
+        public bool HasHardFormWorkHold =>
+            ComplianceFailureReasons.Any(FormWorkBillingRules.IsFormWorkReason);
+        public bool CanOverrideOrdinaryBlockers => ComplianceBlockers.Count > 0;
         public bool IsComplianceException => false; // set by non-compliant queue context
 
-        public PendingNoteViewModel(Note note, string? caseManagerName = null)
+        public PendingNoteViewModel(Note note, string? caseManagerName = null, bool isAdmin = false)
         {
             NoteId = note.Id;
             Revision = note.Revision;
+            FormId = note.FormId;
+            CanAdminCorrectSourceDate = isAdmin && note.NoteType == global::Sati.NoteType.Form &&
+                note.FormId is > 0 && note.FormType is FormType formType &&
+                !FormWorkBillingRules.IsRelease(formType.ToString());
             ClientName = note.Person.FullName;
             PersonId = note.PersonId;
             CaseManagerUserId = note.Person.UserId;

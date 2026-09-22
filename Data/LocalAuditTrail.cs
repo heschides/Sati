@@ -56,6 +56,7 @@ internal static class LocalAuditActions
     public const string NoteApproved = "note.approved";
     public const string NoteApprovalOverridden = "note.approval-overridden";
     public const string NoteReturned = "note.returned";
+    public const string NoteFormDateCorrected = "note.form-date-corrected";
     public const string BillingClaimLineCreated = "billing-claim-line.created";
     public const string BillingPeriodSubmitted = "billing-period.submitted";
     public const string BillingPeriodReturnedToDraft = "billing-period.returned-to-draft";

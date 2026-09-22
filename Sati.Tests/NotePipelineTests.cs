@@ -1098,8 +1098,6 @@ public sealed class NotePipelineTests
     [InlineData(true, "current")]
     [InlineData(false, "historical")]
     [InlineData(true, "historical")]
-    [InlineData(false, "form-tag")]
-    [InlineData(true, "form-tag")]
     public async Task LoggedSubmissionRefusesComplianceFailuresWithoutWriting(bool update, string contingency)
     {
         await using var fixture = await PipelineFixture.CreateAsync();
@@ -1116,12 +1114,6 @@ public sealed class NotePipelineTests
         note.Narrative = "Do not lose this clinical draft.";
         note.Status = NoteStatus.Logged;
         note.GoalProgress = GoalProgressLevel.Moderate;
-        if (contingency == "form-tag")
-        {
-            note.NoteType = NoteType.Form;
-            note.FormType = FormType.PCP;
-        }
-
         var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(async () =>
         {
             if (update) await service.UpdateNoteAsync(note);
@@ -1142,6 +1134,49 @@ public sealed class NotePipelineTests
             Assert.Equal(before.Revision, stored.Revision);
         }
         else Assert.False(await verification.Notes.AnyAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoggedFormNoteCompletesItsOwnOverdueObligation(bool update)
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var activityDate = today.AddDays(-2);
+        var dueDate = today.AddDays(-5);
+        await SeedSubmissionRequirementAsync(fixture, dueDate, null);
+        var service = fixture.NotesAs(fixture.CaseManagerOne);
+        var note = update
+            ? await fixture.DetachedNoteAsync(await fixture.SeedNoteAsync(
+                fixture.PersonOneId, NoteStatus.Pending, activityDate))
+            : Note.Create("Completed the PCP late.", activityDate, NoteStatus.Pending, 30,
+                fixture.PersonOneId);
+        note.Narrative = "Completed the PCP late.";
+        note.Status = NoteStatus.Logged;
+        note.GoalProgress = GoalProgressLevel.Moderate;
+        note.NoteType = NoteType.Form;
+        note.FormType = FormType.PCP;
+        await using (var lookup = fixture.Factory.CreateDbContext())
+            note.FormId = await lookup.Forms.Where(form => form.PersonId == fixture.PersonOneId &&
+                    form.Type == FormType.PCP && form.DueDate == dueDate)
+                .Select(form => form.Id).SingleAsync();
+
+        if (update) await service.UpdateNoteAsync(note);
+        else await service.AddNoteAsync(note);
+
+        await using var verification = fixture.Factory.CreateDbContext();
+        var savedNote = await verification.Notes.SingleAsync(candidate => candidate.Id == note.Id);
+        var completedForm = await verification.Forms.SingleAsync(candidate => candidate.Id == note.FormId);
+        Assert.Equal(NoteStatus.Logged, savedNote.Status);
+        Assert.Null(savedNote.CaseManagerJustification);
+        Assert.Equal(activityDate, completedForm.CompletedDate);
+        Assert.False(FormWorkBillingRules.Evaluate(
+            new FormWorkNoteFact(savedNote.PersonId, savedNote.FormType!.Value.ToString(),
+                savedNote.EventDate, savedNote.FormId),
+            new FormWorkObligationFact(completedForm.Id, completedForm.PersonId,
+                completedForm.Type.ToString(), completedForm.DueDate,
+                completedForm.CompletedDate)).Passed);
     }
 
     [Theory]

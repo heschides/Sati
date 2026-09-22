@@ -45,6 +45,28 @@ public sealed class LocalClientEditPersistenceTests
     }
 
     [Fact]
+    public async Task EffectiveDateCannotChangeAfterAnnualObligationsExist()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        await PrepareAsync(fixture);
+        var people = fixture.PeopleAs(fixture.CaseManagerOne);
+        var loaded = (await people.GetAllPeopleAsync(fixture.CaseManagerOne.Id))
+            .Single(item => item.Id == fixture.PersonOneId);
+        Assert.NotEmpty(loaded.Forms);
+        var originalDate = loaded.EffectiveDate;
+
+        loaded.EffectiveDate = originalDate!.Value.AddDays(1);
+        var error = await Assert.ThrowsAsync<PersonValidationException>(
+            () => people.EditPersonAsync(loaded));
+        Assert.Contains("effectiveDate", error.Errors.Keys);
+
+        await using var db = fixture.Factory.CreateDbContext();
+        var persisted = await db.People.AsNoTracking()
+            .SingleAsync(item => item.Id == loaded.Id);
+        Assert.Equal(originalDate, persisted.EffectiveDate);
+    }
+
+    [Fact]
     public async Task AClientChangedElsewhereIsRefusedAndTheLocalCopyStaysRetryable()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();

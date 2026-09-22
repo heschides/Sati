@@ -139,6 +139,15 @@ namespace Sati.Data
                     ["isTestData"] = ["The Test designation is set only when a consumer is created and cannot be changed later."]
                 });
             }
+            if (person.EffectiveDate?.Date != stored.EffectiveDate?.Date &&
+                (await context.Forms.AnyAsync(form => form.PersonId == person.Id) ||
+                 await context.ReleaseObligations.AnyAsync(obligation => obligation.PersonId == person.Id)))
+            {
+                throw new PersonValidationException(new Dictionary<string, string[]>
+                {
+                    ["effectiveDate"] = ["This date anchors existing annual forms or releases. Correcting it requires an audited schedule reconciliation; ordinary client edits cannot change it."]
+                });
+            }
 
             var before = PersonLifecycleLedger.Capture(stored);
             await PersonLifecycleLedger.EnsureBaselineAsync(context, stored);

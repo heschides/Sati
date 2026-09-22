@@ -75,8 +75,8 @@ public sealed class AnnualFormSlotViewModel
     public bool NeedsAttention => IsOverdue || IsOpeningLate || IsMissing;
 
     public string CheckBoxLabel => Role == AnnualFormSlotRole.Renewal
-        ? $"Renewal for {TargetEffectiveDate:MM/dd/yy}"
-        : AnnualFormSlots.Label(Type);
+        ? $"Renewal: {AnnualFormSlots.Label(Type)} for plan starting {TargetEffectiveDate:MM/dd/yy}"
+        : $"{AnnualFormSlots.Label(Type)} for plan starting {TargetEffectiveDate:MM/dd/yy}";
 
     public string PlanPhrase => Role == AnnualFormSlotRole.Renewal
         ? $"renewal for the plan starting {TargetEffectiveDate:MM/dd/yy}"

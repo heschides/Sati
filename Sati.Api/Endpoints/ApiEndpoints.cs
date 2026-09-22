@@ -51,6 +51,7 @@ internal static partial class ApiEndpoints
         MapCheckRequests(api);
         MapAiContext(api);
         MapNotes(api);
+        MapAdminFormNoteCorrections(api);
         MapSettings(api);
         MapScratchpads(api);
         MapExemptDates(api);
@@ -58,6 +59,7 @@ internal static partial class ApiEndpoints
         MapReports(api);
         MapBilling(api);
         MapForms(api);
+        MapFormAttestationChangeReviewFlags(api);
         MapDocuments(api);
         MapDocumentTemplates(api);
         MapIncidents(api);
@@ -1592,7 +1594,7 @@ internal static partial class ApiEndpoints
                 .Select(row => new
                 {
                     Row = row,
-                    Compliance = EvaluateNoteCompliance(
+                    Compliance = EvaluateSupervisorNoteCompliance(
                         row.Note,
                         row.Person,
                         formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
@@ -1691,7 +1693,7 @@ internal static partial class ApiEndpoints
                 .Select(row => new
                 {
                     Row = row,
-                    Compliance = EvaluateNoteCompliance(
+                    Compliance = EvaluateSupervisorNoteCompliance(
                         row.Note,
                         row.Person,
                         formsByPerson.GetValueOrDefault(row.Person.Id) ?? [],
@@ -2214,6 +2216,15 @@ internal static partial class ApiEndpoints
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
                     ["isTestData"] = ["The Test designation is set only when a consumer is created and cannot be changed later."]
+                });
+            }
+            if (request.EffectiveDate?.Date != person.EffectiveDate?.Date &&
+                (await db.Forms.AnyAsync(form => form.PersonId == personId, cancellationToken) ||
+                 await db.ReleaseObligations.AnyAsync(obligation => obligation.PersonId == personId, cancellationToken)))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["effectiveDate"] = ["This date anchors existing annual forms or releases. Correcting it requires an audited schedule reconciliation; ordinary client edits cannot change it."]
                 });
             }
 
@@ -4718,6 +4729,7 @@ internal static partial class ApiEndpoints
             ClaimsPrincipal principal,
             ApiDbContext db,
             ApiClock clock,
+            AuditTrail auditTrail,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -4730,9 +4742,18 @@ internal static partial class ApiEndpoints
             if (!await TenantAccess.OwnsPersonAsync(db, actor, request.PersonId, cancellationToken))
                 return Results.NotFound();
 
-            var submissionProblem = await FindNoteSubmissionProblemAsync(db, actor, request, clock.Today, cancellationToken);
-            if (submissionProblem is not null)
-                return submissionProblem;
+            var formLinkProblem = await FindFormLinkProblemAsync(db, request, cancellationToken);
+            if (formLinkProblem is not null)
+                return formLinkProblem;
+
+            var attestsFormOnLog = IsNonReleaseLoggedFormNote(request);
+            if (!attestsFormOnLog)
+            {
+                var submissionProblem = await FindNoteSubmissionProblemAsync(
+                    db, actor, request, clock.Today, cancellationToken);
+                if (submissionProblem is not null)
+                    return submissionProblem;
+            }
 
             var timeConflict = await FindServiceTimeProblemAsync(db, actor, request, null, cancellationToken);
             if (timeConflict is not null)
@@ -4751,6 +4772,8 @@ internal static partial class ApiEndpoints
                 StartTime = request.StartTime,
                 PersonId = request.PersonId,
                 FormType = formType,
+                FormId = request.FormId,
+                FormDateCorrectionReason = request.FormDateCorrectionReason,
                 NoteType = noteType,
                 GoalProgress = goalProgress,
                 AgencyId = actor.AgencyId,
@@ -4759,6 +4782,17 @@ internal static partial class ApiEndpoints
             };
             db.Notes.Add(note);
             await db.SaveChangesAsync(cancellationToken);
+            var formAttestationProblem = await AttestFormFromLoggedNoteAsync(
+                db, note, actor, clock, auditTrail, cancellationToken);
+            if (formAttestationProblem is not null)
+                return formAttestationProblem;
+            if (attestsFormOnLog)
+            {
+                var submissionProblem = await FindNoteSubmissionProblemAsync(
+                    db, actor, request, clock.Today, cancellationToken, noteId: note.Id);
+                if (submissionProblem is not null)
+                    return submissionProblem;
+            }
             await scheduleWrite.CommitAsync(cancellationToken);
             return Results.Ok(ContractMapper.ToNote(note));
         });
@@ -4816,9 +4850,18 @@ internal static partial class ApiEndpoints
                     return Results.NotFound();
             }
 
-            var submissionProblem = await FindNoteSubmissionProblemAsync(db, actor, request, clock.Today, cancellationToken, noteId: id);
-            if (submissionProblem is not null)
-                return submissionProblem;
+            var formLinkProblem = await FindFormLinkProblemAsync(db, request, cancellationToken);
+            if (formLinkProblem is not null)
+                return formLinkProblem;
+
+            var attestsFormOnLog = IsNonReleaseLoggedFormNote(request);
+            if (!attestsFormOnLog)
+            {
+                var submissionProblem = await FindNoteSubmissionProblemAsync(
+                    db, actor, request, clock.Today, cancellationToken, noteId: id);
+                if (submissionProblem is not null)
+                    return submissionProblem;
+            }
 
             var timeConflict = await FindServiceTimeProblemAsync(db, actor, request, id, cancellationToken);
             if (timeConflict is not null)
@@ -4835,6 +4878,8 @@ internal static partial class ApiEndpoints
             row.Note.StartTime = request.StartTime;
             row.Note.PersonId = request.PersonId;
             row.Note.FormType = formType;
+            row.Note.FormId = request.FormId;
+            row.Note.FormDateCorrectionReason = request.FormDateCorrectionReason;
             row.Note.NoteType = noteType;
             row.Note.GoalProgress = goalProgress;
             row.Note.CaseManagerJustification = request.CaseManagerJustification;
@@ -4856,6 +4901,17 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                var formAttestationProblem = await AttestFormFromLoggedNoteAsync(
+                    db, row.Note, actor, clock, auditTrail, cancellationToken);
+                if (formAttestationProblem is not null)
+                    return formAttestationProblem;
+                if (attestsFormOnLog)
+                {
+                    var submissionProblem = await FindNoteSubmissionProblemAsync(
+                        db, actor, request, clock.Today, cancellationToken, noteId: id);
+                    if (submissionProblem is not null)
+                        return submissionProblem;
+                }
                 await scheduleWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
@@ -6350,6 +6406,36 @@ internal static partial class ApiEndpoints
                              select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
             if (row is null)
                 return Results.NotFound();
+            if (row.Note.EventDate is not DateTime sourceDate)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["note"] = ["No service date."]
+                });
+            }
+            var serviceDate = sourceDate.Date;
+            var ownerId = row.Person.UserId;
+            // Lock the period before reading the form completion used to approve
+            // this financial write. A concurrent revocation must either commit
+            // first and be seen here, or wait for this transaction to finish.
+            await using var periodWrite = await BillingPeriodWriteScope.BeginAsync(
+                db, actor.AgencyId, ownerId, serviceDate.Year, serviceDate.Month,
+                cancellationToken);
+            db.ChangeTracker.Clear();
+            row = await (from note in db.Notes
+                         join person in db.People on note.PersonId equals person.Id
+                         join owner in db.Users on person.UserId equals owner.Id
+                         where note.Id == request.NoteId && note.Status == 6 &&
+                               owner.AgencyId == actor.AgencyId &&
+                               person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId
+                         select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
+            if (row is null || row.Note.EventDate?.Date != serviceDate ||
+                row.Person.UserId != ownerId)
+            {
+                return Results.Conflict(new ApiErrorDto("billing_source_changed",
+                    "The note's service date, status, or owner changed while billing was being prepared. Refresh and try again.",
+                    string.Empty));
+            }
             if (await db.ClaimLines.AnyAsync(line => line.NoteId == request.NoteId, cancellationToken))
                 return DuplicateClaimLineConflict();
             var agency = await db.Agencies.AsNoTracking()
@@ -6384,10 +6470,6 @@ internal static partial class ApiEndpoints
             if (serviceTimeConflict is not null)
                 return serviceTimeConflict;
 
-            var serviceDate = row.Note.EventDate!.Value.Date;
-            await using var periodWrite = await BillingPeriodWriteScope.BeginAsync(
-                db, actor.AgencyId, row.Person.UserId, serviceDate.Year, serviceDate.Month,
-                cancellationToken);
             var period = await db.BillingPeriods
                 .Include(candidate => candidate.Lines)
                 .SingleOrDefaultAsync(candidate =>
@@ -7340,6 +7422,8 @@ internal static partial class ApiEndpoints
                 !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
+            await using var formWrite = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
             var form = await db.Forms.SingleOrDefaultAsync(candidate =>
                 candidate.Id == request.FormId &&
                 candidate.PersonId == personId &&
@@ -7512,6 +7596,9 @@ internal static partial class ApiEndpoints
                     note.Id == evidenceNoteId &&
                     note.PersonId == personId &&
                     note.FormType == (int)Enum.Parse<FormType>(form.Type) &&
+                    (FormNoteLinkRules.IsRelease(form.Type) ||
+                     (note.FormId == form.Id && note.EventDate != null &&
+                      note.EventDate.Value.Date == request.CompletedOn.Date)) &&
                     note.EventDate != null &&
                     note.EventDate.Value.Date >= cycle.Value.CycleStart.Date &&
                     note.EventDate.Value.Date < cycle.Value.CycleEnd.Date &&
@@ -7532,6 +7619,18 @@ internal static partial class ApiEndpoints
             var prerequisiteStateJson = assessment is null
                 ? FormAttestationRules.NoPrerequisitesStateJson
                 : FormAttestationRules.AssessmentPrerequisiteStateJson(assessment.Id);
+            var precedingEntry = await db.FormAttestations.AsNoTracking()
+                .Where(entry => entry.FormId == form.Id)
+                .OrderByDescending(entry => entry.Id)
+                .Select(entry => new { entry.Kind, entry.Reason })
+                .FirstOrDefaultAsync(cancellationToken);
+            var correctionReason = precedingEntry?.Kind == "Revoked" &&
+                !string.IsNullOrWhiteSpace(precedingEntry.Reason)
+                ? precedingEntry.Reason
+                : "Form completion attested through the form workflow.";
+            await RecordApiLinkedNoteImpactFlagsAsync(
+                db, form, actor.AgencyId, null, request.CompletedOn.Date,
+                correctionReason, recordedAtUtc, cancellationToken);
             form.ApplyAttestation(request.CompletedOn);
             db.FormAttestations.Add(new ServerFormAttestation
             {
@@ -7580,6 +7679,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await formWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -7616,6 +7716,8 @@ internal static partial class ApiEndpoints
             if (person is null ||
                 !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
+            await using var formWrite = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
             var form = await db.Forms.SingleOrDefaultAsync(candidate =>
                 candidate.Id == request.FormId && candidate.PersonId == personId && candidate.Type == type,
                 cancellationToken);
@@ -7627,6 +7729,10 @@ internal static partial class ApiEndpoints
             var actorKind = actor.UserId == person.UserId
                 ? AttestationActorKind.CaseManager
                 : AttestationActorKind.Supervisor;
+            var previousCompletedOn = form.CompletedDate;
+            await RecordApiLinkedNoteImpactFlagsAsync(
+                db, form, actor.AgencyId, previousCompletedOn, null,
+                request.Reason.Trim(), DateTime.UtcNow, cancellationToken);
             form.ApplyRevocation();
             db.FormAttestations.Add(new ServerFormAttestation
             {
@@ -7646,6 +7752,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await formWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -7692,13 +7799,15 @@ internal static partial class ApiEndpoints
                 note.PersonId,
                 Enum.GetName(typeof(FormType), note.FormType!.Value) ?? string.Empty,
                 note.EventDate!.Value,
-                Enum.GetName(typeof(NoteStatus), note.Status!.Value) ?? string.Empty))
+                Enum.GetName(typeof(NoteStatus), note.Status!.Value) ?? string.Empty,
+                note.FormId))
                 .ToList();
             var pending = FormAttestationRules.PendingAttestations(
                 facts, forms, person.EffectiveDate, DateTime.Today)
                 .Select(item => new PendingAttestationDto(
                     item.FormId, item.PersonId, item.FormType, item.CycleStart, item.CycleEnd,
-                    item.DueDate, item.EvidenceNoteId, item.EvidenceDate))
+                    item.DueDate, item.EvidenceNoteId, item.EvidenceDate,
+                    item.IsLegacyUnlinked))
                 .ToList();
             return Results.Ok(pending);
         });
@@ -8432,6 +8541,21 @@ internal static partial class ApiEndpoints
                       select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
     }
 
+    private static async Task<IResult?> FindFormLinkProblemAsync(
+        ApiDbContext db, SaveNoteRequest request, CancellationToken cancellationToken)
+    {
+        if (request.FormId is not int formId)
+            return null;
+
+        var matches = await db.Forms.AsNoTracking().AnyAsync(form =>
+            form.Id == formId && form.PersonId == request.PersonId &&
+            form.Type == request.FormType, cancellationToken);
+        return matches ? null : Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["formId"] = ["The selected form obligation does not match this client and form type."]
+        });
+    }
+
     private static async Task<IResult?> FindNoteSubmissionProblemAsync(
         ApiDbContext db, Actor actor, SaveNoteRequest request, DateTime today,
         CancellationToken cancellationToken, int noteId = 0)
@@ -8554,9 +8678,55 @@ internal static partial class ApiEndpoints
         IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null)
     {
         var errors = ValidateNonComplianceBillingCandidate(note, person, agency).ToList();
+        // The note documenting a form must satisfy its own due date. This check
+        // is outside ordinary compliance recovery and cannot be waived by it.
+        errors.AddRange(EvaluateFormWorkBilling(note, forms));
         errors.AddRange(EvaluateBillingComplianceRelease(
             note, person, forms, releaseObligations, policy, recoveryDecisions, providerLinks));
         return errors;
+    }
+
+    private static BillingComplianceResult EvaluateSupervisorNoteCompliance(
+        ServerNote note,
+        ServerPerson person,
+        IReadOnlyList<ServerForm> forms,
+        IReadOnlyList<ReleaseObligation> releases,
+        ServerBillingCompliancePolicyContext policy,
+        IReadOnlyList<ReleaseProviderLinkFact> providerLinks)
+    {
+        var historical = EvaluateNoteCompliance(
+            note, person, forms, releases, policy, providerLinks);
+        var formWorkReasons = EvaluateFormWorkBilling(note, forms);
+        if (formWorkReasons.Count == 0)
+            return historical;
+        return new BillingComplianceResult(
+            false,
+            historical.Reasons.Concat(formWorkReasons).Distinct(StringComparer.Ordinal).ToArray(),
+            historical.Blockers);
+    }
+
+    private static IReadOnlyList<string> EvaluateFormWorkBilling(
+        ServerNote note,
+        IReadOnlyList<ServerForm> forms)
+    {
+        if (note.NoteType != (int)NoteType.Form)
+            return [];
+
+        var formType = note.FormType is int type
+            ? ContractMapper.FormTypeName(type)
+            : string.Empty;
+        if (FormWorkBillingRules.IsRelease(formType))
+            return [];
+
+        var linkedForm = forms.FirstOrDefault(form => form.Id == note.FormId);
+        var decision = FormWorkBillingRules.Evaluate(
+            new FormWorkNoteFact(note.PersonId, formType, note.EventDate, note.FormId),
+            linkedForm is null
+                ? null
+                : new FormWorkObligationFact(
+                    linkedForm.Id, linkedForm.PersonId, linkedForm.Type,
+                    linkedForm.DueDate, linkedForm.CompletedDate));
+        return decision.Reasons;
     }
 
     /// <summary>
@@ -9686,6 +9856,11 @@ internal static partial class ApiEndpoints
             errors["formType"] = ["The form type is invalid."];
         if (!ContractMapper.TryParseNoteType(request.NoteType, out _))
             errors["noteType"] = ["The note type is invalid."];
+        var formLinkError = FormNoteLinkRules.Validate(
+            request.NoteType, request.FormType, request.Status, request.FormId,
+            request.FormDateCorrectionReason);
+        if (formLinkError is not null)
+            errors["formId"] = [formLinkError];
         if (!ContractMapper.TryParseGoalProgress(request.GoalProgress, out _))
             errors["goalProgress"] = ["Goal progress must be None, Minimal, Moderate, or Substantial."];
         else if (string.Equals(request.Status, "Logged", StringComparison.Ordinal) &&

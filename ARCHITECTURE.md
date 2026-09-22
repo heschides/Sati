@@ -1,6 +1,6 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-09-14.*
+*Living document. Updated during structured review sessions. Last updated: 2026-09-21.*
 
 ## Annual compliance and service-date billing — September 14 correction (unreleased)
 
@@ -15,7 +15,10 @@ applied; no deployment is implied by this source change.
 `Form.TargetEffectiveDate` is the stable identity of one annual obligation. `DueDate` is a deadline,
 not an identity from which a cycle may be inferred. Current and upcoming annual targets are separate
 years, and a missing form remains visibly missing; readers may not borrow a row from the adjacent
-year. The database uniqueness target is `(PersonId, Type, TargetEffectiveDate)`. The only legacy
+year. The database uniqueness target is `(PersonId, Type, TargetEffectiveDate)`. Ordinary person edits
+refuse to change `EffectiveDate` once any form or release obligation exists: that anchor can be
+corrected only by a future audited reconciliation that accounts for linked evidence and billing.
+The only legacy
 due-date identity fallback is isolated inside the schema-gated startup repair immediately before
 the old 2026-09-01 unique-index migration; current runtime readers and repair code may not use it.
 
@@ -49,8 +52,11 @@ The selected `CompletedOn` or `OpenedOn` date is the date the work actually occu
 immutable UTC recording time is a separate fact. Past occurrence dates are ordinary; future dates
 are invalid, and work cannot be recorded before its configured availability date. Generic form
 updates cannot change either date. Opening uses the dedicated audited `/forms/{id}/open` path;
-completion uses an append-only attestation. Form notes, PDFs, external-artifact records, safety-plan
-approval, and privacy receipts may be useful evidence, but none is a second completion gate.
+completion uses an append-only attestation. A non-release Form note identifies its exact
+`FormId`; when it becomes Logged, its activity date attests that form in the same database
+transaction. A reasoned date correction appends a revocation and replacement. PDFs,
+external-artifact records, safety-plan approval, and privacy receipts do not themselves
+change form completion. Releases follow their separate authorization workflow.
 
 Reclassification has one semantic dependency rather than an artifact prerequisite: a completed
 Reclassification means the Comprehensive Assessment for the same `TargetEffectiveDate` was already
@@ -110,9 +116,15 @@ authoritative service-date evaluation.
 
 The due date itself is billable. A selected obligation blocks only when
 `serviceDate > DueDate && serviceDate < CompletedDate`; if completion is still absent, the interval
-has no end. The completion date is billable. Late completion therefore stops future blocking but
-does not silently make notes in the historical gap eligible. Supervisory approval and claim
-creation re-evaluate the same service-date policy and exact blocker identities.
+has no end. The completion date ends this general block for later, unrelated services. The note that
+documents form work has a separate exact-form rule: its activity date must equal the current
+attested completion date, and that date must be on or before the form due date. A late
+form-work note stays nonbillable even after completion lifts the general block. The rule
+excludes releases and cannot be bypassed by supervisor exception or Admin recovery. Claim
+creation, period submission, and 837P generation re-evaluate it. A supervisor may
+approve an accurate clinical note while the billing hold remains. An Admin can restore
+billability only by correcting a demonstrably wrong source fact with a reason and audit
+trail; the ordinary form-work rule must then pass.
 
 A supervisor exception belongs to one note. It requires an explanation, explicit confirmation,
 the expected note revision, and the exact current obligation IDs; an unselected or newly appearing
@@ -772,16 +784,22 @@ report and skip existing ids.
 
 ## Form evidence and attestation
 
-Evidence and `Form` records deliberately answer different questions. A form-tagged case note or
-quarterly `ReviewItem` says work was documented. A current-cycle `Form` records the separate human
-attestation that the form itself was completed. Saving or deleting evidence never completes or
-revokes a form.
+A non-release Form note and its form obligation are coupled by exact `FormId`. A draft documents
+work in progress; transition to Logged attests the form on the note's activity date. Note and
+attestation commit together, with the note ID in the append-only ledger. A conflicting prior date
+requires an explanation; correction appends a reasoned revocation and replacement atomically.
+Ordinary notes and releases retain their separate workflows. Legacy unlinked Form notes are not
+assigned an obligation by guessing; billing holds them until their identity is reviewed.
+The Notes-to-Forms foreign key uses `NO ACTION`: an attempted form deletion cannot silently
+clear a submitted note's exact evidence link. Ordinary persisted-form deletion is already
+refused for compliance retention, and the selected-form panel explains this to staff.
 
 The Reviews workspace, dashboard, and Clients workspace share one `FormAttestationControl` for all
 twelve legacy form types. The date picker starts blank. `FormAttestationRules` in
 `Sati.Contracts.V1` rejects future dates and dates before the obligation's cycle or availability
 window in the WPF capture, Local `FormService`, and API. `PUT /api/v1/forms/{id}` cannot change
-either completion or opening state. Only the attestation/revocation routes can change completion;
+either completion or opening state. Completion changes through the attestation/revocation
+routes or atomically when a linked non-release Form note becomes Logged;
 only `POST /api/v1/forms/{id}/open` can record the actual opening date.
 
 The Clients workspace adds a per-selected-person presentation lock around its Forms matrix.
@@ -804,9 +822,9 @@ matrix, and `UpcomingEvents` refresh together. Changes initiated by the Clients 
 workspace first reload the dashboard's person snapshot, then use that same cascade. People and
 upcoming-event loads take `LatestRequestTracker` identities before publishing shared UI state.
 
-The pending-attestation list is derived from eligible form-tagged notes and outstanding forms by
-person, form type, and the cycle containing the note's event date. It is not a stored prompt and
-does not depend on which dashboard person happened to be selected when the note was saved.
+The pending-attestation list uses an exact `FormId` when a note has one. Older unlinked
+notes may be shown for manual evidence review, but are never silently assigned to an
+obligation or made billable by inference. It does not depend on the dashboard selection.
 
 `DocumentArtifact` remains a separate server fact for a generated, Draft, or externally recorded
 annual document; PDF bytes remain only in the response/save flow. A form attestation is sufficient
@@ -2060,15 +2078,20 @@ Throws `ArgumentOutOfRangeException` for unhandled `FormType`.
   cadence; the legacy Q4-before-anniversary setting no longer defines Q4's due date.
 - `ComputeAvailableDate` subtracts each type's open-window setting from its stored due date. Thus
   the default CA is due target−90 and available target−120, while PCP is due on target and available
-  target−90. Availability must not be confused with due date or annual identity.
+  target−90. Availability must not be confused with due date or annual identity. These offsets are
+  calendar **days**, not calendar months: a plan starting December 16, 2026 has a default CA due
+  September 17, 2026 and available August 18, 2026. Three calendar months before December 16 is
+  September 16, a different rule. Agency settings or a stored form deadline may differ from the
+  defaults. A completion date does not decide which annual target a form belongs to.
 - Recipient-specific release obligations use `ReleaseObligationRules`: annual rows are available
   target−90 and due on target; assignment-start rows are available when known and due one day
   before the provider service begins.
 
 ### `FormCellStatusCalculator`
 Pure timing→color for the Caseload Matrix. `(Form?, today) → FormCellStatus`. Orthogonal to the
-open-form border (composed in XAML). `null` → `NotYetOpen` defensively. `IsCompliant` (i.e., not
-overdue) checked first; a completed form stays `Complete` regardless of today vs. due date.
+open-form border (composed in XAML). `null` → `NotYetOpen` defensively. A completion counts only
+when its actual date has arrived (`IsSatisfiedAsOf`). The matrix selects the renewal once the
+current annual form is satisfied, so a completed old form cannot hide an overdue renewal.
 
 ### `WorkdayHelper`
 Weekday/holiday exclusion for productivity. XML comment still names dead `SchedulerViewModel`.

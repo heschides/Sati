@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Models;
+using Sati.Services.Billing;
 
 namespace Sati.Data;
 
@@ -252,15 +253,24 @@ public sealed class SupervisorService(
         return string.IsNullOrEmpty(term) ? null : term[..Math.Min(term.Length, 200)];
     }
 
-    private static BillingComplianceResult ServiceDateCompliance(
+    internal static BillingComplianceResult ServiceDateCompliance(
         Note note,
-        BillingCompliancePolicyContext policy) =>
-        note.EventDate is DateTime serviceDate
+        BillingCompliancePolicyContext policy)
+    {
+        var historical = note.EventDate is DateTime serviceDate
             ? note.Person.EvaluateBillingWindowDetailed(
                 serviceDate,
                 policy.Resolve(serviceDate),
                 policy.Schedule)
             : new BillingComplianceResult(true, [], []);
+        var formWorkReasons = BillingService.EvaluateFormWorkBilling(note);
+        if (formWorkReasons.Count == 0)
+            return historical;
+        return new BillingComplianceResult(
+            false,
+            historical.Reasons.Concat(formWorkReasons).Distinct(StringComparer.Ordinal).ToArray(),
+            historical.Blockers);
+    }
 
     private async Task<List<Note>> GetLoggedNotesAsync(int supervisorId, bool allSupervisees)
     {

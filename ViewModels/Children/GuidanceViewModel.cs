@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 
@@ -97,6 +97,11 @@ namespace Sati.ViewModels.Children
         {
             var blocks = new[]
             {
+                new GuidanceBlock(
+                    "How does Sati date annual Comp Assessments and PCPs?",
+                    "Annual Forms",
+                    "Sati groups annual forms by the date the plan starts, not by the date you finish the form. By default, the PCP is due on the plan start date. The Comp Assessment is due 90 calendar days before that date and can be started 30 days before its due date. For a plan starting Dec 16, 2026, the Comp is due Sep 17, 2026 and can be started Aug 18, 2026. Ninety days is different from three calendar months: three months before Dec 16 is Sep 16. Agency settings can change these offsets; an existing form keeps its recorded due date. The current and renewal checkboxes are separate records for separate plan years. Choose the plan year that the work belongs to. If a completion is on the wrong year, review its attestation history, revoke it with a reason, and attest the correct year's form using the actual completion date. Then check whether the older year has its own completion evidence. Sati retains the earlier attestation and revocation in the history."),
+
                 new GuidanceBlock(
                     "Where do I find the ModivCare trip request forms?",
                     "Transportation",

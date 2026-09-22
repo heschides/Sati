@@ -262,6 +262,37 @@
                            TextWrapping="Wrap" Margin="0,0,0,8" />
                 <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,0,0,8"
                            AutomationProperties.LiveSetting="Polite" />
+                <Border Background="{DynamicResource SurfaceMutedBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="6" Padding="12"
+                        Margin="0,0,0,16"
+                        AutomationProperties.Name="Form completion date change reviews">
+                    <StackPanel>
+                        <TextBlock Text="FORM COMPLETION DATE CHANGES" Style="{StaticResource SectionHeading}" />
+                        <TextBlock Text="{Binding FormChangeReviewSummary}" TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                        <ItemsControl ItemsSource="{Binding FormChangeReviewFlags}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                            CornerRadius="4" Padding="8" Margin="0,4,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding RecordLabel}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding DateLabel}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding ReasonLabel}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding HoldLabel}" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource DangerStrongBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding RecordedLabel}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
                 <!-- PENDING APPROVALS SECTION -->
                 <TextBlock Text="PENDING APPROVALS"
                            Style="{StaticResource SectionHeading}" />
@@ -363,6 +394,13 @@
                                                 Command="{Binding DataContext.ApproveCommand,
                                                         RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" />
+                                        <Button Content="Correct form date (Admin)"
+                                                Style="{StaticResource ReturnButton}"
+                                                Visibility="{Binding CanAdminCorrectSourceDate, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                AutomationProperties.Name="Correct linked form note source date"
+                                                Command="{Binding DataContext.OpenCorrectionDialogCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
                                         <Button Content="Return"
                                                 Style="{StaticResource ReturnButton}"
                                                 Command="{Binding DataContext.OpenReturnDialogCommand,
@@ -388,7 +426,7 @@
                          FontSize="11"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource DangerStrongBrush}" />
-                    <Run Text="  ·  billing remains blocked unless separately released"
+                    <Run Text="  ·  billing remains blocked until the applicable issue is resolved or authorized"
                          FontSize="10"
                          Foreground="{DynamicResource TextSecondaryBrush}" />
                 </TextBlock>
@@ -435,6 +473,11 @@
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource DangerStrongBrush}"
                                                        TextWrapping="Wrap" />
+                                            <TextBlock Text="Form-work billing remains held even if ordinary blockers receive a supervisor exception. Correct an erroneous source date through the authorized correction workflow."
+                                                       Visibility="{Binding HasHardFormWorkHold, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                       FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource DangerStrongBrush}"
+                                                       TextWrapping="Wrap" Margin="0,4,0,0" />
                                             <ItemsControl ItemsSource="{Binding ComplianceFailureReasons}"
                                                           Margin="0,4,0,0"
                                                           AutomationProperties.Name="Billing compliance failures">
@@ -522,9 +565,18 @@
                                                 Command="{Binding DataContext.ApproveCommand,
                                                         RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" />
-                                        <Button Content="Override &amp; Approve"
+                                        <Button Content="Override ordinary blockers &amp; Approve"
                                                 Style="{StaticResource OverrideButton}"
+                                                Visibility="{Binding CanOverrideOrdinaryBlockers, Converter={StaticResource BoolToVisibilityConverter}}"
+
                                                 Command="{Binding DataContext.OpenOverrideDialogCommand,
+                                                        RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Correct form date (Admin)"
+                                                Style="{StaticResource ReturnButton}"
+                                                Visibility="{Binding CanAdminCorrectSourceDate, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                AutomationProperties.Name="Correct linked form note source date"
+                                                Command="{Binding DataContext.OpenCorrectionDialogCommand,
                                                         RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" />
                                         <Button Content="Return"
@@ -583,6 +635,51 @@
                         <Button Content="Return Note"
                                 Style="{StaticResource ReturnButton}"
                                 Command="{Binding ConfirmReturnCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Admin source date correction dialog -->
+        <Grid Background="{DynamicResource ScrimBrush}"
+              Visibility="{Binding IsCorrectionDialogVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Background="{DynamicResource WindowBackgroundBrush}"
+                    BorderBrush="{DynamicResource OverdueBorderBrush}" BorderThickness="1"
+                    CornerRadius="6" Width="480" Padding="20"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="CORRECT FORM WORK DATE (ADMIN)"
+                               Style="{StaticResource SectionHeading}" />
+                    <TextBlock Text="This corrects the note's recorded activity date and the linked form's completion attestation together. Billing is recalculated from the corrected source facts."
+                               TextWrapping="Wrap" Margin="0,0,0,12"
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <TextBlock Text="{Binding CorrectionNote.ClientName}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding CorrectionNote.FormId, StringFormat='Linked form #{0}'}"
+                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,4" />
+                    <TextBlock Text="{Binding CorrectionTargetSummary}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,12" />
+                    <TextBlock Text="Actual date the work was done" Style="{StaticResource FieldLabel}" />
+                    <DatePicker SelectedDate="{Binding CorrectedActivityDate, Mode=TwoWay}"
+                                AutomationProperties.Name="Corrected actual activity date"
+                                Margin="0,0,0,12" />
+                    <TextBlock Text="Why was the source date wrong?" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding CorrectionReason, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" TextWrapping="Wrap" MaxLength="4000"
+                             Height="96" Padding="8" Margin="0,0,0,12"
+                             AutomationProperties.Name="Form date correction explanation" />
+                    <CheckBox Content="I checked the source record and confirm this is the actual date of work."
+                              IsChecked="{Binding CorrectionEvidenceConfirmed, Mode=TwoWay}"
+                              AutomationProperties.Name="Confirm form date correction evidence"
+                              Margin="0,0,0,12" />
+                    <TextBlock Text="{Binding CorrectionStatusMessage}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource DangerStrongBrush}"
+                               AutomationProperties.LiveSetting="Polite" Margin="0,0,0,12" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Cancel" Style="{StaticResource CancelButton}"
+                                Command="{Binding CancelCorrectionCommand}" />
+                        <Button Content="Save source correction" Style="{StaticResource ApproveButton}"
+                                Command="{Binding ConfirmCorrectionCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Border>

@@ -4203,6 +4203,12 @@ completion does not silently repair the service-date gap.
 
 ### The annual effective date is the identity; the due date is one rule applied to it
 
+Ordinary client edits cannot change the effective-date anchor after forms or recipient-specific
+release obligations exist. Their target identities and stored deadlines remain in place when the
+client row changes, so allowing that edit would split one consumer across incompatible annual
+schedules. A separate audited reconciliation with an impact preview is deferred in `AGENDA.md`.
+
+
 A form now carries `TargetEffectiveDate`. For a March 7 target, the PCP, Safety Plan, Privacy
 Practices, and annual releases are due March 7; the CA is due 90 calendar days earlier; and Reclass
 is due 30 calendar days earlier. Q1–Q4 reviews of the plan beginning March 7 are due exactly
@@ -4866,3 +4872,58 @@ preview is acceptable only if it displays those same generated PDF bytes. Faithf
 Sati-owned outputs may remain. This supersedes the 2026-09-13 decision to require a separately drawn
 live preview in every editable form workspace; it does not change validation, artifact, signature,
 audit, or publication rules.
+
+## 2026-09-21 — annual form labels and the caseload matrix identify renewals
+
+Annual form labels now name the plan start date for both the in-force form and its renewal. The
+caseload matrix displays the renewal once the current form is satisfied; an outstanding current
+form remains visible. A completed old-year assessment must not make an overdue next-year
+assessment look complete in either surface. The matrix uses `AnnualFormSlots` and the agency's
+schedule rather than a second renewal-window formula.
+
+The default Comp Assessment offset is 90 calendar days before the target effective date, not
+three calendar months. For a December 16, 2026 target, the computed due date is September 17.
+The actual annual target is stored on each form, and a completion date alone cannot identify
+its plan year. A completion recorded on an older target while the next target is outstanding
+requires evidence review and an audited revoke/re-attest correction; Sati must not silently
+move it because a genuinely late older-year assessment is possible.
+
+## 2026-09-21 — A submitted form-work note attests one exact obligation
+
+This supersedes the 2026-09-03 choice to keep every form note separate from
+attestation. A non-release Form note now carries the exact form obligation ID.
+When the case manager changes it to Logged, the note's activity date is the
+attested completion date. The note and attestation save atomically. The note
+editor shows the selected obligation's due date and annual target so a prior
+year's form cannot be selected merely because it has the same type.
+
+A correction after an earlier attestation requires a written explanation and
+appends revocation and replacement evidence. Changing an already submitted
+note's attestation creates a durable supervisor review flag; a note that reached
+billing also creates a billing flag. The original note, claim, and audit history
+are retained. A transmitted claim requires the existing claim-correction
+workflow; its retained 837P is never rewritten.
+
+The general compliance interval ends on a form's completion date, so later
+unrelated services can become billable. The note documenting that form work is
+billable only if its activity date matches the current completion attestation
+and the work was completed by the due date. This agency rule excludes releases
+and is enforced again at claim creation, period submission, and EDI export;
+neither a supervisor exception nor Admin recovery waives it. A supervisor may approve
+the note as a clinical record while billing stays blocked. An Admin may restore
+billability only after correcting the wrong source fact, recording the explanation,
+and letting the ordinary form-work rule pass. Historical Form
+notes without an exact link are held for review rather than assigned by guess.
+
+The exact note-to-form foreign key refuses deletion rather than clearing `FormId`. SQL Server
+rejected the initially proposed `SET NULL` action because Person already cascades to both
+Notes and Forms; more importantly, clearing the link would weaken retained evidence. The
+selected-form UI tells staff that saved forms and linked notes are retained and directs
+completion corrections through reasoned revocation and reattestation.
+
+The Admin source-correction workflow changes a submitted Form note's activity date and
+its linked form completion together, with a reason, evidence confirmation, immutable
+audit history, and a revision check. It refuses notes that already have a claim record;
+those require billing claim correction. Existing effective-date editing does not recalculate
+stored form due dates, so changing a due/effective schedule needs a separate audited
+obligation reconciliation before any note can become billable from that change.

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Models;
 using Sati.Models.Billing;
@@ -37,6 +37,7 @@ namespace Sati.Data
         public DbSet<BillingComplianceRecoveryObligation> BillingComplianceRecoveryObligations { get; set; }
         public DbSet<BillingComplianceRecoveryNote> BillingComplianceRecoveryNotes { get; set; }
         public DbSet<BillingCompliancePolicyReviewFlag> BillingCompliancePolicyReviewFlags { get; set; }
+        public DbSet<FormAttestationChangeReviewFlag> FormAttestationChangeReviewFlags { get; set; }
         public DbSet<ReleaseObligation> ReleaseObligations { get; set; }
         public DbSet<ReleaseObligationAttestation> ReleaseObligationAttestations { get; set; }
         public DbSet<ReleaseAuthorizationEvent> ReleaseAuthorizationEvents { get; set; }
@@ -108,6 +109,7 @@ namespace Sati.Data
             ReleaseObligationPersistenceModel.ProtectWrites(ChangeTracker);
             BillingComplianceRecoveryPersistenceModel.ProtectWrites(ChangeTracker);
             BillingCompliancePolicyReviewPersistenceModel.ProtectWrites(ChangeTracker);
+            FormAttestationChangeReviewPersistenceModel.ProtectWrites(ChangeTracker);
             if (ChangeTracker.Entries<Note>().Any(entry =>
                     entry.State == EntityState.Modified &&
                     entry.OriginalValues.GetValue<bool>(nameof(Note.ComplianceOverride)) &&
@@ -166,6 +168,7 @@ namespace Sati.Data
             ReleaseObligationPersistenceModel.Configure<Agency, User, Person, Provider, DocumentArtifact>(modelBuilder);
             BillingComplianceRecoveryPersistenceModel.Configure<Agency, User, Person, Note>(modelBuilder);
             BillingCompliancePolicyReviewPersistenceModel.Configure<Agency, Person, Note, ClaimLine>(modelBuilder);
+            FormAttestationChangeReviewPersistenceModel.Configure<Agency, Person, Note, Form, ClaimLine>(modelBuilder);
             modelBuilder.Entity<Person>()
                 .HasMany(person => person.ReleaseObligations)
                 .WithOne()
@@ -518,11 +521,16 @@ namespace Sati.Data
                       .IsRequired();
                 entity.Property(n => n.VisitDocumentationJson);
                 entity.Property(n => n.OverrideReason).HasMaxLength(4_000);
+                entity.Property(n => n.FormDateCorrectionReason).HasMaxLength(1_000);
                 entity.Property(n => n.OverrideObligationIdsJson).HasMaxLength(4_000);
                 entity.HasOne(n => n.Person)
                       .WithMany(p => p.Notes)
                       .HasForeignKey(n => n.PersonId)
                       .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<Form>()
+                      .WithMany()
+                      .HasForeignKey(n => n.FormId)
+                      .OnDelete(DeleteBehavior.Restrict);
                 entity.HasOne(n => n.Agency)
                       .WithMany()
                       .HasForeignKey(n => n.AgencyId)

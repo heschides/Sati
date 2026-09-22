@@ -33,6 +33,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<BillingComplianceRecoveryObligation> BillingComplianceRecoveryObligations => Set<BillingComplianceRecoveryObligation>();
     public DbSet<BillingComplianceRecoveryNote> BillingComplianceRecoveryNotes => Set<BillingComplianceRecoveryNote>();
     public DbSet<BillingCompliancePolicyReviewFlag> BillingCompliancePolicyReviewFlags => Set<BillingCompliancePolicyReviewFlag>();
+    public DbSet<FormAttestationChangeReviewFlag> FormAttestationChangeReviewFlags => Set<FormAttestationChangeReviewFlag>();
     public DbSet<ReleaseObligation> ReleaseObligations => Set<ReleaseObligation>();
     public DbSet<ReleaseObligationAttestation> ReleaseObligationAttestations => Set<ReleaseObligationAttestation>();
     public DbSet<ReleaseAuthorizationEvent> ReleaseAuthorizationEvents => Set<ReleaseAuthorizationEvent>();
@@ -96,6 +97,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
         ReleaseObligationPersistenceModel.Configure<ServerAgency, ServerUser, ServerPerson, ServerProvider, ServerDocumentArtifact>(modelBuilder);
         BillingComplianceRecoveryPersistenceModel.Configure<ServerAgency, ServerUser, ServerPerson, ServerNote>(modelBuilder);
         BillingCompliancePolicyReviewPersistenceModel.Configure<ServerAgency, ServerPerson, ServerNote, ServerClaimLine>(modelBuilder);
+        FormAttestationChangeReviewPersistenceModel.Configure<ServerAgency, ServerPerson, ServerNote, ServerForm, ServerClaimLine>(modelBuilder);
         modelBuilder.Entity<ServerUser>(entity =>
         {
             entity.ToTable("Users");
@@ -281,7 +283,12 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Revision).IsConcurrencyToken();
             entity.Property(x => x.OverrideReason).HasMaxLength(4_000);
+            entity.Property(x => x.FormDateCorrectionReason).HasMaxLength(1_000);
             entity.Property(x => x.OverrideObligationIdsJson).HasMaxLength(4_000);
+            entity.HasOne<ServerForm>()
+                .WithMany()
+                .HasForeignKey(x => x.FormId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ServerSettings>(entity =>
@@ -773,6 +780,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
         ReleaseObligationPersistenceModel.ProtectWrites(ChangeTracker);
         BillingComplianceRecoveryPersistenceModel.ProtectWrites(ChangeTracker);
         BillingCompliancePolicyReviewPersistenceModel.ProtectWrites(ChangeTracker);
+        FormAttestationChangeReviewPersistenceModel.ProtectWrites(ChangeTracker);
         if (ChangeTracker.Entries<ServerNote>().Any(entry =>
                 entry.State == EntityState.Modified &&
                 entry.OriginalValues.GetValue<bool>(nameof(ServerNote.ComplianceOverride)) &&
@@ -1023,6 +1031,8 @@ internal sealed class ServerNote
     public int Revision { get; set; } = 1;
     public int PersonId { get; set; }
     public int? FormType { get; set; }
+    public int? FormId { get; set; }
+    public string? FormDateCorrectionReason { get; set; }
     public int? NoteType { get; set; }
     public int? GoalProgress { get; set; }
     public int? AgencyId { get; set; }

@@ -22,8 +22,6 @@ public sealed class NoteSubmissionComplianceApiTests(SatiApiFactory factory)
     [InlineData(true, "current")]
     [InlineData(false, "historical")]
     [InlineData(true, "historical")]
-    [InlineData(false, "form-tag")]
-    [InlineData(true, "form-tag")]
     public async Task LoggedSubmissionRefusesComplianceFailuresWithoutWriting(bool update, string contingency)
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
@@ -32,11 +30,7 @@ public sealed class NoteSubmissionComplianceApiTests(SatiApiFactory factory)
             contingency == "historical" ? today : null);
         var noteId = update ? await factory.CreateNoteInStatusAsync(NoteWorkflow.Pending, personId) : 0;
         var revision = update ? (await factory.GetNoteStateAsync(noteId)).Revision : 0;
-        var request = Request(personId, "Logged", today.AddDays(-2), revision) with
-        {
-            FormType = contingency == "form-tag" ? "PCP" : null,
-            NoteType = contingency == "form-tag" ? "Form" : "Contact"
-        };
+        var request = Request(personId, "Logged", today.AddDays(-2), revision);
         var before = await ReadStateAsync(personId);
 
         var response = update

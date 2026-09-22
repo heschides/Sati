@@ -30,7 +30,8 @@ public sealed record NoteFact(
     int PersonId,
     string FormType,
     DateTime EventDate,
-    string Status);
+    string Status,
+    int? FormId = null);
 
 public sealed record FormFact(
     int FormId,
@@ -56,7 +57,8 @@ public sealed record PendingAttestation(
     DateTime CycleEnd,
     DateTime DueDate,
     int EvidenceNoteId,
-    DateTime EvidenceDate);
+    DateTime EvidenceDate,
+    bool IsLegacyUnlinked = false);
 
 /// <summary>
 /// Single owner of the rules that decide whether a compliance-form attestation is
@@ -121,7 +123,8 @@ public static class FormAttestationRules
                 .Where(candidate =>
                     candidate.PersonId == note.PersonId &&
                     string.Equals(candidate.FormType, note.FormType, StringComparison.OrdinalIgnoreCase) &&
-                    candidate.CompletedDate is null)
+                    candidate.CompletedDate is null &&
+                    (note.FormId is null || candidate.FormId == note.FormId))
                 .Select(candidate => new
                 {
                     Form = candidate,
@@ -148,7 +151,8 @@ public static class FormAttestationRules
                 form.Cycle.Value.CycleEnd,
                 form.Form.DueDate.Date,
                 note.NoteId,
-                note.EventDate.Date));
+                note.EventDate.Date,
+                IsLegacyUnlinked: note.FormId is null));
         }
 
         return pending;

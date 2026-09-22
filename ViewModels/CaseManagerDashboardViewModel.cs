@@ -737,6 +737,9 @@ CalendarViewModel calendarViewModel,
                 : $"{category} — {item.RecipientDisplayName.Trim()}";
         }
 
+        private ComplianceScheduleSettings MatrixSchedule =>
+            _settings is null ? new ComplianceScheduleSettings() : ScheduleSettings(_settings);
+
         private static ComplianceScheduleSettings ScheduleSettings(Settings settings) => new(
             settings.ReviewOpenDaysBefore,
             settings.PcpOpenDaysBefore,
@@ -973,7 +976,7 @@ CalendarViewModel calendarViewModel,
         [RelayCommand]
         private void NavigateToMatrix() 
         {
-            Matrix?.Rebuild(People, DateTime.Today);
+            Matrix?.Rebuild(People, DateTime.Today, MatrixSchedule);
             CurrentSubViewModel = Matrix;
         }
         [RelayCommand] private void NavigateToCalendar() => CurrentSubViewModel = Calendar;
@@ -1172,7 +1175,7 @@ CalendarViewModel calendarViewModel,
         {
             RefreshComplianceFlags();
             RefreshPendingAttestations();
-            Matrix?.Rebuild(People, DateTime.Today);
+            Matrix?.Rebuild(People, DateTime.Today, MatrixSchedule);
             await LoadUpcomingEventsAsync();
         }
 
@@ -1200,7 +1203,7 @@ CalendarViewModel calendarViewModel,
                 _settings = await _settingsService.LoadAsync();
                 await LoadPeopleAsync();
                 Matrix = new CaseloadMatrixViewModel();
-                Matrix.Rebuild(People, DateTime.Today);
+                Matrix.Rebuild(People, DateTime.Today, MatrixSchedule);
                 OnPropertyChanged(nameof(Matrix));
                 OnPropertyChanged(nameof(EffectiveDateGroups));
                 await _noteService.UpdateAbandonedNotesAsync(DocumentationWindowDays);
@@ -1499,7 +1502,7 @@ CalendarViewModel calendarViewModel,
             if (!TrySelectOpeningDate(form, out var openedOn))
                 return;
             await _formService.OpenFormAsync(form, openedOn);
-            Matrix?.Rebuild(People, DateTime.Today);
+            Matrix?.Rebuild(People, DateTime.Today, MatrixSchedule);
         }
 
         internal static Form? ResolveAgendaForm(
@@ -1567,7 +1570,8 @@ CalendarViewModel calendarViewModel,
                 return;
             var form = SelectedPerson.Forms.SingleOrDefault(candidate => candidate.Id == pending.FormId);
             if (form is not null)
-                BeginAttestation(form, SelectedPerson, pending.EvidenceNoteId);
+                BeginAttestation(form, SelectedPerson,
+                    pending.IsLegacyUnlinked ? null : pending.EvidenceNoteId);
         }
 
         private void BeginAttestation(Form form, Person? person, int? evidenceNoteId = null)
@@ -1601,7 +1605,8 @@ CalendarViewModel calendarViewModel,
                     note.PersonId,
                     note.FormType!.Value.ToString(),
                     note.EventDate!.Value,
-                    note.Status!.Value.ToString()))
+                    note.Status!.Value.ToString(),
+                    note.FormId))
                 .ToList();
             var formFacts = person.Forms.Select(form => new FormFact(
                 form.Id,

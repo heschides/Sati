@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Sati.Data;
 using Sati.Data.Billing;
 using Sati.Models;
@@ -112,6 +112,26 @@ namespace Sati.Services.Billing
         {
             await using var context = _contextFactory.CreateDbContext();
             var actor = await ValidateBillingActorAsync(context, suppliedActor);
+            // Discover the period key without retaining note/form entities. The
+            // authoritative source and form state are read again only after the
+            // serializable period lock has been acquired.
+            var sourceKey = await context.Notes.AsNoTracking()
+                .Where(candidate => candidate.Id == noteId &&
+                    candidate.AgencyId == actor.AgencyId &&
+                    candidate.Person.AgencyId == actor.AgencyId)
+                .Select(candidate => new
+                {
+                    candidate.EventDate,
+                    OwnerUserId = candidate.Person.UserId
+                })
+                .SingleOrDefaultAsync()
+                ?? throw new InvalidOperationException($"Note {noteId} was not found in your agency.");
+            if (sourceKey.EventDate is not DateTime sourceDate)
+                throw new InvalidOperationException("The service note has no service date.");
+            var serviceDate = sourceDate.Date;
+            await using var periodWrite = await BillingPeriodWriteScope.BeginAsync(
+                context, actor.AgencyId, sourceKey.OwnerUserId,
+                serviceDate.Year, serviceDate.Month);
 
             var note = await context.Notes
                 .Include(n => n.Person)
@@ -127,6 +147,9 @@ namespace Sati.Services.Billing
 
             if (note.Person is null)
                 throw new InvalidOperationException($"Note {noteId} has no associated person.");
+            if (note.EventDate?.Date != serviceDate || note.Person.UserId != sourceKey.OwnerUserId)
+                throw new InvalidOperationException(
+                    "The note's service date or owner changed while billing was being prepared. Refresh and try again.");
             await BillingComplianceProjectionLoader.PopulateAsync(
                 context, [note.Person], actor.AgencyId);
 
@@ -145,7 +168,6 @@ namespace Sati.Services.Billing
             if (await context.ClaimLines.AnyAsync(line => line.NoteId == noteId))
                 throw new InvalidOperationException("This service note already has a billing claim line.");
 
-            var serviceDate = note.EventDate!.Value.Date;
             var period = await context.BillingPeriods
                 .Include(candidate => candidate.Lines)
                 .SingleOrDefaultAsync(candidate =>
@@ -205,10 +227,13 @@ namespace Sati.Services.Billing
             try
             {
                 await context.SaveChangesAsync();
+                await periodWrite.CommitAsync();
                 return claimLine;
             }
             catch (DbUpdateException)
             {
+                await periodWrite.RollbackAsync();
+                await periodWrite.DisposeAsync();
                 context.ChangeTracker.Clear();
                 if (await context.ClaimLines.AsNoTracking().AnyAsync(line => line.NoteId == noteId))
                     throw new InvalidOperationException("This service note already has a billing claim line.");
@@ -391,6 +416,10 @@ namespace Sati.Services.Billing
             IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null)
         {
             var errors = ValidateNonComplianceBillingRequirements(note).ToList();
+            // The note documenting a form is subject to the form's own deadline.
+            // Keep this outside the ordinary compliance-release path: a supervisor
+            // exception or administrative recovery cannot make late form work billable.
+            errors.AddRange(EvaluateFormWorkBilling(note));
             errors.AddRange(EvaluateBillingComplianceRelease(
                 note, complianceContext, recoveryDecisions));
 
@@ -398,6 +427,32 @@ namespace Sati.Services.Billing
                 IsValid: errors.Count == 0,
                 Note: note,
                 Errors: errors);
+        }
+
+        /// <summary>
+        /// A form-work note cites one exact persisted obligation. Form completion
+        /// must be current, on time, and dated to the work recorded by the note.
+        /// The caller loads the person's forms with the note at every billing gate.
+        /// </summary>
+        internal static IReadOnlyList<string> EvaluateFormWorkBilling(Note note)
+        {
+            ArgumentNullException.ThrowIfNull(note);
+            if (note.NoteType != NoteType.Form)
+                return [];
+
+            var formType = note.FormType?.ToString() ?? string.Empty;
+            if (FormWorkBillingRules.IsRelease(formType))
+                return [];
+
+            var linkedForm = note.Person?.Forms.FirstOrDefault(form => form.Id == note.FormId);
+            var decision = FormWorkBillingRules.Evaluate(
+                new FormWorkNoteFact(note.PersonId, formType, note.EventDate, note.FormId),
+                linkedForm is null
+                    ? null
+                    : new FormWorkObligationFact(
+                        linkedForm.Id, linkedForm.PersonId, linkedForm.Type.ToString(),
+                        linkedForm.DueDate, linkedForm.CompletedDate));
+            return decision.Reasons;
         }
 
         /// <summary>

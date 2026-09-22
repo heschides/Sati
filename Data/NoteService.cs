@@ -24,11 +24,16 @@ public class NoteService(
         note.AgencyId = actor.AgencyId;
         await using var scheduleWrite = await ServiceTimeWriteScope.BeginAsync(
             context, actor.AgencyId, actor.Id);
-        await EnsureSubmissionAllowedAsync(context, actor, note, today);
+        await EnsureExactFormLinkAsync(context, note);
         await EnsureServiceTimeAvailableAsync(context, actor.Id, note, null);
         context.Notes.Add(note);
         LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteCreated, "Note");
         await context.SaveChangesAsync();
+        if (await AttestLinkedFormAsync(context, actor, note, today))
+            await context.SaveChangesAsync();
+        // The note's own form completion is now visible to the ordinary window
+        // gate. Any unrelated blocker still rolls this entire transaction back.
+        await EnsureSubmissionAllowedAsync(context, actor, note, today);
         await scheduleWrite.CommitAsync();
         return note;
     }
@@ -99,12 +104,13 @@ public class NoteService(
                     "You may reassign a note only to another client on your own caseload.");
         }
 
-        await EnsureSubmissionAllowedAsync(context, actor, note, today);
+        await EnsureExactFormLinkAsync(context, note);
         await EnsureServiceTimeAvailableAsync(context, actor.Id, note, stored.Id);
         CopyCaseManagerValues(note, stored);
         stored.PersonId = note.PersonId;
         stored.Person = targetPerson;
         stored.Revision++;
+        await AttestLinkedFormAsync(context, actor, stored, today);
         LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteUpdated, "Note", stored.Id);
         if (previousPersonId != stored.PersonId)
         {
@@ -123,6 +129,9 @@ public class NoteService(
         try
         {
             await context.SaveChangesAsync();
+            // Evaluate after this note's form attestation is persisted, but before
+            // commit so a remaining blocker rejects note and attestation together.
+            await EnsureSubmissionAllowedAsync(context, actor, note, today);
             await scheduleWrite.CommitAsync();
             note.Revision = stored.Revision;
             note.Person = targetPerson;
@@ -215,6 +224,8 @@ public class NoteService(
         target.Minutes = source.Minutes;
         target.StartTime = source.StartTime;
         target.FormType = source.FormType;
+        target.FormId = source.FormId;
+        target.FormDateCorrectionReason = source.FormDateCorrectionReason;
         target.NoteType = source.NoteType;
         target.GoalProgress = source.GoalProgress;
         target.CaseManagerJustification = source.CaseManagerJustification;
@@ -238,6 +249,11 @@ public class NoteService(
 
     private static void ValidateCaseManagerInput(Note note)
     {
+        var formLinkError = FormNoteLinkRules.Validate(
+            note.NoteType?.ToString(), note.FormType?.ToString(),
+            note.Status?.ToString(), note.FormId, note.FormDateCorrectionReason);
+        if (formLinkError is not null)
+            throw new ArgumentException(formLinkError, nameof(note));
         if (note.Narrative is null || note.Narrative.Length > 1_000_000)
             throw new ArgumentException("Narrative is required and must not exceed 1,000,000 characters.", nameof(note));
         if (note.PersonId <= 0) throw new ArgumentException("A valid person is required.", nameof(note));
@@ -280,6 +296,152 @@ public class NoteService(
 
     private static T? ParseNullable<T>(string? value) where T : struct, Enum =>
         value is null ? null : Enum.Parse<T>(value, ignoreCase: false);
+
+    private static async Task<bool> AttestLinkedFormAsync(
+        SatiContext context, User actor, Note note, DateTime today)
+    {
+        if (note.NoteType != NoteType.Form || note.Status != NoteStatus.Logged ||
+            FormNoteLinkRules.IsRelease(note.FormType?.ToString()))
+            return false;
+
+        if (note.FormId is not int formId || note.EventDate is not DateTime completedOn ||
+            note.Id <= 0)
+            throw new InvalidOperationException(
+                "A submitted Form note must identify the exact obligation, activity date, and saved note.");
+
+        var form = await context.Forms
+            .Include(candidate => candidate.Person)
+            .SingleAsync(candidate => candidate.Id == formId &&
+                candidate.PersonId == note.PersonId && candidate.Type == note.FormType);
+
+        var previousCompletedOn = form.CompletedDate;
+        if (previousCompletedOn?.Date == completedOn.Date)
+        {
+            var latest = await context.FormAttestations.AsNoTracking()
+                .Where(candidate => candidate.FormId == form.Id)
+                .OrderByDescending(candidate => candidate.Id)
+                .FirstOrDefaultAsync();
+            if (latest is { Kind: FormAttestationKind.Attested } &&
+                latest.EvidenceNoteId == note.Id)
+                return false;
+
+            form.Attest(FormAttestation.Attested(
+                completedOn, AttestationActorKind.CaseManager, actor.Id,
+                DateTime.UtcNow, evidenceNoteId: note.Id,
+                prerequisiteStateJson: FormAttestationRules.NoPrerequisitesStateJson,
+                reason: "Submitted form note cites this completion date."));
+            LocalAuditTrail.Record(context, actor, LocalAuditActions.FormAttested,
+                "Form", form.Id, System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    formType = form.Type.ToString(),
+                    completedOn = completedOn.Date.ToString("yyyy-MM-dd"),
+                    evidenceNoteId = note.Id,
+                    sameDateEvidenceAdded = true
+                }));
+            return true;
+        }
+        var correctionReason = note.FormDateCorrectionReason?.Trim();
+        if (previousCompletedOn is DateTime prior &&
+            string.IsNullOrWhiteSpace(correctionReason))
+            throw new InvalidOperationException(
+                $"This form was attested complete on {prior:M/d/yyyy}, but the note says " +
+                $"the work occurred on {completedOn:M/d/yyyy}. Enter a reason for the " +
+                "date correction before submitting this note.");
+
+        var effectiveDate = form.Person.EffectiveDate
+            ?? throw new InvalidOperationException("The client has no effective date.");
+        var cycle = FormAttestationRules.ResolveCycleForForm(
+            effectiveDate, form.Type.ToString(), form.DueDate,
+            form.TargetEffectiveDate == default ? null : form.TargetEffectiveDate)
+            ?? throw new InvalidOperationException(
+                "The selected form is not attached to a valid compliance cycle.");
+        var settings = await context.Settings.AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.AgencyId == actor.AgencyId)
+            ?? new Settings();
+        var availableOn = FormDueDateCalculator.ComputeAvailableDateForDueDate(
+            form.Type, form.DueDate, settings);
+        var formFacts = await context.Forms.AsNoTracking()
+            .Where(candidate => candidate.PersonId == note.PersonId)
+            .Select(candidate => new FormFact(
+                candidate.Id, candidate.PersonId, candidate.Type.ToString(),
+                candidate.DueDate, candidate.CompletedDate, candidate.TargetEffectiveDate))
+            .ToListAsync();
+        var decision = FormAttestationRules.Evaluate(
+            form.Type.ToString(), completedOn, cycle.CycleStart, today,
+            AttestationActorKind.CaseManager, [], formFacts,
+            targetEffectiveDate: form.TargetEffectiveDate == default
+                ? null : form.TargetEffectiveDate,
+            availableOn: availableOn);
+        if (!decision.Accepted)
+            throw new InvalidOperationException(
+                decision.DateError ?? string.Join(" ",
+                    decision.UnmetPrerequisites.Select(item => item.Message)));
+
+        var prerequisiteState = FormAttestationRules.NoPrerequisitesStateJson;
+        if (form.Type == FormType.Reclassification)
+        {
+            var assessment = formFacts.FirstOrDefault(candidate =>
+                candidate.FormType == FormType.ComprehensiveAssessment.ToString() &&
+                candidate.TargetEffectiveDate?.Date == form.TargetEffectiveDate.Date &&
+                candidate.CompletedDate is DateTime assessmentDate &&
+                assessmentDate.Date <= completedOn.Date);
+            if (assessment is not null)
+                prerequisiteState = FormAttestationRules.AssessmentPrerequisiteStateJson(
+                    assessment.FormId);
+        }
+
+        var recordedAtUtc = DateTime.UtcNow;
+        if (previousCompletedOn is not null)
+        {
+            form.RevokeAttestation(FormAttestation.Revoked(
+                AttestationActorKind.CaseManager, actor.Id, recordedAtUtc,
+                correctionReason!));
+            LocalAuditTrail.Record(
+                context, actor, LocalAuditActions.FormAttestationRevoked, "Form", form.Id,
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    formType = form.Type.ToString(),
+                    actorKind = AttestationActorKind.CaseManager.ToString(),
+                    evidenceNoteId = note.Id
+                }));
+        }
+
+        form.Attest(FormAttestation.Attested(
+            completedOn, AttestationActorKind.CaseManager, actor.Id, recordedAtUtc,
+            evidenceNoteId: note.Id, prerequisiteStateJson: prerequisiteState,
+            reason: correctionReason));
+        if (previousCompletedOn is not null)
+            await FormService.RecordLinkedNoteImpactFlagsAsync(
+                context, form, previousCompletedOn, completedOn, correctionReason!,
+                recordedAtUtc, changedNote: note);
+        LocalAuditTrail.Record(
+            context, actor, LocalAuditActions.FormAttested, "Form", form.Id,
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                formType = form.Type.ToString(),
+                targetEffectiveDate = form.TargetEffectiveDate == default
+                    ? null : form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
+                cycleStart = cycle.CycleStart.ToString("yyyy-MM-dd"),
+                completedOn = completedOn.Date.ToString("yyyy-MM-dd"),
+                actorKind = AttestationActorKind.CaseManager.ToString(),
+                evidenceNoteId = note.Id
+            }));
+        return true;
+    }
+
+    private static async Task EnsureExactFormLinkAsync(SatiContext context, Note note)
+    {
+        if (note.FormId is not int formId)
+            return;
+
+        var matches = await context.Forms.AsNoTracking().AnyAsync(form =>
+            form.Id == formId && form.PersonId == note.PersonId &&
+            form.Type == note.FormType);
+        if (!matches)
+            throw new ArgumentException(
+                "The selected form obligation does not match this client and form type.",
+                nameof(note));
+    }
 
     private static async Task EnsureSubmissionAllowedAsync(
         SatiContext context, User actor, Note note, DateTime today)

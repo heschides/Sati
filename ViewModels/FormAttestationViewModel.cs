@@ -12,6 +12,8 @@ namespace Sati.ViewModels;
 /// </summary>
 public partial class FormAttestationViewModel(IFormService formService) : ObservableObject
 {
+    public string RetentionNotice => FormRetentionRules.Message;
+
     private Form? _form;
     private DateTime _cycleStart;
     private int? _evidenceNoteId;
@@ -72,12 +74,31 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     public bool IsIncomplete => !IsComplete;
     public bool RequiresEvergreenConfirmation =>
         _form?.Type is FormType.PCP or FormType.ComprehensiveAssessment;
+    public string PlanYearWarning
+    {
+        get
+        {
+            if (_form is not { Type: FormType.ComprehensiveAssessment } assessment ||
+                assessment.TargetEffectiveDate == default)
+                return string.Empty;
+
+            var completedOn = assessment.CompletedDate ?? CompletionDate;
+            return completedOn is DateTime date &&
+                   date.Date > assessment.TargetEffectiveDate.Date
+                ? $"This assessment is attached to the plan starting {assessment.TargetEffectiveDate:MM/dd/yy}, " +
+                  $"but its completion date is {date:MM/dd/yy}. Check the plan year; the next plan has a separate renewal."
+                : string.Empty;
+        }
+    }
+    public bool HasPlanYearWarning => !string.IsNullOrEmpty(PlanYearWarning);
     public string AttestationStatement => _form?.Type switch
     {
         FormType.PCP =>
-            "I attest that this Person-Centered Plan was completed in Evergreen on the date entered above.",
+            $"I attest that the Person-Centered Plan for the plan starting {_form.TargetEffectiveDate:MM/dd/yy} " +
+            "was completed in Evergreen on the date entered above.",
         FormType.ComprehensiveAssessment =>
-            "I attest that this Comprehensive Assessment was completed in Evergreen on the date entered above.",
+            $"I attest that the Comprehensive Assessment for the plan starting {_form.TargetEffectiveDate:MM/dd/yy} " +
+            "was completed in Evergreen on the date entered above.",
         _ => string.Empty
     };
     public string StatusText => _form is null
@@ -166,6 +187,8 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     partial void OnCompletionDateChanged(DateTime? value)
     {
+        OnPropertyChanged(nameof(PlanYearWarning));
+        OnPropertyChanged(nameof(HasPlanYearWarning));
         CompletionDateError = value is DateTime date && _form is not null
             ? FormAttestationRules.ValidateCompletionDate(
                 date, _cycleStart, DateTime.Today) ?? string.Empty
@@ -392,6 +415,8 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(IsIncomplete));
         OnPropertyChanged(nameof(RequiresEvergreenConfirmation));
+        OnPropertyChanged(nameof(PlanYearWarning));
+        OnPropertyChanged(nameof(HasPlanYearWarning));
         OnPropertyChanged(nameof(AttestationStatement));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(PrerequisiteSummary));

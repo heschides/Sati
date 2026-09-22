@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using Sati.Models;
 
 namespace Sati.ViewModels
@@ -27,11 +27,11 @@ namespace Sati.ViewModels
         // explicitly so tests can supply any reference date, and so a single
         // load uses one consistent "today" across all rows even if it crosses
         // midnight mid-build.
-        public void Rebuild(IEnumerable<Person> people, DateTime today)
+        public void Rebuild(IEnumerable<Person> people, DateTime today, Contracts.V1.ComplianceScheduleSettings? schedule = null)
         {
             Rows.Clear();
             foreach (var person in people)
-                Rows.Add(new MatrixRowViewModel(person, today));
+                Rows.Add(new MatrixRowViewModel(person, today, schedule));
         }
     }
 }

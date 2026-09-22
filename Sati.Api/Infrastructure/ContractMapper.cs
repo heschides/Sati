@@ -149,7 +149,9 @@ internal static class ContractMapper
         complianceBlockers,
         ParseStringArray(note.OverrideObligationIdsJson),
         note.OverrideAttestationConfirmed,
-        NullableNameAt(GoalProgressNames, note.GoalProgress));
+        NullableNameAt(GoalProgressNames, note.GoalProgress),
+        note.FormId,
+        note.FormDateCorrectionReason);
 
     private static IReadOnlyList<string> ParseStringArray(string? json)
     {

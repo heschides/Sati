@@ -118,6 +118,8 @@ internal static class CloudContractMapper
         note.StartTime = dto.StartTime;
         note.PersonId = dto.PersonId;
         note.FormType = ParseNullable<FormType>(dto.FormType);
+        note.FormId = dto.FormId;
+        note.FormDateCorrectionReason = dto.FormDateCorrectionReason;
         note.NoteType = ParseNullable<NoteType>(dto.NoteType);
         note.GoalProgress = ParseNullable<GoalProgressLevel>(dto.GoalProgress);
         note.AgencyId = dto.AgencyId;
@@ -302,7 +304,9 @@ internal static class CloudContractMapper
         note.CaseManagerJustification,
         note.VisitDocumentationJson,
         note.Revision,
-        note.GoalProgress?.ToString());
+        note.GoalProgress?.ToString(),
+        note.FormId,
+        note.FormDateCorrectionReason);
 
     public static SavePersonRequest ToSavePersonRequest(Person person) =>
         PersonContractMapper.ToSaveRequest(person);

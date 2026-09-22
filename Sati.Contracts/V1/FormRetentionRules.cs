@@ -17,6 +17,7 @@ public static class FormRetentionRules
     public const string ErrorCode = "form_retention_required";
 
     public const string Message =
-        "Persisted forms cannot be deleted because they preserve compliance and billing history. " +
-        "Use attestation or revocation to record completion changes.";
+        "Saved forms cannot be deleted. Their due dates, attestations, and linked notes must stay " +
+        "available for compliance and billing review. To correct a completion, revoke its attestation " +
+        "with a reason and record the actual completion date on the correct form.";
 }

@@ -87,14 +87,19 @@ internal static partial class ApiEndpoints
                 note.ComplianceOverride, note.OverrideReason, note.ApprovedById, note.ApprovedAt,
                 note.OverrideApprovedById, note.OverrideApprovedAt,
                 note.OverrideApprovedById is int approverId && agencyApprovers.Contains(approverId));
+            var personForms = forms.Where(form => form.PersonId == source.Person.Id).ToList();
             var complianceErrors = EvaluateBillingComplianceRelease(
                 note,
                 source.Person,
-                forms.Where(form => form.PersonId == source.Person.Id).ToList(),
+                personForms,
                 releasesByPerson.GetValueOrDefault(source.Person.Id) ?? [],
                 compliancePolicy,
                 recoveryByNote.GetValueOrDefault(note.Id) ?? [],
                 providerLinksByPerson.GetValueOrDefault(source.Person.Id) ?? []);
+            // BillingExportGate omits historical compliance errors for a valid
+            // exception, so the form-work deadline must be checked separately.
+            errors.AddRange(EvaluateFormWorkBilling(note, personForms)
+                .Select(error => $"Note {line.NoteId}: {error}"));
             errors.AddRange(BillingExportGate.Evaluate(
                 ProfessionalClaimSnapshotCodec.Deserialize(line.ClaimSnapshotJson), actor.AgencyId,
                 line.DateOfService, line.IsComplianceException, line.ComplianceExceptionReason, facts,

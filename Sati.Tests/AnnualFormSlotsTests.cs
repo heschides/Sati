@@ -34,6 +34,7 @@ public sealed class AnnualFormSlotsTests
 
         Assert.NotNull(current);
         Assert.True(current.IsComplete);
+        Assert.Equal("Comp Assessment for plan starting 10/15/25", current.CheckBoxLabel);
         Assert.NotNull(renewal);
         Assert.Equal(UpcomingTarget, renewal.TargetEffectiveDate);
         Assert.False(renewal.IsComplete);
@@ -61,7 +62,7 @@ public sealed class AnnualFormSlotsTests
         var renewal = AnnualFormSlots.Resolve(
             person, FormType.PCP, new DateTime(2026, 7, 17), Schedule).Renewal;
         Assert.NotNull(renewal);
-        Assert.Equal("Renewal for 10/15/26", renewal.CheckBoxLabel);
+        Assert.Equal("Renewal: PCP for plan starting 10/15/26", renewal.CheckBoxLabel);
         Assert.Contains("renewal for the plan starting 10/15/26", renewal.AutomationName);
     }
 

@@ -1,6 +1,64 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.23 — 2026-09-22
+
+“Form dates and billing follow the work recorded.” This patch makes annual assessment renewals
+identify the correct plan year and binds a Logged form-work note to one exact obligation. The note's
+activity date becomes its attested completion date. Late form work remains clinically reviewable but
+is not billable; an Admin technical-error correction records a reason and source evidence. Changed
+attestations flag downstream supervisor and billing review. Saved forms and their note links remain
+retained, with a visible explanation in the form screen.
+
+**Schema and API contract change.** `SatiDemo` received the two September 21 additive migrations
+under separate user authorization: rollback rehearsal, real apply, and idempotency rerun passed.
+The temporary exact-IP firewall rule was removed and verified absent. The existing Demo API remained
+ready after migration. Each Local Production installation receives these migrations only when that
+machine launches the new Local client; the Joshu workstation is still known to be on 1.3.14.
+
+- [x] Preflight: fetched `origin/master`, confirmed local `master` equals the remote at `b2d0b54`,
+      reviewed the pending compliance change set, and found no 1.3.23 artifact collision. No branch
+      merge or deletion: the Claude branch has an active worktree; setup, chat, video, and remote
+      Claude branches have separate work; the merged remote Codex branches are not proven disposable.
+- [x] Coordinate 1.3.23 desktop/API versions, installer and readiness defaults, Settings notes,
+      examples, and release expectations.
+- [x] Complete the full Release solution build and all solution test projects. The final build has
+      zero warnings and zero errors. Desktop/domain: 2,440 passed, four documented opt-in skips;
+      API: 886 passed, five documented opt-in skips; signatures: 119 passed; portal: eight passed;
+      Carika: four passed. All 27 focused migration-boundary/theme legibility checks passed.
+      The first full run found stale test expectations, two dark-theme labels, and a shared API
+      fixture collision; these were corrected and the affected complete suites passed.
+- [ ] Commit and push verified source; record source commit.
+- [ ] Package and publish the matching Demo API; record ZIP hash, deployment, health, version, and
+      contract revision.
+- [ ] Build, accept, and distribute Demo and Local installers with verified hashes and cleanup.
+- [ ] Commit and push final release evidence; confirm clean local/remote equality.
+- [ ] Local Production (Joshu login): install and launch the new Local installer when the operator
+      chooses; until then its version and pending local schema changes remain unverified.
+
 ## Unreleased — annual compliance and billing correction (2026-09-14)
+
+- [x] Prepare `scripts/Apply-FormNoteAttestationMigrations.ps1` for the two September 21
+      migrations. The first rollback-only `SatiDemo` rehearsal exposed a SQL Server multiple-
+      cascade-path conflict in the proposed Notes-to-Forms `SET NULL` foreign key; the transaction
+      rolled back, and read-only inspection confirmed no new column, table, or history row. The
+      relationship now uses `NO ACTION`, preserving exact note evidence. Its Demo identity and
+      schema checks, rollback-only path, real apply, idempotency rerun, and mismatched-index
+      refusal then passed on an isolated scratch LocalDB with the relevant person cascade paths;
+      the scratch instance and files were removed. Under separate user authorization on
+      2026-09-22, the corrected `SatiDemo` rollback rehearsal, real apply, and idempotency
+      rerun succeeded. Migration history has 112 rows, both new migrations are recorded,
+      and the review-flag table has zero rows. The operator removed the temporary exact-IP
+      firewall rule; its absence was verified. The existing Demo API's `/health/ready`
+      still returned HTTP 200 after the additive schema change. The matching API/client
+      release remains pending.
+- [ ] Deferred: design an Admin-only, audited source-schedule correction for an erroneous
+      `Person.EffectiveDate`, `Form.TargetEffectiveDate`, or stored `Form.DueDate`. It must preview
+      all affected annual forms and recipient-specific releases; preserve form, note, claim,
+      attestation, and audit history; detect conflicting annual identities; and flag supervisor
+      and billing review for submitted or finalized work. A form's target is its stable identity,
+      while its stored due date controls reminders and billing. The ordinary client edit now
+      refuses an effective-date change when obligations exist. The September 2026 example is not
+      evidence of a wrong default deadline: December 16 minus 90 calendar days is September 17.
 
 This is the active compliance work list. It supersedes the incompatible due-date-inferred cycle,
 born-complete generation, artifact prerequisite, mutable billing-mask, due-day-blocked, and
@@ -306,8 +364,13 @@ migration is required.
 - [x] Regressions for the overdue-renewal case, window edges, early completion, target-date
       collapse, missing rows, February 29, command identity, and the new gate, each confirmed to
       fail against the old behavior.
-- [ ] Next step: the caseload matrix (`FormCellViewModel`) still shows only the current-cycle row
-      and needs its own decision on presenting two years in one cell.
+- [ ] Run `scripts/audit-annual-assessment-targets.sql` against identity-verified My work
+      Production with authorized database access. Review flagged form IDs against source evidence,
+      correct confirmed wrong-year attestations through the app, and verify billing status afterward.
+      This source change alone does not certify existing Production rows.
+- [x] The caseload matrix (`FormCellViewModel`) now shows the renewal after the current annual
+      form is satisfied, and marks an overdue renewal instead of showing the old completion as green.
+      An unfinished current form remains the visible obligation. The cell names renewals explicitly.
 - [x] Stop computing the next annual target as `currentTarget.AddYears(1)`. For a February 29
       admission that is February 28 of a leap year, which no generated row carries: upcoming
       events and the task board missed the leap-year renewal, and the desktop and API release

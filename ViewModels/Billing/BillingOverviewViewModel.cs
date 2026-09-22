@@ -9,6 +9,7 @@ using Sati.Data.Billing;
 using Sati.Helpers;
 using Sati.Models.Billing;
 using Sati.Services;
+using Sati.ViewModels;
 using System.Collections.ObjectModel;
 
 namespace Sati.ViewModels.Billing;
@@ -22,6 +23,8 @@ public partial class BillingOverviewViewModel : ObservableObject
 {
     private readonly IBillingService _billingService;
     private readonly ISessionService _sessionService;
+    private readonly IFormAttestationChangeReviewService? _formChangeReviews;
+    private readonly IAdminFormNoteCorrectionService? _adminFormCorrections;
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private readonly LatestRequestTracker _accountLoads = new();
     private IReadOnlyList<BillingMonthPoint> _revenueMonths = [];
@@ -31,10 +34,14 @@ public partial class BillingOverviewViewModel : ObservableObject
         IBillingService billingService,
         ISessionService sessionService,
         ThemeService? themeService = null,
-        BillingComplianceRecoveryViewModel? complianceRecovery = null)
+        BillingComplianceRecoveryViewModel? complianceRecovery = null,
+        IFormAttestationChangeReviewService? formChangeReviews = null,
+        IAdminFormNoteCorrectionService? adminFormCorrections = null)
     {
         _billingService = billingService;
         _sessionService = sessionService;
+        _formChangeReviews = formChangeReviews;
+        _adminFormCorrections = adminFormCorrections;
         ComplianceRecovery = complianceRecovery;
 
         // OxyPlot colors are copied into a PlotModel, so rebuild the lightweight models when
@@ -71,6 +78,19 @@ public partial class BillingOverviewViewModel : ObservableObject
         "No unresolved billing-policy review flags.";
     public BillingComplianceRecoveryViewModel? ComplianceRecovery { get; }
     public ObservableCollection<BillingPolicyReviewRow> BillingPolicyReviewFlags { get; } = [];
+    public ObservableCollection<FormAttestationChangeReviewRow> FormChangeReviewFlags { get; } = [];
+    [ObservableProperty] private string formChangeReviewSummary =
+        "No form completion date changes need billing review.";
+    [ObservableProperty] private bool canAdminCorrectFormDate;
+    [ObservableProperty] private string correctionNoteIdText = string.Empty;
+    [ObservableProperty] private AdminFormNoteCorrectionTargetDto? correctionTarget;
+    [ObservableProperty] private bool hasCorrectionTarget;
+    [ObservableProperty] private string correctionTargetSummary = string.Empty;
+    [ObservableProperty] private DateTime? correctedActivityDate;
+    [ObservableProperty] private string correctionReason = string.Empty;
+    [ObservableProperty] private bool correctionEvidenceConfirmed;
+    [ObservableProperty] private string correctionStatusMessage = string.Empty;
+    [ObservableProperty] private bool isFormDateCorrectionBusy;
 
     public bool HasLoaded { get; private set; }
 
@@ -86,6 +106,10 @@ public partial class BillingOverviewViewModel : ObservableObject
         try
         {
             IsBusy = true;
+            CanAdminCorrectFormDate = account?.HasAdminPermissions == true && _adminFormCorrections is not null;
+            CorrectionTarget = null;
+            HasCorrectionTarget = false;
+            CorrectionTargetSummary = string.Empty;
             var actor = account?.ToAgencyActor()
                 ?? throw new UnauthorizedAccessException("A signed-in user is required.");
             ResetAnalyticsDisplay();
@@ -132,6 +156,7 @@ public partial class BillingOverviewViewModel : ObservableObject
                     StatusMessage = "Billing configuration loaded, but the dashboard statistics are temporarily unavailable.";
             }
 
+            await LoadFormChangeReviewsAsync(request, account);
             HasLoaded = true;
         }
         catch (Exception ex)
@@ -144,6 +169,145 @@ public partial class BillingOverviewViewModel : ObservableObject
             if (_accountLoads.IsCurrent(request) && ReferenceEquals(_sessionService.CurrentUser, account))
                 IsBusy = false;
             _loadGate.Release();
+        }
+    }
+
+    private async Task LoadFormChangeReviewsAsync(int request, Sati.Models.User? account)
+    {
+        if (_formChangeReviews is null) return;
+        try
+        {
+            var flags = await _formChangeReviews.GetForBillingAsync();
+            if (!_accountLoads.IsCurrent(request) || !ReferenceEquals(_sessionService.CurrentUser, account))
+                return;
+            var current = FormAttestationChangeReviewRow.Latest(flags);
+            FormChangeReviewFlags.Clear();
+            foreach (var flag in current) FormChangeReviewFlags.Add(flag);
+            FormChangeReviewSummary = current.Count == 0
+                ? "No form completion date changes need billing review."
+                : $"{current.Count} form-work note{(current.Count == 1 ? "" : "s")} changed after submission; " +
+                  $"{current.Count(flag => flag.MustHoldBilling)} currently held for billing.";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Billing form change reviews failed: {ex.Message}");
+            if (_accountLoads.IsCurrent(request) && ReferenceEquals(_sessionService.CurrentUser, account))
+                FormChangeReviewSummary = "Form completion date change notices are temporarily unavailable.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task FindFormDateCorrectionTarget()
+    {
+        if (IsFormDateCorrectionBusy) return;
+        if (!CanAdminCorrectFormDate || _adminFormCorrections is null) return;
+        if (!int.TryParse(CorrectionNoteIdText, out var noteId) || noteId <= 0)
+        {
+            CorrectionStatusMessage = "Enter a valid note ID.";
+            return;
+        }
+        await OpenFormDateCorrectionTargetAsync(noteId);
+    }
+
+    [RelayCommand]
+    private async Task ReviewFormDateFlag(int noteId)
+    {
+        if (IsFormDateCorrectionBusy) return;
+        if (!CanAdminCorrectFormDate || _adminFormCorrections is null) return;
+        CorrectionNoteIdText = noteId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        await OpenFormDateCorrectionTargetAsync(noteId);
+    }
+
+    private async Task OpenFormDateCorrectionTargetAsync(int noteId)
+    {
+        if (_adminFormCorrections is null) return;
+        IsFormDateCorrectionBusy = true;
+        CorrectionStatusMessage = string.Empty;
+        CorrectionTarget = null;
+        HasCorrectionTarget = false;
+        try
+        {
+            var account = _sessionService.CurrentUser;
+            var target = await _adminFormCorrections.GetTargetAsync(noteId);
+            if (!ReferenceEquals(_sessionService.CurrentUser, account)) return;
+            if (target is null)
+            {
+                CorrectionStatusMessage =
+                    "No eligible linked non-release form note was found in this agency.";
+                return;
+            }
+            CorrectionTarget = target;
+            HasCorrectionTarget = true;
+            CorrectedActivityDate = target.ActivityDate;
+            CorrectionReason = string.Empty;
+            CorrectionEvidenceConfirmed = false;
+            CorrectionTargetSummary =
+                $"Note #{target.NoteId}, linked form #{target.FormId}, {target.Status}; " +
+                $"activity {target.ActivityDate:MM/dd/yyyy}, completion " +
+                $"{target.CurrentCompletedOn?.ToString("MM/dd/yyyy") ?? "revoked / no current completion"}, " +
+                $"due {target.DueDate:MM/dd/yyyy}.";
+            if (target.HasClaimRecord)
+                CorrectionStatusMessage =
+                    "This note already has a claim record. Review that claim through the billing correction workflow before changing its source date.";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Admin form note lookup failed: {ex.Message}");
+            CorrectionStatusMessage = ex.Message;
+        }
+        finally
+        {
+            IsFormDateCorrectionBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task SaveFormDateCorrection()
+    {
+        if (IsFormDateCorrectionBusy) return;
+        if (!CanAdminCorrectFormDate || _adminFormCorrections is null ||
+            CorrectionTarget is not { } target)
+            return;
+        if (target.HasClaimRecord)
+        {
+            CorrectionStatusMessage =
+                "Review the existing claim through the billing correction workflow first.";
+            return;
+        }
+        if (CorrectedActivityDate is not DateTime corrected ||
+            corrected.Date == target.ActivityDate.Date ||
+            string.IsNullOrWhiteSpace(CorrectionReason) || !CorrectionEvidenceConfirmed)
+        {
+            CorrectionStatusMessage =
+                "Choose the actual work date, explain the correction, and confirm the source evidence. " +
+                "The corrected date must differ from the current date.";
+            return;
+        }
+
+        IsFormDateCorrectionBusy = true;
+        CorrectionStatusMessage = string.Empty;
+        try
+        {
+            await _adminFormCorrections.CorrectAsync(
+                target.NoteId, target.Revision, corrected.Date,
+                CorrectionReason.Trim(), CorrectionEvidenceConfirmed);
+            CorrectionTarget = null;
+            HasCorrectionTarget = false;
+            CorrectionNoteIdText = string.Empty;
+            CorrectedActivityDate = null;
+            CorrectionReason = string.Empty;
+            CorrectionEvidenceConfirmed = false;
+            await LoadAsync(waitForExisting: true);
+            CorrectionStatusMessage = "The source date was corrected and billing was recalculated.";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Admin form note correction failed: {ex.Message}");
+            CorrectionStatusMessage = ex.Message;
+        }
+        finally
+        {
+            IsFormDateCorrectionBusy = false;
         }
     }
 
@@ -221,6 +385,8 @@ public partial class BillingOverviewViewModel : ObservableObject
         BillingPolicyReviewFlags.Clear();
         HasBillingPolicyReviewFlags = false;
         BillingPolicyReviewSummary = "No unresolved billing-policy review flags.";
+        FormChangeReviewFlags.Clear();
+        FormChangeReviewSummary = "No form completion date changes need billing review.";
     }
 
     internal static BillingOverviewAnalytics CreateAnalytics(
@@ -410,6 +576,16 @@ public partial class BillingOverviewViewModel : ObservableObject
         StatusMessage = null;
         IsBusy = false;
         HasLoaded = false;
+        CanAdminCorrectFormDate = false;
+        CorrectionNoteIdText = string.Empty;
+        CorrectionTarget = null;
+        HasCorrectionTarget = false;
+        CorrectionTargetSummary = string.Empty;
+        CorrectedActivityDate = null;
+        CorrectionReason = string.Empty;
+        CorrectionEvidenceConfirmed = false;
+        CorrectionStatusMessage = string.Empty;
+        IsFormDateCorrectionBusy = false;
         ResetAnalyticsDisplay();
     }
 

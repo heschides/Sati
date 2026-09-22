@@ -261,6 +261,24 @@ public sealed class DashboardFormComplianceTests
     }
 
     [Fact]
+    public void AssessmentAttestationWarnsWhenCompletionIsOnAnOlderPlan()
+    {
+        var viewModel = new FormAttestationViewModel(new RecordingFormService());
+        var target = new DateTime(2025, 12, 16);
+        var form = new Form(FormType.ComprehensiveAssessment,
+            new DateTime(2025, 9, 17), targetEffectiveDate: target);
+
+        viewModel.Begin(form, new DateTime(2024, 12, 16),
+            "Comprehensive Assessment, plan starting 12/16/25");
+        viewModel.CompletionDate = new DateTime(2026, 9, 17);
+
+        Assert.Contains("plan starting 12/16/25", viewModel.AttestationStatement);
+        Assert.True(viewModel.HasPlanYearWarning);
+        Assert.Contains("12/16/25", viewModel.PlanYearWarning);
+        Assert.Contains("separate renewal", viewModel.PlanYearWarning);
+    }
+
+    [Fact]
     public void DashboardRendersTheAttestationPanelOpenedByItsFormActions()
     {
         var view = File.ReadAllText(Path.Combine(

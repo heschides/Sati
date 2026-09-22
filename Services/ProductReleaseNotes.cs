@@ -6,11 +6,24 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Today's Work no longer looks like an error";
-    public const string ReleaseDate = "September 20, 2026";
+    public const string ReleaseName = "Form dates and billing follow the work recorded";
+    public const string ReleaseDate = "September 22, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Annual form dates identify the right plan year",
+            [
+                "Annual Forms now distinguishes the current plan from the renewal being prepared, so a completed assessment is not mistaken for last year's plan.",
+                "The default Comprehensive Assessment due date is 90 calendar days before the plan starts. A December 16 plan has a September 17 assessment due date."
+            ]),
+        new(
+            "Form notes and billing stay tied to the exact work",
+            [
+                "When a form-work note becomes Logged, its activity date attests the selected form. Late work remains in the clinical record but its note cannot be billed.",
+                "Changes after supervisor or billing handoff create visible review flags. An Admin may correct a technical date error with a recorded explanation and source evidence before billing eligibility is recalculated.",
+                "Saved forms and their linked notes are retained. The form screen explains why deletion is unavailable and directs staff to the correction workflow."
+            ]),
         new(
             "Today's Work has a clear focus cue",
             [
