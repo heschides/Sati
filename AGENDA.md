@@ -27,11 +27,33 @@ machine launches the new Local client; the Joshu workstation is still known to b
       Carika: four passed. All 27 focused migration-boundary/theme legibility checks passed.
       The first full run found stale test expectations, two dark-theme labels, and a shared API
       fixture collision; these were corrected and the affected complete suites passed.
-- [ ] Commit and push verified source; record source commit.
-- [ ] Package and publish the matching Demo API; record ZIP hash, deployment, health, version, and
-      contract revision.
-- [ ] Build, accept, and distribute Demo and Local installers with verified hashes and cleanup.
-- [ ] Commit and push final release evidence; confirm clean local/remote equality.
+- [x] Commit and push verified source normally. Source commit `f4afb63` is present on
+      `origin/master`; no force or history rewrite was used.
+- [x] Publish only the matching Demo API. `artifacts/SatiApi-1.3.23-fx-x86.zip` is 10,358,612
+      bytes, SHA-256 `5A75A2D7A995D3D78B67668482A91ECEC58876D0378E11A3FF0950E63557B400`,
+      with 68 intended files, no backslash entry names or private settings, and file version
+      1.3.23.0. OneDeploy to the existing `sati-demo-api-satilogica` in `rg-sati-demo` succeeded
+      (deployment `80a08c63e9154f1f99665bb615be4849`). Live and ready return HTTP 200;
+      `/health/version` reports Sati.Api 1.3.23 and contract revision `B62F9B778B49`, which
+      equals the API publish and desktop client's `ApiSurface.Revision`. Health-only readiness
+      passed and wrote `artifacts/release-1.3.23-demo-readiness.json`; authenticated checks were
+      skipped because synthetic Admin credentials were not configured. The 1.3.22 package and
+      deployment remain the prior known-healthy release.
+- [x] Build, accept, and distribute both installers without overwriting. The embedded
+      `SqlLocalDB.msi` source is Valid Microsoft-signed, SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      `SatiDemoSetup-1.3.23.exe` is 103,010,304 bytes, SHA-256
+      `813D90E7119A85C8C6D8DAA8931D752DDB1B0A2C82FA96975CFC9952F03775FD`;
+      five responsive 15-second launches, graceful closes, version 1.3.23.0, and cleanup passed.
+      `SatiLocalSetup-1.3.23.exe` is 205,058,601 bytes, SHA-256
+      `C25021F0959546D40146243D93073C284AF40751C00AEE9D9A7CFA4302C4B8F9`;
+      version 1.3.23.0, `SatiProduction`, integrated security, signed embedded LocalDB, and
+      cleanup passed. These are build-workstation acceptance runs, not clean external-machine
+      attestations. Both accepted installers and their `.sha256` files were published with
+      temporary-copy and final SHA-256 checks to the exact `SatiLogica Demo Files` and
+      `Sati Desktop` distribution folders, respectively. No destination was overwritten.
+- [x] Commit and push final release evidence normally; report the evidence commit in the final
+      handoff and verify clean local/remote equality after the push.
 - [ ] Local Production (Joshu login): install and launch the new Local installer when the operator
       chooses; until then its version and pending local schema changes remain unverified.
 
@@ -50,7 +72,7 @@ machine launches the new Local client; the Joshu workstation is still known to b
       and the review-flag table has zero rows. The operator removed the temporary exact-IP
       firewall rule; its absence was verified. The existing Demo API's `/health/ready`
       still returned HTTP 200 after the additive schema change. The matching API/client
-      release remains pending.
+      shipped with 1.3.23.
 - [ ] Deferred: design an Admin-only, audited source-schedule correction for an erroneous
       `Person.EffectiveDate`, `Form.TargetEffectiveDate`, or stored `Form.DueDate`. It must preview
       all affected annual forms and recipient-specific releases; preserve form, note, claim,
