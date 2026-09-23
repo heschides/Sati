@@ -136,8 +136,13 @@ public static class FormAttestationRules
                 })
                 .Where(candidate => candidate.Cycle is not null &&
                     candidate.Cycle.Value.CycleStart.Date <= note.EventDate.Date &&
-                    note.EventDate.Date < candidate.Cycle.Value.CycleEnd.Date)
-                .OrderByDescending(candidate => candidate.Form.DueDate)
+                    note.EventDate.Date <= candidate.Cycle.Value.CycleEnd.Date)
+                // The effective date is both the end of one annual cycle and
+                // the start of the next. Prefer the form already due on that
+                // date when both remain incomplete; an exact FormId still wins.
+                .OrderByDescending(candidate =>
+                    candidate.Form.DueDate.Date <= note.EventDate.Date)
+                .ThenByDescending(candidate => candidate.Form.DueDate)
                 .FirstOrDefault();
 
             if (form is null || pending.Any(item => item.FormId == form.Form.FormId))

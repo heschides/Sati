@@ -649,9 +649,11 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.24", version);
+        Assert.Equal("1.3.25", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Notes and attestations agree", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Clearer form dates and Legacy Dark controls", ProductReleaseNotes.ReleaseName);
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Scheduled form work becomes a dated draft");
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "One note can describe several activities" &&
             section.Items.Any(item => item.Contains("Reminder", StringComparison.Ordinal)));

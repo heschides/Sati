@@ -76,6 +76,11 @@ public sealed class ThemeLegibilityTests
         ("OnAiAccentBrush", "AiAccentBrush"), ("OnAiAccentBrush", "AiAccentHoverBrush"),
         ("OnAiAccentBrush", "AiAccentPressedBrush"),
         ("AiPanelTextBrush", "AiAccentSoftBrush"),
+        ("InputTextBrush", "InputSurfaceBrush"),
+        ("InputTextBrush", "InputHoverBrush"),
+        ("InputTextBrush", "InputPressedBrush"),
+        ("InputMutedTextBrush", "InputSurfaceBrush"),
+        ("InputSelectionTextBrush", "InputSelectionBrush"),
         // Calendar day squares keep their date and unit lines on these fills.
         ("TextPrimaryBrush", "ProductivityDayFillBrush"),
         ("TextSecondaryBrush", "ProductivityDayFillBrush"),
@@ -119,6 +124,45 @@ public sealed class ThemeLegibilityTests
         foreach (var name in ThemeNamesOnDisk())
             data.Add(name);
         return data;
+    }
+
+    [Fact]
+    public void LegacyDarkUsesOppositeInkOnLightFieldsAndDarkPanels()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            using var _ = ThemeSwap.To("LegacyDark");
+            Brush Brush(string key) => Assert.IsAssignableFrom<Brush>(
+                Application.Current.TryFindResource(key));
+            Color Color(string key) => Assert.Single(
+                ThemeContrast.PaintedColors(Brush(key), Colors.Black));
+
+            Assert.True(ThemeContrast.RelativeLuminance(Color("InputSurfaceBrush")) >
+                        ThemeContrast.RelativeLuminance(Color("SurfaceRaisedBrush")));
+            Assert.True(ThemeContrast.RelativeLuminance(Color("InputTextBrush")) <
+                        ThemeContrast.RelativeLuminance(Color("InputSurfaceBrush")));
+            Assert.True(ThemeContrast.RelativeLuminance(Color("TextPrimaryBrush")) >
+                        ThemeContrast.RelativeLuminance(Color("SurfaceRaisedBrush")));
+            Assert.True(ThemeContrast.WorstRatio(Brush("InputSelectionBrush"),
+                Brush("InputSurfaceBrush"), Colors.Black) >=
+                ThemeContrast.LargeTextMinimum);
+
+            var fields = new Control[]
+            {
+                new TextBox(), new PasswordBox(), new ComboBox(), new DatePicker()
+            };
+            var panel = new StackPanel();
+            foreach (var field in fields)
+                panel.Children.Add(field);
+            WpfUiHarness.Realize(panel);
+            foreach (var field in fields)
+            {
+                var ratio = ThemeContrast.WorstRatio(field.Foreground,
+                    field.Background, Colors.Black);
+                Assert.True(ratio >= Minimum,
+                    $"Legacy Dark {field.GetType().Name} uses {ratio:N2}:1 text contrast.");
+            }
+        });
     }
 
     private static IEnumerable<string> ThemeNamesOnDisk() =>

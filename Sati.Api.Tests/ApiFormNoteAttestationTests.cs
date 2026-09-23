@@ -12,6 +12,246 @@ namespace Sati.Api.Tests;
 public sealed class ApiFormNoteAttestationTests(SatiApiFactory factory)
 {
     [Fact]
+    public async Task ConfirmedSafetyPlanAttestationReusesMovedScheduledNote()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var completedOn = DateTime.Today.AddDays(-1);
+        var plannedOn = DateTime.Today.AddDays(1);
+        int personId;
+        int formId;
+        int noteId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            personId = await db.People.MaxAsync(row => row.Id) + 1;
+            var person = new ServerPerson
+            {
+                Id = personId,
+                UserId = 12,
+                AgencyId = 1,
+                FirstName = "Safety",
+                LastName = "Plan Test",
+                BirthDate = new DateTime(1990, 1, 1),
+                EffectiveDate = completedOn.AddYears(-1)
+            };
+            var form = new ServerForm
+            {
+                PersonId = personId,
+                Type = "SafetyPlan",
+                DueDate = completedOn,
+                TargetEffectiveDate = completedOn
+            };
+            db.People.Add(person);
+            db.Forms.Add(form);
+            await db.SaveChangesAsync();
+            formId = form.Id;
+            var note = new ServerNote
+            {
+                PersonId = personId,
+                AgencyId = 1,
+                Narrative = "Prepare the Safety Plan.",
+                EventDate = plannedOn,
+                Status = NoteWorkflow.Scheduled,
+                Minutes = 15,
+                NoteType = (int)NoteType.Form,
+                Activities = (int)NoteActivity.Form,
+                FormType = (int)FormType.SafetyPlan,
+                FormId = formId
+            };
+            db.Notes.Add(note);
+            await db.SaveChangesAsync();
+            noteId = note.Id;
+        }
+
+        try
+        {
+            using var first = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/SafetyPlan/attestation",
+                new AttestFormRequest(formId, completedOn));
+            Assert.Equal(HttpStatusCode.Conflict, first.StatusCode);
+            var preview = await first.Content.ReadFromJsonAsync<ApiErrorDto>();
+            Assert.NotNull(preview);
+            Assert.Equal(ManualAttestationNoteRules.ScheduledConversionRequiredCode,
+                preview.Code);
+            Assert.False(string.IsNullOrWhiteSpace(preview.ConfirmationToken));
+
+            await using (var unchangedScope = factory.Services.CreateAsyncScope())
+            {
+                var unchanged = unchangedScope.ServiceProvider.GetRequiredService<ApiDbContext>();
+                Assert.Null((await unchanged.Forms.AsNoTracking()
+                    .SingleAsync(row => row.Id == formId)).CompletedDate);
+                var planned = await unchanged.Notes.AsNoTracking()
+                    .SingleAsync(row => row.Id == noteId);
+                Assert.Equal(plannedOn, planned.EventDate);
+                Assert.Equal(NoteWorkflow.Scheduled, planned.Status);
+            }
+
+            using var stale = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/SafetyPlan/attestation",
+                new AttestFormRequest(formId, completedOn, noteId,
+                    ConfirmScheduledNoteConversion: true,
+                    ScheduledNoteConversionToken: "stale"));
+            Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+
+            using var changedActualDate = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/SafetyPlan/attestation",
+                new AttestFormRequest(formId, completedOn.AddDays(1), noteId,
+                    ConfirmScheduledNoteConversion: true,
+                    ScheduledNoteConversionToken: preview.ConfirmationToken));
+            Assert.Equal(HttpStatusCode.Conflict, changedActualDate.StatusCode);
+
+            using var confirmed = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/SafetyPlan/attestation",
+                new AttestFormRequest(formId, completedOn, noteId,
+                    ConfirmScheduledNoteConversion: true,
+                    ScheduledNoteConversionToken: preview.ConfirmationToken));
+            Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var savedNote = await db.Notes.AsNoTracking()
+                .SingleAsync(row => row.FormId == formId);
+            var savedForm = await db.Forms.AsNoTracking()
+                .SingleAsync(row => row.Id == formId);
+            var attestation = await db.FormAttestations.AsNoTracking()
+                .SingleAsync(row => row.FormId == formId);
+            Assert.Equal(noteId, savedNote.Id);
+            Assert.Equal(completedOn, savedNote.EventDate);
+            Assert.Equal(NoteWorkflow.Pending, savedNote.Status);
+            Assert.Equal(2, savedNote.Revision);
+            Assert.Equal(completedOn, savedForm.CompletedDate);
+            Assert.Equal(noteId, attestation.EvidenceNoteId);
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
+    public async Task ManualPcpAttestationOnEffectiveDateCitesItsDraftNote()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var target = DateTime.Today.AddDays(-1);
+        int personId;
+        int formId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            personId = await db.People.MaxAsync(row => row.Id) + 1;
+            var person = new ServerPerson
+            {
+                Id = personId,
+                UserId = 12,
+                AgencyId = 1,
+                FirstName = "Pcp",
+                LastName = "Evidence Test",
+                BirthDate = new DateTime(1990, 1, 1),
+                EffectiveDate = target.AddYears(-1)
+            };
+            var form = new ServerForm
+            {
+                PersonId = personId,
+                Type = "PCP",
+                DueDate = target,
+                TargetEffectiveDate = target
+            };
+            db.People.Add(person);
+            db.Forms.Add(form);
+            await db.SaveChangesAsync();
+            formId = form.Id;
+        }
+
+        try
+        {
+            using var response = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/PCP/attestation",
+                new AttestFormRequest(formId, target));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var form = await db.Forms.AsNoTracking().SingleAsync(row => row.Id == formId);
+            var note = await db.Notes.AsNoTracking().SingleAsync(row => row.FormId == formId);
+            var attestation = await db.FormAttestations.AsNoTracking()
+                .SingleAsync(row => row.FormId == formId);
+            Assert.Equal(target, form.CompletedDate);
+            Assert.Equal(target, note.EventDate);
+            Assert.Equal(note.Id, attestation.EvidenceNoteId);
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
+    public async Task PcpAttestationOnEffectiveDateRefusesToDuplicateAnUnlinkedNote()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var target = DateTime.Today.AddDays(-1);
+        int personId;
+        int formId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            personId = await db.People.MaxAsync(row => row.Id) + 1;
+            var noteId = await db.Notes.MaxAsync(row => row.Id) + 1;
+            var person = new ServerPerson
+            {
+                Id = personId,
+                UserId = 12,
+                AgencyId = 1,
+                FirstName = "Pcp",
+                LastName = "Boundary Test",
+                BirthDate = new DateTime(1990, 1, 1),
+                EffectiveDate = target.AddYears(-1)
+            };
+            var form = new ServerForm
+            {
+                PersonId = personId,
+                Type = "PCP",
+                DueDate = target,
+                TargetEffectiveDate = target
+            };
+            db.People.Add(person);
+            db.Forms.Add(form);
+            db.Notes.Add(new ServerNote
+            {
+                Id = noteId,
+                PersonId = personId,
+                AgencyId = 1,
+                Narrative = "Completed the PCP.",
+                EventDate = target,
+                Status = NoteWorkflow.Logged,
+                NoteType = (int)NoteType.Form,
+                FormType = (int)FormType.PCP
+            });
+            await db.SaveChangesAsync();
+            formId = form.Id;
+        }
+
+        try
+        {
+            var response = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/PCP/attestation",
+                new AttestFormRequest(formId, target));
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            Assert.Contains("unlinked form note", await response.Content.ReadAsStringAsync(),
+                StringComparison.OrdinalIgnoreCase);
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            Assert.Null((await db.Forms.AsNoTracking().SingleAsync(row => row.Id == formId)).CompletedDate);
+            Assert.Equal(1, await db.Notes.CountAsync(row => row.PersonId == personId));
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
     public async Task LoggingMixedFormAndPhonePersistsBothAndAttestsTheForm()
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");

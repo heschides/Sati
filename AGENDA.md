@@ -1,5 +1,96 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.25 — 2026-09-23
+
+“Clearer form dates and Legacy Dark controls.” This patch distinguishes a
+Scheduled note's planned date from the date form work was completed. A short
+confirmation reuses that exact note as a Pending draft and records the form
+attestation. It also refreshes the selected client's form state without a
+restart and gives Legacy Dark light input controls with dark text.
+
+**No schema migration.** The four migrations from 1.3.24 are recorded as
+applied to Demo. This patch adds no migration or dependency on a new column;
+no temporary SQL firewall rule is needed. Local database migration status
+still depends on the version each Windows login has installed and launched.
+
+- [x] Preflight: fetched `origin/master` at `52fc218`, confirmed it is the
+      default and local master matches. Reviewed in-scope changes and found no
+      1.3.25 artifact collision. Retained the active Claude worktree and older
+      or separate branches; none was merged or deleted. The Microsoft-signed
+      LocalDB prerequisite remains valid.
+- [x] Coordinate version 1.3.25 in desktop/API projects, installer builders,
+      readiness checks, Settings release notes, and installer examples.
+- [x] Full Release build passed with 0 warnings and 0 errors. Under the signed-in
+      Windows profile, all solution test projects passed: desktop 2,463 passed,
+      4 skipped; API 894 passed, 5 skipped; signatures 119 passed; portal 8
+      passed; Carika 4 passed. The skips are existing external-prerequisite
+      tests. The restricted sandbox account cannot run DPAPI or write the
+      Local billing export folder, so it was not used for the release gate.
+- [ ] Commit and push verified source; record commit.
+- [ ] Publish Demo API and verify live, ready, version, and contract revision;
+      record ZIP hash and deployment identifier.
+- [ ] Build and accept Demo and Local installers, then publish each installer
+      and checksum to its exact distribution folder; record sizes and hashes.
+- [ ] Commit and push final evidence; confirm clean local/remote equality.
+- [ ] Joshu LocalDB: verify the actual PCP and Safety Plan note links and
+      attestation state after installing this build. That database is under a
+      different Windows login, so this release uses synthetic local/API
+      reproductions and does not claim record-specific verification.
+- [ ] Local Production install tracking: SatiLogica's client was last observed
+      at 1.3.2.0; Joshu reported 1.3.24.0. Recheck each login after install
+      before claiming its local database has caught up.
+
+## Included in 1.3.25 — PCP attestation feedback (2026-09-22)
+
+- [x] Joshu's 1.3.24 record has a Scheduled PCP note dated 09/22 and a Pending
+      PCP note dated 09/21. The Pending note refuses Logged status because it
+      lacks the exact form-obligation selection. In 1.3.24 that selection is an
+      unlabeled second dropdown below Form Type, and the note panel converts the
+      validation exception into a generic Save Error. Label the dropdown,
+      explain the exact selection in the validation message, and surface expected
+      save errors in the note panel. Preserve the existing nonbillable hold path;
+      a full desktop regression run passed (2,457 passed, 4 existing skips).
+- [x] Reviewed the Joshu screenshot: the 09/21/26 PCP and Safety Plan remain
+      unattested while Privacy Practices was attested for that same plan year.
+      Safety Plan has no Evergreen confirmation or separate prerequisite. A
+      synthetic Logged, unlinked Safety Plan note reproduces the same refusal
+      in the newer note-link workflow (introduced in 1.3.23) and now produces
+      visible correction guidance. Joshu confirms 1.3.24 is installed. The
+      record-specific cause remains unverified until the note dates, statuses,
+      and exact form links are known. A clean-database reproduction shows that
+      a Privacy Practices attestation itself does not block PCP or Safety Plan.
+- [x] Traced the later Safety Plan note date: a selected sign-in agenda item
+      creates a persisted Scheduled form note, and the shutdown leftover-work
+      prompt defaults to moving Scheduled notes to the next workday when the
+      user applies it. This explains how a note can reach 09/23 without the user
+      writing a clinical note. Moving the plan does not attest completion.
+      The user changed the scheduled note's date to 09/21 and logged it; the
+      client panel then needed a restart to display the new form state. The
+      actual Joshu note's creation and move history is inaccessible here.
+- [x] Reproduced a PCP attestation refusal with a synthetic Logged note that has
+      the right form type but no exact `FormId`. The duplicate-note guard correctly
+      leaves the form unattested; the shared PCP/assessment UI had hidden its error
+      because the error text was inside the Reclassification-only panel.
+- [x] Show attestation errors for every form, explain when the Evergreen confirmation
+      is still required, clear stale error text before retrying, and show expected
+      API and validation errors. Give a concrete correction route for older unlinked
+      form notes without silently assigning them to an obligation.
+- [x] Correct the effective-date boundary in desktop and API duplicate-note checks,
+      pending note-to-form matching, and the attestation's note evidence. A PCP note
+      dated exactly on the effective date now belongs to the obligation due that day;
+      a manual attestation cites its linked draft, and an older unlinked note cannot
+      silently produce a second draft. The full desktop suite passed again after
+      the note-editor changes (2,457 passed, 4 existing skips); the full API suite
+      passed (893 passed, 5 existing skips).
+      No client data or Joshu LocalDB was accessed from the SatiLogica login.
+- [x] Josh confirmed PCP and Safety Plan work were actually completed on 09/21;
+      the Safety Plan note was unwritten when its Scheduled date moved forward.
+      A Scheduled date is a plan, not completion evidence. Give a distinct
+      explanation when its later planned date meets a 09/21 checkmark.
+- [ ] On the Joshu login, confirm the Evergreen checkbox state and the notes'
+      exact form links before treating the specific record as corrected. The
+      synthetic regression tests establish the general behavior only.
+
 ## Release 1.3.24 — 2026-09-22
 
 “Notes and attestations agree.” This release lets one note describe several activities,
@@ -7141,8 +7232,27 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
 - [x] Give Admin an audited source-date correction for claimed form and release notes.
       Keep the original claim service date and flag its claim line for billing review.
 - [x] Add Legacy Dark with Legacy's typography, leaf, and gradient styling using the
-      supplied Black Bean, Sienna, Brown Sugar, Dun, and Bone palette.
+      supplied Black Bean, Sienna, Brown Sugar, Dun, and Bone palette. Its
+      navigation and raised panels now use distinct dark shades, while editable
+      fields and check controls use light surfaces with dark ink. Selection is
+      dark with light ink. The all-theme contrast sweep and a direct Legacy Dark
+      field-control check pass.
 - [x] Build the solution, verify migration snapshot, and run focused desktop and API tests.
+- [x] Refresh the selected client profile from the newly loaded caseload after a note save,
+      so a form completed by logging a linked note appears without restarting Sati.
+      A desktop regression test covers replacement of a selected client's form state.
+- [x] When a manual form checkmark finds one exact-linked form-only Scheduled note,
+      preview its planned date beside the selected actual completion date. On
+      confirmation, convert that same note to a Pending draft dated for the work
+      and save the attestation in one transaction. Reject a stale confirmation.
+      The note still needs its narrative and normal submission. Mixed,
+      Reclassification, claimed, or ambiguous notes keep the correction route.
+- [ ] Joshu LocalDB follow-up: verify whether the closing "scheduled work that did
+      not get done" prompt moved this Safety Plan note to 9/23. That prompt defaults
+      each unfinished Scheduled note to "Move" and applies the next-workday date
+      when the user chooses "Apply and close". The exact Joshu note history is not
+      available from this login. A moved plan is still not completion evidence;
+      the final Logged note must use the actual work date.
 - [x] Apply migrations `20260922154932_AddMultiActivityNotes`,
       `20260922161704_LinkReleaseNotesToExactObligations`, and
       `20260922162222_TrackReleaseAttestationRevocation`, plus

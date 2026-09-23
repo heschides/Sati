@@ -13,22 +13,31 @@
         <GradientStop Color="#FF421408" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="NavBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#FF461609" Offset="0" />
-        <GradientStop Color="#FF54210D" Offset="1" />
+        <GradientStop Color="#FF693019" Offset="0" />
+        <GradientStop Color="#FF7E3615" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="SurfaceBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#FF54200C" Offset="0" />
-        <GradientStop Color="#FF4B1A0A" Offset="0.5" />
-        <GradientStop Color="#FF5B250F" Offset="1" />
+        <GradientStop Color="#FF5B250F" Offset="0.5" />
+        <GradientStop Color="#FF693019" Offset="1" />
     </LinearGradientBrush>
-    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#53200D" />
-    <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#5B250F" />
-    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#59230E" />
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#693019" />
+    <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#63301B" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#703923" />
     <SolidColorBrush x:Key="SurfaceAlpha70Brush" Color="#B354200C" />
     <SolidColorBrush x:Key="SurfaceAlpha25Brush" Color="#4054200C" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#7E3615" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#AB653D" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="#AB653D" />
-    <SolidColorBrush x:Key="DividerBrush" Color="#7E3615" />
+    <SolidColorBrush x:Key="DividerBrush" Color="#8E4928" />
+
+    <!-- Bone and Dun make editable controls clearly distinct from dark panels. -->
+    <SolidColorBrush x:Key="InputSurfaceBrush" Color="#DFD8CD" />
+    <SolidColorBrush x:Key="InputTextBrush" Color="#3C1006" />
+    <SolidColorBrush x:Key="InputMutedTextBrush" Color="#7E3615" />
+    <SolidColorBrush x:Key="InputHoverBrush" Color="#D3BCA5" />
+    <SolidColorBrush x:Key="InputPressedBrush" Color="#C5A98D" />
+    <SolidColorBrush x:Key="InputSelectionBrush" Color="#7E3615" />
+    <SolidColorBrush x:Key="InputSelectionTextBrush" Color="#DFD8CD" />
 
     <SolidColorBrush x:Key="AccentBrush" Color="#DFD8CD" />
     <SolidColorBrush x:Key="AccentHoverBrush" Color="#FFFFFF" />
@@ -48,17 +57,17 @@
     <SolidColorBrush x:Key="OnAiAccentBrush" Color="#3C1006" />
     <SolidColorBrush x:Key="AiPanelTextBrush" Color="#DFD8CD" />
 
-    <SolidColorBrush x:Key="HoverBrush" Color="#55210E" />
-    <SolidColorBrush x:Key="HoverStrongBrush" Color="#5D2611" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#693019" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#703923" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#DFD8CD" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#D3BCA5" />
     <SolidColorBrush x:Key="TextMutedBrush" Color="#D3BCA5" />
     <SolidColorBrush x:Key="TextSubtleBrush" Color="#D3BCA5" />
     <SolidColorBrush x:Key="NarrativeTextBrush" Color="#DFD8CD" />
-    <SolidColorBrush x:Key="PersonGroupBrush" Color="#4A1A0B" />
-    <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#56220E" />
-    <Color x:Key="SurfaceAltColor">#FF53200D</Color>
-    <Color x:Key="SurfaceRaisedColor">#FF59230E</Color>
+    <SolidColorBrush x:Key="PersonGroupBrush" Color="#54200C" />
+    <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#693019" />
+    <Color x:Key="SurfaceAltColor">#FF693019</Color>
+    <Color x:Key="SurfaceRaisedColor">#FF703923</Color>
     <Color x:Key="TextSubtleColor">#FFD3BCA5</Color>
 
     <!-- Status hues retain their meaning, with dark fills and readable ink. -->

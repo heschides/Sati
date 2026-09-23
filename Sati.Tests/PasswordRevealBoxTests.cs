@@ -17,9 +17,10 @@ namespace Sati.Tests;
 /// wrong in either direction, a user types a correct password, sees it on screen,
 /// and is told their credentials are invalid — with no way to tell why.
 ///
-/// Every test runs on an STA thread because WPF controls cannot be constructed
-/// anywhere else.
+/// Every test runs on the shared WPF STA so theme resources and controls have
+/// the same thread owner.
 /// </summary>
+[Collection(WpfViewCollection.Name)]
 public sealed class PasswordRevealBoxTests
 {
     [Fact]
@@ -172,31 +173,12 @@ public sealed class PasswordRevealBoxTests
 
     private static void OnStaThread(Action<PasswordRevealBox> body)
     {
-        Exception? failure = null;
-        var thread = new Thread(() =>
+        WpfUiHarness.Run(() =>
         {
-            try
-            {
-                var box = new PasswordRevealBox();
-                // Realise the template so the named parts exist.
-                box.Measure(new System.Windows.Size(400, 40));
-                box.Arrange(new System.Windows.Rect(0, 0, 400, 40));
-                body(box);
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-        })
-        {
-            IsBackground = true,
-            Name = "PasswordRevealBox test"
-        };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-
-        Assert.True(thread.Join(TimeSpan.FromSeconds(20)), "The STA test thread did not finish.");
-        if (failure is not null)
-            throw failure;
+            var box = new PasswordRevealBox();
+            // Use the same STA as the application's dynamic theme resources.
+            WpfUiHarness.Realize(box, 400, 40);
+            body(box);
+        });
     }
 }

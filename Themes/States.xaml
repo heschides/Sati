@@ -12,6 +12,16 @@
     <FontFamily x:Key="AppFont">Inter</FontFamily>
     <FontFamily x:Key="DisplayFont">Palatino Linotype</FontFamily>
 
+    <!-- Form controls have their own surface/ink pair. Most themes inherit their
+         existing raised-surface colors; a theme may override the pair together. -->
+    <SolidColorBrush x:Key="InputSurfaceBrush" Color="{DynamicResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputTextBrush" Color="{DynamicResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputMutedTextBrush" Color="{DynamicResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputHoverBrush" Color="{DynamicResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputPressedBrush" Color="{DynamicResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputSelectionBrush" Color="{DynamicResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputSelectionTextBrush" Color="{DynamicResource SurfaceRaisedColor}" />
+
     <!-- STATE / STATUS COLORS — semantic meaning is fixed. Dark themes override
          luminance (not hue/meaning) so foreground and fill pairs stay legible. -->
 

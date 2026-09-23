@@ -55,27 +55,28 @@
 
             <!-- CaretBrush and SelectionBrush are set explicitly: the framework
                  defaults are system colors, so on dark themes the caret and the
-                 selection highlight would otherwise be invisible against a dark
-                 surface. Local TextBox styles must use BasedOn to keep this. -->
+                 selection highlight would otherwise be invisible. InputSurfaceBrush
+                 and InputTextBrush are a matched pair, including on Legacy Dark's
+                 light fields. Local TextBox styles must use BasedOn to keep this. -->
             <Style TargetType="TextBox">
                 <Setter Property="Padding"
                         Value="8,4" />
                 <Setter Property="FontSize"
                         Value="13" />
                 <Setter Property="Background"
-                        Value="{DynamicResource SurfaceBrush}" />
+                        Value="{DynamicResource InputSurfaceBrush}" />
                 <Setter Property="BorderBrush"
                         Value="{DynamicResource InputBorderBrush}" />
                 <Setter Property="BorderThickness"
                         Value="1" />
                 <Setter Property="Foreground"
-                        Value="{DynamicResource TextPrimaryBrush}" />
+                        Value="{DynamicResource InputTextBrush}" />
                 <Setter Property="CaretBrush"
-                        Value="{DynamicResource TextPrimaryBrush}" />
+                        Value="{DynamicResource InputTextBrush}" />
                 <Setter Property="SelectionBrush"
-                        Value="{DynamicResource AccentBrush}" />
+                        Value="{DynamicResource InputSelectionBrush}" />
                 <Setter Property="SelectionTextBrush"
-                        Value="{DynamicResource OnAccentBrush}" />
+                        Value="{DynamicResource InputSelectionTextBrush}" />
                 <Setter Property="Margin"
                         Value="0,0,0,10" />
                 <Style.Triggers>
@@ -89,6 +90,7 @@
                     </Trigger>
                     <Trigger Property="IsReadOnly" Value="True">
                         <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                     </Trigger>
                 </Style.Triggers>
             </Style>
@@ -99,19 +101,25 @@
                 <Setter Property="FontSize"
                         Value="13" />
                 <Setter Property="Background"
-                        Value="{DynamicResource SurfaceBrush}" />
+                        Value="{DynamicResource InputSurfaceBrush}" />
                 <Setter Property="BorderBrush"
                         Value="{DynamicResource InputBorderBrush}" />
                 <Setter Property="BorderThickness"
                         Value="1" />
                 <Setter Property="Foreground"
-                        Value="{DynamicResource TextPrimaryBrush}" />
+                        Value="{DynamicResource InputTextBrush}" />
                 <Setter Property="CaretBrush"
-                        Value="{DynamicResource TextPrimaryBrush}" />
+                        Value="{DynamicResource InputTextBrush}" />
                 <Setter Property="SelectionBrush"
-                        Value="{DynamicResource AccentBrush}" />
+                        Value="{DynamicResource InputSelectionBrush}" />
                 <Setter Property="Margin"
                         Value="0,0,0,10" />
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
             <!-- ComboBox is fully retemplated rather than restyled. The framework
@@ -162,13 +170,13 @@
                 <Setter Property="MinHeight"
                         Value="36" />
                 <Setter Property="Background"
-                        Value="{DynamicResource SurfaceRaisedBrush}" />
+                        Value="{DynamicResource InputSurfaceBrush}" />
                 <Setter Property="BorderBrush"
                         Value="{DynamicResource InputBorderBrush}" />
                 <Setter Property="BorderThickness"
                         Value="1" />
                 <Setter Property="Foreground"
-                        Value="{DynamicResource TextPrimaryBrush}" />
+                        Value="{DynamicResource InputTextBrush}" />
                 <Setter Property="Margin"
                         Value="0,0,0,10" />
                 <Setter Property="HorizontalContentAlignment"
@@ -229,7 +237,7 @@
                                               Margin="6,0,10,0"
                                               VerticalAlignment="Center"
                                               Data="M 0 0 L 4 4 L 8 0 Z"
-                                              Fill="{DynamicResource TextSecondaryBrush}" />
+                                              Fill="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}" />
                                     </Grid>
                                 </Border>
 
@@ -301,8 +309,10 @@
                  calendar button is a real, accessible template part. -->
             <Style TargetType="DatePickerTextBox">
                 <Setter Property="Background" Value="Transparent" />
-                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-                <Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource InputTextBrush}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource InputTextBrush}" />
+                <Setter Property="SelectionBrush" Value="{DynamicResource InputSelectionBrush}" />
+                <Setter Property="SelectionTextBrush" Value="{DynamicResource InputSelectionTextBrush}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Padding" Value="9,5" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -317,9 +327,8 @@
                                            Text="MM/DD/YYYY"
                                            Margin="{TemplateBinding Padding}"
                                            VerticalAlignment="Center"
-                                           Foreground="{DynamicResource TextMutedBrush}"
+                                           Foreground="{DynamicResource InputMutedTextBrush}"
                                            FontStyle="Italic"
-                                           Opacity="0.48"
                                            IsHitTestVisible="False"
                                            Visibility="Collapsed" />
                             </Grid>
@@ -340,10 +349,10 @@
                 <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="MinHeight" Value="36" />
-                <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+                <Setter Property="Background" Value="{DynamicResource InputSurfaceBrush}" />
                 <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource InputTextBrush}" />
                 <Setter Property="Margin" Value="0,0,0,10" />
                 <Setter Property="Template">
                     <Setter.Value>
@@ -396,12 +405,12 @@
                                                         <Trigger Property="IsMouseOver" Value="True">
                                                             <Setter TargetName="CalendarButtonSurface"
                                                                     Property="Background"
-                                                                    Value="{DynamicResource HoverBrush}" />
+                                                                    Value="{DynamicResource InputHoverBrush}" />
                                                         </Trigger>
                                                         <Trigger Property="IsPressed" Value="True">
                                                             <Setter TargetName="CalendarButtonSurface"
                                                                     Property="Background"
-                                                                    Value="{DynamicResource SurfaceAltBrush}" />
+                                                                    Value="{DynamicResource InputPressedBrush}" />
                                                         </Trigger>
                                                     </ControlTemplate.Triggers>
                                                 </ControlTemplate>
@@ -409,7 +418,7 @@
                                             <TextBlock Text="&#xE787;"
                                                        FontFamily="Segoe MDL2 Assets"
                                                        FontSize="15"
-                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       Foreground="{DynamicResource InputTextBrush}"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
                                                        IsHitTestVisible="False" />
@@ -539,7 +548,7 @@
                  as well as the fill, so state is never carried by colour alone. -->
             <Style TargetType="CheckBox">
                 <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-                <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+                <Setter Property="Background" Value="{DynamicResource InputSurfaceBrush}" />
                 <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
                 <Setter Property="Padding" Value="6,0,0,0" />
@@ -616,7 +625,7 @@
 
             <Style TargetType="RadioButton">
                 <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-                <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+                <Setter Property="Background" Value="{DynamicResource InputSurfaceBrush}" />
                 <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
                 <Setter Property="Padding" Value="6,0,0,0" />
@@ -638,7 +647,7 @@
                                     <Ellipse x:Name="Dot"
                                              Width="8" Height="8"
                                              Visibility="Collapsed"
-                                             Fill="{DynamicResource AccentBrush}" />
+                                             Fill="{DynamicResource InputTextBrush}" />
                                 </Border>
                                 <Border x:Name="FocusRing"
                                         Grid.ColumnSpan="2"

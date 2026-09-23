@@ -601,13 +601,19 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <ComboBox AutomationProperties.Name="Exact form obligation and plan year"
-                              Grid.Row="6" Grid.ColumnSpan="4" Margin="0,6,0,0"
-                              ItemsSource="{Binding FormObligations}"
-                              DisplayMemberPath="Label"
-                              SelectedItem="{Binding SelectedFormObligation, Mode=TwoWay}"
-                              Visibility="{Binding IsFormNote,
-                                  Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <StackPanel Grid.Row="6" Grid.ColumnSpan="4" Margin="0,8,0,0"
+                                Visibility="{Binding IsFormNote,
+                                    Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="FORM OBLIGATION / PLAN YEAR"
+                                   Style="{StaticResource LabelStyle}" />
+                        <ComboBox AutomationProperties.Name="Form obligation and plan year"
+                                  ItemsSource="{Binding FormObligations}"
+                                  DisplayMemberPath="Label"
+                                  SelectedItem="{Binding SelectedFormObligation, Mode=TwoWay}" />
+                        <TextBlock Text="Choose the specific form this note documents. Required before submitting a Form note for supervisor review."
+                                   Margin="0,4,0,0" FontSize="11" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
                     <TextBlock Grid.Row="7" Grid.ColumnSpan="4" Margin="0,6,0,0"
                                Text="Reason for changing a prior attested date (if applicable)"
                                Foreground="{DynamicResource TextSecondaryBrush}"

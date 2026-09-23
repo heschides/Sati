@@ -4984,6 +4984,25 @@ the migration, and a read-only allow-list check verified it absent.
 ## 2026-09-22 — Legacy Dark theme
 
 Legacy Dark keeps Legacy's leaf artwork, Palatino typography, and gradient layout.
-Its surfaces use shaded Black Bean and Sienna; Bone and Dun provide readable text,
-while Brown Sugar accents the borders. Semantic status colors retain their meanings.
-The palette is selectable in Settings and stored with the existing per-user theme choice.
+Its window remains Black Bean, while navigation and raised panels move through
+Sienna shades. Bone and Dun provide readable text on those dark surfaces, and
+Brown Sugar accents the borders. Editable fields use Bone with Black Bean ink;
+their selection uses Sienna with Bone ink. The field brush roles are separate
+from the general panel roles, so light controls do not invert text elsewhere.
+Semantic status colors retain their meanings. The palette is selectable in
+Settings and stored with the existing per-user theme choice.
+
+## 2026-09-22 — Scheduled form work may become a draft after a dated checkmark
+
+A Scheduled note carries a planned date. It does not prove that work occurred
+on that date. When a case manager attests an exact form, a single linked
+form-only Scheduled note may become the Pending documentation draft on the
+selected actual date after a short confirmation that shows both dates. The
+same note and exact form link are retained, and the note still must be written
+and submitted. The conversion and attestation commit together. A confirmation
+token tied to the note ID, revision, planned date, and selected actual date
+prevents a stale preview
+from changing a note that was edited in the meantime. Mixed or submitted notes,
+claim-linked notes, and ambiguous evidence continue through the existing
+correction route. Reclassification's combined assessment implication is not
+automatically converted, because it can involve two distinct obligations.

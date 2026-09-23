@@ -898,7 +898,9 @@ public sealed record AttestFormRequest(
     DateTime CompletedOn,
     int? EvidenceNoteId = null,
     string? SupervisorOverrideReason = null,
-    DateTime? ComprehensiveAssessmentCompletedOn = null);
+    DateTime? ComprehensiveAssessmentCompletedOn = null,
+    bool ConfirmScheduledNoteConversion = false,
+    string? ScheduledNoteConversionToken = null);
 public sealed record RevokeFormAttestationRequest(int FormId, string Reason);
 public sealed record FormAttestationHistoryDto(
     long Id,
@@ -923,7 +925,11 @@ public sealed record PendingAttestationDto(
     bool IsLegacyUnlinked = false);
 public sealed record DeleteFormsRequest(IReadOnlyList<int> FormIds);
 
-public sealed record ApiErrorDto(string Code, string Message, string CorrelationId);
+public sealed record ApiErrorDto(
+    string Code,
+    string Message,
+    string CorrelationId,
+    string? ConfirmationToken = null);
 
 /// <summary>
 /// What <c>GET /health/version</c> reports. <c>ContractRevision</c> fingerprints both routes and

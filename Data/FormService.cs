@@ -36,7 +36,18 @@ public sealed class FormService(
             form,
             completedOn,
             comprehensiveAssessmentCompletedOn: null,
-            evidenceNoteId);
+            evidenceNoteId,
+            confirmScheduledNoteConversion: false,
+            scheduledNoteConversionToken: null);
+
+    public Task AttestAsync(
+        Form form,
+        DateTime completedOn,
+        int? evidenceNoteId,
+        bool confirmScheduledNoteConversion,
+        string? scheduledNoteConversionToken = null) =>
+        AttestCoreAsync(form, completedOn, null, evidenceNoteId,
+            confirmScheduledNoteConversion, scheduledNoteConversionToken);
 
     public Task AttestAsync(
         Form form,
@@ -65,14 +76,31 @@ public sealed class FormService(
             form,
             reclassificationCompletedOn,
             comprehensiveAssessmentCompletedOn,
-            evidenceNoteId);
+            evidenceNoteId,
+            confirmScheduledNoteConversion: false,
+            scheduledNoteConversionToken: null);
     }
+
+    public Task AttestReclassificationAsync(
+        Form form,
+        DateTime reclassificationCompletedOn,
+        DateTime? comprehensiveAssessmentCompletedOn,
+        int? evidenceNoteId,
+        bool confirmScheduledNoteConversion,
+        string? scheduledNoteConversionToken = null) =>
+        confirmScheduledNoteConversion
+            ? throw new NotSupportedException(
+                "Convert a Scheduled Reclassification note in the note editor before attesting.")
+            : AttestReclassificationAsync(form, reclassificationCompletedOn,
+                comprehensiveAssessmentCompletedOn, evidenceNoteId);
 
     private async Task AttestCoreAsync(
         Form form,
         DateTime completedOn,
         DateTime? comprehensiveAssessmentCompletedOn,
-        int? evidenceNoteId)
+        int? evidenceNoteId,
+        bool confirmScheduledNoteConversion,
+        string? scheduledNoteConversionToken)
     {
         var actor = CurrentCaseManager();
         await using var context = await contextFactory.CreateDbContextAsync();
@@ -143,8 +171,10 @@ public sealed class FormService(
                 }
 
                 var assessmentEvidenceNoteId = await ResolveManualAttestationNoteAsync(
-                    context, actor, assessment, cycle, assessmentCompletedOn, null);
-                int? citedAssessmentEvidenceNoteId = assessmentCompletedOn.Date < cycle.CycleEnd.Date
+                    context, actor, assessment, cycle, assessmentCompletedOn, null,
+                    confirmScheduledNoteConversion: false,
+                    scheduledNoteConversionToken: null);
+                int? citedAssessmentEvidenceNoteId = assessmentCompletedOn.Date <= cycle.CycleEnd.Date
                     ? assessmentEvidenceNoteId : null;
                 await EnsureEvidenceIsValidAsync(context, assessment, cycle,
                     assessmentCompletedOn, citedAssessmentEvidenceNoteId);
@@ -196,11 +226,13 @@ public sealed class FormService(
         }
 
         evidenceNoteId = await ResolveManualAttestationNoteAsync(
-            context, actor, stored, cycle, completedOn, evidenceNoteId);
-        // An overdue historical form can be completed after its cycle closes.
-        // The draft keeps the exact FormId link, but the older evidence contract
-        // only cites notes inside the cycle; do not widen that evidence rule.
-        var citedEvidenceNoteId = completedOn.Date < cycle.CycleEnd.Date
+            context, actor, stored, cycle, completedOn, evidenceNoteId,
+            confirmScheduledNoteConversion && stored.Type != FormType.Reclassification,
+            scheduledNoteConversionToken);
+        // A note on the target effective date still documents this exact form.
+        // Later overdue notes retain their FormId link but are not cited by the
+        // historical in-cycle evidence field.
+        var citedEvidenceNoteId = completedOn.Date <= cycle.CycleEnd.Date
             ? evidenceNoteId : null;
         await EnsureEvidenceIsValidAsync(context, stored, cycle, completedOn, citedEvidenceNoteId);
 
@@ -669,11 +701,13 @@ public sealed class FormService(
         Form form,
         (DateTime CycleStart, DateTime CycleEnd) cycle,
         DateTime completedOn,
-        int? explicitEvidenceNoteId)
+        int? explicitEvidenceNoteId,
+        bool confirmScheduledNoteConversion,
+        string? scheduledNoteConversionToken)
     {
-        var linked = await context.Notes.AsNoTracking()
-            .Where(note => note.PersonId == form.PersonId && note.FormId == form.Id)
-            .Select(note => new { note.Id, note.EventDate, note.Status })
+        var linked = await context.Notes
+            .Where(note => note.PersonId == form.PersonId && note.FormId == form.Id &&
+                           note.AgencyId == actor.AgencyId)
             .ToListAsync();
         if (linked.Count > 1)
             throw new InvalidOperationException(
@@ -684,13 +718,56 @@ public sealed class FormService(
             if (explicitEvidenceNoteId is int citedId && citedId != note.Id)
                 throw new InvalidOperationException(
                     "The selected evidence note differs from the note already linked to this form.");
+            var hasClaimLine = await context.ClaimLines.AsNoTracking()
+                .AnyAsync(line => line.NoteId == note.Id);
+            if (form.Type != FormType.Reclassification &&
+                ManualAttestationNoteRules.CanConvertScheduledFormNote(
+                    (int?)note.Status, note.NoteType?.ToString(), (int?)note.Activities,
+                    hasClaimLine))
+            {
+                if (!confirmScheduledNoteConversion)
+                    throw new ScheduledFormNoteConversionRequiredException(
+                        ManualAttestationNoteRules.ScheduledConversionPrompt(
+                            Person.FormDisplayName(form.Type), note.EventDate, completedOn),
+                        ManualAttestationNoteRules.ScheduledConversionToken(
+                            note.Id, note.Revision, note.EventDate, completedOn));
+
+                if (scheduledNoteConversionToken !=
+                    ManualAttestationNoteRules.ScheduledConversionToken(
+                        note.Id, note.Revision, note.EventDate, completedOn))
+                    throw new InvalidOperationException(
+                        ManualAttestationNoteRules.ScheduledNoteChangedMessage);
+
+                var plannedOn = note.EventDate;
+                note.EventDate = completedOn.Date;
+                note.Status = NoteStatus.Pending;
+                note.Revision++;
+                LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteUpdated,
+                    "Note", note.Id, JsonSerializer.Serialize(new
+                    {
+                        source = "form-attestation",
+                        plannedOn = plannedOn?.ToString("yyyy-MM-dd"),
+                        actualWorkDate = completedOn.Date.ToString("yyyy-MM-dd"),
+                        newStatus = "Pending"
+                    }));
+                await context.SaveChangesAsync();
+                return note.Id;
+            }
+
+            if (confirmScheduledNoteConversion)
+                throw new InvalidOperationException(
+                    ManualAttestationNoteRules.ScheduledNoteChangedMessage);
+
             var conflict = ManualAttestationNoteRules.Conflict(
-                completedOn, note.EventDate, (int?)note.Status,
-                await context.ClaimLines.AsNoTracking().AnyAsync(line => line.NoteId == note.Id));
+                completedOn, note.EventDate, (int?)note.Status, hasClaimLine);
             if (conflict is not null)
                 throw new InvalidOperationException(conflict);
             return note.Id;
         }
+
+        if (confirmScheduledNoteConversion)
+            throw new InvalidOperationException(
+                ManualAttestationNoteRules.ScheduledNoteChangedMessage);
 
         if (explicitEvidenceNoteId is int evidenceNoteId)
             return evidenceNoteId;
@@ -699,10 +776,10 @@ public sealed class FormService(
             note.PersonId == form.PersonId && note.FormId == null &&
             note.FormType == form.Type && note.EventDate != null &&
             note.EventDate.Value.Date >= cycle.CycleStart.Date &&
-            note.EventDate.Value.Date < cycle.CycleEnd.Date);
+            note.EventDate.Value.Date <= cycle.CycleEnd.Date);
         if (legacyCandidateExists)
             throw new InvalidOperationException(
-                "An older unlinked note may already document this form. Select and review that note before attesting; Sati will not create a duplicate by guessing.");
+                ManualAttestationNoteRules.UnlinkedFormNoteMessage);
 
         var draft = Note.Create(
             $"Draft: document completion of {Person.FormDisplayName(form.Type)}.",
@@ -735,7 +812,7 @@ public sealed class FormService(
             note.EventDate != null &&
             (!requiresExactCompletion || note.EventDate.Value.Date == completedOn.Date) &&
             note.EventDate.Value.Date >= cycle.CycleStart.Date &&
-            note.EventDate.Value.Date < cycle.CycleEnd.Date &&
+            note.EventDate.Value.Date <= cycle.CycleEnd.Date &&
             (note.Status == NoteStatus.Pending ||
              note.Status == NoteStatus.Logged ||
              note.Status == NoteStatus.Approved));

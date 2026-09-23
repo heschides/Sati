@@ -540,7 +540,8 @@ public sealed class CloudApiClient
             _ => error?.Message ?? $"The Demo API returned {(int)response.StatusCode}."
         };
 
-        throw new CloudApiException(response.StatusCode, message, error?.CorrelationId, retryAfter, error?.Code);
+        throw new CloudApiException(response.StatusCode, message, error?.CorrelationId,
+            retryAfter, error?.Code, error?.ConfirmationToken);
     }
 
     private static TimeSpan? GetRetryAfter(HttpResponseMessage response)
@@ -563,13 +564,15 @@ public class CloudApiException(
     string message,
     string? correlationId,
     TimeSpan? retryAfter = null,
-    string? code = null)
+    string? code = null,
+    string? confirmationToken = null)
     : Exception(message)
 {
     public HttpStatusCode StatusCode { get; } = statusCode;
     public string? CorrelationId { get; } = correlationId;
     public TimeSpan? RetryAfter { get; } = retryAfter;
     public string? Code { get; } = code;
+    public string? ConfirmationToken { get; } = confirmationToken;
 }
 
 /// <summary>

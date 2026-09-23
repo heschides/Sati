@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Sati.Contracts.V1;
 using Sati.Data;
+using Sati.Data.Cloud;
 using Sati.Models;
 using Sati.Services;
 using Sati.Services.LocalAi;
@@ -25,7 +26,8 @@ namespace Sati.ViewModels.Children
     // The module owns the full submit pipeline: validation, compliance gate,
     // billing-window check, the ComplianceBlocked/HeldForCompliance fork, and
     // note persistence. Hosts learn about successful saves through NoteSaved.
-    // A form-tagged note is evidence only and never changes compliance state.
+    // A submitted Form note linked to an exact non-release obligation records
+    // that form's attestation through the note service.
     public sealed record FormObligationOption(int FormId, string Label);
 
     public partial class NoteEntryViewModel : ObservableObject
@@ -2106,9 +2108,31 @@ namespace Sati.ViewModels.Children
                     }
                 }
 
+                var formLinkError = FormNoteLinkRules.Validate(
+                    SelectedNoteType?.ToString(), SelectedFormType?.ToString(),
+                    Status?.ToString(), _selectedFormId, FormDateCorrectionReason,
+                    (int)_selectedActivities);
+                if (formLinkError is not null)
+                {
+                    ShowSubmissionRefusal(formLinkError);
+                    return;
+                }
+
                 await SaveAsync();
             }
             catch (NoteSubmissionException ex)
+            {
+                ShowSubmissionRefusal(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                ShowSubmissionRefusal(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                ShowSubmissionRefusal(ex.Message);
+            }
+            catch (CloudApiException ex)
             {
                 ShowSubmissionRefusal(ex.Message);
             }

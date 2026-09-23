@@ -249,12 +249,14 @@ public sealed class DashboardFormComplianceTests
         viewModel.CompletionDate = DateTime.Today;
 
         Assert.True(viewModel.RequiresEvergreenConfirmation);
+        Assert.True(viewModel.NeedsEvergreenConfirmation);
         Assert.Contains("completed in Evergreen", viewModel.AttestationStatement,
             StringComparison.OrdinalIgnoreCase);
         Assert.False(viewModel.CompleteAttestationCommand.CanExecute(null));
 
         viewModel.HasConfirmedEvergreenCompletion = true;
 
+        Assert.False(viewModel.NeedsEvergreenConfirmation);
         Assert.True(viewModel.CompleteAttestationCommand.CanExecute(null));
         await viewModel.CompleteAttestationCommand.ExecuteAsync(null);
         Assert.Equal(DateTime.Today, form.CompletedDate);
@@ -286,6 +288,32 @@ public sealed class DashboardFormComplianceTests
 
         Assert.Contains("<views:FormAttestationControl", view, StringComparison.Ordinal);
         Assert.Contains("DataContext=\"{Binding Attestation}\"", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ClientPanelReloadShowsFormCompletionSavedThroughANote()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        var (original, _) = harness.AddOverdueQuarterlyReview(FormType.Q3R);
+        harness.Dashboard.Clients.SelectedPerson = original;
+
+        // A note save reloads the caseload as fresh Person instances. The open
+        // profile must follow the replacement instance, where the form is complete.
+        var refreshed = Person.CreatePerson(
+            harness.Dashboard.LoggedInUser!.Id,
+            "Quarterly", "Review", string.Empty, new DateTime(1990, 1, 1),
+            original.EffectiveDate, WaiverType.Section21, new Settings());
+        refreshed.GetCurrentCycleForm(FormType.Q3R, DateTime.Today)!
+            .SetInitialCompletion(DateTime.Today);
+        harness.ReplacePerson(refreshed);
+
+        await harness.Dashboard.Clients.ReloadAsync();
+
+        Assert.Same(refreshed, harness.Dashboard.Clients.SelectedPerson);
+        Assert.Equal(DateTime.Today,
+            harness.Dashboard.Clients.SelectedPerson!
+                .GetCurrentCycleForm(FormType.Q3R, DateTime.Today)!.CompletedDate);
     }
 
     [Theory]
@@ -359,6 +387,12 @@ public sealed class DashboardFormComplianceTests
         }
 
         public CaseManagerDashboardViewModel Dashboard { get; }
+
+        public void ReplacePerson(Person person)
+        {
+            people.Items.Clear();
+            people.Items.Add(person);
+        }
 
         public static async Task<DashboardHarness> CreateAsync(NoteEntryFixture fixture)
         {

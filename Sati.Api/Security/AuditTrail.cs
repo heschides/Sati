@@ -37,6 +37,7 @@ internal static class AuditActions
     public const string NoteFormDateCorrected = "note.form-date-corrected";
     public const string NoteReassigned = "note.reassigned";
     public const string NoteDraftCreatedFromAttestation = "note.draft-created-from-attestation";
+    public const string NotePlannedWorkConverted = "note.planned-work-converted-on-attestation";
     public const string AssessmentCreated = "assessment.created";
     public const string AssessmentUpdated = "assessment.updated";
     public const string AssessmentSubmitted = "assessment.submitted";

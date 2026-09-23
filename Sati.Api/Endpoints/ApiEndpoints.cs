@@ -7567,7 +7567,7 @@ internal static partial class ApiEndpoints
                             note.FormId == null && note.FormType == (int)FormType.ComprehensiveAssessment &&
                             note.EventDate != null &&
                             note.EventDate.Value.Date >= cycle.Value.CycleStart.Date &&
-                            note.EventDate.Value.Date < cycle.Value.CycleEnd.Date,
+                            note.EventDate.Value.Date <= cycle.Value.CycleEnd.Date,
                             cancellationToken);
                         if (existingUnlinkedAssessment)
                             return Results.Conflict(new ApiErrorDto("unlinked_assessment_note",
@@ -7600,7 +7600,7 @@ internal static partial class ApiEndpoints
                         ActorKind = actorKind.ToString(),
                         ActorUserId = actor.UserId,
                         RecordedAtUtc = clock.UtcNow.UtcDateTime,
-                        EvidenceNoteId = assessmentCompletedOn.Date < cycle.Value.CycleEnd.Date
+                        EvidenceNoteId = assessmentCompletedOn.Date <= cycle.Value.CycleEnd.Date
                             ? assessmentEvidenceNoteId : null,
                         PrerequisiteStateJson = FormAttestationRules.NoPrerequisitesStateJson
                     };
@@ -7658,10 +7658,9 @@ internal static partial class ApiEndpoints
                 }, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
 
-            var linkedNotes = await db.Notes.AsNoTracking()
+            var linkedNotes = await db.Notes
                 .Where(note => note.PersonId == personId && note.FormId == form.Id &&
                     note.AgencyId == actor.AgencyId)
-                .Select(note => new { note.Id, note.EventDate, note.Status })
                 .ToListAsync(cancellationToken);
             if (linkedNotes.Count > 1)
                 return Results.Conflict(new ApiErrorDto("ambiguous_form_note",
@@ -7675,12 +7674,57 @@ internal static partial class ApiEndpoints
                         "The selected evidence note differs from the note already linked to this form.", string.Empty));
                 var hasClaimLine = await db.ClaimLines.AsNoTracking().AnyAsync(
                     line => line.NoteId == linked.Id, cancellationToken);
-                var conflict = ManualAttestationNoteRules.Conflict(
-                    request.CompletedOn, linked.EventDate, linked.Status, hasClaimLine);
-                if (conflict is not null)
-                    return Results.Conflict(new ApiErrorDto("form_note_date_conflict", conflict, string.Empty));
+                var noteType = linked.NoteType is int typeValue
+                    ? ((NoteType)typeValue).ToString()
+                    : null;
+                if (!string.Equals(form.Type, "Reclassification", StringComparison.Ordinal) &&
+                    ManualAttestationNoteRules.CanConvertScheduledFormNote(
+                        linked.Status, noteType, linked.Activities, hasClaimLine))
+                {
+                    if (!request.ConfirmScheduledNoteConversion)
+                        return Results.Conflict(new ApiErrorDto(
+                            ManualAttestationNoteRules.ScheduledConversionRequiredCode,
+                            ManualAttestationNoteRules.ScheduledConversionPrompt(
+                                form.Type, linked.EventDate, request.CompletedOn), string.Empty,
+                            ManualAttestationNoteRules.ScheduledConversionToken(
+                                linked.Id, linked.Revision, linked.EventDate,
+                                request.CompletedOn)));
+
+                    if (request.ScheduledNoteConversionToken !=
+                        ManualAttestationNoteRules.ScheduledConversionToken(
+                            linked.Id, linked.Revision, linked.EventDate,
+                            request.CompletedOn))
+                        return Results.Conflict(new ApiErrorDto("scheduled_form_note_changed",
+                            ManualAttestationNoteRules.ScheduledNoteChangedMessage, string.Empty));
+
+                    var plannedOn = linked.EventDate;
+                    linked.EventDate = request.CompletedOn.Date;
+                    linked.Status = NoteWorkflow.Pending;
+                    linked.Revision++;
+                    auditTrail.Record(actor, AuditActions.NotePlannedWorkConverted,
+                        "Note", linked.Id, JsonSerializer.Serialize(new
+                        {
+                            plannedOn = plannedOn?.ToString("yyyy-MM-dd"),
+                            actualWorkDate = request.CompletedOn.Date.ToString("yyyy-MM-dd"),
+                            newStatus = "Pending"
+                        }));
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                else
+                {
+                    if (request.ConfirmScheduledNoteConversion)
+                        return Results.Conflict(new ApiErrorDto("scheduled_form_note_changed",
+                            ManualAttestationNoteRules.ScheduledNoteChangedMessage, string.Empty));
+                    var conflict = ManualAttestationNoteRules.Conflict(
+                        request.CompletedOn, linked.EventDate, linked.Status, hasClaimLine);
+                    if (conflict is not null)
+                        return Results.Conflict(new ApiErrorDto("form_note_date_conflict", conflict, string.Empty));
+                }
                 resolvedEvidenceNoteId = linked.Id;
             }
+            else if (request.ConfirmScheduledNoteConversion)
+                return Results.Conflict(new ApiErrorDto("scheduled_form_note_changed",
+                    ManualAttestationNoteRules.ScheduledNoteChangedMessage, string.Empty));
             else if (resolvedEvidenceNoteId is null)
             {
                 var legacyCandidateExists = await db.Notes.AsNoTracking().AnyAsync(note =>
@@ -7689,11 +7733,11 @@ internal static partial class ApiEndpoints
                     note.FormType == (int)Enum.Parse<FormType>(form.Type) &&
                     note.EventDate != null &&
                     note.EventDate.Value.Date >= cycle.Value.CycleStart.Date &&
-                    note.EventDate.Value.Date < cycle.Value.CycleEnd.Date,
+                    note.EventDate.Value.Date <= cycle.Value.CycleEnd.Date,
                     cancellationToken);
                 if (legacyCandidateExists)
                     return Results.Conflict(new ApiErrorDto("unlinked_form_note",
-                        "An older unlinked note may already document this form. Select and review that note before attesting; Sati will not create a duplicate by guessing.", string.Empty));
+                        ManualAttestationNoteRules.UnlinkedFormNoteMessage, string.Empty));
                 var draft = new ServerNote
                 {
                     PersonId = personId,
@@ -7715,7 +7759,7 @@ internal static partial class ApiEndpoints
             // An overdue historical form may be completed after its annual cycle.
             // Keep the exact FormId on the note, while retaining the existing
             // cycle limit for evidence IDs in the attestation ledger.
-            var citedEvidenceNoteId = request.CompletedOn.Date < cycle.Value.CycleEnd.Date
+            var citedEvidenceNoteId = request.CompletedOn.Date <= cycle.Value.CycleEnd.Date
                 ? resolvedEvidenceNoteId : null;
             if (citedEvidenceNoteId is int evidenceNoteId)
             {
@@ -7728,7 +7772,7 @@ internal static partial class ApiEndpoints
                       note.EventDate.Value.Date == request.CompletedOn.Date)) &&
                     note.EventDate != null &&
                     note.EventDate.Value.Date >= cycle.Value.CycleStart.Date &&
-                    note.EventDate.Value.Date < cycle.Value.CycleEnd.Date &&
+                    note.EventDate.Value.Date <= cycle.Value.CycleEnd.Date &&
                     (note.Status == (int)NoteStatus.Pending ||
                      note.Status == (int)NoteStatus.Logged ||
                      note.Status == (int)NoteStatus.Approved),

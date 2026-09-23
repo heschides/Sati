@@ -6,6 +6,25 @@ namespace Sati.Tests;
 public sealed class PendingAttestationExactLinkTests
 {
     [Fact]
+    public void PcpNoteOnEffectiveDatePrefersThePlanDueThatDay()
+    {
+        var target = new DateTime(2026, 9, 21);
+        var next = target.AddYears(1);
+        var forms = new[]
+        {
+            new FormFact(10, 4, "PCP", target, null, target),
+            new FormFact(11, 4, "PCP", next, null, next)
+        };
+        var note = new NoteFact(50, 4, "PCP", target, "Logged", FormId: null);
+
+        var pending = Assert.Single(FormAttestationRules.PendingAttestations(
+            [note], forms, target.AddYears(-1), target.AddDays(1)));
+
+        Assert.Equal(10, pending.FormId);
+        Assert.True(pending.IsLegacyUnlinked);
+    }
+
+    [Fact]
     public void LinkedNoteNeverFallsBackToAnotherCycleForm()
     {
         var effective = new DateTime(2025, 1, 1);

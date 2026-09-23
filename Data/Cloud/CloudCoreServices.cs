@@ -400,6 +400,21 @@ public sealed class CloudFormService(CloudApiClient api) : IFormService
         Form form,
         DateTime completedOn,
         int? evidenceNoteId,
+        bool confirmScheduledNoteConversion,
+        string? scheduledNoteConversionToken = null)
+    {
+        var response = await api.PostAsync<AttestFormRequest, FormDto>(
+            $"/api/v1/people/{form.PersonId}/forms/{form.Type}/attestation",
+            new AttestFormRequest(form.Id, completedOn, evidenceNoteId,
+                ConfirmScheduledNoteConversion: confirmScheduledNoteConversion,
+                ScheduledNoteConversionToken: scheduledNoteConversionToken));
+        Apply(response, form);
+    }
+
+    public async Task AttestAsync(
+        Form form,
+        DateTime completedOn,
+        int? evidenceNoteId,
         string? supervisorOverrideReason)
     {
         if (!string.IsNullOrWhiteSpace(supervisorOverrideReason))
@@ -429,6 +444,19 @@ public sealed class CloudFormService(CloudApiClient api) : IFormService
                 ComprehensiveAssessmentCompletedOn: comprehensiveAssessmentCompletedOn));
         Apply(response, form);
     }
+
+    public Task AttestReclassificationAsync(
+        Form form,
+        DateTime reclassificationCompletedOn,
+        DateTime? comprehensiveAssessmentCompletedOn,
+        int? evidenceNoteId,
+        bool confirmScheduledNoteConversion,
+        string? scheduledNoteConversionToken = null) =>
+        confirmScheduledNoteConversion
+            ? throw new NotSupportedException(
+                "Convert a Scheduled Reclassification note in the note editor before attesting.")
+            : AttestReclassificationAsync(form, reclassificationCompletedOn,
+                comprehensiveAssessmentCompletedOn, evidenceNoteId);
 
     public Task<FormPrerequisiteStatusDto> GetPrerequisiteStatusAsync(Form form) =>
         api.GetAsync<FormPrerequisiteStatusDto>(

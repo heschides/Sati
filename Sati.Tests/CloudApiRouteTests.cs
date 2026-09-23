@@ -198,6 +198,27 @@ public sealed class CloudApiRouteTests
     }
 
     [Fact]
+    public async Task ConfirmingScheduledFormDraftSendsThePreviewToken()
+    {
+        var completedOn = DateTime.Today.AddDays(-1);
+        var responseJson = $$"""
+            {"id":44,"type":"SafetyPlan","dueDate":"{{completedOn:yyyy-MM-dd}}","isCompliant":true,"personId":{{PersonId}},"completedDate":"{{completedOn:yyyy-MM-dd}}","openedDate":null}
+            """;
+        var recorder = new UriRecorder(JsonBody(responseJson));
+        var service = new CloudFormService(ClientFor(recorder));
+        var form = new Form(FormType.SafetyPlan, completedOn) { Id = 44, PersonId = PersonId };
+
+        await service.AttestAsync(form, completedOn, null, true, "44:2:123456");
+
+        Assert.Equal($"/api/v1/people/{PersonId}/forms/SafetyPlan/attestation",
+            recorder.LastUri?.AbsolutePath);
+        Assert.Contains("\"confirmScheduledNoteConversion\":true", recorder.LastBody);
+        Assert.Contains("\"scheduledNoteConversionToken\":\"44:2:123456\"",
+            recorder.LastBody);
+        Assert.Equal(completedOn, form.CompletedDate);
+    }
+
+    [Fact]
     public async Task BillingComplianceResolutionSendsTheExactServiceDate()
     {
         var serviceDate = new DateTime(2026, 8, 10);

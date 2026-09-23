@@ -13,6 +13,15 @@ namespace Sati.Data
             Form form,
             DateTime completedOn,
             int? evidenceNoteId,
+            bool confirmScheduledNoteConversion,
+            string? scheduledNoteConversionToken = null) =>
+            confirmScheduledNoteConversion
+                ? throw new NotSupportedException("This data path cannot convert scheduled form work.")
+                : AttestAsync(form, completedOn, evidenceNoteId);
+        Task AttestAsync(
+            Form form,
+            DateTime completedOn,
+            int? evidenceNoteId,
             string? supervisorOverrideReason) =>
             string.IsNullOrWhiteSpace(supervisorOverrideReason)
                 ? AttestAsync(form, completedOn, evidenceNoteId)
@@ -31,6 +40,17 @@ namespace Sati.Data
                 ? AttestAsync(form, reclassificationCompletedOn, evidenceNoteId)
                 : throw new NotSupportedException(
                     "Atomic Reclassification and Comprehensive Assessment attestation is not available on this data path.");
+        Task AttestReclassificationAsync(
+            Form form,
+            DateTime reclassificationCompletedOn,
+            DateTime? comprehensiveAssessmentCompletedOn,
+            int? evidenceNoteId,
+            bool confirmScheduledNoteConversion,
+            string? scheduledNoteConversionToken = null) =>
+            confirmScheduledNoteConversion
+                ? throw new NotSupportedException("This data path cannot convert scheduled form work.")
+                : AttestReclassificationAsync(form, reclassificationCompletedOn,
+                    comprehensiveAssessmentCompletedOn, evidenceNoteId);
         Task<FormPrerequisiteStatusDto> GetPrerequisiteStatusAsync(Form form) =>
             Task.FromResult(new FormPrerequisiteStatusDto(
                 PrerequisiteKind.None.ToString(), true,
@@ -52,5 +72,13 @@ namespace Sati.Data
         /// Completion corrections use attestation/revocation instead.
         /// </summary>
         Task DeleteFormsAsync(IEnumerable<Form> forms);
+    }
+
+    public sealed class ScheduledFormNoteConversionRequiredException(
+        string message,
+        string confirmationToken)
+        : InvalidOperationException(message)
+    {
+        public string ConfirmationToken { get; } = confirmationToken;
     }
 }

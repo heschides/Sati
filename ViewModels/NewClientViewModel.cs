@@ -368,6 +368,11 @@ namespace Sati.ViewModels
         // flush old, then load new.
         partial void OnSelectedPersonChanged(Person? oldValue, Person? newValue)
         {
+            // A reload can replace this Person instance without changing clients.
+            // Keep the current journal draft; there is no outgoing client to flush.
+            if (oldValue?.Id == newValue?.Id)
+                return;
+
             // Flush any pending edit for the person we're leaving. Fire-and-forget is
             // acceptable: the write is a single-column UPDATE and the timer is stopped
             // so it can't also fire.
@@ -1523,12 +1528,19 @@ namespace Sati.ViewModels
             var account = _sessionService.CurrentUser
                 ?? throw new InvalidOperationException("A signed-in user is required to load clients.");
             var request = _workspaceLoads.Begin();
+            var selectedPersonId = SelectedPerson?.Id;
             var people = await _personService.GetAllPeopleAsync(account.Id);
             if (!_workspaceLoads.IsCurrent(request) || !ReferenceEquals(_sessionService.CurrentUser, account))
                 return;
             People.Clear();
             foreach (var person in people)
                 People.Add(person);
+
+            // Notes can attest a form while this panel is open. The fresh caseload
+            // contains that completion, but the old SelectedPerson still points to
+            // the pre-save form objects unless we rebind it after the reload.
+            if (selectedPersonId is int personId)
+                SelectedPerson = People.FirstOrDefault(person => person.Id == personId);
         }
 
         public void ClearForAccountSwitch()

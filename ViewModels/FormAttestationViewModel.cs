@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Contracts.V1;
 using Sati.Data;
+using Sati.Data.Cloud;
 using Sati.Models;
 
 namespace Sati.ViewModels;
@@ -17,6 +18,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     private Form? _form;
     private DateTime _cycleStart;
     private int? _evidenceNoteId;
+    private string? _scheduledNoteConversionToken;
     private int _loadVersion;
     private FormPrerequisiteStatusDto? _prerequisiteStatus;
 
@@ -28,10 +30,12 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompleteAttestationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmScheduledNoteConversionCommand))]
     private DateTime? completionDate;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompleteAttestationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmScheduledNoteConversionCommand))]
     private bool hasConfirmedEvergreenCompletion;
 
     [ObservableProperty]
@@ -46,6 +50,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompleteAttestationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmScheduledNoteConversionCommand))]
     private DateTime? comprehensiveAssessmentCompletionDate;
 
     [ObservableProperty]
@@ -53,6 +58,9 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     [ObservableProperty]
     private string prerequisiteError = string.Empty;
+
+    [ObservableProperty]
+    private string scheduledNoteConversionPrompt = string.Empty;
 
     [ObservableProperty]
     private IReadOnlyList<FormAttestationHistoryItemViewModel> attestationHistory = [];
@@ -65,6 +73,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompleteAttestationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmScheduledNoteConversionCommand))]
     [NotifyCanExecuteChangedFor(nameof(RevokeAttestationCommand))]
     private bool isSaving;
 
@@ -72,8 +81,13 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     public bool IsComplete => _form?.CompletedDate is not null;
     public bool IsIncomplete => !IsComplete;
+    public bool HasScheduledNoteConversionPrompt =>
+        !string.IsNullOrWhiteSpace(ScheduledNoteConversionPrompt);
     public bool RequiresEvergreenConfirmation =>
         _form?.Type is FormType.PCP or FormType.ComprehensiveAssessment;
+    public bool NeedsEvergreenConfirmation =>
+        RequiresEvergreenConfirmation && CompletionDate is not null &&
+        !HasConfirmedEvergreenCompletion;
     public string PlanYearWarning
     {
         get
@@ -164,6 +178,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         RevocationReason = string.Empty;
         RevocationReasonError = string.Empty;
         PrerequisiteError = string.Empty;
+        ScheduledNoteConversionPrompt = string.Empty;
         AttestationHistory = [];
         HistoryError = string.Empty;
         IsVisible = true;
@@ -187,6 +202,8 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
 
     partial void OnCompletionDateChanged(DateTime? value)
     {
+        ScheduledNoteConversionPrompt = string.Empty;
+        OnPropertyChanged(nameof(NeedsEvergreenConfirmation));
         OnPropertyChanged(nameof(PlanYearWarning));
         OnPropertyChanged(nameof(HasPlanYearWarning));
         CompletionDateError = value is DateTime date && _form is not null
@@ -196,10 +213,22 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         ValidateAssessmentDate();
     }
 
+    partial void OnHasConfirmedEvergreenCompletionChanged(bool value) =>
+        OnPropertyChanged(nameof(NeedsEvergreenConfirmation));
+
     partial void OnComprehensiveAssessmentCompletionDateChanged(DateTime? value)
     {
         _ = value;
+        ScheduledNoteConversionPrompt = string.Empty;
         ValidateAssessmentDate();
+    }
+
+    partial void OnScheduledNoteConversionPromptChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            _scheduledNoteConversionToken = null;
+        OnPropertyChanged(nameof(HasScheduledNoteConversionPrompt));
+        ConfirmScheduledNoteConversionCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnRevocationReasonChanged(string value)
@@ -236,7 +265,21 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     }
 
     [RelayCommand(CanExecute = nameof(CanCompleteAttestation))]
-    private async Task CompleteAttestation()
+    private Task CompleteAttestation() => SaveAttestationAsync(
+        confirmScheduledNoteConversion: false);
+
+    private bool CanConfirmScheduledNoteConversion() =>
+        HasScheduledNoteConversionPrompt && CanCompleteAttestation();
+
+    [RelayCommand(CanExecute = nameof(CanConfirmScheduledNoteConversion))]
+    private Task ConfirmScheduledNoteConversion() => SaveAttestationAsync(
+        confirmScheduledNoteConversion: true);
+
+    [RelayCommand]
+    private void CancelScheduledNoteConversion() =>
+        ScheduledNoteConversionPrompt = string.Empty;
+
+    private async Task SaveAttestationAsync(bool confirmScheduledNoteConversion)
     {
         if (_form is null || CompletionDate is not DateTime completedOn)
             return;
@@ -269,28 +312,47 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         }
 
         IsSaving = true;
+        PrerequisiteError = string.Empty;
         try
         {
             if (IsReclassification)
             {
-                await formService.AttestReclassificationAsync(
-                    _form,
-                    completedOn.Date,
-                    IsAssessmentDateRequired
-                        ? ComprehensiveAssessmentCompletionDate?.Date
-                        : null,
-                    _evidenceNoteId);
+                var assessmentDate = IsAssessmentDateRequired
+                    ? ComprehensiveAssessmentCompletionDate?.Date
+                    : null;
+                if (confirmScheduledNoteConversion)
+                    await formService.AttestReclassificationAsync(
+                        _form, completedOn.Date, assessmentDate, _evidenceNoteId, true,
+                        _scheduledNoteConversionToken);
+                else
+                    await formService.AttestReclassificationAsync(
+                        _form, completedOn.Date, assessmentDate, _evidenceNoteId);
             }
             else
             {
-                await formService.AttestAsync(
-                    _form,
-                    completedOn.Date,
-                    _evidenceNoteId);
+                if (confirmScheduledNoteConversion)
+                    await formService.AttestAsync(
+                        _form, completedOn.Date, _evidenceNoteId, true,
+                        _scheduledNoteConversionToken);
+                else
+                    await formService.AttestAsync(
+                        _form, completedOn.Date, _evidenceNoteId);
             }
+            ScheduledNoteConversionPrompt = string.Empty;
             if (AttestationChangedAsync is not null)
                 await AttestationChangedAsync();
             await LoadHistoryAsync(_form, _loadVersion);
+        }
+        catch (ScheduledFormNoteConversionRequiredException exception)
+        {
+            _scheduledNoteConversionToken = exception.ConfirmationToken;
+            ScheduledNoteConversionPrompt = exception.Message;
+        }
+        catch (CloudApiException exception) when (
+            exception.Code == ManualAttestationNoteRules.ScheduledConversionRequiredCode)
+        {
+            _scheduledNoteConversionToken = exception.ConfirmationToken;
+            ScheduledNoteConversionPrompt = exception.Message;
         }
         catch (ArgumentOutOfRangeException exception)
         {
@@ -301,6 +363,16 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         }
         catch (InvalidOperationException exception)
         {
+            ScheduledNoteConversionPrompt = string.Empty;
+            PrerequisiteError = exception.Message;
+        }
+        catch (ArgumentException exception)
+        {
+            PrerequisiteError = exception.Message;
+        }
+        catch (CloudApiException exception)
+        {
+            ScheduledNoteConversionPrompt = string.Empty;
             PrerequisiteError = exception.Message;
         }
         finally
@@ -415,6 +487,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         OnPropertyChanged(nameof(IsComplete));
         OnPropertyChanged(nameof(IsIncomplete));
         OnPropertyChanged(nameof(RequiresEvergreenConfirmation));
+        OnPropertyChanged(nameof(NeedsEvergreenConfirmation));
         OnPropertyChanged(nameof(PlanYearWarning));
         OnPropertyChanged(nameof(HasPlanYearWarning));
         OnPropertyChanged(nameof(AttestationStatement));

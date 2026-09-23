@@ -632,13 +632,22 @@ the established night themes while the reference palette remains recognizable on
 luminance, contrast ratio, alpha compositing, and the flattening of a gradient or tiled pattern
 into the colours a reader actually receives. Nothing else may reimplement it.
 
-`ThemeLegibilityTests` holds every one of the twenty-five palettes to WCAG AA (4.5:1) two ways. The
+`ThemeLegibilityTests` holds every one of the twenty-seven palettes to WCAG AA (4.5:1) two ways. The
 token pass scores each text role against each surface role it can land on, plus each fill that
 carries its own named ink, so a pair fails before any screen ships that uses it. The rendered pass
 loads every view under every theme, reads the brushes WPF resolved, and finds each run's background
 by hit testing the point its glyphs occupy. A third check fails on any theme key a view names that
 no dictionary defines, because `DynamicResource` resolves a missing key to nothing and silently
 leaves the inherited value in place.
+
+Editable controls use a separate `InputSurfaceBrush`/`InputTextBrush` pair,
+with matching muted, hover, pressed, and selection roles. `States.xaml` maps
+these to each theme's existing raised-surface and text colors by default;
+Legacy Dark overrides them with light Bone fields and dark Black Bean ink.
+The paired roles are checked across every theme, and the Legacy Dark test
+also inspects the resolved brushes on actual text, password, dropdown, and
+date controls. This keeps light fields from inheriting the light ink used by
+the surrounding dark panels.
 
 Two rules follow from what the audit found. A surface, border, or text token is never used outside
 its role — a fill takes a fill token and the ink named for it, never `SurfaceBrush` as a foreground
@@ -811,6 +820,17 @@ window in the WPF capture, Local `FormService`, and API. `PUT /api/v1/forms/{id}
 either completion or opening state. Completion changes through the attestation/revocation
 routes or atomically when a linked non-release Form note becomes Logged;
 only `POST /api/v1/forms/{id}/open` can record the actual opening date.
+
+A Scheduled form note's event date is a plan, not completion evidence. For a
+single exact-linked, form-only Scheduled note without a claim line, the manual
+attestation path returns a preview of the planned date and selected actual date.
+Confirmation supplies a token for the note ID, revision, planned date, and
+selected actual date. Local
+`FormService` and the API recheck that token and convert the same note to a
+Pending draft on the actual date inside the form-attestation transaction.
+Changed, mixed-activity, submitted, claimed, and ambiguous notes are not
+converted automatically. The client reloads the selected person's form state
+after the save so the checkbox updates without restarting.
 
 The Clients workspace adds a per-selected-person presentation lock around its Forms matrix.
 Selecting or switching a person always relocks it and cancels an unfinished attestation capture;

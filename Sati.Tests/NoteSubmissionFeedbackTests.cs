@@ -13,6 +13,36 @@ namespace Sati.Tests;
 public sealed class NoteSubmissionFeedbackTests
 {
     [Fact]
+    public async Task PendingPcpNoteExplainsWhereToSelectItsExactFormBeforeLogging()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var person = await fixture.PersonOneAsync();
+        var target = DateTime.Today;
+        person.Forms.Add(new Form(FormType.PCP, target, targetEffectiveDate: target)
+        {
+            PersonId = person.Id
+        });
+        var panel = fixture.NoteEntry();
+        panel.SetPeople([person]);
+        panel.SelectedPerson = person;
+        panel.IsFormSelected = true;
+        panel.SelectedFormType = FormType.PCP;
+        panel.EventDate = target;
+        panel.Status = NoteStatus.Logged;
+        panel.GoalProgress = GoalProgressLevel.None;
+        panel.Narrative = "The PCP work was completed.";
+        panel.Minutes = 15;
+
+        Assert.Single(panel.FormObligations);
+        await panel.SubmitNoteCommand.ExecuteAsync(null);
+
+        Assert.Contains("FORM OBLIGATION / PLAN YEAR", panel.SubmissionFailureMessage);
+        Assert.Equal("The PCP work was completed.", panel.Narrative);
+        await using var verification = fixture.Factory.CreateDbContext();
+        Assert.Empty(await verification.Notes.ToListAsync());
+    }
+
+    [Fact]
     public async Task LateComplianceFailurePreservesTheUnsubmittedDraft()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();

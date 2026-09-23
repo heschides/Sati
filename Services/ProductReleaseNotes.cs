@@ -6,11 +6,18 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Notes and attestations agree";
-    public const string ReleaseDate = "September 22, 2026";
+    public const string ReleaseName = "Clearer form dates and Legacy Dark controls";
+    public const string ReleaseDate = "September 23, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Scheduled form work becomes a dated draft",
+            [
+                "If a form has one linked Scheduled note, its checkmark shows the planned note date beside the actual completion date you selected.",
+                "Confirming changes that same note to a Pending draft on the work date and records the completion. The note still needs to be written and logged.",
+                "The client profile refreshes its form status after the save, without restarting Sati."
+            ]),
         new(
             "One note can describe several activities",
             [
@@ -32,7 +39,7 @@ public static class ProductReleaseNotes
         new(
             "Legacy Dark joins the theme choices",
             [
-                "Legacy Dark keeps Legacy's leaf, Palatino type, and gradient styling with the Black Bean, Sienna, Brown Sugar, Dun, and Bone palette. Choose it in Settings."
+                "Legacy Dark keeps Legacy's leaf and Palatino type, with Black Bean backgrounds, warmer Sienna panels, and light Bone fields with dark text. Choose it in Settings."
             ]),
         new(
             "Annual form dates identify the right plan year",
