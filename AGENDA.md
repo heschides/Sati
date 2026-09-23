@@ -26,12 +26,42 @@ still depends on the version each Windows login has installed and launched.
       passed; Carika 4 passed. The skips are existing external-prerequisite
       tests. The restricted sandbox account cannot run DPAPI or write the
       Local billing export folder, so it was not used for the release gate.
-- [ ] Commit and push verified source; record commit.
-- [ ] Publish Demo API and verify live, ready, version, and contract revision;
-      record ZIP hash and deployment identifier.
-- [ ] Build and accept Demo and Local installers, then publish each installer
-      and checksum to its exact distribution folder; record sizes and hashes.
-- [ ] Commit and push final evidence; confirm clean local/remote equality.
+- [x] Source commit `d85b0f2` pushed normally to `origin/master`. No branch was
+      merged or deleted. Retained active `claude/cool-jang-f6b3c4` and the
+      separate or uncertain `second-machine-setup`, `team-chat-design`,
+      `video-conferencing-design`, `origin/claude/local-vs-github-workflow-dlcqpb`,
+      `origin/codex/annual-compliance`, and
+      `origin/codex/clarify-project-notes` branches.
+- [x] Published only the existing Demo API resource `sati-demo-api-satilogica`
+      in `rg-sati-demo`. `artifacts/SatiApi-1.3.25-fx-x86.zip` was built from
+      `d85b0f2`, is 10,428,274 bytes, has SHA-256
+      `AF91851334B4B98F095063A11A656C06FD212A0560D6F2178855C85EB89718DB`,
+      and contains 68 intended files without private settings. Its API file
+      version is 1.3.25.0. OneDeploy deployment
+      `7c99095ff63d47308e72df5f43b49437` succeeded. `/health/live` and
+      `/health/ready` returned HTTP 200; `/health/version` reports Sati.Api
+      1.3.25 and contract revision `A28B7894E416`, equal to the desktop
+      `ApiSurface.Revision`. Health-only evidence is in
+      `artifacts/release-1.3.25-demo-readiness.json`; authenticated checks
+      were skipped because synthetic Admin credentials were not configured.
+      The 1.3.24 package and deployment information remain retained.
+- [x] Built, accepted, and published both new installers without overwriting.
+      `SatiDemoSetup-1.3.25.exe` is 103,071,744 bytes, SHA-256
+      `697B8F5EF735E80A0368D8E67B161B8B1596486BDAB3B3B3985D3FB0BD0B4AE5`;
+      five responsive 15-second launches, graceful closes, exact installed
+      version 1.3.25.0, and cleanup passed. Evidence is in
+      `artifacts/release-1.3.25-demo-installer-acceptance.json`; this is a
+      build-workstation test, not an external-machine attestation.
+      `SatiLocalSetup-1.3.25.exe` is 205,123,113 bytes, SHA-256
+      `988819C45225A59C4D2DF1AC1982623E36847E323CF76E9F47BF1B74782B0CBA`;
+      version 1.3.25.0, `SatiProduction`, integrated security, Microsoft-signed
+      embedded LocalDB, and cleanup passed. The signed LocalDB prerequisite's
+      SHA-256 is `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      Hash-verified installers and `.sha256` files are in the exact
+      `SatiLogica Demo Files` and `Sati Desktop` distribution folders under
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents`.
+- [x] Final evidence commit pushed normally; its identifier and clean
+      local/remote equality are confirmed in the DATT handoff.
 - [ ] Joshu LocalDB: verify the actual PCP and Safety Plan note links and
       attestation state after installing this build. That database is under a
       different Windows login, so this release uses synthetic local/API
