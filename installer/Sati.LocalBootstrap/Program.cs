@@ -11,9 +11,33 @@ internal static class Program
     [STAThread]
     private static int Main()
     {
+        var isTest = Environment.GetEnvironmentVariable("SATI_LOCAL_INSTALLER_TEST") == "1";
         var testRoot = Environment.GetEnvironmentVariable("SATI_LOCAL_INSTALL_ROOT");
-        var extractionBase = Environment.GetEnvironmentVariable("SATI_LOCAL_INSTALLER_TEST") == "1" &&
-                             !string.IsNullOrWhiteSpace(testRoot)
+        try
+        {
+            if (IsSatiRunning())
+            {
+                if (!isTest)
+                {
+                    MessageBoxW(IntPtr.Zero,
+                        "Close every Sati and Sati Demo window before installing this update, then run the installer again.",
+                        "Sati is running", 0x00000030);
+                }
+                return 2;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!isTest)
+            {
+                MessageBoxW(IntPtr.Zero,
+                    "Setup could not verify whether Sati is running. Close every Sati and Sati Demo window, then run the installer again.\n\n" + ex.Message,
+                    "Sati installation failed", 0x00000010);
+            }
+            return 1;
+        }
+
+        var extractionBase = isTest && !string.IsNullOrWhiteSpace(testRoot)
             ? Path.GetDirectoryName(Path.GetFullPath(testRoot))!
             : Path.Combine(Path.GetTempPath(), "SatiLogica", "Installer");
         var root = Path.Combine(extractionBase, ".sati-bootstrap-" + Guid.NewGuid().ToString("N"));
@@ -61,6 +85,24 @@ internal static class Program
         {
             try { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); } catch { }
         }
+    }
+
+    private static bool IsSatiRunning()
+    {
+        foreach (var processName in new[] { "Sati", "Sati.Demo" })
+        {
+            var processes = Process.GetProcessesByName(processName);
+            try
+            {
+                if (processes.Length != 0) return true;
+            }
+            finally
+            {
+                foreach (var process in processes) process.Dispose();
+            }
+        }
+
+        return false;
     }
 
     private static void Extract(Assembly assembly, string resourceName, string destination)

@@ -1,45 +1,55 @@
 # Sati — Refactor Agenda
 
-## Release 1.3.26 — 2026-09-24
+## Release 1.3.27 — 2026-09-24
 
-“Cleaner agendas, safer form dates, and larger calendars.” This patch prevents
-exact-form Work Agenda retries from creating another Reclassification or Review,
-repairs only the unambiguous untouched transition duplicates, lets a form note
-satisfy the exact obligation it documents without weakening unrelated billing
-gates, streams large Outlook calendar exports, and gives Legacy Dark the requested
-four-level visual depth.
+“Safer updates, cleaner agendas, and larger calendars.” This patch carries forward
+the exact-form agenda repair, safer form-date attestation, streaming calendar
+import, and four-level Legacy Dark palette staged in 1.3.26. It also makes both
+installers fail closed before changing application files or prerequisites when
+either Sati edition is running: close Sati, then run the installer again.
 
 **Data-only migration; no schema expansion.**
 `20260923180000_ReconcileDuplicateScheduledAgendaNotes` retains and cancels only
 proved redundant Scheduled rows and appends minimized audit events. Because the
 1.3.25 Demo client can still submit the old retry shape, the fixed API and accepted
-1.3.26 Demo installer must be published before the one-time Demo repair; all known
+1.3.27 Demo installer must be published before the one-time Demo repair; all known
 old Demo sessions must then be closed. The repair uses a hash-pinned, identity-
 checked runner with rollback rehearsal and a no-op rerun. Local `SatiProduction`
 receives the migration only when each machine first launches the new Local client.
 
 - [x] Preflight: fetched `origin/master`; local `master` and `origin/master` both
-      resolve to `b7f942c`. The current worktree is the only linked worktree and
+      resolved to `37859ef` before the 1.3.27 source changes. The current worktree is
+      the only linked worktree and
       contains the reviewed release scope. No branch merge is needed and no branch
       is proven safe to delete. Retain the merged but uncertain Codex branches and
       the divergent setup, chat-design, and Claude branches. The previously recorded
       video-conferencing branch is absent after fetch.
-- [x] Select collision-free patch version 1.3.26 and coordinate desktop/API
+- [x] Retain the already built 1.3.26 artifacts without overwrite and select the
+      collision-free patch version 1.3.27. Coordinate desktop/API
       versions, installer builders, readiness expectations, Settings release notes,
       runbook examples, and exact-version tests. The two distribution directories
-      exist under the required documents root and contain no 1.3.26 collision.
-- [x] Verify the pre-release Demo API is healthy at 1.3.25 and the Azure identity is
-      the expected subscription, tenant, SQL server, database `SatiDemo`, and `Demo`
-      database marker. Migration history is at the exact reviewed predecessor:
-      116 rows ending with `20260922191918_SupportReleaseAttestationReviewFlags`.
-- [ ] Complete the full Release solution build and every solution test project;
-      record totals and legitimate external-prerequisite skips.
+      exist under the required documents root and contain no 1.3.27 collision.
+- [x] Verify the current Demo API is healthy at the staged 1.3.26 and the Azure
+      identity is the expected subscription, tenant, SQL server, database
+      `SatiDemo`, and `Demo` database marker. Migration history is at the exact
+      reviewed predecessor: 116 rows ending with
+      `20260922191918_SupportReleaseAttestationReviewFlags`.
+- [x] Verify the shared running-process guard detects both `Sati` and `Sati.Demo`,
+      fails closed on inspection errors, runs before LocalDB and again immediately
+      before file changes, never terminates the application, and has a four-case
+      isolated packaged-refusal harness ready for the new installers.
+- [x] Complete the full Release solution build with zero warnings and errors. All
+      solution test projects pass under the signed-in profile: desktop/domain 2,495
+      passed with 6 documented external-prerequisite skips; API 898 passed with 5
+      skips; signatures 119, portal 8, and Carika 4 passed, for 3,524 passed and 11
+      skipped overall.
 - [ ] Commit and push the verified source normally, then build the Demo API package
       from that exact pushed commit. Record package contents, version, hash,
       deployment identifier, liveness, readiness, and contract parity.
 - [ ] Build and accept new Demo and Local installers without overwrite. Verify the
       Microsoft-signed LocalDB prerequisite, Local integrated security, five Demo
-      launches, exact versions, graceful cleanup, sizes, and SHA-256 hashes.
+      launches, exact versions, graceful cleanup, sizes, SHA-256 hashes, and the
+      four-case packaged refusal matrix against both `Sati` process names.
 - [ ] Publish only the accepted installers and checksum files by verified temporary
       copy and rename to the two exact distribution folders. Record final paths and
       hashes.
@@ -55,13 +65,38 @@ receives the migration only when each machine first launches the new Local clien
 ### Local Production machines
 
 - [ ] **Joshu workstation.** Installed Local client is 1.3.25. Treat its real
-      `SatiProduction` as pending migration 117 until 1.3.26 is installed and a
+      `SatiProduction` as pending migration 117 until 1.3.27 is installed and a
       successful backed-up startup is verified.
 - [ ] **SatiLogica workstation / colleague installation.** Latest durable record is
       1.3.2 and has not been rechecked during this release. Treat both its installed
       version and Local migration state as behind rather than assuming it caught up.
 
-## Included in 1.3.26 — Work Agenda exact-form duplicate repair (2026-09-23)
+## Superseded staging build 1.3.26 — 2026-09-24 (not distributed)
+
+Release 1.3.26 was staged from pushed source commit
+`37859ef081e97a71713530443db88d5f64ab5a26`. Its Release build completed with
+zero warnings and errors. Tests passed: desktop/domain 2,493 with 6 documented
+external-prerequisite skips; API 898 with 5 skips; signatures 119; portal 8; and
+Carika 4, for 3,522 passed and 11 skipped overall.
+
+The 10,445,086-byte API package `SatiApi-1.3.26-fx-x86.zip` has SHA-256
+`ED051AF690F0201974F59941622933FC0F62B1E9B77A06B409591F8642AFB724` and was
+deployed only to the existing Demo API by OneDeploy operation
+`cdb402d3123949d38a9971372badac3f`. Liveness, readiness, version 1.3.26, and
+contract revision `A28B7894E416` parity passed; health evidence is retained in
+`artifacts/release-1.3.26-demo-readiness.json`. The 103,088,128-byte Demo
+installer has SHA-256
+`45AB6B9C65203F4E1306C47E533415D77CBC3E73A51D5E92AD31ABAEE0705732`; the
+205,141,545-byte Local installer has SHA-256
+`9F976C7AD61E63099EB3AB60735D7AB8AC5ED7B260DB5B44DC153D076A5BE352`.
+Local acceptance passed, but Demo acceptance could not complete while an older
+Demo client remained open. Neither installer nor checksum was copied to either
+distribution folder, and the data repair was not applied. Those artifacts are
+retained unchanged as evidence and must never be rebuilt or overwritten under
+version 1.3.26; 1.3.27 supersedes them because its installer behavior is a source
+change.
+
+## Carried into 1.3.27 — Work Agenda exact-form duplicate repair (2026-09-23)
 
 The 1.3.23 exact-form-link transition exposed a compatibility gap: older
 Scheduled Work Agenda notes intentionally retained `FormId = NULL`, but a
@@ -125,7 +160,7 @@ Reviews. This work is not part of the already published 1.3.25 release.
       different long key, so release items retain conservative narrative
       matching until that contract is deliberately reconciled.
 
-## Included in 1.3.26 — Exact-form completion, calendar imports, and Legacy Dark (2026-09-24)
+## Carried into 1.3.27 — Exact-form completion, calendar imports, and Legacy Dark (2026-09-24)
 
 - [x] Let an exact Logged non-release Form activity satisfy its own ordinary
       service-date compliance preflight while preserving every unrelated blocker;

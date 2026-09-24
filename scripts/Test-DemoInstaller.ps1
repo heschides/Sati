@@ -22,6 +22,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$processGuardScript = Join-Path $repoRoot 'installer\InstallerProcessGuard.ps1'
+. $processGuardScript
 $installer = [System.IO.Path]::GetFullPath($InstallerPath)
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
     throw "Installer not found: $installer"
@@ -43,8 +46,8 @@ $priorInstallRoot = [Environment]::GetEnvironmentVariable('SATI_DEMO_INSTALL_ROO
 $app = $null
 
 try {
-    if (@(Get-Process -Name 'Sati.Demo' -ErrorAction SilentlyContinue).Count -ne 0) {
-        throw 'Close Sati Demo before running installer acceptance.'
+    if (@(Get-SatiInstallerRunningProcesses -ProcessNames @('Sati', 'Sati.Demo')).Count -ne 0) {
+        throw 'Close every Sati and Sati Demo window before running installer acceptance.'
     }
 
     [System.IO.Directory]::CreateDirectory($runRoot) | Out-Null

@@ -18,13 +18,36 @@ function Show-InstallerMessage {
         [System.Windows.MessageBoxImage]$Icon) | Out-Null
 }
 
+function Exit-IfSatiIsRunning {
+    param([switch]$SuppressMessage)
+
+    $runningSatiProcesses = @(Get-SatiInstallerRunningProcesses `
+        -ProcessNames @('Sati', 'Sati.Demo'))
+    if ($runningSatiProcesses.Count -eq 0) {
+        return
+    }
+
+    if (-not $SuppressMessage) {
+        Show-InstallerMessage `
+            -Message 'Close every Sati and Sati Demo window before installing this update, then run the installer again.' `
+            -Title 'Sati is running' `
+            -Icon 48
+    }
+    exit 2
+}
+
 try {
     $sourceRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
     $progressScript = Join-Path $sourceRoot 'InstallerProgress.ps1'
+    $processGuardScript = Join-Path $sourceRoot 'InstallerProcessGuard.ps1'
     if (-not (Test-Path -LiteralPath $progressScript -PathType Leaf)) {
         throw 'The installer is missing its progress-window support.'
     }
+    if (-not (Test-Path -LiteralPath $processGuardScript -PathType Leaf)) {
+        throw 'The installer is missing its running-application check.'
+    }
     . $progressScript
+    . $processGuardScript
 
     $manifestPath = Join-Path $sourceRoot 'payload-manifest.txt'
     $versionPath = Join-Path $sourceRoot 'installer-version.txt'
@@ -34,6 +57,32 @@ try {
     }
 
     $isTest = $env:SATI_LOCAL_INSTALLER_TEST -eq '1'
+    $version = (Get-Content -LiteralPath $versionPath -Raw).Trim()
+    if ($version -notmatch '^\d+\.\d+\.\d+$') {
+        throw 'The installer version is invalid.'
+    }
+
+    if ($isTest) {
+        if ([string]::IsNullOrWhiteSpace($env:SATI_LOCAL_INSTALL_ROOT)) {
+            throw 'SATI_LOCAL_INSTALL_ROOT is required in installer test mode.'
+        }
+        $installRoot = [System.IO.Path]::GetFullPath($env:SATI_LOCAL_INSTALL_ROOT)
+    }
+    else {
+        $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
+        if ([string]::IsNullOrWhiteSpace($localAppData)) {
+            throw 'The Windows local application-data folder could not be resolved.'
+        }
+
+        $programsRoot = [System.IO.Path]::GetFullPath((Join-Path $localAppData 'Programs'))
+        $installRoot = [System.IO.Path]::GetFullPath((Join-Path $programsRoot 'SatiLogica\Sati'))
+        if (-not $installRoot.StartsWith($programsRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'The installer resolved an unsafe destination path.'
+        }
+    }
+
+    Exit-IfSatiIsRunning -SuppressMessage:$isTest
+
     if (-not $isTest) {
         $installerProgress = Start-SatiInstallerProgress `
             -Title 'Sati Setup' `
@@ -87,41 +136,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'The MSSQLLocalDB instance could not be started.' }
     }
 
-    $version = (Get-Content -LiteralPath $versionPath -Raw).Trim()
-    if ($version -notmatch '^\d+\.\d+\.\d+$') {
-        throw 'The installer version is invalid.'
-    }
-
-    if ($isTest) {
-        if ([string]::IsNullOrWhiteSpace($env:SATI_LOCAL_INSTALL_ROOT)) {
-            throw 'SATI_LOCAL_INSTALL_ROOT is required in installer test mode.'
-        }
-        $installRoot = [System.IO.Path]::GetFullPath($env:SATI_LOCAL_INSTALL_ROOT)
-    }
-    else {
-        $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
-        if ([string]::IsNullOrWhiteSpace($localAppData)) {
-            throw 'The Windows local application-data folder could not be resolved.'
-        }
-
-        $programsRoot = [System.IO.Path]::GetFullPath((Join-Path $localAppData 'Programs'))
-        $installRoot = [System.IO.Path]::GetFullPath((Join-Path $programsRoot 'SatiLogica\Sati'))
-        if (-not $installRoot.StartsWith($programsRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
-            throw 'The installer resolved an unsafe destination path.'
-        }
-    }
-
-    if (-not $isTest -and @(Get-Process -Name 'Sati' -ErrorAction SilentlyContinue).Count -ne 0) {
-        Show-InstallerMessage `
-            -Message 'Close Sati before installing this update, then run the installer again.' `
-            -Title 'Sati is running' `
-            -Icon 48
-        exit 2
-    }
-
     Update-SatiInstallerProgress $installerProgress `
         -Heading 'Installing Sati' `
         -Detail 'Copying the application to your Windows account...'
+    Exit-IfSatiIsRunning -SuppressMessage:$isTest
     New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
     $payloadFiles = @(Get-Content -LiteralPath $manifestPath | Where-Object {
         -not [string]::IsNullOrWhiteSpace($_)

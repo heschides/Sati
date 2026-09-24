@@ -649,10 +649,14 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.26", version);
+        Assert.Equal("1.3.27", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Cleaner agendas, safer form dates, and larger calendars", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Safer updates, cleaner agendas, and larger calendars", ProductReleaseNotes.ReleaseName);
         Assert.Equal("September 24, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Updates wait until Sati is closed" &&
+            section.Items.Any(item => item.Contains("Sati Demo", StringComparison.Ordinal)) &&
+            section.Items.Any(item => item.Contains("unchanged", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "One form task stays one agenda item" &&
             section.Items.Any(item => item.Contains("not deleted", StringComparison.OrdinalIgnoreCase)));
@@ -990,6 +994,112 @@ public sealed class StabilizationTests
         Assert.Contains("User Pinned\\TaskBar", installer);
         Assert.Contains("$pinnedShortcut.IconLocation = \"$versionedIcon,0\"", installer);
         Assert.Contains("ie4uinit.exe", installer);
+    }
+
+    [Fact]
+    public async Task InstallerProcessGuardMatchesBothEditionsAndFailsClosed()
+    {
+        var root = FindRepositoryRootFromSource();
+        var testScript = Path.Combine(root, "scripts", "Test-InstallerProcessGuard.ps1");
+        var startInfo = new System.Diagnostics.ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-ExecutionPolicy");
+        startInfo.ArgumentList.Add("Bypass");
+        startInfo.ArgumentList.Add("-File");
+        startInfo.ArgumentList.Add(testScript);
+
+        using var process = System.Diagnostics.Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Could not start Windows PowerShell.");
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = await outputTask;
+        var error = await errorTask;
+
+        Assert.True(process.ExitCode == 0, error);
+        Assert.Contains("INSTALLER_PROCESS_GUARD_TESTS_PASSED", output);
+    }
+
+    [Fact]
+    public void InstallersCheckBothSatiProcessesBeforeMakingInstallationChanges()
+    {
+        var root = FindRepositoryRootFromSource();
+        var installerRoot = Path.Combine(root, "installer");
+        var local = File.ReadAllText(Path.Combine(installerRoot, "Install-SatiLocal.ps1"));
+        var demo = File.ReadAllText(Path.Combine(installerRoot, "Install-SatiDemo.ps1"));
+        var guard = File.ReadAllText(Path.Combine(installerRoot, "InstallerProcessGuard.ps1"));
+        var localBuilder = File.ReadAllText(Path.Combine(installerRoot, "Build-LocalInstaller.ps1"));
+        var demoBuilder = File.ReadAllText(Path.Combine(installerRoot, "Build-DemoInstaller.ps1"));
+        var bootstrap = File.ReadAllText(Path.Combine(
+            installerRoot, "Sati.LocalBootstrap", "Program.cs"));
+        var hiddenLauncher = File.ReadAllText(Path.Combine(installerRoot, "Run-PowerShellHidden.vbs"));
+        var localAcceptance = File.ReadAllText(Path.Combine(root, "scripts", "Test-LocalInstaller.ps1"));
+        var demoAcceptance = File.ReadAllText(Path.Combine(root, "scripts", "Test-DemoInstaller.ps1"));
+        var refusalAcceptance = File.ReadAllText(Path.Combine(
+            root, "scripts", "Test-InstallerRunningProcessRefusal.ps1"));
+
+        foreach (var script in new[] { local, demo, localAcceptance, demoAcceptance })
+        {
+            Assert.Contains("Get-SatiInstallerRunningProcesses", script);
+            Assert.Contains("@('Sati', 'Sati.Demo')", script);
+        }
+
+        const string guardCall = "Exit-IfSatiIsRunning -SuppressMessage:$isTest";
+        Assert.Equal(2, Regex.Matches(local, "(?m)^    " + Regex.Escape(guardCall) + "$").Count);
+        Assert.Equal(2, Regex.Matches(demo, "(?m)^    " + Regex.Escape(guardCall) + "$").Count);
+        Assert.True(
+            local.IndexOf("    " + guardCall, StringComparison.Ordinal) <
+            local.IndexOf("Start-SatiInstallerProgress", StringComparison.Ordinal));
+        Assert.True(
+            local.IndexOf("    " + guardCall, StringComparison.Ordinal) <
+            local.IndexOf("msiexec.exe", StringComparison.Ordinal));
+        Assert.True(
+            demo.IndexOf("    " + guardCall, StringComparison.Ordinal) <
+            demo.IndexOf("Start-SatiInstallerProgress", StringComparison.Ordinal));
+
+        var normalizedLocal = local.Replace("\r\n", "\n", StringComparison.Ordinal);
+        var normalizedDemo = demo.Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Contains(
+            guardCall + "\n    New-Item -ItemType Directory -Path $installRoot",
+            normalizedLocal);
+        Assert.Contains(
+            guardCall + "\n    New-Item -ItemType Directory -Path $installRoot",
+            normalizedDemo);
+        Assert.Contains("if (-not $SuppressMessage)", local);
+        Assert.Contains("if (-not $SuppressMessage)", demo);
+
+        Assert.Contains("Get-Process -ErrorAction Stop", guard);
+        Assert.DoesNotContain("Stop-Process", guard);
+        Assert.Contains("InstallerProcessGuard.ps1", localBuilder);
+        Assert.Contains("InstallerProcessGuard.ps1", demoBuilder);
+        Assert.Contains("new[] { \"Sati\", \"Sati.Demo\" }", bootstrap);
+        Assert.True(
+            bootstrap.IndexOf("IsSatiRunning()", StringComparison.Ordinal) <
+            bootstrap.IndexOf("Directory.CreateDirectory(root)", StringComparison.Ordinal));
+        Assert.Contains("if (!isTest)", bootstrap);
+
+        Assert.Contains("SATI_INSTALLER_TEST_RESULT_PATH", hiddenLauncher);
+        Assert.Contains("resultFile.Write CStr(exitCode)", hiddenLauncher);
+        Assert.Contains("SatiLocalSetup-", refusalAcceptance);
+        Assert.Contains("SatiDemoSetup-", refusalAcceptance);
+        Assert.Equal(2, Regex.Matches(
+            refusalAcceptance,
+            "Edition = 'Local'; ProcessName = 'Sati(?:\\.Demo)?'").Count);
+        Assert.Equal(2, Regex.Matches(
+            refusalAcceptance,
+            "Edition = 'Demo'; ProcessName = 'Sati(?:\\.Demo)?'").Count);
+        Assert.Contains("$installerExitCode -ne 2", refusalAcceptance);
+        Assert.Contains("preexisting-sentinel.txt", refusalAcceptance);
+        Assert.Contains("destinationUnchanged=True", refusalAcceptance);
+        Assert.Contains("SATI_LOCAL_INSTALLER_TEST = '1'", refusalAcceptance);
+        Assert.Contains("SATI_DEMO_INSTALLER_TEST = '1'", refusalAcceptance);
     }
 
     [Fact]

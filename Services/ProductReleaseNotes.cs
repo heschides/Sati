@@ -6,11 +6,17 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Cleaner agendas, safer form dates, and larger calendars";
+    public const string ReleaseName = "Safer updates, cleaner agendas, and larger calendars";
     public const string ReleaseDate = "September 24, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Updates wait until Sati is closed",
+            [
+                "The Demo and Local installers check for a running Sati or Sati Demo before replacing application files.",
+                "If Sati is open, the installer stops with a clear message and leaves the existing installation unchanged. Close Sati, then run the installer again."
+            ]),
         new(
             "One form task stays one agenda item",
             [

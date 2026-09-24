@@ -9,7 +9,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $configurationTestScript = Join-Path $repoRoot 'installer\Test-SatiLocalConfiguration.ps1'
+$processGuardScript = Join-Path $repoRoot 'installer\InstallerProcessGuard.ps1'
 . $configurationTestScript
+. $processGuardScript
 if ([string]::IsNullOrWhiteSpace($WorkingRoot)) {
     $WorkingRoot = Join-Path $repoRoot 'artifacts\SatiLocalInstallerAcceptance'
 }
@@ -33,6 +35,10 @@ $priorTestMode = [Environment]::GetEnvironmentVariable('SATI_LOCAL_INSTALLER_TES
 $priorInstallRoot = [Environment]::GetEnvironmentVariable('SATI_LOCAL_INSTALL_ROOT')
 
 try {
+    if (@(Get-SatiInstallerRunningProcesses -ProcessNames @('Sati', 'Sati.Demo')).Count -ne 0) {
+        throw 'Close every Sati and Sati Demo window before running installer acceptance.'
+    }
+
     [System.IO.Directory]::CreateDirectory($runRoot) | Out-Null
     $env:SATI_LOCAL_INSTALLER_TEST = '1'
     $env:SATI_LOCAL_INSTALL_ROOT = $runRoot

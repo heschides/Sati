@@ -1,6 +1,6 @@
 param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = '1.3.26'
+    [string]$Version = '1.3.27'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,6 +70,7 @@ try {
 
     Copy-Item -Path (Join-Path $publishRoot '*') -Destination $stageRoot -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-SatiDemo.ps1') -Destination $stageRoot
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'InstallerProcessGuard.ps1') -Destination $stageRoot
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Uninstall-SatiDemo.ps1') -Destination $stageRoot
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'InstallerProgress.ps1') -Destination $stageRoot
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Run-PowerShellHidden.vbs') -Destination $stageRoot

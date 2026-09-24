@@ -17,6 +17,9 @@ Sati-branded progress window while their internal installation script runs. The 
 still show the normal Windows elevation prompt when the Microsoft-signed LocalDB prerequisite is
 not already installed; that prompt is intentional and must not be suppressed.
 
+Both installers stop before changing prerequisites or application files when either Sati or Sati
+Demo is running. Close every Sati window, then run the installer again.
+
 Build both from the repository root:
 
 ```powershell
@@ -30,7 +33,7 @@ Validate the LocalDB install payload without touching the normal installation:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
     .\scripts\Test-LocalInstaller.ps1 `
-    -InstallerPath .\artifacts\SatiLocalInstaller\SatiLocalSetup-1.3.26.exe
+    -InstallerPath .\artifacts\SatiLocalInstaller\SatiLocalSetup-1.3.27.exe
 ```
 
 On a clean workstation, the combined installer requests elevation only when LocalDB is absent. Sati
@@ -65,7 +68,7 @@ Run the isolated installation and launch acceptance test from the repository roo
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
     .\scripts\Test-DemoInstaller.ps1 `
-    -InstallerPath .\artifacts\SatiDemoInstaller\SatiDemoSetup-1.3.26.exe `
+    -InstallerPath .\artifacts\SatiDemoInstaller\SatiDemoSetup-1.3.27.exe `
     -LaunchIterations 5
 ```
 

@@ -18,13 +18,38 @@ function Show-InstallerMessage {
         $Icon) | Out-Null
 }
 
+function Exit-IfSatiIsRunning {
+    param([switch]$SuppressMessage)
+
+    $runningSatiProcesses = @(Get-SatiInstallerRunningProcesses `
+        -ProcessNames @('Sati', 'Sati.Demo'))
+    if ($runningSatiProcesses.Count -eq 0) {
+        return
+    }
+
+    if (-not $SuppressMessage) {
+        $messageParameters = @{
+            Message = 'Close every Sati and Sati Demo window before installing this update, then run the installer again.'
+            Title = 'Sati is running'
+            Icon = [System.Windows.MessageBoxImage]::Warning
+        }
+        Show-InstallerMessage @messageParameters
+    }
+    exit 2
+}
+
 try {
     $sourceRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
     $progressScript = Join-Path $sourceRoot 'InstallerProgress.ps1'
+    $processGuardScript = Join-Path $sourceRoot 'InstallerProcessGuard.ps1'
     if (-not (Test-Path -LiteralPath $progressScript -PathType Leaf)) {
         throw 'The installer is missing its progress-window support.'
     }
+    if (-not (Test-Path -LiteralPath $processGuardScript -PathType Leaf)) {
+        throw 'The installer is missing its running-application check.'
+    }
     . $progressScript
+    . $processGuardScript
 
     $manifestPath = Join-Path $sourceRoot 'payload-manifest.txt'
     $versionPath = Join-Path $sourceRoot 'installer-version.txt'
@@ -38,12 +63,6 @@ try {
     }
 
     $isTest = $env:SATI_DEMO_INSTALLER_TEST -eq '1'
-    if (-not $isTest) {
-        $installerProgress = Start-SatiInstallerProgress `
-            -Title 'Sati Demo Setup' `
-            -Heading 'Installing Sati Demo' `
-            -Detail 'Checking the installation package...'
-    }
     if ($isTest) {
         if ([string]::IsNullOrWhiteSpace($env:SATI_DEMO_INSTALL_ROOT)) {
             throw 'SATI_DEMO_INSTALL_ROOT is required in installer test mode.'
@@ -64,20 +83,19 @@ try {
         }
     }
 
-    $running = @(Get-Process -Name 'Sati.Demo' -ErrorAction SilentlyContinue)
-    if ($running.Count -ne 0) {
-        $messageParameters = @{
-            Message = 'Close Sati Demo before installing this update, then run the installer again.'
-            Title = 'Sati Demo is running'
-            Icon = [System.Windows.MessageBoxImage]::Warning
-        }
-        Show-InstallerMessage @messageParameters
-        exit 2
+    Exit-IfSatiIsRunning -SuppressMessage:$isTest
+
+    if (-not $isTest) {
+        $installerProgress = Start-SatiInstallerProgress `
+            -Title 'Sati Demo Setup' `
+            -Heading 'Installing Sati Demo' `
+            -Detail 'Checking the installation package...'
     }
 
     Update-SatiInstallerProgress $installerProgress `
         -Heading 'Installing Sati Demo' `
         -Detail 'Copying the application to your Windows account...'
+    Exit-IfSatiIsRunning -SuppressMessage:$isTest
     New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
     $payloadFiles = @(Get-Content -LiteralPath $manifestPath | Where-Object {
         -not [string]::IsNullOrWhiteSpace($_)
