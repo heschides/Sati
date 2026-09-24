@@ -43,22 +43,47 @@ receives the migration only when each machine first launches the new Local clien
       passed with 6 documented external-prerequisite skips; API 898 passed with 5
       skips; signatures 119, portal 8, and Carika 4 passed, for 3,524 passed and 11
       skipped overall.
-- [ ] Commit and push the verified source normally, then build the Demo API package
-      from that exact pushed commit. Record package contents, version, hash,
-      deployment identifier, liveness, readiness, and contract parity.
-- [ ] Build and accept new Demo and Local installers without overwrite. Verify the
-      Microsoft-signed LocalDB prerequisite, Local integrated security, five Demo
-      launches, exact versions, graceful cleanup, sizes, SHA-256 hashes, and the
-      four-case packaged refusal matrix against both `Sati` process names.
-- [ ] Publish only the accepted installers and checksum files by verified temporary
-      copy and rename to the two exact distribution folders. Record final paths and
-      hashes.
-- [ ] Ensure all old Demo sessions are closed, then, with a user-added temporary
-      exact-IP SQL firewall rule, run
-      `scripts/Apply-WorkAgendaDuplicateReconciliationMigration.ps1` rollback-only,
-      apply for real, and rerun to prove no eligible post-history drift. Have the
-      user remove the rule immediately and verify it is absent. The release workflow
-      never creates, changes, or deletes that security rule.
+- [x] Source commit `0abd02123600787df27d0e2d26194b5242721fe3` was pushed
+      normally to `origin/master`. The 10,445,021-byte API package
+      `artifacts/SatiApi-1.3.27-fx-x86.zip` has SHA-256
+      `758E37A2BEED5304C32BBEE15124D715AEF0764C1FF7381DD5BEC3CCE52593F0`,
+      68 intended files, no private settings or secret-like text, and product
+      version `1.3.27+0abd02123600787df27d0e2d26194b5242721fe3`. OneDeploy
+      operation `5a9aa2a077de4c8d9182e46211e9fbea` published it only to the
+      existing Demo API. Liveness and readiness are healthy; `/health/version`
+      reports Sati.Api 1.3.27 and contract revision `A28B7894E416`, equal to the
+      desktop contract. Health-only evidence is retained in
+      `artifacts/release-1.3.27-demo-readiness.json`; authenticated checks remain
+      skipped because designated synthetic Admin credentials are not configured.
+- [x] Build and accept both installers without overwrite. The 103,104,512-byte
+      `SatiDemoSetup-1.3.27.exe` has SHA-256
+      `DC06EEB7292367CAF5381435FCF18612A720008993A7B6BC004CB84FBD5A98B3`;
+      five responsive 15-second launches, exact version 1.3.27.0, normal closes,
+      and cleanup passed. Evidence is in
+      `artifacts/release-1.3.27-demo-installer-acceptance.json`; this is a build-
+      workstation test, not an external-machine attestation. The 205,143,593-byte
+      `SatiLocalSetup-1.3.27.exe` has SHA-256
+      `1122A36E4AE036C41EF6E59030C5526DBFAFC555E2790572AF0BBBA3602811C5`;
+      exact version, `SatiProduction`, Windows integrated security, and cleanup
+      passed. Its Microsoft-signed LocalDB prerequisite remains 63,508,480 bytes,
+      SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      The four-case packaged matrix proved that each installer refuses both `Sati`
+      process names with exit code 2 and leaves its isolated destination unchanged.
+- [x] Publish only those accepted installers and their checksum files by verified
+      temporary copy and rename. Final hashes and checksum contents match in
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop`
+      and
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`.
+- [x] With every Sati client closed and the user-added exact-IP rule, the controlled
+      SatiDemo runner passed its rollback rehearsal, committed migration history row
+      117, and passed the no-op rerun. All three runs found zero eligible groups,
+      cancellations, or audit additions. Post-migration API liveness and readiness
+      remain healthy at 1.3.27; health-only evidence is retained in
+      `artifacts/release-1.3.27-post-migration-readiness.json`. The user removed
+      `datt-workstation-temp`; a read-only verification found zero temporary or
+      unexpected rules, with only 3 dedicated Demo API and 30 dedicated Demo refresh
+      exact-IP rules remaining. The release workflow did not create, change, or
+      delete that security rule.
 - [ ] Record final deployment and migration evidence, push the evidence commit, and
       prove clean local/remote equality.
 
