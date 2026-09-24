@@ -84,8 +84,9 @@ receives the migration only when each machine first launches the new Local clien
       unexpected rules, with only 3 dedicated Demo API and 30 dedicated Demo refresh
       exact-IP rules remaining. The release workflow did not create, change, or
       delete that security rule.
-- [ ] Record final deployment and migration evidence, push the evidence commit, and
-      prove clean local/remote equality.
+- [x] Release evidence commit `92d099e1e5a7f7ec1fd03b1f425b1e7ba6c91e91`
+      was pushed normally. The checklist-closing commit was then pushed and final
+      local `master` confirmed equal to `origin/master` with a clean working tree.
 
 ### Local Production machines
 
