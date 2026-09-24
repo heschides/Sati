@@ -198,12 +198,43 @@ namespace Sati.ViewModels
                         .ResolveBillingComplianceRequirementsAsync(eventDate.Date);
                     var candidate = Note.Rehydrate(SelectedNote.Id);
                     candidate.NoteType = SelectedNote.NoteType;
+                    candidate.Activities = SelectedNote.Activities;
                     candidate.Status = NoteStatus.Logged;
                     candidate.EventDate = eventDate;
-                    windowReasons = SelectedNote.Person.EvaluateBillingWindow(
+                    var exactForm = SelectedNote.FormId is int formId
+                        ? SelectedNote.Person.Forms.SingleOrDefault(form =>
+                            form.Id == formId &&
+                            form.PersonId == SelectedNote.PersonId &&
+                            form.Type == SelectedNote.FormType)
+                        : null;
+                    var completesExactForm = exactForm is not null &&
+                        FormNoteAttestationRules.AttestsExactFormOnLog(
+                            NoteStatus.Logged.ToString(),
+                            (int?)SelectedNote.Activities,
+                            SelectedNote.NoteType?.ToString(),
+                            SelectedNote.FormType?.ToString(),
+                            SelectedNote.FormId);
+                    var reasons = SelectedNote.Person.EvaluateBillingWindow(
                         eventDate,
                         requirements,
-                        contactCandidate: candidate);
+                        contactCandidate: candidate,
+                        projectedCompletedFormId: completesExactForm
+                            ? exactForm!.Id
+                            : null,
+                        projectedCompletedOn: completesExactForm
+                            ? eventDate.Date
+                            : null).ToList();
+                    if (completesExactForm)
+                    {
+                        var ambiguity = NoteEntry.EvaluateFormNoteCycleAmbiguity(
+                            SelectedNote.Person,
+                            SelectedNote.FormType?.ToString(),
+                            SelectedNote.FormId,
+                            eventDate);
+                        if (ambiguity is not null)
+                            reasons.Add(ambiguity.Reason);
+                    }
+                    windowReasons = reasons;
                 }
             }
             catch (Exception ex)

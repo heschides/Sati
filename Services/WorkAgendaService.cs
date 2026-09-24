@@ -130,6 +130,12 @@ public sealed class WorkAgendaService(INoteService notes) : IWorkAgendaService
             throw new InvalidOperationException(
                 "Every selected agenda item must identify a client and form type.");
         }
+        if (selectedItems.Any(item =>
+                item.FormId is not null && item.ReleaseObligationId is not null))
+        {
+            throw new InvalidOperationException(
+                "A selected agenda item cannot identify both a form and a release obligation.");
+        }
 
         var agendaDate = date.Date;
         var day = await notes.GetDayScheduleAsync(userId, agendaDate);
@@ -166,12 +172,42 @@ public sealed class WorkAgendaService(INoteService notes) : IWorkAgendaService
         Note note,
         DailyAgendaItem item,
         DateTime date,
-        string narrative) =>
-        note.Status == NoteStatus.Scheduled &&
-        note.EventDate?.Date == date &&
-        note.PersonId == item.PersonId &&
-        note.NoteType == NoteType.Form &&
-        note.FormType == item.FormType &&
-        note.FormId == item.FormId &&
+        string narrative)
+    {
+        if (note.Status != NoteStatus.Scheduled ||
+            note.EventDate?.Date != date ||
+            note.PersonId != item.PersonId ||
+            note.NoteType != NoteType.Form ||
+            note.FormType != item.FormType)
+        {
+            return false;
+        }
+
+        if (item.FormId is int exactFormId)
+        {
+            // Exact obligation identity is durable; generated agenda wording is not.
+            // It may change when work becomes overdue or display text is refined.
+            if (note.FormId is int storedFormId)
+            {
+                return note.ReleaseObligationId is null &&
+                       item.ReleaseObligationId is null &&
+                       storedFormId == exactFormId;
+            }
+
+            // Notes created before exact form links shipped remain deliberately
+            // unlinked. Treat only the old full display fingerprint as the same
+            // planned work; never use null as a wildcard for another obligation.
+            return note.ReleaseObligationId is null &&
+                   item.ReleaseObligationId is null &&
+                   NarrativeMatches(note, narrative);
+        }
+
+        // Recipient release items do not yet carry the Note table's long FK through
+        // this boundary, so preserve the existing narrative-sensitive identity for
+        // all items without a persisted FormId.
+        return note.FormId is null && NarrativeMatches(note, narrative);
+    }
+
+    private static bool NarrativeMatches(Note note, string narrative) =>
         string.Equals(note.Narrative?.Trim(), narrative, StringComparison.Ordinal);
 }

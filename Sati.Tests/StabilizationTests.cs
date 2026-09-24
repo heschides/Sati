@@ -649,9 +649,23 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.25", version);
+        Assert.Equal("1.3.26", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Clearer form dates and Legacy Dark controls", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("Cleaner agendas, safer form dates, and larger calendars", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("September 24, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "One form task stays one agenda item" &&
+            section.Items.Any(item => item.Contains("not deleted", StringComparison.OrdinalIgnoreCase)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "The form note can supply its own completion date" &&
+            section.Items.Any(item => item.Contains("does not move", StringComparison.OrdinalIgnoreCase)) &&
+            section.Items.Any(item => item.Contains("justification", StringComparison.OrdinalIgnoreCase)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Large Outlook calendars import by streaming" &&
+            section.Items.Any(item => item.Contains("20 MiB", StringComparison.Ordinal)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Legacy Dark has four clear depths" &&
+            section.Items.Any(item => item.Contains("lightest", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Scheduled form work becomes a dated draft");
         Assert.Contains(ProductReleaseNotes.Sections, section =>

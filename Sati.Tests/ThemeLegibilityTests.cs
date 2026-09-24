@@ -165,6 +165,34 @@ public sealed class ThemeLegibilityTests
         });
     }
 
+    [Fact]
+    public void LegacyDarkSurfacesStepFromLightFieldsIntoDarkerInsetContent()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            using var _ = ThemeSwap.To("LegacyDark");
+
+            IReadOnlyList<double> Luminances(params string[] keys) => keys
+                .SelectMany(key => ThemeContrast.PaintedColors(
+                    Assert.IsAssignableFrom<Brush>(Application.Current.TryFindResource(key)),
+                    Colors.Black))
+                .Select(ThemeContrast.RelativeLuminance)
+                .ToList();
+
+            var fields = Luminances("InputSurfaceBrush");
+            var shell = Luminances("WindowBackgroundBrush", "NavBackgroundBrush");
+            var cards = Luminances("SurfaceBrush");
+            var insets = Luminances("SurfaceAltBrush");
+
+            Assert.True(fields.Min() > shell.Max(),
+                "Legacy Dark level 1 fields must be lighter than level 2 shell surfaces.");
+            Assert.True(shell.Min() > cards.Max(),
+                "Legacy Dark level 2 shell surfaces must be lighter than level 3 cards.");
+            Assert.True(cards.Min() > insets.Max(),
+                "Legacy Dark level 3 cards must be lighter than level 4 inset content.");
+        });
+    }
+
     private static IEnumerable<string> ThemeNamesOnDisk() =>
         Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "Themes"), "*.xaml")
             .Select(Path.GetFileNameWithoutExtension)

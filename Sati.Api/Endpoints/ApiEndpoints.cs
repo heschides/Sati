@@ -4800,7 +4800,8 @@ internal static partial class ApiEndpoints
             if (attestsFormOnLog)
             {
                 var submissionProblem = await FindNoteSubmissionProblemAsync(
-                    db, actor, request, clock.Today, cancellationToken, noteId: note.Id);
+                    db, actor, request, clock.Today, cancellationToken,
+                    noteId: note.Id, auditTrail: auditTrail);
                 if (submissionProblem is not null)
                     return submissionProblem;
             }
@@ -4921,7 +4922,8 @@ internal static partial class ApiEndpoints
                 if (attestsFormOnLog)
                 {
                     var submissionProblem = await FindNoteSubmissionProblemAsync(
-                        db, actor, request, clock.Today, cancellationToken, noteId: id);
+                        db, actor, request, clock.Today, cancellationToken,
+                        noteId: id, auditTrail: auditTrail);
                     if (submissionProblem is not null)
                         return submissionProblem;
                 }
@@ -7492,6 +7494,20 @@ internal static partial class ApiEndpoints
                     candidate.DueDate, candidate.CompletedDate,
                     candidate.TargetEffectiveDate))
                 .ToListAsync(cancellationToken);
+            var cycleAmbiguity = AnnualFormCycleDisambiguationRules.Evaluate(
+                personId,
+                form.Type,
+                form.Id,
+                request.CompletedOn,
+                formFacts,
+                ToComplianceSchedule(settings));
+            if (cycleAmbiguity is not null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["formId"] = [cycleAmbiguity.Reason]
+                }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
             ServerForm? assessment = null;
             ServerFormAttestation? impliedAssessmentAttestation = null;
 
@@ -7543,6 +7559,17 @@ internal static partial class ApiEndpoints
                             note.AgencyId == actor.AgencyId)
                         .Select(note => new { note.Id, note.EventDate, note.Status })
                         .ToListAsync(cancellationToken);
+                    var safelyCancelledAssessmentNoteIds =
+                        await SafelyCancelledScheduledDuplicateNoteIdsAsync(
+                            db,
+                            actor.AgencyId,
+                            assessmentLinkedNotes.Select(note =>
+                                (note.Id, (int?)note.Status)),
+                            cancellationToken);
+                    assessmentLinkedNotes.RemoveAll(note =>
+                        !ManualAttestationNoteRules.CompetesForManualAttestation(
+                            note.Status,
+                            safelyCancelledAssessmentNoteIds.Contains(note.Id)));
                     if (assessmentLinkedNotes.Count > 1)
                         return Results.Conflict(new ApiErrorDto("ambiguous_assessment_note",
                             "Several notes are linked to this assessment. Have a supervisor review the exact evidence before attesting.", string.Empty));
@@ -7662,6 +7689,21 @@ internal static partial class ApiEndpoints
                 .Where(note => note.PersonId == personId && note.FormId == form.Id &&
                     note.AgencyId == actor.AgencyId)
                 .ToListAsync(cancellationToken);
+            var safelyCancelledDuplicateIds =
+                await SafelyCancelledScheduledDuplicateNoteIdsAsync(
+                    db,
+                    actor.AgencyId,
+                    linkedNotes.Select(note => (note.Id, (int?)note.Status)),
+                    cancellationToken);
+            linkedNotes.RemoveAll(note =>
+                !ManualAttestationNoteRules.CompetesForManualAttestation(
+                    note.Status,
+                    safelyCancelledDuplicateIds.Contains(note.Id)));
+            if (request.EvidenceNoteId is int explicitlySelectedId &&
+                safelyCancelledDuplicateIds.Contains(explicitlySelectedId))
+                return Results.Conflict(new ApiErrorDto("form_note_mismatch",
+                    "The selected evidence note was retired as a duplicate. Refresh the form and use its surviving linked note.",
+                    string.Empty));
             if (linkedNotes.Count > 1)
                 return Results.Conflict(new ApiErrorDto("ambiguous_form_note",
                     "Several notes are linked to this form. Have a supervisor review the exact evidence before attesting.", string.Empty));
@@ -8749,7 +8791,8 @@ internal static partial class ApiEndpoints
 
     private static async Task<IResult?> FindNoteSubmissionProblemAsync(
         ApiDbContext db, Actor actor, SaveNoteRequest request, DateTime today,
-        CancellationToken cancellationToken, int noteId = 0)
+        CancellationToken cancellationToken, int noteId = 0,
+        AuditTrail? auditTrail = null)
     {
         ContractMapper.TryParseNoteStatus(request.Status, out var status);
         if (status != NoteWorkflow.Logged) return null;
@@ -8787,19 +8830,67 @@ internal static partial class ApiEndpoints
                 Status = status
             },
             person, forms, releaseRows, policy, providerLinks);
-        if (compliance.Passed) return null;
+        var reasons = compliance.Reasons.ToList();
+        AnnualFormCycleAmbiguity? ambiguity = null;
+        if (FormNoteAttestationRules.AttestsExactFormOnLog(
+                request.Status,
+                request.Activities,
+                request.NoteType,
+                request.FormType,
+                request.FormId))
+        {
+            ambiguity = AnnualFormCycleDisambiguationRules.Evaluate(
+                request.PersonId,
+                request.FormType,
+                request.FormId,
+                request.EventDate,
+                forms.Select(form => new FormFact(
+                    form.Id,
+                    form.PersonId,
+                    form.Type,
+                    form.DueDate,
+                    form.CompletedDate,
+                    form.TargetEffectiveDate == default
+                        ? null
+                        : form.TargetEffectiveDate)).ToArray(),
+                policy.Schedule);
+            if (ambiguity is not null)
+                reasons.Add(ambiguity.Reason);
+        }
+        reasons = reasons.Distinct(StringComparer.Ordinal).ToList();
+        if (reasons.Count == 0) return null;
 
         var configurationInvalid = request.EventDate is DateTime serviceDate &&
             !BillingComplianceGate.IsSupported(policy.Resolve(serviceDate));
         var result = new NoteSubmissionResult(
-            false, compliance.Reasons, !configurationInvalid, configurationInvalid);
+            false, reasons, !configurationInvalid, configurationInvalid);
 
         // Clinical review may still proceed with a written justification; billing
         // stays blocked until a supervisor exception or an administrative recovery.
-        return NoteSubmissionGate.IsSubmissionAllowed(result, request.CaseManagerJustification)
-            ? null
-            : Results.Conflict(new ApiErrorDto(
+        if (!NoteSubmissionGate.IsSubmissionAllowed(result, request.CaseManagerJustification))
+            return Results.Conflict(new ApiErrorDto(
                 NoteSubmissionGate.RefusalCode, result.Message, string.Empty));
+
+        if (ambiguity is not null && auditTrail is not null && noteId > 0)
+        {
+            auditTrail.Record(
+                actor,
+                AuditActions.NoteOlderCycleJustified,
+                "Note",
+                noteId,
+                JsonSerializer.Serialize(new
+                {
+                    selectedFormId = ambiguity.SelectedFormId,
+                    selectedTargetEffectiveDate = ambiguity.SelectedTargetEffectiveDate
+                        .ToString("yyyy-MM-dd"),
+                    renewalFormId = ambiguity.RenewalFormId,
+                    renewalTargetEffectiveDate = ambiguity.RenewalTargetEffectiveDate
+                        .ToString("yyyy-MM-dd"),
+                    activityDate = request.EventDate?.Date.ToString("yyyy-MM-dd")
+                }));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        return null;
     }
 
     private static BillingComplianceResult EvaluateNoteCompliance(

@@ -55,6 +55,30 @@ namespace Sati.ViewModels.Children
         internal Task<BillingComplianceRequirements>
             ResolveBillingComplianceRequirementsAsync(DateTime serviceDate) =>
             _settingsService.ResolveBillingComplianceRequirementsAsync(serviceDate.Date);
+        internal ComplianceScheduleSettings ComplianceSchedule => _settings is null
+            ? new ComplianceScheduleSettings()
+            : FormDueDateCalculator.ToSchedule(_settings);
+
+        internal AnnualFormCycleAmbiguity? EvaluateFormNoteCycleAmbiguity(
+            Person person,
+            string? formType,
+            int? formId,
+            DateTime? activityDate) =>
+            AnnualFormCycleDisambiguationRules.Evaluate(
+                person.Id,
+                formType,
+                formId,
+                activityDate,
+                person.Forms.Select(form => new FormFact(
+                    form.Id,
+                    form.PersonId,
+                    form.Type.ToString(),
+                    form.DueDate,
+                    form.CompletedDate,
+                    form.TargetEffectiveDate == default
+                        ? null
+                        : form.TargetEffectiveDate)).ToArray(),
+                ComplianceSchedule);
         private Note? _editingNote;
         private string? _aiSourceNarrative;
         private string? _aiSourceFingerprint;
@@ -2084,19 +2108,54 @@ namespace Sati.ViewModels.Children
                     var serviceDate = EventDate!.Value.Date;
                     var requirements = await ResolveBillingComplianceRequirementsAsync(
                         serviceDate);
+                    var selectedPerson = SelectedPerson!;
                     // The note being logged is itself a contact when it is a visit,
                     // call, or email; its stored copy may still say Scheduled.
                     var candidate = _editingNote is { Id: > 0 } editing
                         ? Note.Rehydrate(editing.Id)
-                        : Note.Create(string.Empty, serviceDate, null, null, SelectedPerson!.Id);
+                        : Note.Create(string.Empty, serviceDate, null, null, selectedPerson.Id);
                     candidate.NoteType = SelectedNoteType;
                     candidate.Activities = _selectedActivities;
                     candidate.Status = NoteStatus.Logged;
                     candidate.EventDate = serviceDate;
-                    var windowReasons = SelectedPerson!.EvaluateBillingWindow(
+                    // A submitted non-release Form activity attests the exact linked
+                    // obligation in the same transaction. Project only that row as
+                    // complete for this desktop preflight; the note service repeats
+                    // the ordinary billing-window gate after persisting the real
+                    // attestation, and every unrelated blocker still applies.
+                    var exactForm = _selectedFormId is int formId
+                        ? selectedPerson.Forms.SingleOrDefault(form =>
+                            form.Id == formId &&
+                            form.PersonId == selectedPerson.Id &&
+                            form.Type == SelectedFormType)
+                        : null;
+                    var completesExactForm = exactForm is not null &&
+                        FormNoteAttestationRules.AttestsExactFormOnLog(
+                            Status?.ToString(),
+                            (int)_selectedActivities,
+                            SelectedNoteType?.ToString(),
+                            SelectedFormType?.ToString(),
+                            _selectedFormId);
+                    var windowReasons = selectedPerson.EvaluateBillingWindow(
                         serviceDate,
                         requirements,
-                        contactCandidate: candidate);
+                        contactCandidate: candidate,
+                        projectedCompletedFormId: completesExactForm
+                            ? exactForm!.Id
+                            : null,
+                        projectedCompletedOn: completesExactForm
+                            ? serviceDate
+                            : null).ToList();
+                    if (completesExactForm)
+                    {
+                        var ambiguity = EvaluateFormNoteCycleAmbiguity(
+                            selectedPerson,
+                            SelectedFormType?.ToString(),
+                            _selectedFormId,
+                            serviceDate);
+                        if (ambiguity is not null)
+                            windowReasons.Add(ambiguity.Reason);
+                    }
 
                     if (windowReasons.Count > 0)
                     {

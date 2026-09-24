@@ -131,6 +131,15 @@ public sealed class FormService(
             ? AttestationActorKind.CaseManager
             : AttestationActorKind.Supervisor;
         var formFacts = await LoadFormFactsAsync(context, stored.PersonId);
+        var cycleAmbiguity = AnnualFormCycleDisambiguationRules.Evaluate(
+            stored.PersonId,
+            stored.Type.ToString(),
+            stored.Id,
+            completedOn,
+            formFacts,
+            FormDueDateCalculator.ToSchedule(settings));
+        if (cycleAmbiguity is not null)
+            throw new InvalidOperationException(cycleAmbiguity.Reason);
         Form? assessment = null;
         FormAttestation? impliedAssessmentAttestation = null;
 
@@ -709,6 +718,12 @@ public sealed class FormService(
             .Where(note => note.PersonId == form.PersonId && note.FormId == form.Id &&
                            note.AgencyId == actor.AgencyId)
             .ToListAsync();
+        var safelyCancelledDuplicateIds = await RemoveSafelyCancelledScheduledDuplicatesAsync(
+            context, actor.AgencyId, linked);
+        if (explicitEvidenceNoteId is int explicitlySelectedId &&
+            safelyCancelledDuplicateIds.Contains(explicitlySelectedId))
+            throw new InvalidOperationException(
+                "The selected evidence note was retired as a duplicate. Refresh the form and use its surviving linked note.");
         if (linked.Count > 1)
             throw new InvalidOperationException(
                 "Several notes are linked to this form. Have a supervisor review the exact evidence before attesting.");
@@ -791,6 +806,43 @@ public sealed class FormService(
         LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteCreated, "Note");
         await context.SaveChangesAsync();
         return draft.Id;
+    }
+
+    private static async Task<HashSet<int>> RemoveSafelyCancelledScheduledDuplicatesAsync(
+        SatiContext context,
+        int agencyId,
+        List<Note> linkedNotes)
+    {
+        var cancelledResourceIds = linkedNotes
+            .Where(note => note.Status == NoteStatus.Cancelled)
+            .Select(note => note.Id.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            .ToArray();
+        if (cancelledResourceIds.Length == 0)
+            return [];
+
+        var auditedResourceIds = await context.AuditEvents.AsNoTracking()
+            .Where(audit =>
+                audit.AgencyId == agencyId &&
+                audit.Action == ManualAttestationNoteRules.ScheduledDuplicateCancellationAuditAction &&
+                audit.ResourceType == "Note" &&
+                audit.ResourceId != null &&
+                cancelledResourceIds.Contains(audit.ResourceId))
+            .Select(audit => audit.ResourceId!)
+            .Distinct()
+            .ToListAsync();
+        var audited = auditedResourceIds.ToHashSet(StringComparer.Ordinal);
+        var safelyCancelledIds = linkedNotes
+            .Where(note => note.Status == NoteStatus.Cancelled &&
+                audited.Contains(note.Id.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture)))
+            .Select(note => note.Id)
+            .ToHashSet();
+
+        linkedNotes.RemoveAll(note =>
+            !ManualAttestationNoteRules.CompetesForManualAttestation(
+                (int?)note.Status,
+                safelyCancelledIds.Contains(note.Id)));
+        return safelyCancelledIds;
     }
 
     private static async Task EnsureEvidenceIsValidAsync(

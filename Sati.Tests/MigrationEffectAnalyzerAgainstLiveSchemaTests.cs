@@ -17,14 +17,16 @@ namespace Sati.Tests;
 ///
 /// This builds a database at the exact state that workstation reports - every migration
 /// through AddGoalProgressToCaseNotes and nothing after it - and asks the analyzer the
-/// same question startup asks. A database that has never seen the release must read as
-/// NotApplied. Anything else stops a caseload from opening over a problem that is not
-/// there.
+/// same question startup asks. Structural migrations must read as NotApplied. A raw
+/// data-only migration has no schema effect to inspect and may read as Indeterminate;
+/// it must never make an untouched database look AlreadyPresent or PartiallyPresent.
 /// </summary>
 [Collection("Local synthetic SQL schedule")]
 public sealed class MigrationEffectAnalyzerAgainstLiveSchemaTests(ITestOutputHelper output)
 {
     private const string LastAppliedOnTheWorkstation = "20260914030703_AddGoalProgressToCaseNotes";
+    private const string DataOnlyAgendaRepair =
+        "20260923180000_ReconcileDuplicateScheduledAgendaNotes";
 
     [LocalSqlFact]
     public async Task AReleaseThatHasNeverRunReadsAsNotAppliedAgainstTheRealChain()
@@ -52,13 +54,22 @@ public sealed class MigrationEffectAnalyzerAgainstLiveSchemaTests(ITestOutputHel
                     output.WriteLine($"    unverifiable {step}");
             }
 
-            var wrong = findings.Where(f => f.State != MigrationEffectState.NotApplied).ToList();
+            var wrong = findings
+                .Where(f => f.MigrationId != DataOnlyAgendaRepair)
+                .Where(f => f.State != MigrationEffectState.NotApplied)
+                .ToList();
             Assert.True(
                 wrong.Count == 0,
-                "A database that has never seen these migrations must read as NotApplied. Got: "
+                "Structural migrations that have never run must read as NotApplied. Got: "
                 + string.Join("; ", wrong.Select(f =>
-                    $"{f.MigrationId} is {f.State} because these read as present: "
+                    $"{f.MigrationId} is {f.State}; effects that read as present: "
                     + string.Join(", ", f.PresentEffects))));
+
+            var dataOnly = Assert.Single(
+                findings,
+                finding => finding.MigrationId == DataOnlyAgendaRepair);
+            Assert.Equal(MigrationEffectState.Indeterminate, dataOnly.State);
+            Assert.Contains("a raw SQL step", dataOnly.UnverifiableSteps);
         }
         finally
         {

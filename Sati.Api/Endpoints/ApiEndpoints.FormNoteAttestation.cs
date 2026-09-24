@@ -11,10 +11,48 @@ namespace Sati.Api.Endpoints;
 internal static partial class ApiEndpoints
 {
     private static bool IsNonReleaseLoggedFormNote(SaveNoteRequest request) =>
-        string.Equals(request.Status, "Logged", StringComparison.Ordinal) &&
-        NoteActivityRules.Has(request.Activities, request.NoteType, NoteActivity.Form) &&
-        request.FormId is > 0 &&
-        !FormNoteLinkRules.IsRelease(request.FormType);
+        FormNoteAttestationRules.AttestsExactFormOnLog(
+            request.Status,
+            request.Activities,
+            request.NoteType,
+            request.FormType,
+            request.FormId);
+
+    private static async Task<HashSet<int>> SafelyCancelledScheduledDuplicateNoteIdsAsync(
+        ApiDbContext db,
+        int agencyId,
+        IEnumerable<(int Id, int? Status)> linkedNotes,
+        CancellationToken cancellationToken)
+    {
+        var cancelledIds = linkedNotes
+            .Where(note => note.Status == NoteWorkflow.Cancelled)
+            .Select(note => note.Id)
+            .Distinct()
+            .ToArray();
+        if (cancelledIds.Length == 0)
+            return [];
+
+        var noteIdsByResourceId = cancelledIds.ToDictionary(
+            id => id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            id => id,
+            StringComparer.Ordinal);
+        var cancelledResourceIds = noteIdsByResourceId.Keys.ToArray();
+        var auditedResourceIds = await db.AuditEvents.AsNoTracking()
+            .Where(audit =>
+                audit.AgencyId == agencyId &&
+                audit.Action == ManualAttestationNoteRules.ScheduledDuplicateCancellationAuditAction &&
+                audit.ResourceType == "Note" &&
+                audit.ResourceId != null &&
+                cancelledResourceIds.Contains(audit.ResourceId))
+            .Select(audit => audit.ResourceId!)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return auditedResourceIds
+            .Where(noteIdsByResourceId.ContainsKey)
+            .Select(resourceId => noteIdsByResourceId[resourceId])
+            .ToHashSet();
+    }
 
     // Called inside the note's serializable write transaction, after the note has
     // an ID. Returning an error leaves the transaction uncommitted, so the note
@@ -28,14 +66,23 @@ internal static partial class ApiEndpoints
         CancellationToken cancellationToken,
         bool allowApprovedForAdminCorrection = false)
     {
-        var allowedStatus = note.Status == (int)NoteStatus.Logged ||
+        if (note.FormType is not int formType)
+            return null;
+        var formTypeName = ContractMapper.FormTypeName(formType);
+        var exactFormActivity = FormNoteAttestationRules.IsExactNonReleaseFormActivity(
+            note.Activities,
+            ContractMapper.NoteTypeName(note.NoteType),
+            formTypeName,
+            note.FormId);
+        var allowedStatus = FormNoteAttestationRules.AttestsExactFormOnLog(
+                ContractMapper.NoteStatusName(note.Status),
+                note.Activities,
+                ContractMapper.NoteTypeName(note.NoteType),
+                formTypeName,
+                note.FormId) ||
             (allowApprovedForAdminCorrection && actor.HasAdminPermissions &&
-             note.Status == (int)NoteStatus.Approved);
-        if (!allowedStatus ||
-            !NoteActivityRules.Has(note.Activities,
-                ContractMapper.NoteTypeName(note.NoteType), NoteActivity.Form) ||
-            note.FormType is not int formType ||
-            FormNoteLinkRules.IsRelease(((FormType)formType).ToString()))
+             note.Status == (int)NoteStatus.Approved && exactFormActivity);
+        if (!allowedStatus)
             return null;
 
         if (note.EventDate is not DateTime activityDate || note.FormId is not int formId)
@@ -43,7 +90,7 @@ internal static partial class ApiEndpoints
 
         var form = await db.Forms.SingleOrDefaultAsync(candidate =>
             candidate.Id == formId && candidate.PersonId == note.PersonId &&
-            candidate.Type == ((FormType)formType).ToString(), cancellationToken);
+            candidate.Type == formTypeName, cancellationToken);
         if (form is null)
             return FormNoteProblem("The selected form obligation no longer matches this note. Refresh the note.");
 

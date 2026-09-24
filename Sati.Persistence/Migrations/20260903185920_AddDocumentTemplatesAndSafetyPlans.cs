@@ -32,7 +32,7 @@ namespace Sati.Persistence.Migrations
             migrationBuilder.CreateIndex("IX_DocumentTemplates_PublishedByUserId", "DocumentTemplates", "PublishedByUserId");
             // Freeze this published content in the migration; later template changes
             // must not alter what a fresh database receives for version 1.
-            const string privacyPracticesBody = """
+            var privacyPracticesBody = """
 # Notice of Privacy Practices
 
 PROVISIONAL SATI DEFAULT - AGENCY PRIVACY AND LEGAL REVIEW REQUIRED
@@ -73,7 +73,7 @@ Prepared for: {{consumer.full_name}}
 Date of birth: {{consumer.birth_date}}
 Case manager: {{case_manager.name}}, {{case_manager.role}}
 Coverage cycle: {{cycle.start}} through {{cycle.end}}
-""";
+""".ReplaceLineEndings("\n");
             migrationBuilder.InsertData("DocumentTemplates", new[] { "Id", "AgencyId", "Kind", "Version", "Body", "PublishedAtUtc", "PublishedByUserId", "RetiredAtUtc" },
                 new object[] { 1, null!, "PrivacyPractices", 1, privacyPracticesBody, new DateTime(2026, 9, 3, 0, 0, 0, DateTimeKind.Utc), null!, null! });
         }

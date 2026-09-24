@@ -67,6 +67,73 @@ public sealed class OutlookCalendarImportTests
     }
 
     [Fact]
+    public async Task StreamingReaderUnfoldsSupportedFields()
+    {
+        var text = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            BEGIN:VEVENT
+            UID:folded-event
+            DTSTART:20260908T130000
+            DTEND:20260908T140000
+            SUMMARY:Case conference with|
+             the full team
+            LOCATION:Conference|
+             room
+            END:VEVENT
+            END:VCALENDAR
+            """.Replace("|", " ", StringComparison.Ordinal);
+        using var reader = new StringReader(text);
+
+        var result = await OutlookIcsReader.ReadAsync(reader, 2026, 2026);
+
+        var imported = Assert.Single(result.Events);
+        Assert.Equal("Case conference with the full team", imported.Title);
+        Assert.Equal("Conference room", imported.Location);
+    }
+
+    [Fact]
+    public async Task ImportStreamsFilesAboveLegacyTwentyMiBLimitAndDiscardsUnsupportedPayloads()
+    {
+        using var fixture = new ImportFixture();
+        var production = new DataEnvironmentInfo(SatiDataEnvironment.Production, "SatiProduction");
+        var service = new OutlookCalendarService(production, fixture.CachePath, bytes => bytes, bytes => bytes);
+        var year = DateTime.Today.Year;
+        await fixture.WriteLargeCalendarAsync(year);
+
+        Assert.True(new FileInfo(fixture.CalendarPath).Length > 20L * 1024 * 1024);
+
+        var result = await service.ImportAsync(7, fixture.CalendarPath);
+
+        Assert.Equal(1, result.ImportedCount);
+        var imported = Assert.Single(await service.GetByYearAsync(7, year));
+        Assert.Equal("Retained title", imported.Title);
+        Assert.Equal("Retained location", imported.Location);
+        Assert.True(new FileInfo(fixture.CachePath).Length < 16 * 1024);
+        Assert.DoesNotContain("ZZZZZZZZ", await File.ReadAllTextAsync(fixture.CachePath));
+    }
+
+    [Fact]
+    public void ReaderRejectsAnOversizedSupportedProperty()
+    {
+        var oversizedSummary = new string(
+            'S',
+            OutlookIcsReader.MaximumRetainedLogicalLineCharacters + 1);
+
+        var error = Assert.Throws<InvalidDataException>(() => OutlookIcsReader.Read($"""
+            BEGIN:VCALENDAR
+            BEGIN:VEVENT
+            UID:oversized-supported-field
+            DTSTART:20260908T130000
+            SUMMARY:{oversizedSummary}
+            END:VEVENT
+            END:VCALENDAR
+            """, 2026, 2026));
+
+        Assert.Contains("supported calendar property", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CacheIsSeparatedBySatiUserAndEnvironmentAndImportReplacesPriorCopy()
     {
         using var fixture = new ImportFixture();
@@ -166,6 +233,39 @@ public sealed class OutlookCalendarImportTests
                 END:VEVENT
                 END:VCALENDAR
                 """, Encoding.UTF8);
+
+        public async Task WriteLargeCalendarAsync(int year)
+        {
+            await using var stream = new FileStream(
+                CalendarPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 64 * 1024,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            await writer.WriteLineAsync("BEGIN:VCALENDAR");
+            await writer.WriteLineAsync("VERSION:2.0");
+            await writer.WriteLineAsync("BEGIN:VEVENT");
+            await writer.WriteLineAsync("UID:large-outlook-export");
+            await writer.WriteLineAsync($"DTSTART:{year}0908T130000");
+            await writer.WriteLineAsync($"DTEND:{year}0908T140000");
+            await writer.WriteLineAsync("SUMMARY:Retained title");
+            await writer.WriteLineAsync("LOCATION:Retained location");
+
+            var filler = new string('Z', 16 * 1024);
+            await writer.WriteAsync("DESCRIPTION:");
+            for (var index = 0; index < 704; index++)
+                await writer.WriteAsync(filler);
+            await writer.WriteLineAsync();
+            await writer.WriteAsync("ATTACH;ENCODING=BASE64:");
+            for (var index = 0; index < 704; index++)
+                await writer.WriteAsync(filler);
+            await writer.WriteLineAsync();
+
+            await writer.WriteLineAsync("END:VEVENT");
+            await writer.WriteLineAsync("END:VCALENDAR");
+        }
 
         public void Dispose()
         {

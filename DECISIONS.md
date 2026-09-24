@@ -4929,6 +4929,21 @@ correction workflow. Existing effective-date editing does not recalculate
 stored form due dates, so changing a due/effective schedule needs a separate audited
 obligation reconciliation before any note can become billable from that change.
 
+## 2026-09-24 — Renewal overlap requires explicit cycle disambiguation
+
+An exact Logged non-release Form activity still attests only its selected `FormId`, and its
+in-flight completion is projected during both desktop billing-window preflights so the work is not
+blocked by the obligation it is completing. That projection never excuses another blocker.
+
+For PCP, Comprehensive Assessment, Reclassification, Safety Plan, and Privacy Practices, selecting
+an older target after a later incomplete same-type renewal has entered its configured availability
+window is ambiguous evidence, not an inference opportunity. The manual checkbox path refuses the
+older target and names both plan targets. A genuinely late older-cycle completion may proceed only
+as an exact linked Form note with written case-manager justification through the existing
+nonbillable supervisory-review path. Local and API writes repeat the rule and record a minimized
+`note.older-form-cycle-justified` event containing only both Form IDs/targets and the activity date;
+the protected Note retains the justification. Sati never redirects or moves the evidence.
+
 ## 2026-09-22 — One note may document several activities
 
 The note editor offers independent Visit, Phone, Email, Form, and Other checkboxes.
@@ -4984,13 +4999,20 @@ the migration, and a read-only allow-list check verified it absent.
 ## 2026-09-22 — Legacy Dark theme
 
 Legacy Dark keeps Legacy's leaf artwork, Palatino typography, and gradient layout.
-Its window remains Black Bean, while navigation and raised panels move through
-Sienna shades. Bone and Dun provide readable text on those dark surfaces, and
-Brown Sugar accents the borders. Editable fields use Bone with Black Bean ink;
-their selection uses Sienna with Bone ink. The field brush roles are separate
-from the general panel roles, so light controls do not invert text elsewhere.
-Semantic status colors retain their meanings. The palette is selectable in
-Settings and stored with the existing per-user theme choice.
+Following use of the first version, its surfaces were re-layered into an explicit
+four-step depth scale: Bone editable fields are lightest; the Sienna window and
+navigation shell is next; Black Bean content cards are darker; and inset editors
+such as the scratchpad are deepest. The primary shell navigation binds the named
+`NavBackgroundBrush`, not the inset `SurfaceAltBrush`, so those roles remain
+independently adjustable. A Legacy Dark-specific luminance test enforces the
+whole ordering in addition to the existing WCAG contrast sweep.
+
+Bone and Dun provide readable text on the dark surfaces, and Brown Sugar accents
+the borders. Editable fields use Bone with Black Bean ink; their selection uses
+Sienna with Bone ink. The field brush roles remain separate from the general
+panel roles, so light controls do not invert text elsewhere. Semantic status
+colors retain their meanings. The palette is selectable in Settings and stored
+with the existing per-user theme choice.
 
 ## 2026-09-22 — Scheduled form work may become a draft after a dated checkmark
 
@@ -5006,3 +5028,71 @@ from changing a note that was edited in the meantime. Mixed or submitted notes,
 claim-linked notes, and ambiguous evidence continue through the existing
 correction route. Reclassification's combined assessment implication is not
 automatically converted, because it can involve two distinct obligations.
+
+## 2026-09-23 — Scheduled Work Agenda identity is exact form identity, with a narrow legacy bridge
+
+Release 1.3.23 added nullable `Notes.FormId` without inventing obligation links for historical
+notes. That preserved evidence correctly, but the Work Agenda retry check immediately treated the
+new exact ID as its only match. A carried-forward pre-upgrade Scheduled row therefore had null
+identity, did not match the same selected form, and was joined by a new exact-linked row. Narrative
+equality is not a durable replacement because ordinary presentation wording changes when work
+moves from upcoming to overdue.
+
+For a selected non-release form with an exact ID, a Scheduled row matches by status, person, date,
+note/form type, and the same non-null `FormId`, regardless of narrative. A legacy null-`FormId` row
+gets only a narrow compatibility bridge: its complete generated narrative must still match and it
+must not carry release identity. Null is never a wildcard, and two different non-null form IDs
+remain different work. An item carrying both form and release identity is invalid at this boundary
+and is rejected before any write.
+
+The existing production artifact is reconciled by cancelling, not deleting or relinking, redundant
+rows. Migration `20260923180000_ReconcileDuplicateScheduledAgendaNotes` acts only on an unambiguous
+fan-out with exactly one legacy null-link, one or more byte-identical exact links that all identify
+the same valid same-person/same-type Form, and no claim, recovery, review-flag, correction,
+attestation-evidence, or meaningful workflow-audit reference to any member. Revision values are
+captured for concurrency but do not define the artifact: moving Scheduled work can legitimately
+raise both old and new rows' revisions. Insert-ID order also does not define membership: discovery
+must see the complete byte-identical group before it can prove that there is exactly one null-link
+and one distinct exact Form. The lowest-ID exact-linked row stays Scheduled; the legacy row and
+every other exact-linked copy become Cancelled, increment revision, and each receive a PHI-minimized
+system-actor audit event. Multiple-form, multiple-legacy, edited, or evidenced groups stay untouched
+for human review. `Down` does not reactivate cancelled rows because doing so could recreate a
+duplicate after later user edits.
+
+EF validates the entire model fingerprint before it will apply even a data-only migration. Seeded
+document text is part of that fingerprint, so the shared Privacy Practices default and its
+historical seed migration normalize source line endings to LF. This changes no wording; it prevents
+a CRLF checkout from manufacturing a pending seed update and blocking the Local startup updater.
+Because the repair consists only of raw data SQL, the migration-effect analyzer intentionally
+classifies it as `Indeterminate` while it is pending. The startup updater still takes its normal
+backup and lets EF apply it; it does not mistake the repair for an already-applied schema change.
+
+UI-only suppression, broad person/type/date matching, deletion, and guessed historical `FormId`
+backfill are rejected: each either hides retained state or can merge distinct annual obligations.
+This decision fixes deterministic upgrade and wording retries; it does not claim a database
+uniqueness guarantee. The current read-before-add boundary remains vulnerable to simultaneous
+writers and needs a future authoritative atomic ensure operation. Recipient-release identity also
+remains separate work because the agenda GUID and the Note table's long key are not the same
+contract.
+
+## 2026-09-24 — Outlook calendar import streams bulk exports and retains only supported fields
+
+The original Outlook `.ics` importer rejected files above 20 MiB because it loaded the whole export,
+unfolded a second whole copy, split a third copy into lines, and retained every property inside each
+event even though Sati uses only dates, recurrence, subject, location, status, and source identity.
+That ceiling was an implementation guard, not a product or compliance rule, and normal Outlook
+exports can exceed it through descriptions and embedded attachments that Sati never displays.
+
+Import now parses incrementally and ignores unsupported properties, including `DESCRIPTION` and
+`ATTACH`, without retaining their values or writing them to the encrypted overlay cache. A 512 MiB
+total-file ceiling remains as a workstation processing guard. Supported unfolded lines are limited
+to 256 KiB, supported properties retained for one source event to 1 MiB and 4,096 entries, retained
+event text to 64 Mi characters, and expanded output to the existing 50,000-event ceiling. These are
+defense-in-depth bounds around untrusted file input; they do not broaden what calendar content Sati
+stores or move the import across the client-local boundary.
+
+**Rejected:** simply raising the old 20 MiB limit while continuing to call `ReadAllText`, because
+peak memory would still scale through several full-file copies; removing all limits, because a
+local file can still exhaust CPU, memory, or encrypted-cache space; and retaining descriptions or
+attachments, because they are not part of the calendar display and unnecessarily increase PHI
+exposure.

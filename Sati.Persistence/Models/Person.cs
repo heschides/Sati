@@ -659,31 +659,52 @@ namespace Sati
             Contracts.V1.BillingComplianceRequirements requirements =
                 Contracts.V1.BillingComplianceGate.DefaultRequirements,
             Contracts.V1.ComplianceScheduleSettings? schedule = null,
-            Note? contactCandidate = null) =>
-            EvaluateBillingWindowDetailed(noteDate, requirements, schedule, contactCandidate).Reasons;
+            Note? contactCandidate = null,
+            int? projectedCompletedFormId = null,
+            DateTime? projectedCompletedOn = null) =>
+            EvaluateBillingWindowDetailed(
+                noteDate,
+                requirements,
+                schedule,
+                contactCandidate,
+                projectedCompletedFormId,
+                projectedCompletedOn).Reasons;
 
         /// <param name="contactCandidate">
         /// A note being saved. Its in-flight type and status replace the stored copy in
         /// the contact history, so a visit counts toward its own service date.
+        /// </param>
+        /// <param name="projectedCompletedFormId">
+        /// The exact loaded form whose completion this in-flight note will record.
+        /// Null leaves every stored form snapshot unchanged.
+        /// </param>
+        /// <param name="projectedCompletedOn">
+        /// The completion date to use only for <paramref name="projectedCompletedFormId"/>.
         /// </param>
         public Contracts.V1.BillingComplianceResult EvaluateBillingWindowDetailed(
             DateTime noteDate,
             Contracts.V1.BillingComplianceRequirements requirements =
                 Contracts.V1.BillingComplianceGate.DefaultRequirements,
             Contracts.V1.ComplianceScheduleSettings? schedule = null,
-            Note? contactCandidate = null) =>
+            Note? contactCandidate = null,
+            int? projectedCompletedFormId = null,
+            DateTime? projectedCompletedOn = null) =>
             Contracts.V1.BillingComplianceGate.EvaluateBillingWindowDetailed(
                 BillingComplianceSnapshots(
                     noteDate,
                     schedule ?? new Contracts.V1.ComplianceScheduleSettings(),
-                    contactCandidate),
+                    contactCandidate,
+                    projectedCompletedFormId,
+                    projectedCompletedOn),
                 noteDate,
                 requirements);
 
         private IReadOnlyList<Contracts.V1.ComplianceFormSnapshot> BillingComplianceSnapshots(
             DateTime asOfDate,
             Contracts.V1.ComplianceScheduleSettings schedule,
-            Note? contactCandidate = null)
+            Note? contactCandidate = null,
+            int? projectedCompletedFormId = null,
+            DateTime? projectedCompletedOn = null)
         {
             var releaseFacts = Contracts.V1.ExpectedBillingComplianceObligations
                 .IncludeMissingReleases(
@@ -708,7 +729,11 @@ namespace Sati
                 .Select(form => new Contracts.V1.ComplianceFormSnapshot(
                     form.Type.ToString(),
                     form.DueDate,
-                    form.CompletedDate,
+                    projectedCompletedFormId is int exactFormId &&
+                    projectedCompletedOn is DateTime completionDate &&
+                    form.Id == exactFormId
+                        ? completionDate.Date
+                        : form.CompletedDate,
                     form.OpenedDate,
                     form.Id > 0 ? $"form:{form.Id}" : null,
                     TargetEffectiveDate: form.TargetEffectiveDate == default

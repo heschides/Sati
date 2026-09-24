@@ -51,7 +51,9 @@ public interface IOutlookCalendarService
 /// </summary>
 public sealed class OutlookCalendarService : IOutlookCalendarService
 {
-    internal const long MaximumImportBytes = 20 * 1024 * 1024;
+    // This is an operational processing bound, not a calendar-content limit. Imports are
+    // streamed, and the parser separately bounds the data it retains from any one event.
+    internal const long MaximumImportBytes = 512L * 1024 * 1024;
     private static readonly byte[] Entropy =
         Encoding.UTF8.GetBytes("Sati.OutlookCalendarOverlay.v1");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -119,14 +121,36 @@ public sealed class OutlookCalendarService : IOutlookCalendarService
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("Choose an Outlook calendar file.", nameof(filePath));
 
-        var file = new FileInfo(filePath);
-        if (!file.Exists)
+        if (!File.Exists(filePath))
             throw new FileNotFoundException("The selected Outlook calendar file no longer exists.", filePath);
-        if (file.Length > MaximumImportBytes)
-            throw new InvalidDataException("The Outlook calendar file is larger than the 20 MB import limit.");
 
-        var text = await File.ReadAllTextAsync(filePath, cancellationToken);
-        var parsed = OutlookIcsReader.Read(text, DateTime.Today.Year - 1, DateTime.Today.Year + 5);
+        OutlookIcsReadResult parsed;
+        await using (var stream = new FileStream(
+            filePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 64 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan))
+        {
+            if (stream.Length > MaximumImportBytes)
+            {
+                throw new InvalidDataException(
+                    "The Outlook calendar file is larger than the 512 MiB import safety limit.");
+            }
+
+            using var reader = new StreamReader(
+                stream,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: true,
+                bufferSize: 64 * 1024,
+                leaveOpen: true);
+            parsed = await OutlookIcsReader.ReadAsync(
+                reader,
+                DateTime.Today.Year - 1,
+                DateTime.Today.Year + 5,
+                cancellationToken);
+        }
         if (parsed.Events.Count == 0)
             throw new InvalidDataException("No supported calendar events were found in the selected file.");
 
@@ -210,52 +234,175 @@ internal sealed record OutlookIcsReadResult(
 internal static class OutlookIcsReader
 {
     private const int MaximumEvents = 50_000;
+    internal const int MaximumRetainedLogicalLineCharacters = 256 * 1024;
+    private const int MaximumRetainedPropertiesPerEvent = 4_096;
+    private const int MaximumRetainedPropertyCharactersPerEvent = 1024 * 1024;
+    private const long MaximumRetainedEventTextCharacters = 64L * 1024 * 1024;
+    private const long MaximumInputCharacters = OutlookCalendarService.MaximumImportBytes;
+    private static readonly HashSet<string> RetainedPropertyNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "BEGIN",
+        "END",
+        "DTSTART",
+        "DTEND",
+        "UID",
+        "SUMMARY",
+        "LOCATION",
+        "STATUS",
+        "EXDATE",
+        "RRULE"
+    };
 
     public static OutlookIcsReadResult Read(string text, int firstYear, int lastYear)
     {
-        if (string.IsNullOrWhiteSpace(text) ||
-            !text.Contains("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException("The selected file is not an iCalendar file.");
-        }
+        ArgumentNullException.ThrowIfNull(text);
+        using var reader = new StringReader(text);
+        return ReadAsync(reader, firstYear, lastYear, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+    }
 
-        var unfolded = text.Replace("\r\n ", string.Empty, StringComparison.Ordinal)
-            .Replace("\r\n\t", string.Empty, StringComparison.Ordinal)
-            .Replace("\n ", string.Empty, StringComparison.Ordinal)
-            .Replace("\n\t", string.Empty, StringComparison.Ordinal);
-        var lines = unfolded.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+    internal static async Task<OutlookIcsReadResult> ReadAsync(
+        TextReader reader,
+        int firstYear,
+        int lastYear,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+        if (firstYear > lastYear)
+            throw new ArgumentOutOfRangeException(nameof(firstYear));
+
+        var lineReader = new BoundedPhysicalLineReader(reader, MaximumInputCharacters);
         var events = new List<ImportedOutlookEvent>();
         var skipped = 0;
+        var sawCalendar = false;
+        var retainedEventTextCharacters = 0L;
+        List<IcsProperty>? properties = null;
+        var retainedPropertyCharacters = 0;
+        PendingLogicalLine? pending = null;
 
-        for (var index = 0; index < lines.Length; index++)
+        void FinishEvent()
         {
-            if (!lines[index].Equals("BEGIN:VEVENT", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var properties = new List<IcsProperty>();
-            while (++index < lines.Length &&
-                   !lines[index].Equals("END:VEVENT", StringComparison.OrdinalIgnoreCase))
-            {
-                var separator = lines[index].IndexOf(':');
-                if (separator <= 0)
-                    continue;
-
-                var declaration = lines[index][..separator];
-                var semicolon = declaration.IndexOf(';');
-                var name = (semicolon < 0 ? declaration : declaration[..semicolon]).ToUpperInvariant();
-                properties.Add(new IcsProperty(name, declaration, lines[index][(separator + 1)..]));
-            }
+            if (properties is null)
+                return;
 
             if (!TryCreateEvents(properties, firstYear, lastYear, out var imported))
             {
                 skipped++;
-                continue;
+                properties = null;
+                retainedPropertyCharacters = 0;
+                return;
+            }
+
+            if (imported.Count > MaximumEvents - events.Count)
+            {
+                throw new InvalidDataException(
+                    "The calendar contains more than 50,000 events in the import window.");
+            }
+
+            foreach (var entry in imported)
+            {
+                retainedEventTextCharacters += entry.SourceId.Length + entry.Title.Length + (entry.Location?.Length ?? 0);
+                if (retainedEventTextCharacters > MaximumRetainedEventTextCharacters)
+                {
+                    throw new InvalidDataException(
+                        "The calendar contains too much event text to import safely.");
+                }
             }
 
             events.AddRange(imported);
-            if (events.Count > MaximumEvents)
-                throw new InvalidDataException("The calendar contains more than 50,000 events in the import window.");
+            properties = null;
+            retainedPropertyCharacters = 0;
         }
+
+        void ProcessLogicalLine(string line)
+        {
+            if (line.Equals("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase))
+            {
+                sawCalendar = true;
+                return;
+            }
+
+            if (line.Equals("BEGIN:VEVENT", StringComparison.OrdinalIgnoreCase))
+            {
+                properties = [];
+                retainedPropertyCharacters = 0;
+                return;
+            }
+
+            if (line.Equals("END:VEVENT", StringComparison.OrdinalIgnoreCase))
+            {
+                FinishEvent();
+                return;
+            }
+
+            if (properties is null)
+                return;
+
+            var separator = line.IndexOf(':');
+            if (separator <= 0)
+                return;
+
+            var declaration = line[..separator];
+            var semicolon = declaration.IndexOf(';');
+            var name = (semicolon < 0 ? declaration : declaration[..semicolon]).ToUpperInvariant();
+            if (!RetainedPropertyNames.Contains(name))
+                return;
+
+            retainedPropertyCharacters = checked(retainedPropertyCharacters + line.Length);
+            if (properties.Count >= MaximumRetainedPropertiesPerEvent ||
+                retainedPropertyCharacters > MaximumRetainedPropertyCharactersPerEvent)
+            {
+                throw new InvalidDataException(
+                    "A calendar event contains too much supported property data to import safely.");
+            }
+
+            properties.Add(new IcsProperty(name, declaration, line[(separator + 1)..]));
+        }
+
+        void FinishPendingLine()
+        {
+            if (pending?.Value is not null)
+                ProcessLogicalLine(pending.Value.ToString());
+            pending = null;
+        }
+
+        while (await lineReader.ReadLineAsync(cancellationToken) is { } physicalLine)
+        {
+            var isContinuation = physicalLine.Value.Length > 0 &&
+                physicalLine.Value[0] is ' ' or '\t';
+            if (isContinuation)
+            {
+                if (pending?.Value is null)
+                    continue;
+
+                if (physicalLine.WasTruncated)
+                    throw RetainedLineTooLong();
+
+                var continuationLength = physicalLine.Value.Length - 1;
+                if (pending.Value.Length + continuationLength > MaximumRetainedLogicalLineCharacters)
+                    throw RetainedLineTooLong();
+
+                pending.Value.Append(physicalLine.Value, 1, continuationLength);
+                continue;
+            }
+
+            FinishPendingLine();
+            if (!ShouldRetainLine(physicalLine.Value))
+            {
+                pending = new PendingLogicalLine(null);
+                continue;
+            }
+
+            if (physicalLine.WasTruncated)
+                throw RetainedLineTooLong();
+
+            pending = new PendingLogicalLine(new StringBuilder(physicalLine.Value));
+        }
+
+        FinishPendingLine();
+        if (!sawCalendar)
+            throw new InvalidDataException("The selected file is not an iCalendar file.");
 
         var distinct = events
             .GroupBy(entry => $"{entry.SourceId}|{entry.Start:O}", StringComparer.Ordinal)
@@ -265,6 +412,27 @@ internal static class OutlookIcsReader
         skipped += events.Count - distinct.Count;
         return new OutlookIcsReadResult(distinct, skipped);
     }
+
+    private static bool ShouldRetainLine(string line)
+    {
+        var separator = line.IndexOf(':');
+        if (separator <= 0)
+            return false;
+
+        var declaration = line.AsSpan(0, separator);
+        var semicolon = declaration.IndexOf(';');
+        var name = semicolon < 0 ? declaration : declaration[..semicolon];
+        foreach (var retainedName in RetainedPropertyNames)
+        {
+            if (name.Equals(retainedName, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static InvalidDataException RetainedLineTooLong() => new(
+        "A supported calendar property is longer than the 256 KiB import safety limit.");
 
     private static bool TryCreateEvents(
         List<IcsProperty> properties,
@@ -453,4 +621,87 @@ internal static class OutlookIcsReader
         .Trim();
 
     private sealed record IcsProperty(string Name, string Declaration, string Value);
+
+    private sealed record PendingLogicalLine(StringBuilder? Value);
+
+    private readonly record struct PhysicalLine(string Value, bool WasTruncated);
+
+    /// <summary>
+    /// Reads physical lines without ever retaining more than one bounded prefix. Unsupported
+    /// Outlook properties such as DESCRIPTION and ATTACH can therefore be arbitrarily verbose
+    /// (within the total input ceiling) without becoming live managed strings.
+    /// </summary>
+    private sealed class BoundedPhysicalLineReader(TextReader reader, long maximumInputCharacters)
+    {
+        private readonly char[] _buffer = new char[16 * 1024];
+        private int _bufferOffset;
+        private int _bufferLength;
+        private long _charactersConsumed;
+        private bool _skipLineFeedAfterCarriageReturn;
+
+        public async ValueTask<PhysicalLine?> ReadLineAsync(CancellationToken cancellationToken)
+        {
+            StringBuilder? retained = null;
+            var sawCharacter = false;
+            var wasTruncated = false;
+
+            while (true)
+            {
+                var value = await ReadCharacterAsync(cancellationToken);
+                if (value < 0)
+                {
+                    return sawCharacter
+                        ? new PhysicalLine(retained?.ToString() ?? string.Empty, wasTruncated)
+                        : null;
+                }
+
+                var character = (char)value;
+                if (_skipLineFeedAfterCarriageReturn)
+                {
+                    _skipLineFeedAfterCarriageReturn = false;
+                    if (character == '\n')
+                        continue;
+                }
+
+                if (character == '\r')
+                {
+                    _skipLineFeedAfterCarriageReturn = true;
+                    return new PhysicalLine(retained?.ToString() ?? string.Empty, wasTruncated);
+                }
+
+                if (character == '\n')
+                    return new PhysicalLine(retained?.ToString() ?? string.Empty, wasTruncated);
+
+                sawCharacter = true;
+                if (!wasTruncated)
+                {
+                    retained ??= new StringBuilder(Math.Min(256, MaximumRetainedLogicalLineCharacters));
+                    if (retained.Length < MaximumRetainedLogicalLineCharacters)
+                        retained.Append(character);
+                    else
+                        wasTruncated = true;
+                }
+            }
+        }
+
+        private async ValueTask<int> ReadCharacterAsync(CancellationToken cancellationToken)
+        {
+            if (_bufferOffset >= _bufferLength)
+            {
+                _bufferLength = await reader.ReadAsync(_buffer.AsMemory(), cancellationToken);
+                _bufferOffset = 0;
+                if (_bufferLength == 0)
+                    return -1;
+            }
+
+            _charactersConsumed++;
+            if (_charactersConsumed > maximumInputCharacters)
+            {
+                throw new InvalidDataException(
+                    "The Outlook calendar contains more than 512 Mi characters and cannot be imported safely.");
+            }
+
+            return _buffer[_bufferOffset++];
+        }
+    }
 }

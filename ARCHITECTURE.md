@@ -68,6 +68,16 @@ transaction. A reasoned date correction appends a revocation and replacement. PD
 external-artifact records, safety-plan approval, and privacy receipts do not themselves
 change form completion. Releases follow their separate authorization workflow.
 
+`FormNoteAttestationRules` owns the exact Logged/non-release/Form-activity predicate.
+`AnnualFormCycleDisambiguationRules` protects renewal-overlap types: if a note selects an older
+annual target after a later same-type incomplete renewal has entered its configured availability
+window, both desktop preflights and the local/API write paths retain that exact selection but
+require the existing written-justification, nonbillable supervisory-review path. The minimized
+`note.older-form-cycle-justified` event records only the old/new Form IDs and targets plus activity
+date; justification remains on the Note. The ordinary checkbox/manual-attestation path refuses
+that ambiguity and directs the case manager to the renewal or exact-note workflow. Neither path
+redirects or moves evidence automatically.
+
 Reclassification has one semantic dependency rather than an artifact prerequisite: a completed
 Reclassification means the Comprehensive Assessment for the same `TargetEffectiveDate` was already
 completed. If that CA has no attestation, the capture asks for its actual completion date and the
@@ -196,8 +206,10 @@ approval, or Production readiness.
 ### Migration and rollout boundary
 
 Migration `20260915004541_CorrectAnnualComplianceAndBillingPolicy` stages nullable
-`TargetEffectiveDate`, derives review targets as the greatest anniversary strictly before their
-deadline and annual targets as the first anniversary on or after it, validates the result, then
+`TargetEffectiveDate` and derives each legacy row's annual identity from the greatest anniversary
+strictly before its legacy deadline. That intentionally preserves the old runtime's cycle-start
+identity: annual deadlines had been calculated from the following anniversary. It then validates
+the result and
 makes the identity required and uniquely indexed. It refuses missing owners/effective dates,
 unknown form types, pre-1900 dates, invalid cycle relationships, duplicate target identities, and
 legacy blanket note overrides rather than manufacturing clinical or exception evidence. It changes
@@ -205,6 +217,9 @@ only recognized old Settings defaults and writes a system/migration audit event 
 The same migration creates the policy, recovery, release-obligation, and signature-projection
 schema. Its synthetic migration tests and script-generation check pass, but it has not been applied
 to Demo, Local Production, or Production and has not been rehearsed against an approved data copy.
+Completion evidence recorded during the next renewal's open window can still be legitimate late
+older-cycle work, so it remains an explicit review ambiguity and is never moved by migration or
+runtime inference.
 
 ## Controlled 2026-09-14 schema application
 
@@ -644,10 +659,15 @@ Editable controls use a separate `InputSurfaceBrush`/`InputTextBrush` pair,
 with matching muted, hover, pressed, and selection roles. `States.xaml` maps
 these to each theme's existing raised-surface and text colors by default;
 Legacy Dark overrides them with light Bone fields and dark Black Bean ink.
-The paired roles are checked across every theme, and the Legacy Dark test
-also inspects the resolved brushes on actual text, password, dropdown, and
-date controls. This keeps light fields from inheriting the light ink used by
-the surrounding dark panels.
+Legacy Dark also has a measured four-level depth contract: fields are lighter
+than the Sienna window/navigation shell, the shell is lighter than content
+cards, and cards are lighter than Black Bean inset editors. The primary shell
+bar consumes `NavBackgroundBrush`; inset editors consume `SurfaceAltBrush`.
+The paired roles are checked across every theme, and Legacy Dark tests inspect
+the resolved brushes on actual text, password, dropdown, and date controls as
+well as the complete luminance ordering. This keeps light fields from inheriting
+the light ink used by the surrounding dark panels and keeps semantic surface
+roles from collapsing into the same shade.
 
 Two rules follow from what the audit found. A surface, border, or text token is never used outside
 its role — a fill takes a fill token and the ink named for it, never `SurfaceBrush` as a foreground
@@ -768,6 +788,23 @@ The daily sign-in agenda creates Scheduled Form notes for selected forms with a 
 estimate. Exact retries are idempotent from the user's point of view. Scheduled notes already due
 today appear automatically and are omitted from the sign-in recommendation list, avoiding a second
 apparent task for the same note.
+
+For non-release form work, persisted `FormId` is the retry identity; generated agenda narrative is
+presentation and may change when an item moves from upcoming to overdue. A pre-1.3.23 Scheduled
+row with null `FormId` is recognized only through its complete historical narrative fingerprint.
+Null is never a wildcard, a different non-null form ID never matches, and a release-linked note
+cannot claim an exact form. This compatibility bridge deliberately does not guess or backfill a
+historical obligation.
+
+Data-only migration `20260923180000_ReconcileDuplicateScheduledAgendaNotes` repairs the observed
+upgrade artifact without hiding it in the UI. It acts only on a byte-identical, unevidenced fan-out
+with exactly one unlinked Scheduled row and one or more Scheduled rows that all link the same real
+matching Form. Discovery covers the complete byte-identical group without assuming insert-ID order.
+The lowest-ID exact-linked row remains active; the legacy row and all other linked copies are
+retained as Cancelled, with an incremented revision and one system audit event apiece. Prior
+revision values do not define identity. Multiple-form, multiple-legacy, edited, claimed,
+attested, flagged, meaningfully audited, or otherwise referenced groups are left untouched. The
+read-before-add service boundary is still not an atomic cross-process uniqueness guarantee.
 
 Starting an agenda item opens that same row in the current-note panel as an unsaved Pending draft.
 It fills the client and type, uses today's date, brackets the planned narrative as replaceable
@@ -2016,6 +2053,7 @@ rather than in either client.
 | `BillingComplianceExceptionRules` | Exact-blocker validation for one-note supervisory exceptions; unselected blockers continue to block. |
 | `BillingComplianceRecoveryRules` | Post-compliance Admin checklist, immutable decision validation, and exact-evidence revalidation before a selected note may reach billing. |
 | `FormAttestationRules` | Attestation-date legality, Reclassification's same-target CA implication, person/type/target resolution, and the derived pending-attestation list. |
+| `FormNoteAttestationRules` / `AnnualFormCycleDisambiguationRules` | The exact Logged form-note shape that attests its linked obligation, and the written-justification boundary when an older target is selected after an incomplete renewal becomes available. |
 | `FormOpeningRules` | Actual opening-date validation against availability and the agency date. |
 | `AnnualDocumentCatalog` | Annual-document identity, display names, and packet eligibility; artifact generation is not form completion. |
 | `ReleaseObligationRules` / `ReleaseAssignmentResolution` | Recipient-specific annual/assignment-start release generation, stable identity, and fail-visible provider-link resolution. |
@@ -2289,11 +2327,14 @@ shared `ServiceTimeline` rule. The focused-day view groups notes by `Note.EventD
 service), because the current note model has no separate logged/created timestamp.
 `OutlookCalendarService` is a separate client-local integration overlay. It parses an exported `.ics`
 file without uploading it, expands common recurrence rules into a bounded seven-year window, and
-stores the replaceable result under `%LOCALAPPDATA%\Sati` encrypted with Windows DPAPI. The cache key
-includes the selected data environment and signed-in Sati user. Imported items are display-only and
-never enter the note, billing, compliance, exemption, or API persistence paths. A future live Graph
-integration is not implemented by this boundary and requires a separate authorization and audit
-design.
+stores the replaceable result under `%LOCALAPPDATA%\Sati` encrypted with Windows DPAPI. Import is a
+streaming parse: verbose unsupported properties such as `DESCRIPTION` and `ATTACH` are discarded
+rather than retained, while total input (512 MiB), retained property size (256 KiB per unfolded
+line and 1 MiB per event), retained event text, and expanded output (50,000 events) remain bounded.
+The cache key includes the selected data environment and signed-in Sati user. Imported items are
+display-only and never enter the note, billing, compliance, exemption, or API persistence paths. A
+future live Graph integration is not implemented by this boundary and requires a separate
+authorization and audit design.
 `ScratchpadViewModel`: loads separate Today and next-
 workday drafts, rolls them forward after midnight on window activation or the 10-min timer, and
 explicitly saves both on shutdown/user-switch; diagnostics omit scratchpad content. A conflict is
@@ -2652,7 +2693,9 @@ Startup ordering is deliberate. `App` awaits `ShellViewModel.InitializeAsync`, i
 `Loaded` handler then invokes `DailyAgendaLauncher`. Account switches invoke it only after
 `ReinitializeAsync`. Confirm sends selected forms through `ScratchpadViewModel` to
 `WorkAgendaService`, which creates Scheduled Form notes for today without altering the freeform
-scratchpad. Exact retries recognize rows already added. Skip writes nothing. Opening a form uses
+scratchpad. Exact-form retries use the persisted `FormId`, not mutable display wording; the narrow
+legacy null-link bridge described under Structured Today's Work covers only an unchanged historical
+fingerprint. Skip writes nothing. Opening a form uses
 the dedicated actual-opening-date prompt and audited form-opening path for that exact form; opening
 a release only selects its exact recipient obligation and does not record an attestation.
 

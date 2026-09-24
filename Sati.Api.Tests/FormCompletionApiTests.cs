@@ -72,57 +72,61 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
     [Fact]
     public async Task AttestationStoresTheEnteredDateInsteadOfSynthesizingTodayOrDueDate()
     {
-        _ = await factory.CreateNonCompliantReviewNoteAsync();
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
-        var people = await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload");
-        var person = people!.Single(candidate => candidate.Id == 102);
-        var form = person.Forms.First(candidate => !candidate.IsCompliant);
+        var fixture = await CreateIsolatedAttestationFixtureAsync();
         var completedOn = DateTime.Today.AddDays(-5);
         var auditBefore = await factory.GetAuditEventsAsync("form.attested");
 
-        var response = await owner.PostAsJsonAsync(
-            $"/api/v1/people/{person.Id}/forms/{form.Type}/attestation",
-            new { FormId = form.Id, CompletedOn = completedOn, EvidenceNoteId = (int?)null });
-
-        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
-        var saved = await response.Content.ReadFromJsonAsync<FormDto>();
-        Assert.NotNull(saved);
-        Assert.Equal(completedOn.Date, saved.CompletedDate);
-        Assert.NotEqual(DateTime.Today, saved.CompletedDate);
-        Assert.NotEqual(form.DueDate.Date, saved.CompletedDate);
-
-        var auditAfter = await factory.GetAuditEventsAsync("form.attested");
-        var audit = Assert.Single(auditAfter.Skip(auditBefore.Count));
-        Assert.Equal(form.Id.ToString(), audit.ResourceId);
-        Assert.Contains(completedOn.ToString("yyyy-MM-dd"), audit.MetadataJson);
-
-        var historyPath =
-            $"/api/v1/people/{person.Id}/forms/{form.Type}/attestations?formId={form.Id}";
-        var attestedHistory = await owner.GetFromJsonAsync<List<FormAttestationHistoryDto>>(historyPath)
-            ?? throw new InvalidOperationException("The attestation history response was empty.");
-        var attested = Assert.IsType<FormAttestationHistoryDto>(attestedHistory.First());
-        Assert.Equal("Attested", attested.Kind);
-        Assert.Equal(completedOn.Date, attested.CompletedOn);
-        Assert.Equal("case-manager-one", attested.ActorDisplayName);
-        Assert.Equal("CaseManager", attested.ActorKind);
-        await using (var scope = factory.Services.CreateAsyncScope())
+        try
         {
-            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
-            var draft = await db.Notes.AsNoTracking().SingleAsync(note =>
-                note.FormId == form.Id && note.EventDate == completedOn.Date);
-            Assert.Equal(NoteWorkflow.Pending, draft.Status);
+            var response = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{fixture.PersonId}/forms/{fixture.Type}/attestation",
+                new { FormId = fixture.FormId, CompletedOn = completedOn, EvidenceNoteId = (int?)null });
+
+            Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+            var saved = await response.Content.ReadFromJsonAsync<FormDto>();
+            Assert.NotNull(saved);
+            Assert.Equal(completedOn.Date, saved.CompletedDate);
+            Assert.NotEqual(DateTime.Today, saved.CompletedDate);
+            Assert.NotEqual(fixture.DueDate.Date, saved.CompletedDate);
+
+            var auditAfter = await factory.GetAuditEventsAsync("form.attested");
+            var audit = Assert.Single(auditAfter.Skip(auditBefore.Count));
+            Assert.Equal(fixture.FormId.ToString(), audit.ResourceId);
+            Assert.Contains(completedOn.ToString("yyyy-MM-dd"), audit.MetadataJson);
+
+            var historyPath =
+                $"/api/v1/people/{fixture.PersonId}/forms/{fixture.Type}/attestations?formId={fixture.FormId}";
+            var attestedHistory = await owner.GetFromJsonAsync<List<FormAttestationHistoryDto>>(historyPath)
+                ?? throw new InvalidOperationException("The attestation history response was empty.");
+            var attested = Assert.IsType<FormAttestationHistoryDto>(attestedHistory.First());
+            Assert.Equal("Attested", attested.Kind);
+            Assert.Equal(completedOn.Date, attested.CompletedOn);
+            Assert.Equal("case-manager-one", attested.ActorDisplayName);
+            Assert.Equal("CaseManager", attested.ActorKind);
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+                var draft = await db.Notes.AsNoTracking().SingleAsync(note =>
+                    note.FormId == fixture.FormId && note.EventDate == completedOn.Date);
+                Assert.Equal(NoteWorkflow.Pending, draft.Status);
+            }
+            Assert.True(attested.RecordedAtUtc > DateTime.UtcNow.AddMinutes(-1));
+
+            var revoke = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{fixture.PersonId}/forms/{fixture.Type}/attestation/revoke",
+                new { FormId = fixture.FormId, Reason = "API regression-test cleanup." });
+            revoke.EnsureSuccessStatusCode();
+
+            var revokedHistory = await owner.GetFromJsonAsync<List<FormAttestationHistoryDto>>(historyPath)
+                ?? throw new InvalidOperationException("The revoked history response was empty.");
+            Assert.Equal("Revoked", revokedHistory.First().Kind);
+            Assert.Equal("API regression-test cleanup.", revokedHistory.First().Reason);
         }
-        Assert.True(attested.RecordedAtUtc > DateTime.UtcNow.AddMinutes(-1));
-
-        var revoke = await owner.PostAsJsonAsync(
-            $"/api/v1/people/{person.Id}/forms/{form.Type}/attestation/revoke",
-            new { FormId = form.Id, Reason = "API regression-test cleanup." });
-        revoke.EnsureSuccessStatusCode();
-
-        var revokedHistory = await owner.GetFromJsonAsync<List<FormAttestationHistoryDto>>(historyPath)
-            ?? throw new InvalidOperationException("The revoked history response was empty.");
-        Assert.Equal("Revoked", revokedHistory.First().Kind);
-        Assert.Equal("API regression-test cleanup.", revokedHistory.First().Reason);
+        finally
+        {
+            await DeleteIsolatedAttestationFixtureAsync(fixture);
+        }
     }
 
     [Fact]
@@ -205,24 +209,13 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
     [Fact]
     public async Task SimultaneousAttestationsReturnATypedConflictForTheLoser()
     {
-        _ = await factory.CreateNonCompliantReviewNoteAsync();
         using var firstClient = await factory.CreateAuthenticatedClientAsync("case-manager-one");
         using var secondClient = await factory.CreateAuthenticatedClientAsync("case-manager-one");
-        var people = await firstClient.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload");
-        var person = people!.Single(candidate => candidate.Id == 102);
-        var form = person.Forms.First(candidate => !candidate.IsCompliant);
-        var path = $"/api/v1/people/{person.Id}/forms/{form.Type}/attestation";
-        // Another test may have revoked this form while retaining its linked
-        // draft. Reuse that draft's activity date so this test isolates the
-        // concurrent attestation rule rather than a genuine date conflict.
-        await using var scope = factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
-        var linkedDate = await db.Notes.AsNoTracking()
-            .Where(note => note.FormId == form.Id)
-            .Select(note => note.EventDate)
-            .SingleOrDefaultAsync();
-        var payload = new AttestFormRequest(form.Id,
-            linkedDate ?? DateTime.Today.AddDays(-3));
+        var fixture = await CreateIsolatedAttestationFixtureAsync();
+        var path =
+            $"/api/v1/people/{fixture.PersonId}/forms/{fixture.Type}/attestation";
+        var payload = new AttestFormRequest(
+            fixture.FormId, DateTime.Today.AddDays(-3));
 
         var responses = await Task.WhenAll(
             firstClient.PostAsJsonAsync(path, payload),
@@ -242,8 +235,10 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
         {
             var revoke = await firstClient.PostAsJsonAsync(
                 $"{path}/revoke",
-                new RevokeFormAttestationRequest(form.Id, "Concurrency regression-test cleanup."));
+                new RevokeFormAttestationRequest(
+                    fixture.FormId, "Concurrency regression-test cleanup."));
             revoke.EnsureSuccessStatusCode();
+            await DeleteIsolatedAttestationFixtureAsync(fixture);
         }
     }
 
@@ -288,4 +283,62 @@ public sealed class FormCompletionApiTests(SatiApiFactory factory)
             after!.SelectMany(person => person.Forms)
                 .Single(candidate => candidate.Id == form.Id).CompletedDate);
     }
+
+    private async Task<AttestationFixture> CreateIsolatedAttestationFixtureAsync()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var personId = await db.People.MaxAsync(person => person.Id) + 1;
+        var targetEffectiveDate = DateTime.Today;
+        var form = new ServerForm
+        {
+            Type = nameof(FormType.PCP),
+            DueDate = targetEffectiveDate,
+            TargetEffectiveDate = targetEffectiveDate
+        };
+        db.People.Add(new ServerPerson
+        {
+            Id = personId,
+            UserId = 12,
+            AgencyId = 1,
+            FirstName = "Attestation",
+            LastName = "Fixture",
+            BirthDate = new DateTime(1990, 1, 1),
+            EffectiveDate = targetEffectiveDate.AddYears(-1),
+            IsTestData = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            Forms = [form]
+        });
+        await db.SaveChangesAsync();
+        return new AttestationFixture(
+            personId, form.Id, form.Type, form.DueDate);
+    }
+
+    private async Task DeleteIsolatedAttestationFixtureAsync(
+        AttestationFixture fixture)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        await db.FormAttestationChangeReviewFlags
+            .Where(flag => flag.FormId == fixture.FormId)
+            .ExecuteDeleteAsync();
+        await db.FormAttestations
+            .Where(attestation => attestation.FormId == fixture.FormId)
+            .ExecuteDeleteAsync();
+        await db.Notes
+            .Where(note => note.PersonId == fixture.PersonId)
+            .ExecuteDeleteAsync();
+        await db.Forms
+            .Where(form => form.PersonId == fixture.PersonId)
+            .ExecuteDeleteAsync();
+        await db.People
+            .Where(person => person.Id == fixture.PersonId)
+            .ExecuteDeleteAsync();
+    }
+
+    private sealed record AttestationFixture(
+        int PersonId,
+        int FormId,
+        string Type,
+        DateTime DueDate);
 }

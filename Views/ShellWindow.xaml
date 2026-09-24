@@ -86,9 +86,10 @@
             <!-- ================================================================ -->
             <!-- NAVIGATION BAR                                                   -->
             <!-- ================================================================ -->
-            <Border Grid.Row="0"
+            <Border x:Name="PrimaryNavigationBar"
+                    Grid.Row="0"
                     Grid.ColumnSpan="4"
-                    Background="{DynamicResource SurfaceAltBrush}"
+                    Background="{DynamicResource NavBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="0,0,0,1">
                 <Border.Style>

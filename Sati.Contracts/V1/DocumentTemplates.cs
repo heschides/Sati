@@ -141,7 +141,10 @@ public static class SatiDefaultDocumentTemplates
     public static readonly DateTime PublishedAtUtc =
         new(2026, 9, 3, 0, 0, 0, DateTimeKind.Utc);
 
-    public const string PrivacyPracticesBody = """
+    // Seed values participate in EF's model fingerprint. Normalize the source
+    // file's platform-dependent line endings so Windows and Linux builds compare
+    // to the same migration snapshot and do not invent a pending data update.
+    public static readonly string PrivacyPracticesBody = """
 # Notice of Privacy Practices
 
 PROVISIONAL SATI DEFAULT - AGENCY PRIVACY AND LEGAL REVIEW REQUIRED
@@ -182,5 +185,5 @@ Prepared for: {{consumer.full_name}}
 Date of birth: {{consumer.birth_date}}
 Case manager: {{case_manager.name}}, {{case_manager.role}}
 Coverage cycle: {{cycle.start}} through {{cycle.end}}
-""";
+""".ReplaceLineEndings("\n");
 }

@@ -3,6 +3,8 @@ namespace Sati.Contracts.V1;
 /// <summary>Guidance when a manual completion conflicts with its exact linked note.</summary>
 public static class ManualAttestationNoteRules
 {
+    public const string ScheduledDuplicateCancellationAuditAction =
+        "note.scheduled-duplicate-cancelled";
     public const string ScheduledConversionRequiredCode = "scheduled_form_note_conversion_required";
     public const string ScheduledNoteChangedMessage =
         "The Scheduled note changed before confirmation. Refresh the form and try again.";
@@ -54,6 +56,20 @@ public static class ManualAttestationNoteRules
         !hasClaimLine &&
         string.Equals(noteType, "Form", StringComparison.Ordinal) &&
         NoteActivityRules.Effective(activities, noteType) == NoteActivity.Form;
+
+    /// <summary>
+    /// Whether an exact-linked note must participate in manual-attestation
+    /// evidence resolution. Status alone is deliberately insufficient to ignore
+    /// a row: even a cancelled note may retain protected evidence or review
+    /// references. The duplicate-repair migration is the one narrow exception,
+    /// because it emits a dedicated audit event only after proving the cancelled
+    /// Scheduled row has no such references.
+    /// </summary>
+    public static bool CompetesForManualAttestation(
+        int? status,
+        bool hasScheduledDuplicateCancellationAudit) =>
+        status != NoteWorkflow.Cancelled ||
+        !hasScheduledDuplicateCancellationAudit;
 
     public static string ScheduledConversionPrompt(
         string formName,

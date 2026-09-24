@@ -1,5 +1,153 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.26 — 2026-09-24
+
+“Cleaner agendas, safer form dates, and larger calendars.” This patch prevents
+exact-form Work Agenda retries from creating another Reclassification or Review,
+repairs only the unambiguous untouched transition duplicates, lets a form note
+satisfy the exact obligation it documents without weakening unrelated billing
+gates, streams large Outlook calendar exports, and gives Legacy Dark the requested
+four-level visual depth.
+
+**Data-only migration; no schema expansion.**
+`20260923180000_ReconcileDuplicateScheduledAgendaNotes` retains and cancels only
+proved redundant Scheduled rows and appends minimized audit events. Because the
+1.3.25 Demo client can still submit the old retry shape, the fixed API and accepted
+1.3.26 Demo installer must be published before the one-time Demo repair; all known
+old Demo sessions must then be closed. The repair uses a hash-pinned, identity-
+checked runner with rollback rehearsal and a no-op rerun. Local `SatiProduction`
+receives the migration only when each machine first launches the new Local client.
+
+- [x] Preflight: fetched `origin/master`; local `master` and `origin/master` both
+      resolve to `b7f942c`. The current worktree is the only linked worktree and
+      contains the reviewed release scope. No branch merge is needed and no branch
+      is proven safe to delete. Retain the merged but uncertain Codex branches and
+      the divergent setup, chat-design, and Claude branches. The previously recorded
+      video-conferencing branch is absent after fetch.
+- [x] Select collision-free patch version 1.3.26 and coordinate desktop/API
+      versions, installer builders, readiness expectations, Settings release notes,
+      runbook examples, and exact-version tests. The two distribution directories
+      exist under the required documents root and contain no 1.3.26 collision.
+- [x] Verify the pre-release Demo API is healthy at 1.3.25 and the Azure identity is
+      the expected subscription, tenant, SQL server, database `SatiDemo`, and `Demo`
+      database marker. Migration history is at the exact reviewed predecessor:
+      116 rows ending with `20260922191918_SupportReleaseAttestationReviewFlags`.
+- [ ] Complete the full Release solution build and every solution test project;
+      record totals and legitimate external-prerequisite skips.
+- [ ] Commit and push the verified source normally, then build the Demo API package
+      from that exact pushed commit. Record package contents, version, hash,
+      deployment identifier, liveness, readiness, and contract parity.
+- [ ] Build and accept new Demo and Local installers without overwrite. Verify the
+      Microsoft-signed LocalDB prerequisite, Local integrated security, five Demo
+      launches, exact versions, graceful cleanup, sizes, and SHA-256 hashes.
+- [ ] Publish only the accepted installers and checksum files by verified temporary
+      copy and rename to the two exact distribution folders. Record final paths and
+      hashes.
+- [ ] Ensure all old Demo sessions are closed, then, with a user-added temporary
+      exact-IP SQL firewall rule, run
+      `scripts/Apply-WorkAgendaDuplicateReconciliationMigration.ps1` rollback-only,
+      apply for real, and rerun to prove no eligible post-history drift. Have the
+      user remove the rule immediately and verify it is absent. The release workflow
+      never creates, changes, or deletes that security rule.
+- [ ] Record final deployment and migration evidence, push the evidence commit, and
+      prove clean local/remote equality.
+
+### Local Production machines
+
+- [ ] **Joshu workstation.** Installed Local client is 1.3.25. Treat its real
+      `SatiProduction` as pending migration 117 until 1.3.26 is installed and a
+      successful backed-up startup is verified.
+- [ ] **SatiLogica workstation / colleague installation.** Latest durable record is
+      1.3.2 and has not been rechecked during this release. Treat both its installed
+      version and Local migration state as behind rather than assuming it caught up.
+
+## Included in 1.3.26 — Work Agenda exact-form duplicate repair (2026-09-23)
+
+The 1.3.23 exact-form-link transition exposed a compatibility gap: older
+Scheduled Work Agenda notes intentionally retained `FormId = NULL`, but a
+later sign-in retry looked only for the newly available exact `FormId`. That
+made a second Scheduled row for some carried-forward Reclassifications and
+Reviews. This work is not part of the already published 1.3.25 release.
+
+- [x] Diagnose Local Production read-only. Forms retain their unique index and
+      have no duplicate obligation groups. Affected Scheduled-note groups share
+      the transition signature: exactly one unlinked carried-forward row and one
+      or more exact-linked rows for the same Form, with identical person,
+      date, form type, generated narrative, and untouched workflow state. The
+      observed rows are not claim, recovery, review-flag, or attestation evidence.
+- [x] Make exact `FormId` the durable retry identity, independent of generated
+      agenda wording. Keep a narrow full-narrative compatibility match for an
+      older null-`FormId` row; null is not a wildcard, and a different exact
+      form or a release-linked row remains separate. Reject an impossible item
+      that carries both form and release identity before writing anything.
+- [x] Add data-only migration
+      `20260923180000_ReconcileDuplicateScheduledAgendaNotes`. It cancels only
+      redundant rows in an unambiguous default 15-minute fan-out: one legacy
+      null-link and one or more byte-identical rows linked to the same exact Form.
+      The lowest-ID exact-linked row remains Scheduled; the legacy row and all
+      other exact-linked copies become Cancelled, increment revision, and each
+      receive a PHI-minimized system audit event. The repair does not depend on a
+      particular prior revision, never deletes or invents a historical `FormId`,
+      and skips multiple-form, multiple-legacy, referenced, evidenced, or
+      meaningfully audited groups. Candidate discovery is independent of row-ID
+      order so an interleaved extra legacy row or different exact Form cannot be
+      hidden from the ambiguity checks.
+- [x] Add regression coverage for retry after the nullable-link upgrade,
+      narrative changes on an exact form, different exact forms, unrelated
+      legacy/release rows, invalid mixed identity, migration guards, migration
+      registration, and generated SQL.
+- [x] Keep the retained Cancelled rows from becoming a new manual-attestation
+      ambiguity. Only a Cancelled exact-linked note carrying this migration's
+      dedicated audit marker is excluded from evidence resolution; every ordinary
+      cancelled or live linked note remains a conservative conflict, and an
+      explicit attempt to cite a retired duplicate is refused.
+- [x] Normalize the seeded Privacy Practices template to LF in both its shared
+      source and historical seed migration. EF fingerprints seed values before
+      applying pending migrations; platform-dependent source line endings made
+      this Windows clone report a phantom model change and would have blocked
+      the otherwise valid data repair. The wording is unchanged.
+- [x] Rehearse the repair and the full startup updater against disposable
+      LocalDB databases. The repair cancels only the proved redundant members,
+      skips ambiguous and evidenced groups, writes one minimized audit event per
+      cancellation, and the complete pending chain applies without a model-drift
+      refusal.
+- [ ] Ship through the normal release path, allow the identity-checked Local
+      Production startup updater to apply the migration, compare the preflight
+      candidate and cancellation counts, and verify that each group retains only
+      its lowest-ID exact-linked Scheduled row. No production row has been changed
+      during this source fix.
+- [ ] Replace the remaining read-before-add boundary with an authoritative
+      atomic ensure operation before claiming cross-process uniqueness. The
+      current matcher makes ordinary retries idempotent but cannot close a race
+      between simultaneous writers.
+- [ ] Carry one durable recipient-release identity through the agenda and Note
+      boundaries. The agenda currently exposes a GUID while `Note` stores a
+      different long key, so release items retain conservative narrative
+      matching until that contract is deliberately reconciled.
+
+## Included in 1.3.26 — Exact-form completion, calendar imports, and Legacy Dark (2026-09-24)
+
+- [x] Let an exact Logged non-release Form activity satisfy its own ordinary
+      service-date compliance preflight while preserving every unrelated blocker;
+      local/API persistence writes the exact attestation before repeating the gate
+      in the same transaction.
+- [x] Require explicit cycle disambiguation when an older renewal-overlap target
+      is selected after a later incomplete same-type renewal becomes available.
+      Manual attestation refuses; the exact linked-note path requires written
+      justification, remains nonbillable, and records a minimized old/new Form
+      audit without moving evidence.
+- [x] Replace the eager whole-file `.ics` parser and its 20 MiB guard with a
+      streaming parser. Unsupported bulk fields such as `DESCRIPTION` and
+      `ATTACH` are discarded; bounded supported properties, retained event text,
+      a 50,000-event output ceiling, and a 512 MiB total-input safety ceiling
+      remain. This is client-local and requires no database migration.
+- [x] Re-layer Legacy Dark into the requested four visual depths: Bone editable
+      fields, lighter Sienna shell/navigation chrome, darker Black Bean cards,
+      and the deepest Black Bean inset editors. The primary shell navigation now
+      consumes `NavBackgroundBrush` rather than sharing the scratchpad's
+      `SurfaceAltBrush`; automated checks enforce both that binding and the
+      complete light-to-dark luminance order while retaining the WCAG AA sweep.
+
 ## Release 1.3.25 — 2026-09-23
 
 “Clearer form dates and Legacy Dark controls.” This patch distinguishes a
@@ -587,10 +735,12 @@ migration is required.
 - [x] Regressions for the overdue-renewal case, window edges, early completion, target-date
       collapse, missing rows, February 29, command identity, and the new gate, each confirmed to
       fail against the old behavior.
-- [ ] Run `scripts/audit-annual-assessment-targets.sql` against identity-verified My work
-      Production with authorized database access. Review flagged form IDs against source evidence,
-      correct confirmed wrong-year attestations through the app, and verify billing status afterward.
-      This source change alone does not certify existing Production rows.
+- [x] Run `scripts/audit-annual-assessment-targets.sql` read-only against identity-verified My work
+      Production with authorized database access. On 2026-09-24 it flagged 12 rows across 11
+      clients and made no writes; those candidates are not proof of an incorrect attestation.
+- [ ] Review the flagged form IDs against source evidence, correct only confirmed wrong-year
+      attestations through the app's retained-history workflow, and verify billing status
+      afterward. This source change alone does not certify or rewrite existing Production rows.
 - [x] The caseload matrix (`FormCellViewModel`) now shows the renewal after the current annual
       form is satisfied, and marks an overdue renewal instead of showing the old completion as green.
       An unfinished current form remains the visible obligation. The cell names renewals explicitly.

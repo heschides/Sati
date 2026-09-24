@@ -44,6 +44,7 @@ public sealed class WorkAgendaServiceTests
         Assert.Equal(NoteStatus.Scheduled, saved.Status);
         Assert.Equal(NoteType.Form, saved.NoteType);
         Assert.Equal(FormType.Q1R, saved.FormType);
+        Assert.Equal(item.FormId, saved.FormId);
         Assert.Equal(WorkAgendaService.DefaultMinutes, saved.Minutes);
         Assert.Null(saved.StartTime);
         Assert.Equal(Today, saved.EventDate);
@@ -66,6 +67,107 @@ public sealed class WorkAgendaServiceTests
     }
 
     [Fact]
+    public async Task LegacyUnlinkedScheduledNotePreventsAnUpgradeDuplicate()
+    {
+        var item = AgendaItem();
+        var legacy = Scheduled(
+            NoteType.Form,
+            DailyAgendaText.FormatItem(item),
+            item.PersonId,
+            item.FormType);
+        var notes = new RecordingNoteService(legacy);
+
+        var result = await new WorkAgendaService(notes).AddFromDailyAgendaAsync(
+            41, Today, [item]);
+
+        Assert.Single(notes.Notes);
+        Assert.Null(legacy.FormId);
+        Assert.Equal(0, result.AddedCount);
+        Assert.Equal(1, result.ExistingCount);
+    }
+
+    [Fact]
+    public async Task ExactFormIdentitySurvivesAnAgendaNarrativeChange()
+    {
+        var item = AgendaItem();
+        var linked = Scheduled(
+            NoteType.Form,
+            "This display text came from an earlier agenda state",
+            item.PersonId,
+            item.FormType,
+            item.FormId);
+        var notes = new RecordingNoteService(linked);
+
+        var result = await new WorkAgendaService(notes).AddFromDailyAgendaAsync(
+            41, Today, [item]);
+
+        Assert.Single(notes.Notes);
+        Assert.Equal(0, result.AddedCount);
+        Assert.Equal(1, result.ExistingCount);
+    }
+
+    [Fact]
+    public async Task ASeparateExactFormRemainsSeparateEvenWhenItsTextMatches()
+    {
+        var item = AgendaItem();
+        var otherForm = Scheduled(
+            NoteType.Form,
+            DailyAgendaText.FormatItem(item),
+            item.PersonId,
+            item.FormType,
+            formId: item.FormId!.Value + 1);
+        var notes = new RecordingNoteService(otherForm);
+
+        var result = await new WorkAgendaService(notes).AddFromDailyAgendaAsync(
+            41, Today, [item]);
+
+        Assert.Equal(2, notes.Notes.Count);
+        Assert.Equal(1, result.AddedCount);
+        Assert.Equal(0, result.ExistingCount);
+    }
+
+    [Fact]
+    public async Task LegacyUnlinkedNoteWithDifferentTextDoesNotClaimTheExactForm()
+    {
+        var item = AgendaItem();
+        var unrelatedLegacy = Scheduled(
+            NoteType.Form,
+            "Different planned work for the same form category",
+            item.PersonId,
+            item.FormType);
+        var notes = new RecordingNoteService(unrelatedLegacy);
+
+        var result = await new WorkAgendaService(notes).AddFromDailyAgendaAsync(
+            41, Today, [item]);
+
+        Assert.Equal(2, notes.Notes.Count);
+        Assert.Equal(1, result.AddedCount);
+        Assert.Equal(0, result.ExistingCount);
+        Assert.Equal(item.FormId, notes.Notes[^1].FormId);
+    }
+
+    [Fact]
+    public async Task ReleaseLinkedLegacyNoteDoesNotClaimAnExactFormWithTheSameText()
+    {
+        var item = AgendaItem();
+        var releaseNote = Scheduled(
+            NoteType.Form,
+            DailyAgendaText.FormatItem(item),
+            item.PersonId,
+            item.FormType);
+        releaseNote.ReleaseObligationId = 91;
+        var notes = new RecordingNoteService(releaseNote);
+
+        var result = await new WorkAgendaService(notes).AddFromDailyAgendaAsync(
+            41, Today, [item]);
+
+        Assert.Equal(2, notes.Notes.Count);
+        Assert.Equal(1, result.AddedCount);
+        Assert.Equal(0, result.ExistingCount);
+        Assert.Equal(item.FormId, notes.Notes[^1].FormId);
+    }
+
+    [Fact]
     public async Task MissingClientOrFormTypeIsRejectedBeforeAnyItemIsWritten()
     {
         var notes = new RecordingNoteService();
@@ -79,24 +181,41 @@ public sealed class WorkAgendaServiceTests
         Assert.Empty(notes.Notes);
     }
 
+    [Fact]
+    public async Task MixedFormAndReleaseIdentityIsRejectedBeforeAnyItemIsWritten()
+    {
+        var notes = new RecordingNoteService();
+        var invalid = AgendaItem() with { ReleaseObligationId = Guid.NewGuid() };
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new WorkAgendaService(notes).AddFromDailyAgendaAsync(
+                41, Today, [invalid]));
+
+        Assert.Contains("both a form and a release obligation", error.Message);
+        Assert.Empty(notes.Notes);
+    }
+
     private static DailyAgendaItem AgendaItem() => new(
-        "form:11:7:Q1R",
+        "form:11:7",
         11,
         "Alex Person",
         "Q1 Review",
         Today.AddDays(-3),
         DailyAgendaItemKind.OverdueForm,
         true,
-        FormType.Q1R);
+        FormType.Q1R,
+        FormId: 7,
+        TargetEffectiveDate: new DateTime(2026, 5, 30));
 
     private static Note Scheduled(
         NoteType type,
         string narrative,
         int personId,
-        FormType? formType = null)
+        FormType? formType = null,
+        int? formId = null)
     {
         var note = Note.Create(
-            narrative, Today, NoteStatus.Scheduled, 15, personId, formType, type);
+            narrative, Today, NoteStatus.Scheduled, 15, personId, formType, type, formId);
         var person = Person.Rehydrate(personId, 41);
         person.FirstName = $"Client {personId}";
         note.Person = person;

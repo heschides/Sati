@@ -12,6 +12,115 @@ namespace Sati.Api.Tests;
 public sealed class ApiFormNoteAttestationTests(SatiApiFactory factory)
 {
     [Fact]
+    public async Task OlderCycleFormNoteRequiresWrittenJustificationAndRetainsExactEvidence()
+    {
+        using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var (personId, olderFormId, renewalFormId, olderTarget, renewalTarget) =
+            await CreateAssessmentOverlapAsync();
+        var justification =
+            "Source evidence confirms this was genuinely late work for the older plan.";
+
+        try
+        {
+            var request = new SaveNoteRequest(
+                "Completed the older-plan Comprehensive Assessment.",
+                DateTime.Today,
+                "Logged",
+                30,
+                null,
+                personId,
+                "ComprehensiveAssessment",
+                "Form",
+                null,
+                null,
+                GoalProgress: "Moderate",
+                FormId: olderFormId,
+                Activities: (int)NoteActivity.Form);
+
+            using var refused = await client.PostAsJsonAsync("/api/v1/notes", request);
+            Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+            var refusal = (await refused.Content.ReadFromJsonAsync<ApiErrorDto>())!;
+            Assert.Equal(NoteSubmissionGate.RefusalCode, refusal.Code);
+            Assert.Contains(olderTarget.ToString("MMMM d, yyyy"), refusal.Message,
+                StringComparison.Ordinal);
+            Assert.Contains(renewalTarget.ToString("MMMM d, yyyy"), refusal.Message,
+                StringComparison.Ordinal);
+
+            await using (var unchangedScope = factory.Services.CreateAsyncScope())
+            {
+                var unchanged = unchangedScope.ServiceProvider
+                    .GetRequiredService<ApiDbContext>();
+                Assert.False(await unchanged.Notes.AsNoTracking().AnyAsync(note =>
+                    note.PersonId == personId));
+                Assert.Null((await unchanged.Forms.AsNoTracking()
+                    .SingleAsync(form => form.Id == olderFormId)).CompletedDate);
+            }
+
+            using var accepted = await client.PostAsJsonAsync("/api/v1/notes", request with
+            {
+                CaseManagerJustification = justification
+            });
+            Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+            var note = (await accepted.Content.ReadFromJsonAsync<NoteDto>())!;
+            Assert.Equal(olderFormId, note.FormId);
+
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            Assert.Equal(DateTime.Today, (await db.Forms.AsNoTracking()
+                .SingleAsync(form => form.Id == olderFormId)).CompletedDate);
+            Assert.Null((await db.Forms.AsNoTracking()
+                .SingleAsync(form => form.Id == renewalFormId)).CompletedDate);
+            var audit = await db.AuditEvents.AsNoTracking().SingleAsync(row =>
+                row.Action == "note.older-form-cycle-justified" &&
+                row.ResourceId == note.Id.ToString());
+            Assert.Contains($"\"selectedFormId\":{olderFormId}", audit.MetadataJson,
+                StringComparison.Ordinal);
+            Assert.Contains($"\"renewalFormId\":{renewalFormId}", audit.MetadataJson,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(justification, audit.MetadataJson,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
+    public async Task ManualOlderCycleAttestationRefusesTheAmbiguousCheckboxPath()
+    {
+        using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var (personId, olderFormId, renewalFormId, olderTarget, renewalTarget) =
+            await CreateAssessmentOverlapAsync();
+
+        try
+        {
+            using var response = await client.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/ComprehensiveAssessment/attestation",
+                new AttestFormRequest(olderFormId, DateTime.Today));
+
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.Contains(olderTarget.ToString("MMMM d, yyyy"), body,
+                StringComparison.Ordinal);
+            Assert.Contains(renewalTarget.ToString("MMMM d, yyyy"), body,
+                StringComparison.Ordinal);
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            Assert.Null((await db.Forms.AsNoTracking()
+                .SingleAsync(form => form.Id == olderFormId)).CompletedDate);
+            Assert.Null((await db.Forms.AsNoTracking()
+                .SingleAsync(form => form.Id == renewalFormId)).CompletedDate);
+            Assert.False(await db.FormAttestations.AsNoTracking().AnyAsync(row =>
+                row.FormId == olderFormId || row.FormId == renewalFormId));
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
     public async Task ConfirmedSafetyPlanAttestationReusesMovedScheduledNote()
     {
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
@@ -121,6 +230,188 @@ public sealed class ApiFormNoteAttestationTests(SatiApiFactory factory)
             Assert.Equal(2, savedNote.Revision);
             Assert.Equal(completedOn, savedForm.CompletedDate);
             Assert.Equal(noteId, attestation.EvidenceNoteId);
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
+    public async Task MigrationCancelledDuplicateDoesNotBlockScheduledNoteConversion()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var completedOn = DateTime.Today.AddDays(-1);
+        var plannedOn = DateTime.Today.AddDays(1);
+        int personId;
+        int formId;
+        int survivorId;
+        int cancelledDuplicateId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            personId = await db.People.MaxAsync(row => row.Id) + 1;
+            var person = new ServerPerson
+            {
+                Id = personId,
+                UserId = 12,
+                AgencyId = 1,
+                FirstName = "Cancelled",
+                LastName = "Duplicate Test",
+                BirthDate = new DateTime(1990, 1, 1),
+                EffectiveDate = completedOn.AddYears(-1)
+            };
+            var form = new ServerForm
+            {
+                PersonId = personId,
+                Type = "SafetyPlan",
+                DueDate = completedOn,
+                TargetEffectiveDate = completedOn
+            };
+            db.People.Add(person);
+            db.Forms.Add(form);
+            await db.SaveChangesAsync();
+            formId = form.Id;
+            var survivor = new ServerNote
+            {
+                PersonId = personId,
+                AgencyId = 1,
+                Narrative = "Prepare the Safety Plan.",
+                EventDate = plannedOn,
+                Status = NoteWorkflow.Scheduled,
+                Minutes = 15,
+                NoteType = (int)NoteType.Form,
+                Activities = (int)NoteActivity.Form,
+                FormType = (int)FormType.SafetyPlan,
+                FormId = formId
+            };
+            var cancelledDuplicate = new ServerNote
+            {
+                PersonId = personId,
+                AgencyId = 1,
+                Narrative = "Prepare the Safety Plan.",
+                EventDate = plannedOn,
+                Status = NoteWorkflow.Cancelled,
+                Minutes = 15,
+                NoteType = (int)NoteType.Form,
+                Activities = (int)NoteActivity.Form,
+                FormType = (int)FormType.SafetyPlan,
+                FormId = formId
+            };
+            db.Notes.AddRange(survivor, cancelledDuplicate);
+            await db.SaveChangesAsync();
+            survivorId = survivor.Id;
+            cancelledDuplicateId = cancelledDuplicate.Id;
+            db.AuditEvents.Add(new ServerAuditEvent
+            {
+                AgencyId = 1,
+                ActorUserId = 12,
+                Action = ManualAttestationNoteRules.ScheduledDuplicateCancellationAuditAction,
+                ResourceType = "Note",
+                ResourceId = cancelledDuplicateId.ToString(),
+                CorrelationId = "test-scheduled-duplicate-repair"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        try
+        {
+            using var first = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/SafetyPlan/attestation",
+                new AttestFormRequest(formId, completedOn));
+            Assert.Equal(HttpStatusCode.Conflict, first.StatusCode);
+            var preview = (await first.Content.ReadFromJsonAsync<ApiErrorDto>())!;
+            Assert.Equal(ManualAttestationNoteRules.ScheduledConversionRequiredCode,
+                preview.Code);
+
+            using var confirmed = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/SafetyPlan/attestation",
+                new AttestFormRequest(formId, completedOn, survivorId,
+                    ConfirmScheduledNoteConversion: true,
+                    ScheduledNoteConversionToken: preview.ConfirmationToken));
+            Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var survivorAfter = await db.Notes.AsNoTracking()
+                .SingleAsync(row => row.Id == survivorId);
+            var duplicateAfter = await db.Notes.AsNoTracking()
+                .SingleAsync(row => row.Id == cancelledDuplicateId);
+            var attestation = await db.FormAttestations.AsNoTracking()
+                .SingleAsync(row => row.FormId == formId);
+            Assert.Equal(NoteWorkflow.Pending, survivorAfter.Status);
+            Assert.Equal(completedOn, survivorAfter.EventDate);
+            Assert.Equal(NoteWorkflow.Cancelled, duplicateAfter.Status);
+            Assert.Equal(formId, duplicateAfter.FormId);
+            Assert.Equal(survivorId, attestation.EvidenceNoteId);
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
+    public async Task TwoLiveLinkedNotesRemainAmbiguousForManualAttestation()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var completedOn = DateTime.Today.AddDays(-1);
+        int personId;
+        int formId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            personId = await db.People.MaxAsync(row => row.Id) + 1;
+            var person = new ServerPerson
+            {
+                Id = personId,
+                UserId = 12,
+                AgencyId = 1,
+                FirstName = "Live",
+                LastName = "Duplicate Test",
+                BirthDate = new DateTime(1990, 1, 1),
+                EffectiveDate = completedOn.AddYears(-1)
+            };
+            var form = new ServerForm
+            {
+                PersonId = personId,
+                Type = "SafetyPlan",
+                DueDate = completedOn,
+                TargetEffectiveDate = completedOn
+            };
+            db.People.Add(person);
+            db.Forms.Add(form);
+            await db.SaveChangesAsync();
+            formId = form.Id;
+            foreach (var status in new[] { NoteWorkflow.Scheduled, NoteWorkflow.Pending })
+            {
+                db.Notes.Add(new ServerNote
+                {
+                    PersonId = personId,
+                    AgencyId = 1,
+                    Narrative = "Prepare the Safety Plan.",
+                    EventDate = completedOn,
+                    Status = status,
+                    Minutes = 15,
+                    NoteType = (int)NoteType.Form,
+                    Activities = (int)NoteActivity.Form,
+                    FormType = (int)FormType.SafetyPlan,
+                    FormId = formId
+                });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        try
+        {
+            using var response = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/forms/SafetyPlan/attestation",
+                new AttestFormRequest(formId, completedOn));
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var problem = (await response.Content.ReadFromJsonAsync<ApiErrorDto>())!;
+            Assert.Equal("ambiguous_form_note", problem.Code);
+            Assert.Contains("Several notes are linked", problem.Message,
+                StringComparison.Ordinal);
         }
         finally
         {
@@ -496,6 +787,43 @@ public sealed class ApiFormNoteAttestationTests(SatiApiFactory factory)
         }
         await db.SaveChangesAsync();
         return (person.Id, form.Id);
+    }
+
+    private async Task<(int PersonId, int OlderFormId, int RenewalFormId,
+        DateTime OlderTarget, DateTime RenewalTarget)> CreateAssessmentOverlapAsync()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var renewalTarget = DateTime.Today.AddDays(90);
+        var olderTarget = renewalTarget.AddYears(-1);
+        var person = new ServerPerson
+        {
+            Id = await db.People.MaxAsync(row => row.Id) + 1,
+            UserId = 12,
+            AgencyId = 1,
+            FirstName = "Cycle",
+            LastName = "Disambiguation Test",
+            BirthDate = new DateTime(1990, 1, 1),
+            EffectiveDate = olderTarget
+        };
+        var older = new ServerForm
+        {
+            PersonId = person.Id,
+            Type = "ComprehensiveAssessment",
+            DueDate = olderTarget.AddDays(-90),
+            TargetEffectiveDate = olderTarget
+        };
+        var renewal = new ServerForm
+        {
+            PersonId = person.Id,
+            Type = "ComprehensiveAssessment",
+            DueDate = DateTime.Today,
+            TargetEffectiveDate = renewalTarget
+        };
+        db.People.Add(person);
+        db.Forms.AddRange(older, renewal);
+        await db.SaveChangesAsync();
+        return (person.Id, older.Id, renewal.Id, olderTarget, renewalTarget);
     }
 
     private async Task RemoveReviewAsync(int personId)

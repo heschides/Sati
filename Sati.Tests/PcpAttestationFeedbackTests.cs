@@ -10,6 +10,71 @@ namespace Sati.Tests;
 
 public sealed class PcpAttestationFeedbackTests
 {
+    [Theory]
+    [InlineData(NoteWorkflow.Cancelled, false, true)]
+    [InlineData(NoteWorkflow.Cancelled, true, false)]
+    [InlineData(NoteWorkflow.Delayed, true, true)]
+    [InlineData(NoteWorkflow.Abandoned, true, true)]
+    [InlineData(NoteWorkflow.Returned, true, true)]
+    public void OnlyAuditBackedMigrationCancellationLeavesManualAttestationResolution(
+        int status,
+        bool hasScheduledDuplicateCancellationAudit,
+        bool expected)
+    {
+        Assert.Equal(expected, ManualAttestationNoteRules.CompetesForManualAttestation(
+            status, hasScheduledDuplicateCancellationAudit));
+    }
+
+    [Fact]
+    public async Task ManualOlderCycleAttestationRefusesWhenIncompleteRenewalIsAvailable()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var completedOn = DateTime.Today;
+        var renewalTarget = completedOn.AddDays(90);
+        var olderTarget = renewalTarget.AddYears(-1);
+        Form older;
+        int renewalFormId;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var person = await db.People.SingleAsync(row => row.Id == fixture.PersonOneId);
+            person.EffectiveDate = olderTarget;
+            older = new Form(
+                FormType.ComprehensiveAssessment,
+                olderTarget.AddDays(-90),
+                targetEffectiveDate: olderTarget)
+            {
+                PersonId = person.Id
+            };
+            var renewal = new Form(
+                FormType.ComprehensiveAssessment,
+                completedOn,
+                targetEffectiveDate: renewalTarget)
+            {
+                PersonId = person.Id
+            };
+            db.Forms.AddRange(older, renewal);
+            await db.SaveChangesAsync();
+            renewalFormId = renewal.Id;
+        }
+
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new FormService(fixture.Factory, session).AttestAsync(older, completedOn));
+
+        Assert.Contains(olderTarget.ToString("MMMM d, yyyy"), error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(renewalTarget.ToString("MMMM d, yyyy"), error.Message,
+            StringComparison.Ordinal);
+        await using var verify = fixture.Factory.CreateDbContext();
+        Assert.Null((await verify.Forms.AsNoTracking()
+            .SingleAsync(row => row.Id == older.Id)).CompletedDate);
+        Assert.Null((await verify.Forms.AsNoTracking()
+            .SingleAsync(row => row.Id == renewalFormId)).CompletedDate);
+        Assert.Empty(await verify.FormAttestations.AsNoTracking().ToListAsync());
+        Assert.Empty(await verify.Notes.AsNoTracking().ToListAsync());
+    }
+
     [Fact]
     public void ScheduledConversionKeepsMixedAndClaimedNotesInCorrectionWorkflow()
     {
@@ -109,6 +174,109 @@ public sealed class PcpAttestationFeedbackTests
         Assert.Equal(2, savedNote.Revision);
         Assert.Equal(completedOn, savedForm.CompletedDate);
         Assert.Equal(noteId, Assert.Single(savedForm.Attestations).EvidenceNoteId);
+    }
+
+    [Fact]
+    public async Task MigrationCancelledDuplicateDoesNotBlockScheduledNoteConversion()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var completedOn = DateTime.Today.AddDays(-1);
+        var plannedOn = DateTime.Today.AddDays(1);
+        Form form;
+        int survivorId;
+        int cancelledDuplicateId;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var person = await db.People.SingleAsync(row => row.Id == fixture.PersonOneId);
+            person.EffectiveDate = completedOn.AddYears(-1);
+            form = new Form(FormType.SafetyPlan, completedOn,
+                targetEffectiveDate: completedOn) { PersonId = person.Id };
+            db.Forms.Add(form);
+            await db.SaveChangesAsync();
+
+            var survivor = Note.Create("Prepare the Safety Plan.", plannedOn,
+                NoteStatus.Scheduled, 15, person.Id,
+                FormType.SafetyPlan, NoteType.Form, form.Id);
+            survivor.Activities = NoteActivity.Form;
+            survivor.AgencyId = fixture.CaseManagerOne.AgencyId;
+            var cancelledDuplicate = Note.Create("Prepare the Safety Plan.", plannedOn,
+                NoteStatus.Cancelled, 15, person.Id,
+                FormType.SafetyPlan, NoteType.Form, form.Id);
+            cancelledDuplicate.Activities = NoteActivity.Form;
+            cancelledDuplicate.AgencyId = fixture.CaseManagerOne.AgencyId;
+            db.Notes.AddRange(survivor, cancelledDuplicate);
+            await db.SaveChangesAsync();
+            survivorId = survivor.Id;
+            cancelledDuplicateId = cancelledDuplicate.Id;
+            db.AuditEvents.Add(new AuditEvent
+            {
+                AgencyId = fixture.CaseManagerOne.AgencyId,
+                ActorUserId = fixture.CaseManagerOne.Id,
+                Action = ManualAttestationNoteRules.ScheduledDuplicateCancellationAuditAction,
+                ResourceType = "Note",
+                ResourceId = cancelledDuplicateId.ToString(),
+                CorrelationId = "test-scheduled-duplicate-repair"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var service = new FormService(fixture.Factory, session);
+
+        var prompt = await Assert.ThrowsAsync<ScheduledFormNoteConversionRequiredException>(
+            () => service.AttestAsync(form, completedOn));
+        await service.AttestAsync(form, completedOn, survivorId,
+            confirmScheduledNoteConversion: true, prompt.ConfirmationToken);
+
+        await using var verification = fixture.Factory.CreateDbContext();
+        var survivorAfter = await verification.Notes.SingleAsync(row => row.Id == survivorId);
+        var duplicateAfter = await verification.Notes.SingleAsync(row => row.Id == cancelledDuplicateId);
+        var formAfter = await verification.Forms.Include(row => row.Attestations)
+            .SingleAsync(row => row.Id == form.Id);
+        Assert.Equal(NoteStatus.Pending, survivorAfter.Status);
+        Assert.Equal(completedOn, survivorAfter.EventDate);
+        Assert.Equal(NoteStatus.Cancelled, duplicateAfter.Status);
+        Assert.Equal(form.Id, duplicateAfter.FormId);
+        Assert.Equal(cancelledDuplicateId, duplicateAfter.Id);
+        Assert.Equal(survivorId, Assert.Single(formAfter.Attestations).EvidenceNoteId);
+    }
+
+    [Fact]
+    public async Task TwoLiveLinkedNotesRemainAmbiguousForManualAttestation()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var completedOn = DateTime.Today.AddDays(-1);
+        Form form;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var person = await db.People.SingleAsync(row => row.Id == fixture.PersonOneId);
+            person.EffectiveDate = completedOn.AddYears(-1);
+            form = new Form(FormType.SafetyPlan, completedOn,
+                targetEffectiveDate: completedOn) { PersonId = person.Id };
+            db.Forms.Add(form);
+            await db.SaveChangesAsync();
+            foreach (var status in new[] { NoteStatus.Scheduled, NoteStatus.Pending })
+            {
+                var note = Note.Create("Prepare the Safety Plan.", completedOn,
+                    status, 15, person.Id,
+                    FormType.SafetyPlan, NoteType.Form, form.Id);
+                note.Activities = NoteActivity.Form;
+                note.AgencyId = fixture.CaseManagerOne.AgencyId;
+                db.Notes.Add(note);
+            }
+            await db.SaveChangesAsync();
+        }
+
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new FormService(fixture.Factory, session).AttestAsync(form, completedOn));
+
+        Assert.Contains("Several notes are linked", error.Message, StringComparison.Ordinal);
+        await using var verification = fixture.Factory.CreateDbContext();
+        Assert.Null((await verification.Forms.SingleAsync(row => row.Id == form.Id)).CompletedDate);
+        Assert.Empty(await verification.FormAttestations.ToListAsync());
     }
 
     [Fact]

@@ -540,6 +540,18 @@ public sealed class ReleaseUiStructureTests
     }
 
     [Fact]
+    public void PrimaryNavigationUsesTheNavigationSurfaceToken()
+    {
+        var document = XDocument.Load(Path.Combine(Root, "Views", "ShellWindow.xaml"));
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var navigation = Assert.Single(document.Descendants(), element =>
+            element.Attribute(x + "Name")?.Value == "PrimaryNavigationBar");
+
+        Assert.Equal("{DynamicResource NavBackgroundBrush}",
+            navigation.Attribute("Background")?.Value);
+    }
+
+    [Fact]
     public void StrongStatusFillsHaveExplicitContrastingForegrounds()
     {
         foreach (var name in new[] { "States", "MidnightOpal", "HarborNight", "IndustrialMatte", "IridescentJewel" })

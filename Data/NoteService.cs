@@ -306,9 +306,12 @@ public class NoteService(
     private static async Task<bool> AttestLinkedFormAsync(
         SatiContext context, User actor, Note note, DateTime today)
     {
-        if (!NoteActivityRules.Has(note.Activities, note.NoteType?.ToString(), NoteActivity.Form) ||
-            note.Status != NoteStatus.Logged ||
-            FormNoteLinkRules.IsRelease(note.FormType?.ToString()))
+        if (!FormNoteAttestationRules.AttestsExactFormOnLog(
+                note.Status?.ToString(),
+                (int?)note.Activities,
+                note.NoteType?.ToString(),
+                note.FormType?.ToString(),
+                note.FormId))
             return false;
 
         if (note.FormId is not int formId || note.EventDate is not DateTime completedOn ||
@@ -486,13 +489,62 @@ public class NoteService(
             context, actor.AgencyId);
         var compliance = person.EvaluateBillingWindowDetailed(
             serviceDate, policy.Resolve(serviceDate), policy.Schedule, contactCandidate: note);
-        if (compliance.Passed) return;
+        var reasons = compliance.Reasons.ToList();
+        AnnualFormCycleAmbiguity? ambiguity = null;
+        if (FormNoteAttestationRules.AttestsExactFormOnLog(
+                note.Status?.ToString(),
+                (int?)note.Activities,
+                note.NoteType?.ToString(),
+                note.FormType?.ToString(),
+                note.FormId))
+        {
+            ambiguity = AnnualFormCycleDisambiguationRules.Evaluate(
+                note.PersonId,
+                note.FormType?.ToString(),
+                note.FormId,
+                serviceDate,
+                person.Forms.Select(form => new FormFact(
+                    form.Id,
+                    form.PersonId,
+                    form.Type.ToString(),
+                    form.DueDate,
+                    form.CompletedDate,
+                    form.TargetEffectiveDate == default
+                        ? null
+                        : form.TargetEffectiveDate)).ToArray(),
+                policy.Schedule);
+            if (ambiguity is not null)
+                reasons.Add(ambiguity.Reason);
+        }
+        reasons = reasons.Distinct(StringComparer.Ordinal).ToList();
+        if (reasons.Count == 0) return;
 
         var configurationInvalid = !BillingComplianceGate.IsSupported(policy.Resolve(serviceDate));
         var result = new NoteSubmissionResult(
-            false, compliance.Reasons, !configurationInvalid, configurationInvalid);
+            false, reasons, !configurationInvalid, configurationInvalid);
         if (!NoteSubmissionGate.IsSubmissionAllowed(result, note.CaseManagerJustification))
             throw new NoteSubmissionException(result.Message);
+
+        if (ambiguity is not null)
+        {
+            LocalAuditTrail.Record(
+                context,
+                actor,
+                LocalAuditActions.NoteOlderCycleJustified,
+                "Note",
+                note.Id,
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    selectedFormId = ambiguity.SelectedFormId,
+                    selectedTargetEffectiveDate = ambiguity.SelectedTargetEffectiveDate
+                        .ToString("yyyy-MM-dd"),
+                    renewalFormId = ambiguity.RenewalFormId,
+                    renewalTargetEffectiveDate = ambiguity.RenewalTargetEffectiveDate
+                        .ToString("yyyy-MM-dd"),
+                    activityDate = serviceDate.ToString("yyyy-MM-dd")
+                }));
+            await context.SaveChangesAsync();
+        }
     }
 
     internal static async Task EnsureServiceTimeAvailableAsync(

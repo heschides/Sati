@@ -1,27 +1,28 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- Legacy's leaf, serif type, and gradient layout in the Black Bean palette. -->
+    <!-- Legacy's leaf and serif type in a four-step Black Bean/Sienna depth scale:
+         Bone fields, lighter shell chrome, dark cards, and deepest inset content. -->
     <BitmapImage x:Key="BrandLeafImage" UriSource="/images/leaf.png" />
     <ImageSource x:Key="AppWindowIcon">/images/leaf.ico</ImageSource>
     <FontFamily x:Key="AppFont">Palatino Linotype, Book Antiqua, Georgia</FontFamily>
     <FontFamily x:Key="DisplayFont">Palatino Linotype, Book Antiqua, Georgia</FontFamily>
 
     <LinearGradientBrush x:Key="WindowBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#FF3C1006" Offset="0" />
-        <GradientStop Color="#FF471709" Offset="0.45" />
-        <GradientStop Color="#FF51200D" Offset="0.78" />
-        <GradientStop Color="#FF421408" Offset="1" />
+        <GradientStop Color="#FF693019" Offset="0" />
+        <GradientStop Color="#FF703923" Offset="0.45" />
+        <GradientStop Color="#FF7E3615" Offset="0.78" />
+        <GradientStop Color="#FF703923" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="NavBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#FF693019" Offset="0" />
+        <GradientStop Color="#FF703923" Offset="0" />
         <GradientStop Color="#FF7E3615" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="SurfaceBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#FF54200C" Offset="0" />
         <GradientStop Color="#FF5B250F" Offset="0.5" />
-        <GradientStop Color="#FF693019" Offset="1" />
+        <GradientStop Color="#FF63301B" Offset="1" />
     </LinearGradientBrush>
-    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#693019" />
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#421408" />
     <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#63301B" />
     <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#703923" />
     <SolidColorBrush x:Key="SurfaceAlpha70Brush" Color="#B354200C" />
@@ -66,7 +67,7 @@
     <SolidColorBrush x:Key="NarrativeTextBrush" Color="#DFD8CD" />
     <SolidColorBrush x:Key="PersonGroupBrush" Color="#54200C" />
     <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#693019" />
-    <Color x:Key="SurfaceAltColor">#FF693019</Color>
+    <Color x:Key="SurfaceAltColor">#FF421408</Color>
     <Color x:Key="SurfaceRaisedColor">#FF703923</Color>
     <Color x:Key="TextSubtleColor">#FFD3BCA5</Color>
 

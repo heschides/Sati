@@ -6,11 +6,34 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Clearer form dates and Legacy Dark controls";
-    public const string ReleaseDate = "September 23, 2026";
+    public const string ReleaseName = "Cleaner agendas, safer form dates, and larger calendars";
+    public const string ReleaseDate = "September 24, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "One form task stays one agenda item",
+            [
+                "Reclassification and review work linked to an exact form is no longer scheduled again when its display wording changes.",
+                "During this update, only untouched transition duplicates with matching details are retired from the agenda. Their records are retained for audit, not deleted, and anything ambiguous is left unchanged for review."
+            ]),
+        new(
+            "The form note can supply its own completion date",
+            [
+                "An exact form note can now be marked Logged using the completion date it is documenting, while every unrelated billing safeguard still applies.",
+                "If a newer annual cycle is waiting, Sati does not move evidence from the older cycle. Continuing requires a written case-manager justification and supervisor review."
+            ]),
+        new(
+            "Large Outlook calendars import by streaming",
+            [
+                "The Outlook calendar import no longer stops at the former 20 MiB file limit. It reads large ICS files incrementally instead of holding several full copies in memory.",
+                "Unsupported attachments and descriptions are skipped during import, and bounded safety limits still protect the application from malformed or unreasonably large calendar data."
+            ]),
+        new(
+            "Legacy Dark has four clear depths",
+            [
+                "Legacy Dark now follows a consistent 1-to-4 depth hierarchy in the same warm palette: lightest fields, distinct navigation, darker content panels, and the deepest inset work areas."
+            ]),
         new(
             "Scheduled form work becomes a dated draft",
             [

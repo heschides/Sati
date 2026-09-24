@@ -1,6 +1,6 @@
 # Audit events
 
-*Current as of 2026-09-14.*
+*Current as of 2026-09-24.*
 
 Clearinghouse intake adds `billing-response.imported` in the same transaction as its encrypted
 immutable receipt, generation/claim matches and financial observations. Metadata contains receipt
@@ -34,7 +34,8 @@ for content; the audit event is only its activity index.
 
 - `authentication.succeeded`
 - `user.created`, `user.updated`, `user.password-reset`, `user.password-changed`
-- `note.reassigned`, `note.approved`, `note.approval-overridden`, `note.returned`
+- `note.reassigned`, `note.approved`, `note.approval-overridden`, `note.returned`,
+  `note.scheduled-duplicate-cancelled`, `note.older-form-cycle-justified`
 - `assessment.created`, `assessment.updated`, `assessment.submitted`
 - `person.created`, `person.updated`, `person.journal-updated`, `person.journal-reminder-added`
 - `person-history.viewed`, `person-history-pdf.generated`
@@ -97,6 +98,21 @@ Settings save cannot mutate the active policy mask.
 one recognized legacy default. It uses the established migration/system actor 0 and identifies
 which legacy values were recognized without pretending an administrator made the decision. It
 does not contain consumer information or infer form completion.
+
+`note.scheduled-duplicate-cancelled` is emitted only by migration
+`ReconcileDuplicateScheduledAgendaNotes`, under the established migration/system actor 0. Its
+resource is each redundant Scheduled Note retained as Cancelled: the legacy unlinked row and, in a
+fan-out, every exact-linked copy after the lowest-ID survivor. PHI-minimized metadata identifies the
+duplicate kind, surviving exact-linked Note and Form, and status/revision transition; it excludes
+names, person ID, and narrative. Every row remains in history. Ambiguous, evidenced, meaningfully
+audited, or referenced groups are skipped and emit no event.
+
+`note.older-form-cycle-justified` is emitted when a case manager deliberately submits an exact
+older-cycle form note after an incomplete same-type renewal has become available. Its metadata is
+limited to the selected and renewal Form IDs and target dates plus the activity date. The written
+justification remains on the protected Note and is never copied into general audit metadata. The
+note, exact attestation, justification, and event commit in the same serializable transaction;
+the renewal remains incomplete and no evidence is redirected.
 
 `note.approval-overridden` records explicit confirmation and the exact compliance-obligation IDs
 the Supervisor excepted. The explanation remains on the protected Note; names and narrative are
