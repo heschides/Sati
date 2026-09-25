@@ -19,6 +19,16 @@ using Sati.Models;
 
 namespace Sati.Api.Endpoints;
 
+internal sealed record CaseloadNoteSummaryRow(
+    int Id,
+    int PersonId,
+    int? Status,
+    DateTime? EventDate,
+    int? NoteType,
+    int? Activities,
+    int? FormType,
+    long? ReleaseObligationId);
+
 internal static partial class ApiEndpoints
 {
     public static void MapSatiApi(this WebApplication app)
@@ -2006,18 +2016,40 @@ internal static partial class ApiEndpoints
             });
 
             var forms = await db.Forms.AsNoTracking().Where(x => ids.Contains(x.PersonId)).ToListAsync(cancellationToken);
-            var notes = await db.Notes.AsNoTracking().Where(x => ids.Contains(x.PersonId) && x.AgencyId == actor.AgencyId).ToListAsync(cancellationToken);
+            // Caseload consumers need only the bounded scheduled-work window here.
+            // Monthly-contact facts travel separately below; narratives and visit
+            // documentation never cross SQL for workspace preparation.
+            var noteRows = await CaseloadNoteSummaries(
+                    db, ids, actor.AgencyId, clock.Today)
+                .ToListAsync(cancellationToken);
+            var contactFacts = await LoadContactFactsByPersonAsync(
+                db, actor.AgencyId, ids, cancellationToken);
             var releases = await LoadReleaseBillingRowsByPersonAsync(
                 db, ids, cancellationToken);
             var formsByPerson = forms.GroupBy(x => x.PersonId).ToDictionary(x => x.Key, x => (IReadOnlyList<ServerForm>)x.ToList());
-            var notesByPerson = notes.GroupBy(x => x.PersonId).ToDictionary(x => x.Key, x => (IReadOnlyList<ServerNote>)x.ToList());
+            var notesByPerson = noteRows
+                .GroupBy(x => x.PersonId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => (IReadOnlyList<ServerNote>)group.Select(x => new ServerNote
+                    {
+                        Id = x.Id,
+                        PersonId = x.PersonId,
+                        Status = x.Status,
+                        EventDate = x.EventDate,
+                        NoteType = x.NoteType,
+                        Activities = x.Activities,
+                        FormType = x.FormType,
+                        ReleaseObligationId = x.ReleaseObligationId
+                    }).ToList());
 
             return Results.Ok(people.Select(person => ContractMapper.ToPerson(
                 person,
                 formsByPerson.GetValueOrDefault(person.Id) ?? [],
                 notesByPerson.GetValueOrDefault(person.Id) ?? [],
                 releases.GetValueOrDefault(person.Id)?.Select(item => item.ToComplianceFact()).ToArray()
-                    ?? [])).ToList());
+                    ?? [],
+                contactFacts[person.Id].ToArray())).ToList());
         });
 
         api.MapGet("/people/{personId:int}/journal", async Task<Results<Ok<string?>, NotFound>> (
@@ -6041,6 +6073,68 @@ internal static partial class ApiEndpoints
                 .ToList());
         });
 
+        api.MapGet("/billing/overview-periods/{year:int}/{month:int}", async Task<IResult> (
+            int year,
+            int month,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!actor.HasBillingPermissions)
+                return Results.Forbid();
+            if (month is < 1 or > 12 || year is < 2000 or > 2200)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["period"] = ["The billing overview month is invalid."]
+                });
+            }
+
+            var asOf = new DateTime(year, month, 1);
+            var firstMonth = asOf.AddMonths(-5);
+            var firstMonthKey = firstMonth.Year * 100 + firstMonth.Month;
+            var lastMonthKey = year * 100 + month;
+            var scopedLines =
+                from line in db.ClaimLines.AsNoTracking()
+                join period in db.BillingPeriods.AsNoTracking()
+                    on line.BillingPeriodId equals period.Id
+                join owner in db.Users.AsNoTracking()
+                    on period.UserId equals owner.Id
+                where owner.AgencyId == actor.AgencyId
+                select new
+                {
+                    period.Year,
+                    period.Month,
+                    period.Status,
+                    line.ChargeAmount
+                };
+
+            var draftRevenue = await scopedLines
+                .Where(row => row.Status == 0)
+                .SumAsync(row => (decimal?)row.ChargeAmount, cancellationToken) ?? 0m;
+            var totals = await scopedLines
+                .Where(row => row.Year * 100 + row.Month >= firstMonthKey &&
+                              row.Year * 100 + row.Month <= lastMonthKey)
+                .GroupBy(row => new { row.Year, row.Month })
+                .Select(group => new BillingMonthChargeDto(
+                    group.Key.Year,
+                    group.Key.Month,
+                    group.Sum(row => row.ChargeAmount)))
+                .ToListAsync(cancellationToken);
+            var totalsByMonth = totals.ToDictionary(
+                row => (row.Year, row.Month),
+                row => row.BilledAmount);
+            var months = Enumerable.Range(0, 6)
+                .Select(offset => firstMonth.AddMonths(offset))
+                .Select(date => new BillingMonthChargeDto(
+                    date.Year,
+                    date.Month,
+                    totalsByMonth.GetValueOrDefault((date.Year, date.Month))))
+                .ToList();
+            return Results.Ok(new BillingPeriodOverviewDto(draftRevenue, months));
+        });
+
         api.MapGet("/billing/submissions", async Task<IResult> (
             ClaimsPrincipal principal,
             ApiDbContext db,
@@ -6358,14 +6452,13 @@ internal static partial class ApiEndpoints
             if (!actor.HasBillingPermissions)
                 return Results.Forbid();
 
-            var rows = await (from note in db.Notes.AsNoTracking()
-                              join person in db.People.AsNoTracking() on note.PersonId equals person.Id
-                              join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
-                              where note.Status == 6 && owner.AgencyId == actor.AgencyId &&
-                                    person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId &&
-                                    !db.ClaimLines.Any(line => line.NoteId == note.Id)
-                              orderby note.EventDate
-                              select new ReviewableNote(note, person)).ToListAsync(cancellationToken);
+            var rows = (await BillingCandidateBaseQuery(db, actor.AgencyId)
+                    .ToListAsync(cancellationToken))
+                .Select(ToReviewableNote)
+                .ToList();
+            if (rows.Count == 0)
+                return Results.Ok(Array.Empty<BillingCandidateDto>());
+
             var agency = await db.Agencies.AsNoTracking()
                 .SingleOrDefaultAsync(candidate => candidate.Id == actor.AgencyId, cancellationToken);
             var personIds = rows.Select(row => row.Person.Id).Distinct().ToList();
@@ -9744,6 +9837,128 @@ internal static partial class ApiEndpoints
 
     private sealed record ReviewableNote(ServerNote Note, ServerPerson Person);
 
+    /// <summary>
+    /// The billing queue needs claim identity and compliance facts, never clinical
+    /// narrative, journal, visit detail, or encrypted identity material. Keeping the
+    /// scalar projection explicit prevents those potentially unbounded or sensitive
+    /// columns from becoming part of the Azure SQL result merely because the rule
+    /// evaluator works with server persistence shapes.
+    /// </summary>
+    internal static IQueryable<BillingCandidateBaseRow> BillingCandidateBaseQuery(
+        ApiDbContext db,
+        int agencyId) =>
+        from note in db.Notes.AsNoTracking()
+        join person in db.People.AsNoTracking() on note.PersonId equals person.Id
+        join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
+        where note.Status == 6 &&
+              owner.AgencyId == agencyId &&
+              person.AgencyId == agencyId &&
+              note.AgencyId == agencyId &&
+              !db.ClaimLines.Any(line => line.NoteId == note.Id)
+        orderby note.EventDate
+        select new BillingCandidateBaseRow(
+            note.Id,
+            note.EventDate,
+            note.Status,
+            note.Minutes,
+            note.PersonId,
+            note.FormType,
+            note.FormId,
+            note.ReleaseObligationId,
+            note.NoteType,
+            note.Activities,
+            note.AgencyId,
+            note.ComplianceOverride,
+            note.OverrideReason,
+            note.OverrideApprovedById,
+            note.OverrideApprovedAt,
+            note.OverrideAttestationConfirmed,
+            note.OverrideObligationIdsJson,
+            person.UserId,
+            person.FirstName,
+            person.LastName,
+            person.BirthDate,
+            person.EffectiveDate,
+            person.AgencyId,
+            person.MaineCareId,
+            person.DiagnosisCode,
+            person.PlaceOfService,
+            person.BillingStreet,
+            person.BillingCity,
+            person.BillingState,
+            person.BillingZip);
+
+    private static ReviewableNote ToReviewableNote(BillingCandidateBaseRow row) => new(
+        new ServerNote
+        {
+            Id = row.NoteId,
+            EventDate = row.EventDate,
+            Status = row.Status,
+            Minutes = row.Minutes,
+            PersonId = row.PersonId,
+            FormType = row.FormType,
+            FormId = row.FormId,
+            ReleaseObligationId = row.ReleaseObligationId,
+            NoteType = row.NoteType,
+            Activities = row.Activities,
+            AgencyId = row.NoteAgencyId,
+            ComplianceOverride = row.ComplianceOverride,
+            OverrideReason = row.OverrideReason,
+            OverrideApprovedById = row.OverrideApprovedById,
+            OverrideApprovedAt = row.OverrideApprovedAt,
+            OverrideAttestationConfirmed = row.OverrideAttestationConfirmed,
+            OverrideObligationIdsJson = row.OverrideObligationIdsJson
+        },
+        new ServerPerson
+        {
+            Id = row.PersonId,
+            UserId = row.PersonOwnerUserId,
+            FirstName = row.FirstName,
+            LastName = row.LastName,
+            BirthDate = row.BirthDate,
+            EffectiveDate = row.EffectiveDate,
+            AgencyId = row.PersonAgencyId,
+            MaineCareId = row.MaineCareId,
+            DiagnosisCode = row.DiagnosisCode,
+            PlaceOfService = row.PlaceOfService,
+            BillingStreet = row.BillingStreet,
+            BillingCity = row.BillingCity,
+            BillingState = row.BillingState,
+            BillingZip = row.BillingZip
+        });
+
+    internal sealed record BillingCandidateBaseRow(
+        int NoteId,
+        DateTime? EventDate,
+        int? Status,
+        int? Minutes,
+        int PersonId,
+        int? FormType,
+        int? FormId,
+        long? ReleaseObligationId,
+        int? NoteType,
+        int? Activities,
+        int? NoteAgencyId,
+        bool ComplianceOverride,
+        string? OverrideReason,
+        int? OverrideApprovedById,
+        DateTime? OverrideApprovedAt,
+        bool OverrideAttestationConfirmed,
+        string? OverrideObligationIdsJson,
+        int PersonOwnerUserId,
+        string FirstName,
+        string LastName,
+        DateTime BirthDate,
+        DateTime? EffectiveDate,
+        int? PersonAgencyId,
+        string? MaineCareId,
+        string? DiagnosisCode,
+        int? PlaceOfService,
+        string? BillingStreet,
+        string? BillingCity,
+        string? BillingState,
+        string? BillingZip);
+
     private sealed record ServerRecoveryInputs(
         ServerPerson Person,
         ServerAgency? Agency,
@@ -9773,6 +9988,31 @@ internal static partial class ApiEndpoints
         public IReadOnlyList<BillingCompliancePolicyVersionSnapshot> RecoveryVersions =>
             [new BillingCompliancePolicyVersionSnapshot(
                 long.MinValue, AgencyId, DateTime.MinValue, FallbackRequirements), .. Versions];
+    }
+
+    internal static IQueryable<CaseloadNoteSummaryRow> CaseloadNoteSummaries(
+        ApiDbContext db,
+        IReadOnlyCollection<int> personIds,
+        int agencyId,
+        DateTime businessDate)
+    {
+        var today = businessDate.Date;
+        var lookahead = today.AddDays(30);
+        return db.Notes.AsNoTracking()
+            .Where(note => personIds.Contains(note.PersonId) &&
+                           note.AgencyId == agencyId &&
+                           note.Status == (int)NoteStatus.Scheduled &&
+                           note.EventDate >= today &&
+                           note.EventDate <= lookahead)
+            .Select(note => new CaseloadNoteSummaryRow(
+                note.Id,
+                note.PersonId,
+                note.Status,
+                note.EventDate,
+                note.NoteType,
+                note.Activities,
+                note.FormType,
+                note.ReleaseObligationId));
     }
 
     private static async Task<ServerSettings> GetOrCreateSettingsAsync(

@@ -697,15 +697,12 @@ namespace Sati.Data
             await EnsureUserInScopeAsync(context, actor, userId);
             var people = await context.People
                 .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
-                .Include(p => p.Notes.Where(note => note.AgencyId == actor.AgencyId))
                 .Include(p => p.Forms)
                 .Include(p => p.ReleaseObligations)
                     .ThenInclude(obligation => obligation.Attestations)
                 .OrderBy(p => p.LastName)
                 .AsSplitQuery()
                 .ToListAsync();
-            await BillingComplianceProjectionLoader.PopulateAsync(context, people, actor.AgencyId);
-
             // Generating missing cycle forms on load is the only thing keeping an
             // ongoing caseload supplied with compliance records; without it clients
             // silently run out once their pre-created cycles lapse. It was gated off
@@ -793,13 +790,14 @@ namespace Sati.Data
                         await EnsureUserInScopeAsync(reread, actor, userId);
                         var stored = await reread.People
                             .Where(p => p.UserId == userId && p.AgencyId == actor.AgencyId && p.Status == PersonStatus.Active)
-                            .Include(p => p.Notes.Where(note => note.AgencyId == actor.AgencyId))
                             .Include(p => p.Forms)
                             .Include(p => p.ReleaseObligations)
                                 .ThenInclude(obligation => obligation.Attestations)
                             .OrderBy(p => p.LastName)
                             .AsSplitQuery()
                             .ToListAsync();
+                        await PopulateNoteSummariesAsync(
+                            reread, stored, actor.AgencyId);
                         await BillingComplianceProjectionLoader.PopulateAsync(
                             reread, stored, actor.AgencyId);
                         return stored;
@@ -807,7 +805,69 @@ namespace Sati.Data
                 }
             }
 
+            // Keep detached read projections out of the tracked graph until every
+            // maintenance write above is complete. If summary Notes are attached to
+            // a tracked Person before SaveChanges, relationship discovery can treat
+            // those existing rows as new entities and attempt duplicate inserts.
+            await PopulateNoteSummariesAsync(context, people, actor.AgencyId);
+            await BillingComplianceProjectionLoader.PopulateAsync(context, people, actor.AgencyId);
             return people;
+        }
+
+        // A caseload needs only scheduled-work facts in the same today-through-30-day
+        // window as UpcomingEventService. Monthly-contact evidence is hydrated through
+        // the separate scalar compliance projection below. Clinical narrative and
+        // visit-documentation JSON stay behind explicit selected-client/note reads.
+        private static async Task PopulateNoteSummariesAsync(
+            SatiContext context,
+            IReadOnlyCollection<Person> people,
+            int agencyId)
+        {
+            var personIds = people.Select(person => person.Id).ToArray();
+            if (personIds.Length == 0)
+                return;
+            var today = DateTime.Today;
+            var lookahead = today.AddDays(30);
+
+            var rows = await context.Notes
+                .AsNoTracking()
+                .Where(note => personIds.Contains(note.PersonId) &&
+                               note.AgencyId == agencyId &&
+                               note.Status == NoteStatus.Scheduled &&
+                               note.EventDate >= today &&
+                               note.EventDate <= lookahead)
+                .Select(note => new
+                {
+                    note.Id,
+                    note.PersonId,
+                    note.Status,
+                    note.EventDate,
+                    note.NoteType,
+                    note.Activities,
+                    note.FormType,
+                    note.ReleaseObligationId
+                })
+                .ToListAsync();
+            var rowsByPerson = rows.ToLookup(row => row.PersonId);
+
+            foreach (var person in people)
+            {
+                person.Notes = rowsByPerson[person.Id]
+                    .Select(row =>
+                    {
+                        var note = Note.Rehydrate(row.Id);
+                        note.PersonId = row.PersonId;
+                        note.Person = person;
+                        note.Status = row.Status;
+                        note.EventDate = row.EventDate;
+                        note.NoteType = row.NoteType;
+                        note.Activities = row.Activities;
+                        note.FormType = row.FormType;
+                        note.ReleaseObligationId = row.ReleaseObligationId;
+                        return note;
+                    })
+                    .ToList();
+            }
         }
 
         // Read-only, blob-free caseload load for the supervisor sidebar. Projects straight
@@ -845,18 +905,26 @@ namespace Sati.Data
                 })
                 .ToListAsync();
 
-            // Query 2: blob-free note summaries for this caseload, keyed by PersonId.
+            // Query 2: blob-free scheduled work in the dashboard's 30-day window,
+            // keyed by PersonId. Historical notes belong to explicit note reads.
             var personIds = summaries.Select(s => s.Id).ToList();
+            var today = DateTime.Today;
+            var lookahead = today.AddDays(30);
             var notesByPerson = (await context.Notes
                     .AsNoTracking()
-                    .Where(n => personIds.Contains(n.PersonId) && n.AgencyId == actor.AgencyId)
-                    .Select(n => new { n.PersonId, n.Status, n.EventDate, n.NoteType, n.Activities, n.FormType, n.ReleaseObligationId })
+                    .Where(n => personIds.Contains(n.PersonId) &&
+                                n.AgencyId == actor.AgencyId &&
+                                n.Status == NoteStatus.Scheduled &&
+                                n.EventDate >= today &&
+                                n.EventDate <= lookahead)
+                    .Select(n => new { n.Id, n.PersonId, n.Status, n.EventDate, n.NoteType, n.Activities, n.FormType, n.ReleaseObligationId })
                     .ToListAsync())
                 .GroupBy(n => n.PersonId)
                 .ToDictionary(
                     g => g.Key,
                     g => g.Select(n => new NoteSummary
                     {
+                        Id = n.Id,
                         Status = n.Status,
                         EventDate = n.EventDate,
                         NoteType = n.NoteType,

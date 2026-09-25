@@ -48,6 +48,10 @@ namespace Sati.ViewModels
         private readonly LatestRequestTracker _upcomingEventLoadRequests = new();
         private readonly LatestRequestTracker _peopleLoadRequests = new();
         private readonly LatestRequestTracker _annualReminderRequests = new();
+        private Task? _calendarInitialization;
+        private User? _calendarInitializationAccount;
+        private User? _calendarLoadedAccount;
+        private long _calendarInitializationVersion;
         private readonly IAnnualDocumentService? _annualDocuments;
         [ObservableProperty] private string annualDocumentReminderText = "";
         private DispatcherTimer? _abandonmentTimer;
@@ -157,7 +161,7 @@ CalendarViewModel calendarViewModel,
             notesWindowViewModel.NoteStatusChanged += async (s, e) =>
             {
                 await LoadMonthlyNotesAsync();
-                await Calendar.RefreshCommand.ExecuteAsync(null);
+                await RefreshCalendarIfLoadedAsync();
                 if (Scratchpad is not null)
                     await Scratchpad.RefreshScheduledWorkAsync();
             };
@@ -971,15 +975,32 @@ CalendarViewModel calendarViewModel,
         [RelayCommand] private void NavigateToReference() => CurrentSubViewModel = Reference;
         [RelayCommand] private Task NavigateToDocuments() => NavigateToATRequestsCommand.ExecuteAsync(null);
         [RelayCommand] private void NavigateToOverview() => CurrentSubViewModel = null; 
-        [RelayCommand] private void NavigateToClients() => CurrentSubViewModel = Clients;
-        [RelayCommand] private void NavigateToNotesLog() => CurrentSubViewModel = NotesLog;
+        [RelayCommand]
+        private async Task NavigateToClients()
+        {
+            Clients.ReplacePeople(People);
+            CurrentSubViewModel = Clients;
+            await Clients.EnsureInitializedAsync();
+        }
+
+        [RelayCommand]
+        private async Task NavigateToNotesLog()
+        {
+            CurrentSubViewModel = NotesLog;
+            await NotesLog.EnsureLoadedAsync();
+        }
         [RelayCommand]
         private void NavigateToMatrix() 
         {
             Matrix?.Rebuild(People, DateTime.Today, MatrixSchedule);
             CurrentSubViewModel = Matrix;
         }
-        [RelayCommand] private void NavigateToCalendar() => CurrentSubViewModel = Calendar;
+        [RelayCommand]
+        private async Task NavigateToCalendar()
+        {
+            CurrentSubViewModel = Calendar;
+            await EnsureCalendarLoadedAsync();
+        }
         [RelayCommand]
         private async Task NavigateToStatistics()
         {
@@ -1060,9 +1081,9 @@ CalendarViewModel calendarViewModel,
                 SelectedNote = null;
                 await LoadMonthlyNotesAsync();
                 await LoadUpcomingEventsAsync();
-                await Calendar.InitializeAsync();
-                await NotesLog.ReloadAsync();
-                await Clients.ReloadAsync();
+                await RefreshCalendarIfLoadedAsync();
+                await NotesLog.ReloadIfLoadedAsync();
+                await Clients.RefreshSelectedNotesIfSelectedAsync();
                 MessageBox.Show(
                     "This note changed after it was selected, so it was not deleted. The note lists have been refreshed; review the latest copy before trying again.",
                     "Note Updated",
@@ -1075,9 +1096,9 @@ CalendarViewModel calendarViewModel,
             await LoadExemptDatesAsync();
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
-            await Calendar.InitializeAsync();
-            await NotesLog.ReloadAsync();
-            await Clients.ReloadAsync();
+            await RefreshCalendarIfLoadedAsync();
+            await NotesLog.ReloadIfLoadedAsync();
+            await Clients.RefreshSelectedNotesIfSelectedAsync();
             SelectedNote = null;
         }
 
@@ -1208,8 +1229,7 @@ CalendarViewModel calendarViewModel,
                 OnPropertyChanged(nameof(EffectiveDateGroups));
                 await _noteService.UpdateAbandonedNotesAsync(DocumentationWindowDays);
                 await LoadMonthlyNotesAsync();
-                await LoadUpcomingEventsAsync();
-                await Calendar.InitializeAsync();
+                await LoadUpcomingEventsAsync(_settings);
 
                 var (_, wasCreated) = await _incentiveService.GetOrCreateAsync(
     LoggedInUser!.Id, DateTime.Now.Month, DateTime.Now.Year);
@@ -1237,9 +1257,8 @@ CalendarViewModel calendarViewModel,
             await LoadPeopleAsync();
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
-            await NotesLog.ReloadAsync();
-            await Clients.ReloadAsync();
-            await Calendar.RefreshCommand.ExecuteAsync(null);
+            await NotesLog.ReloadIfLoadedAsync();
+            await RefreshCalendarIfLoadedAsync();
             if (Scratchpad is not null)
                 await Scratchpad.RefreshScheduledWorkAsync();
         }
@@ -1312,11 +1331,20 @@ CalendarViewModel calendarViewModel,
             try
             {
                 var request = _peopleLoadRequests.Begin();
-                var people = await _personService.GetAllPeopleAsync(LoggedInUser!.Id);
-                if (!_peopleLoadRequests.IsCurrent(request))
+                var account = LoggedInUser;
+                if (account is null)
+                    return;
+                var people = await _personService.GetAllPeopleAsync(account.Id);
+                if (!_peopleLoadRequests.IsCurrent(request) ||
+                    !ReferenceEquals(LoggedInUser, account))
                     return;
 
-                var sortsByLastName = await SortsPickersByLastNameAsync();
+                var sortsByLastName = await SortsPickersByLastNameAsync(account.Id);
+                if (!_peopleLoadRequests.IsCurrent(request) ||
+                    !ReferenceEquals(LoggedInUser, account))
+                {
+                    return;
+                }
                 people = ApplyConsumerPickerSort(people, sortsByLastName);
 
                 People.Clear();
@@ -1327,6 +1355,8 @@ CalendarViewModel calendarViewModel,
                 // same-Id guard preserves any in-progress draft.
                 NoteEntry.SetPeople(People);
                 NoteEntry.SetSortsPickersByLastName(sortsByLastName);
+                NotesLog.ReplacePeople(People);
+                Clients.ReplacePeople(People);
 
                 OnPropertyChanged(nameof(BoardItems));
                 OnPropertyChanged(nameof(BoardGroups));
@@ -1363,15 +1393,15 @@ CalendarViewModel calendarViewModel,
         // first — the client picker order should reflect it starting with the first caseload
         // load of the session, not only after the Settings window has been opened once.
         private int? _sortPickersByLastNameForUserId;
-        private async Task<bool> SortsPickersByLastNameAsync()
+        private async Task<bool> SortsPickersByLastNameAsync(int userId)
         {
-            if (_consumerPickerSortPreferences is null || LoggedInUser is null)
+            if (_consumerPickerSortPreferences is null)
                 return false;
-            if (_sortPickersByLastNameForUserId == LoggedInUser.Id)
+            if (_sortPickersByLastNameForUserId == userId)
                 return _consumerPickerSortPreferences.SortByLastName;
 
-            var sortByLastName = await _consumerPickerSortPreferences.LoadForUserAsync(LoggedInUser.Id);
-            _sortPickersByLastNameForUserId = LoggedInUser.Id;
+            var sortByLastName = await _consumerPickerSortPreferences.LoadForUserAsync(userId);
+            _sortPickersByLastNameForUserId = userId;
             return sortByLastName;
         }
 
@@ -1381,7 +1411,7 @@ CalendarViewModel calendarViewModel,
             await LoadPeopleAsync();
             if (selectedPersonId is int personId)
                 SelectedPerson = People.FirstOrDefault(person => person.Id == personId);
-            await NotesLog.ReloadAsync();
+            await NotesLog.ReloadIfLoadedAsync();
             await AfterFormComplianceChangedAsync();
         }
 
@@ -1413,9 +1443,10 @@ CalendarViewModel calendarViewModel,
                 exempt.Date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) &&
                 (_settings is null || !WorkdayHelper.IsAlwaysExcludedWorkday(exempt.Date.Date, _settings)));
 
-        private async Task LoadUpcomingEventsAsync()
+        private async Task LoadUpcomingEventsAsync(Settings? preparedSettings = null)
         {
-            if (LoggedInUser is null)
+            var account = LoggedInUser;
+            if (account is null)
                 return;
 
             var request = _upcomingEventLoadRequests.Begin();
@@ -1424,11 +1455,16 @@ CalendarViewModel calendarViewModel,
             RefreshBoardState();
             try
             {
-                var settings = await _settingsService.LoadAsync();
+                // Initialization already loaded this snapshot for the matrix and
+                // workday calculations. Reuse it there; callers that do not pass a
+                // snapshot still perform an explicit refresh after settings change.
+                var settings = preparedSettings ?? await _settingsService.LoadAsync();
                 var events = _upcomingEventService.GenerateEvents(People, settings);
-                if (!_upcomingEventLoadRequests.IsCurrent(request))
+                if (!_upcomingEventLoadRequests.IsCurrent(request) ||
+                    !ReferenceEquals(LoggedInUser, account))
                     return;
 
+                _settings = settings;
                 UpcomingEvents.Clear();
                 foreach (var e in events)
                     UpcomingEvents.Add(e);
@@ -1444,7 +1480,8 @@ CalendarViewModel calendarViewModel,
             }
             catch
             {
-                if (_upcomingEventLoadRequests.IsCurrent(request))
+                if (_upcomingEventLoadRequests.IsCurrent(request) &&
+                    ReferenceEquals(LoggedInUser, account))
                 {
                     _deadlineLoadFailure = "Deadlines could not be loaded. Reopen Overview to try again.";
                     RefreshBoardState();
@@ -1452,6 +1489,40 @@ CalendarViewModel calendarViewModel,
                 throw;
             }
         }
+
+        private Task EnsureCalendarLoadedAsync()
+        {
+            var account = LoggedInUser;
+            if (account is null)
+                return Task.CompletedTask;
+            if (ReferenceEquals(_calendarLoadedAccount, account))
+                return Task.CompletedTask;
+            if (ReferenceEquals(_calendarInitializationAccount, account) &&
+                _calendarInitialization is { IsCompleted: false })
+            {
+                return _calendarInitialization;
+            }
+
+            var version = Interlocked.Increment(ref _calendarInitializationVersion);
+            _calendarInitializationAccount = account;
+            return _calendarInitialization = InitializeCalendarAsync(account, version);
+        }
+
+        private async Task InitializeCalendarAsync(User account, long version)
+        {
+            await Calendar.InitializeAsync();
+            if (version != Volatile.Read(ref _calendarInitializationVersion))
+                return;
+            if (ReferenceEquals(LoggedInUser, account))
+                _calendarLoadedAccount = account;
+            _calendarInitialization = null;
+            _calendarInitializationAccount = null;
+        }
+
+        private Task RefreshCalendarIfLoadedAsync() =>
+            ReferenceEquals(_calendarLoadedAccount, LoggedInUser)
+                ? Calendar.RefreshCommand.ExecuteAsync(null)
+                : Task.CompletedTask;
 
         private void RefreshBoardState()
         {
@@ -1714,6 +1785,10 @@ CalendarViewModel calendarViewModel,
             _upcomingEventLoadRequests.Invalidate();
             _peopleLoadRequests.Invalidate();
             _annualReminderRequests.Invalidate();
+            Interlocked.Increment(ref _calendarInitializationVersion);
+            _calendarInitialization = null;
+            _calendarInitializationAccount = null;
+            _calendarLoadedAccount = null;
             LoggedInUser = null;
             People.Clear();
             Notes.Clear();
@@ -1733,6 +1808,7 @@ CalendarViewModel calendarViewModel,
             NoteEntry.Reset();
             NotesLog.ClearForAccountSwitch();
             Clients.ClearForAccountSwitch();
+            Calendar.ClearForAccountSwitch();
         }
 
         public IEnumerable<EffectiveDateGroup> EffectiveDateGroups => BuildEffectiveDateGroups();

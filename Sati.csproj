@@ -102,6 +102,9 @@
 
   <ItemGroup>
     <None Update="appsettings.Public.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="WORKSPACE_REFLECTIONS.md"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

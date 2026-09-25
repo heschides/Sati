@@ -27,6 +27,24 @@ public sealed class CloudApiRouteTests
 {
     private const int PersonId = 1210;
 
+    [Fact]
+    public async Task BillingOverviewRequestsTheBoundedAggregateRoute()
+    {
+        var recorder = new UriRecorder(JsonBody(
+            """{"draftRevenue":12.50,"months":[{"year":2026,"month":9,"billedAmount":8.25}]}"""));
+        var service = new CloudBillingService(ClientFor(recorder));
+
+        var overview = await service.GetBillingPeriodOverviewAsync(
+            new AgencyActor(7, 1, UserPermissions.Billing, 1),
+            new DateTime(2026, 9, 24));
+
+        Assert.Equal(12.50m, overview.DraftRevenue);
+        Assert.Equal(8.25m, Assert.Single(overview.Months).BilledAmount);
+        Assert.Equal(
+            "https://api.invalid/api/v1/billing/overview-periods/2026/9",
+            recorder.LastUri?.ToString());
+    }
+
     [Theory]
     [InlineData("null")]
     [InlineData("")]

@@ -1,5 +1,44 @@
 # Sati — Refactor Agenda
 
+## Unreleased — visible, bounded workspace preparation (2026-09-24)
+
+- [x] Replace the blank post-login interval with an accessible themed preparation surface carrying
+      the exact status “We are preparing the Sati workspace.” Keep it visible through the shell's
+      first render and close it on every success/failure path.
+- [x] Remove the artificial three-second pre-login splash delay.
+- [x] Ship 100 original, nonrepeating Sati reflections under a narrowly scoped CC0-1.0 dedication;
+      rotate slowly without making the prose a screen-reader live region or using a network feed.
+- [x] Remove constructor-triggered Billing work. Load Billing Overview once on first Billing entry,
+      including for billing-only accounts, and clear the cache at the account boundary.
+- [x] Replace the Local billing Forms × Releases join and the Local/API whole-note candidate reads
+      with narrow scalar candidate projections plus independent compliance graphs. Keep the shared
+      billing rules authoritative. No migration is required.
+- [x] Replace Billing Overview's lifetime period/claim-line graph with a tenant-scoped aggregate:
+      all draft charge value plus exactly six monthly totals. Keep full period history behind the
+      detailed Billing tabs and cover Local/API scope, payload, and query shape.
+- [x] Defer Supervisor team-summary work unless Supervisor is the landing workspace or is opened;
+      coalesce first use, reject late account results, and rebuild cached charts without refetching.
+- [x] Prepare one caseload at startup, project note summaries without narrative or visit JSON, and
+      publish that snapshot to Overview, Clients, and Notes Log instead of issuing three caseload
+      loads plus the Notes Log's per-consumer fanout before the shell appears.
+- [ ] Replace the first-use Notes Log sequential per-consumer reads with a bounded server-side page
+      contract. Use a request body for clinical search text, stable `EventDate DESC, Id DESC`
+      ordering, cancellation/latest-request protection, tenant-derived scope, aggregate attention
+      counts, and Load More. First navigation is lazy now, but its full result remains unbounded.
+- [ ] Bound Billing Overview's exact ready/blocked analytics for agencies with unusually large
+      approved-unbilled backlogs, and share that result with the Queue so first Queue navigation
+      does not repeat candidate discovery. Preserve authoritative per-note validation and expose
+      whether the Overview count is complete rather than silently truncating financial totals.
+- [ ] Batch provider-assignment and release-reconciliation inputs once per caseload instead of
+      querying them for each person/target pair. Preserve the current pure reconciliation rules,
+      exact provider identity, transaction boundary, and audit output.
+- [ ] Project the remaining caseload profile row so Local startup does not select the unbounded
+      `Person.Journal` column and the API does not materialize encrypted SSN envelope fields. Bio and
+      full editable profile data should move behind an explicit selected-client/detail boundary.
+- [ ] Capture representative cold/warm Local and hosted Demo timings with a production-shaped
+      synthetic caseload before setting a startup service-level target. Query-shape regressions now
+      prevent the known overfetch, but a workstation-sized test is not an Azure latency benchmark.
+
 ## Release 1.3.27 — 2026-09-24
 
 “Safer updates, cleaner agendas, and larger calendars.” This patch carries forward

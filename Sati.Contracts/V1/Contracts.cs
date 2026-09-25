@@ -112,7 +112,8 @@ public sealed record PersonDto(
     string? StatusNote = null,
     DateTime? StatusChangedAtUtc = null,
     int? StatusChangedByUserId = null,
-    IReadOnlyList<ReleaseComplianceFact>? ReleaseObligations = null);
+    IReadOnlyList<ReleaseComplianceFact>? ReleaseObligations = null,
+    IReadOnlyList<ContactFact>? ContactFacts = null);
 
 public sealed record SavePersonFormRequest(
     int Id,
@@ -684,6 +685,18 @@ public sealed record BillingPeriodDto(
     string Status,
     DateTime? SubmittedAt,
     IReadOnlyList<ClaimLineDto> Lines);
+
+// Purpose-built overview shape. The Billing landing page needs only total draft
+// value and six monthly charge totals; returning every historical period and every
+// frozen claim line makes its latency and payload grow forever.
+public sealed record BillingMonthChargeDto(
+    int Year,
+    int Month,
+    decimal BilledAmount);
+
+public sealed record BillingPeriodOverviewDto(
+    decimal DraftRevenue,
+    IReadOnlyList<BillingMonthChargeDto> Months);
 
 public sealed record ClaimLineDto(
     int Id,

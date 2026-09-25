@@ -80,7 +80,7 @@ public sealed class ConcurrencySafetyTests
     }
 
     [Fact]
-    public async Task NotesLogDoesNotFanOutOneDatabaseReadPerConsumer()
+    public async Task NotesLogDefersFullNoteReadsUntilFirstNavigation()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var notes = new LoadTrackingNoteService();
@@ -92,14 +92,26 @@ public sealed class ConcurrencySafetyTests
             notes,
             fixture.NoteEntry(notes: notes));
 
-        await viewModel.ReloadAsync();
+        var people = await fixture.PeopleAs(fixture.CaseManagerOne)
+            .GetAllPeopleAsync(fixture.CaseManagerOne.Id);
+        viewModel.ReplacePeople(people);
+
+        await viewModel.ReloadIfLoadedAsync();
+        Assert.Equal(0, notes.LoadCalls);
+
+        await viewModel.EnsureLoadedAsync();
+        Assert.True(!viewModel.HasLoadError, viewModel.LoadErrorMessage);
+        Assert.True(viewModel.HasLoadedNotes);
+        var callsAfterFirstNavigation = notes.LoadCalls;
+        await viewModel.EnsureLoadedAsync();
 
         Assert.Equal(1, notes.MaximumConcurrentLoads);
-        Assert.Equal(2, notes.LoadCalls);
+        Assert.True(callsAfterFirstNavigation > 0);
+        Assert.Equal(callsAfterFirstNavigation, notes.LoadCalls);
     }
 
     [Fact]
-    public async Task NotesLogLoadFailureIsContainedForShellStartup()
+    public async Task NotesLogLoadFailureIsContainedAfterNavigation()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var notes = new FailingNoteService();
@@ -116,6 +128,28 @@ public sealed class ConcurrencySafetyTests
         Assert.Null(failure);
         Assert.True(viewModel.HasLoadError);
         Assert.Contains("other workspaces are still available", viewModel.LoadErrorMessage);
+    }
+
+    [Fact]
+    public async Task DelayedNoteEntrySettingsCannotPublishAfterAccountSwitch()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var settings = new DelayedFirstSettingsService();
+        var entry = fixture.NoteEntry(settings: settings, session: session);
+
+        var oldLoad = entry.InitializeAsync();
+        await settings.FirstLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        entry.Reset();
+        session.SetUser(fixture.CaseManagerTwo);
+
+        await entry.InitializeAsync();
+        Assert.Equal(222, entry.PcpOpenDaysBefore);
+
+        settings.ReleaseFirstLoad.TrySetResult();
+        await oldLoad;
+        Assert.Equal(222, entry.PcpOpenDaysBefore);
     }
 
     [Fact]
@@ -398,15 +432,14 @@ public sealed class ConcurrencySafetyTests
         public int MaximumConcurrentLoads { get; private set; }
         public int LoadCalls { get; private set; }
 
-        public async Task<List<Note>> GetAllByPersonAsync(int personId)
+        public Task<List<Note>> GetAllByPersonAsync(int personId)
         {
             LoadCalls++;
             var concurrent = Interlocked.Increment(ref _concurrentLoads);
             MaximumConcurrentLoads = Math.Max(MaximumConcurrentLoads, concurrent);
             try
             {
-                await Task.Delay(50);
-                return [];
+                return Task.FromResult(new List<Note>());
             }
             finally
             {
@@ -608,6 +641,29 @@ public sealed class ConcurrencySafetyTests
     private sealed class StaticSettingsService : ISettingsService
     {
         public Task<Settings> LoadAsync() => Task.FromResult(new Settings());
+        public Task SaveAsync(Settings settings) => Task.CompletedTask;
+    }
+
+    private sealed class DelayedFirstSettingsService : ISettingsService
+    {
+        private int _loads;
+        public TaskCompletionSource FirstLoadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseFirstLoad { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<Settings> LoadAsync()
+        {
+            if (Interlocked.Increment(ref _loads) == 1)
+            {
+                FirstLoadStarted.TrySetResult();
+                await ReleaseFirstLoad.Task;
+                return new Settings { PcpOpenDaysBefore = 111 };
+            }
+
+            return new Settings { PcpOpenDaysBefore = 222 };
+        }
+
         public Task SaveAsync(Settings settings) => Task.CompletedTask;
     }
 }

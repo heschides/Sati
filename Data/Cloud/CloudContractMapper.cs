@@ -80,11 +80,10 @@ internal static class CloudContractMapper
         person.Revision = dto.Revision;
         person.Forms = dto.Forms.Select(ToForm).ToList();
         person.Notes = dto.Notes.Select(ToNoteSummary).ToList();
-        // The API returns every note for the consumer, so its contacts are the full history.
-        person.ContactFactsForCompliance = person.Notes
-            .Select(Person.ToContactFact)
-            .OfType<ContactFact>()
-            .ToList();
+        // Caseload Notes are deliberately bounded to the 30-day scheduled-work
+        // window. Contact history is an independent, scalar-only server projection;
+        // never infer it from that partial note list.
+        person.ContactFactsForCompliance = dto.ContactFacts?.ToList();
         person.ReleaseComplianceSnapshots = dto.ReleaseObligations?.ToList() ?? [];
         return person;
     }
@@ -532,6 +531,7 @@ internal static class CloudContractMapper
 
     private static NoteSummary ToNoteSummaryValue(NoteSummaryDto dto) => new()
     {
+        Id = dto.Id ?? 0,
         Status = ParseNullable<NoteStatus>(dto.Status),
         EventDate = dto.EventDate,
         NoteType = ParseNullable<NoteType>(dto.NoteType),

@@ -116,12 +116,12 @@ actually happened (any status but Scheduled, Cancelled, Delayed, Abandoned, or n
 30-day clock, and the plan's initial effective date starts the first. The rule projects that chain
 as ordinary gate obligations, so blocking, exceptions, and recovery work as they do for forms.
 Contact history is an explicit input: `BillingComplianceProjectionLoader` supplies it on the
-desktop's local paths, the cloud mapper derives it from the person DTO's complete note summaries,
-and every API billing decision attaches it to `ServerPerson` first. A note being saved replaces its
-stored copy, so a visit counts toward its own service date. History that was never loaded is not
-read as "no contact": when the requirement is on, it blocks with a named reason. The client list
-shows the last contact date from the same rule, in red with "overdue" once the clock has run
-out.
+desktop's local paths, the caseload contract carries it as explicit `ContactFacts` independent of
+its bounded scheduled-note window, and every API billing decision attaches it to `ServerPerson`
+first. A note being saved replaces its stored copy, so a visit counts toward its own service date.
+History that was never loaded is not read as "no contact": when the requirement is on, it blocks
+with a named reason. The client list shows the last contact date from the same rule, in red with
+"overdue" once the clock has run out.
 
 The client profile's annual forms show the obligation for the plan in force and, while it is being
 prepared, the renewal for the next target. `ComplianceScheduleRules` decides which types overlap,
@@ -1836,17 +1836,22 @@ All services follow the `IDbContextFactory<SatiContext>` pattern — per-method 
   first lifecycle version, and audit event; a relational rejection rolls the entire graph back.
 - The API likewise commits once and builds the response from the tracked graph. It does not perform
   a second read after commit that could report a false failure after the Person already exists.
-- `GetAllPeopleAsync` is the primary load path: eager-loads `Notes` and `Forms`, then (when enabled)
-  calls `person.EnsureCurrentCycleForms` for every person before returning; one `SaveChangesAsync`
-  covers all additions.
-- **⚠ TEMPORARY GUARD:** `EnableEnsureCycleFormsOnLoad` (const) gates the generate-and-save pass.
-  Added `false` during the due-date migration because, while the membership convention had moved to
-  `(cs, ce]` but stored dates were still old, the pass would *add a fresh duplicate for every annual
-  form on every load*. With the backfill complete, this can be lifted — but confirm the duplicate
-  cleanup first (a lifted pass over triplicated data is fine, but you want clean rows first). Remove
-  the flag and unwrap the `if` when done.
-- **Cascade rule:** Anything needing a fully-populated `Person` must go through `GetAllPeopleAsync`
-  or replicate its `Include` calls (and, once re-enabled, the `EnsureCurrentCycleForms` call).
+- `GetAllPeopleAsync` is the authoritative caseload-preparation path. It loads profile/form/release
+  state, generates missing current and upcoming obligations, and reconciles recipient-specific
+  releases before returning. The database uniqueness constraint and lost-race re-read remain the
+  concurrency boundary for generated forms.
+- The same call now projects only Scheduled notes from the business date through 30 days ahead and
+  only the fields needed by upcoming-work and agenda rules (`Id`, person, status, date,
+  type/activity, form type, and release identity). Monthly-contact evidence is carried separately
+  as explicit `ContactFacts`. It does not retrieve note narrative or visit-documentation JSON. Full
+  notes belong to an explicit selected-person or Notes Log read; callers must not mistake the
+  summary objects on `Person.Notes` for editable notes or complete contact history.
+- The API `/caseload` route follows the same shape: generation/reconciliation stays server-side and
+  serializable, while its note query materializes only `NoteSummaryDto` facts. This keeps startup
+  transfer and API memory independent of narrative size without moving a compliance rule into WPF.
+- **Cascade rule:** Anything needing current obligation state must use the authoritative caseload
+  path or another named preparation operation. Anything needing full note content must use an
+  explicit note service read rather than broadening the caseload projection again.
 
 ### Add/edit client presentation boundary
 
@@ -1923,6 +1928,20 @@ old rows as a side effect.
   The generator does not read mutable Person or Agency values for an existing financial record.
 - Database uniqueness on service-note ID and billing-period owner/month/year makes simultaneous
   promotion/period creation fail safely; local and API paths translate repeat attempts.
+- Billing has no constructor-triggered data work. The dashboard loads Overview on the first actual
+  Billing navigation, coalesces simultaneous initialization, and retains the loaded result until an
+  account switch or an ordinary feature refresh invalidates it. Billing-only accounts use that same
+  awaited path as manual navigation.
+- Candidate discovery is a scalar projection of only the note/person facts consumed by billing
+  validation. Forms with attestations and release obligations with attestations are loaded as
+  separate no-tracking graphs, avoiding the former Forms × Releases Cartesian expansion. Neither
+  Local nor API candidate discovery reads narrative, visit JSON, biography, or journal; the API
+  projection also excludes every encrypted-SSN envelope column. No business rule was copied into
+  either projection: both rehydrate the existing rule input and run the established validators.
+- Billing Overview does not retrieve the historical `BillingPeriod`/`ClaimLine` graph. Local SQL
+  and `GET /billing/overview-periods/{year}/{month}` return one all-time draft charge aggregate and
+  exactly six monthly charge aggregates. Detailed Billing tabs retain their explicit history reads;
+  landing-page payload and materialization are therefore independent of lifetime billing volume.
 
 ### `IncentiveService`
 - Owns `Incentive` CRUD and days-scheduled calc. `CalculateDaysScheduled` loops via
@@ -2207,7 +2226,7 @@ Previously excluded as "stateless, low-risk." One live bug surfaced and was fixe
 | `ExemptDate` records | `WorkdayHelper`, both incentive eligible-day paths, `ProductivityForecast`, productivity UI |
 | Holiday flags on `Settings` | `WorkdayHelper.IsAlwaysExcludedWorkday`, `IncentiveService.CalculateDaysScheduled` |
 | `BillingStatus` enum | `BillingService` submit/unbilled paths, billing UI |
-| `PersonService.GetAllPeopleAsync` query | Anything needing fully-populated `Person`; don't bypass without replicating `Include`s (and `EnsureCurrentCycleForms` when re-enabled) |
+| `PersonService.GetAllPeopleAsync` query | Caseload generation/reconciliation, local/API note-summary parity, monthly-contact/deadline inputs, and every caller that might incorrectly assume its `Person.Notes` contain narratives |
 | Assessment question key, status, or support flag | `BuildSections`, JSON compatibility, completion validation, PDF rendering, supervisor review, and backward-compatibility tests |
 | Assessment workflow state | `ComprehensiveAssessmentService`, permissions, supervisor queue, immutable-version rules, audit events, and matching `Form` completion |
 | `CompAssessmentDaysBeforeAnniversary` | `SettingsService`, `FormDueDateCalculator`, stored `Form.DueDate` reconciliation, reminders, PCP-submission gate, and billing-window tests |
@@ -2426,8 +2445,31 @@ pre-live checklist item above remains.
 | Modal windows + VMs, `ComplianceReviewViewModel` | Transient | Correct |
 
 ### Startup sequence
-Splash (3s) → Login → session set → `ShellViewModel.InitializeAsync` → `ShellWindow.Show`.
-`ShutdownMode.OnExplicitShutdown`. `db.Database.Migrate()` on every startup (idempotent).
+Environment validation and guarded Local migration → Login → session set → show and render the
+workspace-preparation surface → incident-session start/flush → `ShellViewModel.InitializeAsync` →
+assign/show/render `ShellWindow` → close the preparation surface in `finally`.
+
+There is no fixed splash delay. The preparation surface is visible only around real authenticated
+work and says “We are preparing the Sati workspace.” It cannot be dismissed while that work is in
+progress. Its activity status is a polite live region; its slowly rotating prose is deliberately
+not live, so a screen reader is not interrupted every twenty seconds. The 100 original passages are
+presentation-only “Sati reflections,” require no network service, and are separately dedicated
+under CC0-1.0 in `WORKSPACE_REFLECTIONS.md`.
+
+Case-management startup prepares one caseload snapshot for Overview and publishes the same person
+instances to Clients and Notes Log. Hidden Clients and Notes Log workspaces do not repeat the
+caseload query. Full Notes Log content is deferred until first navigation and cached thereafter;
+its current first-use implementation still reads full notes sequentially per consumer, which is a
+documented transitional boundary pending a bounded server-side search/page contract.
+
+Billing and Supervisor dashboards initialize only when they are the selected landing workspace or
+the user first navigates to them. Their account-scoped caches reject late work after account switch;
+cached Supervisor re-entry rebuilds cleared OxyPlot models from its existing summaries without a
+database/API refresh.
+
+`ShutdownMode.OnExplicitShutdown`. Local startup runs `LocalDatabaseUpdater`, which applies only
+pending migrations through `SqlLocalDatabaseMaintenance` after the configured backup and schema-
+drift safeguards; cloud clients never migrate Azure SQL.
 Managed failure handlers write PHI-minimized local diagnostics. The UI-thread handler shows a short
 reference rather than exception text; background-thread failures synchronously attempt to queue the
 curated incident before termination, and unobserved tasks are recorded as warnings. See the current

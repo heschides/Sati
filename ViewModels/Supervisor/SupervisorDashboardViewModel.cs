@@ -25,6 +25,8 @@ namespace Sati.ViewModels.Supervisor
         private readonly IUserService _userService;
         private readonly IServiceDayInclusionService? _serviceDayInclusions;
         private readonly LatestRequestTracker _accountLoads = new();
+        private readonly SemaphoreSlim _initializationGate = new(1, 1);
+        private (int UserId, int AgencyId)? _loadedAccount;
 
         // -------------------------------------------------------------------------
         // Sub-view ViewModels
@@ -70,15 +72,15 @@ namespace Sati.ViewModels.Supervisor
             _userService = userService;
             _userManagementViewModel = userManagementViewModel;
 
-            // Rebuild the sidebar when a supervisee's supervisor/role changes.
-            // async lambda is the standard fire-and-forget handler shape; InitializeAsync
-            // has its own try/catch, so nothing escapes unobserved.
+            // Rebuild an already-open dashboard when a supervisee's supervisor/role changes.
+            // User Management can also be opened directly from the shell, so it must not turn
+            // a still-deferred supervisor dashboard into a hidden background load.
             _userManagementViewModel.UsersChanged += async () =>
             {
                 if (_sessionService.CurrentUser?.HasSupervisorPermissions != true || _sessionService.HasSessionEnded)
                     return;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                await InitializeAsync();
+                await RefreshIfLoadedAsync();
                 sw.Stop();
                 Debug.WriteLine($">>> Sidebar rebuild took {sw.ElapsedMilliseconds} ms");
             };
@@ -102,12 +104,12 @@ namespace Sati.ViewModels.Supervisor
 
             // A distribution changes who holds which consumers, so the sidebar counts the
             // dashboard just drew are stale the moment it succeeds.
-            _caseloadDistributionViewModel.CaseloadsChanged += async () => await InitializeAsync();
+            _caseloadDistributionViewModel.CaseloadsChanged += async () => await RefreshIfLoadedAsync();
 
             _caseloadImportViewModel = caseloadImportViewModel;
 
             // An import lands consumers on this supervisor, so the sidebar counts move too.
-            _caseloadImportViewModel.ConsumersImported += async () => await InitializeAsync();
+            _caseloadImportViewModel.ConsumersImported += async () => await RefreshIfLoadedAsync();
         }
 
         // -------------------------------------------------------------------------
@@ -136,6 +138,8 @@ namespace Sati.ViewModels.Supervisor
         public int TotalClients => CaseManagers.Sum(cm => cm.ClientCount);
         public int TotalOverdue => CaseManagers.Sum(cm => cm.OverdueCount);
         public int TotalNotesThisMonth => CaseManagers.Sum(cm => cm.NotesThisMonth);
+        public bool HasLoaded => _sessionService.CurrentUser is { HasSupervisorPermissions: true } current &&
+            _loadedAccount == (current.Id, current.AgencyId);
         public bool IsPendingApprovalsActive => CurrentSubView is PendingApprovalsViewModel;
         public bool IsCheckRequestApprovalsActive => CurrentSubView is CheckRequestApprovalsViewModel;
 
@@ -273,15 +277,42 @@ namespace Sati.ViewModels.Supervisor
         // Initialization
         // -------------------------------------------------------------------------
 
-        public async Task InitializeAsync()
+        /// <summary>
+        /// Loads the dashboard on its first visible use for the current account. Repeated or
+        /// concurrent navigation reuses that snapshot; successful supervisor mutations call
+        /// <see cref="RefreshIfLoadedAsync"/> to rebuild a dashboard that was already opened.
+        /// </summary>
+        public Task InitializeAsync() => LoadAsync(forceRefresh: false);
+
+        private Task RefreshIfLoadedAsync()
         {
+            var account = _sessionService.CurrentUser;
+            return HasLoaded && account is not null
+                ? LoadAsync(forceRefresh: true, account)
+                : Task.CompletedTask;
+        }
+
+        private async Task LoadAsync(bool forceRefresh, User? requestedAccount = null)
+        {
+            var supervisor = requestedAccount ?? _sessionService.CurrentUser;
+            if (supervisor?.HasSupervisorPermissions != true)
+                return;
+
+            await _initializationGate.WaitAsync();
             var request = _accountLoads.Begin();
-            var supervisor = _sessionService.CurrentUser;
             try
             {
-                CaseManagers.Clear();
-                if (supervisor is null)
+                if (!ReferenceEquals(_sessionService.CurrentUser, supervisor) ||
+                    supervisor.HasSupervisorPermissions != true)
                     return;
+                if (!forceRefresh && HasLoaded)
+                {
+                    RebuildCharts();
+                    return;
+                }
+
+                _loadedAccount = null;
+                CaseManagers.Clear();
                 var supervisees = await _userService.GetSuperviseesAsync(supervisor.Id);
                 var settings = await _settingsService.LoadAsync();
                 if (!_accountLoads.IsCurrent(request) || !ReferenceEquals(_sessionService.CurrentUser, supervisor))
@@ -336,6 +367,7 @@ namespace Sati.ViewModels.Supervisor
 
                 _teamOverviewViewModel.Refresh(CaseManagers);
                 _overdueItemsViewModel.Refresh(CaseManagers);
+                _loadedAccount = (supervisor.Id, supervisor.AgencyId);
             }
             catch (Exception ex)
             {
@@ -348,6 +380,10 @@ namespace Sati.ViewModels.Supervisor
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);
                 Debug.WriteLine($"SupervisorDashboardViewModel.InitializeAsync failed: {ex.Message}");
+            }
+            finally
+            {
+                _initializationGate.Release();
             }
         }
 
@@ -387,6 +423,7 @@ namespace Sati.ViewModels.Supervisor
         public void ClearForAccountSwitch()
         {
             _accountLoads.Invalidate();
+            _loadedAccount = null;
             _userManagementViewModel.ClearForAccountSwitch();
             SelectedCaseManager = null;
             CaseManagers.Clear();
@@ -410,6 +447,12 @@ namespace Sati.ViewModels.Supervisor
         {
             _teamOverviewViewModel.ComplianceChartModel = null;
             _monthlyProductivityViewModel.StatusChartModel = null;
+        }
+
+        private void RebuildCharts()
+        {
+            _teamOverviewViewModel.Refresh(CaseManagers);
+            _monthlyProductivityViewModel.Refresh(CaseManagers);
         }
 
     }

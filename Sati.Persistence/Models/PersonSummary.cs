@@ -41,6 +41,7 @@ namespace Sati
     // Minimal blob-free note shape for event generation. Implements INoteInfo.
     public sealed class NoteSummary : INoteInfo
     {
+        public int Id { get; set; }
         public NoteStatus? Status { get; set; }
         public DateTime? EventDate { get; set; }
         public NoteType? NoteType { get; set; }

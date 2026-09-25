@@ -608,6 +608,12 @@ public sealed class CloudBillingService(CloudApiClient api) : IBillingService
         .Select(CloudContractMapper.ToBillingPeriod)
         .ToList();
 
+    public Task<BillingPeriodOverviewDto> GetBillingPeriodOverviewAsync(
+        AgencyActor actor,
+        DateTime asOf) =>
+        api.GetAsync<BillingPeriodOverviewDto>(
+            $"/api/v1/billing/overview-periods/{asOf.Year}/{asOf.Month}");
+
     public async Task<ClaimLine> CreateClaimLineAsync(AgencyActor actor, int noteId, bool isComplianceException = false, string? complianceExceptionReason = null) =>
         CloudContractMapper.ToClaimLine(await api.PostAsync<CreateClaimLineRequest, ClaimLineDto>(
             "/api/v1/billing/claim-lines",

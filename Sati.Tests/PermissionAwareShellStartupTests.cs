@@ -21,9 +21,7 @@ public sealed class PermissionAwareShellStartupTests
         var source = File.ReadAllText(Path.Combine(directory.FullName, "ViewModels", "ShellViewModel.cs"));
         var initialize = Body(source, $"public async Task {method}()");
         var gatedWork = Body(initialize, "if (IsCaseManagementAvailable)");
-        string[] caseworkCalls = ["await NotesViewModel.InitializeAsync();",
-            "await NotesViewModel.NotesLog.NoteEntry.InitializeAsync();",
-            "await NotesViewModel.NotesLog.ReloadAsync();", "await NotesViewModel.Clients.ReloadAsync();"];
+        string[] caseworkCalls = ["await NotesViewModel.InitializeAsync();"];
         foreach (var call in caseworkCalls)
         {
             Assert.Contains(call, gatedWork);
@@ -31,8 +29,54 @@ public sealed class PermissionAwareShellStartupTests
         }
         Assert.DoesNotContain("Scratchpad.InitializeAsync", gatedWork);
         Assert.DoesNotContain("NavigateByRoleAsync", gatedWork);
+        Assert.DoesNotContain("NotesLog.ReloadAsync", initialize);
+        Assert.DoesNotContain("Clients.ReloadAsync", initialize);
+        Assert.DoesNotContain("NotesLog.NoteEntry.InitializeAsync", initialize);
         Assert.Contains("await Scratchpad.InitializeAsync();", initialize);
         Assert.Contains("await NavigateByRoleAsync();", initialize);
+    }
+
+    [Fact]
+    public void ChildWorkspaceSettingsAreDeferredUntilFirstNavigation()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
+            directory = directory.Parent;
+        Assert.NotNull(directory);
+
+        var clientsSource = File.ReadAllText(Path.Combine(
+            directory.FullName, "ViewModels", "NewClientViewModel.cs"));
+        var clientsConstructor = Body(clientsSource, "public NewClientViewModel(");
+        Assert.DoesNotContain("LoadHealthcareOptionsSafelyAsync", clientsConstructor);
+
+        var dashboardSource = File.ReadAllText(Path.Combine(
+            directory.FullName, "ViewModels", "CaseManagerDashboardViewModel.cs"));
+        var clientsNavigation = Body(dashboardSource, "private async Task NavigateToClients()");
+        Assert.Contains("await Clients.EnsureInitializedAsync();", clientsNavigation);
+        var notesNavigation = Body(dashboardSource, "private async Task NavigateToNotesLog()");
+        Assert.Contains("await NotesLog.EnsureLoadedAsync();", notesNavigation);
+        var dashboardLoad = Body(dashboardSource, "private async Task LoadAsync()");
+        Assert.Contains("await LoadUpcomingEventsAsync(_settings);", dashboardLoad);
+    }
+
+    [Fact]
+    public void SupervisorDashboardLoadsOnlyWhenItIsTheLandingWorkspaceOrExplicitlyOpened()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
+            directory = directory.Parent;
+        Assert.NotNull(directory);
+
+        var source = File.ReadAllText(Path.Combine(directory.FullName, "ViewModels", "ShellViewModel.cs"));
+        var navigation = Body(source, "private async Task NavigateToSupervisorDashboard()");
+        Assert.Contains("CurrentViewModel = _supervisorDashboardViewModel;", navigation);
+        Assert.Contains("await _supervisorDashboardViewModel.InitializeAsync();", navigation);
+
+        var roleSelection = Body(source, "private async Task NavigateByRoleAsync()");
+        Assert.DoesNotContain("InitializeSupervisorAsync", roleSelection);
+        Assert.DoesNotContain("_supervisorDashboardViewModel.InitializeAsync", roleSelection);
+        Assert.Contains("if (IsCaseManagementAvailable) NavigateToCaseManagement();", roleSelection);
+        Assert.Contains("else if (IsSupervisionAvailable) await NavigateToSupervisorDashboard();", roleSelection);
     }
 
     [Theory]

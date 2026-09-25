@@ -20,7 +20,7 @@ public sealed class ConsumerPickerSortPreferenceSaveException(
 /// one setting, not every personal preference at once. Consolidating these
 /// stores is tracked in AGENDA.md.
 /// </summary>
-public sealed class ConsumerPickerSortPreferenceService
+public class ConsumerPickerSortPreferenceService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly DataEnvironmentInfo _environment;
@@ -49,7 +49,7 @@ public sealed class ConsumerPickerSortPreferenceService
     public string? LastLoadWarning { get; private set; }
     public event EventHandler<bool>? PreferenceChanged;
 
-    public async Task<bool> LoadForUserAsync(
+    public virtual async Task<bool> LoadForUserAsync(
         int userId,
         CancellationToken cancellationToken = default)
     {

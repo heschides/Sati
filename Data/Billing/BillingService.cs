@@ -108,6 +108,60 @@ namespace Sati.Services.Billing
             return periods;
         }
 
+        public async Task<BillingPeriodOverviewDto> GetBillingPeriodOverviewAsync(
+            AgencyActor suppliedActor,
+            DateTime asOf)
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            var actor = await ValidateBillingActorAsync(context, suppliedActor);
+            var firstMonth = new DateTime(asOf.Year, asOf.Month, 1).AddMonths(-5);
+            var firstMonthKey = firstMonth.Year * 100 + firstMonth.Month;
+            var lastMonthKey = asOf.Year * 100 + asOf.Month;
+
+            // Keep the landing dashboard independent of the lifetime number of
+            // BillingPeriod and ClaimLine rows. Detailed tabs retain their full
+            // history reads; Overview asks SQL only for one draft total and six
+            // grouped monthly totals.
+            var scopedLines =
+                from line in context.ClaimLines.AsNoTracking()
+                join period in context.BillingPeriods.AsNoTracking()
+                    on line.BillingPeriodId equals period.Id
+                join owner in context.Users.AsNoTracking()
+                    on period.UserId equals owner.Id
+                where owner.AgencyId == actor.AgencyId
+                select new
+                {
+                    period.Year,
+                    period.Month,
+                    period.Status,
+                    line.ChargeAmount
+                };
+
+            var draftRevenue = await scopedLines
+                .Where(row => row.Status == BillingStatus.Draft)
+                .SumAsync(row => (decimal?)row.ChargeAmount) ?? 0m;
+            var totals = await scopedLines
+                .Where(row => row.Year * 100 + row.Month >= firstMonthKey &&
+                              row.Year * 100 + row.Month <= lastMonthKey)
+                .GroupBy(row => new { row.Year, row.Month })
+                .Select(group => new BillingMonthChargeDto(
+                    group.Key.Year,
+                    group.Key.Month,
+                    group.Sum(row => row.ChargeAmount)))
+                .ToListAsync();
+            var totalsByMonth = totals.ToDictionary(
+                row => (row.Year, row.Month),
+                row => row.BilledAmount);
+            var months = Enumerable.Range(0, 6)
+                .Select(offset => firstMonth.AddMonths(offset))
+                .Select(month => new BillingMonthChargeDto(
+                    month.Year,
+                    month.Month,
+                    totalsByMonth.GetValueOrDefault((month.Year, month.Month))))
+                .ToList();
+            return new BillingPeriodOverviewDto(draftRevenue, months);
+        }
+
         public async Task<ClaimLine> CreateClaimLineAsync(AgencyActor suppliedActor, int noteId, bool isComplianceException = false, string? complianceExceptionReason = null)
         {
             await using var context = _contextFactory.CreateDbContext();
@@ -371,22 +425,92 @@ namespace Sati.Services.Billing
             var actor = await ValidateBillingActorAsync(context, suppliedActor);
             _complianceContext = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, actor.AgencyId);
-            var notes = await context.Notes
-                .Include(n => n.Person)
-                    .ThenInclude(p => p.Agency)
-                .Include(n => n.Person)
-                    .ThenInclude(p => p.Forms)
-                        .ThenInclude(form => form.Attestations)
-                .Include(n => n.Person)
-                    .ThenInclude(p => p.ReleaseObligations)
-                        .ThenInclude(obligation => obligation.Attestations)
-                .Where(n => n.Status == NoteStatus.Approved
-                         && n.Person.AgencyId == actor.AgencyId
-                         && !context.ClaimLines.Any(c => c.NoteId == n.Id))
-                .OrderBy(n => n.EventDate)
+            _recoveryDecisionsByNoteId =
+                new Dictionary<int, IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>>();
+            // Billing validation needs a small, explicit subset of note and person
+            // facts. Do not make queue latency or memory track clinical narrative,
+            // visit detail, biography, or the consumer journal as those fields grow.
+            var rows = await (from note in context.Notes.AsNoTracking()
+                              join person in context.People.AsNoTracking()
+                                  on note.PersonId equals person.Id
+                              join owner in context.Users.AsNoTracking()
+                                  on person.UserId equals owner.Id
+                              where note.Status == NoteStatus.Approved &&
+                                    note.AgencyId == actor.AgencyId &&
+                                    person.AgencyId == actor.AgencyId &&
+                                    owner.AgencyId == actor.AgencyId &&
+                                    !context.ClaimLines.Any(line => line.NoteId == note.Id)
+                              orderby note.EventDate
+                              select new LocalBillingCandidateRow(
+                                  note.Id,
+                                  note.EventDate,
+                                  note.Status,
+                                  note.Minutes,
+                                  note.PersonId,
+                                  note.FormType,
+                                  note.FormId,
+                                  note.ReleaseObligationId,
+                                  note.NoteType,
+                                  note.Activities,
+                                  note.AgencyId,
+                                  note.ComplianceOverride,
+                                  note.OverrideReason,
+                                  note.OverrideApprovedById,
+                                  note.OverrideApprovedAt,
+                                  note.OverrideAttestationConfirmed,
+                                  note.OverrideObligationIdsJson,
+                                  person.UserId,
+                                  person.FirstName,
+                                  person.LastName,
+                                  person.BirthDate,
+                                  person.EffectiveDate,
+                                  person.AgencyId,
+                                  person.MaineCareId,
+                                  person.DiagnosisCode,
+                                  person.PlaceOfService,
+                                  person.BillingStreet,
+                                  person.BillingCity,
+                                  person.BillingState,
+                                  person.BillingZip))
                 .ToListAsync();
+
+            if (rows.Count == 0)
+                return [];
+
+            var personIds = rows.Select(row => row.PersonId).Distinct().ToArray();
+            var agency = await context.Agencies.AsNoTracking()
+                .SingleAsync(candidate => candidate.Id == actor.AgencyId);
+            var formsByPerson = (await context.Forms
+                    .AsNoTrackingWithIdentityResolution()
+                    .Include(form => form.Attestations)
+                    .Where(form => personIds.Contains(form.PersonId))
+                    .AsSplitQuery()
+                    .ToListAsync())
+                .GroupBy(form => form.PersonId)
+                .ToDictionary(group => group.Key, group => group.ToList());
+            var releasesByPerson = (await context.ReleaseObligations
+                    .AsNoTrackingWithIdentityResolution()
+                    .Include(obligation => obligation.Attestations)
+                    .Where(obligation => personIds.Contains(obligation.PersonId))
+                    .AsSplitQuery()
+                    .ToListAsync())
+                .GroupBy(obligation => obligation.PersonId)
+                .ToDictionary(group => group.Key, group => group.ToList());
+
+            var peopleById = rows
+                .GroupBy(row => row.PersonId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => ToBillingCandidatePerson(
+                        group.First(),
+                        agency,
+                        formsByPerson.GetValueOrDefault(group.Key) ?? [],
+                        releasesByPerson.GetValueOrDefault(group.Key) ?? []));
             await BillingComplianceProjectionLoader.PopulateAsync(
-                context, notes.Select(note => note.Person), actor.AgencyId);
+                context, peopleById.Values, actor.AgencyId);
+            var notes = rows
+                .Select(row => ToBillingCandidateNote(row, peopleById[row.PersonId]))
+                .ToList();
 
             var noteIds = notes.Select(note => note.Id).ToArray();
             var decisions = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
@@ -403,6 +527,86 @@ namespace Sati.Services.Billing
                     .ToArray());
             return notes;
         }
+
+        private static Person ToBillingCandidatePerson(
+            LocalBillingCandidateRow row,
+            Agency agency,
+            List<Form> forms,
+            List<ReleaseObligation> releaseObligations)
+        {
+            var person = Person.Rehydrate(row.PersonId, row.PersonOwnerUserId);
+            person.FirstName = row.FirstName;
+            person.LastName = row.LastName;
+            person.BirthDate = row.BirthDate;
+            person.EffectiveDate = row.EffectiveDate;
+            person.AgencyId = row.PersonAgencyId;
+            person.Agency = agency;
+            person.MaineCareId = row.MaineCareId;
+            person.DiagnosisCode = row.DiagnosisCode;
+            person.PlaceOfService = row.PlaceOfService;
+            person.BillingStreet = row.BillingStreet;
+            person.BillingCity = row.BillingCity;
+            person.BillingState = row.BillingState;
+            person.BillingZip = row.BillingZip;
+            person.Forms = forms;
+            person.ReleaseObligations = releaseObligations;
+            return person;
+        }
+
+        private static Note ToBillingCandidateNote(LocalBillingCandidateRow row, Person person)
+        {
+            var note = Note.Rehydrate(row.NoteId);
+            note.EventDate = row.EventDate;
+            note.Status = row.Status;
+            note.Minutes = row.Minutes;
+            note.PersonId = row.PersonId;
+            note.Person = person;
+            note.FormType = row.FormType;
+            note.FormId = row.FormId;
+            note.ReleaseObligationId = row.ReleaseObligationId;
+            note.NoteType = row.NoteType;
+            note.Activities = row.Activities;
+            note.AgencyId = row.NoteAgencyId;
+            note.ComplianceOverride = row.ComplianceOverride;
+            note.OverrideReason = row.OverrideReason;
+            note.OverrideApprovedById = row.OverrideApprovedById;
+            note.OverrideApprovedAt = row.OverrideApprovedAt;
+            note.OverrideAttestationConfirmed = row.OverrideAttestationConfirmed;
+            note.OverrideObligationIdsJson = row.OverrideObligationIdsJson;
+            return note;
+        }
+
+        private sealed record LocalBillingCandidateRow(
+            int NoteId,
+            DateTime? EventDate,
+            NoteStatus? Status,
+            int? Minutes,
+            int PersonId,
+            FormType? FormType,
+            int? FormId,
+            long? ReleaseObligationId,
+            NoteType? NoteType,
+            NoteActivity? Activities,
+            int? NoteAgencyId,
+            bool ComplianceOverride,
+            string? OverrideReason,
+            int? OverrideApprovedById,
+            DateTime? OverrideApprovedAt,
+            bool OverrideAttestationConfirmed,
+            string? OverrideObligationIdsJson,
+            int PersonOwnerUserId,
+            string? FirstName,
+            string? LastName,
+            DateTime BirthDate,
+            DateTime? EffectiveDate,
+            int? PersonAgencyId,
+            string? MaineCareId,
+            string? DiagnosisCode,
+            int? PlaceOfService,
+            string? BillingStreet,
+            string? BillingCity,
+            string? BillingState,
+            string? BillingZip);
 
         public BillingValidationResult ValidateNoteForBilling(Note note)
             => ValidateNoteForBilling(

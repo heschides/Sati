@@ -1,5 +1,7 @@
+using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Data.Cloud;
@@ -10,6 +12,111 @@ namespace Sati.Tests;
 
 public sealed class CaseloadComplianceGenerationTests
 {
+    [Fact]
+    public async Task LocalCaseloadProjectsNoteFactsWithoutClinicalBlobs()
+    {
+        await using var connection = new SqliteConnection(
+            "Data Source=:memory:;Foreign Keys=True");
+        await connection.OpenAsync();
+        var commands = new RecordingCommandInterceptor();
+        var options = new DbContextOptionsBuilder<SatiContext>()
+            .UseSqlite(connection)
+            .AddInterceptors(commands)
+            .Options;
+        var factory = new TestContextFactory(options);
+        var actor = User.Create(
+            902,
+            "summary-case-manager",
+            "Summary Case Manager",
+            "hash",
+            "salt",
+            UserRole.CaseManager,
+            null,
+            90);
+        int scheduledNoteId;
+        int contactNoteId;
+
+        await using (var setup = factory.CreateDbContext())
+        {
+            await setup.Database.EnsureCreatedAsync();
+            setup.Agencies.Add(new Agency { Id = 90, Name = "Summary Test Agency" });
+            setup.Users.Add(actor);
+            var person = Person.Rehydrate(0, actor.Id, DateTime.UtcNow);
+            person.AgencyId = 90;
+            person.FirstName = "Blob";
+            person.LastName = "Free";
+            person.BirthDate = new DateTime(1990, 1, 1);
+            setup.People.Add(person);
+            await setup.SaveChangesAsync();
+
+            var note = Note.Create(
+                new string('N', 8_000),
+                DateTime.Today.AddDays(10),
+                NoteStatus.Scheduled,
+                60,
+                person.Id,
+                noteType: NoteType.Visit);
+            note.AgencyId = 90;
+            note.VisitDocumentationJson = new string('J', 8_000);
+            setup.Notes.Add(note);
+            var contact = Note.Create(
+                "Historical contact fact",
+                DateTime.Today.AddDays(-10),
+                NoteStatus.Logged,
+                60,
+                person.Id,
+                noteType: NoteType.Visit);
+            contact.AgencyId = 90;
+            setup.Notes.Add(contact);
+            foreach (var excluded in new[]
+                     {
+                         Note.Create("Past scheduled", DateTime.Today.AddDays(-1),
+                             NoteStatus.Scheduled, 15, person.Id, noteType: NoteType.Reminder),
+                         Note.Create("Far scheduled", DateTime.Today.AddDays(31),
+                             NoteStatus.Scheduled, 15, person.Id, noteType: NoteType.Reminder),
+                         Note.Create("In-window but pending", DateTime.Today.AddDays(5),
+                             NoteStatus.Pending, 15, person.Id, noteType: NoteType.Reminder)
+                     })
+            {
+                excluded.AgencyId = 90;
+                setup.Notes.Add(excluded);
+            }
+            await setup.SaveChangesAsync();
+            scheduledNoteId = note.Id;
+            contactNoteId = contact.Id;
+        }
+
+        commands.Commands.Clear();
+        var session = new SessionService();
+        session.SetUser(actor);
+        var service = new PersonService(factory, new FixedSettingsService(), session);
+
+        var loaded = Assert.Single(await service.GetAllPeopleAsync(actor.Id));
+
+        var summary = Assert.Single(loaded.Notes);
+        Assert.Equal(scheduledNoteId, summary.Id);
+        Assert.Equal(NoteStatus.Scheduled, summary.Status);
+        Assert.Equal(DateTime.Today.AddDays(10), summary.EventDate);
+        Assert.Equal(string.Empty, summary.Narrative);
+        Assert.Contains(loaded.ContactFactsForCompliance!, fact =>
+            fact.EvidenceId == $"note:{contactNoteId}");
+
+        var sidebar = Assert.Single(await service.GetPeopleForSummaryAsync(actor.Id));
+        var sidebarNote = Assert.Single(sidebar.NoteSummaries);
+        Assert.Equal(scheduledNoteId, sidebarNote.Id);
+        Assert.Equal(NoteStatus.Scheduled, sidebarNote.Status);
+        Assert.Equal(DateTime.Today.AddDays(10), sidebarNote.EventDate);
+        var noteSelects = commands.Commands
+            .Where(command => command.Contains("FROM \"Notes\"", StringComparison.Ordinal))
+            .ToArray();
+        Assert.NotEmpty(noteSelects);
+        Assert.All(noteSelects, command =>
+        {
+            Assert.DoesNotContain("Narrative", command, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("VisitDocumentationJson", command, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
     [Fact]
     public async Task LocalCaseloadLoadCreatesCurrentAndNextFormsAndReleasesOnlyOnce()
     {
@@ -32,6 +139,7 @@ public sealed class CaseloadComplianceGenerationTests
             null,
             81);
         int personId;
+        int existingNoteId;
 
         await using (var setup = factory.CreateDbContext())
         {
@@ -81,7 +189,17 @@ public sealed class CaseloadComplianceGenerationTests
                     StartDate = assignmentStart,
                     AssignmentKnownOn = assignmentStart
                 });
+            var existingNote = Note.Create(
+                "Existing clinical narrative must not be reinserted.",
+                DateTime.Today.AddDays(1),
+                NoteStatus.Scheduled,
+                60,
+                personId,
+                noteType: NoteType.Visit);
+            existingNote.AgencyId = 81;
+            setup.Notes.Add(existingNote);
             await setup.SaveChangesAsync();
+            existingNoteId = existingNote.Id;
         }
 
         var session = new SessionService();
@@ -89,6 +207,7 @@ public sealed class CaseloadComplianceGenerationTests
         var service = new PersonService(factory, new FixedSettingsService(), session);
 
         var first = Assert.Single(await service.GetAllPeopleAsync(actor.Id));
+        Assert.Equal(existingNoteId, Assert.Single(first.Notes).Id);
         Assert.Equal(PersonSaveRules.FormTypes.Count * expectedTargets.Length, first.Forms.Count);
         Assert.All(first.Forms, form =>
         {
@@ -130,6 +249,7 @@ public sealed class CaseloadComplianceGenerationTests
         Assert.Equal(3 * expectedTargets.Length,
             await verify.ReleaseObligations.CountAsync(release =>
                 release.PersonId == personId));
+        Assert.Equal(1, await verify.Notes.CountAsync(note => note.PersonId == personId));
     }
 
     [Fact]
@@ -219,6 +339,21 @@ public sealed class CaseloadComplianceGenerationTests
             Forms: [],
             Notes: [],
             ReleaseObligations: [release]);
+
+    private sealed class RecordingCommandInterceptor : DbCommandInterceptor
+    {
+        public List<string> Commands { get; } = [];
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            Commands.Add(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+    }
 
     private sealed class FixedSettingsService : ISettingsService
     {

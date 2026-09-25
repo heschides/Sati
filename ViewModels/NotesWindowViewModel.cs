@@ -23,6 +23,10 @@ namespace Sati.ViewModels
         private readonly ISessionService _sessionService;
         private readonly INoteService _noteService;
         private readonly LatestRequestTracker _accountLoads = new();
+        private IReadOnlyList<Person> _peopleSnapshot = [];
+        private bool _hasPeopleSnapshot;
+        private bool _hasLoadedNotes;
+        private Task? _entryInitializationTask;
 
         // True when the open dialog was triggered by a billing-window block rather
         // than a paperwork-gate failure. Same fork as the entry module: window
@@ -393,17 +397,25 @@ namespace Sati.ViewModels
         }
 
         [RelayCommand]
-        public async Task ReloadAsync()
+        public Task ReloadAsync() => LoadAsync(refreshPeople: true);
+
+        private async Task LoadAsync(bool refreshPeople)
         {
             var request = _accountLoads.Begin();
             var account = _sessionService.CurrentUser;
             try
             {
+                await EnsureEntryInitializedAsync();
                 var userId = account?.Id
                     ?? throw new InvalidOperationException("A signed-in user is required to load notes.");
-                var people = await LoadPeopleWithFullNotesAsync(userId);
+                var people = !refreshPeople && _hasPeopleSnapshot
+                    ? _peopleSnapshot.ToList()
+                    : await _personService.GetAllPeopleAsync(userId);
+                people = await LoadPeopleWithFullNotesAsync(people);
                 if (!_accountLoads.IsCurrent(request) || !ReferenceEquals(_sessionService.CurrentUser, account))
                     return;
+                _peopleSnapshot = people;
+                _hasPeopleSnapshot = true;
 
                 // Publish only after the full replacement is available. A failed
                 // refresh leaves the previously loaded notes visible rather than
@@ -428,6 +440,7 @@ namespace Sati.ViewModels
                 OnPropertyChanged(nameof(HasReturned));
                 OnPropertyChanged(nameof(HasHeld));
                 OnPropertyChanged(nameof(HasAttentionItems));
+                _hasLoadedNotes = true;
                 HasLoadError = false;
                 LoadErrorMessage = string.Empty;
             }
@@ -443,9 +456,65 @@ namespace Sati.ViewModels
             }
         }
 
+        /// <summary>
+        /// Publishes the dashboard's authoritative caseload snapshot without loading
+        /// note narratives. The note editor and client filter become usable at once;
+        /// full note content remains behind the first Notes Log navigation.
+        /// </summary>
+        public void ReplacePeople(IEnumerable<Person> people)
+        {
+            var selectedFilterId = ReferenceEquals(SelectedFilterPerson, AllPersonsSentinel)
+                ? null
+                : SelectedFilterPerson?.Id;
+            _peopleSnapshot = people.ToList();
+            _hasPeopleSnapshot = true;
+
+            FilterPeople.Clear();
+            FilterPeople.Add(AllPersonsSentinel);
+            foreach (var person in _peopleSnapshot)
+                FilterPeople.Add(person);
+            SelectedFilterPerson = selectedFilterId is int personId
+                ? FilterPeople.FirstOrDefault(person => person?.Id == personId)
+                    ?? AllPersonsSentinel
+                : AllPersonsSentinel;
+
+            // SetPeople preserves an in-progress draft when the selected Id did
+            // not change, while refreshing its forms and release facts.
+            NoteEntry.SetPeople(_peopleSnapshot);
+
+            if (!_hasLoadedNotes)
+                return;
+
+            var peopleById = _peopleSnapshot.ToDictionary(person => person.Id);
+            foreach (var note in _allNotes.ToList())
+            {
+                if (!peopleById.TryGetValue(note.PersonId, out var person))
+                {
+                    _allNotes.Remove(note);
+                    continue;
+                }
+                note.Person = person;
+            }
+            foreach (var person in _peopleSnapshot)
+                person.Notes = _allNotes.Where(note => note.PersonId == person.Id).ToList();
+            NotesView.Refresh();
+        }
+
+        public Task EnsureLoadedAsync() =>
+            _hasLoadedNotes ? Task.CompletedTask : LoadAsync(refreshPeople: false);
+
+        public Task ReloadIfLoadedAsync() =>
+            _hasLoadedNotes ? LoadAsync(refreshPeople: false) : Task.CompletedTask;
+
+        internal bool HasLoadedNotes => _hasLoadedNotes;
+
         public void ClearForAccountSwitch()
         {
             _accountLoads.Invalidate();
+            _peopleSnapshot = [];
+            _hasPeopleSnapshot = false;
+            _hasLoadedNotes = false;
+            _entryInitializationTask = null;
             SelectedNote = null;
             ClearFilters();
             _allNotes.Clear();
@@ -462,21 +531,42 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(HasAttentionItems));
         }
 
-        private async Task<List<Person>> LoadPeopleWithFullNotesAsync(int userId)
+        private async Task<List<Person>> LoadPeopleWithFullNotesAsync(List<Person> people)
         {
-            var people = await _personService.GetAllPeopleAsync(userId);
             // A case manager with dozens of consumers previously opened one
             // DbContext/query per consumer at once. On cold LocalDB starts that
-            // exhausted the database grant and escaped through shell initialization.
-            // Reliability matters more than shaving milliseconds off login.
+            // exhausted the database grant. This remains a deliberately sequential,
+            // transitional read, but it now runs only when Notes Log is opened and
+            // never holds up shell startup. A bounded caseload-wide search endpoint
+            // is the durable replacement.
+            var loaded = new List<(Person Person, List<Note> Notes)>();
             foreach (var person in people)
             {
                 var notes = await _noteService.GetAllByPersonAsync(person.Id);
                 foreach (var note in notes)
                     note.Person = person;
-                person.Notes = notes;
+                loaded.Add((person, notes));
             }
+            foreach (var item in loaded)
+                item.Person.Notes = item.Notes;
             return people;
+        }
+
+        private async Task EnsureEntryInitializedAsync()
+        {
+            var initialization = _entryInitializationTask ??= NoteEntry.InitializeAsync();
+            try
+            {
+                await initialization;
+            }
+            catch
+            {
+                // A retry should get a fresh settings request rather than replaying
+                // the same faulted task forever.
+                if (ReferenceEquals(_entryInitializationTask, initialization))
+                    _entryInitializationTask = null;
+                throw;
+            }
         }
 
         /// <summary>

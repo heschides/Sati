@@ -249,9 +249,11 @@ namespace Sati.ViewModels
             if (IsCaseManagementAvailable) CurrentViewModel = _caseManagementViewModel;
         }
         [RelayCommand]
-        private void NavigateToSupervisorDashboard()
+        private async Task NavigateToSupervisorDashboard()
         {
-            if (IsSupervisionAvailable) CurrentViewModel = _supervisorDashboardViewModel;
+            if (!IsSupervisionAvailable) return;
+            CurrentViewModel = _supervisorDashboardViewModel;
+            await _supervisorDashboardViewModel.InitializeAsync();
         }
         [RelayCommand]
         private async Task NavigateToUserManagement()
@@ -262,9 +264,11 @@ namespace Sati.ViewModels
         }
         [RelayCommand] public void OpenSettingsWindow() => OpenSettingsWindowRequested?.Invoke(this, true);
         [RelayCommand]
-        private void NavigateToBilling()
+        private async Task NavigateToBilling()
         {
-            if (IsBillingAvailable) CurrentViewModel = _billingDashboardViewModel;
+            if (!IsBillingAvailable) return;
+            CurrentViewModel = _billingDashboardViewModel;
+            await _billingDashboardViewModel.InitializeAsync();
         }
         [RelayCommand]
         private async Task NavigateToRepresentativePayee()
@@ -534,10 +538,6 @@ namespace Sati.ViewModels
                 // administration. Their service permissions remain independent.
                 // Keep these loads sequential to avoid overlapping LocalDB sort grants.
                 await NotesViewModel.InitializeAsync();
-                // NotesLog hosts its own NoteEntry instance and needs its own settings.
-                await NotesViewModel.NotesLog.NoteEntry.InitializeAsync();
-                await NotesViewModel.NotesLog.ReloadAsync();
-                await NotesViewModel.Clients.ReloadAsync();
             }
 
             await NavigateByRoleAsync();
@@ -583,10 +583,6 @@ namespace Sati.ViewModels
             if (IsCaseManagementAvailable)
             {
                 await NotesViewModel.InitializeAsync();
-                // NotesLog hosts its own NoteEntry instance and needs its own settings.
-                await NotesViewModel.NotesLog.NoteEntry.InitializeAsync();
-                await NotesViewModel.NotesLog.ReloadAsync();
-                await NotesViewModel.Clients.ReloadAsync();
             }
 
             await NavigateByRoleAsync();
@@ -614,24 +610,15 @@ namespace Sati.ViewModels
                 await NavigateToPlatformHealth();
                 return;
             }
-            if (_sessionService.CurrentUser?.HasSupervisorPermissions == true)
-                await InitializeSupervisorAsync();
             if (IsCaseManagementAvailable) NavigateToCaseManagement();
-            else if (IsSupervisionAvailable) NavigateToSupervisorDashboard();
+            else if (IsSupervisionAvailable) await NavigateToSupervisorDashboard();
             else if (IsBillingAvailable)
             {
-                await _billingDashboardViewModel.InitializeAsync();
-                NavigateToBilling();
+                await NavigateToBilling();
             }
             else if (IsRepresentativePayeeAvailable) await NavigateToRepresentativePayee();
             else if (IsAdminAvailable) await NavigateToAdmin();
         }
-
-        private async Task InitializeSupervisorAsync()
-        {
-            await _supervisorDashboardViewModel.InitializeAsync();
-        }
-
 
     }
 }

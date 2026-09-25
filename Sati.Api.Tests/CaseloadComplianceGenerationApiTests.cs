@@ -1,7 +1,9 @@
 using System.Net.Http.Json;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sati.Api.Data;
+using Sati.Api.Endpoints;
 using Sati.Contracts.V1;
 using Xunit;
 
@@ -24,6 +26,70 @@ public sealed class CaseloadComplianceGenerationApiTests(SatiApiFactory factory)
     ];
 
     [Fact]
+    public async Task CaseloadNoteSummaryIsBlobFreeAndUsesTheBusinessDateWindow()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApiDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        using var db = new ApiDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var businessDate = new DateTime(2032, 6, 15);
+        db.Agencies.Add(new ServerAgency { Id = 7, Name = "Projection agency" });
+        db.Users.Add(new ServerUser
+        {
+            Id = 71, AgencyId = 7, Username = "projection", DisplayName = "Projection",
+            PasswordHash = "hash", Salt = "salt", Role = "CaseManager"
+        });
+        db.People.Add(new ServerPerson
+        {
+            Id = 701, UserId = 71, AgencyId = 7, FirstName = "Projection",
+            LastName = "Consumer", BirthDate = new DateTime(1990, 1, 1),
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        db.Notes.AddRange(
+            Note(701, 7, 0, businessDate, "Today"),
+            Note(701, 7, 0, businessDate.AddDays(30), "Last included"),
+            Note(701, 7, 0, businessDate.AddDays(-1), "Yesterday"),
+            Note(701, 7, 0, businessDate.AddDays(31), "Too far"),
+            Note(701, 7, 1, businessDate.AddDays(1), "Not scheduled"));
+        await db.SaveChangesAsync();
+
+        var query = ApiEndpoints.CaseloadNoteSummaries(db, [701], 7, businessDate);
+        var sql = query
+            .ToQueryString();
+        var rows = (await query.ToListAsync())
+            .OrderBy(row => row.EventDate)
+            .ToList();
+
+        Assert.Equal([businessDate, businessDate.AddDays(30)],
+            rows.Select(row => row.EventDate!.Value));
+        Assert.Contains("\"Id\"", sql, StringComparison.Ordinal);
+        Assert.Contains("\"ReleaseObligationId\"", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("Narrative", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("VisitDocumentationJson", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CaseManagerJustification", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static ServerNote Note(
+        int personId,
+        int agencyId,
+        int status,
+        DateTime eventDate,
+        string narrative) => new()
+        {
+            PersonId = personId,
+            AgencyId = agencyId,
+            Status = status,
+            EventDate = eventDate,
+            NoteType = 4,
+            Narrative = narrative,
+            VisitDocumentationJson = new string('J', 2_000)
+        };
+
+    [Fact]
     public async Task CaseloadLoadCreatesOutstandingAnnualGraphOnceAndReturnsReleaseFacts()
     {
         var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
@@ -35,6 +101,13 @@ public sealed class CaseloadComplianceGenerationApiTests(SatiApiFactory factory)
             LoadConsumerAsync(client, seed.PersonId),
             LoadConsumerAsync(client, seed.PersonId));
         var first = simultaneousLoads[0];
+
+        var scheduled = Assert.Single(first.Notes);
+        Assert.Equal(seed.ScheduledNoteId, scheduled.Id);
+        Assert.Equal("Scheduled", scheduled.Status);
+        Assert.Equal(DateTime.Today.AddDays(10), scheduled.EventDate);
+        Assert.Contains(first.ContactFacts!, fact =>
+            fact.EvidenceId == $"note:{seed.ContactNoteId}");
 
         Assert.Equal(ExpectedFormTypes.Length * expectedTargets.Length, first.Forms.Count);
         Assert.All(first.Forms, form =>
@@ -178,8 +251,53 @@ public sealed class CaseloadComplianceGenerationApiTests(SatiApiFactory factory)
                 StartDate = assignmentStart,
                 AssignmentKnownOn = assignmentStart
             });
+        var scheduled = new ServerNote
+        {
+            PersonId = person.Id,
+            AgencyId = 1,
+            Status = 0,
+            EventDate = DateTime.Today.AddDays(10),
+            NoteType = 4,
+            Narrative = new string('N', 8_000),
+            VisitDocumentationJson = new string('J', 8_000)
+        };
+        var contact = new ServerNote
+        {
+            PersonId = person.Id,
+            AgencyId = 1,
+            Status = 2,
+            EventDate = DateTime.Today.AddDays(-10),
+            NoteType = 0,
+            Narrative = "Historical contact fact"
+        };
+        db.Notes.AddRange(
+            scheduled,
+            contact,
+            new ServerNote
+            {
+                PersonId = person.Id, AgencyId = 1, Status = 0,
+                EventDate = DateTime.Today.AddDays(-1), NoteType = 4,
+                Narrative = "Past scheduled"
+            },
+            new ServerNote
+            {
+                PersonId = person.Id, AgencyId = 1, Status = 0,
+                EventDate = DateTime.Today.AddDays(31), NoteType = 4,
+                Narrative = "Far scheduled"
+            },
+            new ServerNote
+            {
+                PersonId = person.Id, AgencyId = 1, Status = 1,
+                EventDate = DateTime.Today.AddDays(5), NoteType = 4,
+                Narrative = "In-window pending"
+            });
         await db.SaveChangesAsync();
-        return new GenerationSeed(person.Id, medicalName, agencyName);
+        return new GenerationSeed(
+            person.Id,
+            medicalName,
+            agencyName,
+            scheduled.Id,
+            contact.Id);
     }
 
     private static async Task<PersonDto> LoadConsumerAsync(
@@ -199,5 +317,7 @@ public sealed class CaseloadComplianceGenerationApiTests(SatiApiFactory factory)
     private sealed record GenerationSeed(
         int PersonId,
         string MedicalProviderName,
-        string AgencyProviderName);
+        string AgencyProviderName,
+        int ScheduledNoteId,
+        int ContactNoteId);
 }

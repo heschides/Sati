@@ -310,12 +310,8 @@ namespace Sati
                     }
                 }
 
-                // Login sequence
-                var splash = new SplashScreenWindow();
-                splash.Show();
-                await Task.Delay(3000);
-                splash.Close();
-
+                // Login sequence. Do not impose a ceremonial splash delay: the only
+                // startup surface after this point covers real authenticated work.
                 var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
                 loginWindow.Title = $"{dataEnvironment.WindowTitle} — Sign in";
                 bool? result = loginWindow.ShowDialog();
@@ -328,19 +324,67 @@ namespace Sati
                     var session = _host.Services.GetRequiredService<ISessionService>();
                     session.SetUser(user);
 
-                    if (_host.Services.GetService<IIncidentReporter>() is { } reporter)
+                    var workspacePreparation = SplashScreenWindow.CreateWorkspacePreparation();
+                    try
                     {
-                        await _host.Services.GetRequiredService<ApplicationRunState>()
-                            .StartSessionAsync(user, reporter);
-                        await reporter.FlushAsync();
+                        workspacePreparation.Show();
+                        // Show and paint the status before the first network or database
+                        // operation. Otherwise the cue could arrive only after the wait.
+                        await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
+
+                        if (_host.Services.GetService<IIncidentReporter>() is { } reporter)
+                        {
+                            await _host.Services.GetRequiredService<ApplicationRunState>()
+                                .StartSessionAsync(user, reporter);
+                            await reporter.FlushAsync();
+                        }
+
+                        var shellVm = _host.Services.GetRequiredService<ShellViewModel>();
+                        await shellVm.InitializeAsync();
+
+                        var shellWindow = _host.Services.GetRequiredService<ShellWindow>();
+                        shellWindow.Title = dataEnvironment.WindowTitle;
+                        MainWindow = shellWindow;
+                        var shellRendered = new TaskCompletionSource(
+                            TaskCreationOptions.RunContinuationsAsynchronously);
+                        EventHandler? markShellRendered = null;
+                        markShellRendered = (_, _) => shellRendered.TrySetResult();
+                        EventHandler? failIfShellCloses = null;
+                        failIfShellCloses = (_, _) => shellRendered.TrySetException(
+                            new InvalidOperationException(
+                                "The Sati workspace closed before its first render."));
+                        shellWindow.ContentRendered += markShellRendered;
+                        shellWindow.Closed += failIfShellCloses;
+                        // Keep the opaque preparation surface above the newly shown
+                        // shell until WPF confirms the shell content was rendered.
+                        workspacePreparation.Topmost = true;
+                        shellWindow.Show();
+                        try
+                        {
+                            var renderOrTimeout = await Task.WhenAny(
+                                shellRendered.Task,
+                                Task.Delay(TimeSpan.FromSeconds(15)));
+                            if (!ReferenceEquals(renderOrTimeout, shellRendered.Task))
+                                throw new TimeoutException(
+                                    "The Sati workspace did not render within 15 seconds.");
+                            await shellRendered.Task;
+                        }
+                        finally
+                        {
+                            shellWindow.ContentRendered -= markShellRendered;
+                            shellWindow.Closed -= failIfShellCloses;
+                        }
+
+                        workspacePreparation.CloseWorkspacePreparation();
+                        shellWindow.Activate();
                     }
-
-                    var shellVm = _host.Services.GetRequiredService<ShellViewModel>();
-                    await shellVm.InitializeAsync();
-
-                    var shellWindow = _host.Services.GetRequiredService<ShellWindow>();
-                    shellWindow.Title = dataEnvironment.WindowTitle;
-                    shellWindow.Show();
+                    finally
+                    {
+                        // On success this follows ShellWindow.Show, so there is no blank
+                        // transition. On failure it gets out of the way before the startup
+                        // error is reported by the outer safety boundary.
+                        workspacePreparation.CloseWorkspacePreparation();
+                    }
                 }
                 else
                 {

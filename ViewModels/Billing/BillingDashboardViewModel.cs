@@ -10,6 +10,7 @@ namespace Sati.ViewModels.Billing
         private readonly BillingSubmissionsViewModel _submissionsViewModel;
         private readonly BillingRemittancesViewModel _remittancesViewModel;
         private readonly BillingAlertsViewModel _alertsViewModel;
+        private readonly SemaphoreSlim _initializationGate = new(1, 1);
 
         public BillingDashboardViewModel(
             BillingOverviewViewModel overviewViewModel,
@@ -25,7 +26,6 @@ namespace Sati.ViewModels.Billing
             _alertsViewModel = alertsViewModel;
 
             CurrentSubView = _overviewViewModel;
-            _ = _overviewViewModel.LoadAsync();
         }
 
         [ObservableProperty] private object? currentSubView;
@@ -48,9 +48,7 @@ namespace Sati.ViewModels.Billing
         [RelayCommand]
         private async Task NavigateToOverview()
         {
-            CurrentSubView = _overviewViewModel;
-            if (!_overviewViewModel.HasLoaded)
-                await _overviewViewModel.LoadAsync(waitForExisting: true);
+            await InitializeAsync();
         }
 
         [RelayCommand]
@@ -87,9 +85,17 @@ namespace Sati.ViewModels.Billing
 
         public async Task InitializeAsync()
         {
-            CurrentSubView = null;
-            await _overviewViewModel.LoadAsync(waitForExisting: true);
             CurrentSubView = _overviewViewModel;
+            await _initializationGate.WaitAsync();
+            try
+            {
+                if (!_overviewViewModel.HasLoaded)
+                    await _overviewViewModel.LoadAsync(waitForExisting: true);
+            }
+            finally
+            {
+                _initializationGate.Release();
+            }
         }
 
         public void ClearForAccountSwitch()

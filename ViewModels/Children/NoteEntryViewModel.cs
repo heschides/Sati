@@ -48,6 +48,7 @@ namespace Sati.ViewModels.Children
         private readonly DiscardChangesPrompt _confirmDiscard;
 
         private Settings? _settings;
+        private readonly LatestRequestTracker _settingsLoads = new();
         public BillingComplianceRequirements ComplianceRequirements =>
             _settings?.BillingComplianceRequirements ?? BillingComplianceGate.DefaultRequirements;
         public int PcpOpenDaysBefore => _settings?.PcpOpenDaysBefore ?? 90;
@@ -971,7 +972,18 @@ namespace Sati.ViewModels.Children
 
         public async Task InitializeAsync()
         {
-            _settings = await _settingsService.LoadAsync();
+            var request = _settingsLoads.Begin();
+            var account = _sessionService.CurrentUser;
+            var settings = await _settingsService.LoadAsync();
+            if (!_settingsLoads.IsCurrent(request) ||
+                !ReferenceEquals(_sessionService.CurrentUser, account))
+            {
+                return;
+            }
+
+            _settings = settings;
+            OnPropertyChanged(nameof(ComplianceRequirements));
+            OnPropertyChanged(nameof(PcpOpenDaysBefore));
             RefreshSuggestedFollowUp(SelectedPerson, resetAcceptance: false);
         }
 
@@ -2590,6 +2602,7 @@ namespace Sati.ViewModels.Children
 
         public void Reset()
         {
+            _settingsLoads.Invalidate();
             _aiDraftRequests.Invalidate();
             _dayScheduleLoad.Invalidate();
             _freshnessChecks.Invalidate();
@@ -2597,6 +2610,9 @@ namespace Sati.ViewModels.Children
             _editingNote = null;
             _isStartingScheduledWork = false;
             _pendingVisitDocumentation = null;
+            _settings = null;
+            OnPropertyChanged(nameof(ComplianceRequirements));
+            OnPropertyChanged(nameof(PcpOpenDaysBefore));
             IsEditing = false;
             IsLocked = false;
             ReturnReason = null;

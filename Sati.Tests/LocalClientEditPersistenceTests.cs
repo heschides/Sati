@@ -96,14 +96,24 @@ public sealed class LocalClientEditPersistenceTests
         await using var fixture = await NoteEntryFixture.CreateAsync();
         await PrepareAsync(fixture);
         var people = fixture.PeopleAs(fixture.CaseManagerOne);
+        int noteId;
+        await using (var before = fixture.Factory.CreateDbContext())
+        {
+            noteId = await before.Notes
+                .Where(item => item.PersonId == fixture.PersonOneId)
+                .Select(item => item.Id)
+                .SingleAsync();
+        }
         var loaded = (await people.GetAllPeopleAsync(fixture.CaseManagerOne.Id))
             .Single(item => item.Id == fixture.PersonOneId);
-        var loadedNote = Assert.Single(loaded.Notes);
+        // Startup caseloads intentionally carry only upcoming Scheduled summaries;
+        // historical Logged notes stay behind the explicit note-service boundary.
+        Assert.Empty(loaded.Notes);
 
         // Someone else changes the note after this caseload was loaded.
         await using (var other = fixture.Factory.CreateDbContext())
         {
-            var note = await other.Notes.SingleAsync(item => item.Id == loadedNote.Id);
+            var note = await other.Notes.SingleAsync(item => item.Id == noteId);
             note.Narrative = "Corrected elsewhere.";
             note.Revision++;
             await other.SaveChangesAsync();
@@ -113,7 +123,7 @@ public sealed class LocalClientEditPersistenceTests
         await people.EditPersonAsync(loaded);
 
         await using var db = fixture.Factory.CreateDbContext();
-        var stored = await db.Notes.AsNoTracking().SingleAsync(item => item.Id == loadedNote.Id);
+        var stored = await db.Notes.AsNoTracking().SingleAsync(item => item.Id == noteId);
         Assert.Equal("Corrected elsewhere.", stored.Narrative);
     }
 

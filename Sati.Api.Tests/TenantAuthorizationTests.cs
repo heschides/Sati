@@ -95,6 +95,7 @@ public sealed class TenantAuthorizationTests
             () => JsonRequest(HttpMethod.Put, "/api/v1/billing/configuration", configuration),
             () => new(HttpMethod.Post, "/api/v1/billing/periods/2026/7?userId=12"),
             () => new(HttpMethod.Get, "/api/v1/billing/periods"),
+            () => new(HttpMethod.Get, "/api/v1/billing/overview-periods/2026/7"),
             () => new(HttpMethod.Get, "/api/v1/billing/submissions"),
             () => new(HttpMethod.Get, "/api/v1/billing/remittances"),
             () => new(HttpMethod.Get, "/api/v1/billing/remittance-deposits"),
@@ -112,7 +113,7 @@ public sealed class TenantAuthorizationTests
                 new GenerateEdiRequest(true, Guid.NewGuid().ToString("N")))
         ];
 
-        Assert.Equal(15, requests.Length);
+        Assert.Equal(16, requests.Length);
         foreach (var createRequest in requests)
         {
             using var request = createRequest();

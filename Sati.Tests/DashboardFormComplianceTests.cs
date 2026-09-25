@@ -1,6 +1,7 @@
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
+using Sati.Services;
 using Sati.ViewModels;
 using Sati.ViewModels.Children;
 using Xunit;
@@ -210,6 +211,7 @@ public sealed class DashboardFormComplianceTests
             targetEffectiveDate: upcomingTarget);
         person.Forms.AddRange([current, upcoming]);
 
+        harness.ReplacePerson(person);
         clients.People.Add(person);
         clients.SelectedPerson = person;
         var row = clients.AnnualFormRow(FormType.PCP);
@@ -235,6 +237,55 @@ public sealed class DashboardFormComplianceTests
         Assert.Equal(completedOn, upcoming.CompletedDate);
         Assert.Equal(currentTarget, current.CompletedDate);
         Assert.True(clients.AnnualFormRow(FormType.PCP).Renewal!.IsComplete);
+    }
+
+    [Fact]
+    public async Task DelayedPickerPreferenceCannotPublishAnOldAccountCaseload()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var preferences = new DelayedSecondPreferenceService();
+        var harness = await DashboardHarness.CreateAsync(fixture, preferences);
+        var oldPerson = Person.Rehydrate(801, fixture.CaseManagerTwo.Id);
+        oldPerson.FirstName = "Old";
+        oldPerson.LastName = "Account";
+        harness.ReplacePerson(oldPerson);
+        harness.Dashboard.LoggedInUser = fixture.CaseManagerTwo;
+
+        var oldLoad = harness.Dashboard.LoadPeopleAsync();
+        await preferences.SecondLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        harness.Dashboard.Reset();
+        harness.Dashboard.LoggedInUser = fixture.CaseManagerOne;
+        var currentPerson = Person.Rehydrate(802, fixture.CaseManagerOne.Id);
+        currentPerson.FirstName = "Current";
+        currentPerson.LastName = "Account";
+        harness.ReplacePerson(currentPerson);
+        await harness.Dashboard.LoadPeopleAsync();
+
+        preferences.ReleaseSecondLoad.TrySetResult();
+        await oldLoad;
+
+        Assert.Same(currentPerson, Assert.Single(harness.Dashboard.People));
+    }
+
+    [Fact]
+    public async Task CalendarYearNotesAreDeferredUntilFirstCalendarNavigation()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+
+        Assert.Equal(0, harness.Notes.YearLoads);
+
+        await harness.Dashboard.NavigateToCalendarCommand.ExecuteAsync(null);
+        await harness.Dashboard.NavigateToCalendarCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, harness.Notes.YearLoads);
+
+        harness.Dashboard.Reset();
+        await harness.Dashboard.InitializeAsync();
+        Assert.Equal(1, harness.Notes.YearLoads);
+        await harness.Dashboard.NavigateToCalendarCommand.ExecuteAsync(null);
+        Assert.Equal(2, harness.Notes.YearLoads);
     }
 
     [Fact]
@@ -378,15 +429,18 @@ public sealed class DashboardFormComplianceTests
             CaseManagerDashboardViewModel dashboard,
             Settings settings,
             UpcomingEventService upcomingEvents,
-            MutablePersonService people)
+            MutablePersonService people,
+            CountingNoteService notes)
         {
             Dashboard = dashboard;
             this.settings = settings;
             this.upcomingEvents = upcomingEvents;
             this.people = people;
+            Notes = notes;
         }
 
         public CaseManagerDashboardViewModel Dashboard { get; }
+        public CountingNoteService Notes { get; }
 
         public void ReplacePerson(Person person)
         {
@@ -394,12 +448,14 @@ public sealed class DashboardFormComplianceTests
             people.Items.Add(person);
         }
 
-        public static async Task<DashboardHarness> CreateAsync(NoteEntryFixture fixture)
+        public static async Task<DashboardHarness> CreateAsync(
+            NoteEntryFixture fixture,
+            ConsumerPickerSortPreferenceService? preferences = null)
         {
             var session = new SessionService();
             session.SetUser(fixture.CaseManagerOne);
             var people = new MutablePersonService();
-            var notes = fixture.NotesFromAnotherSession();
+            var notes = new CountingNoteService(fixture.NotesFromAnotherSession());
             var settings = new Settings { ReviewDaysAfterDue = 30 };
             var settingsService = new FixedSettingsService(settings);
             var forms = new RecordingFormService();
@@ -444,10 +500,11 @@ public sealed class DashboardFormComplianceTests
                 null!,
                 null!,
                 new GuidanceViewModel(),
-                new HelperReferenceViewModel());
+                new HelperReferenceViewModel(),
+                consumerPickerSortPreferences: preferences);
 
             await dashboard.InitializeAsync();
-            return new DashboardHarness(dashboard, settings, upcomingEvents, people);
+            return new DashboardHarness(dashboard, settings, upcomingEvents, people, notes);
         }
 
         public (Person Person, Form Form) AddOverdueQuarterlyReview(FormType type)
@@ -562,6 +619,53 @@ public sealed class DashboardFormComplianceTests
     {
         public Task<Settings> LoadAsync() => Task.FromResult(settings);
         public Task SaveAsync(Settings value) => Task.CompletedTask;
+    }
+
+    private sealed class CountingNoteService(INoteService inner) : INoteService
+    {
+        public int YearLoads { get; private set; }
+        public Task<Note> AddNoteAsync(Note note) => inner.AddNoteAsync(note);
+        public Task DeleteNoteAsync(Note note) => inner.DeleteNoteAsync(note);
+        public Task UpdateNoteAsync(Note note) => inner.UpdateNoteAsync(note);
+        public Task<List<Note>> GetAllByPersonAsync(int personId) =>
+            inner.GetAllByPersonAsync(personId);
+        public Task UpdateAbandonedNotesAsync(int abandonedAfterDays) =>
+            inner.UpdateAbandonedNotesAsync(abandonedAfterDays);
+        public Task<List<Note>> GetMonthlyNotesAsync(int userId) =>
+            inner.GetMonthlyNotesAsync(userId);
+        public Task<List<Note>> GetByYearAsync(int userId, int year)
+        {
+            YearLoads++;
+            return inner.GetByYearAsync(userId, year);
+        }
+        public Task<List<Note>> GetDayScheduleAsync(int userId, DateTime date) =>
+            inner.GetDayScheduleAsync(userId, date);
+    }
+
+    private sealed class DelayedSecondPreferenceService()
+        : ConsumerPickerSortPreferenceService(
+            new DataEnvironmentInfo(
+                SatiDataEnvironment.Demo,
+                "SatiDemo",
+                ApiBaseAddress: new Uri("https://demo.invalid")))
+    {
+        private int _loads;
+        public TaskCompletionSource SecondLoadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseSecondLoad { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async Task<bool> LoadForUserAsync(
+            int userId,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _loads) == 2)
+            {
+                SecondLoadStarted.TrySetResult();
+                await ReleaseSecondLoad.Task.WaitAsync(cancellationToken);
+            }
+            return false;
+        }
     }
 
     private sealed class EmptyExemptDateService : IExemptDateService

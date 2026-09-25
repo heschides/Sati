@@ -13,6 +13,7 @@ public sealed class BillingPrivacyTests(SatiApiFactory factory)
     [Fact]
     public async Task FinanceBillingQueueReturnsMinimumNecessaryServiceFactsOnly()
     {
+        using var finance = await factory.CreateAuthenticatedClientAsync("finance-one");
         int noteId;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
@@ -35,7 +36,6 @@ public sealed class BillingPrivacyTests(SatiApiFactory factory)
 
         try
         {
-            using var finance = await factory.CreateAuthenticatedClientAsync("finance-one");
             using var response = await finance.GetAsync("/api/v1/billing/candidates");
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync();

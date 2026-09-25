@@ -284,6 +284,7 @@ public sealed class NewClientCreationTests
         var settings = new FirstThenThrowSettingsService();
         var people = new CountingPersonService();
         var viewModel = CreateViewModel(people, settings);
+        await viewModel.EnsureInitializedAsync();
         await settings.FirstLoadCompleted.Task;
         viewModel.FirstName = "Jamie";
         viewModel.LastName = "River";
@@ -301,6 +302,19 @@ public sealed class NewClientCreationTests
         Assert.False(shownProblem.SaveStatusUnknown);
         Assert.Contains("form-deadline settings", shownProblem.Message);
         Assert.Contains("Close and reopen Sati", shownProblem.Message);
+    }
+
+    [Fact]
+    public async Task DeferredClientSettingsInitializationRetriesAfterATransientFailure()
+    {
+        var settings = new FirstFailsThenSucceedsSettingsService();
+        var viewModel = CreateViewModel(new CountingPersonService(), settings);
+
+        await viewModel.EnsureInitializedAsync();
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.Equal(2, settings.Loads);
+        Assert.Equal(37, viewModel.PcpOpenDaysBefore);
     }
 
     [Fact]
@@ -756,6 +770,21 @@ public sealed class NewClientCreationTests
 
             return Task.FromException<Settings>(
                 new InvalidOperationException("simulated missing Settings column"));
+        }
+
+        public Task SaveAsync(Settings settings) => Task.CompletedTask;
+    }
+
+    private sealed class FirstFailsThenSucceedsSettingsService : ISettingsService
+    {
+        public int Loads { get; private set; }
+
+        public Task<Settings> LoadAsync()
+        {
+            Loads++;
+            return Loads == 1
+                ? Task.FromException<Settings>(new InvalidOperationException("transient settings failure"))
+                : Task.FromResult(new Settings { PcpOpenDaysBefore = 37 });
         }
 
         public Task SaveAsync(Settings settings) => Task.CompletedTask;

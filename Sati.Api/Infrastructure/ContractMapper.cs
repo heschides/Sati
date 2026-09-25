@@ -44,7 +44,8 @@ internal static class ContractMapper
         ServerPerson person,
         IReadOnlyList<ServerForm> forms,
         IReadOnlyList<ServerNote> notes,
-        IReadOnlyList<ReleaseComplianceFact>? releaseObligations = null) => new(
+        IReadOnlyList<ReleaseComplianceFact>? releaseObligations = null,
+        IReadOnlyList<ContactFact>? contactFacts = null) => new(
         person.Id,
         person.UserId,
         person.FirstName,
@@ -98,7 +99,8 @@ internal static class ContractMapper
         person.StatusNote,
         person.StatusChangedAtUtc,
         person.StatusChangedByUserId,
-        releaseObligations);
+        releaseObligations,
+        contactFacts);
 
     public static FormDto ToForm(ServerForm form) => new(
         form.Id,

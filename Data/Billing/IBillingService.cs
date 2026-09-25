@@ -15,6 +15,31 @@ namespace Sati.Data.Billing
         Task<BillingPeriod> GetOrCreateBillingPeriodAsync(AgencyActor actor, int userId, int month, int year);
         Task<IEnumerable<BillingPeriod>> GetBillingPeriodsAsync(AgencyActor actor, int userId);
         Task<IEnumerable<BillingPeriod>> GetAllBillingPeriodsAsync(AgencyActor actor);
+        async Task<BillingPeriodOverviewDto> GetBillingPeriodOverviewAsync(
+            AgencyActor actor,
+            DateTime asOf)
+        {
+            // Compatibility fallback for isolated test doubles and alternate
+            // implementations. Production Local and Cloud services override this
+            // with bounded aggregate queries.
+            var periods = (await GetAllBillingPeriodsAsync(actor)).ToList();
+            var firstMonth = new DateTime(asOf.Year, asOf.Month, 1).AddMonths(-5);
+            var months = Enumerable.Range(0, 6)
+                .Select(offset => firstMonth.AddMonths(offset))
+                .Select(month => new BillingMonthChargeDto(
+                    month.Year,
+                    month.Month,
+                    periods
+                        .Where(period => period.Year == month.Year && period.Month == month.Month)
+                        .SelectMany(period => period.Lines)
+                        .Sum(line => line.ChargeAmount)))
+                .ToList();
+            var draftRevenue = periods
+                .Where(period => period.Status == BillingStatus.Draft)
+                .SelectMany(period => period.Lines)
+                .Sum(line => line.ChargeAmount);
+            return new BillingPeriodOverviewDto(draftRevenue, months);
+        }
         Task<ClaimLine> CreateClaimLineAsync(AgencyActor actor, int noteId, bool isComplianceException = false, string? complianceExceptionReason = null);
         Task<IEnumerable<ClaimLine>> GetUnbilledClaimLinesAsync(AgencyActor actor, int userId);
         Task SubmitBillingPeriodAsync(AgencyActor actor, int billingPeriodId);

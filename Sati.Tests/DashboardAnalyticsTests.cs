@@ -21,12 +21,17 @@ public sealed class DashboardAnalyticsTests
             new BillingValidationResult(true, ready, []),
             new BillingValidationResult(false, blocked, ["Missing payer data"])
         };
-        var periods = new[]
-        {
-            Period(9, 2026, BillingStatus.Draft, 100m),
-            Period(9, 2026, BillingStatus.Accepted, 200m),
-            Period(3, 2026, BillingStatus.Accepted, 900m)
-        };
+        var periodOverview = new BillingPeriodOverviewDto(
+            DraftRevenue: 100m,
+            Months:
+            [
+                new(2026, 4, 0m),
+                new(2026, 5, 0m),
+                new(2026, 6, 0m),
+                new(2026, 7, 0m),
+                new(2026, 8, 0m),
+                new(2026, 9, 300m)
+            ]);
         var outcomes = new[]
         {
             Outcome("Paid", 160m),
@@ -37,9 +42,8 @@ public sealed class DashboardAnalyticsTests
         var analytics = BillingOverviewViewModel.CreateAnalytics(
             new BillingConfiguration("H2014", null, 20m, "S", "Payer", "P", "C", "2075550100"),
             validations,
-            periods,
-            outcomes,
-            new DateTime(2026, 9, 11));
+            periodOverview,
+            outcomes);
 
         Assert.Equal(40m, analytics.ReadyRevenue);
         Assert.Equal(100m, analytics.DraftRevenue);
@@ -114,15 +118,6 @@ public sealed class DashboardAnalyticsTests
             (string?)element.Attribute("Text") == "CURRENT COMPLIANCE");
         Assert.DoesNotContain(supervisor.ToString(), "ProgressPercent", StringComparison.Ordinal);
     }
-
-    private static BillingPeriod Period(int month, int year, BillingStatus status, params decimal[] charges) =>
-        new()
-        {
-            Month = month,
-            Year = year,
-            Status = status,
-            Lines = charges.Select(charge => new ClaimLine { ChargeAmount = charge }).ToList()
-        };
 
     private static RemittanceClaimOutcomeDto Outcome(string status, decimal paidAmount) => new(
         1,

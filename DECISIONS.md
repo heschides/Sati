@@ -5096,3 +5096,46 @@ peak memory would still scale through several full-file copies; removing all lim
 local file can still exhaust CPU, memory, or encrypted-cache space; and retaining descriptions or
 attachments, because they are not part of the calendar display and unnecessarily increase PHI
 exposure.
+
+## 2026-09-24 — Startup prepares one visible workspace and defers the rest
+
+The blank interval after sign-in is now an explicit preparation state. Sati shows and renders an
+opaque, themed window saying “We are preparing the Sati workspace.” before authenticated incident,
+database, or API startup work begins. It assigns, shows, and renders the shell before closing that
+window in `finally`, so both success and failure have a defined visual transition. The old
+three-second pre-login splash was an artificial delay and is removed.
+
+The preparation surface carries one polite screen-reader status and a separate, non-live reflection
+region. Its 100 short passages are original Sati presentation copy, rotate no faster than every
+twenty seconds, visit the whole bank before repeating, and make no network request. The bank alone
+is dedicated under CC0-1.0 in the shipped `WORKSPACE_REFLECTIONS.md`; it is presented as “A Sati
+reflection,” not as a quotation from or endorsement by another person. External quote feeds and
+unverified attributions were rejected because they add network availability, provenance, privacy,
+and licensing problems to a status surface that needs none of them.
+
+The window does not excuse eager work. Case-management startup runs the authoritative caseload
+preparation once, including form generation and release reconciliation, and publishes that same
+snapshot to Overview, Clients, and Notes Log. Its note component is a scalar summary; narrative and
+visit JSON remain behind explicit note reads. Hidden Clients and Notes Log workspaces no longer
+repeat caseload loads, and full Notes Log content is loaded only on first navigation. That first
+load remains sequential and unbounded by page, so a server-side bounded search contract is tracked
+rather than misrepresented as finished scaling work.
+
+Billing follows the same rule. Constructing the shell or a Billing view model performs no billing
+read. The first actual Billing navigation runs one coalesced Overview initialization and later
+navigation reuses it until account state is cleared. Local and API candidate queries project only
+the facts consumed by the existing billing rules; forms and releases are loaded separately instead
+of multiplied in one joined graph. Clinical narratives, visit JSON, biography, journal, and—in the
+API—the encrypted SSN envelope do not participate in candidate discovery.
+
+The Billing landing page also no longer asks either service for every historical period and frozen
+claim line. Its period root is a purpose-built aggregate: all draft charge value plus six monthly
+charge totals ending in the requested month. Local SQL and the tenant-scoped API route perform the
+aggregation; only the six rows cross the service boundary. Detailed tabs keep their explicit period
+history operations. Supervisor follows the same first-use policy for its more expensive team
+summary, while cached re-entry rebuilds its lightweight chart models without refetching team data.
+
+**Rejected:** moving the old eager loads behind a prettier waiting screen; fire-and-forget startup
+reads that could publish after an account switch; parallel LocalDB graph loads; and adding a schema
+index before removing the measured overfetch and Cartesian query shape. This change requires no
+database migration.

@@ -106,6 +106,10 @@ namespace Sati.ViewModels
         private int? _justSavedPersonId;
         private readonly LatestRequestTracker _workspaceLoads = new();
         private readonly LatestRequestTracker _profileSettingsLoads = new();
+        private Task? _profileSettingsInitialization;
+        private int? _profileSettingsInitializationUserId;
+        private int? _profileSettingsLoadedUserId;
+        private long _profileSettingsInitializationVersion;
         private readonly JournalSaveCoordinator _journalSaveCoordinator = new();
         private readonly JournalDraftTracker _journalDraftTracker = new();
 
@@ -743,7 +747,6 @@ namespace Sati.ViewModels
 
             PeopleView = CollectionViewSource.GetDefaultView(People);
             PeopleView.Filter = MatchesConsumerFilter;
-            _ = LoadHealthcareOptionsSafelyAsync();
         }
 
         public void SetCompactDisplayMode(bool enabled) => IsCompactDisplayMode = enabled;
@@ -1069,7 +1072,7 @@ namespace Sati.ViewModels
         private void BeginClientEdit()
         {
             if (SelectedPerson is not Person person) return;
-            _ = LoadHealthcareOptionsSafelyAsync();
+            _ = EnsureInitializedAsync();
             ClientSaveErrorMessage = string.Empty;
             PopulateFrom(person);
             IsClientEditorOpen = true;
@@ -1524,7 +1527,7 @@ namespace Sati.ViewModels
 
         public async Task ReloadAsync()
         {
-            await LoadHealthcareOptionsSafelyAsync();
+            await ReloadProfileSettingsAsync();
             var account = _sessionService.CurrentUser
                 ?? throw new InvalidOperationException("A signed-in user is required to load clients.");
             var request = _workspaceLoads.Begin();
@@ -1543,10 +1546,59 @@ namespace Sati.ViewModels
                 SelectedPerson = People.FirstOrDefault(person => person.Id == personId);
         }
 
+        /// <summary>
+        /// Accepts the dashboard's already prepared caseload so opening Clients does
+        /// not perform a second full caseload read. Selection follows the consumer Id.
+        /// An open profile draft keeps its original instance and entered fields until
+        /// the user saves or cancels it; a background refresh must not erase that work.
+        /// </summary>
+        public void ReplacePeople(IEnumerable<Person> people)
+        {
+            var incoming = people.ToList();
+            var selected = SelectedPerson;
+            var selectedId = selected?.Id;
+            var currentPersonId = (PeopleView.CurrentItem as Person)?.Id;
+            var preserveDraft = selected is not null && IsClientEditorOpen;
+
+            People.Clear();
+            foreach (var person in incoming)
+            {
+                People.Add(preserveDraft && person.Id == selectedId
+                    ? selected!
+                    : person);
+            }
+
+            if (!preserveDraft)
+            {
+                SelectedPerson = selectedId is int personId
+                    ? People.FirstOrDefault(person => person.Id == personId)
+                    : null;
+            }
+            PeopleView.Refresh();
+            if (currentPersonId is int currentId)
+            {
+                var current = People.FirstOrDefault(person => person.Id == currentId);
+                if (current is not null)
+                    PeopleView.MoveCurrentTo(current);
+            }
+        }
+
+        // A note changed outside the Clients workspace. Refresh only the selected
+        // consumer's note list, and do nothing when this workspace has never had a
+        // selection; this avoids turning a hidden tab into another caseload load.
+        public Task RefreshSelectedNotesIfSelectedAsync() =>
+            SelectedPerson is null
+                ? Task.CompletedTask
+                : LoadSelectedPersonNotesAsync(SelectedPerson);
+
         public void ClearForAccountSwitch()
         {
             _workspaceLoads.Invalidate();
             _profileSettingsLoads.Invalidate();
+            _profileSettingsInitialization = null;
+            _profileSettingsInitializationUserId = null;
+            _profileSettingsLoadedUserId = null;
+            Interlocked.Increment(ref _profileSettingsInitializationVersion);
             Interlocked.Increment(ref _journalLoadVersion);
             _journalSaveTimer?.Stop();
             _journalPersonId = null;
@@ -1578,7 +1630,48 @@ namespace Sati.ViewModels
             OnPropertyChanged(nameof(IsDentistOverdue));
         }
 
-        public Task ReloadProfileSettingsAsync() => LoadHealthcareOptionsSafelyAsync();
+        public Task EnsureInitializedAsync()
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            if (userId is null)
+                return Task.CompletedTask;
+            if (_profileSettingsLoadedUserId == userId)
+                return Task.CompletedTask;
+            if (_profileSettingsInitializationUserId == userId &&
+                _profileSettingsInitialization is { IsCompleted: false })
+            {
+                return _profileSettingsInitialization;
+            }
+
+            return BeginProfileSettingsInitialization(userId.Value);
+        }
+
+        public Task ReloadProfileSettingsAsync()
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            return userId is null
+                ? Task.CompletedTask
+                : BeginProfileSettingsInitialization(userId.Value);
+        }
+
+        private Task BeginProfileSettingsInitialization(int userId)
+        {
+            var version = Interlocked.Increment(ref _profileSettingsInitializationVersion);
+            _profileSettingsInitializationUserId = userId;
+            return _profileSettingsInitialization = InitializeProfileSettingsAsync(userId, version);
+        }
+
+        private async Task InitializeProfileSettingsAsync(int userId, long version)
+        {
+            var loaded = await LoadHealthcareOptionsSafelyAsync();
+            if (version != Volatile.Read(ref _profileSettingsInitializationVersion))
+                return;
+
+            if (loaded && _sessionService.CurrentUser?.Id == userId)
+                _profileSettingsLoadedUserId = userId;
+            _profileSettingsInitialization = null;
+            _profileSettingsInitializationUserId = null;
+        }
 
         // -------------------------------------------------------------------------
         // Private methods
@@ -1946,19 +2039,19 @@ namespace Sati.ViewModels
             return false;
         }
 
-        private async Task LoadHealthcareOptionsSafelyAsync()
+        private async Task<bool> LoadHealthcareOptionsSafelyAsync()
         {
             var account = _sessionService.CurrentUser;
             var request = _profileSettingsLoads.Begin();
             try
             {
-                await LoadHealthcareOptionsAsync(account, request);
+                return await LoadHealthcareOptionsAsync(account, request);
             }
             catch (Exception exception)
             {
                 if (!_profileSettingsLoads.IsCurrent(request) ||
                     !ReferenceEquals(_sessionService.CurrentUser, account))
-                    return;
+                    return false;
                 // Construction cannot await this optional page initialization. Keep
                 // its failure inside the view model rather than letting a fire-and-
                 // forget task become an application-level crash.
@@ -1967,6 +2060,7 @@ namespace Sati.ViewModels
                     ClientSaveStage.LoadingSettings,
                     creating: true,
                     showDialog: false);
+                return false;
             }
         }
 
@@ -2007,12 +2101,12 @@ namespace Sati.ViewModels
         // Loads the configurable system names from Settings and projects each into a
         // HealthcareSystemOption for the combobox. Normalize re-applies the "Other"
         // floor and ordering in case the stored list was hand-edited.
-        private async Task LoadHealthcareOptionsAsync(User? account, int request)
+        private async Task<bool> LoadHealthcareOptionsAsync(User? account, int request)
         {
             var settings = await _settingsService.LoadAsync();
             if (!_profileSettingsLoads.IsCurrent(request) ||
                 !ReferenceEquals(_sessionService.CurrentUser, account))
-                return;
+                return false;
             AllowCredibleProfileUpdates = settings.AllowCredibleProfileUpdates;
             VrAssistantTitle = VocationalRehabilitationProfile.NormalizeAssistantTitle(
                 settings.VrAssistantTitle);
@@ -2031,6 +2125,7 @@ namespace Sati.ViewModels
             HealthcareSystems.Clear();
             foreach (var name in HealthcareSystemOptions.Normalize(settings.HealthcareSystems))
                 HealthcareSystems.Add(new HealthcareSystemOption(name));
+            return true;
         }
 
         private void RefreshComplianceFlags()

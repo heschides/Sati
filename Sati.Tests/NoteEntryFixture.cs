@@ -71,12 +71,13 @@ internal sealed class NoteEntryFixture : IAsyncDisposable
         IPersonContactService? contacts = null,
         INoteService? notes = null,
         IUpcomingEventService? upcomingEvents = null,
-        ISettingsService? settings = null) => new(
+        ISettingsService? settings = null,
+        ISessionService? session = null) => new(
         notes ?? new NoteService(Factory, SessionFor(CaseManagerOne)),
         people ?? PeopleAs(CaseManagerOne),
         settings ?? new StubSettingsService(),
         upcomingEvents ?? new UpcomingEventService(),
-        SessionFor(CaseManagerOne),
+        session ?? SessionFor(CaseManagerOne),
         contacts ?? new StubPersonContactService(),
         aiContext ?? new StubClientAiContextService(),
         formatter ?? new StubCaseNoteFormatter(aiEnabled),

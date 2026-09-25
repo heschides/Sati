@@ -143,6 +143,19 @@ public partial class CalendarViewModel : ObservableObject
 
     public Task InitializeAsync() => LoadYearAsync();
 
+    public void ClearForAccountSwitch()
+    {
+        _yearLoadRequests.Invalidate();
+        _exemptDates = [];
+        _yearNotes = [];
+        _yearOutlookEvents = [];
+        _serviceDayInclusions = [];
+        _settings = null;
+        IsLoading = false;
+        StatusMessage = string.Empty;
+        ClearLoadedYear();
+    }
+
     [RelayCommand]
     private Task Refresh() => LoadYearAsync();
 
@@ -412,7 +425,8 @@ public partial class CalendarViewModel : ObservableObject
             var settingsTask = LoadCalendarSettingsAsync();
             await Task.WhenAll(exemptDatesTask, notesTask, outlookTask, inclusionsTask, settingsTask);
 
-            if (!_yearLoadRequests.IsCurrent(request) || CurrentYear != year)
+            if (!_yearLoadRequests.IsCurrent(request) || CurrentYear != year ||
+                !ReferenceEquals(_sessionService.CurrentUser, user))
                 return;
 
             _serviceDayInclusions = await inclusionsTask;

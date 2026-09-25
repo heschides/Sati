@@ -1,10 +1,13 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
+using Sati.Models.Billing;
 using Sati.Services;
 using Sati.Services.Billing;
+using System.Data.Common;
 using Xunit;
 
 namespace Sati.Tests;
@@ -18,6 +21,7 @@ public sealed class BillingComplianceRecoveryServiceTests : IAsyncDisposable
     private User _foreignAdmin = null!;
     private int _personId;
     private int[] _noteIds = [];
+    private readonly CommandCapture _commands = new();
 
     public BillingComplianceRecoveryServiceTests() =>
         InitializeAsync().GetAwaiter().GetResult();
@@ -64,6 +68,155 @@ public sealed class BillingComplianceRecoveryServiceTests : IAsyncDisposable
 
         db.Remove(stored);
         await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task ApprovedCandidateGraphSplitsFormsAndReleaseObligations()
+    {
+        _commands.Clear();
+
+        var candidates = (await ServiceFor(_admin).GetApprovedUnbilledNotesAsync(
+            _admin.ToAgencyActor())).ToList();
+
+        Assert.Equal(2, candidates.Count);
+        Assert.Same(candidates[0].Person, candidates[1].Person);
+        Assert.DoesNotContain(_commands.ReaderCommands, command =>
+            command.Contains("FROM \"Notes\"", StringComparison.Ordinal) &&
+            command.Contains("\"Forms\"", StringComparison.Ordinal) &&
+            command.Contains("\"ReleaseObligations\"", StringComparison.Ordinal));
+        Assert.Contains(_commands.ReaderCommands, command =>
+            command.Contains("\"Forms\"", StringComparison.Ordinal));
+        Assert.Contains(_commands.ReaderCommands, command =>
+            command.Contains("\"ReleaseObligations\"", StringComparison.Ordinal));
+        var candidateCommand = Assert.Single(_commands.ReaderCommands, command =>
+            command.Contains("FROM \"Notes\"", StringComparison.Ordinal) &&
+            command.Contains("JOIN \"People\"", StringComparison.Ordinal));
+        Assert.DoesNotContain("\"Narrative\"", candidateCommand, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"VisitDocumentationJson\"", candidateCommand, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Bio\"", candidateCommand, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Journal\"", candidateCommand, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ApprovedCandidatesRequireMatchingNotePersonAndOwnerAgency()
+    {
+        _commands.Clear();
+        await using (var db = _factory.CreateDbContext())
+        {
+            var mismatchedNote = await db.Notes.SingleAsync(note => note.Id == _noteIds[0]);
+            mismatchedNote.AgencyId = _foreignAdmin.AgencyId;
+            await db.SaveChangesAsync();
+        }
+
+        var service = ServiceFor(_admin);
+        var candidates = (await service.GetApprovedUnbilledNotesAsync(
+            _admin.ToAgencyActor())).ToList();
+        Assert.Equal([_noteIds[1]], candidates.Select(note => note.Id));
+
+        await using (var db = _factory.CreateDbContext())
+        {
+            var restoredNote = await db.Notes.SingleAsync(note => note.Id == _noteIds[0]);
+            restoredNote.AgencyId = _admin.AgencyId;
+            var mismatchedOwner = await db.Users.SingleAsync(user => user.Id == _caseManager.Id);
+            mismatchedOwner.AgencyId = _foreignAdmin.AgencyId;
+            await db.SaveChangesAsync();
+        }
+
+        candidates = (await service.GetApprovedUnbilledNotesAsync(
+            _admin.ToAgencyActor())).ToList();
+        Assert.Empty(candidates);
+
+        var candidateCommands = _commands.ReaderCommands.Where(command =>
+            command.Contains("FROM \"Notes\"", StringComparison.Ordinal) &&
+            command.Contains("JOIN \"People\"", StringComparison.Ordinal) &&
+            command.Contains("JOIN \"Users\"", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, candidateCommands.Count);
+        Assert.All(candidateCommands, command =>
+            Assert.Contains("AgencyId", command, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task BillingOverviewAggregatesSixMonthsAndEveryDraftWithoutReadingPeriodHistory()
+    {
+        await using (var db = _factory.CreateDbContext())
+        {
+            var foreignPerson = Person.CreatePerson(
+                _foreignAdmin.Id,
+                "Foreign",
+                "Overview",
+                string.Empty,
+                new DateTime(1990, 1, 1),
+                effective: null,
+                WaiverType.Section21,
+                new Settings());
+            foreignPerson.AgencyId = _foreignAdmin.AgencyId;
+            foreignPerson.Gender = Gender.Unknown;
+            db.People.Add(foreignPerson);
+            await db.SaveChangesAsync();
+
+            var noteFacts = new[]
+            {
+                (_personId, _admin.AgencyId, new DateTime(2026, 4, 2)),
+                (_personId, _admin.AgencyId, new DateTime(2026, 9, 2)),
+                (_personId, _admin.AgencyId, new DateTime(2026, 3, 2)),
+                (_personId, _admin.AgencyId, new DateTime(2026, 10, 2)),
+                (foreignPerson.Id, _foreignAdmin.AgencyId, new DateTime(2026, 9, 3))
+            };
+            var notes = noteFacts.Select((fact, index) =>
+            {
+                var note = Note.Create(
+                    $"Overview source {index + 1}",
+                    fact.Item3,
+                    NoteStatus.Approved,
+                    15,
+                    fact.Item1);
+                note.AgencyId = fact.Item2;
+                return note;
+            }).ToArray();
+            db.Notes.AddRange(notes);
+            await db.SaveChangesAsync();
+
+            db.BillingPeriods.AddRange(
+                Period(_caseManager.Id, 2026, 4, BillingStatus.Accepted, notes[0], 20m),
+                Period(_caseManager.Id, 2026, 9, BillingStatus.Draft, notes[1], 10m),
+                Period(_caseManager.Id, 2026, 3, BillingStatus.Draft, notes[2], 1000m),
+                Period(_caseManager.Id, 2026, 10, BillingStatus.Draft, notes[3], 200m),
+                Period(_foreignAdmin.Id, 2026, 9, BillingStatus.Draft, notes[4], 999m));
+            await db.SaveChangesAsync();
+        }
+
+        _commands.Clear();
+        var overview = await ServiceFor(_admin).GetBillingPeriodOverviewAsync(
+            _admin.ToAgencyActor(),
+            new DateTime(2026, 9, 24));
+
+        Assert.Equal(1210m, overview.DraftRevenue);
+        Assert.Equal(
+            [202604, 202605, 202606, 202607, 202608, 202609],
+            overview.Months.Select(month => month.Year * 100 + month.Month));
+        Assert.Equal([20m, 0m, 0m, 0m, 0m, 10m],
+            overview.Months.Select(month => month.BilledAmount));
+        Assert.DoesNotContain(overview.Months, month => month.BilledAmount == 999m);
+
+        var aggregateCommands = _commands.ReaderCommands
+            .Where(command =>
+                command.Contains("ClaimLines", StringComparison.Ordinal)
+                && command.Contains("BillingPeriods", StringComparison.Ordinal)
+                && command.Contains("Users", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(2, aggregateCommands.Length);
+        Assert.Contains(aggregateCommands, command => command.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase));
+        Assert.All(aggregateCommands, command =>
+        {
+            Assert.DoesNotContain("Narrative", command, StringComparison.Ordinal);
+            Assert.DoesNotContain("ClaimSnapshotJson", command, StringComparison.Ordinal);
+            Assert.DoesNotContain("NoteId", command, StringComparison.Ordinal);
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            ServiceFor(_caseManager).GetBillingPeriodOverviewAsync(
+                _caseManager.ToAgencyActor(),
+                new DateTime(2026, 9, 24)));
     }
 
     [Fact]
@@ -138,6 +291,7 @@ public sealed class BillingComplianceRecoveryServiceTests : IAsyncDisposable
         await _connection.OpenAsync();
         var options = new DbContextOptionsBuilder<SatiContext>()
             .UseSqlite(_connection)
+            .AddInterceptors(_commands)
             .Options;
         _factory = new ContextFactory(options);
         await using var db = _factory.CreateDbContext();
@@ -240,9 +394,62 @@ public sealed class BillingComplianceRecoveryServiceTests : IAsyncDisposable
         EdiContactPhone = "2075550101"
     };
 
+    private static BillingPeriod Period(
+        int userId,
+        int year,
+        int month,
+        BillingStatus status,
+        Note note,
+        decimal charge) => new()
+    {
+        UserId = userId,
+        Year = year,
+        Month = month,
+        Status = status,
+        Lines =
+        [
+            new ClaimLine
+            {
+                NoteId = note.Id,
+                DateOfService = note.EventDate ?? new DateTime(year, month, 1),
+                ChargeAmount = charge
+            }
+        ]
+    };
+
     private sealed class ContextFactory(DbContextOptions<SatiContext> options)
         : IDbContextFactory<SatiContext>
     {
         public SatiContext CreateDbContext() => new(options);
+    }
+
+    private sealed class CommandCapture : DbCommandInterceptor
+    {
+        private readonly List<string> _readerCommands = [];
+        public IReadOnlyList<string> ReaderCommands
+        {
+            get
+            {
+                lock (_readerCommands)
+                    return _readerCommands.ToArray();
+            }
+        }
+
+        public void Clear()
+        {
+            lock (_readerCommands)
+                _readerCommands.Clear();
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            lock (_readerCommands)
+                _readerCommands.Add(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
     }
 }

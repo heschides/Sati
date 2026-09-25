@@ -135,11 +135,13 @@ public partial class BillingOverviewViewModel : ObservableObject
                 // Each service owns its own data context/API call. Once the account is confirmed,
                 // these independent reads can run together without delaying one another.
                 var notesTask = _billingService.GetApprovedUnbilledNotesAsync(actor);
-                var periodsTask = _billingService.GetAllBillingPeriodsAsync(actor);
+                var periodOverviewTask = _billingService.GetBillingPeriodOverviewAsync(
+                    actor,
+                    DateTime.Today);
                 var outcomesTask = _billingService.GetRemittanceOutcomesAsync(actor);
                 var policyReviewsTask =
                     _billingService.GetBillingCompliancePolicyReviewFlagsAsync(actor);
-                await Task.WhenAll(notesTask, periodsTask, outcomesTask, policyReviewsTask);
+                await Task.WhenAll(notesTask, periodOverviewTask, outcomesTask, policyReviewsTask);
                 if (!_accountLoads.IsCurrent(request) || !ReferenceEquals(_sessionService.CurrentUser, account))
                     return;
 
@@ -149,9 +151,8 @@ public partial class BillingOverviewViewModel : ObservableObject
                 PublishAnalytics(CreateAnalytics(
                     configuration,
                     validations,
-                    periodsTask.Result,
-                    outcomesTask.Result,
-                    DateTime.Today));
+                    periodOverviewTask.Result,
+                    outcomesTask.Result));
                 PublishBillingPolicyReviewFlags(policyReviewsTask.Result);
                 StatusMessage = "Billing dashboard and configuration loaded.";
             }
@@ -163,6 +164,8 @@ public partial class BillingOverviewViewModel : ObservableObject
             }
 
             await LoadFormChangeReviewsAsync(request, account);
+            if (!_accountLoads.IsCurrent(request) || !ReferenceEquals(_sessionService.CurrentUser, account))
+                return;
             HasLoaded = true;
         }
         catch (Exception ex)
@@ -426,37 +429,27 @@ public partial class BillingOverviewViewModel : ObservableObject
     internal static BillingOverviewAnalytics CreateAnalytics(
         BillingConfiguration configuration,
         IReadOnlyCollection<BillingValidationResult> validations,
-        IEnumerable<BillingPeriod> periods,
-        IEnumerable<RemittanceClaimOutcomeDto> outcomes,
-        DateTime asOf)
+        BillingPeriodOverviewDto periodOverview,
+        IEnumerable<RemittanceClaimOutcomeDto> outcomes)
     {
-        var firstMonth = new DateTime(asOf.Year, asOf.Month, 1).AddMonths(-5);
-        var months = Enumerable.Range(0, 6)
-            .Select(offset => firstMonth.AddMonths(offset))
-            .ToList();
-        var periodList = periods.ToList();
         var outcomeList = outcomes.ToList();
 
-        var points = months.Select(month => new BillingMonthPoint(
-            month,
-            periodList
-                .Where(period => period.Year == month.Year && period.Month == month.Month)
-                .SelectMany(period => period.Lines)
-                .Sum(line => line.ChargeAmount),
-            outcomeList
-                .Where(outcome => SameMonth(outcome.PaymentDate ?? outcome.ReceivedAtUtc, month))
-                .Sum(outcome => outcome.PaidAmount)))
+        var points = periodOverview.Months.Select(month =>
+        {
+            var date = new DateTime(month.Year, month.Month, 1);
+            return new BillingMonthPoint(
+                date,
+                month.BilledAmount,
+                outcomeList
+                    .Where(outcome => SameMonth(outcome.PaymentDate ?? outcome.ReceivedAtUtc, date))
+                    .Sum(outcome => outcome.PaidAmount));
+        })
             .ToList();
 
         var ready = validations.Where(result => result.IsValid).ToList();
         var rate = configuration.UnitRate.GetValueOrDefault();
         var readyRevenue = ready.Sum(result => BillingRules.CalculateCharge(
             BillingRules.CalculateSection13Units(result.Note.Minutes), rate));
-        var draftRevenue = periodList
-            .Where(period => period.Status == BillingStatus.Draft)
-            .SelectMany(period => period.Lines)
-            .Sum(line => line.ChargeAmount);
-
         var paid = outcomeList.Count(outcome =>
             string.Equals(outcome.Status, RemittanceClaimStatus.Paid.ToString(), StringComparison.OrdinalIgnoreCase));
         var partiallyPaid = outcomeList.Count(outcome =>
@@ -464,7 +457,7 @@ public partial class BillingOverviewViewModel : ObservableObject
 
         return new BillingOverviewAnalytics(
             readyRevenue,
-            draftRevenue,
+            periodOverview.DraftRevenue,
             points.Sum(point => point.Billed),
             points.Sum(point => point.Paid),
             ready.Count,

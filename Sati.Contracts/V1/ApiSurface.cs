@@ -46,6 +46,10 @@ public static class ApiSurface
         // The billing queue carries service and claim-readiness facts only. It does
         // not serialize clinical narrative, visit documentation, or consumer names.
         "billing-candidate-minimum-necessary-v1",
+        // Caseload PersonDto notes are a bounded scheduled-event window, while
+        // authoritative monthly-contact evidence is carried separately. Older
+        // clients and servers must not silently infer compliance from the window.
+        "person-caseload-scheduled-notes-and-contact-facts-v1",
         "billing-exchange-history-v4",
         "claim-response-ingestion-v2",
         "form-retention-v1",
@@ -147,6 +151,7 @@ public static class ApiSurface
         "GET /api/v1/billing/compliance-policy-review-flags",
         "GET /api/v1/billing/compliance-recovery/{personId:int}",
         "GET /api/v1/billing/configuration",
+        "GET /api/v1/billing/overview-periods/{year:int}/{month:int}",
         "GET /api/v1/billing/periods",
         "GET /api/v1/billing/periods/{periodId:int}/claims",
         "GET /api/v1/billing/remittance-deposits",
