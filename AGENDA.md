@@ -68,9 +68,8 @@ database access, or firewall rule is needed. **Contract change:** the new route
       temporary files remain.
 - [x] This release-evidence commit was pushed normally, and local `master` was confirmed equal to
       `origin/master` with a clean working tree.
-- [ ] Manual smoke test of the handoff checklist on Demo with real sign-ins (preparation window
-      after login, first render, mixed and Billing-only landings, first-use loads, account
-      switching) — now possible because the Demo API and client are both 1.3.28.
+- Manual smoke test from the workspace-preparation handoff: not required. Sati is not in outside
+  use yet; the owner validates releases by using them and reworks anything found broken.
 
 ### Local Production machines
 
