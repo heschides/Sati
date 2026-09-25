@@ -649,10 +649,24 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.27", version);
+        Assert.Equal("1.3.28", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Safer updates, cleaner agendas, and larger calendars", ProductReleaseNotes.ReleaseName);
-        Assert.Equal("September 24, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Equal("A visible start and room to come back", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("September 25, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Sati shows that it is preparing your workspace" &&
+            section.Items.Any(item => item.Contains("We are preparing the Sati workspace.", StringComparison.Ordinal)));
+        // The remaining unbounded first visit is stated, not implied away.
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Startup loads only what you see first" &&
+            section.Items.Any(item => item.Contains("still reads every note", StringComparison.Ordinal)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Billing Overview reads totals, not the full history" &&
+            section.Items.Any(item => item.Contains("six monthly totals", StringComparison.Ordinal)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Unfinished work can stay on today" &&
+            section.Items.Any(item => item.Contains("Keep all on today", StringComparison.Ordinal)) &&
+            section.Items.Any(item => item.Contains("finished day", StringComparison.Ordinal)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Updates wait until Sati is closed" &&
             section.Items.Any(item => item.Contains("Sati Demo", StringComparison.Ordinal)) &&

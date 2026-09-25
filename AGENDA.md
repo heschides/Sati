@@ -1,5 +1,57 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.28 — 2026-09-25
+
+“A visible start and room to come back.” Ships the two unreleased slices below: bounded,
+visible workspace preparation after sign-in (with the Billing Overview aggregate and the narrow
+billing candidate projections), and the close-time choice to keep unfinished work on today.
+
+**No migration and no schema change.** No `Sati.Persistence/Migrations/` entry; the only
+persistence-assembly change adds `Id` to the unmapped `PersonSummary` projection. New queries read
+existing `Notes`, `ClaimLines`, `BillingPeriods`, and `Users` columns only. No Demo migration,
+database access, or firewall rule is needed. **Contract change:** the new route
+`GET /api/v1/billing/overview-periods/{year}/{month}` and the
+`person-caseload-scheduled-notes-and-contact-facts-v1` shape change `ApiSurface.Revision` from
+`A28B7894E416`, so the 1.3.28 Demo client requires the 1.3.28 Demo API; the API ships first.
+
+- [x] Preflight: fetched `origin/master`; local `master` and `origin/master` both resolved to
+      `831b3f7` with a clean tree and one linked worktree. No branch merge is needed and no branch
+      is proven safe to delete. Retain the merged but uncertain `origin/codex/annual-compliance`
+      and `origin/codex/clarify-project-notes`, and the divergent `origin/second-machine-setup`,
+      `origin/team-chat-design`, and `origin/claude/local-vs-github-workflow-dlcqpb`. The separate
+      SatiLogica-profile clone has no unpushed `master` work; its only commits absent from `origin`
+      are on the retained `video-conferencing-design` branch.
+- [x] Demo API healthy at 1.3.27, contract `A28B7894E416`, in `rg-sati-demo` under the expected
+      subscription. No 1.3.28 API ZIP, installer, or checksum exists in `artifacts` or either
+      distribution directory. Select patch version 1.3.28 and coordinate desktop/API versions,
+      installer builders, readiness expectations, Settings release notes, runbook examples, and
+      exact-version tests.
+- [x] Full `--no-incremental` Release solution build: 0 errors, 17 analyzer warnings, all in
+      files unchanged since 1.3.27 (EF1002 in `SqlLocalDatabaseMaintenance.cs`; xUnit2031,
+      xUnit2013, and CS8604 in existing tests). 1.3.27's zero-warning record did not force a full
+      rebuild. All solution test projects pass under the signed-in profile: desktop/domain 2,520
+      passed with 6 documented external-prerequisite skips; API 901 passed with 5 skips;
+      signatures 119, portal 8, and Carika 4 passed, for 3,552 passed and 11 skipped overall.
+- [ ] Source release commit pushed normally to `origin/master`.
+- [ ] Publish only the matching Demo API; record ZIP hash, deployment identifier, health, release
+      version, and contract revision parity.
+- [ ] Build and accept both installers without overwrite; record sizes, hashes, and acceptance.
+- [ ] Publish the accepted installers and checksums to the two distribution directories.
+- [ ] Evidence commit pushed; local `master` equal to `origin/master` with a clean tree.
+
+### Local Production machines
+
+No schema change, so no machine is newly behind on migrations because of this release. The
+1.3.27 records still stand: each machine's real `SatiProduction` receives migration 117 only when
+1.3.27 or later is installed and launched.
+
+- [ ] **Joshu workstation.** Observed 2026-09-25: installed Local client is
+      `1.3.27+0abd021` and was running from 11:43 that day, so it has launched at 1.3.27 at least
+      once. Migration 117's application to its `SatiProduction` was not independently inspected.
+      Installing 1.3.28 adds no migration.
+- [ ] **SatiLogica workstation / colleague installation.** Latest durable record is 1.3.2; treat
+      it as behind.
+
 ## Unreleased — visible, bounded workspace preparation (2026-09-24)
 
 - [x] Replace the blank post-login interval with an accessible themed preparation surface carrying
@@ -47,7 +99,7 @@
       next workday" stays the default, and "Keep all on today" sets every row. Writes still go
       through `INoteService`. No migration, route, or contract change. See `DECISIONS.md`
       (2026-09-25).
-- [ ] Add a Settings release-notes entry for this choice when the next release is cut.
+- [x] Add a Settings release-notes entry for this choice when the next release is cut (1.3.28).
 
 ## Release 1.3.27 — 2026-09-24
 

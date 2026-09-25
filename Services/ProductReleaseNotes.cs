@@ -6,11 +6,38 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Safer updates, cleaner agendas, and larger calendars";
-    public const string ReleaseDate = "September 24, 2026";
+    public const string ReleaseName = "A visible start and room to come back";
+    public const string ReleaseDate = "September 25, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Sati shows that it is preparing your workspace",
+            [
+                "After you sign in, a window says \"We are preparing the Sati workspace.\" and stays until your workspace has appeared. It closes on its own, including when startup fails and Sati reports the problem.",
+                "While you wait, it shows a short original Sati reflection that changes every 20 seconds. A screen reader can read the reflection, but a change does not interrupt it.",
+                "The three-second pause before the sign-in window is gone."
+            ]),
+        new(
+            "Startup loads only what you see first",
+            [
+                "Your caseload is loaded once at sign-in and shared by Overview, Clients, and Notes Log. Startup no longer reads note narratives or visit details for the whole caseload.",
+                "Notes Log, Calendar, Billing, and Supervisor load the first time you open them, and switching accounts clears what they loaded.",
+                "The first visit to Notes Log still reads every note for your caseload, so it can take a moment with a large caseload."
+            ]),
+        new(
+            "Billing Overview reads totals, not the full history",
+            [
+                "Billing Overview now asks for the draft total and six monthly totals instead of every billing period and claim line. Accounts with only Billing access still open to a filled-in Overview.",
+                "Billing's checks of approved notes no longer read note narratives, visit details, client journals, or encrypted identity fields."
+            ]),
+        new(
+            "Unfinished work can stay on today",
+            [
+                "When you close Sati, each scheduled item that is not done can now be kept on today, for when you will open Sati again before the day ends. \"Keep all on today\" sets every item at once.",
+                "An item left from an earlier day moves to today instead, because it cannot stay on a finished day. Its old start time is cleared.",
+                "Moving to your next workday is still selected first, so pressing Enter works as it did before. Sati asks about kept items again the next time it closes."
+            ]),
         new(
             "Updates wait until Sati is closed",
             [
