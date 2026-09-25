@@ -32,12 +32,45 @@ database access, or firewall rule is needed. **Contract change:** the new route
       rebuild. All solution test projects pass under the signed-in profile: desktop/domain 2,520
       passed with 6 documented external-prerequisite skips; API 901 passed with 5 skips;
       signatures 119, portal 8, and Carika 4 passed, for 3,552 passed and 11 skipped overall.
-- [ ] Source release commit pushed normally to `origin/master`.
-- [ ] Publish only the matching Demo API; record ZIP hash, deployment identifier, health, release
-      version, and contract revision parity.
-- [ ] Build and accept both installers without overwrite; record sizes, hashes, and acceptance.
-- [ ] Publish the accepted installers and checksums to the two distribution directories.
-- [ ] Evidence commit pushed; local `master` equal to `origin/master` with a clean tree.
+- [x] Source commit `a7e0f421ed3a332eb6e885361718fe003ec3dd4f` was pushed normally to
+      `origin/master`.
+- [x] Published only the matching Demo API. The 10,313,950-byte
+      `artifacts/SatiApi-1.3.28-fx-x86.zip` has SHA-256
+      `0B3DDE8F80D9AE3EC3F5130D277E0D597564568C988B98F1073DC7E415EEDF0E`, the same 68-file set
+      as 1.3.27 (70 entries with the two `App_Data/jobs` folder entries, no backslash names), no
+      settings files or secret-like text, and product version
+      `1.3.28+a7e0f421ed3a332eb6e885361718fe003ec3dd4f`. OneDeploy deployment
+      `02e6437e013142a1a52c5b6207b4a053` published it only to existing `sati-demo-api-satilogica`
+      in `rg-sati-demo`; the prior active deployment `5a9aa2a077de4c8d9182e46211e9fbea` and the
+      1.3.27 ZIP are retained. Liveness and readiness are healthy; `/health/version` reports
+      Sati.Api 1.3.28 and contract revision `F52354A957F6`, equal to this build's
+      `ApiSurface.Revision`. The new overview route and `/api/v1/settings` return 401
+      anonymously. Health-only evidence is in `artifacts/release-1.3.28-demo-readiness.json`;
+      authenticated checks remain skipped because synthetic Admin credentials are not configured.
+- [x] Built and accepted both installers without overwrite. The 103,120,896-byte
+      `SatiDemoSetup-1.3.28.exe` has SHA-256
+      `A1A5F71F5053F81C14F3491E6B61954B2AD51CE31F4226DA4BC1F9E4E1781306`; five responsive
+      15-second launches, exact version 1.3.28.0, graceful closes, and cleanup passed. Evidence is
+      in `artifacts/release-1.3.28-demo-installer-acceptance.json`; this is a build-workstation
+      test, not an external-machine attestation. The 205,165,609-byte `SatiLocalSetup-1.3.28.exe`
+      has SHA-256 `F7853AB011C16928DE0AE1F3646E736834335AE8E5957BC21D83CC13DB31519F`; exact
+      version, `SatiProduction`, Windows integrated security, and cleanup passed. Its embedded
+      prerequisite is the durable Valid Microsoft-signed `SqlLocalDB.msi`, 63,508,480 bytes,
+      SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`, read from
+      `C:\Users\SatiLogica\source\repos\heschides\Sati\artifacts\Prerequisites`. The four-case
+      packaged matrix proved that each installer refuses both `Sati` process names with inner exit
+      code 2 and leaves its isolated destination unchanged (the Demo IExpress wrapper reports 0).
+      The acceptance run began with no Sati process open; none was closed by the workflow.
+- [x] Published only those accepted installers and their checksum files by verified temporary copy
+      and rename. Final hashes and checksum contents match in
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop` and
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`; no
+      temporary files remain.
+- [x] This release-evidence commit was pushed normally, and local `master` was confirmed equal to
+      `origin/master` with a clean working tree.
+- [ ] Manual smoke test of the handoff checklist on Demo with real sign-ins (preparation window
+      after login, first render, mixed and Billing-only landings, first-use loads, account
+      switching) — now possible because the Demo API and client are both 1.3.28.
 
 ### Local Production machines
 
