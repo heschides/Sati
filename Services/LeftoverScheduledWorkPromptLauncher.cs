@@ -43,7 +43,7 @@ public sealed class LeftoverScheduledWorkPromptLauncher(
             if (window.ShowDialog() != true)
                 return false;
 
-            var result = await service.ApplyAsync(window.Decisions, nextWorkday);
+            var result = await service.ApplyAsync(window.Decisions, nextWorkday, today);
             if (result.Failed > 0)
             {
                 MessageBox.Show(

@@ -39,6 +39,16 @@
       synthetic caseload before setting a startup service-level target. Query-shape regressions now
       prevent the known overfetch, but a workstation-sized test is not an Azure latency benchmark.
 
+## Unreleased — keep unfinished work on today at shutdown (2026-09-25)
+
+- [x] Add a third close-time choice for leftover Scheduled work: keep it on today, unfinished, for
+      a case manager who closes Sati and returns the same day. Today's items are left untouched;
+      a past day's item is brought forward to today with its old start time cleared. "Move to the
+      next workday" stays the default, and "Keep all on today" sets every row. Writes still go
+      through `INoteService`. No migration, route, or contract change. See `DECISIONS.md`
+      (2026-09-25).
+- [ ] Add a Settings release-notes entry for this choice when the next release is cut.
+
 ## Release 1.3.27 — 2026-09-24
 
 “Safer updates, cleaner agendas, and larger calendars.” This patch carries forward

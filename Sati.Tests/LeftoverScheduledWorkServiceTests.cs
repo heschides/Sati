@@ -2,6 +2,7 @@ using Sati.Data;
 using Sati.Helpers;
 using Sati.Models;
 using Sati.Services;
+using Sati.Views;
 using Xunit;
 
 namespace Sati.Tests;
@@ -74,9 +75,10 @@ public sealed class LeftoverScheduledWorkServiceTests
                 new(moved, LeftoverScheduledWorkChoice.MoveToNextWorkday),
                 new(removed, LeftoverScheduledWorkChoice.Delete)
             ],
-            target);
+            target,
+            Today);
 
-        Assert.Equal(new LeftoverScheduledWorkResult(1, 1, 0), result);
+        Assert.Equal(new LeftoverScheduledWorkResult(1, 0, 1, 0), result);
         Assert.Equal(target, Assert.Single(notes.Updated).EventDate);
         Assert.Equal(2, Assert.Single(notes.Deleted).Id);
     }
@@ -92,10 +94,68 @@ public sealed class LeftoverScheduledWorkServiceTests
 
         var result = await Service(notes).ApplyAsync(
             [new(started, LeftoverScheduledWorkChoice.Delete)],
-            Today.AddDays(3));
+            Today.AddDays(3),
+            Today);
 
-        Assert.Equal(new LeftoverScheduledWorkResult(0, 0, 1), result);
+        Assert.Equal(new LeftoverScheduledWorkResult(0, 0, 0, 1), result);
         Assert.Empty(notes.Deleted);
+    }
+
+    [Fact]
+    public async Task KeepingTodaysItemForTodayWritesNothing()
+    {
+        // Closing Sati mid-day to come back later: today's plan stays exactly as it is and is
+        // offered again at the next close.
+        var morning = Note(1, Today, NoteStatus.Scheduled);
+        morning.StartTime = 120;
+        var notes = new RecordingNoteService(morning);
+
+        var result = await Service(notes).ApplyAsync(
+            [new(morning, LeftoverScheduledWorkChoice.KeepForToday)],
+            new DateTime(2026, 9, 21),
+            Today);
+
+        Assert.Equal(new LeftoverScheduledWorkResult(0, 1, 0, 0), result);
+        Assert.Empty(notes.Updated);
+        Assert.Empty(notes.Deleted);
+        Assert.Equal(Today, morning.EventDate);
+        Assert.Equal(120, morning.StartTime);
+    }
+
+    [Fact]
+    public async Task KeepingAPastItemBringsItToTodayWithoutItsOldStartTime()
+    {
+        // Leaving it on its finished day would recreate the backlog this prompt clears.
+        var lapsed = Note(1, Today.AddDays(-2), NoteStatus.Scheduled);
+        lapsed.StartTime = 90;
+        var notes = new RecordingNoteService(lapsed);
+
+        var result = await Service(notes).ApplyAsync(
+            [new(lapsed, LeftoverScheduledWorkChoice.KeepForToday)],
+            new DateTime(2026, 9, 21),
+            Today);
+
+        Assert.Equal(new LeftoverScheduledWorkResult(0, 1, 0, 0), result);
+        var written = Assert.Single(notes.Updated);
+        Assert.Equal(Today, written.EventDate);
+        Assert.Null(written.StartTime);
+    }
+
+    [Fact]
+    public async Task ARefusedKeepLeavesThePastItemAndItsStartTimeWhereTheyWere()
+    {
+        var lapsed = Note(1, Today.AddDays(-1), NoteStatus.Scheduled);
+        lapsed.StartTime = 60;
+        var notes = new RecordingNoteService(lapsed) { RefuseId = 1 };
+
+        var result = await Service(notes).ApplyAsync(
+            [new(lapsed, LeftoverScheduledWorkChoice.KeepForToday)],
+            new DateTime(2026, 9, 21),
+            Today);
+
+        Assert.Equal(new LeftoverScheduledWorkResult(0, 0, 0, 1), result);
+        Assert.Equal(Today.AddDays(-1), lapsed.EventDate);
+        Assert.Equal(60, lapsed.StartTime);
     }
 
     [Fact]
@@ -111,11 +171,38 @@ public sealed class LeftoverScheduledWorkServiceTests
                 new(refused, LeftoverScheduledWorkChoice.MoveToNextWorkday),
                 new(fine, LeftoverScheduledWorkChoice.MoveToNextWorkday)
             ],
-            target);
+            target,
+            Today);
 
-        Assert.Equal(new LeftoverScheduledWorkResult(1, 0, 1), result);
+        Assert.Equal(new LeftoverScheduledWorkResult(1, 0, 0, 1), result);
         Assert.Equal(Today.AddDays(-1), refused.EventDate);
         Assert.Equal(target, fine.EventDate);
+    }
+
+    [Fact]
+    public void EachRowOffersThreeChoicesAndDefaultsToMoving()
+    {
+        var today = new LeftoverScheduledWorkRow(
+            Note(1, Today, NoteStatus.Scheduled), "Monday, September 21", Today);
+        var lapsed = new LeftoverScheduledWorkRow(
+            Note(2, Today.AddDays(-1), NoteStatus.Scheduled), "Monday, September 21", Today);
+
+        Assert.Equal(LeftoverScheduledWorkChoice.MoveToNextWorkday, today.Choice);
+        Assert.Equal("Keep for today", today.KeepLabel);
+        Assert.Equal("Move to today", lapsed.KeepLabel);
+
+        // A radio group unchecks the old option by pushing false into it; that must never
+        // change the choice, only the newly checked option's true does.
+        today.IsKeep = true;
+        today.IsMove = false;
+        Assert.Equal(LeftoverScheduledWorkChoice.KeepForToday, today.Choice);
+        Assert.True(today.IsKeep);
+        Assert.False(today.IsMove);
+        Assert.False(today.IsDelete);
+
+        today.IsDelete = true;
+        today.IsKeep = false;
+        Assert.Equal(LeftoverScheduledWorkChoice.Delete, today.Choice);
     }
 
     private static LeftoverScheduledWorkService Service(

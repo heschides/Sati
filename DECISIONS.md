@@ -5139,3 +5139,23 @@ summary, while cached re-entry rebuilds its lightweight chart models without ref
 reads that could publish after an account switch; parallel LocalDB graph loads; and adding a schema
 index before removing the measured overfetch and Cartesian query shape. This change requires no
 database migration.
+
+## 2026-09-25 — leftover work may stay on today, never on a finished day
+
+The close-time prompt for leftover Scheduled work (2026-09-18) now offers a third choice beside
+moving to the next workday and deleting: keep the item on today, unfinished. A case manager may
+have to close Sati and open it again within the same day, and today's plan is still live — it is
+not the backlog that prompt exists to clear, and `NoteSchedulingPolicy.IsLapsedScheduled` already
+treats today's Scheduled work as current.
+
+This narrows, rather than reverses, the earlier rejection of a "leave as is" button. Keeping an item
+dated today writes nothing. An item from a past day cannot be kept on that day: the same choice,
+labelled "Move to today" on its row, brings it forward to today through `INoteService` and clears
+its start time, as a move to a later workday already does through `NoteSchedulingPolicy`. A refused
+write restores both fields. Kept items are offered again at the next close.
+
+Moving to the next workday remains the default, so pressing Enter still never loses planned work.
+
+**Rejected:** leaving past-day items on their day, which would restore the calendar clutter and the
+held-open productivity day; and making "keep" the default, which would leave today's plan on
+a finished day whenever the last close of the day is confirmed with Enter.

@@ -7,19 +7,26 @@ namespace Sati.Services;
 public enum LeftoverScheduledWorkChoice
 {
     MoveToNextWorkday,
-    Delete
+    Delete,
+    /// <summary>
+    /// Leave the item on today, unfinished, for a case manager who is closing Sati but will be
+    /// back before the day ends. An item from a past day is brought forward to today, never left
+    /// on the finished day.
+    /// </summary>
+    KeepForToday
 }
 
 public sealed record LeftoverScheduledWorkDecision(Note Note, LeftoverScheduledWorkChoice Choice);
 
-public sealed record LeftoverScheduledWorkResult(int Moved, int Deleted, int Failed);
+public sealed record LeftoverScheduledWorkResult(int Moved, int Kept, int Deleted, int Failed);
 
 /// <summary>
 /// Finds planned work whose day has passed without it being done, and carries out the case
 /// manager's decision about each item at shutdown. A Scheduled note left on a finished day is
 /// not a record of anything: it clutters the calendar, and it also holds that day open in the
 /// productivity average (<see cref="Contracts.V1.ProductivityForecast"/> treats scheduled work
-/// as a day still being written up). Moving or deleting it is the honest resolution.
+/// as a day still being written up). Moving or deleting it is the honest resolution. Today is not
+/// finished yet, so keeping an item on today is also honest; it is offered again at the next close.
 /// </summary>
 /// <remarks>
 /// Every write goes through <see cref="INoteService"/>, so the same ownership, workflow,
@@ -37,7 +44,8 @@ public interface ILeftoverScheduledWorkService
 
     Task<LeftoverScheduledWorkResult> ApplyAsync(
         IReadOnlyList<LeftoverScheduledWorkDecision> decisions,
-        DateTime nextWorkday);
+        DateTime nextWorkday,
+        DateTime today);
 }
 
 public sealed class LeftoverScheduledWorkService(
@@ -73,12 +81,21 @@ public sealed class LeftoverScheduledWorkService(
 
     public async Task<LeftoverScheduledWorkResult> ApplyAsync(
         IReadOnlyList<LeftoverScheduledWorkDecision> decisions,
-        DateTime nextWorkday)
+        DateTime nextWorkday,
+        DateTime today)
     {
         ArgumentNullException.ThrowIfNull(decisions);
-        int moved = 0, deleted = 0, failed = 0;
+        int moved = 0, kept = 0, deleted = 0, failed = 0;
         foreach (var decision in decisions)
         {
+            // Keeping an item already on today writes nothing, so there is nothing to refuse.
+            if (decision.Choice == LeftoverScheduledWorkChoice.KeepForToday &&
+                decision.Note.EventDate?.Date == today.Date)
+            {
+                kept++;
+                continue;
+            }
+
             // Re-checked here rather than trusted from the list: a stale row must not carry a
             // started or submitted note into a delete.
             if (decision.Note.Status != NoteStatus.Scheduled)
@@ -88,12 +105,23 @@ public sealed class LeftoverScheduledWorkService(
             }
 
             var originalDate = decision.Note.EventDate;
+            var originalStartTime = decision.Note.StartTime;
             try
             {
                 if (decision.Choice == LeftoverScheduledWorkChoice.Delete)
                 {
                     await notes.DeleteNoteAsync(decision.Note);
                     deleted++;
+                }
+                else if (decision.Choice == LeftoverScheduledWorkChoice.KeepForToday)
+                {
+                    // Brought forward from a past day. NoteSchedulingPolicy clears the start
+                    // time only for future dates, so clear the past day's slot here as a move
+                    // to a later workday would.
+                    decision.Note.EventDate = today.Date;
+                    decision.Note.StartTime = null;
+                    await notes.UpdateNoteAsync(decision.Note);
+                    kept++;
                 }
                 else
                 {
@@ -107,11 +135,12 @@ public sealed class LeftoverScheduledWorkService(
                 // One refused item must not stop the rest, or stop Sati closing. The item
                 // stays where it was and is offered again next time.
                 decision.Note.EventDate = originalDate;
+                decision.Note.StartTime = originalStartTime;
                 AppErrorLog.Record(error, "leftover-scheduled-work.apply");
                 failed++;
             }
         }
 
-        return new LeftoverScheduledWorkResult(moved, deleted, failed);
+        return new LeftoverScheduledWorkResult(moved, kept, deleted, failed);
     }
 }

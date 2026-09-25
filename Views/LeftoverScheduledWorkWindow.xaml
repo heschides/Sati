@@ -29,6 +29,9 @@
             <Button x:Name="MoveAllButton" Content="Move all to the next workday" Padding="12,5"
                     AutomationProperties.Name="Choose move to the next workday for every item"
                     Click="MoveAll_Click" />
+            <Button x:Name="KeepAllButton" Content="Keep all on today" Padding="12,5" Margin="8,0,0,0"
+                    AutomationProperties.Name="Choose keep on today, unfinished, for every item"
+                    Click="KeepAll_Click" />
             <Button x:Name="DeleteAllButton" Content="Delete all" Padding="12,5" Margin="8,0,0,0"
                     AutomationProperties.Name="Choose delete for every item"
                     Click="DeleteAll_Click" />
@@ -69,6 +72,10 @@
                                                  GroupName="{Binding GroupName}"
                                                  IsChecked="{Binding IsMove, Mode=TwoWay}"
                                                  AutomationProperties.Name="{Binding MoveAutomationName}" />
+                                    <RadioButton Content="{Binding KeepLabel}" Margin="0,4,0,0"
+                                                 GroupName="{Binding GroupName}"
+                                                 IsChecked="{Binding IsKeep, Mode=TwoWay}"
+                                                 AutomationProperties.Name="{Binding KeepAutomationName}" />
                                     <RadioButton Content="Delete" Margin="0,4,0,0"
                                                  GroupName="{Binding GroupName}"
                                                  IsChecked="{Binding IsDelete, Mode=TwoWay}"
@@ -89,7 +96,7 @@
             <Button x:Name="ApplyButton" Content="Apply and close" Padding="16,7" MinWidth="150"
                     Margin="10,0,0,0" IsDefault="True"
                     Style="{StaticResource PrimaryButton}"
-                    AutomationProperties.Name="Move or delete these items as chosen, then close Sati"
+                    AutomationProperties.Name="Move, keep, or delete these items as chosen, then close Sati"
                     Click="Apply_Click" />
         </StackPanel>
     </Grid>
