@@ -123,6 +123,27 @@ No schema change, so no machine is newly behind on migrations because of this re
       synthetic caseload before setting a startup service-level target. Query-shape regressions now
       prevent the known overfetch, but a workstation-sized test is not an Azure latency benchmark.
 
+## Unreleased — Annual Forms by plan year, in three views (2026-09-26)
+
+See `DECISIONS.md` (2026-09-26). Desktop only: no API route, contract revision, or migration change.
+
+- [x] `PlanYearOverview` (Contracts): plan years from admission through the next renewal, the one
+      in force by default, items by the year they serve, and Done only from recorded completions.
+- [x] Overview rebuilt: a header bar with the List / Timeline / By purpose segmented control, a
+      previous / next year stepper, and the packet download. Adds a next-year-open marker, an
+      earlier-year notice, and a no-effective-date state. The date picker, "View selected year",
+      and NEXT STEP boxes are gone. Document records, verification, and signatures are collapsed.
+- [x] View choice remembered per user and environment (`AnnualFormsViewPreferenceService`).
+- [x] Item buttons open the exact release obligation, the client Overview (plan and review
+      completions), or the Safety Plan, Privacy Practices, or DHHS Documents tab. Returning to the
+      overview refreshes it.
+- [x] Tests: `PlanYearOverviewTests`, the rewritten `AnnualDocumentSelectionTests`, and
+      `AnnualDocumentViewRenderTests` (renders all three views; PNGs under `SATI_DOCUMENT_QA_OUTPUT`).
+- [ ] Try it in the Demo app on synthetic clients, including a teaching-exception client, before
+      the next release.
+- [ ] Decide whether the DHHS release's button should open DHHS Documents, where the state PDF is
+      prepared, instead of the Releases tab, where its completion is recorded.
+
 ## Unreleased — keep unfinished work on today at shutdown (2026-09-25)
 
 - [x] Add a third close-time choice for leftover Scheduled work: keep it on today, unfinished, for
@@ -2041,9 +2062,11 @@ Sati-owned output.
       No migration has been applied and no connector, worker, or Production path is active.
 - [ ] Apply `20260926183942_AddClearinghouseDispatchFoundation` only through the reviewed
       migration, backup, and restore procedure; this source change authorizes no database write.
-- [ ] Phase 3: API-owned connector boundary, fake connector, dispatch worker and authorized
-      submission workflow; enforce exact-generation/account/profile selection and uncertain-
-      outcome reconciliation before any retry. Keep WPF free of connector dependencies.
+- [x] Phase 3 source workflow: API-owned connector seam, no-network fake connector, durable
+      worker, authorized test-account generation and exact-generation queue, and a generic
+      WPF queue/status view. The server flag defaults off and the Phase 2 migration remains
+      unapplied. Sending/unknown uploads block another file for the period and are never
+      retried automatically; operational reconciliation is still a Phase 4 gate.
 - [ ] Phase 4: Claim.MD sandbox HTTP connector, status/ERA polling, atomic checkpoint/receipt
       processing, uncertain-upload reconciliation, and end-to-end sandbox evidence before
       considering any Production activation.

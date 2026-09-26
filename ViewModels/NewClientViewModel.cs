@@ -951,6 +951,51 @@ namespace Sati.ViewModels
             AnnualFormsTabIndex = (int)section;
         }
 
+        /// <summary>
+        /// Opens the screen that records an Annual Forms overview item. A release opens on its
+        /// exact obligation; plan and review completions are recorded on the client Overview.
+        /// </summary>
+        [RelayCommand]
+        private async Task OpenPlanYearItemAsync(Sati.Contracts.V1.PlanYearItem? item)
+        {
+            if (item is null)
+                return;
+            switch (item.Workspace)
+            {
+                case Sati.Contracts.V1.PlanYearWorkspace.ClientOverview:
+                    ClientWorkspaceTabIndex = 0;
+                    break;
+                case Sati.Contracts.V1.PlanYearWorkspace.Releases when item.ReleaseObligationId is Guid obligationId:
+                    await OpenReleaseObligationAsync(obligationId, AnnualDocuments?.CycleStart);
+                    break;
+                case Sati.Contracts.V1.PlanYearWorkspace.Releases:
+                    OpenAnnualFormsSection(AnnualFormsSection.Releases);
+                    break;
+                case Sati.Contracts.V1.PlanYearWorkspace.DhhsDocuments:
+                    OpenAnnualFormsSection(AnnualFormsSection.DhhsDocuments);
+                    break;
+                case Sati.Contracts.V1.PlanYearWorkspace.SafetyPlan:
+                    OpenAnnualFormsSection(AnnualFormsSection.SafetyPlan);
+                    break;
+                case Sati.Contracts.V1.PlanYearWorkspace.PrivacyPractices:
+                    OpenAnnualFormsSection(AnnualFormsSection.PrivacyPractices);
+                    break;
+            }
+        }
+
+        // Returning to the overview after recording something elsewhere shows the new state.
+        partial void OnAnnualFormsTabIndexChanged(int value)
+        {
+            if (value == (int)AnnualFormsSection.Overview && ClientWorkspaceTabIndex == AnnualFormsWorkspaceTabIndex)
+                AnnualDocuments?.RefreshOverview();
+        }
+
+        partial void OnClientWorkspaceTabIndexChanged(int value)
+        {
+            if (value == AnnualFormsWorkspaceTabIndex && AnnualFormsTabIndex == (int)AnnualFormsSection.Overview)
+                AnnualDocuments?.RefreshOverview();
+        }
+
         // -------------------------------------------------------------------------
         // Commands
         // -------------------------------------------------------------------------

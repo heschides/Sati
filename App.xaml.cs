@@ -123,6 +123,7 @@ namespace Sati
                         services.AddSingleton<EasyEyesPreferenceService>();
                         services.AddSingleton<IdleLockPreferenceService>();
                         services.AddSingleton<ConsumerPickerSortPreferenceService>();
+                        services.AddSingleton<AnnualFormsViewPreferenceService>();
                         services.AddSingleton<IOutlookCalendarService, OutlookCalendarService>();
                         services.AddSingleton<IOutlookCalendarFilePicker, Sati.Views.OutlookCalendarFilePicker>();
                         services.AddSingleton<IClearinghouseResponseFilePicker, Sati.Views.Billing.ClearinghouseResponseFilePicker>();

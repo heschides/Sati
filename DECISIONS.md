@@ -5301,3 +5301,65 @@ new receipt-provenance evidence. It was not applied to any database.
 upload as a new submission, one shared status/ERA cursor, mutable upload-attempt evidence, a
 connector-owned billability or correction rule, and client-side credentials or endpoints. Network
 transport, workers, account-management APIs, and Production activation remain later gated work.
+
+## 2026-09-26 — synthetic dispatch crosses only an API-owned connector seam
+
+Phase 3 implements the dispatch command and hosted worker against the Phase 2 outbox, but enables
+them only when an exact synthetic Demo/Testing deployment identity and an explicit server flag
+agree. The flag defaults off. Billing staff choose an API-owned test account before generation;
+the API formats and retains the exact file, validates its ISA/GS and stable Claim.MD D9 values
+against that account, and permits one dispatch per generation. It revalidates actor, tenant,
+period, test mode, account, profile, and prior transmission evidence at the queue boundary.
+While an earlier file for the period is Sending or OutcomeUnknown, another cannot queue.
+
+The connector sees only an immutable upload body and transport metadata. It cannot decide
+billability, correction eligibility, payer acceptance, or remittance status. The worker commits
+Sending before invoking the fake connector; only Queued rows are eligible for processing. A
+timeout or crash therefore cannot silently cause a second upload. Completed attempts and
+synthetic submission events are retained as system transport evidence; the human audit event is
+recorded at queue time, not falsely attributed to the worker. The fake connector has no network
+or credentials. An accepted fake upload is not payer acceptance. The WPF ViewModel depends only
+on generic account/dispatch contracts, with no Claim.MD adapter or distributed secret.
+
+**Rejected:** direct transport in the HTTP request, automatic retry after timeout or interrupted
+Sending, client-side connector selection based on arbitrary endpoint/credential fields, treating
+a fake accepted upload as a payer response, and enabling the worker in Production. Phase 4 still
+requires real Claim.MD sandbox behavior, manual reconciliation of uncertain uploads, separate
+feed polling/receipt processing, security review, and explicit rollout gates. No migration or
+account configuration was applied in this phase.
+
+## 2026-09-26 — Annual Forms is organized by plan year, and an item is done only when its completion is recorded
+
+The Annual Forms overview asked staff to pick a date, press "View selected year", and read a NEXT
+STEP box beside each document. Its statuses also came from the wrong record: each row reported
+the state of the document's file (Draft, generated, recorded), so a DHHS release could read
+"Draft" on the overview while the Releases tab showed its obligation attested.
+
+The overview now opens on the plan year in force today. Small "previous" and "next" words step
+from the first plan year to the next renewal. A plan year runs from one anniversary of the
+initial effective date to the day before the next, the same targets billing uses. Items belong
+to the year they serve, so the assessment and PCP appear in the year they prepare for even
+though they fall due before it begins. `PlanYearOverview` in `Sati.Contracts.V1` owns these rules:
+
+- **Done means an attestation completed the obligation**, the fact billing reads. A saved or
+  generated document is a detail line ("Draft saved Sep 20"), never the status.
+- The rows billing expects but no one has created are shown, from the same
+  `ExpectedBillingComplianceObligations` rule, so a missing row reads as not done instead of
+  disappearing. Recipient-specific release obligations replace the old fixed release rows.
+- Each item is Done, Overdue, Open (available, not yet due), or Coming up (not yet available).
+  The status is always written in words, and color only reinforces it.
+- The one-time DHHS authorized representative appears in the year in force until it is on file.
+
+One header bar serves three views: List (needs you, coming up, done), Timeline (the year drawn
+with its preparation window, today, and next year's opening), and By purpose (the plan,
+releases, safety and notices, check-ins). A segmented control switches between them, and each
+user's choice is remembered on the workstation (`AnnualFormsViewPreferenceService`). The stepper
+marks Next when next year's work has opened and links to any earlier year with open items,
+because billing checks old years too. Buttons open the screen that records the item: a release
+on its exact obligation, and plan and review completions on the client Overview. Document
+records, file verification, and signature requests remain in a collapsed section.
+
+**Rejected:** defaulting to the year of the most recent signed release, since releases are signed
+before their year and the default would open on a finished year while this year's work waited;
+keeping the file-based statuses; and dropping the document records section, since staff may
+rely on it.

@@ -50,24 +50,33 @@ public sealed class AnnualDocumentViewRenderTests
             };
             WpfUiHarness.Realize(view, 900, 1200);
             var buttons = WpfUiHarness.Descendants(view).OfType<Button>().ToList();
-            var save = buttons.Single(x => Equals(x.Content, "Save Annual Forms Package"));
+            var save = buttons.Single(x => Equals(x.Content, "Download this year's packet"));
             Assert.Same(model.SavePacketCommand, save.Command); Assert.False(save.IsEnabled);
-            var openPeriod = buttons.Single(x => Equals(x.Content, "View selected year"));
-            Assert.Same(model.ReloadCommand, openPeriod.Command);
-            Assert.Equal("Loads saved form, document, and signature status for the selected service year without changing any record.", openPeriod.ToolTip);
-            Assert.NotNull(WpfUiHarness.FindByAutomationName<DatePicker>(view, "Annual forms service year beginning"));
-            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(view, "Annual form workflow by type"));
-            Assert.Contains(buttons, button => Equals(button.Content, "Submit to consumer or guardian for review"));
-            var directionLabels = WpfUiHarness.Descendants(view).OfType<TextBlock>()
-                .Where(text => Equals(text.Text, "NEXT STEP"))
+            Assert.Same(model.PreviousYearCommand,
+                WpfUiHarness.FindByAutomationName<Button>(view, "Previous plan year")!.Command);
+            Assert.Same(model.NextYearCommand,
+                WpfUiHarness.FindByAutomationName<Button>(view, "Next plan year")!.Command);
+            // The view switch is one radio group; its three choices are named for assistive technology.
+            var segments = new[] { "List view", "Timeline view", "By purpose view" }
+                .Select(name => WpfUiHarness.FindByAutomationName<RadioButton>(view, name))
                 .ToList();
-            Assert.Equal(5, directionLabels.Count);
-            Assert.All(directionLabels, label =>
-            {
-                Assert.Equal(11, label.FontSize);
-                Assert.Equal(FontWeights.Bold, label.FontWeight);
-            });
-            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(view, "Annual Forms workflow directions"));
+            Assert.All(segments, Assert.NotNull);
+            Assert.Single(segments.Select(segment => segment!.GroupName).Distinct());
+            Assert.True(segments[0]!.IsChecked);
+            // The date picker, "View selected year", and NEXT STEP boxes are gone.
+            Assert.Empty(WpfUiHarness.Descendants(view).OfType<DatePicker>()
+                .Where(picker => AutomationProperties.GetName(picker) == "Annual forms service year beginning"));
+            Assert.DoesNotContain(buttons, x => Equals(x.Content, "View selected year"));
+            Assert.DoesNotContain(WpfUiHarness.Descendants(view).OfType<TextBlock>(), text => Equals(text.Text, "NEXT STEP"));
+            // Document records, verification, and signatures remain, collapsed.
+            var records = WpfUiHarness.FindByAutomationName<Expander>(view, "Document records, verification, and signatures");
+            Assert.NotNull(records);
+            Assert.False(records!.IsExpanded);
+            records.IsExpanded = true;
+            view.UpdateLayout();
+            buttons = WpfUiHarness.Descendants(view).OfType<Button>().ToList();
+            Assert.Contains(buttons, button => Equals(button.Content, "Submit to consumer or guardian for review"));
+            Assert.Same(model.VerifyCommand, buttons.Single(x => Equals(x.Content, "Choose file and verify")).Command);
             SavePreview(view, "annual-overview.png");
 
             var sections = WpfUiHarness.FindByAutomationName<TabControl>(view, "Annual forms sections");
@@ -87,6 +96,92 @@ public sealed class AnnualDocumentViewRenderTests
                 element => AutomationProperties.GetName(element) == "Live privacy template preview");
             SavePreview(view, "annual-privacy-practices.png");
         });
+    }
+
+    [Fact]
+    public void AllThreeViewsRenderAPopulatedPlanYear()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            var effective = DateTime.Today.AddYears(-1).AddDays(-45);
+            var target = effective.AddYears(1);
+            var person = Sati.Person.CreatePerson(12, "Synthetic", "Person", "", DateTime.Today.AddYears(-30),
+                effective, Sati.WaiverType.Section21, new Sati.Models.Settings());
+            var settings = new Sati.Models.Settings();
+            // Last year was finished on time; this year the plan and assessment are done.
+            foreach (var start in new[] { effective, target })
+            {
+                person.Forms.RemoveAll(form => form.TargetEffectiveDate == start);
+                foreach (var type in Sati.Contracts.V1.PersonSaveRules.FormTypes.Select(Enum.Parse<Sati.FormType>))
+                {
+                    var form = new Sati.Models.Form(type, Sati.Data.FormDueDateCalculator.Compute(type, start, settings),
+                        completedOn: null, targetEffectiveDate: start);
+                    var due = form.DueDate.Date;
+                    var finished = start == effective ||
+                                   type is Sati.FormType.PCP or Sati.FormType.ComprehensiveAssessment or Sati.FormType.Reclassification;
+                    if (finished && due <= DateTime.Today)
+                        form.Attest(Sati.Models.FormAttestation.Attested(due, Sati.Contracts.V1.AttestationActorKind.CaseManager, 12, DateTime.UtcNow));
+                    person.Forms.Add(form);
+                }
+            }
+            var dhhsKey = $"release:v1:{target:yyyy-MM-dd}:dhhs:annual";
+            var agencyKey = $"release:v1:{target:yyyy-MM-dd}:agency:annual:link-1";
+            person.ReleaseComplianceSnapshots =
+            [
+                new(dhhsKey, Sati.Contracts.V1.ReleaseObligationCategory.Dhhs, target, target.AddDays(-90), null,
+                    [new(dhhsKey, target, DateTime.UtcNow)], Guid.NewGuid(), target, target.AddDays(-90)),
+                new(agencyKey, Sati.Contracts.V1.ReleaseObligationCategory.Agency, target, target.AddDays(-90), null,
+                    [], Guid.NewGuid(), target, target.AddDays(-90), "Wakanda Outreach and Mobility")
+            ];
+
+            var model = new AnnualDocumentsViewModel(new PopulatedAnnualService(), null!, new PopulatedSettings(), new SessionService());
+            model.SetPerson(person);
+            Assert.True(model.HasPlanYears);
+            Assert.Equal(target, model.CycleStart);
+            Assert.NotEmpty(model.ListSections);
+
+            var view = new AnnualDocumentsWorkspace { DataContext = new AnnualFormsHost(model) };
+            foreach (var (choice, file) in new[]
+                     {
+                         (Sati.Services.AnnualFormsView.List, "annual-view-list.png"),
+                         (Sati.Services.AnnualFormsView.Timeline, "annual-view-timeline.png"),
+                         (Sati.Services.AnnualFormsView.ByPurpose, "annual-view-by-purpose.png")
+                     })
+            {
+                model.View = choice;
+                WpfUiHarness.Realize(view, 1280, 1700);
+                SavePreview(view, file);
+            }
+
+            model.View = Sati.Services.AnnualFormsView.Timeline;
+            WpfUiHarness.Realize(view, 1280, 1700);
+            Assert.NotNull(WpfUiHarness.FindByAutomationName<FrameworkElement>(view, "Dated items"));
+            Assert.Contains(WpfUiHarness.Descendants(view).OfType<Button>(),
+                button => Equals(button.Content, "Open release") && button.Visibility == Visibility.Visible);
+        });
+    }
+
+    private sealed class PopulatedSettings : ISettingsService
+    {
+        public Task<Sati.Models.Settings> LoadAsync() => Task.FromResult(new Sati.Models.Settings());
+        public Task SaveAsync(Sati.Models.Settings settings) => throw new NotSupportedException();
+    }
+
+    private sealed class PopulatedAnnualService : IAnnualDocumentService
+    {
+        public Task<Sati.Contracts.V1.AnnualDocumentsStatusDto> GetStatusAsync(int id, DateTime cycle)
+        {
+            var draft = new Sati.Contracts.V1.DocumentArtifactDto(1, id, 1, "SafetyPlan", cycle, "Draft",
+                DateTime.UtcNow.AddDays(-6), 12, null, null, null, [], null);
+            var notice = new Sati.Contracts.V1.DocumentArtifactDto(2, id, 1, "PrivacyPractices", cycle, "GeneratedInSati",
+                DateTime.UtcNow.AddDays(-6), 12, null, null, null, [], null);
+            return Task.FromResult(new Sati.Contracts.V1.AnnualDocumentsStatusDto(
+                new(cycle, cycle.AddDays(-30), cycle.AddYears(1).AddDays(-1), true), [draft, notice], [], "", false));
+        }
+        public Task<Sati.Contracts.V1.DocumentAcknowledgmentDto> AcknowledgeAsync(int id, Sati.Contracts.V1.AcknowledgeDocumentRequest request) => throw new NotSupportedException();
+        public Task<Sati.Contracts.V1.DocumentArtifactDto> RecordAuthorizedRepresentativeOnFileAsync(int id, DateTime cycle, string note) => throw new NotSupportedException();
+        public Task<Sati.Contracts.V1.VerifyDocumentResult> VerifyAsync(int id, Sati.Contracts.V1.VerifyDocumentRequest request) => throw new NotSupportedException();
+        public Task<Sati.Contracts.V1.AgencyReleaseResult> SavePacketAsync(int id, DateTime cycle) => throw new NotSupportedException();
     }
 
     private sealed class AnnualFormsHost(AnnualDocumentsViewModel annualDocuments)
