@@ -1,0 +1,11 @@
+{
+  "bindings": [
+    {
+      "type": "queueTrigger",
+      "direction": "in",
+      "name": "QueueItem",
+      "queueName": "demo-reset-requests",
+      "connection": "AzureWebJobsStorage"
+    }
+  ]
+}

@@ -1772,7 +1772,8 @@ public sealed class StabilizationTests
     {
         var root = FindRepositoryRootFromSource();
         var seed = File.ReadAllText(Path.Combine(root, "scripts", "Seed-DemoShowcaseData.ps1"));
-        var function = File.ReadAllText(Path.Combine(root, "Sati.DemoRefresh", "RefreshCaseload", "run.ps1"));
+        // The nightly function delegates to the shared reset, which owns the managed-identity token.
+        var function = File.ReadAllText(Path.Combine(root, "Sati.DemoRefresh", "Shared", "DemoReset.ps1"));
         var binding = File.ReadAllText(Path.Combine(root, "Sati.DemoRefresh", "RefreshCaseload", "function.json"));
         var publish = File.ReadAllText(Path.Combine(root, "scripts", "Publish-DemoRefresh.ps1"));
         var firewall = File.ReadAllText(Path.Combine(root, "scripts", "Set-DemoRefreshFirewallRules.ps1"));

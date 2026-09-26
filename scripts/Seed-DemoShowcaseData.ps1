@@ -465,6 +465,12 @@ WHERE AgencyId=2;
     # fields define current cycles, due/open windows, quarterly follow-up, and the
     # work agenda. Form evidence and scratchpad comments move with their parent
     # workflow dates; general audit, billing, and publication history does not.
+    #
+    # Every column that places a record in an annual cycle must move together with
+    # EffectiveDate. Billing identifies a form by (type, TargetEffectiveDate) and a
+    # release by a StableKey that embeds its target date; when those stayed behind,
+    # billing projected every cycle as a missing, incomplete obligation and the
+    # whole Demo read as overdue however often its history was completed.
     if ($timelineShiftDays -ne 0) {
         Invoke-SeedNonQuery @"
 UPDATE person
@@ -476,9 +482,41 @@ WHERE owner.AgencyId=2 AND person.EffectiveDate IS NOT NULL;
 UPDATE form
 SET DueDate=DATEADD(day,@TimelineShiftDays,form.DueDate),
     CompletedDate=DATEADD(day,@TimelineShiftDays,form.CompletedDate),
-    OpenedDate=DATEADD(day,@TimelineShiftDays,form.OpenedDate)
+    OpenedDate=DATEADD(day,@TimelineShiftDays,form.OpenedDate),
+    TargetEffectiveDate=DATEADD(day,@TimelineShiftDays,form.TargetEffectiveDate)
 FROM dbo.Forms form
 JOIN dbo.People person ON person.Id=form.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE link
+SET StartDate=DATEADD(day,@TimelineShiftDays,link.StartDate),
+    EndDate=DATEADD(day,@TimelineShiftDays,link.EndDate),
+    AssignmentKnownOn=DATEADD(day,@TimelineShiftDays,link.AssignmentKnownOn)
+FROM dbo.PersonProviders link
+JOIN dbo.People person ON person.Id=link.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE plan_
+SET CycleStart=DATEADD(day,@TimelineShiftDays,plan_.CycleStart)
+FROM dbo.SafetyPlans plan_
+JOIN dbo.People person ON person.Id=plan_.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE artifact
+SET CycleStart=DATEADD(day,@TimelineShiftDays,artifact.CycleStart)
+FROM dbo.DocumentArtifacts artifact
+JOIN dbo.People person ON person.Id=artifact.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE acknowledgment
+SET ReceivedOn=DATEADD(day,@TimelineShiftDays,acknowledgment.ReceivedOn)
+FROM dbo.DocumentAcknowledgments acknowledgment
+JOIN dbo.DocumentArtifacts artifact ON artifact.Id=acknowledgment.DocumentArtifactId
+JOIN dbo.People person ON person.Id=artifact.PersonId
 JOIN dbo.Users owner ON owner.Id=person.UserId
 WHERE owner.AgencyId=2;
 
@@ -523,8 +561,104 @@ JOIN dbo.Forms form ON form.Id=attestation.FormId
 JOIN dbo.People person ON person.Id=form.PersonId
 JOIN dbo.Users owner ON owner.Id=person.UserId
 WHERE owner.AgencyId=2;
+
+-- A release's StableKey is 'release:v1:<target yyyy-MM-dd>:...'; the key moves with
+-- its target or the stored row stops matching the obligation billing expects.
+IF EXISTS (SELECT 1 FROM dbo.ReleaseObligations
+           WHERE StableKey NOT LIKE 'release:v1:[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]:%'
+              OR CONVERT(char(10),TargetEffectiveDate,23)<>SUBSTRING(StableKey,12,10))
+    THROW 51010, 'A Demo release key does not embed its target date; the roll cannot move it safely.', 1;
+UPDATE release
+SET TargetEffectiveDate=DATEADD(day,@TimelineShiftDays,release.TargetEffectiveDate),
+    AvailableOn=DATEADD(day,@TimelineShiftDays,release.AvailableOn),
+    DueOn=DATEADD(day,@TimelineShiftDays,release.DueOn),
+    AppliesFromOn=DATEADD(day,@TimelineShiftDays,release.AppliesFromOn),
+    RetiredOn=DATEADD(day,@TimelineShiftDays,release.RetiredOn),
+    StableKey=CONCAT('release:v1:',
+        CONVERT(char(10),DATEADD(day,@TimelineShiftDays,release.TargetEffectiveDate),23),
+        SUBSTRING(release.StableKey,22,300))
+FROM dbo.ReleaseObligations release
+JOIN dbo.People person ON person.Id=release.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE attestation
+SET CompletedOn=DATEADD(day,@TimelineShiftDays,attestation.CompletedOn),
+    RecordedAtUtc=DATEADD(day,@TimelineShiftDays,attestation.RecordedAtUtc),
+    RevokedAtUtc=DATEADD(day,@TimelineShiftDays,attestation.RevokedAtUtc)
+FROM dbo.ReleaseObligationAttestations attestation
+JOIN dbo.ReleaseObligations release ON release.Id=attestation.ReleaseObligationId
+JOIN dbo.People person ON person.Id=release.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
+
+UPDATE authorization_
+SET OccurredOn=DATEADD(day,@TimelineShiftDays,authorization_.OccurredOn),
+    RecordedAtUtc=DATEADD(day,@TimelineShiftDays,authorization_.RecordedAtUtc)
+FROM dbo.ReleaseAuthorizationEvents authorization_
+JOIN dbo.ReleaseObligations release ON release.Id=authorization_.ReleaseObligationId
+JOIN dbo.People person ON person.Id=release.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2;
 "@ @{ TimelineShiftDays=$timelineShiftDays } | Out-Null
     }
+
+    # Shifting by days cannot keep every anniversary: moving a February 29 start, or
+    # moving across one, lands a year's target a day away from EffectiveDate.AddYears(n),
+    # which is how Sati names a cycle (SQL DATEADD(year) matches .NET AddYears). Snap
+    # each stored cycle row back onto its computed anniversary, carrying its deadlines
+    # and completions by the same day or two, so the roll never manufactures a gap.
+    Invoke-SeedNonQuery @"
+IF OBJECT_ID('tempdb..#snap') IS NOT NULL DROP TABLE #snap;
+SELECT form.Id,
+       DATEDIFF(day,form.TargetEffectiveDate,
+           DATEADD(year,ROUND(DATEDIFF(day,person.EffectiveDate,form.TargetEffectiveDate)/365.2425,0),
+                   person.EffectiveDate)) AS Delta
+INTO #snap
+FROM dbo.Forms form
+JOIN dbo.People person ON person.Id=form.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2 AND person.EffectiveDate IS NOT NULL;
+DELETE FROM #snap WHERE Delta=0 OR ABS(Delta)>3;
+
+UPDATE form
+SET TargetEffectiveDate=DATEADD(day,snap.Delta,form.TargetEffectiveDate),
+    DueDate=DATEADD(day,snap.Delta,form.DueDate),
+    CompletedDate=DATEADD(day,snap.Delta,form.CompletedDate),
+    OpenedDate=DATEADD(day,snap.Delta,form.OpenedDate)
+FROM dbo.Forms form JOIN #snap snap ON snap.Id=form.Id;
+
+UPDATE attestation
+SET CompletedOn=DATEADD(day,snap.Delta,attestation.CompletedOn)
+FROM dbo.FormAttestations attestation JOIN #snap snap ON snap.Id=attestation.FormId;
+
+IF OBJECT_ID('tempdb..#releaseSnap') IS NOT NULL DROP TABLE #releaseSnap;
+SELECT release.Id,
+       DATEDIFF(day,release.TargetEffectiveDate,
+           DATEADD(year,ROUND(DATEDIFF(day,person.EffectiveDate,release.TargetEffectiveDate)/365.2425,0),
+                   person.EffectiveDate)) AS Delta
+INTO #releaseSnap
+FROM dbo.ReleaseObligations release
+JOIN dbo.People person ON person.Id=release.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+WHERE owner.AgencyId=2 AND person.EffectiveDate IS NOT NULL;
+DELETE FROM #releaseSnap WHERE Delta=0 OR ABS(Delta)>3;
+
+UPDATE release
+SET TargetEffectiveDate=DATEADD(day,snap.Delta,release.TargetEffectiveDate),
+    AvailableOn=DATEADD(day,snap.Delta,release.AvailableOn),
+    DueOn=DATEADD(day,snap.Delta,release.DueOn),
+    AppliesFromOn=DATEADD(day,snap.Delta,release.AppliesFromOn),
+    RetiredOn=DATEADD(day,snap.Delta,release.RetiredOn),
+    StableKey=CONCAT('release:v1:',
+        CONVERT(char(10),DATEADD(day,snap.Delta,release.TargetEffectiveDate),23),
+        SUBSTRING(release.StableKey,22,300))
+FROM dbo.ReleaseObligations release JOIN #releaseSnap snap ON snap.Id=release.Id;
+
+UPDATE attestation
+SET CompletedOn=DATEADD(day,snap.Delta,attestation.CompletedOn)
+FROM dbo.ReleaseObligationAttestations attestation JOIN #releaseSnap snap ON snap.Id=attestation.ReleaseObligationId;
+"@ | Out-Null
 
     # Scheduled records are working plans, not history. Give each case manager
     # one stable item per day (up to the available seeded records) across a
@@ -758,21 +892,22 @@ VALUES
     }
 
     # Move the seeded working notes with the reset day. The narratives remain funny and
-    # recognizable; only their operational dates roll forward.
+    # recognizable; only their operational dates roll forward. Visits land 2-25 days ago,
+    # inside the 30-day monthly-contact clock, so no client reads as out of contact.
     Invoke-SeedNonQuery @"
 UPDATE note
 SET EventDate = DATEADD(day, -(
-        CASE note.NoteType WHEN 0 THEN 2 + ((note.PersonId * 11) % 45)
-                           WHEN 1 THEN 11 + ((note.PersonId * 11) % 45)
-                           ELSE 23 + ((note.PersonId * 11) % 45) END), @Today),
+        CASE note.NoteType WHEN 0 THEN 2 + ((note.PersonId * 11) % 24)
+                           WHEN 1 THEN 11 + ((note.PersonId * 11) % 24)
+                           ELSE 23 + ((note.PersonId * 11) % 24) END), @Today),
     Status = CASE WHEN note.NoteType=3 AND note.PersonId%29=0 THEN 7
                   WHEN note.NoteType=3 AND note.PersonId%17=0 THEN 2
                   WHEN note.NoteType=3 THEN 6 ELSE note.Status END,
     ApprovedAt = CASE WHEN note.NoteType<>3 OR (note.PersonId%29<>0 AND note.PersonId%17<>0) THEN DATEADD(day,1,DATEADD(day,-(
-        CASE note.NoteType WHEN 0 THEN 2 + ((note.PersonId * 11) % 45)
-                           WHEN 1 THEN 11 + ((note.PersonId * 11) % 45)
-                           ELSE 23 + ((note.PersonId * 11) % 45) END),@Today)) ELSE NULL END,
-    ReturnedAt = CASE WHEN note.NoteType=3 AND note.PersonId%29=0 THEN DATEADD(day,2,DATEADD(day,-(23 + ((note.PersonId * 11) % 45)),@Today)) ELSE NULL END,
+        CASE note.NoteType WHEN 0 THEN 2 + ((note.PersonId * 11) % 24)
+                           WHEN 1 THEN 11 + ((note.PersonId * 11) % 24)
+                           ELSE 23 + ((note.PersonId * 11) % 24) END),@Today)) ELSE NULL END,
+    ReturnedAt = CASE WHEN note.NoteType=3 AND note.PersonId%29=0 THEN DATEADD(day,2,DATEADD(day,-(23 + ((note.PersonId * 11) % 24)),@Today)) ELSE NULL END,
     ReturnedById = CASE WHEN note.NoteType=3 AND note.PersonId%29=0 THEN 1007 ELSE NULL END,
     ReturnReason = CASE WHEN note.NoteType=3 AND note.PersonId%29=0 THEN 'Please clarify which supporting cast member provided the checklist.' ELSE NULL END,
     ApprovedById = CASE WHEN note.NoteType<>3 OR (note.PersonId%29<>0 AND note.PersonId%17<>0) THEN 1007 ELSE NULL END
@@ -820,19 +955,24 @@ VALUES
         while ($cycleStart.AddYears(1) -le $today) { $cycleStart = $cycleStart.AddYears(1) }
         while ($cycleStart -gt $today) { $cycleStart = $cycleStart.AddYears(-1) }
         $cycleEnd = $cycleStart.AddYears(1)
-        $completedOn = $today.AddDays(-((([int]$person.Id * 5) % 90) + 3))
+        $personCompletedOn = $today.AddDays(-((([int]$person.Id * 5) % 90) + 3))
 
         foreach ($formSpec in @(
             @{ Type="PCP"; Enum=4; Label="Person-Centered Plan"; Joke="The plan contains goals, responsible parties, and zero secret identities." },
             @{ Type="ComprehensiveAssessment"; Enum=5; Label="Comprehensive Assessment"; Joke="Every domain was addressed; no answer was simply 'everybody lies.'" }
         )) {
             if ($formSpec.Type -eq "PCP" -and $index -lt 3) { continue }
-            $formId = Invoke-SeedScalar @"
-SELECT TOP (1) Id FROM dbo.Forms
+            $formDue = Invoke-SeedScalar @"
+SELECT TOP (1) CONCAT(Id, '|', CONVERT(char(10), DueDate, 23)) FROM dbo.Forms
 WHERE PersonId=@PersonId AND Type=@Type AND DueDate>@CycleStart AND DueDate<=@CycleEnd
 ORDER BY DueDate DESC;
 "@ @{ PersonId=[int]$person.Id; Type=$formSpec.Type; CycleStart=$cycleStart; CycleEnd=$cycleEnd }
-            if ($null -eq $formId -or $formId -is [DBNull]) { continue }
+            if ($null -eq $formDue -or $formDue -is [DBNull]) { continue }
+            $formId = [int]($formDue -split '\|')[0]
+            # Never later than the due date: a late completion leaves every note between the
+            # two non-billable, so the Demo's history would still read as out of compliance.
+            $dueDate = [DateTime]::ParseExact(($formDue -split '\|')[1], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+            $completedOn = if ($dueDate -lt $personCompletedOn) { $dueDate } else { $personCompletedOn }
             $formCompletionSql = if ($hasStoredFormCompliance) {
                 "UPDATE dbo.Forms SET IsCompliant=1, CompletedDate=@CompletedOn, OpenedDate=COALESCE(OpenedDate, DATEADD(day,-7,@CompletedOn)) WHERE Id=@Id;"
             }
@@ -1088,6 +1228,34 @@ JOIN dbo.Notes note ON note.Id=claim.NoteId
 JOIN dbo.People person ON person.Id=note.PersonId
 JOIN dbo.Agencies agency ON agency.Id=owner.AgencyId
 WHERE agency.BillingUnitRate>0;
+"@ | Out-Null
+
+    # A form's CompletedDate is only the projection of its attestation ledger. Older seed
+    # versions updated the column for rows the current-cycle step no longer selects, so a
+    # few carried a date their ledger never recorded and failed validation on every run.
+    # The ledger is authoritative: realign the projection wherever a ledger exists.
+    $completionProjection = if ($hasStoredFormCompliance) {
+        "CompletedDate=CASE WHEN live.Kind=N'Attested' THEN live.CompletedOn END, IsCompliant=CASE WHEN live.Kind=N'Attested' THEN 1 ELSE 0 END"
+    }
+    else {
+        "CompletedDate=CASE WHEN live.Kind=N'Attested' THEN live.CompletedOn END"
+    }
+    Invoke-SeedNonQuery @"
+UPDATE form
+SET $completionProjection
+FROM dbo.Forms form
+JOIN dbo.People person ON person.Id=form.PersonId
+JOIN dbo.Users owner ON owner.Id=person.UserId
+CROSS APPLY
+(
+    SELECT TOP (1) attestation.Kind, attestation.CompletedOn
+    FROM dbo.FormAttestations attestation
+    WHERE attestation.FormId=form.Id
+    ORDER BY attestation.RecordedAtUtc DESC, attestation.Id DESC
+) live
+WHERE owner.AgencyId=2
+  AND ((live.Kind=N'Attested' AND (form.CompletedDate IS NULL OR form.CompletedDate<>live.CompletedOn))
+    OR (live.Kind<>N'Attested' AND form.CompletedDate IS NOT NULL));
 "@ | Out-Null
 
     Invoke-SeedNonQuery @"

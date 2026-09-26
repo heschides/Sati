@@ -12,6 +12,13 @@
       "type": "http",
       "direction": "out",
       "name": "Response"
+    },
+    {
+      "type": "queue",
+      "direction": "out",
+      "name": "ResetRequest",
+      "queueName": "demo-reset-requests",
+      "connection": "AzureWebJobsStorage"
     }
   ]
 }

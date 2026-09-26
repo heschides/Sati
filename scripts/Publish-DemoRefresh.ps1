@@ -24,8 +24,22 @@ function Invoke-AzureCli([string[]]$Arguments) {
 try {
     New-Item -ItemType Directory -Path $staging | Out-Null
     Copy-Item -Path (Join-Path $source '*') -Destination $staging -Recurse
-    Copy-Item -LiteralPath $seed -Destination (Join-Path $staging 'RefreshCaseload\Seed-DemoShowcaseData.ps1')
-    Copy-Item -LiteralPath $seed -Destination (Join-Path $staging 'ResetDemo\Seed-DemoShowcaseData.ps1')
+    # One copy beside Shared\DemoReset.ps1, which both the nightly timer and the queued
+    # Admin reset run.
+    Copy-Item -LiteralPath $seed -Destination (Join-Path $staging 'Shared\Seed-DemoShowcaseData.ps1')
+
+    # Both functions finish the reset with SatiComplianceSeed --demo, which applies Sati's
+    # own attestation and release rules. Self-contained, so the PowerShell worker needs no
+    # .NET runtime of its own.
+    $toolProject = Join-Path $repo 'tools\SatiComplianceSeed\SatiComplianceSeed.csproj'
+    $toolOutput = Join-Path $staging 'ComplianceSeed'
+    & dotnet publish $toolProject --configuration Release --runtime win-x64 --self-contained true `
+        -p:PublishSingleFile=true --output $toolOutput --nologo | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw 'Publishing SatiComplianceSeed failed.' }
+    Get-ChildItem -LiteralPath $toolOutput -Filter '*.pdb' | Remove-Item -Force
+    if (-not (Test-Path -LiteralPath (Join-Path $toolOutput 'SatiComplianceSeed.exe') -PathType Leaf)) {
+        throw 'SatiComplianceSeed.exe was not produced.'
+    }
     Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zip -CompressionLevel Optimal
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [IO.Compression.ZipFile]::OpenRead($zip)

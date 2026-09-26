@@ -34,9 +34,12 @@ internal sealed class DemoResetCoordinator(
         };
         await request.Content.LoadIntoBufferAsync(cancellationToken);
         request.Headers.Add("x-functions-key", functionKey);
+        // The Function queues the reset and answers 202: a full reset takes longer than any
+        // HTTP front end holds a request open. It invalidates every token when it restores,
+        // so the result is not polled here; it is recorded as a demo.reset.* audit event.
         using var response = await client.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
-        logger.LogInformation("Full Demo reset {RequestId} completed.", requestId);
-        return new DemoResetResultDto(requestId, DateTime.UtcNow, "Reset completed");
+        logger.LogInformation("Full Demo reset {RequestId} accepted.", requestId);
+        return new DemoResetResultDto(requestId, DateTime.UtcNow, "Reset started");
     }
 }

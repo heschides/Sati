@@ -305,13 +305,13 @@ internal static partial class ApiEndpoints
             catch (HttpRequestException)
             {
                 return Results.Problem(
-                    "The Demo reset service did not report successful completion. An administrator must review the reset operation before retrying.",
+                    "The Demo reset service did not accept the request. An administrator must review the reset operation before retrying.",
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 return Results.Problem(
-                    "The Demo reset service did not finish within the protected reset window. An administrator must review the reset operation before retrying.",
+                    "The Demo reset service did not answer in time. An administrator must review the reset operation before retrying.",
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
         });

@@ -138,11 +138,14 @@ public partial class AdminDashboardViewModel(
         try
         {
             var accepted = await adminService.RequestFullDemoResetAsync("RESET DEMO");
-            NoticeMessage = $"Full Demo reset {accepted.RequestId:N} completed. Close and reopen the Demo, then sign in again.";
+            // The reset runs after this returns and ends every session when it restores, so
+            // its result is read from recent activity after signing in again.
+            NoticeMessage = $"Full Demo reset {accepted.RequestId:N} started. It takes about five minutes. " +
+                            "Close the Demo, then sign in again once it finishes; the result appears under recent activity.";
         }
         catch (Exception ex)
         {
-            StatusMessage = $"The Demo reset did not complete. {ex.Message}";
+            StatusMessage = $"The Demo reset did not start. {ex.Message}";
         }
         finally
         {

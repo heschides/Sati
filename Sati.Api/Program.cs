@@ -50,8 +50,9 @@ if (satiOptions.EdiReplayRetentionDays is < 30 or > 365)
 builder.Services.Configure<ApiAuthenticationOptions>(builder.Configuration.GetSection(ApiAuthenticationOptions.SectionName));
 builder.Services.Configure<SatiApiOptions>(builder.Configuration.GetSection(SatiApiOptions.SectionName));
 builder.Services.Configure<DemoResetOptions>(builder.Configuration.GetSection(DemoResetOptions.SectionName));
+// The Function only queues the reset now, so a slow answer means it did not accept it.
 builder.Services.AddHttpClient<DemoResetCoordinator>(client =>
-    client.Timeout = TimeSpan.FromMinutes(15));
+    client.Timeout = TimeSpan.FromMinutes(2));
 builder.Services.Configure<ChatOptions>(builder.Configuration.GetSection("Chat"));
 builder.Services.AddSingleton<ChatFeature>();
 builder.Services.AddSingleton<ChatNotifications>();

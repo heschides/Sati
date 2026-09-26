@@ -5159,3 +5159,88 @@ Moving to the next workday remains the default, so pressing Enter still never lo
 **Rejected:** leaving past-day items on their day, which would restore the calendar clutter and the
 held-open productivity day; and making "keep" the default, which would leave today's plan on
 a finished day whenever the last close of the day is confirmed with Enter.
+
+## 2026-09-26 — the Demo reset records past compliance as done, keeping one overdue review per caseload
+
+The hosted Demo kept reading as though every client were years behind, however often its history
+was completed. There were two causes.
+
+- **The nightly roll broke cycle identity.** `Seed-DemoShowcaseData.ps1` moved `EffectiveDate` and
+  form due, completed, and opened dates, but not `Forms.TargetEffectiveDate`, release obligations
+  (whose `StableKey` embeds the target date), their attestations, or provider links. Billing names a
+  form by (type, target) and a release by its key, so after each roll every stored row belonged to a
+  cycle that no longer existed. `ExpectedBillingComplianceObligations` then projected every cycle as
+  a missing, incomplete obligation. A rehearsal that rolled a fully completed June 1 snapshot to
+  September 26 left 176 of 177 clients blocked. The roll now moves every cycle-keyed column
+  together and snaps any row a leap day has moved back onto `EffectiveDate.AddYears(n)`.
+- **The baseline history was never complete.** The showcase seed completed only the current PCP and
+  assessment, and sometimes after its due date, which holds every note in between.
+
+`SatiComplianceSeed --demo` now runs after the roll in both Demo functions. It is the Production
+seed's engine: Sati's own `EnsureCurrentCycleForms`, `FormAttestationRules`, `FormOpeningRules`, and
+`MissingReleasePlans`, with every past-due item recorded as done on its due date. It differs in
+the following ways:
+
+- It is guarded to `SatiDemo` with the `Demo` marker and authenticates with the Function's managed
+  identity token, passed through the environment.
+- It has no backup or rehearsal, because the baseline restore is the recovery path. It plans once,
+  applies that plan in one transaction, then re-plans (nothing may remain) and evaluates every
+  client as billing does. The Production seed's extra re-plan and fingerprints are skipped because
+  the manual reset runs inside a fixed HTTP limit.
+- A past form completed after its due date is re-recorded on the due date: the late attestation is
+  revoked and a new one appended, if Sati's rules accept it. A late completion holds every note
+  between the two dates, so synthetic history must not carry one. On Azure that was 581 rows,
+  which also cleared 45 Reclassifications the prerequisite rule had refused.
+- One quarterly review per caseload, due within the last 75 days, is left overdue as a teaching
+  exception. That client is the first eligible one by id, never a profile teaching case. If the
+  restored baseline already completed that review, the completion is revoked, so every presenter
+  login shows the gate on real, recent notes.
+- Per-row audit events are not written. Like the showcase seed's own attestations, the rows carry
+  their reason, and thousands of nightly entries would bury the Admin activity feed the walkthrough
+  shows.
+- The run fails the reset if anything other than a teaching exception blocks billing today. It
+  also reports notes from the last 180 days that billing would hold. What holds a profile teaching
+  case, such as the client with no effective date, whose forms Sati cannot place, is part of that
+  case's lesson and does not fail the run.
+
+The showcase seed also realigns `Forms.CompletedDate` with the live row of its attestation ledger
+before validating. Twelve rows had a date their ledger never recorded, left by an earlier seed in
+cycles the current seed no longer selects, and they failed the seed's own check on every run.
+
+Running the check daily makes the Demo self-healing: new cycles, leap-day stragglers, and whatever
+state a future baseline capture holds are all resolved against the reset's own date.
+
+The hosted reset had not succeeded since September 9. Its baseline predated 15 tables added by
+later migrations, so `SatiResetToCanonicalBaseline` refused with 51002 every night. Every release
+that adds a Demo table repeats this until the baseline is recaptured; see `AGENDA.md`.
+
+**Rejected:** completing history once and recapturing the baseline, which needs a workstation
+firewall opening and silently decays if the roll ever misses a column again; SQL completion inside
+the seed, a second copy of the attestation and release rules; and a monthly-contact teaching
+exception, because monthly contact is not a default billing requirement. The seeded visits now fall
+2 to 25 days back, so no client reads as out of contact.
+
+## 2026-09-26 — the Admin's Demo reset is queued, and every reset's outcome is audited
+
+A full Demo reset takes about four minutes. The Function's HTTP front end abandons a request after
+about 230 seconds, whoever the caller is, the API included. So an Admin reset that ran inside its
+request reported failure even when it succeeded. `ResetDemo` now validates the request, puts it on
+the `demo-reset-requests` storage queue, and answers 202. `ResetDemoWorker` takes it off the queue
+and runs `Shared\DemoReset.ps1`, the same reset the nightly timer runs, under the same exclusive
+lock.
+
+The desktop cannot poll for the result. The restore rotates the database instance id and ends
+every session, including the one that asked. The outcome is therefore written as an audit event,
+`demo.reset.completed` or `demo.reset.failed`, carrying the stage, duration, exception types, and
+SQL error numbers but never messages. The Admin reads it under recent activity after signing in
+again. While the reset holds its lock, the lease middleware already turns sign-ins away with "The
+Demo is being restored." The nightly timer records the same events, so the seventeen nights of
+51002 failures described above would now have been visible on the dashboard.
+
+host.json allows one delivery (`maxDequeueCount` 1) and one message at a time. A failed reset moves
+to the poison queue for review; it is never re-run by the platform.
+
+**Rejected:** a status route the desktop polls, which the token rotation makes unreachable
+mid-reset unless it is anonymous; a status table, which needs DDL rights the refresh identity does
+not have and is one more thing outside the baseline; and starting the reset in the background from
+the API, which would still hit the Function's front-end limit.

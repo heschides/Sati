@@ -260,7 +260,7 @@ public sealed class CloudApiRouteTests
     {
         var requestId = Guid.NewGuid();
         var recorder = new UriRecorder(JsonBody($$"""
-            {"requestId":"{{requestId}}","completedAtUtc":"2026-09-06T12:00:00Z","status":"Reset completed"}
+            {"requestId":"{{requestId}}","completedAtUtc":"2026-09-06T12:00:00Z","status":"Reset started"}
             """));
         var api = ClientFor(recorder);
         var service = new CloudAdminService(api);

@@ -133,6 +133,62 @@ No schema change, so no machine is newly behind on migrations because of this re
       (2026-09-25).
 - [x] Add a Settings release-notes entry for this choice when the next release is cut (1.3.28).
 
+## Unreleased — Demo compliance history reads as done (2026-09-26)
+
+See `DECISIONS.md` (2026-09-26). This is Demo infrastructure only: no desktop, API, migration, or
+contract change.
+
+- [x] Move every cycle-keyed column in the nightly roll (`Forms.TargetEffectiveDate`, release
+      obligations with their `StableKey`, release attestations and authorization events, provider
+      links, Safety Plan and document cycles), snap leap-day stragglers, never seed a late PCP or
+      assessment completion, and keep seeded visits inside the 30-day contact clock.
+- [x] Add `SatiComplianceSeed --demo` and run it after the roll in `ResetDemo` and
+      `RefreshCaseload`, with one overdue quarterly review per caseload kept as a teaching exception.
+      `Publish-DemoRefresh.ps1` publishes it self-contained beside the functions, and the function
+      timeout is now 10 minutes.
+- [x] Rehearse on a separate LocalDB instance holding a migrated synthetic `SatiDemo` (177 clients).
+      The old roll on a completed snapshot left 176 clients blocked with 2,585 obligations. The new
+      roll leaves 1, a leap-day straggler the pass completes. From a never-completed baseline, 2,564
+      blockers today and 1,047 held notes become only the 11 teaching exceptions. The pass takes
+      about 7 seconds locally.
+- [x] Structural tests: `RollingSeedMovesEveryCycleIdentityWithTheEffectiveDate` and
+      `BothFunctionsCompleteComplianceHistoryAfterTheRollInsideTheResetLock`. The first fails
+      against the previous seed.
+- [x] Diagnose the hosted reset. It had not succeeded since 2026-09-09: the 2026-09-14 baseline
+      predated 15 tables (release obligations, recovery, and signature projections among them), so
+      every run stopped with 51002. The 2026-09-14/15 runs got past the restore but failed on 12
+      completed PCP and assessment rows whose date disagreed with their attestation ledger.
+- [x] Read-only check of the live Demo before recapture: every form and release sat on its plan-year
+      anniversary, and activity since the last roll was migration and reconciliation work.
+      Recaptured the baseline from live data, anchored 2026-09-26 (`Initialize-DemoFullReset.ps1
+      -ReplaceBaseline`).
+- [x] Seed realigns completion dates with the ledger before validating. The Demo pass re-records
+      late past completions on their due dates (581 on Azure) and counts profile teaching cases
+      apart from failures.
+- [x] Published the Demo refresh function and ran full resets through it. Result: 12 clients held
+      today (11 teaching exceptions and the no-effective-date case), 0 held by anything else, and
+      every held note in the last 180 days belongs to an exception.
+- [x] **The manual reset was held open past the ~230-second HTTP front end.** A full reset takes
+      about four minutes: restore about 135 seconds, seed about 30, compliance pass 45 to 60. Now
+      `ResetDemo` validates, queues the request on `demo-reset-requests`, and answers 202 in about a
+      second. `ResetDemoWorker` performs the reset through `Shared\DemoReset.ps1`, the same code
+      the nightly timer runs. host.json allows one delivery and one reset at a time. Both paths record
+      `demo.reset.completed` or `demo.reset.failed` as an audit event, so nightly failures now appear
+      on the Admin dashboard instead of only in the Function log. The Function is deployed; the
+      currently deployed API (1.3.28) already treats 202 as success.
+- [ ] Ship the API and desktop wording with the next release. The API returns "Reset started"
+      with a 2-minute Function timeout. The Admin notice says the reset started, takes about five
+      minutes, and reports its result under recent activity. Until then, 1.3.28 says "completed"
+      the moment the reset is queued.
+- [ ] Faster baseline restore: `SatiResetToCanonicalBaseline` deletes and reinserts every table and
+      re-checks every constraint (about 135 seconds). It is no longer user-visible, but it is most
+      of the reset.
+- [ ] Add baseline recapture to `RELEASE_PLAYBOOK.md` for any release that adds a Demo table.
+      Otherwise the hosted reset stops with 51002 until someone notices.
+- [ ] Known limit: PCP and assessment openings whose billing deadline falls before the agency's
+      availability window stay unopened ("opening date cannot be in the future"). They block only
+      if an agency turns on the opening gates, and the run would then fail loudly.
+
 ## Release 1.3.27 — 2026-09-24
 
 “Safer updates, cleaner agendas, and larger calendars.” This patch carries forward

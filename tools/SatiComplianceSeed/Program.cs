@@ -19,15 +19,26 @@ using Sati.Tools.ComplianceSeed;
 //   (no flag)         read-only report of what would change
 //   --apply --expect N
 //                     backup, rehearse on a restored copy, then apply for real
+//   --demo [--apply] [--as-of yyyy-MM-dd]
+//                     SatiDemo only, run by the nightly Demo reset after the baseline is
+//                     restored and rolled; see DemoRun.cs. SATI_SQL_ACCESS_TOKEN, when
+//                     set, authenticates to Azure SQL.
 //
 // The report contains counts only: no names, notes, or other personal information.
 
 var apply = args.Contains("--apply", StringComparer.OrdinalIgnoreCase);
 var testDatabase = args.Contains("--test-database", StringComparer.OrdinalIgnoreCase);
-var database = args.FirstOrDefault(a => !a.StartsWith('-') && !IsOptionValue(args, a)) ?? "SatiProduction";
+var demo = args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
+var database = args.FirstOrDefault(a => !a.StartsWith('-') && !IsOptionValue(args, a)) ??
+               (demo ? "SatiDemo" : "SatiProduction");
 var server = OptionValue(args, "--server") ?? @"(localdb)\MSSQLLocalDB";
 var expected = int.TryParse(OptionValue(args, "--expect"), out var parsedExpected) ? parsedExpected : (int?)null;
-var today = DateTime.Today;
+var today = OptionValue(args, "--as-of") is { } asOfText
+    ? DateTime.ParseExact(asOfText, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+    : DateTime.Today;
+
+if (demo)
+    return await DemoRun.RunAsync(server, database, today, apply, testDatabase);
 
 Console.WriteLine(apply ? "Sati compliance seed - APPLY" : "Sati compliance seed - CHECK ONLY");
 Console.WriteLine($"Run at   : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -152,5 +163,5 @@ static string? OptionValue(string[] args, string name)
 static bool IsOptionValue(string[] args, string value)
 {
     var index = Array.IndexOf(args, value);
-    return index > 0 && args[index - 1] is "--server" or "--expect";
+    return index > 0 && args[index - 1] is "--server" or "--expect" or "--as-of";
 }
