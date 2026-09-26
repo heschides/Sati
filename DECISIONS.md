@@ -5310,7 +5310,9 @@ agree. The flag defaults off. Billing staff choose an API-owned test account bef
 the API formats and retains the exact file, validates its ISA/GS and stable Claim.MD D9 values
 against that account, and permits one dispatch per generation. It revalidates actor, tenant,
 period, test mode, account, profile, and prior transmission evidence at the queue boundary.
-While an earlier file for the period is Sending or OutcomeUnknown, another cannot queue.
+While an earlier file for the period is Queued, Sending, or OutcomeUnknown, another cannot
+queue. The queue transaction takes the database-owned billing-period write lock, so separate
+API instances cannot pass that check concurrently for different generations.
 
 The connector sees only an immutable upload body and transport metadata. It cannot decide
 billability, correction eligibility, payer acceptance, or remittance status. The worker commits

@@ -94,6 +94,7 @@ internal sealed record X12Document(
         {
             SenderQualifier = Required(isa, 5), SenderId = Required(isa, 6),
             ReceiverQualifier = Required(isa, 7), ReceiverId = Required(isa, 8),
+            GroupSenderId = Required(gs, 2), GroupReceiverId = Required(gs, 3),
             GroupControlNumber = gs[6], TransactionControlNumber = st[2], ImplementationVersion = gs[8]
         };
         return new(envelope, type, component, segments.Skip(2).Take(segments.Count - 4).ToArray());

@@ -6207,6 +6207,7 @@ internal static partial class ApiEndpoints
 
         MapClaimResponseIntake(api);
         MapBillingCorrections(api);
+        MapClearinghouseDispatch(api);
 
         // Drive the mock clearinghouse. Scaffolding: it fabricates responses and then hands
         // them to the same ingestion path above, rather than writing rows directly, so the
@@ -6811,6 +6812,7 @@ internal static partial class ApiEndpoints
             ClaimsPrincipal principal,
             ApiDbContext db,
             AuditTrail auditTrail,
+            ClearinghouseDispatchGate clearinghouseGate,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -6836,17 +6838,22 @@ internal static partial class ApiEndpoints
                 cancellationToken);
             if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
                 return Results.Unauthorized();
+            TradingPartnerProfile profile;
+            try { profile = await ClearinghouseAccountSelection.ForGenerationAsync(
+                db, actor.AgencyId, request, clearinghouseGate, cancellationToken); }
+            catch (ClearinghouseSelectionRejected rejected)
+            { return Results.Conflict(new ApiErrorDto(rejected.Code, rejected.Message, string.Empty)); }
             var previous = await db.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(generation =>
                 generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                 generation.IdempotencyKey == normalizedKey, cancellationToken);
             if (previous is not null && (previous.BillingPeriodId != periodId || previous.IsTest != request.IsTest))
-                return ReplayEdiOrConflict(previous, periodId, request.IsTest);
+                return ReplayEdiOrConflict(previous, periodId, request.IsTest, profile);
 
             var export = await LoadExportablePeriodAsync(db, actor, periodId, cancellationToken);
             if (export.Failure is not null) return export.Failure;
             var period = export.Period!;
             if (previous is not null)
-                return ReplayEdiOrConflict(previous, periodId, request.IsTest);
+                return ReplayEdiOrConflict(previous, periodId, request.IsTest, profile);
 
             var generatedAt = DateTime.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
@@ -6855,9 +6862,11 @@ internal static partial class ApiEndpoints
                 return Results.Conflict(new ApiErrorDto("edi_control_conflict",
                     "This submission identity has already been used. Start a new generation attempt.", string.Empty));
             var content = ServerEdiGenerator.Generate(
-                period, request.IsTest, generatedAt, controlNumber);
+                period, request.IsTest, generatedAt, controlNumber, profile);
             var timestamp = generatedAt.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture);
-            var testMarker = request.IsTest ? ".OATEST" : string.Empty;
+            var testMarker = request.IsTest
+                ? profile.Kind == TradingPartnerKind.ClaimMd ? ".CMDTEST" : ".OATEST"
+                : string.Empty;
             var file = new EdiFileDto($"837P{testMarker}_{period.Year}{period.Month:D2}_{timestamp}_{normalizedKey[..8]}.txt", content);
             var retainedGeneration = new ServerEdiGeneration
             {
@@ -6906,7 +6915,7 @@ internal static partial class ApiEndpoints
                 var completed = await db.EdiGenerations.AsNoTracking().SingleAsync(generation =>
                     generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                     generation.IdempotencyKey == normalizedKey, cancellationToken);
-                return ReplayEdiOrConflict(completed, periodId, request.IsTest);
+                return ReplayEdiOrConflict(completed, periodId, request.IsTest, profile);
             }
             return Results.Ok(file);
         });
@@ -9770,8 +9779,10 @@ internal static partial class ApiEndpoints
     private static IResult ReplayEdiOrConflict(
         ServerEdiGeneration generation,
         int billingPeriodId,
-        bool isTest) =>
-        generation.BillingPeriodId == billingPeriodId && generation.IsTest == isTest
+        bool isTest,
+        TradingPartnerProfile profile) =>
+        generation.BillingPeriodId == billingPeriodId && generation.IsTest == isTest &&
+        ClearinghouseAccountSelection.Matches(generation.Content, profile, generation.AgencyId, billingPeriodId, isTest)
             ? Results.Ok(new EdiFileDto(generation.FileName, generation.Content))
             : Results.Conflict(new ApiErrorDto(
                 "idempotency_key_reused",

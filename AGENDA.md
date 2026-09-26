@@ -2065,7 +2065,7 @@ Sati-owned output.
 - [x] Phase 3 source workflow: API-owned connector seam, no-network fake connector, durable
       worker, authorized test-account generation and exact-generation queue, and a generic
       WPF queue/status view. The server flag defaults off and the Phase 2 migration remains
-      unapplied. Sending/unknown uploads block another file for the period and are never
+      unapplied. Queued/sending/unknown uploads block another file for the period and are never
       retried automatically; operational reconciliation is still a Phase 4 gate.
 - [ ] Phase 4: Claim.MD sandbox HTTP connector, status/ERA polling, atomic checkpoint/receipt
       processing, uncertain-upload reconciliation, and end-to-end sandbox evidence before

@@ -2392,8 +2392,9 @@ filters.
 claim lines into `Professional837Claim`; both pass the same immutable
 `ProfessionalClaimSnapshot` and versioned `TradingPartnerProfile` to that renderer.
 The existing call sites select the Office Ally profile by default, preserving their
-retained output. The Claim.MD profile is available for isolated formatting tests; no
-route, client setting, account store, or transport selects it for operational billing.
+retained output. In an explicitly enabled synthetic Demo/Testing deployment, the API can
+select a same-agency server-owned test account for generation; WPF sees only an account
+choice and never a partner secret or endpoint. No real transport selects Claim.MD.
 
 The profile owns interchange and group sender/receiver values. Claim.MD requires its
 account number as the sender and `CLAIMMD` as the receiver. Its Loop 2300 `REF*D9`
@@ -2431,7 +2432,7 @@ index prevents a second dispatch for the same retained file. The dispatch is an 
 outbox, not claim eligibility or payer acceptance. Its revision protects concurrent transitions.
 `OutcomeUnknown` cannot transition back to `Sending`; external reconciliation is required before
 an outcome can be resolved. Completed attempt rows are append-only and reserve encrypted-response
-fields, but no connector writes them yet. A crash while `Sending` may have no completed attempt:
+fields. A crash while `Sending` may have no completed attempt:
 that state is still uncertain and must not trigger an automatic duplicate upload.
 
 Status, ERA, and future modification feeds have independent opaque checkpoints per account. The
@@ -2440,8 +2441,30 @@ their effects; merely storing a cursor is not evidence of processing. Receipt pr
 distinguishes manual, synthetic mock, and future connector sources. Existing manual receipts retain
 their human actor; connector receipts can use a null human actor and must carry account/feed,
 external artifact, content type, and connector version. The current importer remains human/mock
-only. The additive migration has not been applied to Demo or Production; no transport, polling,
-automatic import, credentials, or dispatch UI is active.
+only. The additive migration has not been applied to Demo or Production; there is no real transport,
+polling, automatic import, credentials, or Production dispatch.
+
+### Synthetic dispatch workflow (Phase 3; opt-in source only)
+
+`ClearinghouseDispatchGate` requires both an exact Demo/Testing deployment identity and an
+explicit server setting, disabled by default. The authorized API lists only the actor agency's
+test accounts and retained test generations. The generation routes choose a server-owned account
+and recheck the current actor; the queue route verifies the exact retained ISA/GS envelope and
+Claim.MD D9 identities against that account, the period's owner agency, and its profile version.
+It refuses a file with transmission history and a second file for a period while an earlier
+dispatch is Queued, Sending, or OutcomeUnknown. The queue decision holds the database-owned
+billing-period write lock, so two API hosts cannot both queue different files for that period.
+One generation can create at most one dispatch, and a
+replayed request returns that same dispatch.
+
+`IClearinghouseConnector` receives transport facts only. The hosted worker commits Queued →
+Sending before invoking the synthetic connector, then retains an immutable attempt and a clearly
+synthetic submission event. It selects Queued only; a timeout, exception, or interrupted Sending
+is never automatically uploaded again. The fake connector makes no network call and produces no
+payer acceptance or remittance. WPF can request a queue operation and refresh its status; claim
+eligibility, correction, lifecycle, and tenant authority remain in the API/shared rules, not the
+connector or ViewModel. No account provisioning route exists. Enabling this against a migrated
+synthetic database is an operator-controlled future step, not a deployment performed here.
 
 **Pre-live checklist (before first real submission):**
 1. Replace representative Demo code/rate/payer/submitter values with the agency's verified contract,

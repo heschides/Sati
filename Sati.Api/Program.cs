@@ -124,6 +124,9 @@ else
 
 builder.Services.AddSingleton<EnvelopeProtector>();
 builder.Services.AddScoped<ClaimResponseIngestion>();
+builder.Services.AddSingleton<ClearinghouseDispatchGate>();
+builder.Services.AddSingleton<IClearinghouseConnector, SyntheticClearinghouseConnector>();
+builder.Services.AddHostedService<ClearinghouseDispatchWorker>();
 builder.Services.AddSingleton<IncidentAggregator>();
 builder.Services.AddSingleton<ApiIncidentRecorder>();
 builder.Services.AddHostedService<DatabaseIdentityHostedService>();

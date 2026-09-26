@@ -111,7 +111,8 @@ public static class ApiSurface
         // settled days with no billable work. An older server ignores the parameter and answers
         // with the actor's own rows, which would show a supervisor their own days under a case
         // manager's name.
-        "service-day-inclusion-review-v1"
+        "service-day-inclusion-review-v1",
+        "synthetic-clearinghouse-dispatch-v1"
     ];
 
     /// <summary>
@@ -148,6 +149,7 @@ public static class ApiSurface
         "GET /api/v1/audit-events",
         "GET /api/v1/billing/candidates",
         "GET /api/v1/billing/claim-lines/draft",
+        "GET /api/v1/billing/clearinghouse",
         "GET /api/v1/billing/compliance-policy-review-flags",
         "GET /api/v1/billing/compliance-recovery/{personId:int}",
         "GET /api/v1/billing/configuration",
@@ -246,6 +248,7 @@ public static class ApiSurface
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/renew",
         "POST /api/v1/billing/claim-lines",
+        "POST /api/v1/billing/clearinghouse/dispatches",
         "POST /api/v1/billing/compliance-recovery/{personId:int}",
         "POST /api/v1/billing/periods/{periodId:int}/corrections",
         "POST /api/v1/billing/periods/{periodId:int}/corrections/edi",

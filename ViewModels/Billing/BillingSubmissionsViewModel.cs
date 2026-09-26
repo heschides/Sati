@@ -21,6 +21,7 @@ namespace Sati.ViewModels.Billing
         private CancellationTokenSource? _responseImportCancellation;
         private readonly SemaphoreSlim _loadGate = new(1, 1);
         private readonly LatestRequestTracker _accountLoads = new();
+        private readonly LatestRequestTracker _dispatchLoads = new();
         private readonly Dictionary<int, string> _pendingEdiKeys = [];
         private readonly HashSet<int> _generatedTestPeriodIds = [];
         private readonly HashSet<int> _generatedPeriodIds = [];
@@ -47,6 +48,9 @@ namespace Sati.ViewModels.Billing
         public ObservableCollection<BillingGenerationStageRow> BlockedSubmittedPeriods { get; } = [];
         public ObservableCollection<BillingSubmissionHistoryDto> SubmissionHistory { get; } = [];
         public ObservableCollection<BillingSubmissionBatchRow> SubmissionBatches { get; } = [];
+        public ObservableCollection<ClearinghouseAccountOptionDto> DispatchAccounts { get; } = [];
+        public ObservableCollection<ClearinghouseGenerationDto> DispatchGenerations { get; } = [];
+        public ObservableCollection<ClearinghouseDispatchDto> Dispatches { get; } = [];
         public IReadOnlyList<MockClearinghouseScenarioOption> MockClearinghouseScenarios { get; } =
             MockClearinghouseScenarioOption.All;
 
@@ -79,6 +83,12 @@ namespace Sati.ViewModels.Billing
         [ObservableProperty] private string? statusMessage;
         [ObservableProperty] private bool isGenerating;
         [ObservableProperty] private bool isImportingResponse;
+        [ObservableProperty] private bool isQueueingDispatch;
+        [ObservableProperty] private bool isDispatchEnabled;
+        [ObservableProperty] private string dispatchAvailabilityMessage =
+            "Server-managed test dispatch is not enabled for this connection.";
+        [ObservableProperty] private ClearinghouseAccountOptionDto? selectedDispatchAccount;
+        [ObservableProperty] private ClearinghouseGenerationDto? selectedDispatchGeneration;
         [ObservableProperty] private bool isTestMode = true;
         [ObservableProperty] private DateTime? rangeStart;
         [ObservableProperty] private DateTime? rangeEnd;
@@ -131,6 +141,12 @@ namespace Sati.ViewModels.Billing
         public bool CanImportResponse => ShowsResponseImport && _responseFilePicker is not null &&
             !IsGenerating && !IsImportingResponse && _sessionService.CurrentUser?.HasBillingPermissions == true;
         public bool ShowsMockClearinghouse => _billingService.SupportsMockClearinghouse;
+        public bool ShowsAutomatedDispatch => _billingService.SupportsClearinghouseDispatch;
+        public bool CanQueueDispatch => IsDispatchEnabled && IsTestMode && !IsGenerating &&
+            !IsImportingResponse && !IsQueueingDispatch &&
+            _sessionService.CurrentUser?.HasBillingPermissions == true &&
+            SelectedDispatchAccount is { } account && SelectedDispatchGeneration is { } generation &&
+            generation.MatchingAccountId == account.Id && generation.DispatchState is null;
         public bool CanSubmitToMockClearinghouse =>
             ShowsMockClearinghouse && IsTestMode && !IsGenerating && !IsImportingResponse && MockSubmissionPeriods().Count > 0;
         public string MockClearinghouseAvailabilityMessage
@@ -304,12 +320,17 @@ namespace Sati.ViewModels.Billing
             CorrectionProblem = null;
             try
             {
-                var path = await _billingService.GenerateCorrectionEdiAsync(
-                    CurrentActor(), period.Id, IsTestMode, Guid.NewGuid().ToString("N"));
+                var correctionKey = Guid.NewGuid().ToString("N");
+                var path = IsTestMode && IsDispatchEnabled && SelectedDispatchAccount is { } account
+                    ? await _billingService.GenerateCorrectionEdiForAccountAsync(
+                        CurrentActor(), period.Id, true, correctionKey, account.Id)
+                    : await _billingService.GenerateCorrectionEdiAsync(
+                        CurrentActor(), period.Id, IsTestMode, correctionKey);
                 LastGeneratedPath = path;
                 StatusMessage = $"Correction 837P written to {path}.";
                 await LoadPeriodClaimsAsync(period.Id);
                 await RefreshSubmissionHistoryAsync();
+                await RefreshDispatchWorkspaceAsync();
             }
             catch (Exception ex)
             {
@@ -332,6 +353,7 @@ namespace Sati.ViewModels.Billing
             OnPropertyChanged(nameof(CanImportResponse));
             ImportResponseCommand.NotifyCanExecuteChanged();
             NotifyMockClearinghouseStateChanged();
+            NotifyDispatchStateChanged();
         }
 
         partial void OnIsImportingResponseChanged(bool value)
@@ -341,7 +363,17 @@ namespace Sati.ViewModels.Billing
             OnPropertyChanged(nameof(CanImportResponse));
             ImportResponseCommand.NotifyCanExecuteChanged();
             NotifyMockClearinghouseStateChanged();
+            NotifyDispatchStateChanged();
         }
+
+        partial void OnIsQueueingDispatchChanged(bool value) => NotifyDispatchStateChanged();
+        partial void OnIsDispatchEnabledChanged(bool value) => NotifyDispatchStateChanged();
+        partial void OnSelectedDispatchAccountChanged(ClearinghouseAccountOptionDto? value)
+        {
+            ResetPendingBatch();
+            NotifyDispatchStateChanged();
+        }
+        partial void OnSelectedDispatchGenerationChanged(ClearinghouseGenerationDto? value) => NotifyDispatchStateChanged();
 
         partial void OnRangeStartChanged(DateTime? value) => RebuildGenerationPeriods();
         partial void OnRangeEndChanged(DateTime? value) => RebuildGenerationPeriods();
@@ -350,6 +382,7 @@ namespace Sati.ViewModels.Billing
             ResetPendingBatch();
             _generatedTestPeriodIds.Clear();
             NotifyMockClearinghouseStateChanged();
+            NotifyDispatchStateChanged();
         }
         partial void OnSubmissionSearchTextChanged(string? value) => ApplySubmissionFilters();
         partial void OnOutstandingOnlyChanged(bool value) => ApplySubmissionFilters();
@@ -363,6 +396,7 @@ namespace Sati.ViewModels.Billing
                 return;
             var user = _sessionService.CurrentUser;
             var request = _accountLoads.Begin();
+            _dispatchLoads.Invalidate();
 
             try
             {
@@ -372,6 +406,13 @@ namespace Sati.ViewModels.Billing
                 var actor = user.ToAgencyActor();
                 var periods = await _billingService.GetAllBillingPeriodsAsync(actor);
                 var history = await _billingService.GetSubmissionHistoryAsync(actor);
+                ClearinghouseWorkspaceDto? dispatchWorkspace = null;
+                if (ShowsAutomatedDispatch)
+                {
+                    try { dispatchWorkspace = await _billingService.GetClearinghouseWorkspaceAsync(actor); }
+                    catch (Exception) { dispatchWorkspace = new ClearinghouseWorkspaceDto(false,
+                        "Server-managed test dispatch is unavailable for this connection.", [], [], []); }
+                }
                 if (!_accountLoads.IsCurrent(request) || !ReferenceEquals(_sessionService.CurrentUser, user))
                     return;
 
@@ -400,6 +441,8 @@ namespace Sati.ViewModels.Billing
                 foreach (var item in history)
                     SubmissionHistory.Add(item);
                 RebuildSubmissionBatches();
+                if (dispatchWorkspace is not null)
+                    ApplyDispatchWorkspace(dispatchWorkspace);
 
                 var progressedPeriodIds = SubmissionHistory
                     .Where(item => HasExchangeStage(item.Stage))
@@ -545,6 +588,7 @@ namespace Sati.ViewModels.Billing
 
             var periods = GenerationPeriods.ToList();
             var isTest = IsTestMode;
+            var accountId = isTest && IsDispatchEnabled ? SelectedDispatchAccount?.Id : null;
             var fingerprint = BatchFingerprint(periods, isTest);
             if (!string.Equals(_pendingBatchFingerprint, fingerprint, StringComparison.Ordinal))
                 ResetPendingBatch(fingerprint);
@@ -564,10 +608,10 @@ namespace Sati.ViewModels.Billing
                         _pendingEdiKeys[period.Id] = key;
                     }
 
-                    LastGeneratedPath = await _ediService.GenerateAndSaveAsync(
-                        period.Id,
-                        isTest,
-                        key);
+                    LastGeneratedPath = accountId is { } selectedAccountId
+                        ? await _ediService.GenerateForAccountAndSaveAsync(
+                            period.Id, true, key, selectedAccountId)
+                        : await _ediService.GenerateAndSaveAsync(period.Id, isTest, key);
                     if (isTest)
                         _generatedTestPeriodIds.Add(period.Id);
                     _generatedPeriodIds.Add(period.Id);
@@ -575,6 +619,7 @@ namespace Sati.ViewModels.Billing
                 }
 
                 await RefreshSubmissionHistoryAsync();
+                await RefreshDispatchWorkspaceAsync();
                 RebuildGenerationPeriods();
                 StatusMessage = periods.Count == 1
                     ? $"1 staged period was captured in an 837P file and removed from staging. File saved: {LastGeneratedPath}"
@@ -670,6 +715,84 @@ namespace Sati.ViewModels.Billing
                 IsGenerating = false;
                 NotifyMockClearinghouseStateChanged();
             }
+        }
+
+        private bool CanQueueSelectedDispatch() => CanQueueDispatch;
+
+        [RelayCommand(CanExecute = nameof(CanQueueSelectedDispatch))]
+        private async Task QueueClearinghouseDispatch()
+        {
+            if (!CanQueueDispatch || SelectedDispatchAccount is not { } account ||
+                SelectedDispatchGeneration is not { } generation)
+                return;
+            var user = _sessionService.CurrentUser;
+            var request = _dispatchLoads.Begin();
+            IsQueueingDispatch = true;
+            try
+            {
+                var queued = await _billingService.QueueClearinghouseDispatchAsync(
+                    CurrentActor(), generation.Id, account.Id);
+                if (!_dispatchLoads.IsCurrent(request) || !ReferenceEquals(_sessionService.CurrentUser, user))
+                    return;
+                StatusMessage = $"Test 837P queued for server-managed synthetic dispatch ({queued.State}). " +
+                    "An accepted upload is not a payer acceptance or payment.";
+                await RefreshDispatchWorkspaceAsync();
+            }
+            catch (Exception)
+            {
+                if (_dispatchLoads.IsCurrent(request) && ReferenceEquals(_sessionService.CurrentUser, user))
+                {
+                    StatusMessage = "Sati could not confirm whether the test file was queued. " +
+                        "Refresh the dispatch list before trying again; never create a second file to resolve uncertainty.";
+                    await RefreshDispatchWorkspaceAsync();
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(_sessionService.CurrentUser, user))
+                    IsQueueingDispatch = false;
+            }
+        }
+
+        [RelayCommand]
+        private Task RefreshClearinghouseDispatch() => RefreshDispatchWorkspaceAsync();
+
+        private async Task RefreshDispatchWorkspaceAsync()
+        {
+            if (!ShowsAutomatedDispatch) return;
+            var user = _sessionService.CurrentUser;
+            if (user is null) return;
+            var request = _dispatchLoads.Begin();
+            ClearinghouseWorkspaceDto workspace;
+            try { workspace = await _billingService.GetClearinghouseWorkspaceAsync(user.ToAgencyActor()); }
+            catch (Exception)
+            {
+                workspace = new ClearinghouseWorkspaceDto(false,
+                    "Server-managed test dispatch could not be refreshed. No new file was sent by this view.",
+                    [], [], []);
+            }
+            if (_dispatchLoads.IsCurrent(request) && ReferenceEquals(_sessionService.CurrentUser, user))
+                ApplyDispatchWorkspace(workspace);
+        }
+
+        private void ApplyDispatchWorkspace(ClearinghouseWorkspaceDto workspace)
+        {
+            var accountId = SelectedDispatchAccount?.Id;
+            var generationId = SelectedDispatchGeneration?.Id;
+            DispatchAccounts.Clear();
+            DispatchGenerations.Clear();
+            Dispatches.Clear();
+            foreach (var account in workspace.Accounts) DispatchAccounts.Add(account);
+            foreach (var generation in workspace.Generations) DispatchGenerations.Add(generation);
+            foreach (var dispatch in workspace.Dispatches) Dispatches.Add(dispatch);
+            IsDispatchEnabled = workspace.Enabled;
+            DispatchAvailabilityMessage = workspace.Status;
+            SelectedDispatchAccount = DispatchAccounts.FirstOrDefault(account => account.Id == accountId)
+                ?? DispatchAccounts.FirstOrDefault();
+            SelectedDispatchGeneration = DispatchGenerations.FirstOrDefault(generation => generation.Id == generationId)
+                ?? DispatchGenerations.FirstOrDefault(generation => generation.DispatchState is null &&
+                    generation.MatchingAccountId == SelectedDispatchAccount?.Id);
+            NotifyDispatchStateChanged();
         }
 
         private void RebuildGenerationPeriods()
@@ -784,6 +907,12 @@ namespace Sati.ViewModels.Billing
             OnPropertyChanged(nameof(MockClearinghouseAvailabilityMessage));
         }
 
+        private void NotifyDispatchStateChanged()
+        {
+            OnPropertyChanged(nameof(CanQueueDispatch));
+            QueueClearinghouseDispatchCommand.NotifyCanExecuteChanged();
+        }
+
         public void ClearForAccountSwitch()
         {
             _responseImports.Invalidate();
@@ -791,6 +920,15 @@ namespace Sati.ViewModels.Billing
             _responseImportCancellation = null;
             IsImportingResponse = false;
             _accountLoads.Invalidate();
+            _dispatchLoads.Invalidate();
+            IsQueueingDispatch = false;
+            IsDispatchEnabled = false;
+            DispatchAvailabilityMessage = "Server-managed test dispatch is not enabled for this connection.";
+            SelectedDispatchAccount = null;
+            SelectedDispatchGeneration = null;
+            DispatchAccounts.Clear();
+            DispatchGenerations.Clear();
+            Dispatches.Clear();
             SelectedPeriod = null;
             BillingPeriods.Clear();
             DraftBillingPeriods.Clear();
@@ -825,6 +963,7 @@ namespace Sati.ViewModels.Billing
             OnPropertyChanged(nameof(HasBlockedSubmittedPeriods));
             OnPropertyChanged(nameof(RangeSummary));
             NotifyMockClearinghouseStateChanged();
+            NotifyDispatchStateChanged();
         }
 
         private void ResetPendingBatch(string? fingerprint = null)
@@ -835,7 +974,7 @@ namespace Sati.ViewModels.Billing
 
         private string BatchFingerprint(IEnumerable<BillingPeriod> periods, bool isTest) =>
             $"{MonthStart(RangeStart!.Value):yyyyMM}:{MonthStart(RangeEnd!.Value):yyyyMM}:" +
-            $"{isTest}:{string.Join(',', periods.Select(period => period.Id))}";
+            $"{isTest}:{SelectedDispatchAccount?.Id}:{string.Join(',', periods.Select(period => period.Id))}";
 
         private static bool HasExchangeStage(string stage) =>
             Enum.TryParse<BillingSubmissionStage>(stage, out _);

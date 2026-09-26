@@ -224,7 +224,7 @@
         <!-- 837 generation actions. Period locking belongs with the selector above. -->
         <StackPanel Grid.Row="3"
                     Margin="0,0,0,16">
-            <CheckBox Content="Test mode (OATEST in filename — safe to upload to Office Ally)"
+            <CheckBox Content="Test mode (test marker in filename; never a production submission)"
                       IsChecked="{Binding IsTestMode}"
                       IsEnabled="{Binding IsGenerating, Converter={StaticResource InverseBoolConverter}}"
                       AutomationProperties.Name="Generate test 837P files"
@@ -290,6 +290,51 @@
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        TextWrapping="Wrap"
                        Margin="0,3,0,0" />
+            <StackPanel Visibility="{Binding ShowsAutomatedDispatch, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Margin="0,20,0,0">
+                <TextBlock Text="SERVER-MANAGED TEST DISPATCH — SYNTHETIC ONLY"
+                           Style="{StaticResource LabelStyle}" />
+                <TextBlock Text="Choose a configured test account before generating a file. Then choose the matching retained file and queue it. A queued or accepted upload is not payer acceptance or payment."
+                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,8" />
+                <TextBlock Text="Test account" Style="{StaticResource LabelStyle}" />
+                <ComboBox ItemsSource="{Binding DispatchAccounts}"
+                          SelectedItem="{Binding SelectedDispatchAccount, Mode=TwoWay}"
+                          DisplayMemberPath="Label" Width="300" HorizontalAlignment="Left"
+                          AutomationProperties.Name="Test clearinghouse account"
+                          IsEnabled="{Binding IsDispatchEnabled}" Margin="0,0,0,8" />
+                <TextBlock Text="Retained test file" Style="{StaticResource LabelStyle}" />
+                <ComboBox ItemsSource="{Binding DispatchGenerations}"
+                          SelectedItem="{Binding SelectedDispatchGeneration, Mode=TwoWay}"
+                          DisplayMemberPath="FileName" Width="500" HorizontalAlignment="Left"
+                          AutomationProperties.Name="Retained test 837P file"
+                          IsEnabled="{Binding IsDispatchEnabled}" Margin="0,0,0,8" />
+                <WrapPanel>
+                    <Button Content="Queue test dispatch" Style="{StaticResource PrimaryButton}"
+                            Command="{Binding QueueClearinghouseDispatchCommand}"
+                            IsEnabled="{Binding CanQueueDispatch}"
+                            AutomationProperties.Name="Queue selected test file for synthetic dispatch"
+                            Margin="0,0,10,0" />
+                    <Button Content="Refresh dispatch status" Style="{StaticResource SmallButton}"
+                            Command="{Binding RefreshClearinghouseDispatchCommand}"
+                            AutomationProperties.Name="Refresh test dispatch status" />
+                </WrapPanel>
+                <TextBlock Text="{Binding DispatchAvailabilityMessage}"
+                           AutomationProperties.LiveSetting="Polite"
+                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap" Margin="0,6,0,0" />
+                <DataGrid ItemsSource="{Binding Dispatches}" AutoGenerateColumns="False"
+                          IsReadOnly="True" CanUserAddRows="False" MaxHeight="150"
+                          AutomationProperties.Name="Test dispatch history" Margin="0,8,0,0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="FILE ID" Binding="{Binding EdiGenerationId}" Width="75" />
+                        <DataGridTextColumn Header="STATUS" Binding="{Binding State}" Width="180" />
+                        <DataGridTextColumn Header="REQUESTED" Binding="{Binding RequestedAtUtc, StringFormat={}{0:g}}" Width="145" />
+                        <DataGridTextColumn Header="EXTERNAL FILE ID" Binding="{Binding ExternalFileId}" Width="*" />
+                        <DataGridTextColumn Header="ERROR CODE" Binding="{Binding SafeErrorCode}" Width="145" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
         </StackPanel>
 
         <StackPanel Grid.Row="5">

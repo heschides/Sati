@@ -39,6 +39,7 @@ public sealed record SubmittedClaimReference(
 {
     /// <summary>CLM05-3: 1 an original claim, 7 a replacement, 8 a void.</summary>
     public string FrequencyCode { get; init; } = "1";
+    public string? RemoteClaimId { get; init; }
 }
 
 /// <summary>Correlation facts extracted from the exact retained outbound 837P.</summary>

@@ -49,6 +49,49 @@ public sealed class ClearinghouseResponseImportTests
     }
 
     [Fact]
+    public void SyntheticDispatchButtonRequiresAMatchingAccountAndRetainedFile()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            var session = new SessionService(); session.SetUser(Biller());
+            var vm = new BillingSubmissionsViewModel(new BillingStub { DispatchSupported = true },
+                new EdiStub(), session);
+            var accountId = Guid.NewGuid();
+            vm.IsDispatchEnabled = true;
+            vm.DispatchAccounts.Add(new ClearinghouseAccountOptionDto(accountId, "ClaimMd", "Test account"));
+            vm.SelectedDispatchAccount = vm.DispatchAccounts[0];
+            vm.DispatchGenerations.Add(new ClearinghouseGenerationDto(1, 77, "synthetic-test.txt",
+                DateTime.UtcNow, false, accountId, null));
+            vm.SelectedDispatchGeneration = vm.DispatchGenerations[0];
+            var view = new Sati.Views.Billing.BillingSubmissionsView { DataContext = vm };
+            WpfUiHarness.Realize(view, 1100, 900);
+            var button = WpfUiHarness.FindByAutomationName<System.Windows.Controls.Button>(view,
+                "Queue selected test file for synthetic dispatch");
+            Assert.Same(vm.QueueClearinghouseDispatchCommand, button.Command);
+            Assert.True(button.IsEnabled);
+            vm.SelectedDispatchGeneration = vm.DispatchGenerations[0] with { MatchingAccountId = Guid.NewGuid() };
+            WpfUiHarness.Realize(view, 1100, 900);
+            Assert.False(button.IsEnabled);
+        });
+    }
+
+    [Fact]
+    public async Task LateDispatchRefreshCannotPublishAfterAccountSwitch()
+    {
+        var session = new SessionService(); session.SetUser(Biller());
+        var pending = new TaskCompletionSource<ClearinghouseWorkspaceDto>();
+        var billing = new BillingStub { DispatchSupported = true, DispatchWorkspace = () => pending.Task };
+        var vm = new BillingSubmissionsViewModel(billing, new EdiStub(), session);
+        var refresh = vm.RefreshClearinghouseDispatchCommand.ExecuteAsync(null);
+        vm.ClearForAccountSwitch(); session.SetUser(Biller(8));
+        pending.SetResult(new ClearinghouseWorkspaceDto(true, "Old account",
+            [new ClearinghouseAccountOptionDto(Guid.NewGuid(), "ClaimMd", "Old")], [], []));
+        await refresh;
+        Assert.Empty(vm.DispatchAccounts);
+        Assert.False(vm.IsDispatchEnabled);
+    }
+
+    [Fact]
     public async Task AChosenFileNeverPostsAfterTheAccountChanges()
     {
         var session = new SessionService(); session.SetUser(Biller());
@@ -186,6 +229,12 @@ public sealed class ClearinghouseResponseImportTests
     private sealed class BillingStub : IBillingService
     {
         public bool SupportsResponseImport => true;
+        public bool DispatchSupported { get; init; }
+        public bool SupportsClearinghouseDispatch => DispatchSupported;
+        public Func<Task<ClearinghouseWorkspaceDto>> DispatchWorkspace { get; init; } = () =>
+            Task.FromResult(new ClearinghouseWorkspaceDto(false, "Disabled", [], [], []));
+        public Task<ClearinghouseWorkspaceDto> GetClearinghouseWorkspaceAsync(
+            AgencyActor actor, CancellationToken cancellationToken = default) => DispatchWorkspace();
         public int ImportCalls { get; private set; }
         public bool FailHistory { get; init; }
         public Func<Task<ClaimResponseIngestResultDto>> Import { get; init; } = () => Task.FromResult(Receipt());

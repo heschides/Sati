@@ -41,4 +41,6 @@ internal sealed class SatiApiOptions
     public string TimeZoneId { get; init; } = "Eastern Standard Time";
     public int AuditRetentionDays { get; init; } = OperationalPolicyDefaults.AuditRetentionDays;
     public int EdiReplayRetentionDays { get; init; } = OperationalPolicyDefaults.EdiReplayRetentionDays;
+    // Server-only, opt-in synthetic dispatch. The exact Demo/Testing identity gate is separate.
+    public bool EnableSyntheticClearinghouseDispatch { get; init; }
 }

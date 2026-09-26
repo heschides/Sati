@@ -127,6 +127,8 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
     private readonly SyntheticPipelineDatabase _database;
     private readonly IInterceptor[] _interceptors;
     public TestKeyWrapper Vault { get; }
+    public bool EnableSyntheticDispatch { get; set; }
+    public bool DisableDispatchWorker { get; set; }
 
     public SyntheticPipelineFactory(SyntheticPipelineDatabase database, TestKeyWrapper? vault = null,
         params IInterceptor[] interceptors)
@@ -157,6 +159,7 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
                 // The connection itself remains our independently validated unique DB.
                 ["Sati:ExpectedDatabaseName"] = "SatiApiTests",
                 ["Sati:ExpectedEnvironment"] = "Testing",
+                ["Sati:EnableSyntheticClearinghouseDispatch"] = EnableSyntheticDispatch.ToString(),
                 ["Authentication:Issuer"] = "Sati.Api.Tests",
                 ["Authentication:Audience"] = "Sati.Api.Tests",
                 ["Authentication:SigningKey"] = SigningKey,
@@ -166,7 +169,8 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
         {
             foreach (var hosted in services.Where(x => x.ServiceType == typeof(IHostedService) &&
                 (x.ImplementationType == typeof(DatabaseIdentityHostedService) ||
-                 x.ImplementationType == typeof(SignatureProcessingService))).ToArray())
+                 x.ImplementationType == typeof(SignatureProcessingService) ||
+                 (DisableDispatchWorker && x.ImplementationType == typeof(ClearinghouseDispatchWorker)))).ToArray())
                 services.Remove(hosted);
             services.RemoveAll<ApiDbContext>();
             services.RemoveAll<DbContextOptions<ApiDbContext>>();

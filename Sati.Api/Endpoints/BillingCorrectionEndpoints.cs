@@ -256,7 +256,8 @@ internal static partial class ApiEndpoints
 
         api.MapPost("/billing/periods/{periodId:int}/corrections/edi", async Task<IResult> (
             int periodId, GenerateEdiRequest request, ClaimsPrincipal principal, ApiDbContext db,
-            AuditTrail auditTrail, CancellationToken cancellationToken) =>
+            AuditTrail auditTrail, ClearinghouseDispatchGate clearinghouseGate,
+            CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
             if (!actor.HasBillingPermissions)
@@ -272,12 +273,17 @@ internal static partial class ApiEndpoints
                 db, actor.AgencyId, periodKey.UserId, periodKey.Year, periodKey.Month, cancellationToken);
             if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
                 return Results.Unauthorized();
+            TradingPartnerProfile profile;
+            try { profile = await ClearinghouseAccountSelection.ForGenerationAsync(
+                db, actor.AgencyId, request, clearinghouseGate, cancellationToken); }
+            catch (ClearinghouseSelectionRejected rejected)
+            { return Results.Conflict(new ApiErrorDto(rejected.Code, rejected.Message, string.Empty)); }
             var previous = await db.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(generation =>
                 generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                 generation.IdempotencyKey == normalizedKey, cancellationToken);
             if (previous is not null)
                 return previous.IsCorrection
-                    ? ReplayEdiOrConflict(previous, periodId, request.IsTest)
+                    ? ReplayEdiOrConflict(previous, periodId, request.IsTest, profile)
                     : Results.Conflict(new ApiErrorDto("idempotency_key_reused",
                         "This retry key was already used for a different EDI request.", string.Empty));
 
@@ -318,7 +324,7 @@ internal static partial class ApiEndpoints
                         CorrectedLine(period.Lines.Single(line => line.Id == item.ClaimLineId), item),
                         ClaimCorrectionRules.FrequencyCode(item.Action),
                         item.PayerClaimControlNumber)).ToList(),
-                    request.IsTest, generatedAt, controlNumber);
+                    request.IsTest, generatedAt, controlNumber, profile);
             }
             catch (InvalidOperationException failure)
             {
@@ -326,7 +332,9 @@ internal static partial class ApiEndpoints
             }
 
             var timestamp = generatedAt.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-            var testMarker = request.IsTest ? ".OATEST" : string.Empty;
+            var testMarker = request.IsTest
+                ? profile.Kind == TradingPartnerKind.ClaimMd ? ".CMDTEST" : ".OATEST"
+                : string.Empty;
             var file = new EdiFileDto(
                 $"837P{testMarker}_CORRECTION_{period.Year}{period.Month:D2}_{timestamp}_{normalizedKey[..8]}.txt", content);
             var generation = new ServerEdiGeneration

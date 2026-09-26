@@ -588,6 +588,17 @@ public sealed class CloudBillingService(CloudApiClient api) : IBillingService
 {
     public bool SupportsMockClearinghouse => true;
     public bool SupportsResponseImport => true;
+    public bool SupportsClearinghouseDispatch => true;
+    public Task<ClearinghouseWorkspaceDto> GetClearinghouseWorkspaceAsync(
+        AgencyActor actor, CancellationToken cancellationToken = default) =>
+        api.GetAsync<ClearinghouseWorkspaceDto>("/api/v1/billing/clearinghouse", cancellationToken);
+
+    public Task<ClearinghouseDispatchDto> QueueClearinghouseDispatchAsync(
+        AgencyActor actor, long generationId, Guid accountId,
+        CancellationToken cancellationToken = default) =>
+        api.PostWithCapturedSessionAsync<QueueClearinghouseDispatchRequest, ClearinghouseDispatchDto>(
+            "/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(generationId, accountId), cancellationToken);
     public Task<ClaimResponseIngestResultDto> ImportResponseAsync(
         AgencyActor actor, string document, CancellationToken cancellationToken = default) =>
         api.PostWithCapturedSessionAsync<ClaimResponseIngestRequest, ClaimResponseIngestResultDto>(
@@ -737,6 +748,12 @@ public sealed class CloudBillingService(CloudApiClient api) : IBillingService
         await CloudEdiFiles.SaveAsync(await api.PostAsync<GenerateEdiRequest, EdiFileDto>(
             $"/api/v1/billing/periods/{billingPeriodId}/corrections/edi",
             new GenerateEdiRequest(isTest, idempotencyKey)));
+
+    public async Task<string> GenerateCorrectionEdiForAccountAsync(
+        AgencyActor actor, int billingPeriodId, bool isTest, string idempotencyKey, Guid accountId) =>
+        await CloudEdiFiles.SaveAsync(await api.PostAsync<GenerateEdiRequest, EdiFileDto>(
+            $"/api/v1/billing/periods/{billingPeriodId}/corrections/edi",
+            new GenerateEdiRequest(isTest, idempotencyKey) { ClearinghouseAccountId = accountId }));
 }
 
 /// <summary>Where a file the Demo API generated is written, and the one check on its name.</summary>
@@ -766,6 +783,15 @@ public sealed class CloudEdiService(CloudApiClient api) : IEdiService
         var file = await api.PostAsync<GenerateEdiRequest, EdiFileDto>(
             $"/api/v1/billing/periods/{billingPeriodId}/edi",
             new GenerateEdiRequest(isTest, idempotencyKey));
+        return await CloudEdiFiles.SaveAsync(file);
+    }
+
+    public async Task<string> GenerateForAccountAndSaveAsync(int billingPeriodId, bool isTest,
+        string idempotencyKey, Guid accountId)
+    {
+        var file = await api.PostAsync<GenerateEdiRequest, EdiFileDto>(
+            $"/api/v1/billing/periods/{billingPeriodId}/edi",
+            new GenerateEdiRequest(isTest, idempotencyKey) { ClearinghouseAccountId = accountId });
         return await CloudEdiFiles.SaveAsync(file);
     }
 }

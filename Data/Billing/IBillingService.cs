@@ -8,6 +8,20 @@ namespace Sati.Data.Billing
     {
         bool SupportsMockClearinghouse => false;
         bool SupportsResponseImport => false;
+        bool SupportsClearinghouseDispatch => false;
+        Task<ClearinghouseWorkspaceDto> GetClearinghouseWorkspaceAsync(
+            AgencyActor actor, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ClearinghouseWorkspaceDto(false,
+                "Server-managed dispatch requires an API connection.", [], [], []));
+        Task<ClearinghouseDispatchDto> QueueClearinghouseDispatchAsync(
+            AgencyActor actor, long generationId, Guid accountId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<ClearinghouseDispatchDto>(new NotSupportedException(
+                "Server-managed dispatch requires an API connection."));
+        Task<string> GenerateCorrectionEdiForAccountAsync(
+            AgencyActor actor, int billingPeriodId, bool isTest, string idempotencyKey, Guid accountId) =>
+            Task.FromException<string>(new NotSupportedException(
+                "Server-managed correction generation requires an API connection."));
         Task<ClaimResponseIngestResultDto> ImportResponseAsync(
             AgencyActor actor, string document, CancellationToken cancellationToken = default) =>
             Task.FromException<ClaimResponseIngestResultDto>(new NotSupportedException(
