@@ -49,6 +49,10 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerBillingPeriod> BillingPeriods => Set<ServerBillingPeriod>();
     public DbSet<ServerClaimLine> ClaimLines => Set<ServerClaimLine>();
     public DbSet<ServerEdiGeneration> EdiGenerations => Set<ServerEdiGeneration>();
+    public DbSet<ClearinghouseAccount> ClearinghouseAccounts => Set<ClearinghouseAccount>();
+    public DbSet<ClearinghouseDispatch> ClearinghouseDispatches => Set<ClearinghouseDispatch>();
+    public DbSet<ClearinghouseDispatchAttempt> ClearinghouseDispatchAttempts => Set<ClearinghouseDispatchAttempt>();
+    public DbSet<ClearinghouseFeedCheckpoint> ClearinghouseFeedCheckpoints => Set<ClearinghouseFeedCheckpoint>();
     public DbSet<ClearinghouseResponseReceipt> ClearinghouseResponseReceipts => Set<ClearinghouseResponseReceipt>();
     public DbSet<ClearinghouseResponseMatch> ClearinghouseResponseMatches => Set<ClearinghouseResponseMatch>();
     public DbSet<ServerBillingSubmissionEvent> BillingSubmissionEvents => Set<ServerBillingSubmissionEvent>();

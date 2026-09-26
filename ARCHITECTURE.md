@@ -2387,9 +2387,22 @@ filters.
 
 ## EDI Generator
 
-**`EdiGenerator`** — pure static translation. Caller (`EdiService`) loads
-`BillingPeriod → Lines → immutable ProfessionalClaimSnapshot`. Legacy or malformed claim lines
-without that snapshot fail closed instead of silently reading today's Person/Agency values.
+`Professional837Formatter` in `Sati.Contracts.V1` is the single pure 837P renderer.
+`EdiGenerator` (local desktop) and `ServerEdiGenerator` (API) only map their persisted
+claim lines into `Professional837Claim`; both pass the same immutable
+`ProfessionalClaimSnapshot` and versioned `TradingPartnerProfile` to that renderer.
+The existing call sites select the Office Ally profile by default, preserving their
+retained output. The Claim.MD profile is available for isolated formatting tests; no
+route, client setting, account store, or transport selects it for operational billing.
+
+The profile owns interchange and group sender/receiver values. Claim.MD requires its
+account number as the sender and `CLAIMMD` as the receiver. Its Loop 2300 `REF*D9`
+uses `SATI1-{namespace}-{agencyId}-{billingPeriodId}-{noteId}`. The non-secret,
+stable namespace is an input to the profile and must remain fixed for an account's
+claim history. The generation-specific `CLM01`, service-line `REF*6R`, and payer
+number `REF*F8` retain their separate purposes. Claim correction eligibility,
+billability, immutable history, and response matching remain outside the profile
+and formatter. Legacy or malformed frozen lines still fail closed.
 
 `Sati.Contracts.V1.ProfessionalClaimReadiness` is the single owner for validating the exact frozen
 row that the generator consumes. Both persistence paths evaluate it immediately after constructing
@@ -2401,6 +2414,34 @@ predate the current candidate gates.
 The generation timestamp is supplied by the caller so the persisted response, control numbers,
 and filename describe one atomic attempt. Billing-period submission uses `Status` as an EF
 concurrency token and treats a retry of an already-successful submission as the same success.
+
+### Clearinghouse dispatch foundation (Phase 2; source only)
+
+`Sati.Persistence` now defines the server-owned `ClearinghouseAccount`, `ClearinghouseDispatch`,
+`ClearinghouseDispatchAttempt`, and `ClearinghouseFeedCheckpoint` records. The desktop and API
+contexts use the same mapping. An account has an immutable agency, partner, test/production mode,
+external account number, and Claim.MD claim namespace; the secret field is only a reference to
+future server-side secret storage. A filtered database index permits one enabled account per
+agency/partner/mode. No account provisioning endpoint or Production activation exists.
+
+A dispatch names one exact immutable `EdiGeneration` and one same-agency account. Composite foreign
+keys enforce account and generation agency consistency; the future API dispatch service must
+revalidate the requesting user's current agency and billing permission. A unique generation
+index prevents a second dispatch for the same retained file. The dispatch is an operational
+outbox, not claim eligibility or payer acceptance. Its revision protects concurrent transitions.
+`OutcomeUnknown` cannot transition back to `Sending`; external reconciliation is required before
+an outcome can be resolved. Completed attempt rows are append-only and reserve encrypted-response
+fields, but no connector writes them yet. A crash while `Sending` may have no completed attempt:
+that state is still uncertain and must not trigger an automatic duplicate upload.
+
+Status, ERA, and future modification feeds have independent opaque checkpoints per account. The
+future polling worker must advance a checkpoint in the same transaction as retained artifacts and
+their effects; merely storing a cursor is not evidence of processing. Receipt provenance now
+distinguishes manual, synthetic mock, and future connector sources. Existing manual receipts retain
+their human actor; connector receipts can use a null human actor and must carry account/feed,
+external artifact, content type, and connector version. The current importer remains human/mock
+only. The additive migration has not been applied to Demo or Production; no transport, polling,
+automatic import, credentials, or dispatch UI is active.
 
 **Pre-live checklist (before first real submission):**
 1. Replace representative Demo code/rate/payer/submitter values with the agency's verified contract,

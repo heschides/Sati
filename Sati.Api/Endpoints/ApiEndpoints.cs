@@ -6333,7 +6333,8 @@ internal static partial class ApiEndpoints
                     continue;
 
                 ClaimResponseIngestResultDto outcome;
-                try { outcome = await ingestion.ImportAsync(document, actor, periodId, cancellationToken); }
+                try { outcome = await ingestion.ImportAsync(document, actor, periodId, cancellationToken,
+                    Sati.Models.Billing.ClearinghouseReceiptSource.Mock); }
                 catch (ClaimResponseRejected rejected) { return ClaimResponseFailure(rejected); }
                 if (outcome.StageRecorded is { } stage)
                     stages.Add(stage);

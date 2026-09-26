@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Infrastructure;
 using Sati.Contracts.V1;
+using Sati.Models.Billing;
 using Xunit;
 
 namespace Sati.Api.Tests;
@@ -68,6 +69,8 @@ public sealed class JoinedBillingPipelineAcceptanceTests
 
         // Exact response replays leave all persisted financial effects unchanged.
         await using var before = factory.OpenDatabase();
+        Assert.All(await before.ClearinghouseResponseReceipts.ToListAsync(),
+            receipt => Assert.Equal(ClearinghouseReceiptSource.Mock, receipt.Source));
         var counts = await CountsAsync(before);
         foreach (var document in new[] { result.FunctionalAcknowledgement, result.ClaimAcknowledgement, result.RemittanceAdvice })
         {

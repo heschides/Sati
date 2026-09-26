@@ -83,7 +83,7 @@ public sealed class WorkAgendaMigrationTests
     }
 
     [Fact]
-    public void DuplicateRepairIsTheNextRegisteredMigrationAndGeneratesSqlServerSql()
+    public void DuplicateRepairRemainsRegisteredAndGeneratesSqlServerSql()
     {
         var options = new DbContextOptionsBuilder<SatiContext>()
             .UseSqlServer(
@@ -91,7 +91,7 @@ public sealed class WorkAgendaMigrationTests
             .Options;
         using var context = new SatiContext(options);
 
-        Assert.Equal(RepairMigration, context.Database.GetMigrations().Last());
+        Assert.Contains(RepairMigration, context.Database.GetMigrations());
 
         var script = context.GetService<IMigrator>()
             .GenerateScript(PreviousMigration, RepairMigration);

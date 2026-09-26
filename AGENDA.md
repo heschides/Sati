@@ -2031,6 +2031,31 @@ Sati-owned output.
 
 ## Unreleased — clearinghouse response intake and launch security review
 
+- [x] Phase 1 clearinghouse formatting boundary: one shared 837P renderer, versioned
+      Office Ally and Claim.MD profiles, Office Ally byte-regression coverage, and a
+      stable Claim.MD `REF*D9` across original, resend, replacement, and void files.
+      This is source preparation only; no Claim.MD connection or live billing is active.
+- [x] Phase 2 source foundation: agency-scoped account metadata, durable one-generation
+      dispatch outbox, immutable completed attempts, separate feed checkpoints, automated
+      receipt provenance, tenant/comcurrency constraints, and a reviewed additive migration.
+      No migration has been applied and no connector, worker, or Production path is active.
+- [ ] Apply `20260926183942_AddClearinghouseDispatchFoundation` only through the reviewed
+      migration, backup, and restore procedure; this source change authorizes no database write.
+- [ ] Phase 3: API-owned connector boundary, fake connector, dispatch worker and authorized
+      submission workflow; enforce exact-generation/account/profile selection and uncertain-
+      outcome reconciliation before any retry. Keep WPF free of connector dependencies.
+- [ ] Phase 4: Claim.MD sandbox HTTP connector, status/ERA polling, atomic checkpoint/receipt
+      processing, uncertain-upload reconciliation, and end-to-end sandbox evidence before
+      considering any Production activation.
+- [ ] Before Claim.MD sandbox submission, obtain and protect the account's configuration
+      server-side, assign a durable environment/account namespace, verify the account's
+      `remote_claimid` duplicate-field setting with Claim.MD support, and validate
+      submitter/receiver loop values and file behavior against its current companion guide.
+- [ ] Exercise actual Claim.MD sandbox submissions and responses end to end, including
+      rejection, resend, replacement, void, 999/277CA/835 correlation, and remittance/EFT
+      reconciliation; resolve the existing security and operational launch gates before
+      considering any Production activation.
+
 - [x] Add Billing Submissions file import for a single original 999, 277CA, or 835; match retained
       outbound evidence automatically within the current agency and test environment.
 - [x] Preserve encrypted immutable raw receipts, generation/claim matches, and atomic financial

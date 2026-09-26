@@ -35,7 +35,8 @@ public sealed class PersistenceAssemblyBoundaryTests
             .Where(id => id is not null)
             .ToList();
 
-        Assert.Equal(117, migrationIds.Count);
+        Assert.Equal(118, migrationIds.Count);
+        Assert.Contains("20260926183942_AddClearinghouseDispatchFoundation", migrationIds);
         Assert.Contains("20260923180000_ReconcileDuplicateScheduledAgendaNotes", migrationIds);
         Assert.Contains("20260922154932_AddMultiActivityNotes", migrationIds);
         Assert.Contains("20260922161704_LinkReleaseNotesToExactObligations", migrationIds);

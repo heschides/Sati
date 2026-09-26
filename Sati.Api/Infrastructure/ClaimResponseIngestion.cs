@@ -30,8 +30,11 @@ internal sealed class ClaimResponseIngestion(
         options.Value.ExpectedDatabaseName == "SatiApiTests";
 
     public async Task<ClaimResponseIngestResultDto> ImportAsync(string document, Actor actor,
-        int? assertedPeriodId, CancellationToken cancellationToken)
+        int? assertedPeriodId, CancellationToken cancellationToken,
+        ClearinghouseReceiptSource receiptSource = ClearinghouseReceiptSource.Manual)
     {
+        if (receiptSource is not (ClearinghouseReceiptSource.Manual or ClearinghouseReceiptSource.Mock))
+            throw new ArgumentOutOfRangeException(nameof(receiptSource), "Automated connector imports require their own system-actor path.");
         if (!actor.HasBillingPermissions)
             throw new ClaimResponseRejected("forbidden", "Billing permission is required.");
         if (!IsEnabled)
@@ -66,7 +69,7 @@ internal sealed class ClaimResponseIngestion(
         var matches = await MatchAsync(parsed, actor.AgencyId, assertedPeriodId, cancellationToken);
         var receipt = new ClearinghouseResponseReceipt
         {
-            Id = Guid.NewGuid(), AgencyId = actor.AgencyId, ActorUserId = actor.UserId,
+            Id = Guid.NewGuid(), AgencyId = actor.AgencyId, ActorUserId = actor.UserId, Source = receiptSource,
             ReceivedAtUtc = DateTime.UtcNow, IsTest = parsed.Envelope.IsTestInterchange, Kind = parsed.Envelope.Kind,
             ParserVersion = ParserVersion, RawSha256 = rawHash, SemanticSha256 = semanticHash,
             IdentitySha256 = identityHash, PaymentIdentitySha256 = paymentHash

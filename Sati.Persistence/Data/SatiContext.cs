@@ -47,6 +47,10 @@ namespace Sati.Data
         public DbSet<BillingPeriod> BillingPeriods { get; set; }
         public DbSet<ClaimLine> ClaimLines { get; set; }
         public DbSet<EdiGeneration> EdiGenerations { get; set; }
+        public DbSet<ClearinghouseAccount> ClearinghouseAccounts => Set<ClearinghouseAccount>();
+        public DbSet<ClearinghouseDispatch> ClearinghouseDispatches => Set<ClearinghouseDispatch>();
+        public DbSet<ClearinghouseDispatchAttempt> ClearinghouseDispatchAttempts => Set<ClearinghouseDispatchAttempt>();
+        public DbSet<ClearinghouseFeedCheckpoint> ClearinghouseFeedCheckpoints => Set<ClearinghouseFeedCheckpoint>();
         public DbSet<ClearinghouseResponseReceipt> ClearinghouseResponseReceipts => Set<ClearinghouseResponseReceipt>();
         public DbSet<ClearinghouseResponseMatch> ClearinghouseResponseMatches => Set<ClearinghouseResponseMatch>();
         public DbSet<BillingSubmissionEvent> BillingSubmissionEvents { get; set; }

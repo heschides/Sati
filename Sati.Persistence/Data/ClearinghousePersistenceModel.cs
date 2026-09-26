@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Sati.Contracts.V1;
 using Sati.Models.Billing;
 
 namespace Sati.Data;
@@ -9,10 +10,84 @@ public static class ClearinghousePersistenceModel
     public static void Configure<TAgency, TUser, TPeriod, TGeneration>(ModelBuilder model)
         where TAgency : class where TUser : class where TPeriod : class where TGeneration : class
     {
+        model.Entity<TGeneration>().HasAlternateKey("AgencyId", "Id");
+
+        model.Entity<ClearinghouseAccount>(entity =>
+        {
+            entity.ToTable("ClearinghouseAccounts", table => table.HasCheckConstraint(
+                "CK_ClearinghouseAccounts_ClaimMdProfile",
+                "[ConnectorKind] <> 2 OR ([ClaimNamespace] IS NOT NULL AND [TradingPartnerProfileVersion] > 0)"));
+            entity.HasKey(x => x.Id);
+            entity.HasAlternateKey(x => new { x.AgencyId, x.Id });
+            entity.Property(x => x.ExternalAccountNumber).HasMaxLength(80);
+            entity.Property(x => x.ClaimNamespace).HasMaxLength(8);
+            entity.Property(x => x.SecretReference).HasMaxLength(500);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.AgencyId, x.ConnectorKind, x.IsTest }).IsUnique()
+                .HasFilter("[IsEnabled] = 1");
+            entity.HasIndex(x => x.ClaimNamespace).IsUnique().HasFilter("[ClaimNamespace] IS NOT NULL");
+            entity.HasOne<TAgency>().WithMany().HasForeignKey(x => x.AgencyId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        model.Entity<ClearinghouseDispatch>(entity =>
+        {
+            entity.ToTable("ClearinghouseDispatches");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ExternalFileId).HasMaxLength(128);
+            entity.Property(x => x.SafeErrorCode).HasMaxLength(80);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasIndex(x => x.EdiGenerationId).IsUnique();
+            entity.HasIndex(x => new { x.AgencyId, x.State, x.RequestedAtUtc });
+            entity.HasOne<ClearinghouseAccount>().WithMany()
+                .HasForeignKey(x => new { x.AgencyId, x.AccountId })
+                .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TGeneration>().WithMany()
+                .HasForeignKey("AgencyId", "EdiGenerationId")
+                .HasPrincipalKey("AgencyId", "Id").OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TUser>().WithMany()
+                .HasForeignKey(x => x.RequestingUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        model.Entity<ClearinghouseDispatchAttempt>(entity =>
+        {
+            entity.ToTable("ClearinghouseDispatchAttempts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ContentSha256).HasMaxLength(64);
+            entity.Property(x => x.FileName).HasMaxLength(260);
+            entity.Property(x => x.VendorCode).HasMaxLength(40);
+            entity.Property(x => x.CorrelationId).HasMaxLength(80);
+            entity.Property(x => x.ResponseSha256).HasMaxLength(64);
+            entity.Property(x => x.ResponseNonce).HasMaxLength(12);
+            entity.Property(x => x.ResponseTag).HasMaxLength(16);
+            entity.Property(x => x.ResponseKeyId).HasMaxLength(500);
+            entity.HasIndex(x => new { x.DispatchId, x.AttemptNumber }).IsUnique();
+            entity.HasOne<ClearinghouseDispatch>().WithMany().HasForeignKey(x => x.DispatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        model.Entity<ClearinghouseFeedCheckpoint>(entity =>
+        {
+            entity.ToTable("ClearinghouseFeedCheckpoints");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Cursor).HasMaxLength(256);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.AccountId, x.FeedKind }).IsUnique();
+            entity.HasOne<ClearinghouseAccount>().WithMany()
+                .HasForeignKey(x => new { x.AgencyId, x.AccountId })
+                .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ClearinghouseResponseReceipt>().WithMany()
+                .HasForeignKey(x => new { x.AgencyId, x.LastReceiptId })
+                .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
         model.Entity<ClearinghouseResponseReceipt>(entity =>
         {
             entity.ToTable("ClearinghouseResponseReceipts");
             entity.HasKey(x => x.Id);
+            entity.HasAlternateKey(x => new { x.AgencyId, x.Id });
+            entity.Property(x => x.ExternalArtifactId).HasMaxLength(128);
+            entity.Property(x => x.ContentType).HasMaxLength(80);
+            entity.Property(x => x.ConnectorVersion).HasMaxLength(40);
             entity.Property(x => x.ParserVersion).HasMaxLength(40);
             entity.Property(x => x.RawSha256).HasMaxLength(64);
             entity.Property(x => x.SemanticSha256).HasMaxLength(64);
@@ -26,8 +101,13 @@ public static class ClearinghousePersistenceModel
             entity.HasIndex(x => new { x.AgencyId, x.IsTest, x.IdentitySha256 }).IsUnique();
             entity.HasIndex(x => new { x.AgencyId, x.IsTest, x.PaymentIdentitySha256 }).IsUnique().HasFilter("[PaymentIdentitySha256] IS NOT NULL");
             entity.HasIndex(x => new { x.AgencyId, x.ReceivedAtUtc });
+            entity.HasIndex(x => new { x.AccountId, x.FeedKind, x.ExternalArtifactId }).IsUnique()
+                .HasFilter("[AccountId] IS NOT NULL AND [FeedKind] IS NOT NULL AND [ExternalArtifactId] IS NOT NULL");
             entity.HasOne<TAgency>().WithMany().HasForeignKey(x => x.AgencyId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<TUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ClearinghouseAccount>().WithMany()
+                .HasForeignKey(x => new { x.AgencyId, x.AccountId })
+                .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(x => x.Matches).WithOne().HasForeignKey(x => x.ResponseId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<ClearinghouseResponseMatch>(entity =>
@@ -42,6 +122,69 @@ public static class ClearinghousePersistenceModel
 
     public static void ProtectWrites(ChangeTracker tracker)
     {
+        foreach (var entry in tracker.Entries<ClearinghouseAccount>().Where(x => x.State == EntityState.Added))
+        {
+            var account = entry.Entity;
+            if (account.TradingPartnerProfileVersion != TradingPartnerProfile.CurrentVersion)
+                throw new InvalidOperationException("Unsupported clearinghouse trading-partner profile version.");
+            if (account.ConnectorKind == TradingPartnerKind.ClaimMd)
+                _ = TradingPartnerProfile.ClaimMd(account.ExternalAccountNumber, account.ClaimNamespace ?? string.Empty);
+            else if (account.ConnectorKind != TradingPartnerKind.OfficeAlly || account.ClaimNamespace is not null)
+                throw new InvalidOperationException("Unsupported clearinghouse account profile.");
+        }
+        foreach (var entry in tracker.Entries<ClearinghouseResponseReceipt>().Where(x => x.State == EntityState.Added))
+        {
+            var receipt = entry.Entity;
+            if (receipt.Source == ClearinghouseReceiptSource.Connector)
+            {
+                if (receipt.AccountId is null || receipt.ConnectorKind is null || receipt.FeedKind is null ||
+                    string.IsNullOrWhiteSpace(receipt.ExternalArtifactId) ||
+                    string.IsNullOrWhiteSpace(receipt.ContentType) ||
+                    string.IsNullOrWhiteSpace(receipt.ConnectorVersion))
+                    throw new InvalidOperationException("Automated clearinghouse receipts require account and artifact provenance.");
+            }
+            else if (receipt.Source is ClearinghouseReceiptSource.Manual or ClearinghouseReceiptSource.Mock)
+            {
+                if (receipt.ActorUserId is null || receipt.AccountId is not null ||
+                    receipt.ExternalArtifactId is not null)
+                    throw new InvalidOperationException("Manual and mock receipts require a human actor and cannot claim connector provenance.");
+            }
+            else
+                throw new InvalidOperationException("Unsupported clearinghouse receipt source.");
+        }
+        if (tracker.Entries<ClearinghouseDispatchAttempt>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Clearinghouse upload attempts are immutable.");
+        if (tracker.Entries<ClearinghouseAccount>().Any(x => x.State == EntityState.Deleted) ||
+            tracker.Entries<ClearinghouseDispatch>().Any(x => x.State == EntityState.Deleted) ||
+            tracker.Entries<ClearinghouseFeedCheckpoint>().Any(x => x.State == EntityState.Deleted))
+            throw new InvalidOperationException("Clearinghouse routing and dispatch history cannot be deleted.");
+        foreach (var entry in tracker.Entries<ClearinghouseAccount>().Where(x => x.State == EntityState.Modified))
+        {
+            if (entry.Property(x => x.AgencyId).IsModified || entry.Property(x => x.ConnectorKind).IsModified ||
+                entry.Property(x => x.IsTest).IsModified || entry.Property(x => x.ClaimNamespace).IsModified ||
+                entry.Property(x => x.ExternalAccountNumber).IsModified ||
+                entry.Entity.Revision != entry.OriginalValues.GetValue<long>(nameof(ClearinghouseAccount.Revision)) + 1)
+                throw new InvalidOperationException("Clearinghouse account identity is fixed and updates require a new revision.");
+        }
+        foreach (var entry in tracker.Entries<ClearinghouseDispatch>().Where(x => x.State == EntityState.Modified))
+        {
+            if (entry.Property(x => x.AgencyId).IsModified || entry.Property(x => x.AccountId).IsModified ||
+                entry.Property(x => x.EdiGenerationId).IsModified || entry.Property(x => x.RequestingUserId).IsModified ||
+                entry.Property(x => x.TradingPartnerProfileVersion).IsModified ||
+                entry.Entity.Revision != entry.OriginalValues.GetValue<long>(nameof(ClearinghouseDispatch.Revision)) + 1)
+                throw new InvalidOperationException("A clearinghouse dispatch cannot change its source or account and updates require a new revision.");
+            var before = entry.OriginalValues.GetValue<ClearinghouseDispatchState>(nameof(ClearinghouseDispatch.State));
+            var after = entry.Entity.State;
+            if (before != after && !CanAdvanceDispatch(before, after))
+                throw new InvalidOperationException("Clearinghouse dispatch cannot return to sending or skip a required state.");
+        }
+        foreach (var entry in tracker.Entries<ClearinghouseFeedCheckpoint>().Where(x => x.State == EntityState.Modified))
+        {
+            if (entry.Property(x => x.AgencyId).IsModified || entry.Property(x => x.AccountId).IsModified ||
+                entry.Property(x => x.FeedKind).IsModified ||
+                entry.Entity.Revision != entry.OriginalValues.GetValue<long>(nameof(ClearinghouseFeedCheckpoint.Revision)) + 1)
+                throw new InvalidOperationException("A clearinghouse feed cannot change its identity and updates require a new revision.");
+        }
         if (tracker.Entries<ClearinghouseResponseReceipt>().Any(x => x.State is EntityState.Modified or EntityState.Deleted) ||
             tracker.Entries<ClearinghouseResponseMatch>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Clearinghouse response evidence is immutable.");
@@ -50,4 +193,15 @@ public static class ClearinghousePersistenceModel
         if (tracker.Entries<ClearinghouseResponseMatch>().Any(entry => entry.State == EntityState.Added && !newReceiptIds.Contains(entry.Entity.ResponseId)))
             throw new InvalidOperationException("A retained clearinghouse receipt cannot acquire new matches.");
     }
+
+    private static bool CanAdvanceDispatch(ClearinghouseDispatchState before, ClearinghouseDispatchState after) =>
+        before switch
+        {
+            ClearinghouseDispatchState.Queued => after is ClearinghouseDispatchState.Sending or ClearinghouseDispatchState.CancelledBeforeSend,
+            ClearinghouseDispatchState.Sending => after is ClearinghouseDispatchState.AcceptedByClearinghouse or
+                ClearinghouseDispatchState.RejectedByClearinghouse or ClearinghouseDispatchState.OutcomeUnknown,
+            ClearinghouseDispatchState.OutcomeUnknown => after is ClearinghouseDispatchState.AcceptedByClearinghouse or
+                ClearinghouseDispatchState.RejectedByClearinghouse,
+            _ => false
+        };
 }

@@ -32,6 +32,7 @@ public sealed class ClearinghouseResponseIntakeTests
         var receipt = await db.ClearinghouseResponseReceipts.Include(x => x.Matches).SingleAsync();
         Assert.Equal(result.ResponseId, receipt.Id);
         Assert.Equal(7, receipt.ActorUserId);
+        Assert.Equal(ClearinghouseReceiptSource.Manual, receipt.Source);
         Assert.Equal(ClaimResponseIngestion.ParserVersion, receipt.ParserVersion);
         Assert.Equal(64, receipt.RawSha256.Length);
         Assert.NotEqual(document, System.Text.Encoding.UTF8.GetString(receipt.Ciphertext));

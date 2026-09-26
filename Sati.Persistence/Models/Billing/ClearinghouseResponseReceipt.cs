@@ -7,7 +7,15 @@ public sealed class ClearinghouseResponseReceipt
 {
     public Guid Id { get; set; }
     public int AgencyId { get; set; }
-    public int ActorUserId { get; set; }
+    // Null for an automated connector import; Source remains the authoritative actor class.
+    public int? ActorUserId { get; set; }
+    public ClearinghouseReceiptSource Source { get; set; }
+    public Guid? AccountId { get; set; }
+    public TradingPartnerKind? ConnectorKind { get; set; }
+    public ClearinghouseFeedKind? FeedKind { get; set; }
+    public string? ExternalArtifactId { get; set; }
+    public string? ContentType { get; set; }
+    public string? ConnectorVersion { get; set; }
     public DateTime ReceivedAtUtc { get; set; }
     public ClaimResponseKind Kind { get; set; }
     public bool IsTest { get; set; }
@@ -25,6 +33,13 @@ public sealed class ClearinghouseResponseReceipt
     public int ClaimOutcomesRecorded { get; set; }
     public bool DepositRecorded { get; set; }
     public List<ClearinghouseResponseMatch> Matches { get; set; } = [];
+}
+
+public enum ClearinghouseReceiptSource
+{
+    Manual = 0,
+    Mock = 1,
+    Connector = 2
 }
 
 public sealed class ClearinghouseResponseMatch

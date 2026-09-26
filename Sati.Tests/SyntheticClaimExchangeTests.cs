@@ -14,6 +14,16 @@ namespace Sati.Tests;
 public sealed class SyntheticClaimExchangeTests
 {
     [Fact]
+    public void OfficeAllyOriginal837BytesStayStable()
+    {
+        var content = EdiGenerator.Generate(CreateSubmittedPeriod(), true,
+            new DateTime(2026, 8, 29, 9, 30, 0), "123456789");
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(content)));
+        Assert.Equal("43115C8978F1D33D7E4072B935D2B6E066AF2CB6834CDF890052661239AA612D", hash);
+    }
+
+    [Fact]
     public void Test837ReceivesAcknowledgementsAndABalancedSynthetic835()
     {
         var generatedAt = new DateTime(2026, 8, 29, 9, 30, 0, DateTimeKind.Local);

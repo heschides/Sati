@@ -5244,3 +5244,60 @@ to the poison queue for review; it is never re-run by the platform.
 mid-reset unless it is anonymous; a status table, which needs DDL rights the refresh identity does
 not have and is one more thing outside the baseline; and starting the reset in the background from
 the API, which would still hit the Function's front-end limit.
+
+## 2026-09-26 — one 837P formatter with versioned trading-partner profiles
+
+`Professional837Formatter` in Contracts owns the X12 layout used by both desktop and API
+generation. Their thin mappers retain the existing claim validation and authorization paths;
+the formatter receives frozen claim facts and a versioned `TradingPartnerProfile`. Existing
+generation calls continue to select Office Ally, and a fixed-fixture byte hash protects its
+current output. Claim.MD's profile supplies its documented ISA/GS account and receiver values.
+No operational caller selects Claim.MD in this phase.
+
+Claim.MD's Loop 2300 `REF*D9` is a versioned Sati claim identity formed from a stable
+deployment/account namespace, agency ID, billing period ID, and note ID. It does not contain
+the generation control number or corrected claim contents. Thus resend, replacement, and
+void retain D9 while `CLM01` remains unique per generation, `REF*6R` preserves the service
+note, and `REF*F8` cites the payer's number on frequency 7 or 8. The namespace is a
+required, non-secret profile input; choosing and retaining it is an activation gate.
+Claim.MD documents that using D9 as its sole duplicate/update key requires a support
+request to change the account's Duplicate Fields setting to `remote_claimid`.
+
+Correction permission, billing compliance, claim lifecycle, response correlation, and
+immutable submission evidence remain Sati application responsibilities. The profile does
+not authorize a claim, transmit it, accept a response, or select a Production account.
+Future account/credential storage and runtime routing belong server-side, after sandbox
+acceptance and the existing security and operational gates.
+
+**Rejected:** separate desktop and API X12 renderers, a broad clearinghouse adapter that
+owns claim eligibility or corrections, reusing CLM01 as D9 (it changes on every attempt),
+deriving D9 from mutable demographics or charge, persisting a redundant remote ID through
+a new migration, and placing partner credentials or endpoints in WPF configuration.
+
+## 2026-09-26 — durable clearinghouse dispatch is a server-owned outbox
+
+Phase 2 adds agency-scoped account metadata, one dispatch per retained generation, immutable
+completed upload attempts, independent status/ERA/modification checkpoints, and source provenance
+on encrypted response receipts. The desktop and API contexts share one persistence mapping.
+Composite account/generation foreign keys enforce agency consistency; requesting-user agency and
+permission must be checked by the future API dispatch service. A user-agency composite key was
+rejected because it would prohibit valid agency reassignment elsewhere in Sati. Filtered
+indexes permit one enabled account per agency/connector/environment and prevent a second dispatch
+of the same generation. The Claim.MD namespace and account number cannot change on an existing
+account, preserving the basis of `REF*D9`; the account's credential is represented only by a
+server-side secret reference. A dispatch freezes the selected profile version and uses a revision
+for operational state changes. Unknown upload outcomes cannot return to Sending; confirmation or
+manual reconciliation must resolve them. An attempt is inserted only after an upload completes;
+an interrupted Sending row without an attempt is itself uncertain, never a reason to resend.
+
+Checkpoint cursors are opaque and independent by feed. The future worker must atomically retain
+an artifact and its processing effects before advancing a cursor. Connector response provenance
+will use a system actor with an optional initiating user, rather than impersonating billing staff.
+The present ingestion path explicitly accepts only manual or synthetic mock sources. The migration
+is source-only and rollback refuses to erase populated account, dispatch, checkpoint, attempt, or
+new receipt-provenance evidence. It was not applied to any database.
+
+**Rejected:** sending directly from an HTTP request without a durable outbox, retrying a timed-out
+upload as a new submission, one shared status/ERA cursor, mutable upload-attempt evidence, a
+connector-owned billability or correction rule, and client-side credentials or endpoints. Network
+transport, workers, account-management APIs, and Production activation remain later gated work.
