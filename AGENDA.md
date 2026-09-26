@@ -183,8 +183,10 @@ contract change.
 - [ ] Faster baseline restore: `SatiResetToCanonicalBaseline` deletes and reinserts every table and
       re-checks every constraint (about 135 seconds). It is no longer user-visible, but it is most
       of the reset.
-- [ ] Add baseline recapture to `RELEASE_PLAYBOOK.md` for any release that adds a Demo table.
-      Otherwise the hosted reset stops with 51002 until someone notices.
+- [x] Add baseline recapture to `RELEASE_PLAYBOOK.md`. Every Demo migration now requires it, not only
+      a new table: a new column fails the restore's inserts (SQL 207) just as a new table trips 51002.
+      It is approved in preflight, done in section 6 (check, capture, one verification reset, rule
+      closed), and required by the success criteria, evidence, and stop conditions.
 - [ ] Known limit: PCP and assessment openings whose billing deadline falls before the agency's
       availability window stay unopened ("opening date cannot be in the future"). They block only
       if an agency turns on the opening gates, and the run would then fail loudly.

@@ -56,7 +56,9 @@ A DATT release is complete only when all applicable conditions are true:
 - deployment identifiers, test results, artifact paths, sizes, and SHA-256 hashes are recorded;
 - when the release changes schema, both halves are recorded: the Demo application with its
   evidence, and the known Local Production machines with the release each is on, including any
-  known to be behind; and
+  known to be behind;
+- when the release migrates `SatiDemo`, the reset baseline has been recaptured and one full reset
+  afterwards has recorded `demo.reset.completed`; and
 - the final evidence commit is pushed and the local default branch matches its remote.
 
 ## 1. Preflight and repository audit
@@ -97,6 +99,14 @@ A DATT release is complete only when all applicable conditions are true:
    store `DemoReset__FunctionEndpoint` and `DemoReset__FunctionKey` only in the Demo API's protected
    application settings. Verify the restarted API afterward. Never place the key in a URL, client
    configuration, release evidence, or logs.
+
+   **Every Demo schema change also replaces the reset baseline.** `SatiResetToCanonicalBaseline`
+   refuses (SQL 51002) when a `dbo` table was added or removed after capture, and a column added to
+   an existing table fails the restore's inserts (SQL 207). Either way no Demo reset succeeds, nightly
+   or manual, until the baseline is recaptured. Between 2026-09-10 and 2026-09-26 this went unnoticed
+   for seventeen nights. So a release that migrates `SatiDemo` needs the same separate approval to
+   capture its current contents, and the firewall rule must stay open through the capture in step 6.
+   Ask for both in the preflight report, together with the migration authorization.
 
    A schema change reaches two kinds of place, never one. `SatiDemo` is a single Azure database
    migrated deliberately. Local `SatiProduction` is a separate database on *every* machine, migrated
@@ -217,6 +227,32 @@ The user adds and removes it; this workflow never does. A readiness check that r
 afterwards is the real confirmation that the migration satisfied the deployed model, because
 `SchemaDriftHealthCheck` compares the model's tables and columns against the database.
 
+### Demo reset baseline after a migration
+
+A migrated `SatiDemo` cannot be reset until its baseline matches the new schema (see preflight).
+With the capture approved and the firewall rule still open, once the migrated API reports healthy:
+
+1. Check the live data before freezing it. Run `tools/SatiComplianceSeed` with `--demo` and no
+   `--apply` against `sati-demo-satilogica-central.database.windows.net`, with
+   `SATI_SQL_ACCESS_TOKEN` set from `az account get-access-token --resource
+   https://database.windows.net/`. It changes nothing. Stop if it reports anything other than
+   what a reset would normally complete. The capture freezes whatever is live, including the
+   migration's own backfills.
+2. Capture: `scripts/Initialize-DemoFullReset.ps1 -ReplaceBaseline`, keeping the default anchor
+   (today). Anchoring to an earlier date would roll rows recorded since then into the future. Expect
+   `DEMO_FULL_RESET_BASELINE_CAPTURED`. The capture replaces the previous baseline, which cannot be
+   restored against the new schema anyway.
+3. Queue one full reset: the Admin **Reset Demo** button, or a POST to the Function with its host
+   key held only in memory. It answers 202 at once and runs for about four minutes.
+4. Confirm the outcome: a `demo.reset.completed` audit event with `ResourceId` equal to the
+   request id, and `DEMO_COMPLIANCE_HISTORY_COMPLETE` in the `ResetDemoWorker` log. A
+   `demo.reset.failed` event names the failing stage. Stop and report it; the reset is never
+   retried automatically.
+5. Ask the user to remove the firewall rule, and confirm that it is gone.
+
+Record the capture marker, the anchor date, the reset request id, and its outcome in the release
+evidence.
+
 After publication, verify:
 
 - deployment success and deployment identifier;
@@ -277,7 +313,9 @@ Update the current `AGENDA.md` release section with:
 
 - source and evidence commit identifiers;
 - test totals and any legitimate skips;
-- API ZIP hash, deployment identifier, health status, release version, and contract revision; and
+- API ZIP hash, deployment identifier, health status, release version, and contract revision;
+- for a Demo migration: the baseline capture marker and anchor date, plus the verification reset's
+  request id and outcome; and
 - Demo and Local installer names, byte sizes, hashes, acceptance results, cleanup results, and
   verified distribution paths.
 
@@ -304,6 +342,8 @@ Stop before the next side effect and explain the blocker when any of these occur
 - the deployed API is unhealthy or reports the wrong version or contract revision;
 - a required Demo migration is unauthorized, or reaching SatiDemo would need a firewall or other
   security setting the user has not already put in place;
+- a Demo migration is authorized but the baseline recapture that must follow it is not, or the
+  verification reset records `demo.reset.failed`;
 - the LocalDB prerequisite is missing or its Microsoft signature is invalid;
 - a distribution path resolves outside the named documents root, cannot be written, or contains a
   same-named artifact with a different hash; or
