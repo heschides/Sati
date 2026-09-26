@@ -266,42 +266,59 @@ public sealed class ThemeLegibilityTests
 
     [Theory]
     [MemberData(nameof(EveryTheme))]
-    public void NoViewPaintsTextThatDisappearsIntoItsOwnBackground(string theme)
+    public void NoViewPaintsTextThatDisappearsIntoItsOwnBackground(string theme) =>
+        AssertNoViewPaintsTextThatDisappears(theme, newLayout: false);
+
+    /// <summary>The layout pilot recolors surfaces and adds a banner, so it is scored too.</summary>
+    [Theory]
+    [MemberData(nameof(EveryTheme))]
+    public void NoViewPaintsTextThatDisappearsWithTheNewLayoutPreview(string theme) =>
+        AssertNoViewPaintsTextThatDisappears(theme, newLayout: true);
+
+    private static void AssertNoViewPaintsTextThatDisappears(string theme, bool newLayout)
     {
         WpfUiHarness.Run(() =>
         {
             using var _ = ThemeSwap.To(theme);
-            var failures = new List<string>();
-
-            foreach (var file in ViewFiles())
+            NewLayoutPreview.IsEnabled = newLayout;
+            try
             {
-                var element = TryLoad(file);
-                if (element is null)
-                    continue;
+                var failures = new List<string>();
 
-                WpfUiHarness.Realize(element);
-                foreach (var text in WpfUiHarness.Descendants(element).OfType<TextBlock>())
+                foreach (var file in ViewFiles())
                 {
-                    if (string.IsNullOrWhiteSpace(text.Text) || text.ActualHeight <= 0)
+                    var element = TryLoad(file);
+                    if (element is null)
                         continue;
 
-                    var (behind, source) = PaintedBehind(element, text);
-                    if (behind is null)
-                        continue;
-
-                    var ratio = ThemeContrast.WorstRatio(text.Foreground, behind, Colors.Black);
-                    if (ratio is not null && ratio < Minimum)
+                    WpfUiHarness.Realize(element);
+                    foreach (var text in WpfUiHarness.Descendants(element).OfType<TextBlock>())
                     {
-                        var excerpt = text.Text.Length > 40 ? text.Text[..40] + "â€¦" : text.Text;
-                        failures.Add($"  {ratio,5:N2}:1  {Path.GetFileName(file)}  "
-                            + $"{Describe(text.Foreground)} on {Describe(behind)} [{source}]  \"{excerpt}\"");
+                        if (string.IsNullOrWhiteSpace(text.Text) || text.ActualHeight <= 0)
+                            continue;
+
+                        var (behind, source) = PaintedBehind(element, text);
+                        if (behind is null)
+                            continue;
+
+                        var ratio = ThemeContrast.WorstRatio(text.Foreground, behind, Colors.Black);
+                        if (ratio is not null && ratio < Minimum)
+                        {
+                            var excerpt = text.Text.Length > 40 ? text.Text[..40] + "â€¦" : text.Text;
+                            failures.Add($"  {ratio,5:N2}:1  {Path.GetFileName(file)}  "
+                                + $"{Describe(text.Foreground)} on {Describe(behind)} [{source}]  \"{excerpt}\"");
+                        }
                     }
                 }
-            }
 
-            Assert.True(failures.Count == 0,
-                $"{theme} renders {failures.Count} text runs below {Minimum:N1}:1:{Environment.NewLine}"
-                + string.Join(Environment.NewLine, failures.Distinct().OrderBy(line => line)));
+                Assert.True(failures.Count == 0,
+                    $"{theme}{(newLayout ? " with the new layout" : "")} renders {failures.Count} text runs below {Minimum:N1}:1:{Environment.NewLine}"
+                    + string.Join(Environment.NewLine, failures.Distinct().OrderBy(line => line)));
+            }
+            finally
+            {
+                NewLayoutPreview.IsEnabled = false;
+            }
         });
     }
 

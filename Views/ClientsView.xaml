@@ -12,6 +12,32 @@
 
     <UserControl.Resources>
         <helpers:BindingProxy x:Key="LayoutProxy" Data="{Binding}" />
+        <!-- Client roster type. The new layout preview raises the smallest text to a
+             comfortable reading size; the standard layout keeps its original sizes. -->
+        <Style x:Key="RosterNameText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True">
+                    <Setter Property="FontSize" Value="14" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RosterDetailText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True">
+                    <Setter Property="FontSize" Value="13" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RosterFlagText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True">
+                    <Setter Property="FontSize" Value="12" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <converters:BoolToWidthConverter x:Key="BoolToWidthConverter" />
         <converters:BoolToWidthConverter x:Key="SpacerWidthConverter"
                                          TrueWidth="16"
@@ -836,11 +862,11 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
                                         <TextBlock Text="{Binding FullName}"
-                                                   FontSize="13"
+                                                   Style="{StaticResource RosterNameText}"
                                                    FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                                    TextTrimming="CharacterEllipsis" />
-                                        <TextBlock FontSize="11"
+                                        <TextBlock Style="{StaticResource RosterDetailText}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    Margin="0,3,0,0">
                                                             <Run Text="{Binding Waiver, Mode=OneWay}" />
@@ -850,8 +876,7 @@
                                         <!-- Last visit, phone call, or email. Red, with
                                              "overdue" in the text, once the monthly
                                              contact clock has run out. -->
-                                        <TextBlock FontSize="11"
-                                                   Margin="0,2,0,0"
+                                        <TextBlock Margin="0,2,0,0"
                                                    TextWrapping="Wrap">
                                             <TextBlock.Text>
                                                 <MultiBinding Converter="{StaticResource PersonMonthlyContactConverter}">
@@ -861,7 +886,7 @@
                                                 </MultiBinding>
                                             </TextBlock.Text>
                                             <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource RosterDetailText}">
                                                     <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                     <Style.Triggers>
                                                         <Trigger Property="Text" Value="">
@@ -884,12 +909,11 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                         <TextBlock Text="Billing attention required"
-                                                   FontSize="10"
                                                    FontWeight="SemiBold"
                                                    Foreground="{DynamicResource DangerStrongBrush}"
                                                    Margin="0,3,0,0">
                                             <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource RosterFlagText}">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                     <Style.Triggers>
                                                         <DataTrigger Value="False">

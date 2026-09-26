@@ -26,6 +26,7 @@ namespace Sati.ViewModels
         private readonly DailyAgendaPreferenceService _dailyAgendaPreferences;
         private readonly CheckRequestAutomationPreferenceService _checkRequestAutomationPreferences;
         private readonly EasyEyesPreferenceService _easyEyesPreferences;
+        private readonly NewLayoutPreferenceService _newLayoutPreferences;
         private readonly IdleLockPreferenceService _idlePreferences;
         private readonly ConsumerPickerSortPreferenceService _consumerPickerSortPreferences;
         private Settings? _settings;
@@ -35,6 +36,8 @@ namespace Sati.ViewModels
         private bool _savedEnableWeeklyCheckRequestAutomation = true;
         private bool _loadingEasyEyesPreference;
         private bool _savedEasyEyesMode;
+        private bool _loadingNewLayoutPreference;
+        private bool _savedTryNewLayout;
         private bool _loadingIdlePreference;
         private int _savedIdleMinutes = IdleLockPreferenceService.DefaultMinutes;
         private bool _loadingConsumerPickerSortPreference;
@@ -52,6 +55,7 @@ namespace Sati.ViewModels
             DailyAgendaPreferenceService dailyAgendaPreferences,
             CheckRequestAutomationPreferenceService checkRequestAutomationPreferences,
             EasyEyesPreferenceService easyEyesPreferences,
+            NewLayoutPreferenceService newLayoutPreferences,
             IdleLockPreferenceService idlePreferences,
             ConsumerPickerSortPreferenceService consumerPickerSortPreferences,
             MyAccountViewModel account,
@@ -70,6 +74,7 @@ namespace Sati.ViewModels
             _dailyAgendaPreferences = dailyAgendaPreferences;
             _checkRequestAutomationPreferences = checkRequestAutomationPreferences;
             _easyEyesPreferences = easyEyesPreferences;
+            _newLayoutPreferences = newLayoutPreferences;
             _idlePreferences = idlePreferences;
             _consumerPickerSortPreferences = consumerPickerSortPreferences;
             selectedTheme = _themeService.CurrentTheme;
@@ -83,6 +88,7 @@ namespace Sati.ViewModels
             _ = LoadDailyAgendaPreferenceAsync();
             _ = LoadCheckRequestAutomationPreferenceAsync();
             _ = LoadEasyEyesPreferenceAsync();
+            _ = LoadNewLayoutPreferenceAsync();
             _ = LoadIdlePreferenceAsync();
             _ = LoadConsumerPickerSortPreferenceAsync();
             if (CanManageAgencySettings)
@@ -145,6 +151,13 @@ namespace Sati.ViewModels
         private string easyEyesPreferenceStatus = string.Empty;
 
         public double EasyEyesScale => EasyEyesMode ? 1.3 : 1.0;
+
+        // The layout pilot. Off by default; applies at once, so staff can flip back mid-task.
+        [ObservableProperty]
+        private bool tryNewLayout;
+
+        [ObservableProperty]
+        private string newLayoutPreferenceStatus = string.Empty;
 
         // Minutes of no input before Sati covers the screen. "Never" is offered
         // because a case manager presenting from this machine should be able to
@@ -227,6 +240,12 @@ namespace Sati.ViewModels
                 _ = SaveEasyEyesPreferenceAsync(value);
         }
 
+        partial void OnTryNewLayoutChanged(bool value)
+        {
+            if (!_loadingNewLayoutPreference)
+                _ = SaveNewLayoutPreferenceAsync(value);
+        }
+
         partial void OnSortConsumerPickersByLastNameChanged(bool value)
         {
             if (!_loadingConsumerPickerSortPreference)
@@ -287,6 +306,65 @@ namespace Sati.ViewModels
                 }
 
                 EasyEyesPreferenceStatus = $"Preference was not changed. {exception.Message}";
+            }
+        }
+
+        private async Task LoadNewLayoutPreferenceAsync()
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            if (userId is null)
+            {
+                NewLayoutPreferenceStatus = "Sign in to try the new layout.";
+                return;
+            }
+
+            var enabled = await _newLayoutPreferences.LoadForUserAsync(userId.Value);
+            _loadingNewLayoutPreference = true;
+            try
+            {
+                TryNewLayout = enabled;
+                _savedTryNewLayout = enabled;
+            }
+            finally
+            {
+                _loadingNewLayoutPreference = false;
+            }
+
+            NewLayoutPreferenceStatus = _newLayoutPreferences.LastLoadWarning ??
+                "This personal setting is saved immediately for this Sati account on this computer.";
+        }
+
+        private async Task SaveNewLayoutPreferenceAsync(bool value)
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            if (userId is null)
+            {
+                NewLayoutPreferenceStatus = "Sign in before trying the new layout.";
+                return;
+            }
+
+            NewLayoutPreferenceStatus = "Saving new layout preference...";
+            try
+            {
+                await _newLayoutPreferences.SetEnabledAsync(userId.Value, value);
+                _savedTryNewLayout = value;
+                NewLayoutPreferenceStatus = value
+                    ? "New layout on. Turn it off here at any time."
+                    : "New layout off.";
+            }
+            catch (NewLayoutPreferenceSaveException exception)
+            {
+                _loadingNewLayoutPreference = true;
+                try
+                {
+                    TryNewLayout = _savedTryNewLayout;
+                }
+                finally
+                {
+                    _loadingNewLayoutPreference = false;
+                }
+
+                NewLayoutPreferenceStatus = $"Preference was not changed. {exception.Message}";
             }
         }
 

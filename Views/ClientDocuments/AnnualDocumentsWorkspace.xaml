@@ -3,6 +3,7 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:local="clr-namespace:Sati.Views.ClientDocuments"
  xmlns:converters="clr-namespace:Sati.Converters"
+ xmlns:helpers="clr-namespace:Sati.Helpers"
  DataContextChanged="OnContextChanged"
  Background="{DynamicResource SurfaceBrush}"
  Foreground="{DynamicResource TextPrimaryBrush}">
@@ -48,6 +49,14 @@
    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
    <Setter Property="BorderThickness" Value="1"/>
    <Setter Property="CornerRadius" Value="10"/>
+   <Style.Triggers>
+    <!-- New layout preview: sections sit on the page, separated by row dividers, not boxed. -->
+    <DataTrigger Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True">
+     <Setter Property="Background" Value="Transparent"/>
+     <Setter Property="BorderThickness" Value="0"/>
+     <Setter Property="CornerRadius" Value="0"/>
+    </DataTrigger>
+   </Style.Triggers>
   </Style>
   <!-- Previous / next: small words, full-size click targets. -->
   <Style x:Key="YearStepButton" TargetType="Button">
@@ -182,6 +191,93 @@
     </Grid>
    </Border>
   </DataTemplate>
+
+  <!-- NEW LAYOUT PREVIEW. The row is itself the button, so there is no View button;
+       a Done row states its status in its date line ("Done Sep 28, 2025") and drops the
+       pill, which is kept only for items that are not done. Starting work happens in the
+       "needs you" banner above the views, so rows never repeat that button. -->
+  <Style x:Key="PlanYearStatePillNew" TargetType="Border" BasedOn="{StaticResource PlanYearStatePill}">
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding StateKey}" Value="Done">
+     <Setter Property="Visibility" Value="Collapsed"/>
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+  <DataTemplate x:Key="PlanYearRowContentNew">
+   <Grid MinHeight="40">
+    <Grid.ColumnDefinitions>
+     <ColumnDefinition Width="24"/>
+     <ColumnDefinition Width="*"/>
+     <ColumnDefinition Width="Auto"/>
+     <ColumnDefinition Width="Auto"/>
+    </Grid.ColumnDefinitions>
+    <TextBlock Text="{Binding Marker}" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"
+               Style="{StaticResource PlanYearStateText}"/>
+    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0,12,0">
+     <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"
+                Foreground="{DynamicResource TextPrimaryBrush}"/>
+     <TextBlock Text="{Binding WhenText}" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+     <TextBlock Text="{Binding Detail}" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"
+                Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}"/>
+    </StackPanel>
+    <Border Grid.Column="2" Style="{StaticResource PlanYearStatePillNew}">
+     <TextBlock Text="{Binding StateLabel}" Style="{StaticResource PlanYearStateText}"/>
+    </Border>
+    <Path Grid.Column="3" Data="M0,0 L5,5 L0,10" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.8"
+          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+          VerticalAlignment="Center" Margin="14,0,2,0"
+          Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibilityConverter}}"/>
+   </Grid>
+  </DataTemplate>
+  <Style x:Key="PlanYearRowButton" TargetType="Button">
+   <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+   <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+   <Setter Property="Cursor" Value="Hand"/>
+   <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+   <Setter Property="Template">
+    <Setter.Value>
+     <ControlTemplate TargetType="Button">
+      <Border x:Name="Row" Background="Transparent" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0">
+       <Border x:Name="Focus" BorderThickness="2" BorderBrush="Transparent" CornerRadius="4" Padding="14,9">
+        <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+       </Border>
+      </Border>
+      <ControlTemplate.Triggers>
+       <Trigger Property="IsMouseOver" Value="True">
+        <Setter TargetName="Row" Property="Background" Value="{DynamicResource HoverBrush}"/>
+       </Trigger>
+       <Trigger Property="IsKeyboardFocused" Value="True">
+        <Setter TargetName="Focus" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+       </Trigger>
+      </ControlTemplate.Triggers>
+     </ControlTemplate>
+    </Setter.Value>
+   </Setter>
+  </Style>
+  <DataTemplate x:Key="PlanYearRowTemplateNew">
+   <Grid>
+    <Button Style="{StaticResource PlanYearRowButton}" Content="{Binding}" ContentTemplate="{StaticResource PlanYearRowContentNew}"
+            Command="{Binding DataContext.OpenPlanYearItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+            CommandParameter="{Binding Item}"
+            AutomationProperties.Name="{Binding AccessibleName}"
+            AutomationProperties.HelpText="{Binding QuickActionLabel}"
+            Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibilityConverter}}"/>
+    <Border Padding="16,11" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0"
+            AutomationProperties.Name="{Binding AccessibleName}"
+            Visibility="{Binding HasAction, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+     <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource PlanYearRowContentNew}"/>
+    </Border>
+   </Grid>
+  </DataTemplate>
+  <!-- Every row list picks its template here, so the preview switches all three views at once. -->
+  <Style x:Key="PlanYearRows" TargetType="ItemsControl">
+   <Setter Property="ItemTemplate" Value="{StaticResource PlanYearRowTemplate}"/>
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True">
+     <Setter Property="ItemTemplate" Value="{StaticResource PlanYearRowTemplateNew}"/>
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
  </UserControl.Resources>
  <Grid Margin="12">
   <Grid.RowDefinitions>
@@ -376,6 +472,67 @@
         </StackPanel>
        </Border>
 
+       <!-- New layout preview: one place to start work, above whichever view is showing.
+            Overdue items sit on the overdue tint; open ones on the opened-form tint. -->
+       <ItemsControl ItemsSource="{Binding NeedsYouRows}" Margin="0,12,0,0" AutomationProperties.Name="Needs you now">
+        <ItemsControl.Style>
+         <Style TargetType="ItemsControl">
+          <Setter Property="Visibility" Value="Collapsed"/>
+          <Style.Triggers>
+           <MultiDataTrigger>
+            <MultiDataTrigger.Conditions>
+             <Condition Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True"/>
+             <Condition Binding="{Binding HasNeedsYouRows}" Value="True"/>
+            </MultiDataTrigger.Conditions>
+            <Setter Property="Visibility" Value="Visible"/>
+           </MultiDataTrigger>
+          </Style.Triggers>
+         </Style>
+        </ItemsControl.Style>
+        <ItemsControl.ItemTemplate>
+         <DataTemplate>
+          <Border CornerRadius="8" Padding="16,12" Margin="0,0,0,8" AutomationProperties.Name="{Binding AccessibleName}">
+           <Border.Style>
+            <Style TargetType="Border">
+             <Setter Property="Background" Value="{DynamicResource OpenedFormFillBrush}"/>
+             <Style.Triggers>
+              <DataTrigger Binding="{Binding StateKey}" Value="Overdue">
+               <Setter Property="Background" Value="{DynamicResource OverdueFillBrush}"/>
+              </DataTrigger>
+             </Style.Triggers>
+            </Style>
+           </Border.Style>
+           <Grid>
+            <Grid.ColumnDefinitions>
+             <ColumnDefinition Width="24"/>
+             <ColumnDefinition Width="*"/>
+             <ColumnDefinition Width="Auto"/>
+             <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding Marker}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"
+                       Style="{StaticResource PlanYearStateText}"/>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0,12,0">
+             <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextPrimaryBrush}"/>
+             <TextBlock Text="{Binding WhenText}" FontSize="14" TextWrapping="Wrap" Margin="0,2,0,0" Foreground="{DynamicResource TextPrimaryBrush}"/>
+             <TextBlock Text="{Binding Detail}" FontSize="14" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}"
+                        Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </StackPanel>
+            <Border Grid.Column="2" Style="{StaticResource PlanYearStatePill}" Margin="0,0,12,0">
+             <TextBlock Text="{Binding StateLabel}" Style="{StaticResource PlanYearStateText}"/>
+            </Border>
+            <Button Grid.Column="3" Style="{StaticResource PrimaryButton}" MinHeight="40" MinWidth="96"
+                    Content="{Binding ActionLabel}"
+                    Command="{Binding DataContext.OpenPlanYearItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    CommandParameter="{Binding Item}"
+                    AutomationProperties.Name="{Binding QuickActionLabel}"
+                    Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibilityConverter}}"/>
+           </Grid>
+          </Border>
+         </DataTemplate>
+        </ItemsControl.ItemTemplate>
+       </ItemsControl>
+
        <!-- LIST VIEW -->
        <ItemsControl ItemsSource="{Binding ListSections}" Margin="0,14,0,0"
                      Visibility="{Binding IsListView, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -383,13 +540,27 @@
         <ItemsControl.ItemTemplate>
          <DataTemplate>
           <StackPanel Margin="0,0,0,16">
+           <!-- New layout preview: the banner above already lists what needs you. -->
+           <StackPanel.Style>
+            <Style TargetType="StackPanel">
+             <Style.Triggers>
+              <MultiDataTrigger>
+               <MultiDataTrigger.Conditions>
+                <Condition Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True"/>
+                <Condition Binding="{Binding HasOpenWork}" Value="True"/>
+               </MultiDataTrigger.Conditions>
+               <Setter Property="Visibility" Value="Collapsed"/>
+              </MultiDataTrigger>
+             </Style.Triggers>
+            </Style>
+           </StackPanel.Style>
            <StackPanel Orientation="Horizontal" Margin="2,0,0,8">
             <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"/>
             <TextBlock Text="{Binding Hint}" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}"
                        VerticalAlignment="Bottom" Margin="10,0,0,1"/>
            </StackPanel>
            <Border Style="{StaticResource PlanYearCard}" ClipToBounds="True">
-            <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource PlanYearRowTemplate}" Margin="0,-1,0,0"/>
+            <ItemsControl ItemsSource="{Binding Rows}" Style="{StaticResource PlanYearRows}" Margin="0,-1,0,0"/>
            </Border>
           </StackPanel>
          </DataTemplate>
@@ -585,7 +756,17 @@
        <!-- BY PURPOSE VIEW -->
        <StackPanel Margin="0,14,0,0"
                    Visibility="{Binding IsByPurposeView, Converter={StaticResource BoolToVisibilityConverter}}">
+        <!-- In the new layout preview the banner above the views takes this job. -->
         <ItemsControl ItemsSource="{Binding NeedsYouRows}" HorizontalAlignment="Center" Margin="0,0,0,12">
+         <ItemsControl.Style>
+          <Style TargetType="ItemsControl">
+           <Style.Triggers>
+            <DataTrigger Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True">
+             <Setter Property="Visibility" Value="Collapsed"/>
+            </DataTrigger>
+           </Style.Triggers>
+          </Style>
+         </ItemsControl.Style>
          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
          <ItemsControl.ItemTemplate>
           <DataTemplate>
@@ -607,21 +788,35 @@
               <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"/>
              </DockPanel>
              <TextBlock Text="{Binding Hint}" FontSize="13" Margin="16,0,16,8" Foreground="{DynamicResource TextSecondaryBrush}"/>
-             <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource PlanYearRowTemplate}"/>
+             <ItemsControl ItemsSource="{Binding Rows}" Style="{StaticResource PlanYearRows}"/>
             </StackPanel>
            </Border>
           </DataTemplate>
          </ItemsControl.ItemTemplate>
         </ItemsControl>
         <!-- Not tied to any plan year, so it sits apart from the yearly cards. -->
-        <Border CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource InputBorderBrush}"
-                Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0" ClipToBounds="True"
+        <Border Margin="0,0,12,0" ClipToBounds="True"
                 Visibility="{Binding HasOneTimeRows, Converter={StaticResource BoolToVisibilityConverter}}"
                 AutomationProperties.Name="One-time items">
+         <Border.Style>
+          <Style TargetType="Border">
+           <Setter Property="CornerRadius" Value="10"/>
+           <Setter Property="BorderThickness" Value="1"/>
+           <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}"/>
+           <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+           <Style.Triggers>
+            <DataTrigger Binding="{Binding Path=(helpers:NewLayoutPreview.IsEnabled)}" Value="True">
+             <Setter Property="CornerRadius" Value="0"/>
+             <Setter Property="BorderThickness" Value="0"/>
+             <Setter Property="Background" Value="Transparent"/>
+            </DataTrigger>
+           </Style.Triggers>
+          </Style>
+         </Border.Style>
          <StackPanel>
           <TextBlock Text="One-time" FontSize="17" FontWeight="SemiBold" Margin="16,12,16,0" AutomationProperties.HeadingLevel="Level2"/>
           <TextBlock Text="Not tied to a plan year." FontSize="13" Margin="16,0,16,8" Foreground="{DynamicResource TextSecondaryBrush}"/>
-          <ItemsControl ItemsSource="{Binding OneTimeRows}" ItemTemplate="{StaticResource PlanYearRowTemplate}"/>
+          <ItemsControl ItemsSource="{Binding OneTimeRows}" Style="{StaticResource PlanYearRows}"/>
          </StackPanel>
         </Border>
        </StackPanel>

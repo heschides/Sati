@@ -121,6 +121,7 @@ namespace Sati
                         services.AddSingleton<DailyAgendaPreferenceService>();
                         services.AddSingleton<CheckRequestAutomationPreferenceService>();
                         services.AddSingleton<EasyEyesPreferenceService>();
+                        services.AddSingleton<NewLayoutPreferenceService>();
                         services.AddSingleton<IdleLockPreferenceService>();
                         services.AddSingleton<ConsumerPickerSortPreferenceService>();
                         services.AddSingleton<AnnualFormsViewPreferenceService>();

@@ -5365,3 +5365,29 @@ records, file verification, and signature requests remain in a collapsed section
 before their year and the default would open on a finished year while this year's work waited;
 keeping the file-based statuses; and dropping the document records section, since staff may
 rely on it.
+
+## 2026-09-26 — the flatter layout is a time-boxed, opt-in pilot, and Modern themes change color only
+
+A design review of Annual Forms found the screen clean inside its cards but busy around them:
+boxes inside boxes, a status shown three ways on finished rows (check, Done pill, View button),
+the same Start action in two places, and small low-contrast secondary text. Josh wanted to work
+with a fix before committing to it, so it ships behind "Try the new layout" in Settings, off by
+default and stored per user and environment like Easy Eyes.
+
+Under the preview, Annual Forms sections sit on the page without card frames. A row is itself the
+button, so there is no View button, and a Done row drops its pill because its date line already
+says "Done Sep 28, 2025"; the status is still written in words. Every item that needs work
+appears once, in a banner above whichever view is showing, with its Start button; the rows below
+never repeat it, and the List view's Needs-you section hides. The client roster's smallest text
+grows from 10-11 to 12-13. Views read the flag through a static binding
+(`Helpers/NewLayoutPreview`), which the shell sets from `NewLayoutPreferenceService`, so no view
+model carries it.
+
+The Modern themes (Modern, Gray, Pink, Blue, Dark) are separate: flat palettes and Segoe UI
+Variable, color and type only. Sizes, corners, and layout are written into each view, so a theme
+cannot change them without first converting those values to named resources.
+
+**Rejected:** making the layout part of a theme, which would mean two versions of every screen
+for as long as both themes exist; a separate build, which would not carry real work; and a
+clickable mockup, which cannot show how the screen feels on a real caseload. The pilot ends with
+a decision, after which one layout is deleted.

@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
+using Sati.Helpers;
 using Sati.Models;
 using Sati.Services;
 using Sati.ViewModels.Billing;
@@ -31,6 +32,7 @@ namespace Sati.ViewModels
         private readonly DataEnvironmentInfo _dataEnvironment;
         private readonly IApiCompatibilityService _apiCompatibility;
         private readonly EasyEyesPreferenceService _easyEyesPreferences;
+        private readonly NewLayoutPreferenceService _newLayoutPreferences;
         private readonly IdleLockPreferenceService _idlePreferences;
         private bool _isTogglingEasyEyes;
 
@@ -52,6 +54,7 @@ namespace Sati.ViewModels
             IApiCompatibilityService apiCompatibility,
             DatabaseActivityViewModel databaseActivity,
             EasyEyesPreferenceService easyEyesPreferences,
+            NewLayoutPreferenceService newLayoutPreferences,
             IdleLockPreferenceService idlePreferences,
             ChatViewModel chatViewModel,
             ISessionLifetime sessionLifetime)
@@ -69,9 +72,11 @@ namespace Sati.ViewModels
             _platformHealthViewModel = platformHealthViewModel;
             _dataEnvironment = dataEnvironment;
             _easyEyesPreferences = easyEyesPreferences;
+            _newLayoutPreferences = newLayoutPreferences;
             DatabaseActivity = databaseActivity;
             _idlePreferences = idlePreferences;
             _easyEyesPreferences.PreferenceChanged += (_, enabled) => ApplyEasyEyesMode(enabled);
+            _newLayoutPreferences.PreferenceChanged += (_, enabled) => NewLayoutPreview.IsEnabled = enabled;
             _idlePreferences.PreferenceChanged += (_, minutes) => Idle.ApplyTimeout(minutes);
             Idle.PropertyChanged += (_, args) =>
             {
@@ -425,6 +430,14 @@ namespace Sati.ViewModels
                 await _easyEyesPreferences.LoadForUserAsync(userId.Value));
         }
 
+        // A switched-in user sees their own choice, never the previous user's.
+        private async Task LoadNewLayoutPreferenceAsync()
+        {
+            var userId = _sessionService.CurrentUser?.Id;
+            NewLayoutPreview.IsEnabled = userId is not null &&
+                await _newLayoutPreferences.LoadForUserAsync(userId.Value);
+        }
+
         private async Task LoadIdlePreferenceAsync()
         {
             var userId = _sessionService.CurrentUser?.Id;
@@ -523,6 +536,7 @@ namespace Sati.ViewModels
             Chat.ResumeAccount();
             NotifyRoleDependentProperties();
             await LoadEasyEyesPreferenceAsync();
+            await LoadNewLayoutPreferenceAsync();
             await LoadIdlePreferenceAsync();
             await CheckApiCompatibilityAsync();
             if (_sessionService.CurrentUser?.Role == UserRole.PlatformOperator)
@@ -572,6 +586,7 @@ namespace Sati.ViewModels
             _caseManagementViewModel.ResetToDashboard();
             NotifyRoleDependentProperties();
             await LoadEasyEyesPreferenceAsync();
+            await LoadNewLayoutPreferenceAsync();
             await LoadIdlePreferenceAsync();
             if (_sessionService.CurrentUser?.Role == UserRole.PlatformOperator)
             {

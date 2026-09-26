@@ -123,6 +123,24 @@ No schema change, so no machine is newly behind on migrations because of this re
       synthetic caseload before setting a startup service-level target. Query-shape regressions now
       prevent the known overfetch, but a workstation-sized test is not an Azure latency benchmark.
 
+## Unreleased — Modern themes and the new layout pilot (2026-09-26)
+
+See `DECISIONS.md` (2026-09-26, new layout pilot). Desktop only: no API route, contract, or migration.
+
+- [x] Modern, Modern Gray, Modern Pink, Modern Blue, and Modern Dark themes: flat palettes and
+      Segoe UI Variable. Color and type only.
+- [x] "Try the new layout" in Settings > Appearance, per user and environment
+      (`NewLayoutPreferenceService`), read by views through `Helpers/NewLayoutPreview`.
+- [x] Annual Forms under the preview: unboxed sections, whole-row buttons with no View button,
+      the Done pill dropped (the date line still says Done), and one "needs you" banner above all
+      three views that holds every Start button. The List view's duplicate Needs-you section hides.
+- [x] Client roster under the preview: 14/13/12 text instead of 13/11/10.
+- [x] Tests: `NewLayoutPreferenceTests`, the preview render test in
+      `AnnualDocumentViewRenderTests`, and every view under every theme with the preview on.
+- [ ] Use it in daily work for about two weeks, then decide. Keep: make it the default, delete the
+      old templates and the preference, and carry the pattern to other screens. Drop: delete the
+      preview templates, `NewLayoutPreview`, and `NewLayoutPreferenceService`.
+
 ## Unreleased — Annual Forms by plan year, in three views (2026-09-26)
 
 See `DECISIONS.md` (2026-09-26). Desktop only: no API route, contract revision, or migration change.
