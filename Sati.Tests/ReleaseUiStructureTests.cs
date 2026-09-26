@@ -362,7 +362,8 @@ public sealed class ReleaseUiStructureTests
                  {
                      "PineCoast", "BlueberryMist", "BlueGrayPearl", "CedarGrove", "HarborNight",
                      "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
-                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor", "UmberFacets", "Legacy"
+                     "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor", "UmberFacets", "Legacy",
+                     "Modern", "ModernGray", "ModernPink", "ModernBlue", "ModernDark"
                  })
         {
             var supplied = ResourceKeys(Path.Combine(Root, "Themes", $"{name}.xaml"));
@@ -386,6 +387,11 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("Bodhi Watercolor", service);
         Assert.Contains("Umber Facets", service);
         Assert.Contains("\"Legacy\"", service);
+        Assert.Contains("\"Modern\"", service);
+        Assert.Contains("Modern Gray", service);
+        Assert.Contains("Modern Pink", service);
+        Assert.Contains("Modern Blue", service);
+        Assert.Contains("Modern Dark", service);
     }
 
     [Fact]
@@ -554,7 +560,7 @@ public sealed class ReleaseUiStructureTests
     [Fact]
     public void StrongStatusFillsHaveExplicitContrastingForegrounds()
     {
-        foreach (var name in new[] { "States", "MidnightOpal", "HarborNight", "IndustrialMatte", "IridescentJewel" })
+        foreach (var name in new[] { "States", "MidnightOpal", "HarborNight", "IndustrialMatte", "IridescentJewel", "ModernDark" })
         {
             var theme = File.ReadAllText(Path.Combine(Root, "Themes", $"{name}.xaml"));
             Assert.True(ContrastRatio(Color(theme, "SuccessStrongBrush"), Color(theme, "OnSuccessStrongBrush")) >= 4.5);

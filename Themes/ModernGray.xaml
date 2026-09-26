@@ -1,0 +1,62 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- MODERN GRAY: the Modern layout in cool neutral grays with a graphite accent.
+         Status colors carry the only hue, so warnings and overdue items stand out. -->
+    <FontFamily x:Key="AppFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
+
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F4F4F5" />
+    <SolidColorBrush x:Key="NavBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="#F4F4F5" />
+    <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#E9E9EC" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceAlpha70Brush" Color="#B3FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceAlpha25Brush" Color="#40FFFFFF" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#E4E4E7" />
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#C9C9CF" />
+    <SolidColorBrush x:Key="DividerBrush" Color="#E9E9EC" />
+
+    <!-- Form fields read at full ink rather than the muted default. -->
+    <SolidColorBrush x:Key="InputSurfaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="InputTextBrush" Color="#18181B" />
+    <SolidColorBrush x:Key="InputMutedTextBrush" Color="#52525B" />
+    <SolidColorBrush x:Key="InputHoverBrush" Color="#FAFAFA" />
+    <SolidColorBrush x:Key="InputPressedBrush" Color="#F4F4F5" />
+    <SolidColorBrush x:Key="InputSelectionBrush" Color="#3F3F46" />
+    <SolidColorBrush x:Key="InputSelectionTextBrush" Color="#FFFFFF" />
+
+    <SolidColorBrush x:Key="AccentBrush" Color="#27272A" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#3F3F46" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#18181B" />
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+    <!-- Button fill is its own token so a palette can lighten its buttons
+         without lightening the accent used for type. -->
+    <SolidColorBrush x:Key="AccentButtonBrush" Color="#27272A" />
+    <SolidColorBrush x:Key="AccentButtonHoverBrush" Color="#3F3F46" />
+    <SolidColorBrush x:Key="AccentButtonPressedBrush" Color="#18181B" />
+    <SolidColorBrush x:Key="OnAccentButtonBrush" Color="#FFFFFF" />
+
+    <!-- Local AI: violet, the one chromatic accent in an otherwise gray palette. -->
+    <Color x:Key="AiGlowColor">#FF8D75B8</Color>
+    <SolidColorBrush x:Key="AiAccentBrush" Color="#6B4FA0" />
+    <SolidColorBrush x:Key="AiAccentHoverBrush" Color="#7D62B3" />
+    <SolidColorBrush x:Key="AiAccentPressedBrush" Color="#513879" />
+    <SolidColorBrush x:Key="AiAccentSoftBrush" Color="#EFE9F7" />
+    <SolidColorBrush x:Key="AiAccentBorderBrush" Color="#C7B8E0" />
+    <SolidColorBrush x:Key="OnAiAccentBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AiPanelTextBrush" Color="#3A2A5A" />
+
+    <SolidColorBrush x:Key="HoverBrush" Color="#F4F4F5" />
+    <SolidColorBrush x:Key="HoverStrongBrush" Color="#E9E9EC" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#18181B" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#3F3F46" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#52525B" />
+    <SolidColorBrush x:Key="TextSubtleBrush" Color="#52525B" />
+    <SolidColorBrush x:Key="NarrativeTextBrush" Color="#27272A" />
+    <SolidColorBrush x:Key="PersonGroupBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="PersonGroupAltBrush" Color="#F4F4F5" />
+    <Color x:Key="SurfaceAltColor">#FFF4F4F5</Color>
+    <Color x:Key="SurfaceRaisedColor">#FFFFFFFF</Color>
+    <Color x:Key="TextSubtleColor">#FF52525B</Color>
+</ResourceDictionary>

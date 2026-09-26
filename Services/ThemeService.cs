@@ -20,6 +20,11 @@ namespace Sati.Services
         public IReadOnlyList<ThemeOption> Themes { get; } =
         [
             new("Sunlit Shell", "SunlitShell"),
+            new("Modern", "Modern"),
+            new("Modern Gray", "ModernGray"),
+            new("Modern Pink", "ModernPink"),
+            new("Modern Blue", "ModernBlue"),
+            new("Modern Dark", "ModernDark"),
             new("Apricot Pearl", "ApricotPearl"),
             new("Rosewater Pearl", "RosewaterPearl"),
             new("Pearlescent Cream", "PearlescentCream"),
