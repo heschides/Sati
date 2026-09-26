@@ -179,7 +179,9 @@ contract change.
 - [ ] Ship the API and desktop wording with the next release. The API returns "Reset started"
       with a 2-minute Function timeout. The Admin notice says the reset started, takes about five
       minutes, and reports its result under recent activity. Until then, 1.3.28 says "completed"
-      the moment the reset is queued.
+      the moment the reset is queued. Sign-in during a reset now reports that the Demo is being
+      reset instead of 1.3.28's "waking up or temporarily unavailable". The API's
+      `demo_reset_in_progress` code was already there; the desktop discarded it.
 - [ ] Faster baseline restore: `SatiResetToCanonicalBaseline` deletes and reinserts every table and
       re-checks every constraint (about 135 seconds). It is no longer user-visible, but it is most
       of the reset.

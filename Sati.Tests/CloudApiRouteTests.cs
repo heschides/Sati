@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using Sati.Contracts.V1;
+using Sati.Data;
 using Sati.Data.Cloud;
 using Sati.Models;
 using Xunit;
@@ -13,15 +14,15 @@ namespace Sati.Tests;
 /// Written after a live failure: the SSN, DHHS form, and agency-release routes were
 /// built with bare paths like <c>people/1210/forms.pdf</c> while the API base address
 /// is only the host, so every service must supply <c>/api/v1/</c> itself. The result
-/// was not a clean error — App Service answered the GET with its own HTML page and
+/// was not a clean error â€” App Service answered the GET with its own HTML page and
 /// HTTP 200, which surfaced as a JSON parse failure, and the POST 404'd and was
 /// reported to the case manager as "the record was not found or is outside your
 /// caseload". A wrong URL and a genuinely missing consumer are indistinguishable at
 /// the call site, which is why this is asserted here rather than left to a run-time
 /// symptom.
 ///
-/// New cloud services belong here. The mistake is invisible in review — a bare path
-/// looks exactly like a correct one — and its symptom points at the wrong thing.
+/// New cloud services belong here. The mistake is invisible in review â€” a bare path
+/// looks exactly like a correct one â€” and its symptom points at the wrong thing.
 /// </summary>
 public sealed class CloudApiRouteTests
 {
@@ -309,8 +310,45 @@ public sealed class CloudApiRouteTests
         return api;
     }
 
+    [Fact]
+    public async Task SignInDuringAFullResetSaysTheDemoIsBeingResetNotWakingUp()
+    {
+        var service = new CloudAuthService(ClientFor(new UriRecorder(JsonBody("""
+            {"code":"demo_reset_in_progress","message":"The Demo is being restored. Sign in again in a few minutes.","correlationId":"c1"}
+            """), HttpStatusCode.ServiceUnavailable)));
+
+        var failure = await Assert.ThrowsAsync<AuthenticationServiceException>(() =>
+            service.AuthenticateAsync("admin", SecurePassword("pw")));
+
+        Assert.Equal(AuthenticationServiceIssue.ServiceUnavailable, failure.Issue);
+        Assert.Contains("being reset", failure.Message);
+        Assert.DoesNotContain("waking up", failure.Message);
+    }
+
+    [Fact]
+    public async Task SignInAgainstAnUnavailableServiceStillSaysItMayBeWakingUp()
+    {
+        var service = new CloudAuthService(ClientFor(new UriRecorder(
+            new StringContent(string.Empty), HttpStatusCode.ServiceUnavailable)));
+
+        var failure = await Assert.ThrowsAsync<AuthenticationServiceException>(() =>
+            service.AuthenticateAsync("admin", SecurePassword("pw")));
+
+        Assert.Contains("waking up", failure.Message);
+    }
+
+    private static System.Security.SecureString SecurePassword(string value)
+    {
+        var secure = new System.Security.SecureString();
+        foreach (var character in value)
+            secure.AppendChar(character);
+        secure.MakeReadOnly();
+        return secure;
+    }
+
     /// <summary>Records the request URI and answers with a canned body.</summary>
-    private sealed class UriRecorder(HttpContent content) : HttpMessageHandler
+    private sealed class UriRecorder(HttpContent content, HttpStatusCode status = HttpStatusCode.OK)
+        : HttpMessageHandler
     {
         public Uri? LastUri { get; private set; }
         public HttpMethod? LastMethod { get; private set; }
@@ -325,7 +363,7 @@ public sealed class CloudApiRouteTests
             LastBody = request.Content is null
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+            return new HttpResponseMessage(status) { Content = content };
         }
     }
 }
