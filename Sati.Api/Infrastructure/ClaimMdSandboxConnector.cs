@@ -41,7 +41,8 @@ internal sealed record ClaimMdEraPage(string Cursor, IReadOnlyList<ClaimMdEraEnt
 internal sealed record ClaimMdUploadListing(string FileId, string FileName, long UploadTime);
 
 /// <summary>Fixed-host Claim.MD API 1.19 transport. No endpoint is supplied by a client or account row.</summary>
-internal sealed class ClaimMdSandboxConnector(HttpClient http, IClaimMdSandboxKeySource keys) : IClearinghouseConnector
+internal sealed class ClaimMdSandboxConnector(HttpClient http, IClaimMdSandboxKeySource keys,
+    IClaimMdSandboxCoordination coordination) : IClearinghouseConnector
 {
     private const string Base = "https://svc.claim.md/services/";
     private const int MaximumResponseBytes = 16 * 1024 * 1024;
@@ -196,26 +197,27 @@ internal sealed class ClaimMdSandboxConnector(HttpClient http, IClaimMdSandboxKe
         return await PostAsync(path, form, token);
     }
 
-    private async Task<string> PostAsync(string path, HttpContent content, CancellationToken token)
+    private Task<string> PostAsync(string path, HttpContent content, CancellationToken token) =>
+        coordination.RequestAsync(async coordinatedToken =>
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, Base + path) { Content = content };
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, coordinatedToken);
         // Redirects must be disabled on the injected handler; never forward an AccountKey.
         if (!response.IsSuccessStatusCode || (int)response.StatusCode is >= 300 and < 400)
             throw new HttpRequestException("Claim.MD did not confirm the request.");
-        await using var stream = await response.Content.ReadAsStreamAsync(token);
+        await using var stream = await response.Content.ReadAsStreamAsync(coordinatedToken);
         using var buffer = new MemoryStream();
         var chunk = new byte[8192];
         int read;
-        while ((read = await stream.ReadAsync(chunk, token)) > 0)
+        while ((read = await stream.ReadAsync(chunk, coordinatedToken)) > 0)
         {
             if (buffer.Length + read > MaximumResponseBytes)
                 throw new FormatException("Claim.MD response exceeds the safe limit.");
             buffer.Write(chunk, 0, read);
         }
         return Encoding.UTF8.GetString(buffer.ToArray());
-    }
+    }, token);
 
     private static XElement Parse(string xml)
     {

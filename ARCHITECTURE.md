@@ -2468,6 +2468,13 @@ synthetic database is an operator-controlled future step, not a deployment perfo
 
 ### Claim.MD sandbox transport and feeds (Phase 4 source; not activated)
 
+Phase 5 adds `IClaimMdSandboxCoordination` at the API boundary. Its SQL Server application
+locks serialize every Claim.MD request across API hosts with a one-second minimum interval
+and allow only one poller run. It introduces no migration or client configuration. A status
+or ERA feed without an explicitly seeded, agency-matched numeric checkpoint is not polled;
+`0` is not an implicit default. Unknown uploads remain quarantined pending the reviewed
+workflow in `CLAIMMD_SANDBOX_RUNBOOK.md`; this source hardening does not enable transport.
+
 The API has an independent, default-off `EnableClaimMdSandboxTransport` gate that requires the
 exact Demo/SatiDemo identity and cannot coexist with synthetic dispatch. Only enabled, test-mode
 Claim.MD accounts with a server secret reference are eligible. The reference names a

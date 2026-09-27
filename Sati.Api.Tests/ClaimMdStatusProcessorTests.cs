@@ -168,6 +168,13 @@ public sealed class ClaimMdStatusProcessorTests
             var account = await db.ClearinghouseAccounts.SingleAsync();
             account.SecretReference = "CLAIMMD_SANDBOX_KEY_TEST";
             account.Revision++;
+            db.ClearinghouseFeedCheckpoints.AddRange(
+                new ClearinghouseFeedCheckpoint { Id = Guid.NewGuid(), AccountId = fixture.AccountId,
+                    AgencyId = account.AgencyId, FeedKind = ClearinghouseFeedKind.Status,
+                    Cursor = "0", UpdatedAtUtc = DateTime.UtcNow },
+                new ClearinghouseFeedCheckpoint { Id = Guid.NewGuid(), AccountId = fixture.AccountId,
+                    AgencyId = account.AgencyId, FeedKind = ClearinghouseFeedKind.Era,
+                    Cursor = "0", UpdatedAtUtc = DateTime.UtcNow });
             await db.SaveChangesAsync();
         }
         var listedPages = new List<int>();
@@ -192,7 +199,7 @@ public sealed class ClaimMdStatusProcessorTests
             }
             throw new InvalidOperationException("Unexpected Claim.MD test request.");
         }));
-        var connector = new ClaimMdSandboxConnector(http, new PageKeySource());
+        var connector = new ClaimMdSandboxConnector(http, new PageKeySource(), new TestClaimMdCoordination());
         var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
         {
             ExpectedEnvironment = "Demo", ExpectedDatabaseName = "SatiDemo",
@@ -201,13 +208,55 @@ public sealed class ClaimMdStatusProcessorTests
         var poller = new ClaimMdSandboxPoller(
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
             fixture.Factory.Services.GetRequiredService<IServiceScopeFactory>(), gate,
-            fixture.Protector, NullLogger<ClaimMdSandboxPoller>.Instance);
+            fixture.Protector, new TestClaimMdCoordination(), NullLogger<ClaimMdSandboxPoller>.Instance);
 
         Assert.Equal(0, await poller.PollOnceAsync(CancellationToken.None));
         Assert.Equal([1, 2], listedPages);
         Assert.Equal("100", firstEraRequested);
         await using var finalDb = fixture.Factory.OpenDatabase();
-        Assert.Empty(await finalDb.ClearinghouseFeedCheckpoints.ToListAsync());
+        Assert.All(await finalDb.ClearinghouseFeedCheckpoints.ToListAsync(), row => Assert.Equal("0", row.Cursor));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not-a-cursor")]
+    public async Task UninitializedFeedCursorsNeverTriggerVendorRequests(string? invalidCursor)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using (var db = fixture.Factory.OpenDatabase())
+        {
+            var account = await db.ClearinghouseAccounts.SingleAsync();
+            account.SecretReference = "CLAIMMD_SANDBOX_KEY_TEST";
+            account.Revision++;
+            if (invalidCursor is not null)
+                db.ClearinghouseFeedCheckpoints.AddRange(
+                    new ClearinghouseFeedCheckpoint { Id = Guid.NewGuid(), AccountId = fixture.AccountId,
+                        AgencyId = account.AgencyId, FeedKind = ClearinghouseFeedKind.Status,
+                        Cursor = invalidCursor, UpdatedAtUtc = DateTime.UtcNow },
+                    new ClearinghouseFeedCheckpoint { Id = Guid.NewGuid(), AccountId = fixture.AccountId,
+                        AgencyId = account.AgencyId, FeedKind = ClearinghouseFeedKind.Era,
+                        Cursor = invalidCursor, UpdatedAtUtc = DateTime.UtcNow });
+            await db.SaveChangesAsync();
+        }
+        var requests = 0;
+        using var http = new HttpClient(new PageHandler(_ =>
+        {
+            requests++;
+            return Task.FromResult(Xml("<result />"));
+        }));
+        var connector = new ClaimMdSandboxConnector(http, new PageKeySource(), new TestClaimMdCoordination());
+        var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
+        {
+            ExpectedEnvironment = "Demo", ExpectedDatabaseName = "SatiDemo",
+            EnableClaimMdSandboxTransport = true
+        }), new DemoHostEnvironment());
+        var poller = new ClaimMdSandboxPoller(
+            fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
+            fixture.Factory.Services.GetRequiredService<IServiceScopeFactory>(), gate,
+            fixture.Protector, new TestClaimMdCoordination(), NullLogger<ClaimMdSandboxPoller>.Instance);
+
+        Assert.Equal(0, await poller.PollOnceAsync(CancellationToken.None));
+        Assert.Equal(0, requests);
     }
 
     private static HttpResponseMessage Xml(string value) => new(HttpStatusCode.OK)

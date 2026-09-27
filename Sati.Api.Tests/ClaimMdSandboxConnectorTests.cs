@@ -145,7 +145,7 @@ public sealed class ClaimMdSandboxConnectorTests
     }
 
     private static ClaimMdSandboxConnector Client(StubHandler handler) =>
-        new(new HttpClient(handler), new FakeKeySource());
+        new(new HttpClient(handler), new FakeKeySource(), new TestClaimMdCoordination());
 
     private static HttpResponseMessage Xml(string content) => new(HttpStatusCode.OK)
     {

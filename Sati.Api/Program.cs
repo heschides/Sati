@@ -134,6 +134,7 @@ builder.Services.AddScoped<ClaimResponseIngestion>();
 builder.Services.AddSingleton<ClearinghouseDispatchGate>();
 builder.Services.AddSingleton<SyntheticClearinghouseConnector>();
 builder.Services.AddSingleton<IClaimMdSandboxKeySource, EnvironmentClaimMdSandboxKeySource>();
+builder.Services.AddSingleton<IClaimMdSandboxCoordination, SqlClaimMdSandboxCoordination>();
 builder.Services.AddHttpClient<ClaimMdSandboxConnector>(client => client.Timeout = TimeSpan.FromSeconds(45))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
 builder.Services.AddSingleton<IClearinghouseConnector, SandboxConnectorRouter>();

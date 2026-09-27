@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
 using Sati.Models.Billing;
@@ -9,11 +10,16 @@ internal sealed class ClaimMdSandboxPoller(
     IDbContextFactory<ApiDbContext> contexts, ClaimMdSandboxConnector connector,
     IServiceScopeFactory scopes,
     ClearinghouseDispatchGate gate, Sati.Contracts.V1.EnvelopeProtector protector,
-    ILogger<ClaimMdSandboxPoller> logger) : BackgroundService
+    IClaimMdSandboxCoordination coordination, ILogger<ClaimMdSandboxPoller> logger) : BackgroundService
 {
     internal async Task<int> PollOnceAsync(CancellationToken token)
     {
         if (!gate.IsRealSandboxEnabled) return 0;
+        return await coordination.PollOnceAsync(PollAccountsAsync, token);
+    }
+
+    private async Task<int> PollAccountsAsync(CancellationToken token)
+    {
         await using var db = await contexts.CreateDbContextAsync(token);
         var accounts = await db.ClearinghouseAccounts.AsNoTracking().Where(row =>
             row.IsEnabled && row.IsTest && row.ConnectorKind == Sati.Contracts.V1.TradingPartnerKind.ClaimMd &&
@@ -47,8 +53,14 @@ internal sealed class ClaimMdSandboxPoller(
     {
         await using var db = await contexts.CreateDbContextAsync(token);
         var cursor = await db.ClearinghouseFeedCheckpoints.AsNoTracking()
-            .Where(row => row.AccountId == account.Id && row.FeedKind == ClearinghouseFeedKind.Status)
-            .Select(row => row.Cursor).SingleOrDefaultAsync(token) ?? "0";
+            .Where(row => row.AccountId == account.Id && row.AgencyId == account.AgencyId &&
+                row.FeedKind == ClearinghouseFeedKind.Status)
+            .Select(row => row.Cursor).SingleOrDefaultAsync(token);
+        if (!IsInitializedCursor(cursor))
+        {
+            logger.LogWarning("Claim.MD status feed has no reviewed starting cursor for account {AccountId}.", account.Id);
+            return 0;
+        }
         var page = await connector.GetStatusesAsync(account.SecretReference, cursor, token);
         if (page.Claims.Count == 0) return 0;
         await using var receiptDb = await contexts.CreateDbContextAsync(token);
@@ -60,8 +72,14 @@ internal sealed class ClaimMdSandboxPoller(
     {
         await using var db = await contexts.CreateDbContextAsync(token);
         var cursor = await db.ClearinghouseFeedCheckpoints.AsNoTracking()
-            .Where(row => row.AccountId == account.Id && row.FeedKind == ClearinghouseFeedKind.Era)
-            .Select(row => row.Cursor).SingleOrDefaultAsync(token) ?? "0";
+            .Where(row => row.AccountId == account.Id && row.AgencyId == account.AgencyId &&
+                row.FeedKind == ClearinghouseFeedKind.Era)
+            .Select(row => row.Cursor).SingleOrDefaultAsync(token);
+        if (!IsInitializedCursor(cursor))
+        {
+            logger.LogWarning("Claim.MD ERA feed has no reviewed starting cursor for account {AccountId}.", account.Id);
+            return 0;
+        }
         // The listing can span pages, and the API does not promise ascending page order.
         // Reading only page one before moving the cursor could permanently skip an older ERA.
         var eras = new List<ClaimMdEraEntry>();
@@ -109,4 +127,7 @@ internal sealed class ClaimMdSandboxPoller(
             catch (OperationCanceledException) { break; }
         }
     }
+
+    private static bool IsInitializedCursor([NotNullWhen(true)] string? cursor) =>
+        cursor is { Length: > 0 and <= 20 } && cursor.All(char.IsAsciiDigit);
 }

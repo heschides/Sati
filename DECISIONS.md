@@ -5359,6 +5359,23 @@ inventing API 999/277CA files, sharing a status/ERA cursor, advancing a cursor b
 effects commit, advancing past an unread ERA listing page, retrying an unknown upload, and
 automatically resolving a dispatch by filename.
 
+## 2026-09-26 — Claim.MD sandbox workers share a server-side coordination boundary
+
+Phase 5 uses SQL Server session application locks in the Demo database: one lock permits only
+one Claim.MD poller across API hosts, and a second wraps each vendor request with at least a
+one-second delay while held. This keeps the combined upload/status/ERA request rate below
+Claim.MD's documented 100/minute ceiling without a new table or migration. A failed lock
+acquisition fails closed. The connector owns transport pacing; it does not gain claim,
+correction, tenancy, or financial authority. Each account/feed must have an explicitly
+reviewed, agency-matched numeric starting checkpoint; absence never silently means `0`.
+`CLAIMMD_SANDBOX_RUNBOOK.md` describes the review but does not provision cursors or resolve
+an unknown upload. Those operations remain activation gates until actual vendor evidence and
+an audited resolution workflow can be tested.
+
+**Rejected:** per-process-only throttling, assuming a single API instance forever, polling
+from `0` when onboarding is incomplete, guessing a high-water mark, automatic retry of
+uncertain uploads, and treating `uploadlist` filename/inbound ID as an exact-file receipt.
+
 ## 2026-09-26 — Annual Forms is organized by plan year, and an item is done only when its completion is recorded
 
 The Annual Forms overview asked staff to pick a date, press "View selected year", and read a NEXT

@@ -2089,9 +2089,13 @@ Sati-owned output.
       server-side account-key lookup, encrypted upload evidence, distinct status/ERA reads,
       atomic status and 835 receipt/effect/checkpoint processing, and fail-closed matching.
       Source tests use synthetic vendor responses only; no Claim.MD account was contacted.
+- [x] Phase 5 source hardening: SQL Server application-lock coordination for one poller
+      and a shared sub-100/minute request budget; missing or invalid account/feed cursors
+      now fail closed. An uncertain-upload operator checklist is recorded in
+      `CLAIMMD_SANDBOX_RUNBOOK.md`. No account, migration, API call, or deployment was changed.
 - [ ] Phase 4 activation gates: reviewed Phase 2 migration, account/secret provisioning,
-      single-worker and API rate coordination, onboarding cursors, vendor response-variant
-      tests, verified uncertain-upload reconciliation, and end-to-end sandbox evidence.
+      reviewed per-feed starting-cursor provisioning, vendor response-variant tests,
+      verified uncertain-upload reconciliation, and end-to-end sandbox evidence.
 - [ ] Before Claim.MD sandbox submission, obtain and protect the account's configuration
       server-side, assign a durable environment/account namespace, verify the account's
       `remote_claimid` duplicate-field setting with Claim.MD support, and validate
