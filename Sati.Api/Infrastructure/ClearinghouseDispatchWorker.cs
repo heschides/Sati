@@ -8,10 +8,11 @@ using Sati.Models.Billing;
 namespace Sati.Api.Infrastructure;
 
 internal sealed record ClearinghouseUpload(Guid DispatchId, string FileName, string Content,
-    string ContentSha256, TradingPartnerKind Partner);
+    string ContentSha256, TradingPartnerKind Partner, string? SecretReference = null);
 
 internal sealed record ClearinghouseUploadResult(ClearinghouseAttemptOutcome Outcome,
-    string? ExternalFileId, string? VendorCode, int? AcceptedClaims, int? RejectedClaims);
+    string? ExternalFileId, string? VendorCode, int? AcceptedClaims, int? RejectedClaims,
+    string? RawResponse = null);
 
 /// <summary>Only transport facts cross this seam. Eligibility, corrections and claim state stay in Sati.</summary>
 internal interface IClearinghouseConnector
@@ -36,7 +37,8 @@ internal sealed class SyntheticClearinghouseConnector : IClearinghouseConnector
 /// <summary>Claims a queued row before any upload. Sending is never selected again after interruption.</summary>
 internal sealed class ClearinghouseDispatchWorker(
     IDbContextFactory<ApiDbContext> contexts, IClearinghouseConnector connector,
-    ClearinghouseDispatchGate gate, ILogger<ClearinghouseDispatchWorker> logger) : BackgroundService
+    ClearinghouseDispatchGate gate, EnvelopeProtector protector, IClaimMdSandboxKeySource keys,
+    ILogger<ClearinghouseDispatchWorker> logger) : BackgroundService
 {
     internal async Task<bool> ProcessOneAsync(CancellationToken token)
     {
@@ -53,7 +55,8 @@ internal sealed class ClearinghouseDispatchWorker(
         var generation = await db.EdiGenerations.AsNoTracking()
             .SingleOrDefaultAsync(row => row.Id == dispatch.EdiGenerationId && row.AgencyId == dispatch.AgencyId, token);
         if (account is null || generation is null || !account.IsEnabled || !account.IsTest ||
-            !generation.IsTest || dispatch.TradingPartnerProfileVersion != account.TradingPartnerProfileVersion ||
+            !generation.IsTest || !gate.CanUseAccount(account) ||
+            dispatch.TradingPartnerProfileVersion != account.TradingPartnerProfileVersion ||
             !ClearinghouseAccountSelection.Matches(generation.Content, account, generation.BillingPeriodId))
         {
             dispatch.State = ClearinghouseDispatchState.CancelledBeforeSend;
@@ -62,6 +65,15 @@ internal sealed class ClearinghouseDispatchWorker(
             try { await db.SaveChangesAsync(token); }
             catch (DbUpdateConcurrencyException) { return true; }
             return true;
+        }
+
+        if (gate.IsRealSandboxEnabled)
+        {
+            // Neither a missing AccountKey nor an unavailable receipt-wrapping key should
+            // convert an unsent file into an uncertain upload. Preflight before Sending.
+            _ = keys.Resolve(account.SecretReference);
+            _ = await protector.ProtectAsync("claimmd-receipt-preflight",
+                new FieldBinding(dispatch.AgencyId, 0, $"ClaimMdPreflight:{dispatch.Id:N}"), token);
         }
 
         dispatch.State = ClearinghouseDispatchState.Sending;
@@ -75,7 +87,7 @@ internal sealed class ClearinghouseDispatchWorker(
         try
         {
             outcome = await connector.UploadAsync(new ClearinghouseUpload(dispatch.Id,
-                generation.FileName, generation.Content, hash, account.ConnectorKind), token);
+                generation.FileName, generation.Content, hash, account.ConnectorKind, account.SecretReference), token);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
@@ -96,7 +108,7 @@ internal sealed class ClearinghouseDispatchWorker(
         dispatch.RejectedClaimCount = rejected ? outcome.RejectedClaims : null;
         dispatch.SafeErrorCode = accepted ? null : safeVendorCode ?? "upload_outcome_unknown";
         dispatch.Revision++;
-        db.ClearinghouseDispatchAttempts.Add(new ClearinghouseDispatchAttempt
+        var attempt = new ClearinghouseDispatchAttempt
         {
             Id = Guid.NewGuid(), DispatchId = dispatch.Id, AttemptNumber = 1,
             StartedAtUtc = startedAt, CompletedAtUtc = DateTime.UtcNow,
@@ -104,20 +116,34 @@ internal sealed class ClearinghouseDispatchWorker(
             Outcome = accepted ? ClearinghouseAttemptOutcome.Accepted :
                 rejected ? ClearinghouseAttemptOutcome.Rejected : ClearinghouseAttemptOutcome.OutcomeUnknown,
             VendorCode = safeVendorCode, CorrelationId = dispatch.Id.ToString("N")
-        });
+        };
+        if (outcome.RawResponse is { } raw)
+        {
+            attempt.ResponseSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)));
+            var protectedResponse = await protector.ProtectAsync(raw,
+                ResponseBinding(dispatch.AgencyId, attempt), CancellationToken.None);
+            attempt.ResponseCiphertext = protectedResponse.Ciphertext;
+            attempt.ResponseNonce = protectedResponse.Nonce;
+            attempt.ResponseTag = protectedResponse.Tag;
+            attempt.ResponseWrappedDataKey = protectedResponse.WrappedDataKey;
+            attempt.ResponseKeyId = protectedResponse.KeyId;
+        }
+        db.ClearinghouseDispatchAttempts.Add(attempt);
         db.BillingSubmissionEvents.Add(new ServerBillingSubmissionEvent
         {
             AgencyId = dispatch.AgencyId, BillingPeriodId = generation.BillingPeriodId,
             EdiGenerationId = generation.Id, OccurredAtUtc = DateTime.UtcNow,
             Stage = accepted ? BillingSubmissionStage.Transmitted : BillingSubmissionStage.TransportFailed,
             Reference = accepted ? safeFileId : null, ResponseType = "837P",
-            ResponseCode = accepted ? "synthetic-upload" : dispatch.SafeErrorCode,
+            ResponseCode = accepted ? gate.IsRealSandboxEnabled ? "claimmd-upload" : "synthetic-upload" : dispatch.SafeErrorCode,
             Explanation = accepted
-                ? "Synthetic test upload accepted by the fake connector; no payer response is implied."
+                ? gate.IsRealSandboxEnabled
+                    ? "Claim.MD received the test file; no payer acceptance or payment is implied."
+                    : "Synthetic test upload accepted by the fake connector; no payer response is implied."
                 : rejected
-                    ? "The fake connector rejected the test upload. Review the dispatch evidence."
+                    ? "The test upload was rejected. Review the dispatch evidence."
                     : "The test upload outcome is unknown. Do not resend until reconciled.",
-            IsSynthetic = true
+            IsSynthetic = true // This gate only permits test files, even when the vendor receives them.
         });
         // The queued audit event names the human requester. These rows are system-operated
         // transport evidence; no background process impersonates that human in AuditEvents.
@@ -142,7 +168,7 @@ internal sealed class ClearinghouseDispatchWorker(
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception)
             {
-                logger.LogError("Synthetic clearinghouse dispatch worker paused after a safe processing failure.");
+                logger.LogError("Clearinghouse dispatch worker paused after a safe processing failure.");
             }
             try { await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken); }
             catch (OperationCanceledException) { break; }
@@ -153,4 +179,7 @@ internal sealed class ClearinghouseDispatchWorker(
         !string.IsNullOrWhiteSpace(value) && value.Length <= maxLength &&
         value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.')
             ? value : null;
+
+    internal static FieldBinding ResponseBinding(int agencyId, ClearinghouseDispatchAttempt attempt) =>
+        new(agencyId, 0, $"ClearinghouseAttempt:{attempt.Id:N}:Response:{attempt.ResponseSha256}");
 }

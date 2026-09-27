@@ -6,7 +6,7 @@ using Sati.Models.Billing;
 
 namespace Sati.Api.Infrastructure;
 
-/// <summary>Never enables a real clearinghouse. Deployment identity and an opt-in are both required.</summary>
+/// <summary>Transport is only possible for an exact Demo/Testing identity and an explicit server opt-in.</summary>
 internal sealed class ClearinghouseDispatchGate(IOptions<SatiApiOptions> options, IHostEnvironment environment)
 {
     public bool IsSyntheticEnvironment =>
@@ -14,7 +14,16 @@ internal sealed class ClearinghouseDispatchGate(IOptions<SatiApiOptions> options
         environment.IsEnvironment("Testing") && options.Value.ExpectedEnvironment == "Testing" &&
         options.Value.ExpectedDatabaseName == "SatiApiTests";
 
-    public bool IsEnabled => IsSyntheticEnvironment && options.Value.EnableSyntheticClearinghouseDispatch;
+    public bool IsRealSandboxEnabled => IsSyntheticEnvironment && options.Value.EnableClaimMdSandboxTransport &&
+        !options.Value.EnableSyntheticClearinghouseDispatch;
+
+    public bool IsEnabled => IsSyntheticEnvironment &&
+        (options.Value.EnableSyntheticClearinghouseDispatch || IsRealSandboxEnabled);
+
+    public bool CanUseAccount(ClearinghouseAccount account) => account.IsEnabled && account.IsTest &&
+        (options.Value.EnableSyntheticClearinghouseDispatch ||
+         IsRealSandboxEnabled && account.ConnectorKind == TradingPartnerKind.ClaimMd &&
+         EnvironmentClaimMdSandboxKeySource.IsValidReference(account.SecretReference));
 }
 
 internal sealed class ClearinghouseSelectionRejected(string code, string message) : Exception(message)
@@ -34,7 +43,7 @@ internal static class ClearinghouseAccountSelection
                 "Server-managed clearinghouse generation is available only in an enabled test environment.");
         var account = await db.ClearinghouseAccounts.AsNoTracking().SingleOrDefaultAsync(
             row => row.Id == accountId && row.AgencyId == agencyId && row.IsEnabled && row.IsTest, token);
-        if (account is null)
+        if (account is null || !gate.CanUseAccount(account))
             throw new ClearinghouseSelectionRejected("account_unavailable",
                 "The selected test clearinghouse account is unavailable for this agency.");
         return Profile(account);

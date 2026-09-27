@@ -28,6 +28,7 @@ internal static partial class ApiEndpoints
             var accounts = await db.ClearinghouseAccounts.AsNoTracking()
                 .Where(row => row.AgencyId == actor.AgencyId && row.IsEnabled && row.IsTest)
                 .OrderBy(row => row.ConnectorKind).ToListAsync(token);
+            accounts = accounts.Where(gate.CanUseAccount).ToList();
             var dispatches = await db.ClearinghouseDispatches.AsNoTracking()
                 .Where(row => row.AgencyId == actor.AgencyId)
                 .OrderByDescending(row => row.RequestedAtUtc).ThenByDescending(row => row.Id)
@@ -54,7 +55,9 @@ internal static partial class ApiEndpoints
             return Results.Ok(new ClearinghouseWorkspaceDto(accounts.Count > 0,
                 accounts.Count == 0
                     ? "No enabled test clearinghouse account is configured for this agency."
-                    : "Synthetic server dispatch is enabled. Queued files are sent only to the fake connector.",
+                    : gate.IsRealSandboxEnabled
+                        ? "Claim.MD test transport is enabled; payer acceptance and payment require separate review."
+                        : "Synthetic server dispatch is enabled. Queued files are sent only to the fake connector.",
                 accounts.Select(row => new ClearinghouseAccountOptionDto(row.Id,
                     row.ConnectorKind.ToString(), row.ConnectorKind == TradingPartnerKind.ClaimMd
                         ? "Claim.MD test profile" : "Office Ally test profile")).ToList(),
@@ -95,7 +98,7 @@ internal static partial class ApiEndpoints
             if (generation is null) return Results.NotFound();
             var account = await db.ClearinghouseAccounts.AsNoTracking().SingleOrDefaultAsync(row =>
                 row.Id == request.AccountId && row.AgencyId == actor.AgencyId && row.IsEnabled && row.IsTest, token);
-            if (account is null) return Results.NotFound();
+            if (account is null || !gate.CanUseAccount(account)) return Results.NotFound();
 
             ClearinghouseDispatch? existing = await db.ClearinghouseDispatches.AsNoTracking()
                 .SingleOrDefaultAsync(row => row.EdiGenerationId == generation.Id, token);

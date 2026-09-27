@@ -46,6 +46,11 @@ if (satiOptions.AuditRetentionDays is < 365 or > 3_650)
     throw new InvalidOperationException("Sati:AuditRetentionDays must be between 365 and 3650.");
 if (satiOptions.EdiReplayRetentionDays is < 30 or > 365)
     throw new InvalidOperationException("Sati:EdiReplayRetentionDays must be between 30 and 365.");
+if (satiOptions.EnableClaimMdSandboxTransport && satiOptions.EnableSyntheticClearinghouseDispatch)
+    throw new InvalidOperationException("Choose only one clearinghouse dispatch transport.");
+if (satiOptions.EnableClaimMdSandboxTransport &&
+    (satiOptions.ExpectedEnvironment != "Demo" || satiOptions.ExpectedDatabaseName != "SatiDemo"))
+    throw new InvalidOperationException("Claim.MD sandbox transport requires the exact Demo identity.");
 
 builder.Services.Configure<ApiAuthenticationOptions>(builder.Configuration.GetSection(ApiAuthenticationOptions.SectionName));
 builder.Services.Configure<SatiApiOptions>(builder.Configuration.GetSection(SatiApiOptions.SectionName));
@@ -110,6 +115,8 @@ builder.Services.AddSingleton<AnnualPacketComposer>();
 // malformed URI is a startup error, not a surprise during a form fill.
 var ssnOptions = builder.Configuration.GetSection(SsnProtectionOptions.SectionName)
     .Get<SsnProtectionOptions>() ?? new SsnProtectionOptions();
+if (satiOptions.EnableClaimMdSandboxTransport && string.IsNullOrWhiteSpace(ssnOptions.KeyUri))
+    throw new InvalidOperationException("Claim.MD sandbox transport requires server-side receipt encryption.");
 if (string.IsNullOrWhiteSpace(ssnOptions.KeyUri))
 {
     builder.Services.AddSingleton<IKeyWrapper, UnconfiguredKeyWrapper>();
@@ -125,8 +132,13 @@ else
 builder.Services.AddSingleton<EnvelopeProtector>();
 builder.Services.AddScoped<ClaimResponseIngestion>();
 builder.Services.AddSingleton<ClearinghouseDispatchGate>();
-builder.Services.AddSingleton<IClearinghouseConnector, SyntheticClearinghouseConnector>();
+builder.Services.AddSingleton<SyntheticClearinghouseConnector>();
+builder.Services.AddSingleton<IClaimMdSandboxKeySource, EnvironmentClaimMdSandboxKeySource>();
+builder.Services.AddHttpClient<ClaimMdSandboxConnector>(client => client.Timeout = TimeSpan.FromSeconds(45))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
+builder.Services.AddSingleton<IClearinghouseConnector, SandboxConnectorRouter>();
 builder.Services.AddHostedService<ClearinghouseDispatchWorker>();
+builder.Services.AddHostedService<ClaimMdSandboxPoller>();
 builder.Services.AddSingleton<IncidentAggregator>();
 builder.Services.AddSingleton<ApiIncidentRecorder>();
 builder.Services.AddHostedService<DatabaseIdentityHostedService>();

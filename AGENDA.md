@@ -2085,17 +2085,22 @@ Sati-owned output.
       WPF queue/status view. The server flag defaults off and the Phase 2 migration remains
       unapplied. Queued/sending/unknown uploads block another file for the period and are never
       retried automatically; operational reconciliation is still a Phase 4 gate.
-- [ ] Phase 4: Claim.MD sandbox HTTP connector, status/ERA polling, atomic checkpoint/receipt
-      processing, uncertain-upload reconciliation, and end-to-end sandbox evidence before
-      considering any Production activation.
+- [x] Phase 4 source path: default-off, Demo-only Claim.MD HTTP upload, fixed host and
+      server-side account-key lookup, encrypted upload evidence, distinct status/ERA reads,
+      atomic status and 835 receipt/effect/checkpoint processing, and fail-closed matching.
+      Source tests use synthetic vendor responses only; no Claim.MD account was contacted.
+- [ ] Phase 4 activation gates: reviewed Phase 2 migration, account/secret provisioning,
+      single-worker and API rate coordination, onboarding cursors, vendor response-variant
+      tests, verified uncertain-upload reconciliation, and end-to-end sandbox evidence.
 - [ ] Before Claim.MD sandbox submission, obtain and protect the account's configuration
       server-side, assign a durable environment/account namespace, verify the account's
       `remote_claimid` duplicate-field setting with Claim.MD support, and validate
       submitter/receiver loop values and file behavior against its current companion guide.
 - [ ] Exercise actual Claim.MD sandbox submissions and responses end to end, including
-      rejection, resend, replacement, void, 999/277CA/835 correlation, and remittance/EFT
+      rejection, resend, replacement, void, Claim.MD API status/835 correlation, and remittance/EFT
       reconciliation; resolve the existing security and operational launch gates before
-      considering any Production activation.
+      considering any Production activation. Claim.MD's API does not return 999; 277 is
+      available through SFTP only, not this API integration.
 
 - [x] Add Billing Submissions file import for a single original 999, 277CA, or 835; match retained
       outbound evidence automatically within the current agency and test environment.

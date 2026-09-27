@@ -2,7 +2,8 @@ using static Sati.Contracts.V1.X12Document;
 
 namespace Sati.Contracts.V1;
 
-public enum ClaimResponseKind { FunctionalAcknowledgement, ClaimAcknowledgement, RemittanceAdvice, Unrecognised }
+public enum ClaimResponseKind { FunctionalAcknowledgement, ClaimAcknowledgement, RemittanceAdvice, Unrecognised,
+    ClaimMdApiStatus }
 
 /// <summary>ControlNumber is this document's ISA13, never the original 837's control number.</summary>
 public sealed record ClaimResponseEnvelope(ClaimResponseKind Kind, bool IsTestInterchange, string? ControlNumber)

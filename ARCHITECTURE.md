@@ -2392,9 +2392,10 @@ filters.
 claim lines into `Professional837Claim`; both pass the same immutable
 `ProfessionalClaimSnapshot` and versioned `TradingPartnerProfile` to that renderer.
 The existing call sites select the Office Ally profile by default, preserving their
-retained output. In an explicitly enabled synthetic Demo/Testing deployment, the API can
+retained output. In an explicitly enabled test Demo/Testing deployment, the API can
 select a same-agency server-owned test account for generation; WPF sees only an account
-choice and never a partner secret or endpoint. No real transport selects Claim.MD.
+choice and never a partner secret or endpoint. A separate Demo-only Claim.MD transport
+gate exists in source but is off and unprovisioned.
 
 The profile owns interchange and group sender/receiver values. Claim.MD requires its
 account number as the sender and `CLAIMMD` as the receiver. Its Loop 2300 `REF*D9`
@@ -2422,7 +2423,7 @@ concurrency token and treats a retry of an already-successful submission as the 
 `ClearinghouseDispatchAttempt`, and `ClearinghouseFeedCheckpoint` records. The desktop and API
 contexts use the same mapping. An account has an immutable agency, partner, test/production mode,
 external account number, and Claim.MD claim namespace; the secret field is only a reference to
-future server-side secret storage. A filtered database index permits one enabled account per
+server-side secret storage, never the key itself. A filtered database index permits one enabled account per
 agency/partner/mode. No account provisioning endpoint or Production activation exists.
 
 A dispatch names one exact immutable `EdiGeneration` and one same-agency account. Composite foreign
@@ -2440,9 +2441,8 @@ future polling worker must advance a checkpoint in the same transaction as retai
 their effects; merely storing a cursor is not evidence of processing. Receipt provenance now
 distinguishes manual, synthetic mock, and future connector sources. Existing manual receipts retain
 their human actor; connector receipts can use a null human actor and must carry account/feed,
-external artifact, content type, and connector version. The current importer remains human/mock
-only. The additive migration has not been applied to Demo or Production; there is no real transport,
-polling, automatic import, credentials, or Production dispatch.
+external artifact, content type, and connector version. The additive migration has not been applied
+to Demo or Production; no account credential or Production dispatch has been configured.
 
 ### Synthetic dispatch workflow (Phase 3; opt-in source only)
 
@@ -2466,10 +2466,44 @@ eligibility, correction, lifecycle, and tenant authority remain in the API/share
 connector or ViewModel. No account provisioning route exists. Enabling this against a migrated
 synthetic database is an operator-controlled future step, not a deployment performed here.
 
+### Claim.MD sandbox transport and feeds (Phase 4 source; not activated)
+
+The API has an independent, default-off `EnableClaimMdSandboxTransport` gate that requires the
+exact Demo/SatiDemo identity and cannot coexist with synthetic dispatch. Only enabled, test-mode
+Claim.MD accounts with a server secret reference are eligible. The reference names a
+`CLAIMMD_SANDBOX_KEY_...` API-host environment variable (which may be backed by the host's secret
+store); no credential or endpoint is sent to WPF. HTTP requests target the fixed
+`https://svc.claim.md/services/` host with redirects and cookies disabled. Upload accepts only
+test 837P evidence; the worker verifies account-key availability and receipt encryption before
+marking the file Sending. It checks returned `pcn`/`remote_claimid` against retained CLM01/D9 and treats
+identity-incomplete, malformed, or ambiguous responses as unknown, never as a retry signal.
+Per-claim `R` means the file was received but the claim needs review. Bounded vendor
+XML is retained encrypted with the immutable attempt. `Sending` remains unretryable after a crash.
+
+The Demo-only poller reads Claim.MD API status XML using an account-specific ResponseID cursor and
+ERA listings/835s using a separate ERAID cursor. It collects the bounded ERA listing across all
+pages before processing ERA IDs in ascending order; otherwise a later-numbered first page could
+advance past an unseen remittance. Status XML is not mislabeled as 999 or 277CA:
+`A` records receipt, not payer approval, and `R` is a claim-level rejection requiring review.
+The status processor matches file ID, generation CLM01, and stable D9; it writes encrypted receipt,
+per-claim observations, submission events, and cursor atomically. The 835 connector path reuses
+`ClaimResponseIngestion`'s existing matching and financial rules, and commits its encrypted
+receipt, remittance effects, deposit, and ERA cursor together. Unmatched or duplicate evidence
+advances neither feed. The two feeds do not control authoritative billability or correction rules.
+
+This is source work only. The Phase 2 migration is unapplied; no account/key is provisioned and
+no vendor sandbox submission has been performed. Unknown uploads are still held for manual
+reconciliation: Claim.MD's upload listing supplies an inbound ID, not an authenticated content
+hash, so a filename match alone cannot prove the exact Sati file was received. Multi-instance
+polling/rate coordination, onboarding cursor policy, vendor response variants, and sandbox
+acceptance remain gates before enabling even Demo transport. Production startup rejects this
+transport option.
+
 **Pre-live checklist (before first real submission):**
 1. Replace representative Demo code/rate/payer/submitter values with the agency's verified contract,
    enrollment, and clearinghouse values.
-2. Test through the clearinghouse sandbox (`isTest = true`) and receive/validate a 999 and 277CA.
+2. Test through the clearinghouse sandbox (`isTest = true`). For Claim.MD's API, validate its
+   XML/JSON claim statuses and X12 835; it does not return a 999, and X12 277 is SFTP-only.
 3. Obtain payer-specific acceptance; implement rejection correction, transport, 835 remittance,
    reconciliation, and void/replacement workflows.
 4. Complete qualified billing/compliance review. Structural generation tests are not payer certification.

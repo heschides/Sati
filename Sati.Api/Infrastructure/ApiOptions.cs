@@ -43,4 +43,6 @@ internal sealed class SatiApiOptions
     public int EdiReplayRetentionDays { get; init; } = OperationalPolicyDefaults.EdiReplayRetentionDays;
     // Server-only, opt-in synthetic dispatch. The exact Demo/Testing identity gate is separate.
     public bool EnableSyntheticClearinghouseDispatch { get; init; }
+    // Independent, default-off Demo-only gate. Never route Office Ally through this transport.
+    public bool EnableClaimMdSandboxTransport { get; init; }
 }

@@ -29,6 +29,105 @@ internal sealed class ClaimResponseIngestion(
         environment.IsEnvironment("Testing") && options.Value.ExpectedEnvironment == "Testing" &&
         options.Value.ExpectedDatabaseName == "SatiApiTests";
 
+    /// <summary>Claim.MD's ERA is real X12 835; reuse the same matching and financial effects as manual intake.</summary>
+    internal async Task<bool> ImportConnectorEraAsync(Guid accountId, string eraId, string expectedCursor,
+        string document, CancellationToken token)
+    {
+        if (!IsEnabled || string.IsNullOrWhiteSpace(document) ||
+            document.Length > MaximumDocumentCharacters ||
+            eraId.Length is < 1 or > 20 || !eraId.All(char.IsAsciiDigit) ||
+            expectedCursor.Length is < 1 or > 20 || !expectedCursor.All(char.IsAsciiDigit))
+            throw new ClaimResponseRejected("connector_era_invalid", "The test ERA cannot be imported safely.");
+        ParsedClaimResponse parsed;
+        try { parsed = ClaimResponseReader.ReadDocument(document); }
+        catch (Exception failure) when (failure is FormatException or InvalidOperationException or OverflowException)
+        { throw new ClaimResponseRejected("connector_era_invalid", "The test ERA is malformed or unsupported."); }
+        if (parsed.Envelope.Kind != ClaimResponseKind.RemittanceAdvice || !parsed.Envelope.IsTestInterchange)
+            throw new ClaimResponseRejected("connector_era_invalid", "The connector accepts test 835 remittances only.");
+
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        var account = await db.ClearinghouseAccounts.AsNoTracking().SingleOrDefaultAsync(row =>
+            row.Id == accountId && row.IsEnabled && row.IsTest &&
+            row.ConnectorKind == TradingPartnerKind.ClaimMd, token);
+        if (account is null) throw new ClaimResponseRejected("connector_account_unavailable", "The test account is unavailable.");
+        var checkpoint = await db.ClearinghouseFeedCheckpoints.SingleOrDefaultAsync(row =>
+            row.AccountId == accountId && row.FeedKind == ClearinghouseFeedKind.Era, token);
+        if ((checkpoint?.Cursor ?? "0") != expectedCursor) return false;
+        if (decimal.Parse(eraId, System.Globalization.CultureInfo.InvariantCulture) <=
+            decimal.Parse(expectedCursor, System.Globalization.CultureInfo.InvariantCulture)) return false;
+
+        var rawHash = Hash(document);
+        var source = JsonSerializer.Serialize(new { parsed.Envelope.SenderQualifier, parsed.Envelope.SenderId,
+            parsed.Envelope.ReceiverQualifier, parsed.Envelope.ReceiverId, parsed.Envelope.Kind,
+            parsed.Envelope.IsTestInterchange });
+        var semanticHash = Hash(source + parsed.CanonicalTransaction);
+        var identityHash = Hash(source + JsonSerializer.Serialize(new { parsed.Envelope.ControlNumber,
+            parsed.Envelope.GroupControlNumber, parsed.Envelope.TransactionControlNumber }));
+        var advice = parsed.Remittance!;
+        var paymentHash = Hash(source + JsonSerializer.Serialize(new { advice.PaymentOriginatorId,
+            advice.PaymentReference, advice.PayeeId, advice.PayerId, advice.PaymentDate }));
+        if (await db.ClearinghouseResponseReceipts.AnyAsync(row => row.AgencyId == account.AgencyId &&
+                (row.RawSha256 == rawHash || row.SemanticSha256 == semanticHash ||
+                 row.IdentitySha256 == identityHash || row.PaymentIdentitySha256 == paymentHash ||
+                 row.AccountId == accountId && row.FeedKind == ClearinghouseFeedKind.Era &&
+                 row.ExternalArtifactId == "era:" + eraId), token))
+            throw new ClaimResponseRejected("connector_era_conflict",
+                "An ERA or payment identity is already retained. Reconcile the receipt before advancing this feed.");
+
+        var matches = await MatchAsync(parsed, account.AgencyId, null, token);
+        // A test 835 must match only this account's dispatched generations. Manual files or
+        // another account's retained 837 cannot give connector provenance to an ERA.
+        var generationIds = matches.Select(match => match.Generation.Id).Distinct().ToArray();
+        var accountGenerationIds = await db.ClearinghouseDispatches.AsNoTracking().Where(row =>
+            row.AccountId == accountId && row.AgencyId == account.AgencyId &&
+            row.State == ClearinghouseDispatchState.AcceptedByClearinghouse &&
+            generationIds.Contains(row.EdiGenerationId))
+            .Select(row => row.EdiGenerationId).ToListAsync(token);
+        if (accountGenerationIds.Distinct().Count() != generationIds.Length)
+            throw new ClaimResponseRejected("connector_era_unmatched",
+                "The ERA does not match this account's retained test submissions.");
+
+        var receipt = new ClearinghouseResponseReceipt
+        {
+            Id = Guid.NewGuid(), AgencyId = account.AgencyId, Source = ClearinghouseReceiptSource.Connector,
+            AccountId = accountId, ConnectorKind = TradingPartnerKind.ClaimMd,
+            FeedKind = ClearinghouseFeedKind.Era, ExternalArtifactId = "era:" + eraId,
+            ContentType = "application/edi-x12", ConnectorVersion = "claimmd-api-1.19",
+            ReceivedAtUtc = DateTime.UtcNow, IsTest = true, Kind = ClaimResponseKind.RemittanceAdvice,
+            ParserVersion = ParserVersion, RawSha256 = rawHash, SemanticSha256 = semanticHash,
+            IdentitySha256 = identityHash, PaymentIdentitySha256 = paymentHash
+        };
+        var protectedValue = await protector.ProtectAsync(document, Binding(receipt), token);
+        receipt.Ciphertext = protectedValue.Ciphertext;
+        receipt.Nonce = protectedValue.Nonce;
+        receipt.Tag = protectedValue.Tag;
+        receipt.WrappedDataKey = protectedValue.WrappedDataKey;
+        receipt.KeyId = protectedValue.KeyId;
+        receipt.Matches = matches.Select(match => new ClearinghouseResponseMatch
+        {
+            ResponseId = receipt.Id, BillingPeriodId = match.Generation.BillingPeriodId,
+            EdiGenerationId = match.Generation.Id, ClaimReference = match.ClaimReference
+        }).ToList();
+        db.ClearinghouseResponseReceipts.Add(receipt);
+        await RecordEffectsAsync(parsed, receipt, matches, token);
+        if (checkpoint is null)
+        {
+            checkpoint = new ClearinghouseFeedCheckpoint
+            {
+                Id = Guid.NewGuid(), AgencyId = account.AgencyId, AccountId = accountId,
+                FeedKind = ClearinghouseFeedKind.Era
+            };
+            db.ClearinghouseFeedCheckpoints.Add(checkpoint);
+        }
+        else checkpoint.Revision++;
+        checkpoint.Cursor = eraId;
+        checkpoint.LastReceiptId = receipt.Id;
+        checkpoint.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(token);
+        await transaction.CommitAsync(token);
+        return true;
+    }
+
     public async Task<ClaimResponseIngestResultDto> ImportAsync(string document, Actor actor,
         int? assertedPeriodId, CancellationToken cancellationToken,
         ClearinghouseReceiptSource receiptSource = ClearinghouseReceiptSource.Manual)

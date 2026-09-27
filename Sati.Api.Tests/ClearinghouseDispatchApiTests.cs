@@ -1,10 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Sati.Api.Data;
 using Sati.Api.Infrastructure;
+using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Models.Billing;
 using Xunit;
@@ -144,6 +148,72 @@ public sealed class ClearinghouseDispatchApiTests
         Assert.Single(await db.ClearinghouseDispatchAttempts.ToListAsync());
     }
 
+    [Fact]
+    public async Task ReturnedVendorEvidenceIsEncryptedAndBoundToTheAttempt()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.GenerateAsync(fixture.AccountId);
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(fixture.GenerationId, fixture.AccountId))).EnsureSuccessStatusCode();
+        Assert.True(await fixture.Worker(new EvidenceConnector()).ProcessOneAsync(CancellationToken.None));
+        await using var db = fixture.Factory.OpenDatabase();
+        var attempt = await db.ClearinghouseDispatchAttempts.SingleAsync();
+        Assert.NotNull(attempt.ResponseCiphertext);
+        Assert.NotNull(attempt.ResponseSha256);
+        var protectedValue = new ProtectedValue(attempt.ResponseCiphertext!, attempt.ResponseNonce!,
+            attempt.ResponseTag!, attempt.ResponseWrappedDataKey!, attempt.ResponseKeyId!);
+        var protector = fixture.Factory.Services.GetRequiredService<EnvelopeProtector>();
+        Assert.Equal("<result>synthetic test response</result>", await protector.UnprotectAsync(
+            protectedValue, ClearinghouseDispatchWorker.ResponseBinding(fixture.Actors.AgencyId, attempt)));
+        attempt.Id = Guid.NewGuid();
+        await Assert.ThrowsAsync<AuthenticationTagMismatchException>(() => protector.UnprotectAsync(
+            protectedValue, ClearinghouseDispatchWorker.ResponseBinding(fixture.Actors.AgencyId, attempt)));
+    }
+
+    [Fact]
+    public async Task MissingSandboxKeyCannotTurnAnUnsentFileIntoAnUnknownUpload()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using (var db = fixture.Factory.OpenDatabase())
+        {
+            var account = await db.ClearinghouseAccounts.SingleAsync();
+            account.SecretReference = "CLAIMMD_SANDBOX_KEY_TEST";
+            account.Revision++;
+            await db.SaveChangesAsync();
+        }
+        await fixture.GenerateAsync(fixture.AccountId);
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(fixture.GenerationId, fixture.AccountId))).EnsureSuccessStatusCode();
+        var connector = new ThrowingConnector();
+        var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
+        {
+            ExpectedEnvironment = "Demo", ExpectedDatabaseName = "SatiDemo",
+            EnableClaimMdSandboxTransport = true
+        }), fixture.Factory.Services.GetRequiredService<IHostEnvironment>());
+        var worker = new ClearinghouseDispatchWorker(
+            fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(),
+            connector, gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
+            new MissingKeySource(), fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => worker.ProcessOneAsync(CancellationToken.None));
+        Assert.Equal(0, connector.Calls);
+        await using var saved = fixture.Factory.OpenDatabase();
+        Assert.Equal(ClearinghouseDispatchState.Queued,
+            (await saved.ClearinghouseDispatches.SingleAsync()).State);
+        Assert.Empty(await saved.ClearinghouseDispatchAttempts.ToListAsync());
+    }
+
+    private sealed class MissingKeySource : IClaimMdSandboxKeySource
+    {
+        public string Resolve(string? reference) => throw new InvalidOperationException("No test key provisioned.");
+    }
+
+    private sealed class EvidenceConnector : IClearinghouseConnector
+    {
+        public Task<ClearinghouseUploadResult> UploadAsync(ClearinghouseUpload upload, CancellationToken token) =>
+            Task.FromResult(new ClearinghouseUploadResult(ClearinghouseAttemptOutcome.Accepted,
+                "123456", null, 1, 0, "<result>synthetic test response</result>"));
+    }
+
     private sealed class ThrowingConnector : IClearinghouseConnector
     {
         public int Calls { get; private set; }
@@ -227,6 +297,8 @@ public sealed class ClearinghouseDispatchApiTests
         public ClearinghouseDispatchWorker Worker(IClearinghouseConnector connector) => new(
             Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
             Factory.Services.GetRequiredService<ClearinghouseDispatchGate>(),
+            Factory.Services.GetRequiredService<EnvelopeProtector>(),
+            Factory.Services.GetRequiredService<IClaimMdSandboxKeySource>(),
             Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>());
 
         public async ValueTask DisposeAsync()
