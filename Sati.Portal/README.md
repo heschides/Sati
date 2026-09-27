@@ -70,6 +70,26 @@ so the vault policies are the current access boundary. No portal code has been d
 must remain stopped until its SQL role, exact protected settings, HTTPS/logging controls, and
 synthetic-only activation checks are ready.
 
+### Current Demo email boundary (2026-09-27)
+
+`scripts/Provision-DemoSignatureEmail.ps1` provisioned a dedicated Email Communication Service,
+Azure-managed test domain, and `sati-demo-sign-comm-satilogica` Communication Service. Local/key
+authentication and engagement tracking are disabled. The Demo API system identity has the custom
+**Sati Demo Signature Email Sender** role only at that Communication Service; the role contains
+only the Microsoft-documented `CommunicationServices/Read` and `CommunicationServices/Write`
+actions and no data actions. The public portal identity has no sender role.
+
+This sender is separate from team chat. Sati team chat uses authenticated API writes and the
+API's push-only WSS stream; it does not use an Azure Communication Services resource. The email
+resource is likewise not a chat or calling authorization boundary.
+
+The Azure-managed domain and `DoNotReply` address are for controlled synthetic acceptance only.
+No recipient allow-list or API email setting was configured, the feature and workers remain off,
+the portal remains stopped, and no message was sent. A reviewed custom domain, current DNS
+authentication, provider-event monitoring, and the agency operating procedure remain necessary
+before any real use. Re-running the script without `-Apply` previews/verifies; `-Apply` is
+idempotent and still does not activate or send mail.
+
 ## Configuration
 
 Supply configuration through the host's protected settings. The following names are required;

@@ -116,6 +116,15 @@ workers, or email.
       The API has the private blob and versioned PIN/outbox key locations so external signed-PDF
       evidence works when a matching desktop client is later distributed; hosted signing remains
       unavailable.
+- [x] Provision the isolated Demo invitation-email boundary without activating it. Register
+      `Microsoft.Communication`, create the dedicated Azure-managed email domain and
+      `sati-demo-sign-comm-satilogica` communication resource, disable local/key authentication,
+      disable engagement tracking, and assign the Demo API identity only the documented
+      Communication Services read/write actions at that one resource. Sati team chat remains its
+      own authenticated HTTPS/WSS feature and shares no resource or permission with this sender.
+      The final idempotent verifier resolved the endpoint and Azure-managed `DoNotReply` address;
+      signatures, portal, workers and email stayed disabled and no message was sent. Use
+      `scripts/Provision-DemoSignatureEmail.ps1` to preview or re-verify the boundary.
 - [ ] Build and publish desktop installers only under a later, explicit release authorization.
 - [ ] Complete real-use legal/program review, agency procedure and training, accessibility review,
       retention/legal-hold enforcement, malware scanning, and approved delivery/provider agreements.
