@@ -68,10 +68,11 @@ function Assert-StringSet {
 
 function Get-AppSetting {
     param([object[]]$Settings, [string]$Name)
-    $matches = @($Settings | Where-Object { $_.name -ceq $Name })
+    $flatSettings = @($Settings | ForEach-Object { $_ })
+    $matches = @($flatSettings | Where-Object { $_.name -ceq $Name })
     if ($matches.Count -gt 1) { throw "App setting '$Name' occurs more than once." }
     if ($matches.Count -eq 0) { return $null }
-    return [string]$matches[0].value
+    return [string]($matches[0].value)
 }
 
 function Test-AppSettingEnabled {
@@ -353,6 +354,8 @@ $portal = Read-AzureJson @(
 $portalSettings = @(Read-AzureJson @(
     'webapp', 'config', 'appsettings', 'list', '--resource-group', $ResourceGroup,
     '--name', $PortalApp, '--only-show-errors'))
+$apiSettings = @($apiSettings | ForEach-Object { $_ })
+$portalSettings = @($portalSettings | ForEach-Object { $_ })
 $apiSignaturesEnabled = Test-AppSettingEnabled $apiSettings 'Signatures__Enabled'
 $apiWorkersEnabled = Test-AppSettingEnabled $apiSettings 'Signatures__WorkersEnabled'
 $apiEmailEnabled = Test-AppSettingEnabled $apiSettings 'Signatures__EmailEnabled'

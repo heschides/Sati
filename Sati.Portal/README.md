@@ -36,10 +36,10 @@ unique paths and conditional writes to prevent replacement, while versioning ret
 
 The storage public endpoint is presently network-reachable because Demo has no private endpoint or
 VNet path; Entra authorization is the current boundary and anonymous container listing returns
-HTTP 401. No retention duration is configured or locked. The portal has not been deployed and has
-no blob grant. Provisioning did not set `Signatures:BlobContainerUri`, enable either signature
-feature, start workers, or configure email. Re-running the script without `-Apply` previews and
-verifies; `-Apply` is idempotent.
+HTTP 401. No retention duration is configured or locked. At this provisioning step the portal was
+not deployed and had no blob grant; the later identity, deployment and controlled activation steps
+below supplied those separately. Re-running the script without `-Apply` previews and verifies;
+`-Apply` is idempotent and does not change feature gates.
 
 ### Current Demo key and identity boundary (2026-09-27)
 
@@ -66,9 +66,8 @@ vault uses vault-wide access policies:
 Both vaults have purge protection and a 90-day soft-delete recovery window. The operator policy is
 limited to key lifecycle and recovery; it grants no secret, certificate, storage, wrap, or unwrap
 operations. Their public endpoints remain network-reachable until Demo has a private network path,
-so the vault policies are the current access boundary. No portal code has been deployed and the host
-must remain stopped until its SQL role, exact protected settings, HTTPS/logging controls, and
-synthetic-only activation checks are ready.
+so the vault policies are the current access boundary. The portal package, SQL role and protected
+settings were subsequently deployed and verified before the controlled activation below.
 
 ### Current Demo email boundary (2026-09-27)
 
@@ -84,11 +83,13 @@ API's push-only WSS stream; it does not use an Azure Communication Services reso
 resource is likewise not a chat or calling authorization boundary.
 
 The Azure-managed domain and `DoNotReply` address are for controlled synthetic acceptance only.
-No recipient allow-list or API email setting was configured, the feature and workers remain off,
-the portal remains stopped, and no message was sent. A reviewed custom domain, current DNS
-authentication, provider-event monitoring, and the agency operating procedure remain necessary
-before any real use. Re-running the script without `-Apply` previews/verifies; `-Apply` is
-idempotent and still does not activate or send mail.
+The later `scripts/Configure-DemoSignatureRehearsal.ps1` activation started and live-probed the
+portal, enabled the API platform/workers/email adapter, and configured one exact owner-controlled
+test-recipient address without writing it to source. Every agency remained opted out, no request
+was created, and no message was sent. A reviewed custom domain, current DNS authentication,
+provider-event monitoring, and the agency operating procedure remain necessary before any real
+use. The provisioning script is idempotent and never activates or sends mail; the separate
+rehearsal script makes the Demo-only activation explicit.
 
 ## Configuration
 

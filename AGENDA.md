@@ -125,6 +125,14 @@ workers, or email.
       The final idempotent verifier resolved the endpoint and Azure-managed `DoNotReply` address;
       signatures, portal, workers and email stayed disabled and no message was sent. Use
       `scripts/Provision-DemoSignatureEmail.ps1` to preview or re-verify the boundary.
+- [x] Activate only the controlled synthetic Demo platform with
+      `scripts/Configure-DemoSignatureRehearsal.ps1`: start the dedicated portal, verify its live
+      antiforgery bootstrap, enable the API feature/workers/ACS adapter, and restrict sending to
+      one exact owner-controlled test inbox. The idempotent final pass found portal enabled and
+      running, API 1.3.29 healthy, and no additional allow-list recipient. No agency setting was
+      changed, no request was created, and no email was sent. The encrypted Global Admin
+      credential on this workstation no longer authenticates and no agency-Admin credential is
+      stored here, so an authorized agency Admin must perform the visible agency opt-in.
 - [ ] Build and publish desktop installers only under a later, explicit release authorization.
 - [ ] Complete real-use legal/program review, agency procedure and training, accessibility review,
       retention/legal-hold enforcement, malware scanning, and approved delivery/provider agreements.

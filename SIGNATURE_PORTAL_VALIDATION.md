@@ -243,5 +243,8 @@ Further checks remain necessary before real use:
   review as described in the implementation guide.
 
 The feature, background processing and email sending remain separately disabled by default.
-Production cannot be enabled by this feature flag. Passing these checks does not establish HIPAA
-compliance, legal sufficiency, successful deployment or approval to use real client information.
+On September 27, 2026, the separately hosted Demo platform and worker/email gates were activated
+for a controlled synthetic rehearsal with one exact owner-controlled recipient; every agency
+remained opted out and no email was sent. Production cannot be enabled by this feature flag.
+Passing these checks does not establish HIPAA compliance, legal sufficiency, successful real-use
+deployment or approval to use real client information.

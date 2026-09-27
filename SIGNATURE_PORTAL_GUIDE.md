@@ -392,7 +392,7 @@ from deployment or real-use approval. Continue using only synthetic information 
 |---|---|
 | Local software and automated checks | Implemented; see the validation record for results and limits. |
 | Actual browser, keyboard, screen-reader, and document acceptance | Still requires hands-on user acceptance; automated checks and visual PDF review do not establish it. |
-| Hosted setup, actual permissions, authenticated email and delivery/failure monitoring | Requires separately reviewed setup and external-service verification. No deployment or real email occurred. |
+| Hosted setup, actual permissions, authenticated email and delivery/failure monitoring | Dedicated Demo hosting, identities, storage, keys and a restricted ACS sender are deployed; the synthetic platform is active with every agency still opted out. Actual test sending, authentication-header review, delivery/failure events and alerting remain incomplete. No email has been sent. |
 | Legally sufficient agency and medical release wording | Requires qualified agency and legal review. |
 | State-form, safety-plan, PCP/team, and other program acceptance | Requires the relevant written program decisions. |
 | Identity, authority, shared-address, and recovery procedures | Requires agency approval and staff training. |
