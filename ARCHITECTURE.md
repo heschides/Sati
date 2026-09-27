@@ -203,6 +203,28 @@ attestation. This bridge remains within the separately gated synthetic signature
 Local Production electronic signing is still disabled, and source code is not deployment, legal
 approval, or Production readiness.
 
+External completion is a separate, always-preferred delivery path. Sati accepts only a complete,
+current generated release tied to one exact obligation. The returned wet-ink or third-party-signed
+PDF is validated as a readable PDF, written once to private object storage, hashed, and represented
+by append-only `ExternalSignatureEvidence`. An authenticated staff member must affirm document
+identity, signer identity/authority, and signature/date completeness; signer name and capacity must
+also match the current consumer or guardian record. That evidence may complete only the linked
+release obligation. “Externally signed — staff verified” describes this human verification and is
+not a claim that Sati cryptographically validated a wet signature or a third-party envelope.
+
+`Settings.IsInternalElectronicSignatureEnabled` is false by default. An administrator may enable
+Sati-hosted signing as an additional agency method only when the independent environment gate is
+already active. External signing remains available and selected by default; neither switch removes
+paper, assisted, or agency-approved third-party options.
+
+The Releases presentation begins with the exact recipient-obligation cards. Choosing **Prepare for
+delivery** opens that obligation in the release editor with a horizontal panel transition; the list
+moves left and the editor enters from the right. Back or successful final preparation reverses the
+direction. Reduced-motion Windows settings bypass the animation. A draft remains in the editor and
+persists as Generated; a complete current `GeneratedInSati` artifact is Prepared; signed evidence
+is Completed. These stages are derived from retained artifacts and attestations rather than from
+navigation state.
+
 ### Migration and rollout boundary
 
 Migration `20260915004541_CorrectAnnualComplianceAndBillingPolicy` stages nullable

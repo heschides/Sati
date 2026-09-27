@@ -6,8 +6,39 @@
  Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}">
  <UserControl.Resources><converters:SignatureLabelConverter x:Key="SignatureLabel"/></UserControl.Resources>
  <StackPanel>
-  <TextBlock Text="Electronic review and signature — fictional-data testing" FontSize="18" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"/>
+  <TextBlock Text="Signature delivery" FontSize="18" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"/>
   <TextBlock Text="{Binding ConsumerContext}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
+  <TextBlock Text="External signing is the default. Generate the PDF, obtain a wet signature or use an agency-approved third-party service, then upload the returned signed copy." TextWrapping="Wrap"/>
+  <GroupBox Header="Record an externally signed release" Margin="0,12">
+   <StackPanel Margin="12">
+    <TextBlock Text="Complete Sati-generated release"/>
+    <ComboBox ItemsSource="{Binding Artifacts}" SelectedItem="{Binding SelectedArtifact}" AutomationProperties.Name="Release returned with external signatures">
+     <ComboBox.ItemTemplate><DataTemplate><TextBlock><Run Text="{Binding Kind, Mode=OneWay, Converter={StaticResource SignatureLabel}}"/><Run Text=" — record "/><Run Text="{Binding Id, Mode=OneWay}"/></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+    </ComboBox>
+    <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel><TextBlock Text="Signing method"/><ComboBox ItemsSource="{Binding ExternalMethods}" SelectedItem="{Binding ExternalMethod}" AutomationProperties.Name="External signing method"/></StackPanel>
+     <StackPanel Grid.Column="2"><TextBlock Text="Date signed"/><DatePicker SelectedDate="{Binding ExternallySignedOn}" AutomationProperties.Name="External signature date"/></StackPanel>
+    </Grid>
+    <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel><TextBlock Text="Signer name"/><TextBox Text="{Binding ExternalSignerName, UpdateSourceTrigger=PropertyChanged}" MaxLength="120" AutomationProperties.Name="External signer name"/></StackPanel>
+     <StackPanel Grid.Column="2"><TextBlock Text="Signer capacity"/><ComboBox ItemsSource="{Binding ExternalSignerCapacities}" SelectedItem="{Binding ExternalSignerCapacity}" AutomationProperties.Name="External signer capacity"/></StackPanel>
+    </Grid>
+    <TextBlock Text="Staff verification attestation" FontWeight="SemiBold" Margin="0,12,0,4"/>
+    <CheckBox Content="I reviewed the returned PDF and confirmed it is the signed version of this document" IsChecked="{Binding ExternalDocumentReviewed}"/>
+    <CheckBox Content="I verified the signer's identity and authority through the agency's approved process" IsChecked="{Binding ExternalIdentityAndAuthorityVerified}" Margin="0,6"/>
+    <CheckBox Content="I confirmed the required signatures and dates are complete" IsChecked="{Binding ExternalSignaturesAndDatesComplete}"/>
+    <TextBlock Text="Verification note (optional)" Margin="0,8,0,0"/>
+    <TextBox Text="{Binding ExternalVerificationNote, UpdateSourceTrigger=PropertyChanged}" MaxLength="1000" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="44" AutomationProperties.Name="External signature verification note"/>
+    <Button Content="Choose signed PDF and record verification" Command="{Binding RecordExternalCommand}" IsEnabled="{Binding CanRecordExternal}" HorizontalAlignment="Left" Margin="0,10,0,0" AutomationProperties.Name="Upload externally signed PDF with staff verification"/>
+    <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Text="Sati retains the PDF in private write-once storage, records its fingerprint, and links the attestation to the exact recipient obligation. The status means staff verified the evidence; it does not claim cryptographic validation by Sati."/>
+   </StackPanel>
+  </GroupBox>
+  <TextBlock Text="Externally signed — staff verified" FontWeight="SemiBold" Margin="0,8,0,4" AutomationProperties.HeadingLevel="Level3"/>
+  <DataGrid ItemsSource="{Binding ExternalEvidence}" SelectedItem="{Binding SelectedExternalEvidence}" AutoGenerateColumns="False" IsReadOnly="True" MaxHeight="180" SelectionMode="Single" AutomationProperties.Name="Externally signed document history">
+   <DataGrid.Columns><DataGridTextColumn Header="Record" Binding="{Binding Id}"/><DataGridTextColumn Header="Method" Binding="{Binding Method, Converter={StaticResource SignatureLabel}}"/><DataGridTextColumn Header="Signer" Binding="{Binding SignerName}"/><DataGridTextColumn Header="Capacity" Binding="{Binding SignerCapacity, Converter={StaticResource SignatureLabel}}"/><DataGridTextColumn Header="Signed" Binding="{Binding SignedOn, StringFormat={}{0:d}}"/><DataGridTextColumn Header="Verified (UTC)" Binding="{Binding AttestedAtUtc}"/></DataGrid.Columns>
+  </DataGrid>
+  <Button Content="Save retained externally signed copy" Command="{Binding DownloadExternalCommand}" IsEnabled="{Binding CanDownloadExternal}" HorizontalAlignment="Left" Margin="0,8,0,18"/>
+  <TextBlock Text="Sati-hosted electronic signature — optional" FontSize="17" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level2"/>
   <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Margin="0,8"/>
   <TextBlock Text="Paper, in-person and assisted options remain available without disadvantage. Each request is for one named signer." TextWrapping="Wrap"/>
   <TextBlock Text="{Binding ScopeNotice}" TextWrapping="Wrap" Margin="0,8"/>
@@ -50,8 +81,8 @@
     <TextBlock Text="Provide the code by an independently verified channel. It is cleared after every attempt and is never shown in the request history." TextWrapping="Wrap"/>
     <WrapPanel Margin="0,8"><TextBlock Text="Link expires after hours (24 to 168)" VerticalAlignment="Center"/>
      <TextBox Text="{Binding ExpiryHours, UpdateSourceTrigger=PropertyChanged}" Width="70" Margin="8,0" AutomationProperties.Name="Signature request expiry hours"/>
-     <Button Content="Submit to consumer or guardian for review" Click="CreateRequest" IsEnabled="{Binding CanCreate}"
-             AutomationProperties.Name="Submit selected document for consumer or guardian review"/>
+     <Button Content="Send secure signature link" Click="CreateRequest" IsEnabled="{Binding CanCreate}"
+             AutomationProperties.Name="Send selected document to consumer or guardian for secure signature"/>
     </WrapPanel>
    </StackPanel>
   </GroupBox>
@@ -64,7 +95,7 @@
     <DataGridTextColumn Header="Signer" Binding="{Binding SignerName}"/>
     <DataGridTextColumn Header="Capacity" Binding="{Binding SignerCapacity, Converter={StaticResource SignatureLabel}}"/>
     <DataGridTextColumn Header="Status" Binding="{Binding State, Converter={StaticResource SignatureLabel}}"/>
-    <DataGridTextColumn Header="Delivery" Binding="{Binding DeliveryState, Converter={StaticResource SignatureLabel}}"/>
+    <DataGridTextColumn Header="Email submission" Binding="{Binding DeliveryState, Converter={StaticResource SignatureLabel}}"/>
     <DataGridTextColumn Header="Signed-copy notice" Binding="{Binding ReceiptDeliveryState, Converter={StaticResource SignatureLabel}}"/>
     <DataGridCheckBoxColumn Header="Code locked" Binding="{Binding IsLocked}"/>
     <DataGridTextColumn Header="Expires (UTC)" Binding="{Binding ExpiresAtUtc}"/>

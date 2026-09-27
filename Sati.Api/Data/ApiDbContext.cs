@@ -15,6 +15,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerForm> Forms => Set<ServerForm>();
     public DbSet<ServerFormAttestation> FormAttestations => Set<ServerFormAttestation>();
     public DbSet<ServerDocumentArtifact> DocumentArtifacts => Set<ServerDocumentArtifact>();
+    public DbSet<ExternalSignatureEvidence> ExternalSignatureEvidence => Set<ExternalSignatureEvidence>();
     public DbSet<FrozenSignatureDocument> FrozenSignatureDocuments => Set<FrozenSignatureDocument>();
     public DbSet<SignatureRequest> SignatureRequests => Set<SignatureRequest>();
     public DbSet<SignatureSession> SignatureSessions => Set<SignatureSession>();
@@ -249,6 +250,27 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .WithMany()
                 .HasForeignKey(x => x.GeneratedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExternalSignatureEvidence>(entity =>
+        {
+            entity.ToTable("ExternalSignatureEvidence");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Method).HasMaxLength(40);
+            entity.Property(x => x.SignedOn).HasColumnType("date");
+            entity.Property(x => x.SignerName).HasMaxLength(120);
+            entity.Property(x => x.SignerCapacity).HasMaxLength(40);
+            entity.Property(x => x.AttestationText).HasMaxLength(1_000);
+            entity.Property(x => x.BlobPath).HasMaxLength(400);
+            entity.Property(x => x.ContentSha256).HasColumnType("char(64)");
+            entity.Property(x => x.VerificationNote).HasMaxLength(1_000);
+            entity.HasIndex(x => new { x.AgencyId, x.ClientRequestId }).IsUnique();
+            entity.HasIndex(x => x.DocumentArtifactId).IsUnique();
+            entity.HasOne<ServerDocumentArtifact>().WithMany().HasForeignKey(x => x.DocumentArtifactId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ReleaseObligation>().WithMany().HasForeignKey(x => x.ReleaseObligationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerAgency>().WithMany().HasForeignKey(x => x.AgencyId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerPerson>().WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerUser>().WithMany().HasForeignKey(x => x.AttestedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ServerDocumentTemplate>(entity =>
@@ -821,6 +843,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<ServerDocumentAcknowledgment>()
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+            ChangeTracker.Entries<ExternalSignatureEvidence>()
+                .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<ServerBillingSubmissionEvent>()
                 .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<ServerRemittanceClaimOutcome>()
@@ -1070,6 +1094,7 @@ internal sealed class ServerSettings
     public bool IsComprehensiveAssessmentAuthoringEnabled { get; set; }
     public bool IsClassificationAuthoringEnabled { get; set; }
     public bool IsPersonCenteredPlanAuthoringEnabled { get; set; }
+    public bool IsInternalElectronicSignatureEnabled { get; set; }
     public bool AllowCredibleProfileUpdates { get; set; }
     public string VrAssistantTitle { get; set; } =
         VocationalRehabilitationProfile.DefaultAssistantTitle;

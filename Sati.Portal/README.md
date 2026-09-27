@@ -25,6 +25,51 @@ does not create users or assign an identity; an authorized operator performs and
 step separately. A compromised portal identity can still read signature metadata and retained
 PDFs across the dedicated container. These permissions do not create per-agency SQL identities.
 
+### Current Demo storage boundary (2026-09-27)
+
+`scripts/Provision-DemoSignatureStorage.ps1` provisioned the dedicated `satidemosignatures`
+StorageV2 account and private `signature-documents` container. The account requires HTTPS/TLS 1.2,
+disables public blob and shared-key access, and enables blob versioning plus version-level
+immutability capability. The Demo API managed identity has the custom **Sati Demo Signature Blob
+Writer** role only at that container; it can read and write blobs but cannot delete them. Sati uses
+unique paths and conditional writes to prevent replacement, while versioning retains prior bytes.
+
+The storage public endpoint is presently network-reachable because Demo has no private endpoint or
+VNet path; Entra authorization is the current boundary and anonymous container listing returns
+HTTP 401. No retention duration is configured or locked. The portal has not been deployed and has
+no blob grant. Provisioning did not set `Signatures:BlobContainerUri`, enable either signature
+feature, start workers, or configure email. Re-running the script without `-Apply` previews and
+verifies; `-Apply` is idempotent.
+
+### Current Demo key and identity boundary (2026-09-27)
+
+`scripts/Provision-DemoSignatureKeysAndPortalIdentity.ps1` created the stopped, undeployed .NET 10
+host `sati-demo-sign-satilogica` to establish the portal's separate system-assigned identity. That
+identity has **Storage Blob Data Reader** only at the `signature-documents` container. It has no
+write/delete storage role. In `SatiDemo`, its contained external user is bound to the verified
+managed-identity client ID and belongs only to
+`sati_signature_portal`; its only direct permission is the required database `CONNECT` grant.
+`scripts/Apply-DemoSignaturePortalGrant.ps1` hash-pins and applies the reviewed SQL role script,
+checks effective allowed/denied operations, and supports preflight and rollback rehearsal.
+
+`scripts/Configure-DemoSignaturePortal.ps1` sets the exact passwordless managed-identity SQL,
+private-container, versioned PIN-key, host, and Demo identity settings while requiring the host to
+remain stopped. `Signatures:Enabled` and `Signatures:WorkersEnabled` are false; the public host has
+no outbox key or email settings. The script does not deploy or start the portal.
+
+The versioned RSA-3072 keys are isolated in separate single-purpose vaults because the existing SSN
+vault uses vault-wide access policies:
+
+- `sati-demo-sign-pin-kv/keys/signing-pin`: API wrap/unwrap; portal unwrap-only.
+- `sati-demo-sign-out-kv/keys/signature-outbox`: API wrap/unwrap; no portal policy.
+
+Both vaults have purge protection and a 90-day soft-delete recovery window. The operator policy is
+limited to key lifecycle and recovery; it grants no secret, certificate, storage, wrap, or unwrap
+operations. Their public endpoints remain network-reachable until Demo has a private network path,
+so the vault policies are the current access boundary. No portal code has been deployed and the host
+must remain stopped until its SQL role, exact protected settings, HTTPS/logging controls, and
+synthetic-only activation checks are ready.
+
 ## Configuration
 
 Supply configuration through the host's protected settings. The following names are required;
@@ -87,6 +132,11 @@ connection to Azure SQL are not alternatives to the intended identities.
    DMARC records before making any change; do not blindly use historical DNS observations in the
    handoff. Test authentication headers in an approved external test mailbox. No mail was sent
    and no DNS was changed while implementing the feature.
+9. After the environment, storage, keys, portal, worker, and restricted test-recipient email are
+   verified, an agency administrator may enable **Administration → Signatures → Sati-hosted
+   electronic signatures** for that agency. This database setting is additive and cannot bypass a
+   disabled environment gate. Keep it off for every agency not participating in the approved
+   fictional-data rehearsal.
 
 ## Recovery and accurate delivery status
 

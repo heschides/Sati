@@ -155,6 +155,7 @@ internal static class CloudContractMapper
         IsComprehensiveAssessmentAuthoringEnabled = s.IsComprehensiveAssessmentAuthoringEnabled,
         IsClassificationAuthoringEnabled = s.IsClassificationAuthoringEnabled,
         IsPersonCenteredPlanAuthoringEnabled = s.IsPersonCenteredPlanAuthoringEnabled,
+        IsInternalElectronicSignatureEnabled = s.IsInternalElectronicSignatureEnabled,
         AllowCredibleProfileUpdates = s.AllowCredibleProfileUpdates,
         VrAssistantTitle = VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle),
         AnnualPacketOpenDaysBefore = s.AnnualPacketOpenDaysBefore,
@@ -242,7 +243,8 @@ internal static class CloudContractMapper
         VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle), s.AnnualPacketOpenDaysBefore,
         s.AllowPastBillingPolicyEffectiveDates,
         s.IsComprehensiveAssessmentAuthoringEnabled, s.IsClassificationAuthoringEnabled,
-        s.IsPersonCenteredPlanAuthoringEnabled);
+        s.IsPersonCenteredPlanAuthoringEnabled,
+        s.IsInternalElectronicSignatureEnabled);
 
     public static Scratchpad ToScratchpad(ScratchpadDto dto) => new()
     {

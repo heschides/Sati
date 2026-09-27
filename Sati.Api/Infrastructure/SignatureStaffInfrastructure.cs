@@ -18,13 +18,19 @@ internal sealed class SignatureStaffSingleAttempt(ApiDbContext db) : ExecutionSt
     protected override bool ShouldRetryOn(Exception exception) => false;
 }
 
-internal sealed class SignatureEnabledFilter(SignatureFeature feature) : IEndpointFilter
+internal sealed class SignatureEnabledFilter(SignatureFeature feature, ApiDbContext db) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         context.HttpContext.Response.Headers.CacheControl = "no-store, no-cache";
         context.HttpContext.Response.Headers.Pragma = "no-cache";
         if (!feature.Enabled) return Results.NotFound();
+        var actor = Sati.Api.Security.Actor.From(context.HttpContext.User);
+        var agencyEnabled = await db.Settings.AsNoTracking().AnyAsync(
+            settings => settings.AgencyId == actor.AgencyId &&
+                        settings.IsInternalElectronicSignatureEnabled,
+            context.HttpContext.RequestAborted);
+        if (!agencyEnabled) return Results.NotFound();
         try { return await next(context); }
         catch (SignatureWorkflowException error)
         { return Results.Json(new ApiErrorDto(error.Code, error.Message, string.Empty), statusCode: error.StatusCode); }

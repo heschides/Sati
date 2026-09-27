@@ -679,5 +679,46 @@
                 DataContext="{Binding ComplianceRecovery}"
                 Margin="18,14,18,18" />
         </TabItem>
+        <TabItem Header="Signatures"
+                 AutomationProperties.Name="Agency signature settings">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24" MaxWidth="760" HorizontalAlignment="Left">
+                    <TextBlock Text="Signature delivery" FontSize="24" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               AutomationProperties.HeadingLevel="Level1" />
+                    <TextBlock Margin="0,8,0,20" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="Staff can generate a PDF, have it signed on paper or through an agency-approved external service, and upload the returned copy with a verification attestation. External signing is always available and remains the default." />
+
+                    <Border Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="Sati-hosted electronic signing" FontSize="17" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       AutomationProperties.HeadingLevel="Level2" />
+                            <TextBlock Text="Optional additional delivery method"
+                                       Margin="0,3,0,12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <CheckBox Content="Allow staff to send eligible documents through Sati for electronic signature"
+                                      IsChecked="{Binding IsInternalElectronicSignatureEnabled}"
+                                      IsEnabled="{Binding CanChangeInternalSignatureSetting}"
+                                      FontWeight="SemiBold"
+                                      AutomationProperties.Name="Enable Sati-hosted electronic signatures for this agency" />
+                            <TextBlock Text="{Binding SignatureConfigurationMessage}" Margin="24,8,0,0"
+                                       TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Margin="24,8,0,0" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="This agency setting cannot bypass Sati's environment-wide safety gate, approved document catalog, signer-authority rules, or delivery controls." />
+                            <Button Content="Save signature setting"
+                                    Command="{Binding SaveSignatureConfigurationCommand}"
+                                    IsEnabled="{Binding CanChangeInternalSignatureSetting}"
+                                    HorizontalAlignment="Left" Margin="24,16,0,0"
+                                    Style="{StaticResource SmallButton}"
+                                    AutomationProperties.Name="Save agency signature delivery setting" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
     </TabControl>
 </UserControl>

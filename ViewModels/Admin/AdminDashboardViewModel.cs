@@ -14,7 +14,9 @@ public partial class AdminDashboardViewModel(
     ISessionService sessionService,
     IPersonService? personService = null,
     DataEnvironmentInfo? environmentInfo = null,
-    BillingComplianceRecoveryViewModel? complianceRecovery = null) : ObservableObject
+    BillingComplianceRecoveryViewModel? complianceRecovery = null,
+    ISettingsService? settingsService = null,
+    ISignatureService? signatureService = null) : ObservableObject
 {
     private CancellationTokenSource? _historyCancellation;
     private readonly LatestRequestTracker _accountLoads = new();
@@ -46,6 +48,14 @@ public partial class AdminDashboardViewModel(
     [ObservableProperty] private string consumerDeletionReason = string.Empty;
     [ObservableProperty] private string selectedTargetStatus = PersonStatusRules.NoLongerServed;
     [ObservableProperty] private string statusChangeNote = string.Empty;
+    [ObservableProperty] private bool isInternalElectronicSignatureEnabled;
+    [ObservableProperty] private bool isInternalSignaturePlatformAvailable;
+    [ObservableProperty] private string signatureConfigurationMessage =
+        "External signing is the agency default. Sati-hosted signing is an optional additional method.";
+    private Settings? signatureSettings;
+
+    public bool CanChangeInternalSignatureSetting =>
+        settingsService is not null && IsInternalSignaturePlatformAvailable && !IsBusy;
 
     public IReadOnlyList<string> StatusChoices { get; } = PersonStatusRules.AllStatuses;
 
@@ -184,11 +194,15 @@ public partial class AdminDashboardViewModel(
             var activityTask = adminService.GetActivityAsync(30, 150);
             var operationsTask = adminService.GetOperationsAsync();
             var incidentsTask = adminService.GetIncidentsAsync();
+            var signatureSettingsTask = settingsService?.LoadAsync();
+            var signatureAvailabilityTask = signatureService?.GetAvailabilityAsync();
             var recoveryTask = ComplianceRecovery is null
                 ? Task.CompletedTask
                 : LoadComplianceRecoveryAsync(peopleTask);
             await Task.WhenAll(
-                overviewTask, peopleTask, activityTask, operationsTask, incidentsTask, recoveryTask);
+                overviewTask, peopleTask, activityTask, operationsTask, incidentsTask, recoveryTask,
+                signatureSettingsTask ?? Task.CompletedTask,
+                signatureAvailabilityTask ?? Task.CompletedTask);
             if (!_accountLoads.IsCurrent(request) || !ReferenceEquals(sessionService.CurrentUser, account))
                 return;
 
@@ -203,6 +217,21 @@ public partial class AdminDashboardViewModel(
             Replace(RecentActivity, (await activityTask).Select(item => new AdminActivityRow(item)));
             LastRefreshedAt = DateTime.Now;
 
+            if (signatureSettingsTask is not null)
+            {
+                signatureSettings = await signatureSettingsTask;
+                IsInternalElectronicSignatureEnabled =
+                    signatureSettings.IsInternalElectronicSignatureEnabled;
+            }
+            if (signatureAvailabilityTask is not null)
+            {
+                var availability = await signatureAvailabilityTask;
+                IsInternalSignaturePlatformAvailable = availability.PlatformEnabled;
+                SignatureConfigurationMessage = availability.PlatformEnabled
+                    ? "External signing remains available and is selected by default. Enabling this adds Sati-hosted signing for the agency; it does not remove paper or third-party signing."
+                    : "External signing remains available and is selected by default. Sati-hosted signing cannot be enabled until the environment-wide security and delivery configuration is approved and active.";
+            }
+
             SelectedPerson = selectedId is int id
                 ? People.FirstOrDefault(person => person.PersonId == id)
                 : People.FirstOrDefault();
@@ -216,6 +245,41 @@ public partial class AdminDashboardViewModel(
         {
             if (_accountLoads.IsCurrent(request) && ReferenceEquals(sessionService.CurrentUser, account))
                 IsBusy = false;
+        }
+    }
+
+    partial void OnIsInternalSignaturePlatformAvailableChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanChangeInternalSignatureSetting));
+        SaveSignatureConfigurationCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanChangeInternalSignatureSetting))]
+    private async Task SaveSignatureConfigurationAsync()
+    {
+        if (settingsService is null || signatureSettings is null)
+            return;
+        var previous = signatureSettings.IsInternalElectronicSignatureEnabled;
+        signatureSettings.IsInternalElectronicSignatureEnabled =
+            IsInternalElectronicSignatureEnabled;
+        IsBusy = true;
+        StatusMessage = string.Empty;
+        try
+        {
+            await settingsService.SaveAsync(signatureSettings);
+            NoticeMessage = IsInternalElectronicSignatureEnabled
+                ? "Sati-hosted signing is enabled as an additional agency option. External signing remains the default."
+                : "Sati-hosted signing is disabled. External signing remains available.";
+        }
+        catch (Exception ex)
+        {
+            signatureSettings.IsInternalElectronicSignatureEnabled = previous;
+            IsInternalElectronicSignatureEnabled = previous;
+            StatusMessage = $"The signature setting could not be saved. {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
@@ -282,6 +346,8 @@ public partial class AdminDashboardViewModel(
         DeleteTestConsumerCommand.NotifyCanExecuteChanged();
         DeleteConsumerInWindowCommand.NotifyCanExecuteChanged();
         SetPersonStatusCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanChangeInternalSignatureSetting));
+        SaveSignatureConfigurationCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnConsumerDeletionReasonChanged(string value) =>

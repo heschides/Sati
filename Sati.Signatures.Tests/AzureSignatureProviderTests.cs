@@ -28,7 +28,7 @@ public sealed class AzureSignatureProviderTests
     };
 
     [Fact]
-    public async Task Disabled_or_production_configuration_cannot_contact_any_provider()
+    public async Task Disabled_or_production_hosted_signing_cannot_contact_key_or_email_providers()
     {
         var disabled = Enabled();
         disabled.Enabled = false;
@@ -40,7 +40,6 @@ public sealed class AzureSignatureProviderTests
             var credential = new FakeCredential();
             var handler = new CaptureHandler(_ => throw new InvalidOperationException("Network must remain unused."));
             using var transport = new AzureSignatureTransport(credential, handler);
-            await Assert.ThrowsAsync<SignatureWorkflowException>(() => new AzureSignatureBlobStore(transport, options).ReadAsync("source.pdf"));
             await Assert.ThrowsAsync<SignatureWorkflowException>(() => new AzureSigningPinKeyWrapper(transport, options).WrapAsync(new byte[32]));
             var sender = new AzureSignatureEmailSender(transport, options);
             Assert.Equal("Suppressed", (await sender.SendAsync(Guid.NewGuid(), new(Recipient, "https://synthetic.example.test/s/" + Token, "Invitation"))).State);

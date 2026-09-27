@@ -19,6 +19,7 @@ namespace Sati.Data
         public DbSet<Form> Forms { get; set; }
         public DbSet<FormAttestation> FormAttestations { get; set; }
         public DbSet<DocumentArtifact> DocumentArtifacts { get; set; }
+        public DbSet<ExternalSignatureEvidence> ExternalSignatureEvidence { get; set; }
         public DbSet<FrozenSignatureDocument> FrozenSignatureDocuments => Set<FrozenSignatureDocument>();
         public DbSet<SignatureRequest> SignatureRequests => Set<SignatureRequest>();
         public DbSet<SignatureSession> SignatureSessions => Set<SignatureSession>();
@@ -144,6 +145,8 @@ namespace Sati.Data
                 ChangeTracker.Entries<DocumentTemplate>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
                 ChangeTracker.Entries<DocumentAcknowledgment>()
+                    .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+                ChangeTracker.Entries<ExternalSignatureEvidence>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
                 ChangeTracker.Entries<BillingSubmissionEvent>()
                     .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
@@ -650,6 +653,27 @@ namespace Sati.Data
                     .WithMany()
                     .HasForeignKey(artifact => artifact.GeneratedByUserId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ExternalSignatureEvidence>(entity =>
+            {
+                entity.ToTable("ExternalSignatureEvidence");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Method).HasMaxLength(40);
+                entity.Property(x => x.SignedOn).HasColumnType("date");
+                entity.Property(x => x.SignerName).HasMaxLength(120);
+                entity.Property(x => x.SignerCapacity).HasMaxLength(40);
+                entity.Property(x => x.AttestationText).HasMaxLength(1_000);
+                entity.Property(x => x.BlobPath).HasMaxLength(400);
+                entity.Property(x => x.ContentSha256).HasColumnType("char(64)");
+                entity.Property(x => x.VerificationNote).HasMaxLength(1_000);
+                entity.HasIndex(x => new { x.AgencyId, x.ClientRequestId }).IsUnique();
+                entity.HasIndex(x => x.DocumentArtifactId).IsUnique();
+                entity.HasOne<DocumentArtifact>().WithMany().HasForeignKey(x => x.DocumentArtifactId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<ReleaseObligation>().WithMany().HasForeignKey(x => x.ReleaseObligationId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<Agency>().WithMany().HasForeignKey(x => x.AgencyId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<Person>().WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<User>().WithMany().HasForeignKey(x => x.AttestedByUserId).OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<DocumentTemplate>(entity =>

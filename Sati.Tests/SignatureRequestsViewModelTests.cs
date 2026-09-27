@@ -55,6 +55,8 @@ public sealed class SignatureRequestsViewModelTests
     public async Task PinAttemptRequiresAffirmationsAndAlwaysClearsMaskedInputs()
     {
         var fake = new Service(); var vm = Ready(fake, new Session()); Select(vm);
+        vm.ChooseFreezePdfAsync = () => Task.FromResult<byte[]?>([1, 2, 3]);
+        await vm.FreezeAsync();
         var clears = 0; vm.ClearSensitiveInputs += () => clears++;
         await vm.SubmitAsync("73925814", "73925814", false);
         Assert.Equal(0, fake.Creates); Assert.True(clears > 0);
@@ -62,6 +64,15 @@ public sealed class SignatureRequestsViewModelTests
         await vm.SubmitAsync("73925814", "73925814", false);
         Assert.Equal(1, fake.Creates); Assert.False(vm.IdentityConfirmed); Assert.False(vm.EmailConfirmed);
         Assert.True(clears > 1);
+    }
+
+    [Fact]
+    public void SecureLinkCannotBeSentBeforeTheExactPdfIsRetained()
+    {
+        var vm = Ready(new Service(), new Session());
+        Select(vm);
+        Assert.True(vm.CanFreeze);
+        Assert.False(vm.CanCreate);
     }
 
     [Fact]
@@ -109,7 +120,7 @@ public sealed class SignatureRequestsViewModelTests
         public int Freezes; public int Creates;
         public Func<int, Task<IReadOnlyList<SignatureRequestDto>>> List = _ => Task.FromResult<IReadOnlyList<SignatureRequestDto>>([]);
         public Func<int, Task<AgencyReleaseResult>> Download = _ => Task.FromResult(new AgencyReleaseResult([1], "original.pdf"));
-        public Task<SignatureAvailabilityDto> GetAvailabilityAsync() => Task.FromResult(new SignatureAvailabilityDto(true, "Fictional-data testing", "Suppressed"));
+        public Task<SignatureAvailabilityDto> GetAvailabilityAsync() => Task.FromResult(new SignatureAvailabilityDto(true, "Fictional-data testing", "Suppressed", true, true, true));
         public Task<IReadOnlyList<SignatureSignerDto>> GetSignersAsync(int id) => Task.FromResult<IReadOnlyList<SignatureSignerDto>>([new(SignerCapacity.Consumer, null, "Synthetic Signer", "synthetic@example.test")]);
         public Task<IReadOnlyList<SignatureRequestDto>> GetRequestsAsync(int id) => List(id);
         public Task<FrozenSignatureDocumentDto> FreezeAsync(int id, int artifact, FreezeSignatureDocumentRequest r)
@@ -120,5 +131,10 @@ public sealed class SignatureRequestsViewModelTests
         public Task<SignatureRequestDto> WithdrawAuthorizationAsync(int id, SignatureReasonRequest r) => Task.FromResult(Request(101));
         public Task<AgencyReleaseResult> GetOriginalAsync(int id) => Download(id);
         public Task<AgencyReleaseResult> GetSignedAsync(int id) => Download(id);
+        public Task<IReadOnlyList<ExternalSignatureEvidenceDto>> GetExternalSignaturesAsync(int id) =>
+            Task.FromResult<IReadOnlyList<ExternalSignatureEvidenceDto>>([]);
+        public Task<ExternalSignatureEvidenceDto> RecordExternalSignatureAsync(
+            int id, RecordExternalSignatureRequest request) => throw new NotSupportedException();
+        public Task<AgencyReleaseResult> GetExternalSignedAsync(int id) => Download(id);
     }
 }

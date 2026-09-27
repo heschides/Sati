@@ -732,8 +732,26 @@ namespace Sati.ViewModels
                 ReleaseObligations.ComplianceChangedAsync = AfterAttestationChangedAsync;
                 ReleaseObligations.ObligationsChanged += AgencyRelease.SetReleaseObligations;
                 ReleaseObligations.ObligationsChanged += DhhsForms.SetReleaseObligations;
+                if (agencyRelease is not null)
+                    ReleaseObligations.PreparationRequested += agencyRelease.BeginPreparation;
                 ConsumerProviders.ProviderAssignmentsChangedAsync =
                     ReleaseObligations.RefreshAsync;
+                if (AnnualDocuments is not null)
+                {
+                    AnnualDocuments.ArtifactsChanged += ReleaseObligations.SetDocumentArtifacts;
+                    if (AnnualDocuments.Signatures is not null)
+                        AnnualDocuments.Signatures.CompletionChangedAsync = ReleaseObligations.RefreshAsync;
+                }
+            }
+            if (agencyRelease is not null)
+            {
+                agencyRelease.ReleasePreparedAsync = async () =>
+                {
+                    if (AnnualDocuments is not null)
+                        await AnnualDocuments.RefreshCurrentAsync();
+                    if (ReleaseObligations is not null)
+                        await ReleaseObligations.RefreshAsync();
+                };
             }
 
             // The review panel hands over accepted values and nothing else; filling the form is

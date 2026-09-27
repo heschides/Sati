@@ -40,6 +40,37 @@ public sealed class SignatureApiTests(SatiApiFactory factory) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, (await staff.PostAsJsonAsync("/api/v1/signature-requests", Create(101, 1))).StatusCode);
     }
 
+    [Fact]
+    public async Task AgencyOptInCannotBeBypassedByAnEnabledPlatform()
+    {
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            await db.Settings.Where(x => x.AgencyId == 1)
+                .ExecuteUpdateAsync(update => update.SetProperty(
+                    x => x.IsInternalElectronicSignatureEnabled, false));
+        }
+        try
+        {
+            using var staff = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+            var availability = (await staff.GetFromJsonAsync<SignatureAvailabilityDto>(
+                "/api/v1/signatures/availability"))!;
+            Assert.False(availability.Enabled);
+            Assert.True(availability.PlatformEnabled);
+            Assert.False(availability.AgencyEnabled);
+            Assert.Equal(HttpStatusCode.NotFound,
+                (await staff.GetAsync("/api/v1/people/101/signature-signers")).StatusCode);
+        }
+        finally
+        {
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            await db.Settings.Where(x => x.AgencyId == 1)
+                .ExecuteUpdateAsync(update => update.SetProperty(
+                    x => x.IsInternalElectronicSignatureEnabled, true));
+        }
+    }
+
     [Theory]
     [InlineData("case-manager-two")]
     [InlineData("billing-only-one")]

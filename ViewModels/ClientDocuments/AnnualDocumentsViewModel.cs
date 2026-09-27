@@ -138,6 +138,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
     public bool CanPublishTemplate => CanManageTemplates &&
         DocumentTemplateRules.Validate(AnnualDocumentKind.PrivacyPractices, TemplateBody).Count == 0;
     public event Action<AgencyReleaseResult>? FileReady;
+    public event Action<IReadOnlyList<DocumentArtifactDto>>? ArtifactsChanged;
     public Func<Task<(string Hash, long Length)?>>? ChooseVerificationFileAsync { get; set; }
 
     partial void OnIsBusyChanged(bool value)
@@ -151,7 +152,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
     {
         if (applyingCycle) return;
         // A cycle chosen outside the stepper (tests, other workspaces) loads that year.
-        requests.Invalidate(); status = null; Artifacts.Clear(); IsBusy = false;
+        requests.Invalidate(); status = null; Artifacts.Clear(); ArtifactsChanged?.Invoke([]); IsBusy = false;
         Signatures?.SetContext(person?.Id ?? 0, []);
         ClearDocumentInputs();
         Reminder = ""; WindowDescription = ""; Message = "";
@@ -213,6 +214,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
     public void SetPerson(Person? selected)
     {
         requests.Invalidate(); person = selected; status = null; Artifacts.Clear();
+        ArtifactsChanged?.Invoke([]);
         Signatures?.SetContext(selected?.Id ?? 0, []);
         IsBusy = false; ClearDocumentInputs();
         Message = ""; Reminder = ""; WindowDescription = "";
@@ -283,7 +285,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
         applyingCycle = true;
         try { CycleStart = cycle; SelectedYearIndex = IndexOf(cycle); }
         finally { applyingCycle = false; }
-        status = null; Artifacts.Clear(); ClearDocumentInputs();
+        status = null; Artifacts.Clear(); ArtifactsChanged?.Invoke([]); ClearDocumentInputs();
         RebuildOverview(); NotifyYear();
         var result = await service.GetStatusAsync(id, cycle);
         if (requests.IsCurrent(ticket)) { Apply(result); Message = ""; }
@@ -292,6 +294,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
     private void Apply(AnnualDocumentsStatusDto value)
     {
         status = value; Artifacts.Clear(); foreach (var artifact in value.Artifacts) Artifacts.Add(artifact);
+        ArtifactsChanged?.Invoke(value.Artifacts);
         Signatures?.SetContext(person?.Id ?? 0, value.Artifacts);
         WindowDescription = value.Window.IsOpen ? $"Packet available through {value.Window.EndsOn:d}." : $"Packet opens {value.Window.OpensOn:d}.";
         Reminder = value.Reminder; RebuildOverview(); NotifyState(); NotifyYear();
@@ -425,6 +428,7 @@ public partial class AnnualDocumentsViewModel(IAnnualDocumentService service, ID
     }
     [RelayCommand] private Task ReloadAsync() => Run((_, cycle) =>
         Task.FromResult<string?>(null));
+    public Task RefreshCurrentAsync() => Run((_, _) => Task.FromResult<string?>(null));
     [RelayCommand] private Task GenerateNoticeAsync()
     {
         var ticket = 0;

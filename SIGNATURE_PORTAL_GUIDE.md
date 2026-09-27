@@ -16,10 +16,24 @@ are explained in [SIGNATURE_PORTAL_REVIEW.md](SIGNATURE_PORTAL_REVIEW.md).
 
 ## 1. What a person should experience
 
-For the initial test, an authorized staff member uses **Annual Documents** for a consumer that was
-explicitly marked as fictional test data when created. Generate and save the complete PDF first,
-then select that exact file when retaining it for signing. If the saved original is missing,
-generate and review a new version. Sati will not reconstruct an older original from today's profile.
+For the initial test, an authorized staff member uses **Annual Forms → Releases** for a consumer
+that was explicitly marked as fictional test data when created. Choose the exact recipient's
+**Prepare for delivery** action. The release list slides away and the editable release enters from
+the right. **Save draft** records an incomplete Generated artifact and keeps the editor open;
+**Prepare final PDF** requires every field, records the current Prepared artifact, saves the PDF,
+and returns to the recipient cards. If the saved original is missing, generate and review a new
+version. Sati will not reconstruct an older original from today's profile.
+
+External signing remains the default. For wet ink or an agency-approved third-party service, obtain
+the returned signed PDF and upload it under **Sign and complete** with the required staff
+verification. Sati labels that evidence “Externally signed — staff verified”; it does not claim to
+validate a third party's cryptography.
+
+When the agency and environment have both enabled Sati-hosted signing, select the Prepared artifact
+under **Sati-hosted electronic signature**. Confirm it is complete, choose the exact saved PDF so
+Sati can retain and hash-match it, select the current signer, confirm identity and email, establish
+the separate signing code, and choose **Send secure signature link**. The button remains unavailable
+until the exact PDF has been retained.
 
 Select the consumer, guardian, or authorized representative from the current record. Confirm the
 displayed name and email, record the representative's authority where needed, and establish a
@@ -30,8 +44,9 @@ verifying identity and issuing a new link with a different code. A completed sig
 reopened or replaced to recover copy access; staff verify identity and arrange an approved copy.
 The old code is never revealed or unlocked.
 
-The feature, automatic copy preparation, and email delivery are separate settings and begin
-disabled. Enabling the test screen alone does not configure hosting or send invitations. The
+The environment feature, agency opt-in, automatic copy preparation, and email delivery are
+separate settings and begin disabled. Enabling the agency setting alone does not configure hosting
+or send invitations. The
 person performing setup should follow [the setup instructions](Sati.Portal/README.md). Email tests
 are limited to exact approved test addresses. No emails were sent while building this feature.
 

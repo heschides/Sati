@@ -2,6 +2,7 @@ using System.Data;
 using System.Net.Mail;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Sati.Api.Data;
@@ -9,6 +10,7 @@ using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Signatures;
+using Sati.Models;
 
 namespace Sati.Api.Endpoints;
 
@@ -16,16 +18,31 @@ internal static partial class ApiEndpoints
 {
     private static void MapSignatures(RouteGroupBuilder api)
     {
-        api.MapGet("/signatures/availability", (SignatureFeature feature, SignatureOptions options, HttpContext context) =>
+        api.MapGet("/signatures/availability", async (SignatureFeature feature, SignatureOptions options,
+            ISignatureBlobStore blobs,
+            ClaimsPrincipal principal, ApiDbContext db, HttpContext context, CancellationToken ct) =>
         {
             PreventSensitiveResponseCaching(context);
-            return Results.Ok(new SignatureAvailabilityDto(feature.Enabled,
-                feature.Enabled ? "Electronic signing is for consumers explicitly marked as Test when created. Use only fictional records; do not relabel an existing real consumer. Delivery remains controlled by this environment."
-                    : "Electronic signing is unavailable in this environment. Continue with the paper or assisted process.",
-                feature.Enabled && options.EmailEnabled ? "RestrictedTestRecipients" : "Suppressed"));
+            var actor = Actor.From(principal);
+            var agencyEnabled = await db.Settings.AsNoTracking().AnyAsync(
+                settings => settings.AgencyId == actor.AgencyId &&
+                            settings.IsInternalElectronicSignatureEnabled, ct);
+            var enabled = feature.Enabled && agencyEnabled;
+            var explanation = !feature.Enabled
+                ? "Sati-hosted signing is unavailable in this environment. Continue with the external signing process."
+                : !agencyEnabled
+                    ? "Your agency has not enabled Sati-hosted signing. Continue with the external signing process."
+                    : "Sati-hosted signing is enabled only for consumers explicitly marked as Test. Use fictional records only; delivery remains controlled by this environment.";
+            return Results.Ok(new SignatureAvailabilityDto(enabled, explanation,
+                enabled && options.EmailEnabled ? "RestrictedTestRecipients" : "Suppressed",
+                feature.Enabled, agencyEnabled,
+                blobs is not UnconfiguredSignatureBlobStore));
         });
         api.MapGet("/signatures/catalog", (HttpContext context) =>
         { PreventSensitiveResponseCaching(context); return Results.Ok(SignatureMeaningCatalog.All); });
+        api.MapGet("/people/{personId:int}/external-signatures", ListExternalSignatures);
+        api.MapPost("/people/{personId:int}/external-signatures", RecordExternalSignature);
+        api.MapGet("/external-signatures/{evidenceId:int}/signed.pdf", DownloadExternalSignature);
         var signatures = api.MapGroup("").AddEndpointFilter<SignatureEnabledFilter>();
         signatures.MapGet("/people/{personId:int}/signature-signers", GetSignatureSigners);
         signatures.MapGet("/people/{personId:int}/signature-requests", ListSignatureRequests);
@@ -37,6 +54,164 @@ internal static partial class ApiEndpoints
         signatures.MapGet("/signature-requests/{requestId:int}/original.pdf", DownloadOriginalSignatureDocument);
         signatures.MapGet("/signature-requests/{requestId:int}/signed.pdf", DownloadSignedSignatureDocument);
     }
+
+    private static async Task<IResult> ListExternalSignatures(
+        int personId, ClaimsPrincipal principal, ApiDbContext db, HttpContext context,
+        CancellationToken ct)
+    {
+        PreventSensitiveResponseCaching(context);
+        var actor = Actor.From(principal);
+        if (await AccessibleSafetyPerson(db, actor, personId, ct) is null)
+            return Results.NotFound();
+        var rows = await db.ExternalSignatureEvidence.AsNoTracking()
+            .Where(x => x.AgencyId == actor.AgencyId && x.PersonId == personId)
+            .OrderByDescending(x => x.AttestedAtUtc)
+            .Select(x => ToExternalSignatureDto(x))
+            .ToListAsync(ct);
+        return Results.Ok(rows);
+    }
+
+    private static async Task<IResult> RecordExternalSignature(
+        int personId, RecordExternalSignatureRequest input, ClaimsPrincipal principal,
+        ApiDbContext db, ISignatureBlobStore blobs, ApiClock clock, AuditTrail audit,
+        CancellationToken ct)
+    {
+        var actor = Actor.From(principal);
+        if (personId != input.PersonId ||
+            await AccessibleSafetyPerson(db, actor, personId, ct) is not { } person)
+            return Results.NotFound();
+
+        var existing = await db.ExternalSignatureEvidence.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.AgencyId == actor.AgencyId &&
+                                       x.ClientRequestId == input.ClientRequestId, ct);
+        if (existing is not null)
+            return Results.Ok(ToExternalSignatureDto(existing));
+
+        var pdfError = ExternalSignatureRules.ValidatePdf(input.Pdf);
+        if (pdfError is not null)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["pdf"] = [pdfError] });
+        if (input.SignedOn.Date > clock.Today)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["signedOn"] = ["The signing date cannot be in the future."] });
+        if (string.IsNullOrWhiteSpace(input.SignerName) || input.SignerName.Trim().Length > 120)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["signerName"] = ["Enter the signer's name (120 characters or fewer)."] });
+        if (!ReleaseSigningRules.CanSign(person.HasGuardian, input.SignerCapacity))
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["signerCapacity"] = [person.HasGuardian
+                ? "The active guardian must sign this release."
+                : "The consumer must sign this release."] });
+        var signerMatchesRecord = input.SignerCapacity == SignerCapacity.Consumer
+            ? SignatureRules.NamesMatch(
+                SigningName(person.FirstName, person.LastName), input.SignerName)
+            : (await db.PersonContacts.AsNoTracking()
+                .Where(x => x.PersonId == personId && x.IsActive && x.Kind == "Guardian")
+                .Select(x => new { x.FirstName, x.LastName })
+                .ToListAsync(ct))
+                .Any(x => SignatureRules.NamesMatch(
+                    SigningName(x.FirstName, x.LastName), input.SignerName));
+        if (!signerMatchesRecord)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["signerName"] = ["The signer name and capacity must match the current consumer or guardian record."] });
+        if (!input.DocumentReviewed || !input.IdentityAndAuthorityVerified ||
+            !input.SignaturesAndDatesComplete)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["attestation"] = ["All external-signature verification statements must be affirmed."] });
+        var note = input.VerificationNote?.Trim();
+        if (note?.Length > ExternalSignatureRules.MaximumNoteLength)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["verificationNote"] = ["The verification note cannot exceed 1,000 characters."] });
+
+        try
+        {
+            using var stream = new MemoryStream(input.Pdf, writable: false);
+            using var document = PdfSharp.Pdf.IO.PdfReader.Open(
+                stream, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            if (document.PageCount == 0)
+                throw new InvalidDataException();
+        }
+        catch
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["pdf"] = ["The uploaded PDF is damaged, encrypted, or cannot be safely read."] });
+        }
+
+        var artifact = await db.DocumentArtifacts.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.Id == input.DocumentArtifactId && x.AgencyId == actor.AgencyId &&
+            x.PersonId == personId && x.SupersededByArtifactId == null &&
+            x.Origin == nameof(DocumentArtifactOrigin.GeneratedInSati), ct);
+        if (artifact is null || artifact.ReleaseObligationId is not long obligationId ||
+            artifact.BlankFieldsJson != "[]" ||
+            artifact.Kind is not (nameof(AnnualDocumentKind.ReleaseAgency) or
+                                  nameof(AnnualDocumentKind.ReleaseMedical) or
+                                  nameof(AnnualDocumentKind.ReleaseDhhs)))
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["documentArtifactId"] = ["Choose a complete, current Sati-generated release linked to one recipient obligation."] });
+
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var obligation = await db.ReleaseObligations.Include(x => x.Attestations)
+            .Include(x => x.AuthorizationEvents).SingleOrDefaultAsync(x =>
+                x.Id == obligationId && x.AgencyId == actor.AgencyId &&
+                x.PersonId == personId && x.TargetEffectiveDate == artifact.CycleStart, ct);
+        if (obligation is null)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["documentArtifactId"] = ["The document's recipient obligation is no longer available."] });
+
+        var hash = Convert.ToHexString(SHA256.HashData(input.Pdf));
+        var blobPath = $"external/{actor.AgencyId}/{personId}/{artifact.Id}/{input.ClientRequestId:N}.pdf";
+        await blobs.WriteOnceAsync(blobPath, input.Pdf, ct);
+        var recordedAt = clock.UtcNow.UtcDateTime;
+        var evidence = new ExternalSignatureEvidence
+        {
+            ClientRequestId = input.ClientRequestId,
+            AgencyId = actor.AgencyId,
+            PersonId = personId,
+            DocumentArtifactId = artifact.Id,
+            ReleaseObligationId = obligation.Id,
+            Method = input.Method.ToString(),
+            SignedOn = input.SignedOn.Date,
+            SignerName = input.SignerName.Trim(),
+            SignerCapacity = input.SignerCapacity.ToString(),
+            AttestedByUserId = actor.UserId,
+            AttestedAtUtc = recordedAt,
+            AttestationText = ExternalSignatureRules.AttestationText,
+            BlobPath = blobPath,
+            ContentSha256 = hash,
+            ByteCount = input.Pdf.LongLength,
+            VerificationNote = string.IsNullOrWhiteSpace(note) ? null : note
+        };
+        db.ExternalSignatureEvidence.Add(evidence);
+        await db.SaveChangesAsync(ct);
+
+        if (obligation.CompletedOn is null)
+        {
+            obligation.AttestManually(input.SignedOn, clock.Today,
+                actor.UserId == person.UserId ? AttestationActorKind.CaseManager : AttestationActorKind.Supervisor,
+                actor.UserId, recordedAt,
+                $"Externally signed PDF evidence {evidence.Id}; staff identity, authority, and completeness verification recorded.");
+        }
+        audit.Record(actor, "signature.external-verified", "ExternalSignatureEvidence", evidence.Id,
+            JsonSerializer.Serialize(new { artifactId = artifact.Id, obligationId, method = input.Method.ToString(), hash, byteCount = input.Pdf.LongLength }));
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return Results.Ok(ToExternalSignatureDto(evidence));
+    }
+
+    private static async Task<IResult> DownloadExternalSignature(
+        int evidenceId, ClaimsPrincipal principal, ApiDbContext db,
+        ISignatureBlobStore blobs, AuditTrail audit, HttpContext context, CancellationToken ct)
+    {
+        PreventSensitiveResponseCaching(context);
+        var actor = Actor.From(principal);
+        var evidence = await db.ExternalSignatureEvidence.AsNoTracking().SingleOrDefaultAsync(
+            x => x.Id == evidenceId && x.AgencyId == actor.AgencyId, ct);
+        if (evidence is null ||
+            await AccessibleSafetyPerson(db, actor, evidence.PersonId, ct) is null)
+            return Results.NotFound();
+        var bytes = await blobs.ReadAsync(evidence.BlobPath, ct);
+        if (!CryptographicOperations.FixedTimeEquals(
+                SHA256.HashData(bytes), Convert.FromHexString(evidence.ContentSha256)))
+            throw new SignatureWorkflowException("external_signature_integrity", "The retained signed copy failed its integrity check.", 503);
+        audit.Record(actor, "signature.external-document-released", "ExternalSignatureEvidence", evidence.Id);
+        await db.SaveChangesAsync(ct);
+        return Results.File(bytes, "application/pdf", $"Externally-signed-release-{evidence.Id}.pdf");
+    }
+
+    private static ExternalSignatureEvidenceDto ToExternalSignatureDto(ExternalSignatureEvidence x) => new(
+        x.Id, x.PersonId, x.DocumentArtifactId, x.ReleaseObligationId, x.Method,
+        x.SignedOn, x.SignerName, x.SignerCapacity, x.AttestedByUserId,
+        x.AttestedAtUtc, x.ContentSha256, x.ByteCount, x.VerificationNote);
 
     private static Task<IResult> SignatureTransaction(ApiDbContext db, Func<Task<IResult>> operation, CancellationToken ct) =>
         new SignatureStaffSingleAttempt(db).ExecuteAsync(async () =>

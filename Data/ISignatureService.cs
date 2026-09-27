@@ -14,4 +14,8 @@ public interface ISignatureService
     Task<SignatureRequestDto> WithdrawAuthorizationAsync(int requestId, SignatureReasonRequest request);
     Task<AgencyReleaseResult> GetOriginalAsync(int requestId);
     Task<AgencyReleaseResult> GetSignedAsync(int requestId);
+    Task<IReadOnlyList<ExternalSignatureEvidenceDto>> GetExternalSignaturesAsync(int personId);
+    Task<ExternalSignatureEvidenceDto> RecordExternalSignatureAsync(
+        int personId, RecordExternalSignatureRequest request);
+    Task<AgencyReleaseResult> GetExternalSignedAsync(int evidenceId);
 }

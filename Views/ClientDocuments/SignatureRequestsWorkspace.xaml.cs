@@ -13,10 +13,10 @@ public partial class SignatureRequestsWorkspace : UserControl
     private void OnContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (e.OldValue is SignatureRequestsViewModel old)
-        { old.SetActive(false); old.FileReady -= Save; old.ClearSensitiveInputs -= ClearPins; old.ChooseFreezePdfAsync = null; }
+        { old.SetActive(false); old.FileReady -= Save; old.ClearSensitiveInputs -= ClearPins; old.ChooseFreezePdfAsync = null; old.ChooseExternalSignedPdfAsync = null; }
         ClearPins();
         if (e.NewValue is SignatureRequestsViewModel current)
-        { current.FileReady += Save; current.ClearSensitiveInputs += ClearPins; current.ChooseFreezePdfAsync = ChoosePdf; current.SetActive(IsLoaded); }
+        { current.FileReady += Save; current.ClearSensitiveInputs += ClearPins; current.ChooseFreezePdfAsync = ChoosePdf; current.ChooseExternalSignedPdfAsync = ChooseExternalPdf; current.SetActive(IsLoaded); }
     }
     private void OnLoaded(object sender, RoutedEventArgs e) { if (DataContext is SignatureRequestsViewModel vm) vm.SetActive(true); }
     private void OnUnloaded(object sender, RoutedEventArgs e) { if (DataContext is SignatureRequestsViewModel vm) vm.SetActive(false); ClearPins(); }
@@ -39,6 +39,18 @@ public partial class SignatureRequestsWorkspace : UserControl
             var bytes = new byte[checked((int)stream.Length)]; await stream.ReadExactlyAsync(bytes); return bytes;
         }
         catch (Exception) { MessageBox.Show("The PDF could not be read."); return null; }
+    }
+    private async Task<byte[]?> ChooseExternalPdf()
+    {
+        var dialog = new OpenFileDialog { Title = "Choose the returned signed PDF", Filter = "PDF documents (*.pdf)|*.pdf" };
+        if (dialog.ShowDialog() != true) return null;
+        try
+        {
+            await using var stream = File.OpenRead(dialog.FileName);
+            if (stream.Length is <= 0 or > ExternalSignatureRules.MaximumPdfBytes) { MessageBox.Show("Choose a PDF no larger than 15 MB."); return null; }
+            var bytes = new byte[checked((int)stream.Length)]; await stream.ReadExactlyAsync(bytes); return bytes;
+        }
+        catch (Exception) { MessageBox.Show("The signed PDF could not be read."); return null; }
     }
     private async void Save(AgencyReleaseResult file)
     {

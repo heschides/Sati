@@ -122,7 +122,8 @@ public sealed class AzureSignatureBlobStore(AzureSignatureTransport transport, S
 
     public async Task WriteOnceAsync(string path, byte[] content, CancellationToken cancellationToken = default)
     {
-        new SignatureFeature(options).RequireEnabled();
+        // Private write-once storage is also used for externally signed PDFs.
+        // Sati-hosted workflow callers enforce SignatureFeature separately.
         if (content is null || content.Length is 0 or > MaximumStoredBytes) throw AzureSignatureTransport.Unavailable();
         var address = BlobAddress(path);
         await RequirePrivateContainerAsync(cancellationToken);
@@ -146,7 +147,8 @@ public sealed class AzureSignatureBlobStore(AzureSignatureTransport transport, S
 
     public async Task<byte[]> ReadAsync(string path, CancellationToken cancellationToken = default)
     {
-        new SignatureFeature(options).RequireEnabled();
+        // Read authorization is owned by the API endpoint/workflow, not by the
+        // agency's optional Sati-hosted-signing switch.
         var address = BlobAddress(path);
         await RequirePrivateContainerAsync(cancellationToken);
         using var request = StorageRequest(HttpMethod.Get, address);

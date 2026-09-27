@@ -6,11 +6,25 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "A visible start and room to come back";
-    public const string ReleaseDate = "September 25, 2026";
+    public const string ReleaseName = "A clear path from release to completion";
+    public const string ReleaseDate = "September 27, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Releases follow a clear, visible path",
+            [
+                "Each agency release now moves through Generated, Prepared, and Completed, so the page shows what has happened and what comes next without treating PDF creation as completion.",
+                "Prepare for delivery opens an editable release panel with a smooth horizontal transition. Back and final preparation return to the obligation without losing the workflow context.",
+                "The optional Sati-hosted signing path will add Delivered only after Sati can prove that it sent the invitation. It remains off unless an agency Admin and the environment both enable it."
+            ]),
+        new(
+            "Externally signed releases keep their evidence together",
+            [
+                "External signing is the default: generate the final PDF, have it signed on paper or through an approved signing service, then upload the exact signed PDF to Sati.",
+                "Completion requires staff to attest to the document, signer identity and authority, and visible signature and date. Sati keeps the signed PDF with an integrity hash and links the evidence only to the selected release obligation.",
+                "Uploading a file does not independently prove that a signature is legally valid. The staff attestation records who reviewed it and what they confirmed."
+            ]),
         new(
             "Sati shows that it is preparing your workspace",
             [

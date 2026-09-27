@@ -307,6 +307,64 @@ public sealed class AgencyReleaseTests
         Assert.Contains("Same Provider (directory #78)", item.AutomationName);
     }
 
+    [Fact]
+    public async Task ReleaseCardOpensExactEditorAndDraftDoesNotCloseIt()
+    {
+        var service = new RecordingAgencyReleaseService();
+        var viewModel = ReadyViewModel(service);
+        var obligation = Obligation(31, Guid.NewGuid(), ReleaseObligationCategory.Agency,
+            "Exact Provider", recipientProviderId: 91);
+        viewModel.SetReleaseObligations([obligation]);
+        var item = new ReleaseObligationItemViewModel(obligation, DateTime.Today);
+
+        viewModel.BeginPreparation(item);
+
+        Assert.True(viewModel.IsEditorOpen);
+        Assert.Equal(item.ObligationId, viewModel.SelectedReleaseObligation?.ObligationId);
+        await viewModel.SaveDraftCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsEditorOpen);
+        Assert.True(service.LastRequest?.IsDraft);
+        Assert.False(service.LastRequest?.ConfirmedObtainedRoi);
+    }
+
+    [Fact]
+    public async Task PreparingFinalCopyRefreshesWorkflowAndClosesEditor()
+    {
+        var service = new RecordingAgencyReleaseService();
+        var viewModel = ReadyViewModel(service);
+        var obligation = Obligation(31, Guid.NewGuid(), ReleaseObligationCategory.Agency,
+            "Exact Provider", recipientProviderId: 92);
+        viewModel.SetReleaseObligations([obligation]);
+        viewModel.BeginPreparation(new ReleaseObligationItemViewModel(obligation, DateTime.Today));
+        var refreshed = 0;
+        viewModel.ReleasePreparedAsync = () => { refreshed++; return Task.CompletedTask; };
+
+        await viewModel.PrepareFinalCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsEditorOpen);
+        Assert.False(service.LastRequest?.IsDraft);
+        Assert.Equal(1, refreshed);
+    }
+
+    [Fact]
+    public void ReleaseCardStageComesFromRetainedArtifactAndCompletionEvidence()
+    {
+        var obligation = Obligation(31, Guid.NewGuid(), ReleaseObligationCategory.Agency,
+            "Exact Provider");
+        var draft = new DocumentArtifactDto(7, 31, 1, nameof(AnnualDocumentKind.ReleaseAgency),
+            DateTime.Today, "Draft", DateTime.UtcNow, 12, "hash", 3, "draft.pdf",
+            ["AuthorizationGranted"], null, ReleaseObligationRecordId: obligation.Id);
+        var item = new ReleaseObligationItemViewModel(obligation, DateTime.Today, draft);
+        Assert.Equal("Generated", item.WorkflowStage);
+
+        item.SetDocumentArtifact(draft with { Id = 8, Origin = "GeneratedInSati", BlankFields = [] });
+        Assert.Equal("Prepared", item.WorkflowStage);
+
+        var completed = new ReleaseObligationItemViewModel(
+            obligation with { CompletedOn = DateTime.Today }, DateTime.Today, draft);
+        Assert.Equal("Completed", completed.WorkflowStage);
+    }
+
     private static AgencyReleaseViewModel ReadyViewModel(IAgencyReleaseService service)
     {
         var viewModel = new AgencyReleaseViewModel(service);
@@ -392,6 +450,7 @@ public sealed class AgencyReleaseTests
         public int GenerationCount { get; private set; }
         public Guid? LastObligationId { get; private set; }
         public AnnualDocumentKind? LastKind { get; private set; }
+        public AgencyReleaseRequest? LastRequest { get; private set; }
 
         public Task<AgencyReleaseResult> GenerateAsync(
             int personId,
@@ -399,6 +458,7 @@ public sealed class AgencyReleaseTests
             CancellationToken cancellationToken = default)
         {
             GenerationCount++;
+            LastRequest = request;
             return Task.FromResult(new AgencyReleaseResult([1, 2, 3], "agency-release.pdf"));
         }
 
@@ -409,6 +469,7 @@ public sealed class AgencyReleaseTests
             CancellationToken cancellationToken = default)
         {
             GenerationCount++;
+            LastRequest = request;
             LastObligationId = releaseObligationId;
             LastKind = AnnualDocumentKind.ReleaseAgency;
             return Task.FromResult(new AgencyReleaseResult([1, 2, 3], "agency-release.pdf"));
@@ -421,6 +482,7 @@ public sealed class AgencyReleaseTests
             CancellationToken cancellationToken = default)
         {
             GenerationCount++;
+            LastRequest = request;
             LastObligationId = releaseObligationId;
             LastKind = AnnualDocumentKind.ReleaseMedical;
             return Task.FromResult(new AgencyReleaseResult([1, 2, 3], "medical-release.pdf"));

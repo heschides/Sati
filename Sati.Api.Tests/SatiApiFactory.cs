@@ -582,14 +582,16 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                     AgencyId = 1,
                     IsComprehensiveAssessmentAuthoringEnabled = true,
                     IsClassificationAuthoringEnabled = true,
-                    IsPersonCenteredPlanAuthoringEnabled = true
+                    IsPersonCenteredPlanAuthoringEnabled = true,
+                    IsInternalElectronicSignatureEnabled = true
                 },
                 new ServerSettings
                 {
                     AgencyId = 2,
                     IsComprehensiveAssessmentAuthoringEnabled = true,
                     IsClassificationAuthoringEnabled = true,
-                    IsPersonCenteredPlanAuthoringEnabled = true
+                    IsPersonCenteredPlanAuthoringEnabled = true,
+                    IsInternalElectronicSignatureEnabled = true
                 });
             db.Users.AddRange(
                 CreateUser(verifier, 11, "admin-one", "Admin", 1),
@@ -1388,6 +1390,24 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
         await db.DocumentArtifacts
             .Where(artifact => artifact.PersonId == personId && artifact.Kind == kind.ToString())
+            .ExecuteDeleteAsync();
+    }
+
+    public async Task DeleteExternalSignatureEvidenceAsync(int personId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+        var obligationIds = await db.ExternalSignatureEvidence
+            .Where(x => x.PersonId == personId)
+            .Select(x => x.ReleaseObligationId)
+            .Distinct()
+            .ToListAsync();
+        await db.ExternalSignatureEvidence.Where(x => x.PersonId == personId)
+            .ExecuteDeleteAsync();
+        await db.ReleaseObligationAttestations
+            .Where(x => obligationIds.Contains(x.ReleaseObligationId) &&
+                        x.Reason != null &&
+                        x.Reason.StartsWith("Externally signed PDF evidence"))
             .ExecuteDeleteAsync();
     }
 

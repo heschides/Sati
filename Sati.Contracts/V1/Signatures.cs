@@ -6,6 +6,7 @@ public enum SignerCapacity { Consumer, Guardian, AuthorizedRepresentative }
 public enum SignatureMeaning { Authorization, ReceiptAcknowledgment, PlanAgreement, None }
 public enum SignaturePolicyStatus { SyntheticTestingOnly, PendingProgramConfirmation, NotSignable }
 public enum SignatureComplianceProjectionOutcome { Applied, AlreadySatisfied }
+public enum ExternalSignatureMethod { WetInk, ThirdPartyElectronic }
 
 public static class SignatureComplianceTargets
 {
@@ -111,7 +112,60 @@ public static class SignatureRules
         .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }
 
-public sealed record SignatureAvailabilityDto(bool Enabled, string Explanation, string DeliveryMode);
+public static class ExternalSignatureRules
+{
+    public const int MaximumPdfBytes = 15 * 1024 * 1024;
+    public const int MaximumNoteLength = 1_000;
+    public const string AttestationText =
+        "I reviewed the returned PDF, confirmed that it is the signed version of the selected document, verified the signer's identity and authority through the agency's approved process, and confirmed that the required signatures and dates are complete.";
+
+    public static string? ValidatePdf(byte[]? pdf)
+    {
+        if (pdf is null || pdf.Length == 0) return "Choose the returned signed PDF.";
+        if (pdf.Length > MaximumPdfBytes) return "The signed PDF cannot exceed 15 MB.";
+        return pdf.Length < 5 || pdf[0] != (byte)'%' || pdf[1] != (byte)'P' ||
+               pdf[2] != (byte)'D' || pdf[3] != (byte)'F' || pdf[4] != (byte)'-'
+            ? "The uploaded file is not a PDF."
+            : null;
+    }
+}
+
+public sealed record RecordExternalSignatureRequest(
+    Guid ClientRequestId,
+    int PersonId,
+    int DocumentArtifactId,
+    byte[] Pdf,
+    ExternalSignatureMethod Method,
+    DateTime SignedOn,
+    string SignerName,
+    SignerCapacity SignerCapacity,
+    bool DocumentReviewed,
+    bool IdentityAndAuthorityVerified,
+    bool SignaturesAndDatesComplete,
+    string? VerificationNote = null);
+
+public sealed record ExternalSignatureEvidenceDto(
+    int Id,
+    int PersonId,
+    int DocumentArtifactId,
+    long ReleaseObligationId,
+    string Method,
+    DateTime SignedOn,
+    string SignerName,
+    string SignerCapacity,
+    int AttestedByUserId,
+    DateTime AttestedAtUtc,
+    string ContentSha256,
+    long ByteCount,
+    string? VerificationNote);
+
+public sealed record SignatureAvailabilityDto(
+    bool Enabled,
+    string Explanation,
+    string DeliveryMode,
+    bool PlatformEnabled = false,
+    bool AgencyEnabled = false,
+    bool ExternalUploadEnabled = false);
 public sealed record SignatureSignerDto(SignerCapacity Capacity, int? ContactId, string Name, string? Email);
 public sealed record FreezeSignatureDocumentRequest(Guid ClientRequestId, byte[] Pdf, bool CompletenessReviewed);
 public sealed record FrozenSignatureDocumentDto(int Id, int DocumentArtifactId, string ContentSha256,

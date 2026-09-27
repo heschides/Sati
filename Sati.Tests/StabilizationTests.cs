@@ -649,10 +649,18 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.28", version);
+        Assert.Equal("1.3.29", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("A visible start and room to come back", ProductReleaseNotes.ReleaseName);
-        Assert.Equal("September 25, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Equal("A clear path from release to completion", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("September 27, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Releases follow a clear, visible path" &&
+            section.Items.Any(item => item.Contains("Generated, Prepared, and Completed", StringComparison.Ordinal)) &&
+            section.Items.Any(item => item.Contains("remains off", StringComparison.OrdinalIgnoreCase)));
+        Assert.Contains(ProductReleaseNotes.Sections, section =>
+            section.Title == "Externally signed releases keep their evidence together" &&
+            section.Items.Any(item => item.Contains("External signing is the default", StringComparison.Ordinal)) &&
+            section.Items.Any(item => item.Contains("does not independently prove", StringComparison.OrdinalIgnoreCase)));
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Sati shows that it is preparing your workspace" &&
             section.Items.Any(item => item.Contains("We are preparing the Sati workspace.", StringComparison.Ordinal)));

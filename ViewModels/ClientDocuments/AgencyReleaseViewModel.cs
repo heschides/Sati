@@ -140,6 +140,9 @@ public partial class AgencyReleaseViewModel : ObservableObject
     [ObservableProperty]
     private string statusMessage = string.Empty;
 
+    [ObservableProperty]
+    private bool isEditorOpen;
+
     public bool HasPerson => _personId.HasValue;
     public bool CanGenerate => HasPerson && !IsBusy;
     public bool HasReleaseObligationChoices => ReleaseObligationChoices.Count != 0;
@@ -174,10 +177,13 @@ public partial class AgencyReleaseViewModel : ObservableObject
     public event EventHandler<AgencyReleasePdfReadyEventArgs>? PdfReady;
     public event EventHandler<AgencyReleaseProblemEventArgs>? Problem;
     public event Func<AgencyReleaseAttestationEventArgs, bool>? AttestationRequested;
+    public Func<Task>? ReleasePreparedAsync { get; set; }
 
     partial void OnIsBusyChanged(bool value)
     {
         GenerateCommand.NotifyCanExecuteChanged();
+        SaveDraftCommand.NotifyCanExecuteChanged();
+        PrepareFinalCommand.NotifyCanExecuteChanged();
         ClearCommand.NotifyCanExecuteChanged();
     }
 
@@ -230,10 +236,34 @@ public partial class AgencyReleaseViewModel : ObservableObject
         PersonName = person?.FullName ?? "Select a consumer";
         _knownReleaseObligations.Clear();
         ResetInputs();
+        IsEditorOpen = false;
         RebuildReleaseObligationChoices();
         OnPropertyChanged(nameof(HasPerson));
         OnPropertyChanged(nameof(CanGenerate));
         GenerateCommand.NotifyCanExecuteChanged();
+    }
+
+    public void BeginPreparation(ReleaseObligationItemViewModel item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        if (!item.CanPrepare)
+            return;
+        var kind = item.Category == nameof(ReleaseObligationCategory.Medical)
+            ? AnnualDocumentKind.ReleaseMedical
+            : item.Category == nameof(ReleaseObligationCategory.Agency)
+                ? AnnualDocumentKind.ReleaseAgency
+                : throw new InvalidOperationException("Use DHHS Documents for the state release.");
+        SelectedReleaseKind = ReleaseKindChoices.Single(choice => choice.Kind == kind);
+        SelectedReleaseObligation = ReleaseObligationChoices.SingleOrDefault(
+            choice => choice.ObligationId == item.ObligationId);
+        if (SelectedReleaseObligation is null)
+        {
+            StatusMessage = "The selected recipient obligation changed. Reload the release list before preparing it.";
+            return;
+        }
+        ValidationMessage = string.Empty;
+        StatusMessage = "Complete the release, save a draft if needed, then prepare the final signing copy.";
+        IsEditorOpen = true;
     }
 
     /// <summary>
@@ -256,12 +286,33 @@ public partial class AgencyReleaseViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
-    private async Task GenerateAsync()
+    private Task GenerateAsync() => GenerateCoreAsync(BuildRequest(), closeEditorWhenPrepared: false);
+
+    [RelayCommand(CanExecute = nameof(CanGenerate))]
+    private Task SaveDraftAsync()
+    {
+        var request = BuildRequest() with
+        {
+            ConfirmedObtainedRoi = false,
+            IsDraft = true
+        };
+        return GenerateCoreAsync(request, closeEditorWhenPrepared: false);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanGenerate))]
+    private Task PrepareFinalAsync() =>
+        GenerateCoreAsync(BuildRequest() with { IsDraft = false }, closeEditorWhenPrepared: true);
+
+    [RelayCommand]
+    private void CloseEditor() => IsEditorOpen = false;
+
+    private async Task GenerateCoreAsync(
+        AgencyReleaseRequest request,
+        bool closeEditorWhenPrepared)
     {
         if (_personId is not int personId)
             return;
 
-        var request = BuildRequest();
         var errors = AgencyReleaseRules.Validate(request);
         if (errors.Count > 0)
         {
@@ -289,7 +340,9 @@ public partial class AgencyReleaseViewModel : ObservableObject
         ValidationMessage = string.Empty;
         var documentName = DocumentName;
         var selectedObligation = SelectedReleaseObligation;
-        StatusMessage = $"Preparing the Sati {documentName}...";
+        StatusMessage = request.IsDraft
+            ? $"Saving the Sati {documentName} draft..."
+            : $"Preparing the final Sati {documentName}...";
         try
         {
             var result = (SelectedReleaseKind.Kind, selectedObligation) switch
@@ -315,6 +368,18 @@ public partial class AgencyReleaseViewModel : ObservableObject
                 : $"The {documentName} draft is ready to save. No staff generation confirmation was recorded.") +
                 linkageMessage;
             PdfReady?.Invoke(this, new AgencyReleasePdfReadyEventArgs(result.Pdf, result.FileName));
+            if (!request.IsDraft && closeEditorWhenPrepared)
+                IsEditorOpen = false;
+            if (ReleasePreparedAsync is not null)
+            {
+                try { await ReleasePreparedAsync(); }
+                catch
+                {
+                    StatusMessage = request.IsDraft
+                        ? $"The {documentName} draft was saved, but the release list could not be refreshed. Reload the page to see its current status."
+                        : $"The {documentName} was prepared, but the release list could not be refreshed. Reload the page to see its current status.";
+                }
+            }
         }
         catch (Exception ex)
         {

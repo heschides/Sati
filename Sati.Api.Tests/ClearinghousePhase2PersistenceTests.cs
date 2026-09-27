@@ -228,9 +228,13 @@ public sealed class ClearinghousePhase2PersistenceTests
         using var db = new SatiContext(new DbContextOptionsBuilder<SatiContext>()
             .UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=SatiMigrationScriptOnly;Integrated Security=true")
             .Options);
-        var migrationId = db.Database.GetMigrations().Last();
+        var migrations = db.Database.GetMigrations().ToList();
+        var migrationId = Assert.Single(migrations,
+            id => id.EndsWith("AddClearinghouseDispatchFoundation", StringComparison.Ordinal));
         Assert.EndsWith("AddClearinghouseDispatchFoundation", migrationId);
-        var previousId = db.Database.GetMigrations().Reverse().Skip(1).First();
+        var migrationIndex = migrations.IndexOf(migrationId);
+        Assert.True(migrationIndex > 0);
+        var previousId = migrations[migrationIndex - 1];
         var rollback = db.GetService<IMigrator>().GenerateScript(migrationId, previousId);
         Assert.Contains("ClearinghouseDispatchAttempts", rollback);
         Assert.Contains("prevents rollback", rollback);

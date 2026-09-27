@@ -68,19 +68,23 @@ public sealed class AnnualDocumentViewRenderTests
                 .Where(picker => AutomationProperties.GetName(picker) == "Annual forms service year beginning"));
             Assert.DoesNotContain(buttons, x => Equals(x.Content, "View selected year"));
             Assert.DoesNotContain(WpfUiHarness.Descendants(view).OfType<TextBlock>(), text => Equals(text.Text, "NEXT STEP"));
-            // Document records, verification, and signatures remain, collapsed.
-            var records = WpfUiHarness.FindByAutomationName<Expander>(view, "Document records, verification, and signatures");
+            // Document records and verification remain collapsed; release delivery now lives in Releases.
+            var records = WpfUiHarness.FindByAutomationName<Expander>(view, "Document records and verification");
             Assert.NotNull(records);
             Assert.False(records!.IsExpanded);
             records.IsExpanded = true;
             view.UpdateLayout();
             buttons = WpfUiHarness.Descendants(view).OfType<Button>().ToList();
-            Assert.Contains(buttons, button => Equals(button.Content, "Submit to consumer or guardian for review"));
             Assert.Same(model.VerifyCommand, buttons.Single(x => Equals(x.Content, "Choose file and verify")).Command);
             SavePreview(view, "annual-overview.png");
 
             var sections = WpfUiHarness.FindByAutomationName<TabControl>(view, "Annual forms sections");
             Assert.NotNull(sections);
+            sections!.SelectedIndex = (int)AnnualFormsSection.Releases;
+            view.UpdateLayout();
+            buttons = WpfUiHarness.Descendants(view).OfType<Button>().ToList();
+            Assert.Contains(buttons, button => Equals(button.Content, "Send secure signature link"));
+
             sections!.SelectedIndex = (int)AnnualFormsSection.PrivacyPractices;
             view.UpdateLayout();
             buttons = WpfUiHarness.Descendants(view).OfType<Button>().ToList();

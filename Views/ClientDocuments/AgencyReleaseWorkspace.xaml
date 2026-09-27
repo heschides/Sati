@@ -51,7 +51,7 @@
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource TextSecondaryBrush}" />
                     <TextBlock Margin="0,6,0,0"
-                               Text="This screen collects the release information; it is not a document preview. Generate and save the PDF before reviewing or signing it."
+                               Text="Edit the release information here. Save a draft at any time, or prepare the final PDF when every required field is complete."
                                TextWrapping="Wrap"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -322,11 +322,11 @@
                                 Background="{DynamicResource PersonGroupAltBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                             <StackPanel>
-                                <CheckBox Content="I prepared this release from the authorization provided and want to attach my staff generation confirmation"
+                                <CheckBox Content="Attach my optional staff preparation confirmation to the final document record"
                                           IsChecked="{Binding DidObtainRoi}" FontWeight="SemiBold"
                                           AutomationProperties.Name="Attach staff generation confirmation" />
                                 <TextBlock Margin="24,5,0,0" TextWrapping="Wrap"
-                                           Text="If unchecked, Sati generates a draft. If checked, Sati records the authenticated user and generation time. This does not sign for the consumer or guardian and does not complete the tracked release obligation; record completion separately in Recipient-specific releases."
+                                           Text="This records the authenticated user and preparation time. It does not sign for the consumer or guardian and does not complete the tracked release obligation."
                                            Foreground="{DynamicResource TextSecondaryBrush}" />
                             </StackPanel>
                         </Border>
@@ -348,12 +348,21 @@
                                  Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Back" Command="{Binding CloseEditorCommand}" Padding="13,7" Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            AutomationProperties.Name="Return to release list" />
                     <Button Content="Clear" Command="{Binding ClearCommand}" Padding="13,7" Margin="0,0,8,0"
                             Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
                             BorderBrush="{DynamicResource BorderBrush}" />
-                    <Button Content="{Binding GenerateButtonText}" Command="{Binding GenerateCommand}"
+                    <Button Content="Save draft" Command="{Binding SaveDraftCommand}"
+                            IsEnabled="{Binding CanGenerate}" Padding="13,7" Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            AutomationProperties.Name="Save release draft PDF" />
+                    <Button Content="Prepare final PDF" Command="{Binding PrepareFinalCommand}"
                             IsEnabled="{Binding CanGenerate}" Padding="16,7" FontWeight="SemiBold"
-                            AutomationProperties.Name="Generate and save agency release PDF" />
+                            AutomationProperties.Name="Prepare final release PDF for signing" />
                 </StackPanel>
             </Grid>
         </Border>

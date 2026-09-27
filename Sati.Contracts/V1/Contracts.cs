@@ -423,7 +423,8 @@ public sealed record SettingsDto(
     bool AllowPastBillingPolicyEffectiveDates = false,
     bool IsComprehensiveAssessmentAuthoringEnabled = false,
     bool IsClassificationAuthoringEnabled = false,
-    bool IsPersonCenteredPlanAuthoringEnabled = false);
+    bool IsPersonCenteredPlanAuthoringEnabled = false,
+    bool IsInternalElectronicSignatureEnabled = false);
 
 /// <summary>
 /// One immutable agency billing-compliance policy version. The numeric id is the

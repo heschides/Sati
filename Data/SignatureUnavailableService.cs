@@ -17,4 +17,11 @@ public sealed class SignatureUnavailableService : ISignatureService
     public Task<SignatureRequestDto> WithdrawAuthorizationAsync(int requestId, SignatureReasonRequest request) => Unavailable<SignatureRequestDto>();
     public Task<AgencyReleaseResult> GetOriginalAsync(int requestId) => Unavailable<AgencyReleaseResult>();
     public Task<AgencyReleaseResult> GetSignedAsync(int requestId) => Unavailable<AgencyReleaseResult>();
+    public Task<IReadOnlyList<ExternalSignatureEvidenceDto>> GetExternalSignaturesAsync(int personId) =>
+        Task.FromResult<IReadOnlyList<ExternalSignatureEvidenceDto>>([]);
+    public Task<ExternalSignatureEvidenceDto> RecordExternalSignatureAsync(
+        int personId, RecordExternalSignatureRequest request) =>
+        Unavailable<ExternalSignatureEvidenceDto>();
+    public Task<AgencyReleaseResult> GetExternalSignedAsync(int evidenceId) =>
+        Unavailable<AgencyReleaseResult>();
 }

@@ -3220,6 +3220,70 @@ after awaited work before evidence or disclosure is committed.
 `SIGNATURE_PORTAL_GUIDE.md`, `Sati.Portal/README.md`, and `SIGNATURE_PORTAL_VALIDATION.md` distinguish
 completed local work from deployment, legal, program, accessibility and operations prerequisites.
 
+## 2026-09-27 — External signing is the default; internal signing is an additive agency opt-in
+
+Release delivery has two parallel paths. External signing is the default: Sati generates the exact
+PDF; the agency obtains wet ink or uses an agency-approved third-party service; staff uploads the
+returned PDF and makes three explicit affirmations covering document identity, signer
+identity/authority, and signature/date completeness. Sati also checks the signer name and capacity
+against the current consumer/guardian record, retains the PDF in private write-once object storage,
+and stores its SHA-256 fingerprint and authenticated attestor. The resulting label is “Externally
+signed — staff verified.” It does not claim native DocuSign integration or cryptographic validation
+of an external provider's envelope.
+
+The evidence is append-only and linked to one current complete generated artifact and one exact
+recipient obligation. It can satisfy only that obligation; it never guesses by category or display
+name. SQL stores metadata, not PDF bytes. A missing private blob configuration fails closed rather
+than falling back to an unprotected workstation copy or database BLOB.
+
+`IsInternalElectronicSignatureEnabled` is an agency setting that defaults false. It adds Sati's
+hosted signer portal without removing external signing. The API still requires its independent
+environment gate, approved catalog purpose, test-consumer restriction, storage, keys, and delivery
+controls. An agency administrator therefore cannot turn an unapproved Production implementation on
+with a settings checkbox.
+
+The shared release path has three observable stages: Generated, Prepared, and Completed. For an
+external document, completion means the signed evidence was retained and staff verified. A
+Delivered stage belongs only to the future internal-signature path, where Sati can record successful
+invitation delivery; it must not be inferred from generation or imposed on external signing.
+
+Preparation starts from one exact recipient card. The card and editor use opposing horizontal
+transitions, while the view model retains the selected obligation and preparation state. The editor
+has separate Save draft and Prepare final PDF actions; an optional staff preparation confirmation no
+longer decides whether the document is a draft. The hosted-signature send action remains a later,
+explicit step and is unavailable until the exact saved PDF has been frozen and verified against the
+current artifact.
+
+For Demo, retained signature documents use the dedicated `satidemosignatures` account and private
+`signature-documents` container. Shared-key and public blob access are disabled; the API's managed
+identity receives a custom role only at that container, with blob read/create/write but no delete
+permission. Blob versioning and version-level immutability capability preserve the basis for a
+later reviewed retention policy. The public storage endpoint remains network-reachable until Demo
+has a private network path, so Entra authorization—not network isolation—is the present access
+boundary. Application writes remain conditional and path-unique; the role by itself cannot express
+create-only access. No retention duration is guessed or locked, and no portal identity, application
+setting, upload path, signing worker, or email path is enabled by provisioning storage.
+
+The Demo signature keys do not share the existing SSN vault or one another. That vault uses legacy
+vault-wide access policies, which cannot express “portal may unwrap the PIN key but not the outbox
+or SSN key.” The PIN and outbox therefore live as RSA-3072 keys in separate, single-purpose vaults.
+Both vaults have purge protection and a 90-day soft-delete recovery window. The API receives only
+wrap/unwrap on both vaults; the stopped portal host's separate system identity receives unwrap-only
+on the PIN vault, no outbox- or SSN-vault policy, and read-only access at the exact signature blob
+container. The signed-in operator retains key lifecycle/recovery permissions but no secret,
+certificate, storage, wrap, or unwrap permission in these vaults. The vault endpoints remain public
+until a private network path exists, with access controlled by Entra-backed vault policies.
+
+Creating the stopped App Service reserves the future portal hostname and establishes the system
+identity expected by the portal code; it is not a portal deployment. Its exact Demo, host, blob,
+versioned PIN-key, and passwordless managed-identity SQL settings are present, but the environment
+and worker gates are explicitly false and no outbox or email setting is allowed. It has no content
+deployment, worker, or mail capability. Its controlled `SatiDemo` database grant
+binds a contained external user to the verified managed-identity client ID. That user belongs only
+to `sati_signature_portal`, has no direct permission beyond required `CONNECT`, and receives the
+reviewed table/view grants and denials from `Grant-SignaturePortal.sql`. Starting or configuring the
+host remains a separate controlled activation step.
+
 ## 2026-09-06 — Team chat is a room dock with open rooms as tabs
 
 The chat workspace was rebuilt as presentation only. No service, contract, authorization, audit or

@@ -13,6 +13,21 @@ in [SIGNATURE_PORTAL_REVIEW.md](SIGNATURE_PORTAL_REVIEW.md), and setup in
 
 ## Final automated verification
 
+### September 27, 2026 release-workflow increment
+
+The recipient-card workflow, animated preparation editor, external signed-PDF evidence path, and
+agency opt-in controls were verified after the original portal review. Focused runs passed **72**
+desktop workflow/render tests, **46** API signature/document-artifact tests, and all **8** public
+portal HTTP security tests. The desktop project and the separate portal host also built
+successfully. `git diff --check` reported only the repository's line-ending notices.
+
+The portal HTTP suite initially returned the portal's deliberate generic 503 response while run in
+a filesystem sandbox that blocked ASP.NET's data-protection key store. The unchanged suite passed
+outside that restriction. This is also an operational requirement: a deployed portal must have a
+protected, persistent antiforgery/data-protection key ring shared only by that environment. No
+schema migration, deployment, cloud resource change, or email send was performed during this
+increment.
+
 The final full solution run in the Release configuration passed:
 
 | Suite | Passed | Failed | Skipped |

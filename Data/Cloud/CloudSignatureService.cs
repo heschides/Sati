@@ -18,4 +18,13 @@ public sealed class CloudSignatureService(CloudApiClient api) : ISignatureServic
         api.PostAsync<SignatureReasonRequest, SignatureRequestDto>($"/api/v1/signature-requests/{requestId}/withdraw-authorization", request);
     public async Task<AgencyReleaseResult> GetOriginalAsync(int requestId) => new(await api.GetBytesAsync($"/api/v1/signature-requests/{requestId}/original.pdf"), $"Signature-{requestId}-original.pdf");
     public async Task<AgencyReleaseResult> GetSignedAsync(int requestId) => new(await api.GetBytesAsync($"/api/v1/signature-requests/{requestId}/signed.pdf"), $"Signature-{requestId}-signed.pdf");
+    public Task<IReadOnlyList<ExternalSignatureEvidenceDto>> GetExternalSignaturesAsync(int personId) =>
+        api.GetAsync<IReadOnlyList<ExternalSignatureEvidenceDto>>($"/api/v1/people/{personId}/external-signatures");
+    public Task<ExternalSignatureEvidenceDto> RecordExternalSignatureAsync(
+        int personId, RecordExternalSignatureRequest request) =>
+        api.PostAsync<RecordExternalSignatureRequest, ExternalSignatureEvidenceDto>(
+            $"/api/v1/people/{personId}/external-signatures", request);
+    public async Task<AgencyReleaseResult> GetExternalSignedAsync(int evidenceId) =>
+        new(await api.GetBytesAsync($"/api/v1/external-signatures/{evidenceId}/signed.pdf"),
+            $"Externally-signed-release-{evidenceId}.pdf");
 }

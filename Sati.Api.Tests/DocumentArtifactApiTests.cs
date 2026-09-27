@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Sati.Api.Data;
 using Sati.Contracts.V1;
 using Xunit;
 
@@ -198,6 +201,113 @@ public sealed class DocumentArtifactApiTests(SatiApiFactory factory)
             if (revoke.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.Conflict))
                 revoke.EnsureSuccessStatusCode();
             await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.ReleaseMedical);
+        }
+    }
+
+    [Fact]
+    public async Task ExternallySignedPdfRequiresStaffVerificationAndCompletesExactObligation()
+    {
+        const int personId = 101;
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        await factory.DeleteExternalSignatureEvidenceAsync(personId);
+        await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.ReleaseAgency);
+        var person = (await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload"))!
+            .Single(candidate => candidate.Id == personId);
+        var target = AnnualDocumentCycle.CurrentStart(person.EffectiveDate!.Value, DateTime.Today);
+        int providerId;
+        int providerLinkId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            providerId = await db.Providers.MaxAsync(x => x.Id) + 1;
+            var provider = new ServerProvider
+            {
+                Id = providerId,
+                AgencyId = 1,
+                Type = "Waiver",
+                Name = "External Signature Test Provider"
+            };
+            var link = new ServerPersonProvider
+            {
+                PersonId = personId,
+                ProviderId = providerId,
+                Role = "Test waiver provider",
+                StartDate = target,
+                AssignmentKnownOn = target
+            };
+            db.Providers.Add(provider);
+            db.PersonProviders.Add(link);
+            await db.SaveChangesAsync();
+            providerLinkId = link.Id;
+        }
+        try
+        {
+            var reconcile = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/release-obligations/reconcile",
+                new ReconcileReleaseObligationsRequest(target));
+            reconcile.EnsureSuccessStatusCode();
+            var status = (await reconcile.Content.ReadFromJsonAsync<ReleaseObligationStatusDto>())!;
+            var obligation = status.Obligations.First(item =>
+                item.Category == nameof(ReleaseObligationCategory.Agency) &&
+                item.RecipientProviderId == providerId &&
+                item.CompletedOn is null);
+
+            var generated = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/documents/{AnnualDocumentKind.ReleaseAgency}",
+                new RenderAnnualDocumentRequest(target, ValidRelease(),
+                    ReleaseObligationId: obligation.ObligationId));
+            generated.EnsureSuccessStatusCode();
+            var pdf = await generated.Content.ReadAsByteArrayAsync();
+            var artifacts = await owner.GetFromJsonAsync<List<DocumentArtifactDto>>(
+                $"/api/v1/people/{personId}/documents?cycleStart={target:yyyy-MM-dd}");
+            var artifact = Assert.Single(artifacts!, item =>
+                item.Kind == nameof(AnnualDocumentKind.ReleaseAgency) &&
+                item.ReleaseObligationRecordId == obligation.Id);
+
+            var incomplete = new RecordExternalSignatureRequest(
+                Guid.NewGuid(), personId, artifact.Id, pdf,
+                ExternalSignatureMethod.WetInk, DateTime.Today,
+                "Person One", SignerCapacity.Consumer,
+                true, true, false, "Reviewed in person.");
+            Assert.Equal(HttpStatusCode.BadRequest,
+                (await owner.PostAsJsonAsync(
+                    $"/api/v1/people/{personId}/external-signatures", incomplete)).StatusCode);
+
+            var request = incomplete with
+            {
+                ClientRequestId = Guid.NewGuid(),
+                SignaturesAndDatesComplete = true
+            };
+            var recorded = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/external-signatures", request);
+            Assert.True(recorded.IsSuccessStatusCode,
+                await recorded.Content.ReadAsStringAsync());
+            var evidence = (await recorded.Content.ReadFromJsonAsync<ExternalSignatureEvidenceDto>())!;
+            Assert.Equal(artifact.Id, evidence.DocumentArtifactId);
+            Assert.Equal(obligation.Id, evidence.ReleaseObligationId);
+
+            var refreshed = await owner.GetFromJsonAsync<ReleaseObligationStatusDto>(
+                $"/api/v1/people/{personId}/release-obligations?targetEffectiveDate={target:yyyy-MM-dd}");
+            Assert.Equal(DateTime.Today,
+                refreshed!.Obligations.Single(x => x.Id == obligation.Id).CompletedOn);
+            var download = await owner.GetByteArrayAsync(
+                $"/api/v1/external-signatures/{evidence.Id}/signed.pdf");
+            Assert.Equal(pdf, download);
+        }
+        finally
+        {
+            await factory.DeleteExternalSignatureEvidenceAsync(personId);
+            await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.ReleaseAgency);
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var obligationIds = await db.ReleaseObligations
+                .Where(x => x.PersonId == personId && x.RecipientProviderId == providerId)
+                .Select(x => x.Id).ToListAsync();
+            await db.ReleaseAuthorizationEvents.Where(x => obligationIds.Contains(x.ReleaseObligationId)).ExecuteDeleteAsync();
+            await db.ReleaseObligationAttestations.Where(x => obligationIds.Contains(x.ReleaseObligationId)).ExecuteDeleteAsync();
+            await db.ReleaseObligations.Where(x => obligationIds.Contains(x.Id)).ExecuteDeleteAsync();
+            await db.PersonProviders.Where(x => x.Id == providerLinkId).ExecuteDeleteAsync();
+            await db.Providers.Where(x => x.Id == providerId).ExecuteDeleteAsync();
         }
     }
 

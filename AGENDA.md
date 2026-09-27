@@ -1,5 +1,108 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.29 — 2026-09-27
+
+“A clear path from release to completion.” Replaces the dense release workspace with a staged
+Generated → Prepared → Completed flow, makes externally signed evidence the default completion
+path, and lays down the separately gated Sati-hosted signature boundary without activating it.
+
+**Migrations 118 and 119 were applied to Demo before this source release.** Migration 118 is the
+previously deferred clearinghouse-dispatch foundation; migration 119 adds immutable external-
+signature evidence. The reset baseline was rebuilt and verified at the same 119-migration state.
+The 1.3.29 API must ship before a 1.3.29 Demo client because the signature contracts and routes
+change `ApiSurface.Revision`. This scoped rollout publishes the API and a disabled portal package;
+it does not build or distribute desktop installers, start the portal, or enable hosted signing,
+workers, or email.
+
+- [x] Make external signing the default release path and retain wet-ink or agency-approved
+      third-party signed PDFs in private write-once object storage with SHA-256 evidence.
+- [x] Require an authenticated staff attestation for document identity, signer identity/authority,
+      and signature/date completeness; also match signer name/capacity to the current consumer or
+      guardian record and update only the exact linked release obligation.
+- [x] Keep Sati-hosted signing as an additional agency opt-in, false by default and subordinate to
+      the existing environment-wide gate. Add the control to the Admin workspace.
+- [x] Reframe the shared release path around Generated → Prepared → Completed and place
+      preparation, external completion, and optional hosted signing in that workflow.
+- [x] Start preparation from the exact obligation card; slide the card workspace left and the
+      editable panel in from the right, reverse the transition on Back/final preparation, honor
+      reduced-motion settings, and derive card stages from retained artifacts/evidence.
+- [x] Separate Save draft from Prepare final PDF and require the exact final PDF to be retained and
+      hash-matched before the hosted **Send secure signature link** action becomes available.
+- [ ] Add a Delivered stage only to the internal-signature path when Sati can record successful
+      invitation delivery; never infer delivery from PDF generation or require it for external signing.
+- [x] Add migration `20260927152031_AddExternalSignatureEvidence`, tenant/agency authorization,
+      immutable evidence mapping, download integrity checking, and focused API coverage.
+- [x] Generate the hash-pinned, Demo-identity-checked signature migration SQL and controlled
+      PowerShell runner with preflight, rollback rehearsal, schema verification, and no-op rerun.
+      The runner deliberately requires the immediately preceding clearinghouse migration and will
+      neither deploy that unrelated schema nor create a gap in EF migration history.
+- [x] With separate user authorization on September 27, rehearse, apply, and no-op rerun the
+      guarded clearinghouse migration 118 (`20260926183942_AddClearinghouseDispatchFoundation`)
+      and external-signature migration 119 (`20260927152031_AddExternalSignatureEvidence`) on
+      identity-checked Azure `SatiDemo`. The generated SQL remained hash-pinned. The clearinghouse
+      runner needed two SQL batches inside its one outer transaction so SQL Server could compile
+      the new-column index after table creation; the first failed rehearsal rolled back before the
+      corrected rehearsal and application. No connector, account, secret, claim dispatch, or
+      external upload was enabled by these schema changes.
+- [x] With the same authorization, replace the SatiDemo reset baseline and run exactly one
+      verification reset. Both live and baseline histories have 119 migrations and both target
+      tables. Reset request `6f30e723-a428-47f3-b44b-8e7450663bd0` completed at
+      2026-09-27 16:56 UTC. The post-reset read-only compliance check found zero required changes,
+      zero unexpected billing holds, and zero unexpectedly held recent notes; Demo API 1.3.28
+      liveness and readiness were healthy. A subsequent read-only check confirmed the temporary
+      exact-IP workstation firewall rule was removed; the migration/reset runners did not change it.
+- [x] Provision and verify the dedicated Demo retained-document boundary: StorageV2 account
+      `satidemosignatures`, private `signature-documents` container, TLS 1.2/HTTPS-only transport,
+      public blob and shared-key access disabled, versioning and version-level immutability
+      capability enabled, and a custom read/create/write-without-delete role assigned to the Demo
+      API only at container scope. An anonymous listing returns HTTP 401 and a second provisioning
+      run is a no-op. Public network reachability remains enabled because this environment has no
+      private network path; authorization is Entra-only. No retention duration was chosen or
+      locked, the portal has no identity/read grant yet, no API setting was changed, and no upload,
+      hosted-signature, worker, or email feature was enabled. Use
+      `scripts/Provision-DemoSignatureStorage.ps1` to preview or re-verify this boundary.
+- [x] Provision the isolated Demo signature-key and portal-identity boundary. The stopped,
+      undeployed .NET 10 host `sati-demo-sign-satilogica` owns a distinct system identity with
+      container-scoped blob read access. RSA-3072 PIN and outbox keys live in separate
+      single-purpose vaults with purge protection and 90-day soft-delete recovery: the API may
+      wrap/unwrap both, while the portal may unwrap only the PIN key and has no outbox- or
+      SSN-vault policy. Azure's automatic broad creator policies were narrowed to key-lifecycle
+      permissions only. A clean repeat verification passed. No portal code, signature feature,
+      worker, upload, or email path was enabled. Use
+      `scripts/Provision-DemoSignatureKeysAndPortalIdentity.ps1` to preview or re-verify.
+- [x] Rehearse, apply, and idempotently rerun the hash-pinned `sati_signature_portal` SQL grant in
+      identity-checked `SatiDemo`. The contained external user is bound to the stopped portal's
+      verified managed-identity client ID, belongs only to the reviewed role, has no direct grant
+      beyond required database `CONNECT`, and passed effective-permission checks for allowed
+      signature operations and denied clinical, user, outbox, frozen-evidence update, and deletion
+      paths. No portal process was started. Use `scripts/Apply-DemoSignaturePortalGrant.ps1` for the
+      guarded preflight, rollback rehearsal, application, and repeat verification. The temporary
+      exact-IP workstation firewall rule was removed by the operator and a subsequent read-only
+      allow-list check found neither temporary rule name nor workstation IP.
+- [x] Configure the stopped portal with exact Demo identity, host, private-container, versioned-PIN-
+      key, and passwordless managed-identity SQL settings while explicitly leaving signatures and
+      workers false and omitting outbox/email capability. The final idempotent verifier confirmed
+      the host remained stopped. Portal integration tests passed 8/8 under the signed-in profile
+      after a restricted-sandbox run returned five 503s, and browser behavior tests passed 9/9. A
+      local, ignored 11,175,608-byte staging ZIP was built with SHA-256
+      `A13681D0DE3CE95F14BEBA0D88253DDDDD3CAE39F647EB3E1565A5C71087F93F`; it was not uploaded.
+      `scripts/Configure-DemoSignaturePortal.ps1` reproduces the disabled configuration.
+- [x] Coordinate version 1.3.29 across desktop/API assemblies, installer defaults, readiness
+      expectations, runbook examples, release notes, and exact-version tests. The final
+      no-incremental Release solution build completed with 0 errors and 18 pre-existing analyzer
+      warnings. Serial signed-profile test runs passed 2,610 desktop/domain tests with 6 documented
+      external-prerequisite skips; 941 API tests with 6 skips; signatures 119, portal 8, and Carika
+      4, for 3,682 passed and 12 skipped overall. Portal browser behavior passed 9/9, every
+      PowerShell file parsed, and `git diff --check` found no whitespace errors.
+- [ ] Push the exact validated source normally to `origin/master`.
+- [ ] Build clean API and portal packages from that pushed source, publish the matching Demo API,
+      deploy the portal package while keeping its host stopped, and verify every internal-signing,
+      worker, and email gate remains false.
+- [ ] Build and publish desktop installers only under a later, explicit release authorization.
+- [ ] Complete real-use legal/program review, agency procedure and training, accessibility review,
+      retention/legal-hold enforcement, malware scanning, and approved delivery/provider agreements.
+      No Production internal-signature activation is authorized by this implementation.
+
 ## Release 1.3.28 — 2026-09-25
 
 “A visible start and room to come back.” Ships the two unreleased slices below: bounded,

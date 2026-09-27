@@ -62,17 +62,34 @@
                                 <TextBlock Text="{Binding TimingLabel}"
                                            FontSize="11"
                                            Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding WorkflowStage}"
+                                           Margin="0,5,0,0"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           AutomationProperties.Name="Release workflow stage" />
+                                <TextBlock Text="{Binding WorkflowDescription}"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
                                 <TextBlock Text="{Binding StatusLabel}"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            TextWrapping="Wrap"
                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                            AutomationProperties.LiveSetting="Polite" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                <Button Content="Prepare for delivery"
+                                        Command="{Binding DataContext.PrepareReleaseCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        Visibility="{Binding CanPrepare, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        Padding="10,4"
+                                        AutomationProperties.Name="{Binding Name, StringFormat='Prepare {0} for delivery'}" />
                                 <Button Content="Attest"
                                         Command="{Binding DataContext.BeginAttestationCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                         CommandParameter="{Binding}"
                                         IsEnabled="{Binding CanAttest}"
+                                        Margin="0,6,0,0"
                                         Padding="10,4"
                                         AutomationProperties.Name="{Binding AttestAutomationName}" />
                                 <Button Content="Withdraw"

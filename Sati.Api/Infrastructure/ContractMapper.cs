@@ -366,7 +366,8 @@ internal static class ContractMapper
         VocationalRehabilitationProfile.NormalizeAssistantTitle(s.VrAssistantTitle), s.AnnualPacketOpenDaysBefore,
         s.AllowPastBillingPolicyEffectiveDates,
         s.IsComprehensiveAssessmentAuthoringEnabled, s.IsClassificationAuthoringEnabled,
-        s.IsPersonCenteredPlanAuthoringEnabled);
+        s.IsPersonCenteredPlanAuthoringEnabled,
+        s.IsInternalElectronicSignatureEnabled);
 
     public static BillingCompliancePolicyVersionDto ToBillingCompliancePolicyVersion(
         Sati.Models.BillingCompliancePolicyVersion version) => new(

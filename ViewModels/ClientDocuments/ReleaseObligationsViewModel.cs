@@ -19,6 +19,7 @@ public partial class ReleaseObligationsViewModel(
 {
     private readonly LatestRequestTracker _loads = new();
     private Person? _person;
+    private IReadOnlyList<DocumentArtifactDto> _documentArtifacts = [];
 
     public ObservableCollection<ReleaseObligationItemViewModel> Items { get; } = [];
     public ObservableCollection<string> LinkageIssues { get; } = [];
@@ -76,6 +77,7 @@ public partial class ReleaseObligationsViewModel(
 
     public Func<Task>? ComplianceChangedAsync { get; set; }
     public event Action<IReadOnlyList<ReleaseObligationDto>>? ObligationsChanged;
+    public event Action<ReleaseObligationItemViewModel>? PreparationRequested;
 
     public bool HasItems => Items.Count != 0;
     public bool HasNoItems => !IsBusy && Items.Count == 0;
@@ -88,6 +90,7 @@ public partial class ReleaseObligationsViewModel(
     public void SetPerson(Person? person)
     {
         _person = person;
+        _documentArtifacts = [];
         var request = _loads.Begin();
         Items.Clear();
         LinkageIssues.Clear();
@@ -101,6 +104,13 @@ public partial class ReleaseObligationsViewModel(
 
         if (person?.EffectiveDate is not null && person.Id > 0)
             _ = LoadAsync(person, request);
+    }
+
+    public void SetDocumentArtifacts(IReadOnlyList<DocumentArtifactDto> artifacts)
+    {
+        _documentArtifacts = artifacts ?? [];
+        foreach (var item in Items)
+            item.SetDocumentArtifact(CurrentArtifact(item.RecordId));
     }
 
     public Task RefreshAsync()
@@ -214,7 +224,8 @@ public partial class ReleaseObligationsViewModel(
             {
                 SignerLabel = status.SignerLabel;
                 foreach (var obligation in status.Obligations)
-                    Items.Add(new ReleaseObligationItemViewModel(obligation, DateTime.Today));
+                    Items.Add(new ReleaseObligationItemViewModel(
+                        obligation, DateTime.Today, CurrentArtifact(obligation.Id)));
                 foreach (var issue in status.LinkageIssues.Select(issue => issue.Message))
                 {
                     if (!LinkageIssues.Contains(issue, StringComparer.Ordinal))
@@ -245,6 +256,23 @@ public partial class ReleaseObligationsViewModel(
             if (_loads.IsCurrent(request))
                 IsBusy = false;
         }
+    }
+
+    private DocumentArtifactDto? CurrentArtifact(long obligationRecordId) =>
+        _documentArtifacts
+            .Where(artifact => artifact.ReleaseObligationRecordId == obligationRecordId)
+            .OrderByDescending(artifact => artifact.GeneratedAtUtc)
+            .ThenByDescending(artifact => artifact.Id)
+            .FirstOrDefault();
+
+    [RelayCommand]
+    private void PrepareRelease(ReleaseObligationItemViewModel? item)
+    {
+        if (item?.CanPrepare != true)
+            return;
+        CancelEditorsCore();
+        StatusMessage = string.Empty;
+        PreparationRequested?.Invoke(item);
     }
 
     private static void MergeAuthoritativeFacts(
@@ -497,10 +525,14 @@ public partial class ReleaseObligationsViewModel(
     }
 }
 
-public sealed class ReleaseObligationItemViewModel
+public sealed partial class ReleaseObligationItemViewModel : ObservableObject
 {
-    public ReleaseObligationItemViewModel(ReleaseObligationDto source, DateTime today)
+    public ReleaseObligationItemViewModel(
+        ReleaseObligationDto source,
+        DateTime today,
+        DocumentArtifactDto? artifact = null)
     {
+        RecordId = source.Id;
         ObligationId = source.ObligationId;
         Category = source.Category;
         RecipientDisplayName = source.RecipientDisplayName;
@@ -516,8 +548,15 @@ public sealed class ReleaseObligationItemViewModel
         CanWithdraw = CompletedOn is not null && IsAuthorizationActive;
         CanRevokeAttestation = source.Attestations.Count(item => item.RevokedAtUtc is null) == 1 &&
             source.Attestations.Any(item => item.RevokedAtUtc is null && item.Source == "Manual");
+        CanPrepare = CompletedOn is null &&
+            RetiredOn is null &&
+            today.Date >= AvailableOn &&
+            Category is nameof(ReleaseObligationCategory.Agency) or
+                nameof(ReleaseObligationCategory.Medical);
+        SetDocumentArtifact(artifact);
     }
 
+    public long RecordId { get; }
     public Guid ObligationId { get; }
     public string Category { get; }
     public string? RecipientDisplayName { get; }
@@ -532,6 +571,39 @@ public sealed class ReleaseObligationItemViewModel
     public bool CanAttest { get; }
     public bool CanWithdraw { get; }
     public bool CanRevokeAttestation { get; }
+    public bool CanPrepare { get; }
+    public int? CurrentDocumentArtifactId { get; private set; }
+    public string WorkflowStage { get; private set; } = "Not started";
+    public string WorkflowDescription { get; private set; } = "Prepare the recipient-specific release.";
+
+    public void SetDocumentArtifact(DocumentArtifactDto? artifact)
+    {
+        CurrentDocumentArtifactId = artifact?.Id;
+        if (CompletedOn is not null)
+        {
+            WorkflowStage = "Completed";
+            WorkflowDescription = "Signed evidence is retained and the obligation is satisfied.";
+        }
+        else if (artifact is { Origin: "GeneratedInSati", BlankFields.Count: 0 })
+        {
+            WorkflowStage = "Prepared";
+            WorkflowDescription = "The final signing copy is ready for external or internal signing.";
+        }
+        else if (artifact is not null)
+        {
+            WorkflowStage = "Generated";
+            WorkflowDescription = "A draft exists. Review and prepare the final signing copy.";
+        }
+        else
+        {
+            WorkflowStage = "Not started";
+            WorkflowDescription = "Prepare the recipient-specific release.";
+        }
+        OnPropertyChanged(nameof(CurrentDocumentArtifactId));
+        OnPropertyChanged(nameof(WorkflowStage));
+        OnPropertyChanged(nameof(WorkflowDescription));
+        OnPropertyChanged(nameof(AutomationName));
+    }
 
     public string Name => Category switch
     {
@@ -549,7 +621,7 @@ public sealed class ReleaseObligationItemViewModel
 
     public string CycleLabel => $"Annual effective date {TargetEffectiveDate:MMM d, yyyy}";
     public string TimingLabel => $"Available {AvailableOn:MMM d, yyyy}; due {DueOn:MMM d, yyyy}";
-    public string AutomationName => $"{Name}. {CycleLabel}. {TimingLabel}. {StatusLabel}";
+    public string AutomationName => $"{Name}. {CycleLabel}. {TimingLabel}. {WorkflowStage}. {StatusLabel}";
     public string AttestAutomationName => $"Attest {Name} for {TargetEffectiveDate:MMM d, yyyy}";
     public string WithdrawAutomationName =>
         $"Withdraw authorization for {Name}, effective-date cycle {TargetEffectiveDate:MMM d, yyyy}";

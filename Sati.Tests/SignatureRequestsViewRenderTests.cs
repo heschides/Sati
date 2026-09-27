@@ -26,7 +26,7 @@ public sealed class SignatureRequestsViewRenderTests
             Assert.DoesNotContain(WpfUiHarness.Descendants(view).OfType<TextBox>(), box => box.Name.Contains("Pin", StringComparison.OrdinalIgnoreCase));
             Assert.True(WpfUiHarness.FindByAutomationName<ComboBox>(view, "Intended signer").Focusable);
             Assert.Contains(WpfUiHarness.Descendants(view).OfType<Button>(),
-                button => Equals(button.Content, "Submit to consumer or guardian for review"));
+                button => Equals(button.Content, "Send secure signature link"));
             var history = WpfUiHarness.FindByAutomationName<DataGrid>(view, "Signature request history");
             Assert.Contains(history.Columns, column => Equals(column.Header, "Status"));
             Assert.DoesNotContain(history.Columns, column => Equals(column.Header, "Outcome"));

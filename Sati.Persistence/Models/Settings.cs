@@ -24,6 +24,11 @@ namespace Sati.Models
         public bool IsClassificationAuthoringEnabled { get; set; }
         public bool IsPersonCenteredPlanAuthoringEnabled { get; set; }
 
+        // External signing (paper or an agency-approved third-party service) remains
+        // available regardless of this setting. This opt-in only allows Sati's own
+        // signer portal when the server-wide signature safety gate is also open.
+        public bool IsInternalElectronicSignatureEnabled { get; set; }
+
         // Agency policy. Off by default: importing into an existing profile can
         // replace current demographics, so an administrator must opt the agency in.
         public bool AllowCredibleProfileUpdates { get; set; }

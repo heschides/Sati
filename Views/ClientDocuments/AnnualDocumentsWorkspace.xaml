@@ -822,8 +822,8 @@
        </StackPanel>
 
        <!-- Kept for staff who rely on them, out of the way of the everyday view. -->
-       <Expander Header="Document records, verification, and signatures" Margin="0,18,0,0"
-                 AutomationProperties.Name="Document records, verification, and signatures">
+       <Expander Header="Document records and verification" Margin="0,18,0,0"
+                 AutomationProperties.Name="Document records and verification">
         <StackPanel Margin="0,10,0,0">
          <TextBlock Text="{Binding WindowDescription}" TextWrapping="Wrap"/>
          <TextBlock Text="{Binding AuthorizedRepresentativeRecordedMessage}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,8"/>
@@ -846,7 +846,6 @@
          </WrapPanel>
          <TextBlock Text="Verification compares the selected file's fingerprint with the recorded generated document. The file contents are not uploaded."
                     TextWrapping="Wrap"/>
-         <local:SignatureRequestsWorkspace DataContext="{Binding Signatures}" Margin="0,24"/>
         </StackPanel>
        </Expander>
       </StackPanel>
@@ -856,15 +855,43 @@
 
    <TabItem Header="Releases" AutomationProperties.Name="Annual form releases">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-     <StackPanel Margin="16">
-      <TextBlock Text="Releases" FontSize="18" FontWeight="SemiBold"
-                 AutomationProperties.HeadingLevel="Level2"/>
-      <TextBlock Text="First confirm the exact recipient and service year below. Then prepare the matching medical or agency release. For Maine DHHS's state release, use DHHS Documents."
-                 TextWrapping="Wrap" Margin="0,6,0,12"/>
-      <local:ReleaseObligationsWorkspace DataContext="{Binding ReleaseObligations}"/>
-      <Separator Margin="0,12"/>
-      <local:AgencyReleaseWorkspace DataContext="{Binding AgencyRelease}"/>
-     </StackPanel>
+     <Grid x:Name="ReleaseTransitionHost" Margin="16" ClipToBounds="True">
+      <Grid x:Name="ReleaseOverviewPanel" AutomationProperties.Name="Release list and signing options">
+       <Grid.RenderTransform><TranslateTransform x:Name="ReleaseOverviewTransform"/></Grid.RenderTransform>
+       <StackPanel>
+        <TextBlock Text="Releases" FontSize="18" FontWeight="SemiBold"
+                   AutomationProperties.HeadingLevel="Level2"/>
+        <TextBlock Text="Choose the exact recipient and select Prepare for delivery. External signing is the default; Sati-hosted signing appears only when your agency and environment enable it."
+                   TextWrapping="Wrap" Margin="0,6,0,16" Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+        <Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,16"
+                AutomationProperties.Name="Release workflow: Generated, Prepared, Completed">
+         <StackPanel>
+          <TextBlock Text="Release workflow" FontWeight="SemiBold" Margin="0,0,0,10"/>
+          <UniformGrid Rows="1" Columns="3">
+           <StackPanel Margin="0,0,14,0"><TextBlock Text="1  Generated" FontWeight="SemiBold"/><TextBlock Text="Create or save a draft" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/></StackPanel>
+           <StackPanel Margin="0,0,14,0"><TextBlock Text="2  Prepared" FontWeight="SemiBold"/><TextBlock Text="Finalize the exact signing copy" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/></StackPanel>
+           <StackPanel><TextBlock Text="3  Completed" FontWeight="SemiBold"/><TextBlock Text="Signed evidence retained and verified" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/></StackPanel>
+          </UniformGrid>
+         </StackPanel>
+        </Border>
+
+        <Expander Header="Required releases" IsExpanded="True" AutomationProperties.Name="Required recipient-specific releases">
+         <local:ReleaseObligationsWorkspace DataContext="{Binding ReleaseObligations}" Margin="0,8,0,0"/>
+        </Expander>
+        <Expander Header="Sign and complete" IsExpanded="True" Margin="0,16,0,0" AutomationProperties.Name="External or Sati-hosted signature delivery">
+         <local:SignatureRequestsWorkspace DataContext="{Binding AnnualDocuments.Signatures}" Margin="0,12,0,0"/>
+        </Expander>
+       </StackPanel>
+      </Grid>
+
+      <Grid x:Name="ReleaseEditorPanel" Visibility="Collapsed"
+            AutomationProperties.Name="Editable release preparation panel">
+       <Grid.RenderTransform><TranslateTransform x:Name="ReleaseEditorTransform"/></Grid.RenderTransform>
+       <local:AgencyReleaseWorkspace DataContext="{Binding AgencyRelease}"/>
+      </Grid>
+     </Grid>
     </ScrollViewer>
    </TabItem>
 
