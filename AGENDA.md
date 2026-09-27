@@ -94,10 +94,28 @@ workers, or email.
       external-prerequisite skips; 941 API tests with 6 skips; signatures 119, portal 8, and Carika
       4, for 3,682 passed and 12 skipped overall. Portal browser behavior passed 9/9, every
       PowerShell file parsed, and `git diff --check` found no whitespace errors.
-- [ ] Push the exact validated source normally to `origin/master`.
-- [ ] Build clean API and portal packages from that pushed source, publish the matching Demo API,
-      deploy the portal package while keeping its host stopped, and verify every internal-signing,
-      worker, and email gate remains false.
+- [x] Push the exact validated source normally to `origin/master`: commit
+      `d6cd84454b26a5822a8653ea0dafe73879f211fd`.
+- [x] Build clean API and portal packages from that pushed source. The 68-entry, 10,576,511-byte
+      `artifacts/SatiApi-1.3.29-fx-x86.zip` has SHA-256
+      `23AF29F4571EB24F2BABA0F7F7EB7C5210BCCAD85A53CFE11B1035964E143B95` and product version
+      `1.3.29+d6cd84454b26a5822a8653ea0dafe73879f211fd`; it contains no settings file, unsafe ZIP
+      path, duplicate entry, or secret-like configuration text. OneDeploy deployment
+      `af31526299894afda1323805ff3fc081` published it only to the existing Demo API. Liveness and
+      readiness are healthy, `/health/version` reports 1.3.29 and the validated contract revision
+      `0E7AF64750B0`, and the new evidence routes plus `/api/v1/settings` return 401 anonymously.
+      Health-only evidence is in `artifacts/release-1.3.29-demo-readiness.json`; authenticated
+      checks remain skipped because synthetic Admin credentials are not configured.
+- [x] Deploy the 75-entry, 9,828,611-byte `artifacts/SatiPortal-1.3.29-fx-x86.zip`, SHA-256
+      `69FFEC4B3B6B43DDFEB9D8883CC570A4D4CD40805130BCEA0F2732F6B5165D66`, from the same pushed
+      commit to the dedicated portal through OneDeploy deployment
+      `a3b45d8384854c60bd26ede27cb0a8db`. Restart was disabled and the host remained stopped before
+      and after deployment. Final read-only verification found the API and portal signature gates
+      false, both worker gates false, email false with no endpoint/sender/recipient allow-list,
+      no portal outbox key, and the portal's passwordless managed-identity SQL connection intact.
+      The API has the private blob and versioned PIN/outbox key locations so external signed-PDF
+      evidence works when a matching desktop client is later distributed; hosted signing remains
+      unavailable.
 - [ ] Build and publish desktop installers only under a later, explicit release authorization.
 - [ ] Complete real-use legal/program review, agency procedure and training, accessibility review,
       retention/legal-hold enforcement, malware scanning, and approved delivery/provider agreements.
