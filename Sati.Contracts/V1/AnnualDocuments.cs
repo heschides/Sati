@@ -120,7 +120,21 @@ public sealed record DocumentArtifactDto(
     int? TemplateVersion = null,
     int? SourceContentId = null,
     int? SourceContentVersion = null,
-    long? ReleaseObligationRecordId = null);
+    long? ReleaseObligationRecordId = null,
+    Guid? OneOffReleaseId = null,
+    OneOffReleaseRecipientDto? OneOffRecipient = null,
+    int? PromotedProviderId = null);
+
+public sealed record OneOffReleaseRecipientDto(
+    string? ContactType,
+    string ContactName,
+    string? Relationship,
+    string? Street,
+    string? City,
+    string? State,
+    string? Phone,
+    string? Fax,
+    string? Email);
 
 public sealed record RecordExternalDocumentRequest(
     DateTime CycleStart,
@@ -145,7 +159,8 @@ public sealed record RenderAnnualDocumentRequest(
     DateTime? CycleStart = null,
     AgencyReleaseRequest? Release = null,
     DhhsFormRequest? Dhhs = null,
-    Guid? ReleaseObligationId = null);
+    Guid? ReleaseObligationId = null,
+    Guid? OneOffReleaseId = null);
 
 public sealed record FormPrerequisiteStatusDto(
     string Kind,

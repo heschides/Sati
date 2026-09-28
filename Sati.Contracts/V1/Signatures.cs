@@ -148,7 +148,7 @@ public sealed record ExternalSignatureEvidenceDto(
     int Id,
     int PersonId,
     int DocumentArtifactId,
-    long ReleaseObligationId,
+    long? ReleaseObligationId,
     string Method,
     DateTime SignedOn,
     string SignerName,

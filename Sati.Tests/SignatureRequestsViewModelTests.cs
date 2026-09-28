@@ -98,6 +98,45 @@ public sealed class SignatureRequestsViewModelTests
         Assert.False(vm.CanCreate);
     }
 
+    [Fact]
+    public void CompleteOneOffReleaseCanEnterBothSignaturePipelines()
+    {
+        var vm = Ready(new Service(), new Session());
+        vm.SelectedArtifact = Artifact(4) with
+        {
+            Kind = nameof(AnnualDocumentKind.ReleaseAgency),
+            ReleaseObligationRecordId = null
+        };
+        vm.SelectedSigner = vm.Signers[0];
+        vm.CompletenessReviewed = true;
+        vm.ExternallySignedOn = DateTime.Today;
+        vm.ExternalSignerName = "Synthetic Signer";
+        vm.ExternalDocumentReviewed = true;
+        vm.ExternalIdentityAndAuthorityVerified = true;
+        vm.ExternalSignaturesAndDatesComplete = true;
+
+        Assert.True(vm.CanFreeze);
+        Assert.True(vm.CanRecordExternal);
+    }
+
+    [Fact]
+    public void OneOffCardShowsDeliveredOnlyForInternalMailAndCompletedForEitherSignaturePath()
+    {
+        var artifact = Artifact(7) with
+        {
+            Kind = nameof(AnnualDocumentKind.ReleaseAgency),
+            OneOffReleaseId = Guid.NewGuid(),
+            OneOffRecipient = new OneOffReleaseRecipientDto(
+                "School", "Example School", null, null, null, "ME", null, null, null)
+        };
+
+        Assert.Equal("Prepared", new OneOffReleaseItemViewModel(artifact).WorkflowStage);
+        Assert.Equal("Delivered", new OneOffReleaseItemViewModel(
+            artifact, isCompleted: false, isDelivered: true).WorkflowStage);
+        Assert.Equal("Completed", new OneOffReleaseItemViewModel(
+            artifact, isCompleted: true, isDelivered: true).WorkflowStage);
+    }
+
     private static SignatureRequestsViewModel Ready(Service service, Session session)
     {
         var vm = new SignatureRequestsViewModel(service, session); vm.SetContext(101, [Artifact(1)]); vm.SetActive(true); return vm;

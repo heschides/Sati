@@ -474,13 +474,14 @@ internal static class CloudContractMapper
         Npi = dto.Npi, MaineCareProviderId = dto.MaineCareProviderId,
         // Absent or unrecognised leaves the entry unaffiliated rather than guessing a tier.
         MedicalKind = Enum.TryParse<MedicalProviderKind>(dto.MedicalKind, out var kind) ? kind : null,
-        ParentProviderId = dto.ParentProviderId
+        ParentProviderId = dto.ParentProviderId,
+        Email = dto.Email
     };
 
     public static SaveProviderRequest ToSaveProviderRequest(Provider p) => new(
         p.Type.ToString(), p.Name, p.Street, p.City, p.State, p.Zip, p.PrimaryContact, p.Phone,
         (int)p.OfferedServices, p.ProvidesPassthroughService, p.BillingLocationEis, p.ProgramContact, p.BillingContact,
-        p.Npi, p.MaineCareProviderId, p.MedicalKind?.ToString(), p.ParentProviderId);
+        p.Npi, p.MaineCareProviderId, p.MedicalKind?.ToString(), p.ParentProviderId, p.Email);
 
     public static ATRequest ToAtRequest(AtRequestDto dto)
     {

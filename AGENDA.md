@@ -1,5 +1,54 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.30 — 2026-09-27
+
+“A release for every recipient.” Adds durable one-off releases beside provider requirements,
+lets staff promote a prepared recipient into the provider directory without replacing the
+document, and fixes the Representative Payee radio-button crash in the Clients workspace.
+
+**Migration 120 was applied to Demo before this source release.** Migration
+`20260927232039_SupportDurableOneOffReleases` gives each one-off release its own durable identity,
+immutable recipient snapshot, and optional provider-promotion link. The reset baseline was rebuilt
+and verified at the same 120-migration state. It remains unapplied to Production. The 1.3.30 API
+must ship before a 1.3.30 Demo client because the new contract shape and promotion route change
+`ApiSurface.Revision`; accepted Demo and Local installers follow only after API verification.
+
+- [x] Present Provider requirements and One-off releases as sibling views in the Releases workspace.
+- [x] Give every one-off editor session a durable opaque identity and immutable recipient snapshot,
+      so multiple recipients in the same annual cycle remain independent.
+- [x] Permit both default external signing and the separately gated hosted-signature path without
+      creating or completing an annual provider-release obligation.
+- [x] Add **Add to provider list** after preparation, with a prefilled review modal and optional
+      prospective consumer assignment through the authoritative provider and release rules.
+- [x] Preserve the one-off document when promoted; retain only a one-time provider provenance link.
+- [x] Generate migration `20260927232039_SupportDurableOneOffReleases` and add focused desktop/API
+      coverage. On September 27, 2026, the guarded runner rehearsed, applied, verified, and proved
+      the migration idempotent against identity-marked `SatiDemo`, bringing it to 120 history rows.
+      The temporary exact-IP firewall rule was then removed and verified absent. It remains
+      unapplied to Production.
+- [x] Recapture and verify the Demo reset baseline before publishing a client that depends on this
+      schema. The read-only check found 177 synthetic consumers, zero planned changes, zero
+      unexpected billing blockers, and only the documented teaching/future-opening skips. Capture
+      returned `DEMO_FULL_RESET_BASELINE_CAPTURED` with timeline anchor `2026-09-27`. Verification
+      reset `d325db36-f16b-469a-bae7-888cf51e4a84` completed in 219 seconds with audited action
+      `demo.reset.completed` and worker marker `DEMO_COMPLIANCE_HISTORY_COMPLETE`; the post-reset
+      database retained 120 migrations, 76/76 baseline tables, all 177 People, and all three new
+      one-off artifact columns, while API readiness returned HTTP 200 `Healthy`. The temporary
+      exact-IP firewall rule was removed and verified absent by the operator.
+- [x] Coordinate version 1.3.30, release notes, installer defaults, readiness expectations, and
+      exact-version tests. The no-incremental Release solution build completed with 0 errors and
+      19 pre-existing analyzer warnings. Serial signed-profile test runs passed 2,623 desktop/
+      domain tests with 6 documented external-prerequisite skips; 944 API tests with 6 skips;
+      signatures 119, portal 8, and Carika 4, for 3,698 passed and 12 skipped overall. Portal
+      browser behavior passed 9/9, all 88 PowerShell files parsed, and `git diff --check` found no
+      whitespace errors.
+- [ ] Push the exact validated source normally to `origin/master`.
+- [ ] Build, inspect, publish, and verify the 1.3.30 package against only the existing Demo API.
+- [ ] Build and accept the 1.3.30 Demo and Local installers, then publish each installer and
+      checksum atomically to its exact distribution folder without overwriting an existing file.
+- [ ] Record final hashes, deployment/health evidence, test totals, acceptance cleanup, retained
+      branches, and Local Production migration follow-up in a pushed evidence commit.
+
 ## Release 1.3.29 — 2026-09-27
 
 “A clear path from release to completion.” Replaces the dense release workspace with a staged

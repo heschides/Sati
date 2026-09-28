@@ -733,14 +733,25 @@ namespace Sati.ViewModels
                 ReleaseObligations.ObligationsChanged += AgencyRelease.SetReleaseObligations;
                 ReleaseObligations.ObligationsChanged += DhhsForms.SetReleaseObligations;
                 if (agencyRelease is not null)
+                {
                     ReleaseObligations.PreparationRequested += agencyRelease.BeginPreparation;
+                    ReleaseObligations.OneOffPreparationRequested += agencyRelease.BeginOneOffPreparation;
+                }
                 ConsumerProviders.ProviderAssignmentsChangedAsync =
                     ReleaseObligations.RefreshAsync;
                 if (AnnualDocuments is not null)
                 {
                     AnnualDocuments.ArtifactsChanged += ReleaseObligations.SetDocumentArtifacts;
                     if (AnnualDocuments.Signatures is not null)
-                        AnnualDocuments.Signatures.CompletionChangedAsync = ReleaseObligations.RefreshAsync;
+                    {
+                        AnnualDocuments.Signatures.CompletionChangedAsync = async () =>
+                        {
+                            ReleaseObligations.SetSignatureState(
+                                AnnualDocuments.Signatures.ExternalEvidence,
+                                AnnualDocuments.Signatures.Requests);
+                            await ReleaseObligations.RefreshAsync();
+                        };
+                    }
                 }
             }
             if (agencyRelease is not null)

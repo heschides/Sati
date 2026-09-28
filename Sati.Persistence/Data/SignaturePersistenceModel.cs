@@ -273,12 +273,24 @@ public static class SignaturePersistenceModel
         foreach (var e in tracker.Entries<TArtifact>())
         {
             if (e.State != EntityState.Modified) continue;
-            Only(e, "SupersededByArtifactId");
+            // The prepared-document evidence is immutable. The only two lifecycle
+            // annotations allowed afterward are replacement by a newer artifact and
+            // a one-time link to the provider directory created from a one-off recipient.
+            Only(e, "SupersededByArtifactId", "PromotedProviderId");
             var superseded = e.Property("SupersededByArtifactId");
-            var id = (int)e.Property("Id").CurrentValue!;
-            if (superseded.CurrentValue is not int successor || successor <= 0 ||
-                superseded.OriginalValue is int original && original != id)
-                throw new InvalidOperationException("Document metadata is immutable; replacement must retain the previous version.");
+            if (superseded.IsModified)
+            {
+                var id = (int)e.Property("Id").CurrentValue!;
+                if (superseded.CurrentValue is not int successor || successor <= 0 ||
+                    superseded.OriginalValue is int original && original != id)
+                    throw new InvalidOperationException("Document metadata is immutable; replacement must retain the previous version.");
+            }
+
+            var promoted = e.Property("PromotedProviderId");
+            if (promoted.IsModified &&
+                (promoted.OriginalValue is not null || promoted.CurrentValue is not int providerId || providerId <= 0))
+                throw new InvalidOperationException(
+                    "A one-off document may be linked to one provider exactly once.");
         }
     }
 

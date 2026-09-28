@@ -248,6 +248,12 @@ namespace Sati.ViewModels.Children
             set { if (_provider.Phone != value) { _provider.Phone = value; OnPropertyChanged(); } }
         }
 
+        public string? Email
+        {
+            get => _provider.Email;
+            set { if (_provider.Email != value) { _provider.Email = value; OnPropertyChanged(); } }
+        }
+
         // ---- Waiver services: one bool per [Flags] bit ----
         // Set a bit with OR (| flag); clear it with AND-NOT (& ~flag). The guard
         // suppresses a redundant notify when the bit is already in the target state.

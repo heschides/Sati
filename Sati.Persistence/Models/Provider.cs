@@ -59,6 +59,7 @@ namespace Sati.Models
         // General directory contact.
         public string? PrimaryContact { get; set; }
         public string? Phone { get; set; }
+        public string? Email { get; set; }
 
         // Waiver services offered. [Flags] bitmask — inert until client↔provider
         // links land, but modeled now per the provider-form design.

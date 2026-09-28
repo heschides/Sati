@@ -93,6 +93,7 @@ public static class ApiSurface
         "release-attestation-billing-review-flag-v1",
         "team-chat-v1",
         "signature-evidence-v1",
+        "one-off-release-artifacts-v1",
         "account-session-lifecycle-v1",
         // A reset rotates the Demo database instance identifier embedded in access tokens,
         // making every session issued against the replaced baseline unusable.
@@ -294,6 +295,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/documents/{kind}",
         "POST /api/v1/people/{personId:int}/documents/{kind}/external",
         "POST /api/v1/people/{personId:int}/external-signatures",
+        "POST /api/v1/people/{personId:int}/one-off-releases/{artifactId:int}/provider",
         "POST /api/v1/people/{personId:int}/forms.pdf",
         "POST /api/v1/people/{personId:int}/forms/{type}/attestation",
         "POST /api/v1/people/{personId:int}/forms/{type}/attestation/revoke",

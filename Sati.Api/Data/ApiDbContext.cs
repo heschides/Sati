@@ -230,14 +230,19 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.TemplateKey).HasMaxLength(100);
             entity.Property(x => x.BlankFieldsJson).IsRequired().HasMaxLength(4_000);
             entity.Property(x => x.ExternalNote).HasMaxLength(1_000);
+            entity.Property(x => x.OneOffRecipientJson).HasMaxLength(4_000);
             entity.HasIndex(x => new { x.PersonId, x.Kind, x.CycleStart })
                 .IsUnique()
-                .HasFilter("[ReleaseObligationId] IS NULL AND [SupersededByArtifactId] IS NULL")
+                .HasFilter("[ReleaseObligationId] IS NULL AND [OneOffReleaseId] IS NULL AND [SupersededByArtifactId] IS NULL")
                 .HasDatabaseName("IX_DocumentArtifacts_OneLivePerCycle");
             entity.HasIndex(x => new { x.ReleaseObligationId, x.Kind })
                 .IsUnique()
                 .HasFilter("[ReleaseObligationId] IS NOT NULL AND [SupersededByArtifactId] IS NULL")
                 .HasDatabaseName("IX_DocumentArtifacts_OneLivePerReleaseObligation");
+            entity.HasIndex(x => new { x.OneOffReleaseId, x.Kind })
+                .IsUnique()
+                .HasFilter("[OneOffReleaseId] IS NOT NULL AND [SupersededByArtifactId] IS NULL")
+                .HasDatabaseName("IX_DocumentArtifacts_OneLivePerOneOffRelease");
             entity.HasOne<ServerPerson>()
                 .WithMany()
                 .HasForeignKey(x => x.PersonId)
@@ -246,6 +251,10 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .WithMany()
                 .HasForeignKey(x => x.AgencyId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ServerProvider>()
+                .WithMany()
+                .HasForeignKey(x => x.PromotedProviderId)
+                .OnDelete(DeleteBehavior.SetNull);
             entity.HasOne<ServerUser>()
                 .WithMany()
                 .HasForeignKey(x => x.GeneratedByUserId)
@@ -608,6 +617,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.ToTable("Providers"); entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.AgencyId, x.Name });
             entity.Property(x => x.Type).HasMaxLength(20);
+            entity.Property(x => x.Name).HasMaxLength(150);
+            entity.Property(x => x.Email).HasMaxLength(254);
             // Restrict rather than SetNull: silently promoting a subtree to top level splits
             // the hierarchy with nothing in the interface showing it. The route refuses the
             // delete and names the affiliated entries.
@@ -1038,6 +1049,9 @@ internal sealed class ServerDocumentArtifact
     public string? ExternalNote { get; set; }
     public int? SupersededByArtifactId { get; set; }
     public long? ReleaseObligationId { get; set; }
+    public Guid? OneOffReleaseId { get; set; }
+    public string? OneOffRecipientJson { get; set; }
+    public int? PromotedProviderId { get; set; }
 }
 
 internal sealed class ServerDocumentTemplate
@@ -1460,6 +1474,7 @@ internal sealed class ServerProvider
     public string? Zip { get; set; }
     public string? PrimaryContact { get; set; }
     public string? Phone { get; set; }
+    public string? Email { get; set; }
     public int OfferedServices { get; set; }
     public bool ProvidesPassthroughService { get; set; }
     public string? BillingLocationEis { get; set; }

@@ -3231,10 +3231,11 @@ and stores its SHA-256 fingerprint and authenticated attestor. The resulting lab
 signed — staff verified.” It does not claim native DocuSign integration or cryptographic validation
 of an external provider's envelope.
 
-The evidence is append-only and linked to one current complete generated artifact and one exact
-recipient obligation. It can satisfy only that obligation; it never guesses by category or display
-name. SQL stores metadata, not PDF bytes. A missing private blob configuration fails closed rather
-than falling back to an unprotected workstation copy or database BLOB.
+The evidence is append-only and linked to one current complete generated artifact. A tracked
+artifact carries one exact recipient obligation and can satisfy only that obligation; it never
+guesses by category or display name. A one-off artifact carries no obligation and therefore changes
+no annual compliance fact. SQL stores metadata, not PDF bytes. A missing private blob configuration
+fails closed rather than falling back to an unprotected workstation copy or database BLOB.
 
 `IsInternalElectronicSignatureEnabled` is an agency setting that defaults false. It adds Sati's
 hosted signer portal without removing external signing. The API still requires its independent
@@ -3253,6 +3254,36 @@ has separate Save draft and Prepare final PDF actions; an optional staff prepara
 longer decides whether the document is a draft. The hosted-signature send action remains a later,
 explicit step and is unavailable until the exact saved PDF has been frozen and verified against the
 current artifact.
+
+## 2026-09-27 — One-off release recipients are durable documents, not implicit providers
+
+A release may be needed for a school, family member, specialist, records office, or other recipient
+that has not been curated into the agency provider directory. Creating such a release must not
+manufacture provider administration or an annual billing-compliance obligation. Each preparation
+therefore receives a fresh opaque `OneOffReleaseId` and stores a bounded recipient snapshot with the
+immutable document artifact. Its draft/final replacements occupy only that one-off identity's slot;
+other one-offs in the same annual cycle remain independent.
+
+After the release is prepared, staff may choose **Add to provider list**. The modal is prefilled from
+the retained snapshot, but requires review and uses the existing provider-directory permission,
+tenant, affiliation, duplicate-identifier, and consumer-assignment rules. Assignment is optional
+and prospective. The artifact receives a one-time provider link for provenance; its recipient
+snapshot and any signature evidence are not rewritten, and the document never becomes retroactive
+proof for a newly created obligation.
+
+Migration `20260927232039_SupportDurableOneOffReleases` adds the nullable one-off identity and
+recipient snapshot, the one-time provider link, nullable obligation linkage for external evidence,
+and provider email. On September 27, 2026, its pinned, guarded runner passed a rollback rehearsal,
+applied it to identity-marked `SatiDemo`, verified the 120-row migration boundary and complete
+schema, and passed an idempotency rerun. The separately authorized baseline capture and full reset
+also passed: anchor `2026-09-27`, request `d325db36-f16b-469a-bae7-888cf51e4a84`, audited outcome
+`demo.reset.completed`, worker marker `DEMO_COMPLIANCE_HISTORY_COMPLETE`, and post-reset API readiness
+HTTP 200 `Healthy`. The temporary exact-IP rule was removed and verified absent by the operator. The
+migration remains unapplied to Production.
+
+**Rejected:** silently adding every one-off recipient to the shared directory, keying one-offs by
+display name, letting one recipient supersede another in the same cycle, or treating later provider
+promotion as completion of a compliance requirement.
 
 For Demo, retained signature documents use the dedicated `satidemosignatures` account and private
 `signature-documents` container. Shared-key and public blob access are disabled; the API's managed

@@ -26,7 +26,9 @@ internal static class DocumentArtifactPersistence
         int? templateVersion = null,
         int? sourceContentId = null,
         int? sourceContentVersion = null,
-        long? releaseObligationId = null) =>
+        long? releaseObligationId = null,
+        Guid? oneOffReleaseId = null,
+        OneOffReleaseRecipientDto? oneOffRecipient = null) =>
         StageReplacementAsync(db, new ServerDocumentArtifact
         {
             PersonId = personId,
@@ -45,6 +47,10 @@ internal static class DocumentArtifactPersistence
             SourceContentId = sourceContentId,
             SourceContentVersion = sourceContentVersion,
             ReleaseObligationId = releaseObligationId,
+            OneOffReleaseId = oneOffReleaseId,
+            OneOffRecipientJson = oneOffRecipient is null
+                ? null
+                : JsonSerializer.Serialize(oneOffRecipient),
             BlankFieldsJson = JsonSerializer.Serialize(
                 (blankFields ?? []).Where(value => !string.IsNullOrWhiteSpace(value))
                     .Select(value => value.Trim()).Distinct(StringComparer.Ordinal).Order().ToArray())
@@ -89,7 +95,12 @@ internal static class DocumentArtifactPersistence
         artifact.ExternalNote,
         artifact.TemplateOwner, artifact.TemplateKey, artifact.TemplateVersion,
         artifact.SourceContentId, artifact.SourceContentVersion,
-        artifact.ReleaseObligationId);
+        artifact.ReleaseObligationId,
+        artifact.OneOffReleaseId,
+        string.IsNullOrWhiteSpace(artifact.OneOffRecipientJson)
+            ? null
+            : JsonSerializer.Deserialize<OneOffReleaseRecipientDto>(artifact.OneOffRecipientJson),
+        artifact.PromotedProviderId);
 
     private static async Task<ServerDocumentArtifact> StageReplacementAsync(
         ApiDbContext db,
@@ -101,6 +112,7 @@ internal static class DocumentArtifactPersistence
             candidate.Kind == replacement.Kind &&
             candidate.CycleStart == replacement.CycleStart &&
             candidate.ReleaseObligationId == replacement.ReleaseObligationId &&
+            candidate.OneOffReleaseId == replacement.OneOffReleaseId &&
             candidate.SupersededByArtifactId == null,
             cancellationToken);
         if (prior is not null)

@@ -153,6 +153,109 @@ public sealed class AgencyReleaseTests
     }
 
     [Fact]
+    public async Task LocalOneOffGenerationKeepsDifferentRecipientsInIndependentLiveSlots()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var person = await db.People.SingleAsync(candidate => candidate.Id == fixture.PersonOneId);
+            person.EffectiveDate ??= DateTime.Today.AddMonths(-2);
+            await db.SaveChangesAsync();
+        }
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var shared = new AgencyReleasePdfGenerator();
+        var service = new AgencyReleaseService(
+            fixture.Factory, session, shared, new MedicalReleasePdfGenerator(shared));
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+
+        await service.GenerateOneOffAsync(
+            fixture.PersonOneId,
+            ValidRequest() with { ContactName = "First independent recipient", IsDraft = true },
+            firstId);
+        await service.GenerateOneOffAsync(
+            fixture.PersonOneId,
+            ValidRequest() with { ContactName = "Second independent recipient" },
+            secondId);
+        await service.GenerateOneOffAsync(
+            fixture.PersonOneId,
+            ValidRequest() with { ContactName = "First independent recipient" },
+            firstId);
+
+        await using var verification = fixture.Factory.CreateDbContext();
+        var artifacts = await verification.DocumentArtifacts.AsNoTracking()
+            .Where(artifact => artifact.PersonId == fixture.PersonOneId &&
+                               artifact.Kind == AnnualDocumentKind.ReleaseAgency &&
+                               artifact.OneOffReleaseId != null)
+            .OrderBy(artifact => artifact.Id)
+            .ToListAsync();
+        Assert.Equal(3, artifacts.Count);
+        Assert.Equal(2, artifacts.Count(artifact => artifact.SupersededByArtifactId is null));
+        Assert.Single(artifacts, artifact =>
+            artifact.OneOffReleaseId == firstId && artifact.SupersededByArtifactId is null);
+        Assert.Single(artifacts, artifact =>
+            artifact.OneOffReleaseId == secondId && artifact.SupersededByArtifactId is null);
+        Assert.All(artifacts, artifact => Assert.NotNull(artifact.OneOffRecipientJson));
+    }
+
+    [Fact]
+    public async Task LocalOneOffPromotionAtomicallyCreatesTheDirectoryLinkAndFutureCompliance()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var person = await db.People.SingleAsync(candidate => candidate.Id == fixture.PersonOneId);
+            person.EffectiveDate = DateTime.Today.AddYears(-1);
+            await db.SaveChangesAsync();
+        }
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var shared = new AgencyReleasePdfGenerator();
+        var service = new AgencyReleaseService(
+            fixture.Factory, session, shared, new MedicalReleasePdfGenerator(shared));
+
+        await service.GenerateOneOffAsync(
+            fixture.PersonOneId,
+            ValidRequest() with { ContactName = "Promoted one-off recipient" },
+            Guid.NewGuid());
+        int artifactId;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            artifactId = await db.DocumentArtifacts
+                .Where(artifact => artifact.PersonId == fixture.PersonOneId &&
+                                   artifact.OneOffReleaseId != null &&
+                                   artifact.SupersededByArtifactId == null)
+                .Select(artifact => artifact.Id)
+                .SingleAsync();
+        }
+
+        var result = await service.PromoteOneOffToProviderAsync(
+            fixture.PersonOneId,
+            new PromoteOneOffReleaseRequest(
+                artifactId,
+                new SaveProviderRequest(
+                    "Waiver", "Promoted one-off recipient", "1 Main Street", "Augusta",
+                    "ME", "04330", null, "207-555-0147", 0, false,
+                    null, null, null, Email: "promoted@example.test"),
+                true,
+                DateTime.Today,
+                "Records recipient"));
+
+        await using var verification = fixture.Factory.CreateDbContext();
+        var provider = await verification.Providers.SingleAsync(item => item.Id == result.ProviderId);
+        Assert.Equal("promoted@example.test", provider.Email);
+        Assert.True(await verification.PersonProviders.AnyAsync(link =>
+            link.PersonId == fixture.PersonOneId && link.ProviderId == provider.Id));
+        var artifact = await verification.DocumentArtifacts.SingleAsync(item => item.Id == artifactId);
+        Assert.Equal(provider.Id, artifact.PromotedProviderId);
+        Assert.True(await verification.ReleaseObligations.AnyAsync(obligation =>
+            obligation.PersonId == fixture.PersonOneId &&
+            obligation.RecipientProviderId == provider.Id &&
+            obligation.Category == ReleaseObligationCategory.Agency));
+    }
+
+    [Fact]
     public async Task LocalGenerationLinksTheArtifactToTheExactSelectedRecipientObligation()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
@@ -325,6 +428,24 @@ public sealed class AgencyReleaseTests
         Assert.True(viewModel.IsEditorOpen);
         Assert.True(service.LastRequest?.IsDraft);
         Assert.False(service.LastRequest?.ConfirmedObtainedRoi);
+    }
+
+    [Fact]
+    public void OneOffPreparationOpensASeparateUnlinkedEditor()
+    {
+        var viewModel = ReadyViewModel(new RecordingAgencyReleaseService());
+        var obligation = Obligation(31, Guid.NewGuid(), ReleaseObligationCategory.Agency,
+            "Tracked Provider", recipientProviderId: 91);
+        viewModel.SetReleaseObligations([obligation]);
+
+        viewModel.BeginOneOffPreparation();
+
+        Assert.True(viewModel.IsEditorOpen);
+        Assert.True(viewModel.IsOneOffPreparation);
+        Assert.Null(viewModel.SelectedReleaseObligation);
+        Assert.Equal("ONE-OFF RELEASE", viewModel.EditorContextTitle);
+        Assert.Contains("will not create", viewModel.StatusMessage,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

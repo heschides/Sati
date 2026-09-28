@@ -84,6 +84,18 @@ public sealed record AgencyReleaseRequest(
 
 public sealed record AgencyReleaseResult(byte[] Pdf, string FileName);
 
+public sealed record PromoteOneOffReleaseRequest(
+    int DocumentArtifactId,
+    SaveProviderRequest Provider,
+    bool AssignToConsumer,
+    DateTime? AssignmentStartDate,
+    string? AssignmentRole);
+
+public sealed record OneOffReleasePromotionDto(
+    int DocumentArtifactId,
+    int ProviderId,
+    bool AssignedToConsumer);
+
 /// <summary>
 /// The single validation owner used before either local or API generation. This is
 /// document validity, not mere UI enablement, so it lives in the shared contract.

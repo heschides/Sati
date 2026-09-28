@@ -7034,6 +7034,13 @@ internal static partial class ApiEndpoints
             }
             var isRelease = documentKind is AnnualDocumentKind.ReleaseAgency or AnnualDocumentKind.ReleaseMedical;
             var release = request.Release;
+            if (!isRelease && request.OneOffReleaseId is not null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["oneOffReleaseId"] = ["Only agency and medical releases can be one-off documents."]
+                }, statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
             if (isRelease && release is null)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -7053,6 +7060,20 @@ internal static partial class ApiEndpoints
                         ["releaseObligationId"] =
                         ["A revocation cannot replace the document linked to a release obligation. Record the withdrawal separately so the historical authorization is preserved."]
                     }, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+                if (request.OneOffReleaseId == Guid.Empty)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["oneOffReleaseId"] = ["A one-off release identifier cannot be empty."]
+                    });
+                }
+                if (request.OneOffReleaseId is not null && request.ReleaseObligationId is not null)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["oneOffReleaseId"] = ["A release cannot be both one-off and linked to annual compliance."]
+                    });
                 }
             }
 
@@ -7191,7 +7212,14 @@ internal static partial class ApiEndpoints
                 origin,
                 generatedAtUtc, actor.UserId, pdf, fileName,
                 blankFields, cancellationToken, templateOwner, templateKey, templateVersion,
-                sourceContentId, sourceContentVersion, releaseLink.Obligation?.Id);
+                sourceContentId, sourceContentVersion, releaseLink.Obligation?.Id,
+                request.OneOffReleaseId,
+                request.OneOffReleaseId is null || release is null
+                    ? null
+                    : new OneOffReleaseRecipientDto(
+                        release.ContactType, release.ContactName.Trim(), release.Relationship,
+                        release.ContactAddress, release.ContactCity, release.ContactState,
+                        release.ContactPhone, release.ContactFax, release.ContactEmail));
             auditTrail.Record(actor, AuditActions.DocumentGenerated, "Person", personId,
                 JsonSerializer.Serialize(new
                 {
@@ -7204,13 +7232,123 @@ internal static partial class ApiEndpoints
                     sourceContentId,
                     sourceContentVersion,
                     releaseObligationId = releaseLink.Obligation?.ObligationId,
-                    releaseObligationKey = releaseLink.Obligation?.StableKey
+                    releaseObligationKey = releaseLink.Obligation?.StableKey,
+                    oneOffReleaseId = request.OneOffReleaseId
                 }));
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             PreventSensitiveResponseCaching(httpContext);
             return Results.File(pdf, "application/pdf", fileName);
+        });
+
+        api.MapPost("/people/{personId:int}/one-off-releases/{artifactId:int}/provider", async Task<IResult> (
+            int personId,
+            int artifactId,
+            PromoteOneOffReleaseRequest request,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            AuditTrail auditTrail,
+            ApiClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            if (!ProviderDirectoryRules.CanCreateOrEdit(actor.Permissions))
+                return Results.Forbid();
+            if (request.DocumentArtifactId != artifactId ||
+                !await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
+                return Results.NotFound();
+
+            var providerErrors = ValidateProvider(request.Provider);
+            if (providerErrors.Count > 0)
+                return Results.ValidationProblem(providerErrors);
+            var affiliationErrors = await ValidateProviderAffiliationAsync(
+                db, actor.AgencyId, request.Provider, 0, cancellationToken);
+            if (affiliationErrors.Count > 0)
+                return Results.ValidationProblem(affiliationErrors);
+
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken);
+            var artifact = await db.DocumentArtifacts.SingleOrDefaultAsync(candidate =>
+                candidate.Id == artifactId && candidate.PersonId == personId &&
+                candidate.AgencyId == actor.AgencyId &&
+                candidate.OneOffReleaseId != null &&
+                candidate.SupersededByArtifactId == null &&
+                candidate.Origin == nameof(DocumentArtifactOrigin.GeneratedInSati) &&
+                candidate.BlankFieldsJson == "[]", cancellationToken);
+            if (artifact is null)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["documentArtifactId"] = ["Choose a complete, current one-off release."]
+                });
+
+            if (artifact.PromotedProviderId is int existingProviderId)
+            {
+                var alreadyAssigned = await db.PersonProviders.AsNoTracking().AnyAsync(link =>
+                    link.PersonId == personId && link.ProviderId == existingProviderId &&
+                    link.EndDate == null, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return Results.Ok(new OneOffReleasePromotionDto(
+                    artifact.Id, existingProviderId, alreadyAssigned));
+            }
+
+            var duplicate = await FindDuplicateProviderAsync(
+                db, actor.AgencyId, request.Provider, null, cancellationToken);
+            if (duplicate is not null)
+                return duplicate;
+
+            var provider = new ServerProvider { AgencyId = actor.AgencyId };
+            ApplyProvider(provider, request.Provider);
+            db.Providers.Add(provider);
+            await db.SaveChangesAsync(cancellationToken);
+
+            if (request.AssignToConsumer)
+            {
+                var linkRequest = new SaveConsumerProviderRequest(
+                    provider.Id,
+                    request.AssignmentRole,
+                    false,
+                    request.AssignmentStartDate,
+                    null,
+                    false,
+                    await db.PersonProviders.CountAsync(link =>
+                        link.PersonId == personId, cancellationToken));
+                var linkErrors = ConsumerProviderRules.Validate(linkRequest);
+                if (linkErrors.Count > 0)
+                    return Results.ValidationProblem(linkErrors);
+                var conflict = await FindConsumerProviderConflictAsync(
+                    db, actor.AgencyId, personId, linkRequest, 0, cancellationToken);
+                if (conflict is not null)
+                    return conflict;
+                var link = new ServerPersonProvider
+                {
+                    PersonId = personId,
+                    AssignmentKnownOn = clock.Today
+                };
+                ApplyConsumerProvider(link, linkRequest);
+                db.PersonProviders.Add(link);
+                await db.SaveChangesAsync(cancellationToken);
+                var releasePerson = await LoadReleasePersonAsync(
+                    db, actor, personId, cancellationToken);
+                if (releasePerson is null)
+                    return Results.NotFound();
+                await ReconcileCurrentReleaseCyclesAsync(
+                    db, auditTrail, actor, releasePerson, clock,
+                    "one-off-provider-promoted", cancellationToken);
+            }
+
+            artifact.PromotedProviderId = provider.Id;
+            auditTrail.Record(actor, "release.one-off-provider-added", "DocumentArtifact",
+                artifact.Id, JsonSerializer.Serialize(new
+                {
+                    providerId = provider.Id,
+                    assignedToConsumer = request.AssignToConsumer,
+                    oneOffReleaseId = artifact.OneOffReleaseId
+                }));
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(new OneOffReleasePromotionDto(
+                artifact.Id, provider.Id, request.AssignToConsumer));
         });
 
         api.MapPost("/people/{personId:int}/documents/{kind}/external", async Task<IResult> (
@@ -10600,8 +10738,15 @@ internal static partial class ApiEndpoints
     {
         var errors = new Dictionary<string, string[]>();
         if (request.Type is not ("Waiver" or "Healthcare" or "Other")) errors["type"] = ["The provider type is invalid."];
-        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 200) errors["name"] = ["Provider name is required and must not exceed 200 characters."];
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 150)
+            errors["name"] = ["Provider name is required and must not exceed 150 characters."];
         if (request.OfferedServices < 0 || (request.OfferedServices & ~15) != 0) errors["offeredServices"] = ["The selected services are invalid."];
+        var email = request.Email?.Trim();
+        if (email is { Length: > 254 })
+            errors["email"] = ["The provider email must not exceed 254 characters."];
+        else if (!string.IsNullOrEmpty(email) &&
+                 !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email))
+            errors["email"] = ["Enter a valid provider email address, or leave it blank."];
 
         // Durable identifiers. An NPI carries a Luhn check digit, so a typo is
         // detectable here rather than surfacing years later as a failed match
@@ -10624,6 +10769,7 @@ internal static partial class ApiEndpoints
         provider.Type = request.Type; provider.Name = request.Name.Trim(); provider.Street = Normalize(request.Street);
         provider.City = Normalize(request.City); provider.State = Normalize(request.State); provider.Zip = Normalize(request.Zip);
         provider.PrimaryContact = Normalize(request.PrimaryContact); provider.Phone = Normalize(request.Phone);
+        provider.Email = Normalize(request.Email);
         provider.OfferedServices = request.OfferedServices; provider.ProvidesPassthroughService = request.ProvidesPassthroughService;
         provider.BillingLocationEis = Normalize(request.BillingLocationEis); provider.ProgramContact = Normalize(request.ProgramContact);
         provider.BillingContact = Normalize(request.BillingContact);

@@ -42,16 +42,29 @@ namespace Sati.Data
         public async Task<PersonProvider> SaveAsync(PersonProvider link)
         {
             await using var context = _contextFactory.CreateDbContext();
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable);
+            var saved = await SaveWithinTransactionAsync(context, link);
+            await transaction.CommitAsync();
+            return saved;
+        }
+
+        internal async Task<PersonProvider> SaveWithinTransactionAsync(
+            SatiContext context,
+            PersonProvider link,
+            CancellationToken cancellationToken = default)
+        {
+            var validation = ConsumerProviderRules.Validate(new SaveConsumerProviderRequest(
+                link.ProviderId, link.Role, link.IsPrimaryCare, link.StartDate,
+                link.EndDate, link.HasActiveRelease, link.SortOrder));
+            if (validation.Count > 0)
+                throw new InvalidOperationException(string.Join(" ",
+                    validation.Values.SelectMany(messages => messages)));
             await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             await EnsureOwnedPersonAsync(context, link.PersonId);
 
             link.Role = Normalize(link.Role);
             await GuardAsync(context, link);
-            // Reconciliation derives release obligations from the provider link id. The link
-            // therefore has to be flushed first, but both saves belong to one transaction so a
-            // reconciliation failure cannot leave an assignment without its compliance rows.
-            await using var transaction = await context.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable);
 
             if (link.Id == 0)
             {
@@ -59,12 +72,11 @@ namespace Sati.Data
                 // provider added after the annual date; legacy nulls remain explicit.
                 link.AssignmentKnownOn = DateTime.Today;
                 context.PersonProviders.Add(link);
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(cancellationToken);
                 await ReconcileCurrentReleaseCyclesAsync(
                     context, link.PersonId, "provider-created");
                 if (context.ChangeTracker.HasChanges())
-                    await context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                    await context.SaveChangesAsync(cancellationToken);
                 return link;
             }
 
@@ -80,12 +92,11 @@ namespace Sati.Data
             tracked.EndDate = link.EndDate;
             tracked.HasActiveRelease = link.HasActiveRelease;
             tracked.SortOrder = link.SortOrder;
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
             await ReconcileCurrentReleaseCyclesAsync(
                 context, tracked.PersonId, "provider-updated");
             if (context.ChangeTracker.HasChanges())
-                await context.SaveChangesAsync();
-            await transaction.CommitAsync();
+                await context.SaveChangesAsync(cancellationToken);
             return tracked;
         }
 

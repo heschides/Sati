@@ -28,6 +28,9 @@ public sealed class DocumentArtifact
     public string? ExternalNote { get; private set; }
     public int? SupersededByArtifactId { get; private set; }
     public long? ReleaseObligationId { get; private set; }
+    public Guid? OneOffReleaseId { get; private set; }
+    public string? OneOffRecipientJson { get; private set; }
+    public int? PromotedProviderId { get; private set; }
 
     private DocumentArtifact() { }
 
@@ -47,13 +50,31 @@ public sealed class DocumentArtifact
         int? templateVersion = null,
         int? sourceContentId = null,
         int? sourceContentVersion = null,
-        long? releaseObligationId = null)
+        long? releaseObligationId = null,
+        Guid? oneOffReleaseId = null,
+        OneOffReleaseRecipientDto? oneOffRecipient = null)
     {
         if (origin == DocumentArtifactOrigin.RecordedAsExternal)
             throw new ArgumentException("Generated content cannot use the external origin.", nameof(origin));
         ArgumentNullException.ThrowIfNull(content);
         if (content.Length == 0)
             throw new ArgumentException("Generated document content cannot be empty.", nameof(content));
+        if (releaseObligationId is not null && oneOffReleaseId is not null)
+            throw new ArgumentException(
+                "A release cannot be both one-off and linked to annual compliance.",
+                nameof(oneOffReleaseId));
+        if (oneOffReleaseId == Guid.Empty)
+            throw new ArgumentException(
+                "A one-off release identifier cannot be empty.", nameof(oneOffReleaseId));
+        if (oneOffReleaseId is not null &&
+            kind is not (AnnualDocumentKind.ReleaseAgency or AnnualDocumentKind.ReleaseMedical))
+            throw new ArgumentException(
+                "Only agency and medical releases can be one-off documents.",
+                nameof(oneOffReleaseId));
+        if ((oneOffReleaseId is null) != (oneOffRecipient is null))
+            throw new ArgumentException(
+                "A one-off release identifier and recipient snapshot must be recorded together.",
+                nameof(oneOffRecipient));
 
         return new DocumentArtifact
         {
@@ -73,6 +94,10 @@ public sealed class DocumentArtifact
             SourceContentId = sourceContentId,
             SourceContentVersion = sourceContentVersion,
             ReleaseObligationId = releaseObligationId,
+            OneOffReleaseId = oneOffReleaseId,
+            OneOffRecipientJson = oneOffRecipient is null
+                ? null
+                : JsonSerializer.Serialize(oneOffRecipient),
             BlankFieldsJson = JsonSerializer.Serialize(
                 (blankFields ?? []).Where(value => !string.IsNullOrWhiteSpace(value))
                     .Select(value => value.Trim()).Distinct(StringComparer.Ordinal).Order().ToArray())
@@ -113,6 +138,21 @@ public sealed class DocumentArtifact
         if (SupersededByArtifactId is not null && SupersededByArtifactId != Id)
             throw new InvalidOperationException("This document artifact has already been superseded.");
         SupersededByArtifactId = replacementArtifactId;
+    }
+
+    public void MarkPromotedToProvider(int providerId)
+    {
+        if (providerId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(providerId));
+        if (OneOffReleaseId is null)
+            throw new InvalidOperationException("Only a one-off release can be added to the provider directory.");
+        if (Origin != DocumentArtifactOrigin.GeneratedInSati || BlankFieldsJson != "[]")
+            throw new InvalidOperationException(
+                "Only a complete, prepared one-off release can be added to the provider directory.");
+        if (PromotedProviderId is not null && PromotedProviderId != providerId)
+            throw new InvalidOperationException(
+                "This one-off release has already been added to the provider directory.");
+        PromotedProviderId = providerId;
     }
 
     private static string? Normalize(string? value) =>

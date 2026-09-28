@@ -43,6 +43,12 @@
                     <TextBlock Text="{Binding WorkspaceTitle}"
                                FontSize="11" FontWeight="Bold"
                                Foreground="{DynamicResource AccentBrush}" />
+                    <TextBlock Text="{Binding EditorContextTitle}"
+                               Margin="0,3,0,0"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               AutomationProperties.Name="Release editor context" />
                     <TextBlock Text="{Binding PersonName}"
                                Margin="0,4,0,4" FontSize="20" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
@@ -81,6 +87,23 @@
                       AutomationProperties.Name="Agency release entry form">
             <StackPanel>
                 <Border Style="{StaticResource ReleaseCard}"
+                        Visibility="{Binding IsOneOffPreparation, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Background="{DynamicResource PersonGroupAltBrush}"
+                        AutomationProperties.Name="One-off release explanation">
+                    <StackPanel>
+                        <TextBlock Text="ONE-OFF RECIPIENT"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   AutomationProperties.HeadingLevel="Level3" />
+                        <TextBlock Text="Enter this recipient below. Sati will prepare and retain the document for signing, but it will not create a provider-directory record or satisfy an annual provider-release requirement."
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource ReleaseCard}"
+                        Visibility="{Binding IsOneOffPreparation, Converter={StaticResource InverseBoolToVisibilityConverter}}"
                         AutomationProperties.Name="Tracked recipient obligation selection">
                     <StackPanel>
                         <TextBlock Text="TRACKED RECIPIENT OBLIGATION"

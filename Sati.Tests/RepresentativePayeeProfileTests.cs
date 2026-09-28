@@ -1,9 +1,12 @@
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Data;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Sati.Contracts.V1;
+using Sati.Converters;
 using Sati.Data.Cloud;
 using Xunit;
 
@@ -99,6 +102,67 @@ public sealed class RepresentativePayeeProfileTests
         Assert.Contains("RepPayeeRegularCheckRequestNeeds", xaml, StringComparison.Ordinal);
         Assert.Contains("It does not request or authorize a check", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxLength=\"2000\"", xaml, StringComparison.Ordinal);
+        Assert.Equal(2, xaml.Split("Converter={StaticResource BooleanRadioChoiceConverter}").Length - 1);
+        Assert.Contains("ConverterParameter=True", xaml, StringComparison.Ordinal);
+        Assert.Contains("ConverterParameter=False", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "CaseManagerIsRepPayee, Mode=TwoWay, Converter={StaticResource InverseBoolConverter}",
+            xaml,
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, "True", true)]
+    [InlineData(true, "False", false)]
+    [InlineData(false, "True", false)]
+    [InlineData(false, "False", true)]
+    public void RadioChoiceConverterDisplaysTheMatchingBoolean(
+        bool value,
+        string parameter,
+        bool expected)
+    {
+        var converter = new BooleanRadioChoiceConverter();
+
+        var actual = converter.Convert(value, typeof(bool), parameter, CultureInfo.InvariantCulture);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
+    [InlineData("True", true)]
+    [InlineData("False", false)]
+    public void RadioChoiceConverterWritesOnlyTheButtonThatBecameChecked(
+        string parameter,
+        bool expected)
+    {
+        var converter = new BooleanRadioChoiceConverter();
+
+        var checkedValue = converter.ConvertBack(
+            true,
+            typeof(bool),
+            parameter,
+            CultureInfo.InvariantCulture);
+        var uncheckedValue = converter.ConvertBack(
+            false,
+            typeof(bool),
+            parameter,
+            CultureInfo.InvariantCulture);
+
+        Assert.Equal(expected, checkedValue);
+        Assert.Same(Binding.DoNothing, uncheckedValue);
+    }
+
+    [Fact]
+    public void RadioChoiceConverterRejectsAnInvalidChoiceParameter()
+    {
+        var converter = new BooleanRadioChoiceConverter();
+
+        Assert.Same(
+            DependencyProperty.UnsetValue,
+            converter.Convert(true, typeof(bool), "invalid", CultureInfo.InvariantCulture));
+        Assert.Same(
+            Binding.DoNothing,
+            converter.ConvertBack(true, typeof(bool), "invalid", CultureInfo.InvariantCulture));
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Forms;
 using Sati.Models;
+using System.Data;
 using System.Text.Json;
 
 namespace Sati.Data;
@@ -27,14 +28,30 @@ public sealed class AgencyReleaseService(
         CancellationToken cancellationToken = default)
     {
         return await GenerateAsync(
-            personId, request, AnnualDocumentKind.ReleaseAgency, null, cancellationToken);
+            personId, request, AnnualDocumentKind.ReleaseAgency, null, null, cancellationToken);
     }
 
     public Task<AgencyReleaseResult> GenerateMedicalAsync(
         int personId,
         AgencyReleaseRequest request,
         CancellationToken cancellationToken = default) =>
-        GenerateAsync(personId, request, AnnualDocumentKind.ReleaseMedical, null, cancellationToken);
+        GenerateAsync(personId, request, AnnualDocumentKind.ReleaseMedical, null, null, cancellationToken);
+
+    public Task<AgencyReleaseResult> GenerateOneOffAsync(
+        int personId,
+        AgencyReleaseRequest request,
+        Guid oneOffReleaseId,
+        CancellationToken cancellationToken = default) =>
+        GenerateAsync(personId, request, AnnualDocumentKind.ReleaseAgency, null,
+            RequiredOneOffReleaseId(oneOffReleaseId), cancellationToken);
+
+    public Task<AgencyReleaseResult> GenerateOneOffMedicalAsync(
+        int personId,
+        AgencyReleaseRequest request,
+        Guid oneOffReleaseId,
+        CancellationToken cancellationToken = default) =>
+        GenerateAsync(personId, request, AnnualDocumentKind.ReleaseMedical, null,
+            RequiredOneOffReleaseId(oneOffReleaseId), cancellationToken);
 
     public Task<AgencyReleaseResult> GenerateForObligationAsync(
         int personId,
@@ -46,6 +63,7 @@ public sealed class AgencyReleaseService(
             request,
             AnnualDocumentKind.ReleaseAgency,
             RequiredObligationId(releaseObligationId),
+            null,
             cancellationToken);
 
     public Task<AgencyReleaseResult> GenerateMedicalForObligationAsync(
@@ -58,6 +76,7 @@ public sealed class AgencyReleaseService(
             request,
             AnnualDocumentKind.ReleaseMedical,
             RequiredObligationId(releaseObligationId),
+            null,
             cancellationToken);
 
     private async Task<AgencyReleaseResult> GenerateAsync(
@@ -65,12 +84,15 @@ public sealed class AgencyReleaseService(
         AgencyReleaseRequest request,
         AnnualDocumentKind kind,
         Guid? releaseObligationId,
+        Guid? oneOffReleaseId,
         CancellationToken cancellationToken)
     {
         AgencyReleaseRules.EnsureValid(request);
         if (request.IsRevocation && releaseObligationId is not null)
             throw new InvalidOperationException(
                 "A revocation cannot replace the document linked to a release obligation. Record the withdrawal separately so the historical authorization is preserved.");
+        if (releaseObligationId is not null && oneOffReleaseId is not null)
+            throw new InvalidOperationException("A release cannot be both one-off and linked to annual compliance.");
         var actor = sessionService.CurrentUser
             ?? throw new InvalidOperationException("An agency release cannot be generated without a signed-in user.");
 
@@ -131,7 +153,9 @@ public sealed class AgencyReleaseService(
             fileName,
             request.IsDraft ? DraftBlankFields(request) : [],
             cancellationToken,
-            releaseObligationId: releaseObligation?.Id);
+            releaseObligationId: releaseObligation?.Id,
+            oneOffReleaseId: oneOffReleaseId,
+            oneOffRecipient: oneOffReleaseId is null ? null : ToOneOffRecipient(request));
 
         LocalAuditTrail.Record(
             context,
@@ -218,6 +242,131 @@ public sealed class AgencyReleaseService(
         if (value == Guid.Empty)
             throw new ArgumentException("A release obligation is required.", nameof(value));
         return value;
+    }
+
+    private static Guid RequiredOneOffReleaseId(Guid value)
+    {
+        if (value == Guid.Empty)
+            throw new ArgumentException("A one-off release identifier is required.", nameof(value));
+        return value;
+    }
+
+    private static OneOffReleaseRecipientDto ToOneOffRecipient(AgencyReleaseRequest request) =>
+        new(request.ContactType,
+            request.ContactName?.Trim()
+                ?? throw new InvalidOperationException("A one-off release recipient is required."),
+            request.Relationship,
+            request.ContactAddress, request.ContactCity, request.ContactState,
+            request.ContactPhone, request.ContactFax, request.ContactEmail);
+
+    public async Task<OneOffReleasePromotionDto> PromoteOneOffToProviderAsync(
+        int personId,
+        PromoteOneOffReleaseRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var actor = sessionService.CurrentUser
+            ?? throw new InvalidOperationException("A signed-in user is required.");
+        if (!ProviderDirectoryRules.CanCreateOrEdit(actor.Permissions))
+            throw new UnauthorizedAccessException("Your account cannot change the provider directory.");
+
+        if (request.AssignToConsumer && request.AssignmentStartDate is null)
+            throw new InvalidOperationException("Enter the provider assignment start date.");
+        var provider = ToProvider(request.Provider);
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
+        if (!await LocalTenantAccess.OwnsPersonAsync(
+                context, actor, personId, cancellationToken))
+            throw new InvalidOperationException("That consumer is not on your current caseload.");
+        var artifact = await context.DocumentArtifacts.SingleOrDefaultAsync(candidate =>
+            candidate.Id == request.DocumentArtifactId &&
+            candidate.PersonId == personId && candidate.AgencyId == actor.AgencyId &&
+            candidate.OneOffReleaseId != null &&
+            candidate.SupersededByArtifactId == null &&
+            candidate.Origin == DocumentArtifactOrigin.GeneratedInSati &&
+            candidate.BlankFieldsJson == "[]",
+            cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Choose a complete, current one-off release.");
+        if (artifact.PromotedProviderId is int existingProviderId)
+        {
+            var alreadyAssigned = await context.PersonProviders.AsNoTracking().AnyAsync(link =>
+                link.PersonId == personId && link.ProviderId == existingProviderId &&
+                link.EndDate == null, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new OneOffReleasePromotionDto(
+                artifact.Id, existingProviderId, alreadyAssigned);
+        }
+
+        provider = await new ProviderService(contextFactory, sessionService)
+            .AddWithinTransactionAsync(context, provider, cancellationToken);
+
+        if (request.AssignToConsumer)
+        {
+            await new ConsumerProviderService(contextFactory, sessionService)
+                .SaveWithinTransactionAsync(
+                context,
+                new PersonProvider
+                {
+                    PersonId = personId,
+                    ProviderId = provider.Id,
+                    Role = request.AssignmentRole,
+                    StartDate = request.AssignmentStartDate!.Value.Date
+                }, cancellationToken);
+        }
+
+        artifact.MarkPromotedToProvider(provider.Id);
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new OneOffReleasePromotionDto(
+            artifact.Id, provider.Id, request.AssignToConsumer);
+    }
+
+    private static Provider ToProvider(SaveProviderRequest request)
+    {
+        if (!Enum.TryParse<ProviderType>(request.Type, out var providerType))
+            throw new InvalidOperationException("Choose a valid provider type.");
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 150)
+            throw new InvalidOperationException(
+                "Provider name is required and must not exceed 150 characters.");
+        var email = request.Email?.Trim();
+        if (email is { Length: > 254 } ||
+            !string.IsNullOrEmpty(email) &&
+            !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email))
+            throw new InvalidOperationException("Enter a valid provider email address, or leave it blank.");
+        if (request.OfferedServices < 0 || (request.OfferedServices & ~15) != 0)
+            throw new InvalidOperationException("The selected provider services are invalid.");
+        if (!string.IsNullOrWhiteSpace(request.Npi) && !BillingRules.IsValidNpi(request.Npi.Trim()))
+            throw new InvalidOperationException(
+                "The National Provider Identifier must be 10 digits with a valid check digit.");
+        if (request.MaineCareProviderId?.Trim() is { Length: > 30 })
+            throw new InvalidOperationException(
+                "The MaineCare provider identifier must not exceed 30 characters.");
+
+        return new Provider
+        {
+            Type = providerType,
+            Name = request.Name.Trim(),
+            Street = request.Street,
+            City = request.City,
+            State = request.State,
+            Zip = request.Zip,
+            PrimaryContact = request.PrimaryContact,
+            Phone = request.Phone,
+            Email = email,
+            OfferedServices = (WaiverService)request.OfferedServices,
+            ProvidesPassthroughService = request.ProvidesPassthroughService,
+            BillingLocationEis = request.BillingLocationEis,
+            ProgramContact = request.ProgramContact,
+            BillingContact = request.BillingContact,
+            Npi = request.Npi,
+            MaineCareProviderId = request.MaineCareProviderId,
+            MedicalKind = Enum.TryParse<MedicalProviderKind>(
+                request.MedicalKind, out var medicalKind) ? medicalKind : null,
+            ParentProviderId = request.ParentProviderId
+        };
     }
 
     internal static string SuggestedFileName(

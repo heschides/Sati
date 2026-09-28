@@ -25,13 +25,15 @@ internal static class DocumentArtifactStore
         int? templateVersion = null,
         int? sourceContentId = null,
         int? sourceContentVersion = null,
-        long? releaseObligationId = null)
+        long? releaseObligationId = null,
+        Guid? oneOffReleaseId = null,
+        OneOffReleaseRecipientDto? oneOffRecipient = null)
     {
         var artifact = DocumentArtifact.Generated(
             personId, agencyId, kind, cycleStart, origin, generatedAtUtc,
             generatedByUserId, content, suggestedFileName, blankFields,
             templateOwner, templateKey, templateVersion, sourceContentId, sourceContentVersion,
-            releaseObligationId);
+            releaseObligationId, oneOffReleaseId, oneOffRecipient);
         return await StageReplacementAsync(context, artifact, personId, kind, cycleStart, cancellationToken);
     }
 
@@ -72,7 +74,12 @@ internal static class DocumentArtifactStore
         artifact.TemplateVersion,
         artifact.SourceContentId,
         artifact.SourceContentVersion,
-        artifact.ReleaseObligationId);
+        artifact.ReleaseObligationId,
+        artifact.OneOffReleaseId,
+        string.IsNullOrWhiteSpace(artifact.OneOffRecipientJson)
+            ? null
+            : JsonSerializer.Deserialize<OneOffReleaseRecipientDto>(artifact.OneOffRecipientJson),
+        artifact.PromotedProviderId);
 
     private static async Task<DocumentArtifact> StageReplacementAsync(
         SatiContext context,
@@ -86,6 +93,7 @@ internal static class DocumentArtifactStore
             candidate.PersonId == personId && candidate.Kind == kind &&
             candidate.CycleStart == cycleStart.Date &&
             candidate.ReleaseObligationId == replacement.ReleaseObligationId &&
+            candidate.OneOffReleaseId == replacement.OneOffReleaseId &&
             candidate.SupersededByArtifactId == null,
             cancellationToken);
 

@@ -13,6 +13,7 @@ public partial class AgencyReleaseViewModel : ObservableObject
     private readonly List<ReleaseObligationDto> _knownReleaseObligations = [];
     private int? _personId;
     private int _personVersion;
+    private Guid? _oneOffReleaseId;
 
     public AgencyReleaseViewModel(IAgencyReleaseService service)
     {
@@ -143,6 +144,10 @@ public partial class AgencyReleaseViewModel : ObservableObject
     [ObservableProperty]
     private bool isEditorOpen;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EditorContextTitle))]
+    private bool isOneOffPreparation;
+
     public bool HasPerson => _personId.HasValue;
     public bool CanGenerate => HasPerson && !IsBusy;
     public bool HasReleaseObligationChoices => ReleaseObligationChoices.Count != 0;
@@ -167,6 +172,9 @@ public partial class AgencyReleaseViewModel : ObservableObject
     public string WorkspaceDescription => SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
         ? "Prepare Sati's medical release for a healthcare recipient. Consumer identity, guardian, agency, and case-manager details come from the signed-in record."
         : "Prepare Sati's agency release to disclose or obtain information. Consumer identity, guardian, agency, and case-manager details come from the signed-in record.";
+    public string EditorContextTitle => IsOneOffPreparation
+        ? "ONE-OFF RELEASE"
+        : "TRACKED PROVIDER RELEASE";
     public string GenerateButtonText => SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
         ? "Generate medical release PDF"
         : "Generate agency release PDF";
@@ -236,6 +244,8 @@ public partial class AgencyReleaseViewModel : ObservableObject
         PersonName = person?.FullName ?? "Select a consumer";
         _knownReleaseObligations.Clear();
         ResetInputs();
+        _oneOffReleaseId = null;
+        IsOneOffPreparation = false;
         IsEditorOpen = false;
         RebuildReleaseObligationChoices();
         OnPropertyChanged(nameof(HasPerson));
@@ -248,6 +258,8 @@ public partial class AgencyReleaseViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(item);
         if (!item.CanPrepare)
             return;
+        IsOneOffPreparation = false;
+        _oneOffReleaseId = null;
         var kind = item.Category == nameof(ReleaseObligationCategory.Medical)
             ? AnnualDocumentKind.ReleaseMedical
             : item.Category == nameof(ReleaseObligationCategory.Agency)
@@ -263,6 +275,21 @@ public partial class AgencyReleaseViewModel : ObservableObject
         }
         ValidationMessage = string.Empty;
         StatusMessage = "Complete the release, save a draft if needed, then prepare the final signing copy.";
+        IsEditorOpen = true;
+    }
+
+    public void BeginOneOffPreparation()
+    {
+        if (!HasPerson)
+            return;
+
+        ResetInputs();
+        _oneOffReleaseId = Guid.NewGuid();
+        SelectedReleaseKind = ReleaseKindChoices.Single(
+            choice => choice.Kind == AnnualDocumentKind.ReleaseAgency);
+        IsOneOffPreparation = true;
+        ValidationMessage = string.Empty;
+        StatusMessage = "Enter the recipient directly. This release will not create a provider-directory entry or an annual compliance obligation.";
         IsEditorOpen = true;
     }
 
@@ -347,11 +374,15 @@ public partial class AgencyReleaseViewModel : ObservableObject
         {
             var result = (SelectedReleaseKind.Kind, selectedObligation) switch
             {
+                (AnnualDocumentKind.ReleaseMedical, null) when IsOneOffPreparation && _oneOffReleaseId is Guid oneOffId =>
+                    await _service.GenerateOneOffMedicalAsync(personId, request, oneOffId),
                 (AnnualDocumentKind.ReleaseMedical, not null) =>
                     await _service.GenerateMedicalForObligationAsync(
                         personId, request, selectedObligation.ObligationId),
                 (AnnualDocumentKind.ReleaseMedical, null) =>
                     await _service.GenerateMedicalAsync(personId, request),
+                (_, null) when IsOneOffPreparation && _oneOffReleaseId is Guid oneOffId =>
+                    await _service.GenerateOneOffAsync(personId, request, oneOffId),
                 (_, not null) =>
                     await _service.GenerateForObligationAsync(
                         personId, request, selectedObligation.ObligationId),

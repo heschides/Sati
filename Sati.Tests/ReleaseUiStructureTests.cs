@@ -164,6 +164,12 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("AutomationProperties.Name=\"Exact tracked release obligation\"", editor);
         Assert.Contains("durable identifier, not the recipient's displayed name", editor);
         Assert.Contains("ClearReleaseObligationLinkCommand", editor);
+        Assert.Contains("New one-off release", obligations);
+        Assert.Contains("PrepareOneOffReleaseCommand", obligations);
+        Assert.Contains("Add to provider list", obligations);
+        Assert.Contains("SaveOneOffProviderCommand", obligations);
+        Assert.Contains("The original one-off release stays unchanged", obligations);
+        Assert.Contains("One-off release explanation", editor);
         Assert.Contains("AutomationProperties.Name=\"Release attestation completion date\"", obligations);
         Assert.Contains("AutomationProperties.Name=\"Release withdrawal explanation\"", obligations);
         Assert.Contains(

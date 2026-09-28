@@ -1976,12 +1976,12 @@
                                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                                 <RadioButton Content="Yes"
                                                              GroupName="RepresentativePayeeChoice"
-                                                             IsChecked="{Binding CaseManagerIsRepPayee, Mode=TwoWay}"
+                                                             IsChecked="{Binding CaseManagerIsRepPayee, Mode=TwoWay, Converter={StaticResource BooleanRadioChoiceConverter}, ConverterParameter=True}"
                                                              Margin="0,0,18,0"
                                                              AutomationProperties.Name="Case manager is representative payee, yes" />
                                                 <RadioButton Content="No"
                                                              GroupName="RepresentativePayeeChoice"
-                                                             IsChecked="{Binding CaseManagerIsRepPayee, Mode=TwoWay, Converter={StaticResource InverseBoolConverter}}"
+                                                             IsChecked="{Binding CaseManagerIsRepPayee, Mode=TwoWay, Converter={StaticResource BooleanRadioChoiceConverter}, ConverterParameter=False}"
                                                              AutomationProperties.Name="Case manager is representative payee, no" />
                                             </StackPanel>
                                         </StackPanel>

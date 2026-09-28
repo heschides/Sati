@@ -315,7 +315,7 @@ internal static class ContractMapper
     public static ProviderDto ToProvider(ServerProvider p) => new(
         p.Id, p.Type, p.Name, p.Street, p.City, p.State, p.Zip, p.PrimaryContact, p.Phone,
         p.OfferedServices, p.ProvidesPassthroughService, p.BillingLocationEis, p.ProgramContact, p.BillingContact,
-        p.Npi, p.MaineCareProviderId, p.MedicalKind, p.ParentProviderId);
+        p.Npi, p.MaineCareProviderId, p.MedicalKind, p.ParentProviderId, p.Email);
 
     public static AtRequestDto ToAtRequest(ServerAtRequest a) => new(
         a.Id, a.PersonId, a.ClientName, a.ClientEvergreenId, a.CaseManagerName, a.CaseManagerEmail,

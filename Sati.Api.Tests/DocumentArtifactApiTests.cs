@@ -312,6 +312,186 @@ public sealed class DocumentArtifactApiTests(SatiApiFactory factory)
     }
 
     [Fact]
+    public async Task ExternallySignedOneOffReleaseIsRetainedWithoutCreatingCompliance()
+    {
+        const int personId = 101;
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        await factory.DeleteExternalSignatureEvidenceAsync(personId);
+        await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.ReleaseAgency);
+        try
+        {
+            var generated = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/documents/{AnnualDocumentKind.ReleaseAgency}",
+                new RenderAnnualDocumentRequest(
+                    Release: ValidRelease(), OneOffReleaseId: Guid.NewGuid()));
+            generated.EnsureSuccessStatusCode();
+            var pdf = await generated.Content.ReadAsByteArrayAsync();
+
+            var person = (await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload"))!
+                .Single(candidate => candidate.Id == personId);
+            var target = AnnualDocumentCycle.CurrentStart(
+                person.EffectiveDate!.Value, DateTime.Today);
+            var artifacts = await owner.GetFromJsonAsync<List<DocumentArtifactDto>>(
+                $"/api/v1/people/{personId}/documents?cycleStart={target:yyyy-MM-dd}");
+            var artifact = Assert.Single(artifacts!, item =>
+                item.Kind == nameof(AnnualDocumentKind.ReleaseAgency) &&
+                item.ReleaseObligationRecordId is null &&
+                item.OneOffReleaseId is not null);
+
+            var request = new RecordExternalSignatureRequest(
+                Guid.NewGuid(), personId, artifact.Id, pdf,
+                ExternalSignatureMethod.WetInk, DateTime.Today,
+                "Person One", SignerCapacity.Consumer,
+                true, true, true, "One-off recipient; reviewed in person.");
+            var recorded = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/external-signatures", request);
+
+            Assert.True(recorded.IsSuccessStatusCode,
+                await recorded.Content.ReadAsStringAsync());
+            var evidence = (await recorded.Content
+                .ReadFromJsonAsync<ExternalSignatureEvidenceDto>())!;
+            Assert.Equal(artifact.Id, evidence.DocumentArtifactId);
+            Assert.Null(evidence.ReleaseObligationId);
+        }
+        finally
+        {
+            await factory.DeleteExternalSignatureEvidenceAsync(personId);
+            await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.ReleaseAgency);
+        }
+    }
+
+    [Fact]
+    public async Task SeparateOneOffReleasesRemainVisibleAndOneCanBecomeAProviderWithoutChangingItsSnapshot()
+    {
+        const int personId = 101;
+        var firstOneOffId = Guid.NewGuid();
+        var secondOneOffId = Guid.NewGuid();
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var firstName = $"One-off Clinic {unique}";
+        var secondName = $"One-off Records {unique}";
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        using var otherAgency = await factory.CreateAuthenticatedClientAsync("case-manager-two");
+        await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.ReleaseAgency);
+
+        try
+        {
+            var firstRelease = ValidRelease() with
+            {
+                ContactName = firstName,
+                ContactEmail = $"clinic-{unique}@example.test"
+            };
+            var secondRelease = ValidRelease() with { ContactName = secondName };
+            (await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/documents/{AnnualDocumentKind.ReleaseAgency}",
+                new RenderAnnualDocumentRequest(
+                    Release: firstRelease, OneOffReleaseId: firstOneOffId)))
+                .EnsureSuccessStatusCode();
+            (await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/documents/{AnnualDocumentKind.ReleaseAgency}",
+                new RenderAnnualDocumentRequest(
+                    Release: secondRelease, OneOffReleaseId: secondOneOffId)))
+                .EnsureSuccessStatusCode();
+
+            var person = (await owner.GetFromJsonAsync<List<PersonDto>>("/api/v1/caseload"))!
+                .Single(candidate => candidate.Id == personId);
+            var target = AnnualDocumentCycle.CurrentStart(
+                person.EffectiveDate!.Value, DateTime.Today);
+            var artifacts = (await owner.GetFromJsonAsync<List<DocumentArtifactDto>>(
+                $"/api/v1/people/{personId}/documents?cycleStart={target:yyyy-MM-dd}"))!;
+            var oneOffs = artifacts.Where(item =>
+                    item.Kind == nameof(AnnualDocumentKind.ReleaseAgency) &&
+                    item.OneOffReleaseId is not null)
+                .ToList();
+            Assert.Equal(2, oneOffs.Count);
+            var firstArtifact = Assert.Single(oneOffs,
+                item => item.OneOffReleaseId == firstOneOffId);
+            Assert.Equal(firstName, firstArtifact.OneOffRecipient?.ContactName);
+
+            var promotion = new PromoteOneOffReleaseRequest(
+                firstArtifact.Id,
+                new SaveProviderRequest(
+                    "Other", firstName, "1 Medical Center", "Portland", "ME", "04101",
+                    null, "207-555-0100", 0, false, null, null, null,
+                    Email: $"clinic-{unique}@example.test"),
+                true,
+                DateTime.Today,
+                "Records recipient");
+            var crossTenantResponse = await otherAgency.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/one-off-releases/{firstArtifact.Id}/provider",
+                promotion);
+            Assert.Equal(HttpStatusCode.NotFound, crossTenantResponse.StatusCode);
+
+            var promotedResponse = await owner.PostAsJsonAsync(
+                $"/api/v1/people/{personId}/one-off-releases/{firstArtifact.Id}/provider",
+                promotion);
+            Assert.True(promotedResponse.IsSuccessStatusCode,
+                await promotedResponse.Content.ReadAsStringAsync());
+            var promoted = (await promotedResponse.Content
+                .ReadFromJsonAsync<OneOffReleasePromotionDto>())!;
+            Assert.True(promoted.AssignedToConsumer);
+
+            var directory = await owner.GetFromJsonAsync<List<ProviderDto>>("/api/v1/providers");
+            var provider = Assert.Single(directory!, item => item.Id == promoted.ProviderId);
+            Assert.Equal(firstName, provider.Name);
+            Assert.Equal($"clinic-{unique}@example.test", provider.Email);
+            var links = await owner.GetFromJsonAsync<List<ConsumerProviderDto>>(
+                $"/api/v1/people/{personId}/providers");
+            Assert.Contains(links!, link => link.ProviderId == provider.Id);
+
+            var refreshed = (await owner.GetFromJsonAsync<List<DocumentArtifactDto>>(
+                $"/api/v1/people/{personId}/documents?cycleStart={target:yyyy-MM-dd}"))!;
+            var original = Assert.Single(refreshed,
+                item => item.OneOffReleaseId == firstOneOffId);
+            Assert.Equal(provider.Id, original.PromotedProviderId);
+            Assert.Equal(firstName, original.OneOffRecipient?.ContactName);
+            Assert.Single(refreshed,
+                item => item.OneOffReleaseId == secondOneOffId);
+        }
+        finally
+        {
+            await factory.DeleteDocumentArtifactsAsync(personId, AnnualDocumentKind.ReleaseAgency);
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            var providerIds = await db.Providers
+                .Where(provider => provider.Name == firstName || provider.Name == secondName)
+                .Select(provider => provider.Id)
+                .ToListAsync();
+            var obligationIds = await db.ReleaseObligations
+                .Where(obligation => obligation.PersonId == personId &&
+                                     obligation.RecipientProviderId != null &&
+                                     providerIds.Contains(obligation.RecipientProviderId.Value))
+                .Select(obligation => obligation.Id)
+                .ToListAsync();
+            await db.ReleaseAuthorizationEvents
+                .Where(item => obligationIds.Contains(item.ReleaseObligationId))
+                .ExecuteDeleteAsync();
+            await db.ReleaseObligationAttestations
+                .Where(item => obligationIds.Contains(item.ReleaseObligationId))
+                .ExecuteDeleteAsync();
+            await db.ReleaseObligations
+                .Where(item => obligationIds.Contains(item.Id))
+                .ExecuteDeleteAsync();
+            await db.PersonProviders
+                .Where(link => link.PersonId == personId && providerIds.Contains(link.ProviderId))
+                .ExecuteDeleteAsync();
+            await db.Providers.Where(provider => providerIds.Contains(provider.Id))
+                .ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
+    public async Task NonReleaseDocumentRejectsAOneOffReleaseIdentity()
+    {
+        using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+
+        var response = await owner.PostAsJsonAsync(
+            $"/api/v1/people/101/documents/{AnnualDocumentKind.PrivacyPractices}",
+            new RenderAnnualDocumentRequest(OneOffReleaseId: Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task FormPrerequisiteOverrideIsRejectedBecauseAttestationIsSufficient()
     {
         using var owner = await factory.CreateAuthenticatedClientAsync("case-manager-one");

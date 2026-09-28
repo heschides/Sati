@@ -204,13 +204,16 @@ Local Production electronic signing is still disabled, and source code is not de
 approval, or Production readiness.
 
 External completion is a separate, always-preferred delivery path. Sati accepts only a complete,
-current generated release tied to one exact obligation. The returned wet-ink or third-party-signed
-PDF is validated as a readable PDF, written once to private object storage, hashed, and represented
-by append-only `ExternalSignatureEvidence`. An authenticated staff member must affirm document
-identity, signer identity/authority, and signature/date completeness; signer name and capacity must
-also match the current consumer or guardian record. That evidence may complete only the linked
-release obligation. “Externally signed — staff verified” describes this human verification and is
-not a claim that Sati cryptographically validated a wet signature or a third-party envelope.
+current generated release. A tracked release retains its exact obligation identity; a one-off
+release instead retains an opaque one-off identity and an immutable recipient snapshot and creates
+no compliance obligation. The returned wet-ink or third-party-signed PDF is validated as a readable
+PDF, written once to private object storage, hashed, and represented by append-only
+`ExternalSignatureEvidence`. An authenticated staff member must affirm document identity, signer
+identity/authority, and signature/date completeness; signer name and capacity must also match the
+current consumer or guardian record. Evidence for a tracked release may complete only its linked
+obligation. Evidence for a one-off release completes the document workflow only. “Externally signed
+— staff verified” describes this human verification and is not a claim that Sati cryptographically
+validated a wet signature or a third-party envelope.
 
 `Settings.IsInternalElectronicSignatureEnabled` is false by default. An administrator may enable
 Sati-hosted signing as an additional agency method only when the independent environment gate is
@@ -224,6 +227,14 @@ direction. Reduced-motion Windows settings bypass the animation. A draft remains
 persists as Generated; a complete current `GeneratedInSati` artifact is Prepared; signed evidence
 is Completed. These stages are derived from retained artifacts and attestations rather than from
 navigation state.
+
+One-off releases are a sibling view of the same workspace, not a provider workaround. Each editor
+session receives a fresh `OneOffReleaseId`, so two recipients in one annual cycle never supersede
+one another. A prepared one-off can later seed a normal agency provider-directory record. The API
+copies only the staff-reviewed fields, optionally creates a prospective consumer assignment, and
+records the resulting provider id on the artifact. That link is a one-time lifecycle annotation;
+the original recipient snapshot and signed document remain immutable, and promotion never
+retroactively turns the one-off into annual compliance evidence.
 
 ### Migration and rollout boundary
 

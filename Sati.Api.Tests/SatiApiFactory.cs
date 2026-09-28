@@ -1398,8 +1398,8 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         await using var scope = Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
         var obligationIds = await db.ExternalSignatureEvidence
-            .Where(x => x.PersonId == personId)
-            .Select(x => x.ReleaseObligationId)
+            .Where(x => x.PersonId == personId && x.ReleaseObligationId != null)
+            .Select(x => x.ReleaseObligationId!.Value)
             .Distinct()
             .ToListAsync();
         await db.ExternalSignatureEvidence.Where(x => x.PersonId == personId)

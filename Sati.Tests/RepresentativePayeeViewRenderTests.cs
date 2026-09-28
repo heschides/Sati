@@ -1,4 +1,10 @@
+using System.Collections;
+using System.ComponentModel;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Sati.Contracts.V1;
+using Sati.Data;
 using Sati.Views;
 using Sati.Views.Finance;
 using Xunit;
@@ -8,6 +14,52 @@ namespace Sati.Tests;
 [Collection(WpfViewCollection.Name)]
 public sealed class RepresentativePayeeViewRenderTests
 {
+    [Fact]
+    public void ClientEditorRepPayeeChoiceUpdatesOncePerCheckedButton()
+    {
+        using var host = Host.CreateDefaultBuilder()
+            .ConfigureServices(services =>
+            {
+                services.AddSingleton<ISessionService, SessionService>();
+                services.AddSingleton<IComprehensiveAssessmentService, StabilizationTests.SmokeAssessmentService>();
+                services.AddSingleton<IPersonCenteredPlanSourceService, StabilizationTests.SmokePlanSourceService>();
+                services.AddSingleton<IConsumerProviderService, StabilizationTests.SmokeConsumerProviderService>();
+                services.AddSingleton<IProviderService, StabilizationTests.SmokeProviderService>();
+            })
+            .Build();
+
+        WpfUiHarness.RunWithHost(host, () =>
+        {
+            var profile = new RepPayeeEditorHost();
+            var view = new ClientsView { DataContext = profile };
+            WpfUiHarness.Realize(view, 1400, 900);
+
+            var yes = WpfUiHarness.FindByAutomationName<RadioButton>(
+                view,
+                "Case manager is representative payee, yes");
+            var no = WpfUiHarness.FindByAutomationName<RadioButton>(
+                view,
+                "Case manager is representative payee, no");
+
+            Assert.False(profile.CaseManagerIsRepPayee);
+            Assert.False(yes.IsChecked);
+            Assert.True(no.IsChecked);
+
+            yes.IsChecked = true;
+            view.UpdateLayout();
+            Assert.True(profile.CaseManagerIsRepPayee);
+            Assert.True(yes.IsChecked);
+            Assert.False(no.IsChecked);
+
+            no.IsChecked = true;
+            view.UpdateLayout();
+            Assert.False(profile.CaseManagerIsRepPayee);
+            Assert.False(yes.IsChecked);
+            Assert.True(no.IsChecked);
+            Assert.Equal(2, profile.SourceUpdates);
+        });
+    }
+
     [Fact]
     public void FinanceWorkspaceExposesQueueReleaseReceiptAndAppendOnlyLedgerControls()
     {
@@ -78,5 +130,46 @@ public sealed class RepresentativePayeeViewRenderTests
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SatiLogica.slnx")))
             directory = directory.Parent;
         return directory?.FullName ?? throw new DirectoryNotFoundException("Repository root not found.");
+    }
+
+    private sealed class RepPayeeEditorHost : INotifyPropertyChanged, INotifyDataErrorInfo
+    {
+        private bool caseManagerIsRepPayee;
+
+        public bool ShowClientWorkspace => true;
+        public bool IsClientEditorOpen => true;
+        public int ClientWorkspaceTabIndex { get; set; }
+        public int CompliancePresentationRevision => 0;
+        public BillingComplianceRequirements BillingComplianceRequirements =>
+            BillingComplianceGate.DefaultRequirements;
+        public int PcpOpenDaysBefore => 90;
+        public int SourceUpdates { get; private set; }
+        public string RepPayeeMonthlyIncomeText { get; set; } = "";
+        public string RepPayeeRegularCheckRequestNeeds { get; set; } = "";
+
+        public bool CaseManagerIsRepPayee
+        {
+            get => caseManagerIsRepPayee;
+            set
+            {
+                if (caseManagerIsRepPayee == value)
+                    return;
+
+                caseManagerIsRepPayee = value;
+                SourceUpdates++;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CaseManagerIsRepPayee)));
+                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(RepPayeeMonthlyIncomeText)));
+                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(RepPayeeRegularCheckRequestNeeds)));
+            }
+        }
+
+        public bool HasErrors => CaseManagerIsRepPayee;
+        public IEnumerable GetErrors(string? propertyName) =>
+            CaseManagerIsRepPayee && propertyName is nameof(RepPayeeMonthlyIncomeText) or nameof(RepPayeeRegularCheckRequestNeeds)
+                ? new[] { "Required for this test." }
+                : Array.Empty<string>();
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
     }
 }

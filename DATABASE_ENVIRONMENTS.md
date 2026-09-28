@@ -304,6 +304,21 @@ in history counts reflects previously reconciled long-lived database history; pe
 evaluated against the current compiled migration chain for each target. The temporary exact-IP Azure
 firewall rule was removed and verified absent. No Production-cloud database was accessed.
 
+On September 27, 2026, guarded migration
+`20260927232039_SupportDurableOneOffReleases` passed its rollback-only rehearsal, was applied to
+identity-marked Azure `SatiDemo`, and passed complete schema and idempotency verification. Demo moved
+from 119 to 120 recorded migrations, and the hosted API readiness endpoint returned HTTP 200
+`Healthy`. The temporary exact-IP workstation firewall rule was removed and verified absent by the
+operator. No Production database was accessed. A separately authorized read-only audit then found
+zero planned compliance changes and zero unexpected billing blockers across all 177 synthetic
+People. Baseline capture returned `DEMO_FULL_RESET_BASELINE_CAPTURED` with timeline anchor
+`2026-09-27`; queued verification reset `d325db36-f16b-469a-bae7-888cf51e4a84` completed in 219
+seconds with audited action `demo.reset.completed` and worker log marker
+`DEMO_COMPLIANCE_HISTORY_COMPLETE`. Post-reset verification found the same 120-migration boundary,
+76/76 `dbo` and `demo_baseline` tables, all 177 People, all three new one-off artifact columns, and
+HTTP 200 `Healthy` readiness. The temporary exact-IP rule used for the capture and verification was
+again removed and verified absent by the operator.
+
 ## Azure migration checklist
 
 - [x] Confirm every Demo record is synthetic.

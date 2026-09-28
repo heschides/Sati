@@ -20,6 +20,26 @@ public interface IAgencyReleaseService
         CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Medical-release generation is not available on this data path.");
 
+    Task<AgencyReleaseResult> GenerateOneOffAsync(
+        int personId,
+        AgencyReleaseRequest request,
+        Guid oneOffReleaseId,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("One-off release generation is not available on this data path.");
+
+    Task<AgencyReleaseResult> GenerateOneOffMedicalAsync(
+        int personId,
+        AgencyReleaseRequest request,
+        Guid oneOffReleaseId,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("One-off medical-release generation is not available on this data path.");
+
+    Task<OneOffReleasePromotionDto> PromoteOneOffToProviderAsync(
+        int personId,
+        PromoteOneOffReleaseRequest request,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("One-off provider promotion is not available on this data path.");
+
     /// <summary>
     /// Generates an agency release for one exact recipient-specific compliance obligation.
     /// The ordinary generation method remains available for releases that are not compliance

@@ -433,6 +433,14 @@ Actual deployed permissions, vendor/agency agreements, risk/incident/restore evi
 and holds, later copies, accessible documents and program approval remain necessary operating
 work. The generated evidence PDF is untagged; automated page checks do not establish accessibility.
 
+One-off release recipients do not bypass those limits. A staff-verified uploaded PDF is evidence
+that an authenticated staff member reviewed the named document, signer identity/authority, and
+signature/date completeness; it is not forensic authentication of wet ink or a third-party
+signature envelope. Adding that recipient to the provider directory later does not make the
+earlier authorization satisfy a newly created annual obligation. Agency procedure and counsel must
+still establish acceptable external signing services, verification steps, signer authority,
+retention, legal holds, and correction/escalation practice before real-client reliance.
+
 ## Cross-tenant sharing between programs (design stage, 2026-09-07)
 
 `PLATFORM_DOMAIN.md` designs Karuna documentation flowing to the case manager who authorised the

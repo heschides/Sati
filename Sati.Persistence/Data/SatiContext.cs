@@ -205,6 +205,7 @@ namespace Sati.Data
                 entity.Property(p => p.Name)
                       .IsRequired()
                       .HasMaxLength(150);
+                entity.Property(p => p.Email).HasMaxLength(254);
 
                 // Enum-as-string, matching User.Role / ATRequest.Status. OfferedServices
                 // is deliberately NOT converted — a [Flags] bitmask stores as its int,
@@ -633,14 +634,19 @@ namespace Sati.Data
                 entity.Property(artifact => artifact.TemplateKey).HasMaxLength(100);
                 entity.Property(artifact => artifact.BlankFieldsJson).IsRequired().HasMaxLength(4_000);
                 entity.Property(artifact => artifact.ExternalNote).HasMaxLength(1_000);
+                entity.Property(artifact => artifact.OneOffRecipientJson).HasMaxLength(4_000);
                 entity.HasIndex(artifact => new { artifact.PersonId, artifact.Kind, artifact.CycleStart })
                     .IsUnique()
-                    .HasFilter("[ReleaseObligationId] IS NULL AND [SupersededByArtifactId] IS NULL")
+                    .HasFilter("[ReleaseObligationId] IS NULL AND [OneOffReleaseId] IS NULL AND [SupersededByArtifactId] IS NULL")
                     .HasDatabaseName("IX_DocumentArtifacts_OneLivePerCycle");
                 entity.HasIndex(artifact => new { artifact.ReleaseObligationId, artifact.Kind })
                     .IsUnique()
                     .HasFilter("[ReleaseObligationId] IS NOT NULL AND [SupersededByArtifactId] IS NULL")
                     .HasDatabaseName("IX_DocumentArtifacts_OneLivePerReleaseObligation");
+                entity.HasIndex(artifact => new { artifact.OneOffReleaseId, artifact.Kind })
+                    .IsUnique()
+                    .HasFilter("[OneOffReleaseId] IS NOT NULL AND [SupersededByArtifactId] IS NULL")
+                    .HasDatabaseName("IX_DocumentArtifacts_OneLivePerOneOffRelease");
                 entity.HasOne(artifact => artifact.Person)
                     .WithMany()
                     .HasForeignKey(artifact => artifact.PersonId)
@@ -653,6 +659,10 @@ namespace Sati.Data
                     .WithMany()
                     .HasForeignKey(artifact => artifact.GeneratedByUserId)
                     .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<Provider>()
+                    .WithMany()
+                    .HasForeignKey(artifact => artifact.PromotedProviderId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ExternalSignatureEvidence>(entity =>

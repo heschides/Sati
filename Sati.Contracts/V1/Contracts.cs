@@ -793,14 +793,16 @@ public sealed record ProviderDto(
     string? PrimaryContact, string? Phone, int OfferedServices, bool ProvidesPassthroughService,
     string? BillingLocationEis, string? ProgramContact, string? BillingContact,
     string? Npi = null, string? MaineCareProviderId = null,
-    string? MedicalKind = null, int? ParentProviderId = null);
+    string? MedicalKind = null, int? ParentProviderId = null,
+    string? Email = null);
 
 public sealed record SaveProviderRequest(
     string Type, string Name, string? Street, string? City, string? State, string? Zip,
     string? PrimaryContact, string? Phone, int OfferedServices, bool ProvidesPassthroughService,
     string? BillingLocationEis, string? ProgramContact, string? BillingContact,
     string? Npi = null, string? MaineCareProviderId = null,
-    string? MedicalKind = null, int? ParentProviderId = null);
+    string? MedicalKind = null, int? ParentProviderId = null,
+    string? Email = null);
 
 // A named person at a provider, distinct from the organization's general directory contact on
 // ProviderDto.PrimaryContact/Phone. A directory entry accumulates several of these.

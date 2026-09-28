@@ -1124,6 +1124,7 @@
             <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
             <converters:BillingPeriodLabelConverter x:Key="BillingPeriodLabelConverter" />
             <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <converters:BooleanRadioChoiceConverter x:Key="BooleanRadioChoiceConverter" />
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
             <converters:BoardTabConverter x:Key="BoardTabConverter" />
             <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter" />

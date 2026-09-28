@@ -15,14 +15,49 @@ namespace Sati.ViewModels.ClientDocuments;
 /// receives its own attestation.
 /// </summary>
 public partial class ReleaseObligationsViewModel(
-    IReleaseObligationService service) : ObservableObject
+    IReleaseObligationService service,
+    IAgencyReleaseService? agencyReleaseService = null) : ObservableObject
 {
     private readonly LatestRequestTracker _loads = new();
     private Person? _person;
     private IReadOnlyList<DocumentArtifactDto> _documentArtifacts = [];
+    private readonly HashSet<int> _completedArtifactIds = [];
+    private readonly HashSet<int> _deliveredArtifactIds = [];
 
     public ObservableCollection<ReleaseObligationItemViewModel> Items { get; } = [];
     public ObservableCollection<string> LinkageIssues { get; } = [];
+    public ObservableCollection<OneOffReleaseItemViewModel> OneOffReleases { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsProviderRequirementsVisible))]
+    [NotifyPropertyChangedFor(nameof(IsOneOffReleasesVisible))]
+    private bool isOneOffMode;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasProviderModal))]
+    private OneOffReleaseItemViewModel? selectedOneOffForProvider;
+
+    [ObservableProperty] private ProviderType providerType = ProviderType.Other;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveOneOffProviderCommand))]
+    private string providerName = string.Empty;
+    [ObservableProperty] private string providerStreet = string.Empty;
+    [ObservableProperty] private string providerCity = string.Empty;
+    [ObservableProperty] private string providerState = "ME";
+    [ObservableProperty] private string providerZip = string.Empty;
+    [ObservableProperty] private string providerPhone = string.Empty;
+    [ObservableProperty] private string providerEmail = string.Empty;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveOneOffProviderCommand))]
+    private bool assignProviderToConsumer = true;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveOneOffProviderCommand))]
+    private DateTime? providerAssignmentStartDate = DateTime.Today;
+    [ObservableProperty] private string providerAssignmentRole = string.Empty;
+    [ObservableProperty] private string providerModalError = string.Empty;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveOneOffProviderCommand))]
+    private bool isSavingProvider;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStatusMessage))]
@@ -72,12 +107,14 @@ public partial class ReleaseObligationsViewModel(
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompleteAttestationCommand))]
     [NotifyCanExecuteChangedFor(nameof(CompleteWithdrawalCommand))]
+    [NotifyCanExecuteChangedFor(nameof(PrepareOneOffReleaseCommand))]
     [NotifyPropertyChangedFor(nameof(HasNoItems))]
     private bool isBusy;
 
     public Func<Task>? ComplianceChangedAsync { get; set; }
     public event Action<IReadOnlyList<ReleaseObligationDto>>? ObligationsChanged;
     public event Action<ReleaseObligationItemViewModel>? PreparationRequested;
+    public event Action? OneOffPreparationRequested;
 
     public bool HasItems => Items.Count != 0;
     public bool HasNoItems => !IsBusy && Items.Count == 0;
@@ -86,13 +123,26 @@ public partial class ReleaseObligationsViewModel(
     public bool HasAttestationEditor => SelectedForAttestation is not null;
     public bool HasWithdrawalEditor => SelectedForWithdrawal is not null;
     public bool HasRevocationEditor => SelectedForRevocation is not null;
+    public bool HasOneOffReleases => OneOffReleases.Count != 0;
+    public bool HasNoOneOffReleases => OneOffReleases.Count == 0;
+    public bool IsProviderRequirementsVisible => !IsOneOffMode;
+    public bool IsOneOffReleasesVisible => IsOneOffMode;
+    public bool HasProviderModal => SelectedOneOffForProvider is not null;
+    public IReadOnlyList<ProviderType> ProviderTypes { get; } =
+        Enum.GetValues<ProviderType>();
 
     public void SetPerson(Person? person)
     {
         _person = person;
         _documentArtifacts = [];
+        _completedArtifactIds.Clear();
+        _deliveredArtifactIds.Clear();
+        IsOneOffMode = false;
         var request = _loads.Begin();
         Items.Clear();
+        OneOffReleases.Clear();
+        OnPropertyChanged(nameof(HasOneOffReleases));
+        OnPropertyChanged(nameof(HasNoOneOffReleases));
         LinkageIssues.Clear();
         SignerLabel = string.Empty;
         StatusMessage = person is not null && person.EffectiveDate is null
@@ -100,6 +150,7 @@ public partial class ReleaseObligationsViewModel(
             : string.Empty;
         CancelEditorsCore();
         RaiseCollectionsChanged();
+        PrepareOneOffReleaseCommand.NotifyCanExecuteChanged();
         ObligationsChanged?.Invoke([]);
 
         if (person?.EffectiveDate is not null && person.Id > 0)
@@ -111,7 +162,34 @@ public partial class ReleaseObligationsViewModel(
         _documentArtifacts = artifacts ?? [];
         foreach (var item in Items)
             item.SetDocumentArtifact(CurrentArtifact(item.RecordId));
+        RebuildOneOffReleases();
     }
+
+    public void SetSignatureState(
+        IEnumerable<ExternalSignatureEvidenceDto> externalEvidence,
+        IEnumerable<SignatureRequestDto> requests)
+    {
+        ArgumentNullException.ThrowIfNull(externalEvidence);
+        ArgumentNullException.ThrowIfNull(requests);
+        _completedArtifactIds.Clear();
+        _deliveredArtifactIds.Clear();
+        foreach (var evidence in externalEvidence)
+            _completedArtifactIds.Add(evidence.DocumentArtifactId);
+        foreach (var request in requests)
+        {
+            if (request.State == "Signed")
+                _completedArtifactIds.Add(request.DocumentArtifactId);
+            else if (request.DeliveryState == "Sent")
+                _deliveredArtifactIds.Add(request.DocumentArtifactId);
+        }
+        RebuildOneOffReleases();
+    }
+
+    [RelayCommand]
+    private void ShowProviderRequirements() => IsOneOffMode = false;
+
+    [RelayCommand]
+    private void ShowOneOffReleases() => IsOneOffMode = true;
 
     public Task RefreshAsync()
     {
@@ -274,6 +352,125 @@ public partial class ReleaseObligationsViewModel(
         StatusMessage = string.Empty;
         PreparationRequested?.Invoke(item);
     }
+
+    private bool CanPrepareOneOffRelease() =>
+        !IsBusy && _person is { Id: > 0, EffectiveDate: not null };
+
+    [RelayCommand(CanExecute = nameof(CanPrepareOneOffRelease))]
+    private void PrepareOneOffRelease()
+    {
+        CancelEditorsCore();
+        StatusMessage = string.Empty;
+        IsOneOffMode = true;
+        OneOffPreparationRequested?.Invoke();
+    }
+
+    [RelayCommand]
+    private void BeginAddOneOffProvider(OneOffReleaseItemViewModel? item)
+    {
+        if (item?.CanAddToProviderList != true)
+            return;
+        var recipient = item.Artifact.OneOffRecipient;
+        if (recipient is null)
+            return;
+        SelectedOneOffForProvider = item;
+        ProviderType = item.Artifact.Kind == nameof(AnnualDocumentKind.ReleaseMedical) ||
+                       recipient.ContactType?.Contains("health", StringComparison.OrdinalIgnoreCase) == true
+            ? ProviderType.Healthcare
+            : ProviderType.Other;
+        ProviderName = recipient.ContactName;
+        ProviderStreet = recipient.Street ?? string.Empty;
+        ProviderCity = recipient.City ?? string.Empty;
+        ProviderState = string.IsNullOrWhiteSpace(recipient.State) ? "ME" : recipient.State;
+        ProviderZip = string.Empty;
+        ProviderPhone = recipient.Phone ?? string.Empty;
+        ProviderEmail = recipient.Email ?? string.Empty;
+        AssignProviderToConsumer = true;
+        ProviderAssignmentStartDate = DateTime.Today;
+        ProviderAssignmentRole = recipient.Relationship ?? string.Empty;
+        ProviderModalError = string.Empty;
+    }
+
+    [RelayCommand]
+    private void CancelAddOneOffProvider()
+    {
+        if (IsSavingProvider)
+            return;
+        SelectedOneOffForProvider = null;
+        ProviderModalError = string.Empty;
+    }
+
+    private bool CanSaveOneOffProvider() =>
+        !IsSavingProvider && SelectedOneOffForProvider is not null &&
+        !string.IsNullOrWhiteSpace(ProviderName) &&
+        (!AssignProviderToConsumer || ProviderAssignmentStartDate is not null);
+
+    [RelayCommand(CanExecute = nameof(CanSaveOneOffProvider))]
+    private async Task SaveOneOffProviderAsync()
+    {
+        if (_person is not { Id: > 0 } person ||
+            SelectedOneOffForProvider is not { } item ||
+            agencyReleaseService is null)
+            return;
+        if (!CanSaveOneOffProvider())
+            return;
+
+        IsSavingProvider = true;
+        ProviderModalError = string.Empty;
+        try
+        {
+            var provider = new SaveProviderRequest(
+                ProviderType.ToString(), ProviderName.Trim(),
+                NullIfBlank(ProviderStreet), NullIfBlank(ProviderCity),
+                NullIfBlank(ProviderState), NullIfBlank(ProviderZip),
+                null, NullIfBlank(ProviderPhone), 0, false,
+                null, null, null, Email: NullIfBlank(ProviderEmail));
+            var result = await agencyReleaseService.PromoteOneOffToProviderAsync(
+                person.Id,
+                new PromoteOneOffReleaseRequest(
+                    item.Artifact.Id, provider, AssignProviderToConsumer,
+                    ProviderAssignmentStartDate?.Date,
+                    NullIfBlank(ProviderAssignmentRole)));
+            item.MarkPromoted(result.ProviderId);
+            SelectedOneOffForProvider = null;
+            StatusMessage = result.AssignedToConsumer
+                ? $"{ProviderName.Trim()} was added to the provider directory and assigned to this consumer. Any tracked release requirements follow the assignment date; the one-off document remains unchanged."
+                : $"{ProviderName.Trim()} was added to the provider directory. The one-off document remains unchanged.";
+            if (result.AssignedToConsumer)
+                await RefreshAsync();
+        }
+        catch (Exception exception) when (exception is InvalidOperationException
+                                               or ArgumentException
+                                               or UnauthorizedAccessException
+                                               or CloudApiException
+                                               or CloudConnectivityException
+                                               or SessionExpiredException)
+        {
+            ProviderModalError = exception.Message;
+        }
+        finally
+        {
+            IsSavingProvider = false;
+        }
+    }
+
+    private void RebuildOneOffReleases()
+    {
+        OneOffReleases.Clear();
+        foreach (var artifact in _documentArtifacts
+                     .Where(artifact => artifact.OneOffReleaseId is not null &&
+                                        artifact.OneOffRecipient is not null)
+                     .OrderByDescending(artifact => artifact.GeneratedAtUtc))
+            OneOffReleases.Add(new OneOffReleaseItemViewModel(
+                artifact,
+                _completedArtifactIds.Contains(artifact.Id),
+                _deliveredArtifactIds.Contains(artifact.Id)));
+        OnPropertyChanged(nameof(HasOneOffReleases));
+        OnPropertyChanged(nameof(HasNoOneOffReleases));
+    }
+
+    private static string? NullIfBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static void MergeAuthoritativeFacts(
         Person person,
@@ -522,6 +719,44 @@ public partial class ReleaseObligationsViewModel(
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(HasNoItems));
         OnPropertyChanged(nameof(HasLinkageIssues));
+    }
+}
+
+public sealed partial class OneOffReleaseItemViewModel(
+    DocumentArtifactDto artifact,
+    bool isCompleted = false,
+    bool isDelivered = false) : ObservableObject
+{
+    public DocumentArtifactDto Artifact { get; private set; } = artifact;
+    public string RecipientName => Artifact.OneOffRecipient?.ContactName ?? "One-off recipient";
+    public string DocumentType => Artifact.Kind == nameof(AnnualDocumentKind.ReleaseMedical)
+        ? "Medical release"
+        : "Agency release";
+    public string PreparedLabel => Artifact.Origin == nameof(DocumentArtifactOrigin.Draft)
+        ? $"Draft saved {Artifact.GeneratedAtUtc.ToLocalTime():MMM d, yyyy}"
+        : $"Prepared {Artifact.GeneratedAtUtc.ToLocalTime():MMM d, yyyy}";
+    public string WorkflowStage => isCompleted
+        ? "Completed"
+        : isDelivered
+            ? "Delivered"
+            : Artifact.Origin == nameof(DocumentArtifactOrigin.Draft)
+                ? "Generated"
+                : "Prepared";
+    public bool CanAddToProviderList =>
+        Artifact.Origin == nameof(DocumentArtifactOrigin.GeneratedInSati) &&
+        Artifact.PromotedProviderId is null;
+    public bool HasPromotedProvider => Artifact.PromotedProviderId is not null;
+    public string ProviderStatus => Artifact.PromotedProviderId is int id
+        ? $"Added to provider list (directory #{id})"
+        : string.Empty;
+
+    public void MarkPromoted(int providerId)
+    {
+        Artifact = Artifact with { PromotedProviderId = providerId };
+        OnPropertyChanged(nameof(Artifact));
+        OnPropertyChanged(nameof(CanAddToProviderList));
+        OnPropertyChanged(nameof(HasPromotedProvider));
+        OnPropertyChanged(nameof(ProviderStatus));
     }
 }
 

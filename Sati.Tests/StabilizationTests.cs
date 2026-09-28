@@ -649,9 +649,9 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.29", version);
+        Assert.Equal("1.3.30", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("A clear path from release to completion", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("A release for every recipient", ProductReleaseNotes.ReleaseName);
         Assert.Equal("September 27, 2026", ProductReleaseNotes.ReleaseDate);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Releases follow a clear, visible path" &&

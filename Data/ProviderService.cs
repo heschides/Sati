@@ -44,14 +44,22 @@ namespace Sati.Data
 
         public async Task<Provider> AddAsync(Provider provider)
         {
-            EnsureCanCreateOrEdit();
             await using var context = _contextFactory.CreateDbContext();
+            return await AddWithinTransactionAsync(context, provider);
+        }
+
+        internal async Task<Provider> AddWithinTransactionAsync(
+            SatiContext context,
+            Provider provider,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureCanCreateOrEdit();
             await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
             provider.AgencyId = CurrentAgencyId();
             await GuardDuplicateIdentifierAsync(context, provider, null);
             await GuardAffiliationAsync(context, provider, 0);
             context.Providers.Add(provider);
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
             return provider;
         }
 

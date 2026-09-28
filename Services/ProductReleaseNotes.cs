@@ -6,11 +6,29 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "A clear path from release to completion";
+    public const string ReleaseName = "A release for every recipient";
     public const string ReleaseDate = "September 27, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Create a one-off release without provider setup",
+            [
+                "Provider requirements and One-off releases now sit side by side in the Releases workspace, so an occasional recipient does not have to be entered in the provider directory first.",
+                "Each one-off release keeps its own recipient details and follows the same Generated, Prepared, and Completed path as a provider release. External signing remains the default; an agency-enabled Sati signature invitation also shows Delivered after Sati records successful delivery.",
+                "Separate one-off recipients in the same service year remain separate documents, with their own retained identity and signing evidence."
+            ]),
+        new(
+            "Turn a prepared recipient into a provider",
+            [
+                "After preparing a one-off release, choose Add to provider list to open a review window with the recipient details already filled in.",
+                "You can save the directory entry alone or also assign it to the consumer. The prepared document stays intact and records the provider it became without being rewritten as a different release."
+            ]),
+        new(
+            "Representative Payee choices stay responsive",
+            [
+                "Changing the Representative Payee Yes or No choice no longer lets the radio button being cleared write a competing value and interrupt the Clients workspace."
+            ]),
         new(
             "Releases follow a clear, visible path",
             [

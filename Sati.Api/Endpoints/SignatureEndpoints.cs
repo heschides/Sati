@@ -133,20 +133,23 @@ internal static partial class ApiEndpoints
             x.Id == input.DocumentArtifactId && x.AgencyId == actor.AgencyId &&
             x.PersonId == personId && x.SupersededByArtifactId == null &&
             x.Origin == nameof(DocumentArtifactOrigin.GeneratedInSati), ct);
-        if (artifact is null || artifact.ReleaseObligationId is not long obligationId ||
-            artifact.BlankFieldsJson != "[]" ||
+        if (artifact is null || artifact.BlankFieldsJson != "[]" ||
             artifact.Kind is not (nameof(AnnualDocumentKind.ReleaseAgency) or
                                   nameof(AnnualDocumentKind.ReleaseMedical) or
                                   nameof(AnnualDocumentKind.ReleaseDhhs)))
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["documentArtifactId"] = ["Choose a complete, current Sati-generated release linked to one recipient obligation."] });
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["documentArtifactId"] = ["Choose a complete, current Sati-generated release."] });
 
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var obligation = await db.ReleaseObligations.Include(x => x.Attestations)
-            .Include(x => x.AuthorizationEvents).SingleOrDefaultAsync(x =>
-                x.Id == obligationId && x.AgencyId == actor.AgencyId &&
-                x.PersonId == personId && x.TargetEffectiveDate == artifact.CycleStart, ct);
-        if (obligation is null)
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["documentArtifactId"] = ["The document's recipient obligation is no longer available."] });
+        ReleaseObligation? obligation = null;
+        if (artifact.ReleaseObligationId is long obligationId)
+        {
+            obligation = await db.ReleaseObligations.Include(x => x.Attestations)
+                .Include(x => x.AuthorizationEvents).SingleOrDefaultAsync(x =>
+                    x.Id == obligationId && x.AgencyId == actor.AgencyId &&
+                    x.PersonId == personId && x.TargetEffectiveDate == artifact.CycleStart, ct);
+            if (obligation is null)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["documentArtifactId"] = ["The document's recipient obligation is no longer available."] });
+        }
 
         var hash = Convert.ToHexString(SHA256.HashData(input.Pdf));
         var blobPath = $"external/{actor.AgencyId}/{personId}/{artifact.Id}/{input.ClientRequestId:N}.pdf";
@@ -158,7 +161,7 @@ internal static partial class ApiEndpoints
             AgencyId = actor.AgencyId,
             PersonId = personId,
             DocumentArtifactId = artifact.Id,
-            ReleaseObligationId = obligation.Id,
+            ReleaseObligationId = obligation?.Id,
             Method = input.Method.ToString(),
             SignedOn = input.SignedOn.Date,
             SignerName = input.SignerName.Trim(),
@@ -174,7 +177,7 @@ internal static partial class ApiEndpoints
         db.ExternalSignatureEvidence.Add(evidence);
         await db.SaveChangesAsync(ct);
 
-        if (obligation.CompletedOn is null)
+        if (obligation is { CompletedOn: null })
         {
             obligation.AttestManually(input.SignedOn, clock.Today,
                 actor.UserId == person.UserId ? AttestationActorKind.CaseManager : AttestationActorKind.Supervisor,
@@ -182,7 +185,7 @@ internal static partial class ApiEndpoints
                 $"Externally signed PDF evidence {evidence.Id}; staff identity, authority, and completeness verification recorded.");
         }
         audit.Record(actor, "signature.external-verified", "ExternalSignatureEvidence", evidence.Id,
-            JsonSerializer.Serialize(new { artifactId = artifact.Id, obligationId, method = input.Method.ToString(), hash, byteCount = input.Pdf.LongLength }));
+            JsonSerializer.Serialize(new { artifactId = artifact.Id, obligationId = obligation?.Id, isOneOff = obligation is null, method = input.Method.ToString(), hash, byteCount = input.Pdf.LongLength }));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return Results.Ok(ToExternalSignatureDto(evidence));

@@ -72,7 +72,7 @@ public partial class SignatureRequestsViewModel(ISignatureService service, ISess
     public bool CanWithdrawAuthorization => CanManage && SelectedRequest is { State: "Signed", Meaning: "Authorization", AuthorizationRevokedAtUtc: null };
     public bool CanDownloadSigned => CanManage && SelectedRequest?.HasSignedPackage == true;
     public bool CanRecordExternal => active && IsExternalUploadEnabled && !IsBusy && IsCurrentAccount &&
-        SelectedArtifact is { Origin: "GeneratedInSati", BlankFields.Count: 0, ReleaseObligationRecordId: not null } artifact &&
+        SelectedArtifact is { Origin: "GeneratedInSati", BlankFields.Count: 0 } artifact &&
         artifact.Kind is nameof(AnnualDocumentKind.ReleaseAgency) or nameof(AnnualDocumentKind.ReleaseMedical) or nameof(AnnualDocumentKind.ReleaseDhhs) &&
         ExternallySignedOn is not null && !string.IsNullOrWhiteSpace(ExternalSignerName) &&
         ExternalDocumentReviewed && ExternalIdentityAndAuthorityVerified &&
@@ -153,7 +153,9 @@ public partial class SignatureRequestsViewModel(ISignatureService service, ISess
             applyingServerResult = true;
             try { SelectedRequest = null; SelectedSigner = null; }
             finally { applyingServerResult = false; }
-            if (requests.Any(request => request.State == "Signed") && CompletionChangedAsync is not null)
+            if ((external.Count > 0 || requests.Any(request =>
+                    request.State == "Signed" || request.DeliveryState == "Sent")) &&
+                CompletionChangedAsync is not null)
                 await CompletionChangedAsync();
             NotifyState();
         }
@@ -184,7 +186,9 @@ public partial class SignatureRequestsViewModel(ISignatureService service, ISess
             ExternalEvidence.Insert(0, evidence);
             SelectedExternalEvidence = evidence;
             externalKey = Guid.NewGuid();
-            Message = "The externally signed PDF is retained and marked Externally signed — staff verified. The exact recipient obligation was updated.";
+            Message = artifact.ReleaseObligationRecordId is null
+                ? "The externally signed one-off PDF is retained and marked Externally signed — staff verified. No annual provider-release obligation was created or updated."
+                : "The externally signed PDF is retained and marked Externally signed — staff verified. The exact recipient obligation was updated.";
             ResetExternalAttestation();
             if (CompletionChangedAsync is not null)
             {
