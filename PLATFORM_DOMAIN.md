@@ -266,9 +266,9 @@ business-day arithmetic.
 
 ## Answered 2026-09-28
 
-Karuna's design (`karuna/KARUNA_DESIGN.md`) was confirmed with nine decisions, recorded in
-`DECISIONS.md` under "2026-09-28 — Karuna's foundational decisions". The four that change this
-document:
+Karuna's design (`karuna/KARUNA_DESIGN.md`) was confirmed with thirteen decisions, recorded in
+`DECISIONS.md` under "2026-09-28 — Karuna's foundational decisions" (D-1 to D-9) and "2026-09-28 —
+Karuna prerequisite corrections, D-10 to D-13". The six that change this document:
 
 1. **Tenancy is per product.** An organization that provides both case management and direct services
    holds one Sati tenant and one Karuna tenant (D-8). Membership stays single, so a person working on
@@ -278,6 +278,13 @@ document:
    platform host with product endpoint libraries.
 4. **One migration chain lives in a composition assembly**, `SatiLogica.Schema` (D-1), so platform
    persistence never references a product.
+5. **Identity is platform in mechanics, per product in storage, for now** (D-10). "Identity and
+   authentication" in the platform column above means password hashing, token issuance and validation,
+   lockout, revocation and the audit envelope. Karuna keeps its own user, membership and audit tables;
+   Sati keeps its `dbo` ones. A platform identity store is designed when something must span products,
+   such as `PlatformOperator` or the OADS authority grants.
+6. **Platform contracts are introduced, not moved** (D-11). Today's `Sati.Contracts` types for
+   permissions, envelope protection, legal hold and document artifacts are Sati-shaped and stay in Sati.
 
 Karuna's access model inside its tenant is enrolment- and shift-derived care-team reach, not caseload
 ownership (`karuna/KARUNA_DESIGN.md` §4.4). That is a product rule, not a platform one.

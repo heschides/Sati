@@ -5737,3 +5737,120 @@ sending annual, unbilled, or confirmation fields to an older server.
 
 **Rejected:** inferring annual intent from narrative text; completing an unopened plan in one save;
 silently relabeling pre-window work as annual; and hiding Unbilled notes from supervisors.
+
+## 2026-09-28 — Karuna prerequisite corrections, D-10 to D-13
+
+Codex reviewed the Karuna prerequisites (`karuna/CODEX_HANDOFF.md` P0–P5) against the code. Claude
+verified each of its nine findings with file and line evidence. All nine were confirmed; two were
+refined. The handoff had been wrong or too loose in six places:
+
+- P2's list of clock call sites was incomplete, and it treated `WorkdayHelper` and `ExemptDate` as a
+  holiday calendar.
+- P3 said "mechanical moves" of files that turn out to be Sati-shaped.
+- P4 claimed "no behaviour change" for code written directly against `ApiDbContext`.
+- P5 had an unbuildable plan and a proof that proved nothing.
+- It stated a blanket firewall requirement.
+- It gave Karuna database permissions that its own identity design made impossible.
+
+Josh confirmed four new decisions, and `karuna/CODEX_HANDOFF.md`, `karuna/KARUNA_DESIGN.md`,
+`PLATFORM_DOMAIN.md` and `PLATFORM_RESTRUCTURE_PLAN.md` were corrected to match.
+
+### D-10. Karuna keeps its own identity and audit tables; the platform owns the mechanics
+
+Karuna's users, organizations, memberships and audit events live in the `karuna` schema. Password
+hashing format, token issuance and validation, lockout, session revocation through a security version,
+and the audit envelope come from `SatiLogica.Hosting` through host-supplied seams. Sati's `dbo`
+identity is not relocated. D-8 already accepted two accounts for a person working on both sides, so
+per-product storage costs no user experience. It also lets Karuna's runtime identity hold no `dbo`
+rights. A platform identity store is designed when something must span products (`PlatformOperator`,
+OADS authority grants).
+
+**Rejected:** relocating `dbo.Users`, `dbo.Agencies` and `dbo.AuditEvents` into a platform schema
+before Karuna. It is a large migration through Local Production's sign-in path. **Rejected:** granting
+Karuna read access to Sati's identity tables through views. It couples Karuna to Sati's `Role`,
+`Permissions` and `SupervisorId` columns and breaks D-2's least-privilege reason.
+
+### D-11. Platform contracts are introduced, not moved
+
+`SatiLogica.Contracts` starts with product-neutral types only:
+
+- a tenant actor carrying user id, tenant id, product and security version, with no permission enum;
+- the audit envelope contract;
+- `AuditCsv`, whose header is already product-neutral;
+- the tenant clock.
+
+`UserPermissions` and `AgencyActor` are Sati's capability set. `EnvelopeProtection.FieldBinding` binds
+integer agency and record ids under the literal `sati.v1`, and changing that encoding would make
+existing ciphertext unreadable. `LegalHold` and `DocumentArtifactDto` carry Sati's integer person and
+agency ids. All of these stay in Sati, unchanged.
+
+A platform version of any of them is designed when a second product needs it. For envelope protection
+that means a new versioned prefix for new bindings, `sati.v1` decryption kept permanently, and a
+golden-ciphertext test.
+
+`UserPermissions` also gains regression pins: the flag values, the combined mask, the legacy role
+mapping, unknown-bit denial, the database round trip, and its integer JSON representation.
+
+**Rejected:** restructure stage 3's "move the ~15 platform files". Most of them are Sati-shaped, and
+moving them would put Sati's product rules into the platform under a new name.
+
+### D-12. Local Production's migrations move to an installer-run runner
+
+Local Production applies migrations at startup in two places: fresh-database provisioning
+(`LocalDatabaseProvisioner`) and the backed-up updater (`LocalDatabaseUpdater`). Under D-1's single
+chain, that would make the WPF desktop reference the composition assembly, and so every product's
+persistence code. Before the chain gains any non-Sati entity, `SatiLogica.Migrator` takes over both
+paths, invoked by the Local installer. It keeps the database identity check before any write and the
+backup before migrating.
+
+The desktop records its expected head migration id at build time and refuses to open a database that
+is behind, rather than repairing it. A developer launch runs the migrator as a separate process.
+
+**Accepted cost:** Local Production's database carries other products' empty tables, because one chain
+cannot be partly applied. Only retiring Local Production (`SATI_STRUCTURAL_REVIEW_2026-09-28.md`, S-1)
+would avoid that.
+
+**Rejected:** letting the desktop reference the composition assembly, which ships Karuna code in the
+Sati desktop; and a partial chain per product, which D-1 already rejected.
+
+### D-13. The Maine business-day calendar is its own step, before event reports
+
+State filing deadlines need a Maine State holiday calendar. None exists in the code:
+
+- `WorkdayHelper` applies an agency's configured productivity exclusions;
+- `ExemptDate` stores one user's personal days off.
+
+Neither changes. The calendar is new versioned data in `SatiLogica.Contracts` with a cited source, and
+lands before Karuna's event reports (K3). It no longer sits inside the one-clock step, which is now the
+clock alone.
+
+### Corrections that follow, without a new decision
+
+- **P2 is the clock only.**
+  - One zone owner.
+  - `ApiClock` and `BillingRules.MaineBusinessDate` delegate to it.
+  - Shared contract rules take today's date as a parameter instead of reading it
+    (`AnnualPacket.cs:93`, `RepresentativePayee.cs:197, 201`, `ServiceTimeline.cs:156`).
+  - Desktop callers pass `DateTime.Today` explicitly, so Local Production's dates cannot change
+    silently.
+  - The banned-API analyzer applies to `Sati.Api` and `Sati.Contracts` only.
+  - Josh accepted one Demo-visible change: EDI `generatedAt` moves from UTC to Eastern, which changes
+    the ISA/GS date and time of newly generated 837 files.
+- **D-2 is clarified, not reversed.** The hosting library works through host-supplied seams: an actor
+  store, an audit writer in the host's transaction, and environment identity from validated
+  configuration instead of the `"Demo"` literal. Each host has its own token audience and signing key.
+  The audience Sati already issues and validates is enough to bind a token to its product, so no
+  product claim or persisted product is needed and P4 has no migration.
+- **P5 needs preparation and a real proof.**
+  - Preparation: schema-aware `SchemaComparison` and `SchemaSnapshotReader`, which key tables by name
+    alone today, and a CI check that runtime models are subsets of the composed model.
+  - `SchemaDriftHealthCheck` compares the API model with the live database, not with the chain, so
+    "health check green" proved nothing about the move.
+  - The proof is identical migration ids, a byte-identical idempotent script, no model-differ
+    difference, zero pending migrations on a scratch synthetic database, and a read-only Demo check.
+- **A step that adds no migration writes nothing to any database schema.** Its Demo check is read-only.
+  The first schema-changing migration (Karuna's first tables) needs an authorized runner and access
+  path that Josh decides at that time. The history-reconciliation WebJob cannot apply DDL.
+- **Row-level security needs a lifecycle before K0 builds on it.** The design must cover sign-in before
+  an organization is known, a read-only session context set per request, no leakage across pooled
+  connections, and explicit per-tenant background jobs. A spike proves it first.

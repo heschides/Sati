@@ -4,8 +4,8 @@
 `ui-legibility-and-accessibility` at commit `6e78c6d`, restaged the same day and updated 2026-09-09. Read
 `PLATFORM_DOMAIN.md` first: it decides what the platform is, and this document only moves code to
 match. `ARCHITECTURE.md` says what owns what today and `DECISIONS.md` says why. **Amended 2026-09-28**
-by Karuna decisions D-1 and D-2, which change the target shape and stages 4 and 5; see "Amended
-2026-09-28" below.*
+by Karuna decisions D-1, D-2 and D-10 to D-13, which change the target shape and stages 3, 4 and 5;
+see "Amended 2026-09-28" below.*
 
 ---
 
@@ -82,41 +82,59 @@ SatiLogica.slnx
 └── upekkha/                      designed in PLATFORM_DOMAIN.md, no code yet
 ```
 
-## Amended 2026-09-28 — two changes from designing Karuna
+## Amended 2026-09-28 — changes from designing Karuna and from Codex's review
 
-Recorded in `DECISIONS.md`, "2026-09-28 — Karuna's foundational decisions". The shape above is
-superseded in two places.
+Recorded in `DECISIONS.md` under "2026-09-28 — Karuna's foundational decisions" (D-1, D-2) and
+"2026-09-28 — Karuna prerequisite corrections, D-10 to D-13". Stages 3, 4 and 5 below have been
+rewritten to match; the earlier wording is not preserved in place.
 
-**The migration chain lives in a composition assembly (D-1).** Stage 4 as written put the chain in
-`SatiLogica.Persistence` while stage 1 forbids platform projects from referencing products. EF needs
-every entity type in the model that owns the chain, so both cannot hold. The chain moves instead to a
-new `SatiLogica.Schema`, which references the platform and every product persistence assembly and owns
-the design-time model. `SatiLogica.Persistence` holds platform entities only, with no product
-references. Stage 1's rule gains one named exception, `SatiLogica.Schema`.
+**The migration chain lives in a composition assembly (D-1).** Stage 4 as first written put the chain
+in `SatiLogica.Persistence`, while stage 1 forbids platform projects from referencing products. EF
+needs every entity type in the model that owns the chain, so both cannot hold. The chain moves instead
+to `SatiLogica.Schema`, which references the platform and every product persistence assembly. It owns
+a design-time composition context that is separate from every runtime context, so no client or
+product host has to reference it. Stage 1's rule gains one named exception: `SatiLogica.Schema`.
 
-**Each product keeps its own host (D-2).** `SatiLogica.Api` becomes a library, `SatiLogica.Hosting`,
-holding token issuance, actor validation, the core of `TenantAccess`, `AuditTrail`,
-`LoginAttemptGuard`, and the endpoint and outbox primitives. `Sati.Api` stays Sati's host and
-references it; Karuna gets its own `Karuna.Api` host. Stage 5 therefore no longer renames Sati's entry
-assembly or changes its deployed artifact. It becomes a library extraction with no behaviour change.
+**Each product keeps its own host (D-2).** `SatiLogica.Hosting` is a library holding authentication
+and audit *mechanics* behind seams the host supplies: an actor store, an audit writer enlisted in the
+host's own transaction, and environment identity from validated configuration. `Sati.Api` stays Sati's
+host and keeps its entry assembly; Karuna gets `Karuna.Api`. Each host has its own token audience and
+signing key.
+
+**Platform contracts are introduced, not moved (D-11).** Review showed that most "platform" files in
+`Sati.Contracts` are Sati-shaped. `UserPermissions` and `AgencyActor` are Sati's capability set.
+`EnvelopeProtection` binds integer agency and record ids under the `sati.v1` prefix. `LegalHold` and
+`DocumentArtifactDto` carry Sati's integer person and agency ids. They stay in Sati. `SatiLogica.Contracts`
+starts with only product-neutral types; platform versions of the others are designed when a second
+product needs them.
+
+**Identity storage is per product for now (D-10).** Karuna keeps its own users, memberships and audit
+events in the `karuna` schema. The platform owns the mechanics, not the tables. Relocating Sati's
+`dbo` identity into a platform schema is not part of this plan.
+
+**Local Production stops migrating itself (D-12).** Before the chain gains any non-Sati entity, Local
+Production's migrations move to a separate runner the installer invokes; see stage 4.
 
 The revised platform folder:
 
 ```
 platform/
-├── SatiLogica.Contracts      identity, permissions shape, audit, tenant clock and business days,
-│                             legal hold, envelope protection, documents, signatures, billing mechanics
-├── SatiLogica.Persistence    platform entities only
-├── SatiLogica.Hosting        library: auth, actor validation, TenantAccess core, audit, seams
-├── SatiLogica.Schema         composition root: the one migration chain
+├── SatiLogica.Contracts      product-neutral only: tenant actor (no permission enum), audit envelope
+│                             and AuditCsv, tenant clock; later the business-day calendar and
+│                             billing mechanics
+├── SatiLogica.Persistence    platform entities only (none yet; identity stays per product, D-10)
+├── SatiLogica.Hosting        library: token issuance, actor validation, TenantAccess core, audit,
+│                             LoginAttemptGuard, behind host-supplied seams
+├── SatiLogica.Schema         design-time composition context and the one migration chain
+├── SatiLogica.Migrator       installer-run migration runner for Local Production (D-12)
 ├── SatiLogica.Forms
 └── SatiLogica.Signatures  ── SatiLogica.Portal
 ```
 
-The prerequisite work Karuna needs from these stages, in order, is §3 of `karuna/CODEX_HANDOFF.md`.
-Its first item is not in this plan and should precede every stage that creates files under
-`platform/`: the root `Sati.csproj` compiles every `.cs` file beneath it unless excluded
-(`SATI_STRUCTURAL_REVIEW_2026-09-28.md`, S-8).
+The prerequisite work Karuna needs, in order, is §3 of `karuna/CODEX_HANDOFF.md`. Its first item is
+not a stage of this plan and must precede any stage that creates files under `platform/`: the root
+`Sati.csproj` picks up every file beneath it unless excluded (`SATI_STRUCTURAL_REVIEW_2026-09-28.md`,
+S-8).
 
 ## Superseded: the staging changed on 2026-09-07
 
@@ -206,60 +224,105 @@ release instructions, and source-based repository-root discovery now use `SatiLo
 *Risk: none beyond anyone with the old solution path in muscle memory. `README.md`, the release
 scripts and `RELEASE_PLAYBOOK.md` reference the solution by name and need updating together.*
 
-### Stage 3 — extract the platform core
+### Stage 3 — introduce the platform contracts
 
-The real work, and the only stage with design judgement in it.
+*Rewritten 2026-09-28 (D-11). The first version moved "~15 platform files"; review found most of them
+Sati-shaped.*
 
-1. Create `SatiLogica.Contracts`. Move the ~15 platform files into it.
-2. Split `Contracts.cs` and `ApiSurface.cs` along the same line. This is the delicate part: 103
-   types in one file, and the split has to be by concern rather than by convenience.
-3. Point `Sati.Contracts` at `SatiLogica.Contracts` and leave the case-management files where they
-   are, correctly named at last.
-4. Repoint `Carika` at both.
+1. Create `SatiLogica.Contracts` with product-neutral types only: a tenant actor carrying user id,
+   tenant id, product and security version (no permission enum); the audit envelope contract; and
+   `AuditCsv`, whose header is already product-neutral. The tenant clock arrives here from the clock
+   step that precedes this stage.
+2. Leave `UserPermissions`, `AgencyActor`, `EnvelopeProtection`, `LegalHold`, `DocumentArtifactDto` and
+   the rest of `Contracts.cs` and `ApiSurface.cs` in `Sati.Contracts`, unchanged. Sati adopts the new
+   types through adapters where it needs them, one call site at a time, with no change to any public
+   contract or encrypted value.
+3. Pin `UserPermissions`' integer values, the combined mask, the legacy role mapping, unknown-bit denial,
+   the database round trip and the JSON representation, so no later change can silently reinterpret
+   stored permissions.
 
-Namespaces move with the files. Every file that changes namespace is a `using` change everywhere it
-is consumed, so this stage produces a large diff that is nearly all mechanical. Keep it mechanical:
-no behaviour changes, no renames beyond the namespace, nothing else in the commit.
+A platform version of legal hold, document artifacts or envelope protection is designed when a second
+product needs it. For envelope protection that means a new versioned prefix for new bindings, with
+`sati.v1` decryption kept permanently and a golden-ciphertext test.
 
-*Risk: moderate but contained. Compile errors are the failure mode, and the compiler finds them all.
-The 1,536-test suite plus the `API_AUTHORIZATION.md` route inventory catch the rest.*
+*Risk: small. No Sati type moves, so there is no namespace churn and no compatibility exposure.*
 
-### Stage 4 — extract platform persistence
+### Stage 4 — move the migration chain into `SatiLogica.Schema`
 
-> Amended 2026-09-28 (D-1): the migration chain moves to `SatiLogica.Schema`, not
-> `SatiLogica.Persistence`. The migration rules in this stage are unchanged.
+*Rewritten 2026-09-28 (D-1, D-12).*
 
-Move `SatiContext`, the migration chain, and the platform entities (`User`, `Agency`, `AuditEvent`,
-and the Organization registry when it lands) into `SatiLogica.Persistence`. Case-management entities
-move to `Sati.Persistence` and register through `IEntityTypeConfiguration`.
+**Prepare first**, each independently committable:
 
-**Do not renumber, rewrite or split the migrations.** Their namespaces change; their ids, their
-order and `__EFMigrationsHistory` must not. `MigrationEffectAnalyzer` and `SchemaDriftHealthCheck`
-both read that chain and are the safety net that proves it.
+1. Make schema comparison schema-aware. `SchemaTable` has a name but no schema
+   (`Sati.Contracts/V1/SchemaComparison.cs:7`), and the comparer and `SchemaSnapshotReader` key tables
+   by name alone, so `dbo.X` and `karuna.X` would be conflated. This must land before any non-`dbo`
+   table exists.
+2. Add a CI check that each runtime model (today `SatiContext` and `ApiDbContext`) is a subset of the
+   composed design-time model. `SchemaDriftHealthCheck` compares the API model with the live database;
+   it does not compare anything with the chain.
 
-*Risk: the highest in this plan. Controlled migration deployment is still manual and outstanding in
-`AGENDA.md`, and the Demo SQL firewall is closed to workstations, so verification needs a temporary
-rule only you can add. Do this stage alone, against Demo, with the drift health check green before
-and after.*
+**Then move.** Create `SatiLogica.Schema` with a design-time composition context distinct from the
+runtime `SatiContext`. Move the migrations and the model snapshot into it, re-pointing the
+`[DbContext]` attribute in all 122 migration and snapshot files. Update `MigrationEffectAnalyzer` and
+`PersistenceAssemblyBoundaryTests`. **Do not renumber, rewrite or split migrations**: ids, order and
+`__EFMigrationsHistory` must not change.
 
-### Stage 5 — split the API
+**Proof**, replacing "drift health check green":
 
-> Amended 2026-09-28 (D-2): stage 5 is now a library extraction. `SatiLogica.Hosting` receives the
-> platform pieces named below; `Sati.Api` stays Sati's host and keeps its entry assembly; Karuna has
-> its own host. The deployment risk described below applied to renaming the entry assembly, which no
-> longer happens. It still ships as a release with its own acceptance run, because authentication code
-> moves.
+1. The ordered list of migration ids is identical before and after (a pinned test).
+2. The idempotent script from zero to head is byte-identical before and after.
+3. EF's model differ finds no difference between the old and new snapshot models, and
+   `has-pending-model-changes` reports none.
+4. A scratch synthetic local database migrated by the old build opens under the new build with zero
+   pending migrations and an unchanged history table.
+5. On Demo, after an ordinary API deployment, a read-only check shows the history table equals the
+   pinned list and `/health/ready` is Healthy.
 
-`SatiLogica.Api` keeps hosting, `TokenIssuer`, `TenantAccess`, `AuditTrail`, `LoginAttemptGuard`,
-`ValidatedActorFilter` and the endpoint-registration seam. `Sati.Api` becomes a library of
-case-management endpoints registered through it.
+This stage adds no migration and writes nothing to any database schema. Its Demo check is read-only.
+The first migration that does change a schema — Karuna's first tables — needs its own authorized
+runner and access path, decided by Josh at that time. The history-reconciliation WebJob cannot apply
+DDL.
 
-**This stage changes the deployed artifact.** Release 1.3.4 shipped `SatiApi-1.3.4-fx-x86.zip` to a
-live Azure app, and renaming the entry assembly changes what is deployed and what the Function's
-settings point at. It needs its own release, its own acceptance run, and `DATABASE_ENVIRONMENTS.md`
-updated with a matched client/API pair.
+**Then take migration out of the desktop (D-12).** Before the chain gains its first non-Sati entity,
+Local Production stops migrating itself and `SatiLogica.Migrator`, invoked by the Local installer,
+takes over. It must carry everything the desktop does today:
 
-*Risk: deployment, not code. Sequence it as a release, never as a refactor.*
+- fresh-database provisioning (`App.xaml.cs:270-274`, `LocalDatabaseProvisioner.cs:34-51`);
+- the backed-up update of an existing database (`App.xaml.cs:289-303`, `LocalDatabaseUpdater`);
+- the database identity check before any write.
+
+The desktop records the expected head migration id at build time and refuses to open a database that
+is behind, telling the user to run the updater. A developer launch runs the migrator as a separate
+process. WPF never references `SatiLogica.Schema`. Local Production's database will still receive
+other products' empty tables, because one chain cannot be partly applied.
+
+*Risk: moderate. The move is proven byte-for-byte, and the desktop change is guarded by refusal rather
+than repair.*
+
+### Stage 5 — extract `SatiLogica.Hosting`
+
+*Rewritten 2026-09-28 (D-2).*
+
+Extract `TokenIssuer`, `ValidatedActorFilter`, the core of `TenantAccess`, `AuditTrail` and
+`LoginAttemptGuard` into `SatiLogica.Hosting`. Today they are written directly against `ApiDbContext`
+and `Server*` entities (for example `AuditTrail.cs:5,14`), so the library needs seams the host supplies:
+
+- an actor store returning a user's security facts (enabled, security version, tenant, product
+  permissions as an opaque integer);
+- an audit writer enlisted in the host's own transaction;
+- the expected environment name from startup-validated configuration, replacing the `"Demo"` literal
+  in `TenantAccess.cs:123` and `ApiEndpoints.cs:1300, 1343`.
+
+`Sati.Api` stays Sati's host and keeps its entry assembly. Product binding uses the audience the token
+already carries and validates (`TokenIssuer.cs:46-48`, `Program.cs:156-161`): each host has its own
+audience and signing key. Existing Sati tokens are unaffected, and nothing about a product is persisted
+in this stage.
+
+The goal is no intended change for Sati, proven by the full API suite plus a test that a token issued by
+the previous code is still accepted. It ships as its own Sati release with an acceptance run, because
+authentication code moves.
+
+*Risk: moderate, in authentication. Sequence it as a release, never as a refactor.*
 
 ### Stage 6 — rename the desktop project
 
@@ -279,7 +342,8 @@ reprieve, and an existing install's uninstall entry has to keep working.*
   a namespace trades a working guard for a cosmetic gain. If they are ever renamed it is its own
   project with its own runbook, and not while Demo and Production are the only two things standing
   between the app and the wrong data.
-- **The migration chain.** One chain, one context. See decision 3.
+- **The migration chain.** One chain, owned by one design-time composition context in
+  `SatiLogica.Schema`; product runtime contexts map their own tables. See decision 3 and D-1.
 - **`Sati.Portal`.** It serves signature recipients and is already product-neutral. It moves folder
   and namespace in stage 3 and nothing else.
 
@@ -288,12 +352,12 @@ reprieve, and an existing install's uninstall entry has to keep working.*
 | Stage | Size | Can start now |
 |---|---|---|
 | 0 design | done for the structural decisions | — |
-| 1 guardrail | small | yes |
+| 1 guardrail | small | yes, after the root-project exclusions |
 | 2 solution shape | done 2026-09-09 | — |
-| 3 platform contracts | large | yes, boundary now derived |
-| 4 platform persistence | large | yes, one chain confirmed |
-| 5 API split | medium, plus a release | after 4 |
+| 3 platform contracts (introduce) | small | after the clock step |
+| 4 migration chain to `SatiLogica.Schema`, then the Local migrator | medium, plus an installer change | after 3; the migrator before any non-Sati entity |
+| 5 `SatiLogica.Hosting` extraction | medium, plus a release | after 3; independent of 4 |
 | 6 desktop rename | medium, plus an installer test | any time after 2 |
 
-Stage 2 is complete. Stage 1 remains the next structural step: its dependency-graph guardrail is
-what keeps the boundary honest after extraction.
+Stage 2 is complete. The exact order, with the steps that are not stages of this plan (root-project
+exclusions, the clock, the business-day calendar), is §3 of `karuna/CODEX_HANDOFF.md`.

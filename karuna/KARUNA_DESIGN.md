@@ -12,9 +12,14 @@ problems that Karuna must not inherit; several of this document's choices are th
 
 **What this document decides:** Karuna's shape inside SatiLogica, its access model, its time model,
 the principle that separates clinical facts from claims, the module boundaries and their rule owners,
-and the landing order. Its nine foundational decisions (D-1 to D-9) were **confirmed by Josh on
-2026-09-28** and are recorded in `DECISIONS.md`, "2026-09-28 — Karuna's foundational decisions". They
-are marked where they appear below.
+and the landing order. Its foundational decisions were **confirmed by Josh on 2026-09-28** and are
+recorded in `DECISIONS.md`:
+
+- D-1 to D-9 under "Karuna's foundational decisions";
+- D-10 to D-13 under "Karuna prerequisite corrections", which followed Codex's review of the
+  prerequisites against the code.
+
+They are marked where they appear below.
 **What it deliberately does not decide:** anything listed in §19. Do not settle those in code.
 
 ---
@@ -135,14 +140,15 @@ Following the target shape in `PLATFORM_RESTRUCTURE_PLAN.md`:
 ```
 SatiLogica.slnx
 ├── platform/
-│   ├── SatiLogica.Contracts      identity, permissions shape, audit, tenant clock, business-day
-│   │                             calendar, legal hold, envelope protection, documents, signatures,
-│   │                             service authorization, sharing policy, billing mechanics (§11.1)
-│   ├── SatiLogica.Persistence    platform entities and configurations (no product types)
+│   ├── SatiLogica.Contracts      product-neutral only (D-11): tenant actor with no permission
+│   │                             enum, audit envelope and AuditCsv, tenant clock, business-day
+│   │                             calendar; later billing mechanics, authorization, sharing policy
+│   ├── SatiLogica.Persistence    platform entities only (no product types; none yet, D-10)
 │   ├── SatiLogica.Hosting        token issuance, actor validation, TenantAccess core, AuditTrail,
-│   │                             endpoint-registration seam, outbox and worker primitives
-│   └── SatiLogica.Schema         composition root: references platform + every product
-│                                 persistence assembly and owns the single migration chain (§3.3)
+│   │                             LoginAttemptGuard behind host-supplied seams; outbox and workers
+│   ├── SatiLogica.Schema         design-time composition context and the single migration chain
+│   │                             (§3.3); referenced by no runtime project
+│   └── SatiLogica.Migrator       installer-run migration runner for Local Production (D-12)
 ├── sati/                         unchanged in this design
 └── karuna/
     ├── Karuna.Contracts          V1 DTOs and Karuna rule owners; references SatiLogica.Contracts only
@@ -173,8 +179,11 @@ restructure stage 5 from "one platform host" to "a shared hosting library". Reas
   AM whether or not Sati is being redeployed. Karuna needs a higher availability target and its own
   deployment cadence; a shared host couples them.
 - **Blast radius.** A Sati endpoint defect, memory leak or runaway request cannot take down a MAR.
-- **Least privilege.** The Karuna host's managed identity gets rights on the `karuna` schema and the
-  platform views it needs, nothing in Sati's tables (§11.1).
+- **Least privilege.** The Karuna host's managed identity gets rights on the `karuna` schema only,
+  nothing in Sati's tables (§11.1). That is possible because Karuna keeps its own identity and audit
+  tables (D-10).
+- **Separate trust.** Each host has its own token audience and signing key, so neither accepts the
+  other's tokens under the JWT validation Sati already performs.
 - **It forces the platform seam to be real.** If Karuna can be hosted without referencing Sati, the
   platform extraction worked.
 
@@ -191,12 +200,24 @@ assemblies, and stage 1 forbids a platform project from referencing a product. T
 the model snapshot that EF migrations compare against needs every entity type at design time.
 
 **Decided (D-1):** a composition assembly, `SatiLogica.Schema`, references the platform and all
-product persistence assemblies and owns the one chain and the one design-time model.
+product persistence assemblies. It owns the one chain through a design-time composition context that
+is **separate from every runtime context**, so no client or product host references it.
 `SatiLogica.Persistence` stays product-agnostic. Runtime contexts per product (`KarunaDbContext`,
-the future server-side `SatiDbContext`) map only their own schema plus the platform tables they read,
-and `SchemaDriftHealthCheck` compares each against the chain. A separate Karuna migration chain was
+`SatiContext`, `ApiDbContext`) map only their own tables. A separate Karuna migration chain was
 considered and rejected. The contradiction is also recorded as a structural finding (S-5), because it
 blocked Sati's stage 4 as much as Karuna.
+
+*Corrected 2026-09-28 after Codex's review.* An earlier version said `SchemaDriftHealthCheck` compares
+each runtime model against the chain. It does not: it compares the API model with the live database
+(`SchemaDriftHealthCheck.cs:56-59`). Two additions are therefore required before a second schema
+exists:
+
+- schema-aware comparison — `SchemaComparison` and `SchemaSnapshotReader` key tables by name alone
+  today, so `dbo.X` and `karuna.X` would be conflated;
+- a CI check that each runtime model is a subset of the composed model.
+
+Both are part of restructure stage 4 (handoff P5). Because Local Production still migrates itself at
+startup, the desktop stops doing so before the chain gains any Karuna entity (D-12, handoff P6).
 
 ### 3.4 What becomes platform because Karuna exists
 
@@ -207,9 +228,10 @@ these, and each needs to be in `SatiLogica.*` before Karuna depends on it:
 |---|---|---|
 | Service authorization | Designed as platform; not built | The join for relationship reads. Karuna bills against it. |
 | Sharing policy | Designed as platform; not built | One owner for what crosses a tenant boundary. |
-| Tenant clock and business-day calendar | `ApiClock`, `BillingRules.MaineBusinessDate`, `WorkdayHelper`, `ExemptDate` | Two owners of "the Maine date" today (S-3). Karuna's filing deadlines are business-day arithmetic. |
+| Tenant clock | `ApiClock` and `BillingRules.MaineBusinessDate`, which choose the zone separately | Two owners of "the Maine date" today (S-3). |
+| Maine business-day calendar | Does not exist (D-13) | Karuna's filing deadlines are business-day arithmetic. A new State holiday dataset; `WorkdayHelper` (agency productivity exclusions) and `ExemptDate` (a user's days off) are unrelated and unchanged. |
 | 837P formatting, trading-partner profiles, clearinghouse outbox and connectors, 835 ingestion, remittance and deposit reconciliation, claim correction mechanics | `Sati.Contracts`, `Sati.Api` | Karuna bills MaineCare on the same transaction sets. Eligibility and readiness rules stay per product. |
-| Documents and hash-verified artifacts, signatures, envelope protection, legal hold | Mixed | Already classified platform. |
+| Documents and hash-verified artifacts, signatures, envelope protection, legal hold | Sati-shaped types in `Sati.Contracts` | Platform in principle, but today's types carry Sati's integer person and agency ids, and envelope protection binds them under `sati.v1`. They stay in Sati (D-11). Platform versions are designed when Karuna first needs each one; Karuna's early steps do not. |
 | Notifications (contentless) and chat | Chat in Sati | Karuna's shift handoff and alerts. |
 | Organization and person registries | Designed; not built | Karuna's tenant is an organization; its recipients link to the registry. |
 
@@ -228,10 +250,18 @@ non-null `OrganizationId`. Sites (homes, day programs, offices) and programs (a 
 "Section 21 residential") belong to the organization.
 
 **Tenancy is per product (D-8).** An organization that provides case management to some people and
-direct services to others holds a Sati tenant and a separate Karuna tenant. The tenant carries its
-product, and a token issued for one product's tenant is never accepted by the other product's host.
-Membership stays single, so a staff member who works on both sides holds two accounts. This
+direct services to others holds a Sati tenant and a separate Karuna tenant. A token issued by one
+product's host is never accepted by the other's, because each host has its own audience and signing
+key. Membership stays single, so a staff member who works on both sides holds two accounts. This
 supersedes "at most one tenant" in the 2026-08-15 provider-directory decision.
+
+**Karuna owns its identity tables (D-10).** Karuna's users, organizations (its tenants), memberships
+and audit events live in the `karuna` schema. The platform supplies the mechanics through
+`SatiLogica.Hosting`: password hashing format, token issuance and validation, lockout, session
+revocation through a security version, and the audit envelope. It does not supply the tables. Sati's
+`dbo` identity is not relocated. A platform identity store becomes necessary only when something must
+span products, such as `PlatformOperator` or the OADS authority grants in `PLATFORM_DOMAIN.md`. It is
+designed then.
 
 ### 4.2 Isolation that does not depend on remembering a predicate
 
@@ -246,7 +276,17 @@ starts with four layers:
    applied to every Karuna entity by convention; a test fails if an entity type lacks one.
 3. **SQL Server row-level security** on the `karuna` schema, keyed to `SESSION_CONTEXT` set by the
    connection interceptor from the validated actor. Defence in depth: a raw SQL query or a filter
-   accidentally ignored with `IgnoreQueryFilters()` still cannot cross.
+   accidentally ignored with `IgnoreQueryFilters()` still cannot cross. Its lifecycle is proven by a
+   spike before K0 builds on it:
+   - **Unset means empty.** The predicate returns no rows when no organization is set.
+   - **Read-only per request.** The organization is set when the connection opens for a request, with
+     `@read_only = 1`, so nothing can change it mid-request.
+   - **No pooled leakage.** A pooled connection must not carry one request's organization into the
+     next. That a connection reset clears session context is believed but not yet proven here; the
+     spike tests it.
+   - **Sign-in bootstrap.** Sign-in runs before any organization is known. The user table is outside
+     the tenant predicate and reachable only through a narrow sign-in path.
+   - **Background jobs** set the organization explicitly, one tenant at a time.
 4. **Cross-tenant tests** on every route, as Sati already does.
 
 Relationship reads (a case manager reading documentation) and authority reads (OADS) are the only
@@ -784,11 +824,15 @@ Rates are append-only versions per service code and modifier with an effective d
 
 ### 11.1 Schema and principals
 
-- All Karuna tables live in a `karuna` SQL schema; platform tables in a `platform` schema as they are
-  extracted. Sati's tables stay in `dbo` until its own stage 4.
-- `Karuna.Api`'s managed identity gets DML on `karuna` and read on the platform views it needs; no
-  rights on `dbo`. `Karuna.Worker` gets its own identity. The migration identity is separate from
-  both, following `OPERATIONS.md`.
+- All Karuna tables, including its users, organizations, memberships and audit events (D-10), live in
+  a `karuna` SQL schema. Sati's tables stay in `dbo`, and nothing moves out of `dbo` for Karuna. A
+  `platform` schema is created only when a genuinely cross-product table is first needed (the person
+  or organization registry, authority grants).
+- `Karuna.Api`'s managed identity gets DML on `karuna` and no rights on `dbo`. This is achievable
+  because Karuna does not read Sati's identity tables. `Karuna.Worker` gets its own identity. The
+  migration identity is separate from both, following `OPERATIONS.md`.
+- Sign-in reads the user table before any organization is known, so that table is outside the
+  row-level security tenant predicate and reachable only through the narrow sign-in path (§4.2).
 
 ### 11.2 Keys
 
@@ -999,12 +1043,18 @@ route):
 
 Detailed with acceptance criteria in `CODEX_HANDOFF.md`. In short:
 
-- **Prerequisites (in Sati's repository, before any Karuna code):** root-project glob exclusions; the
-  dependency-graph guardrail; the platform clock; platform extraction of the pieces §3.4 lists that
-  Karuna's first steps need (identity, audit, hosting library); and the migration chain's move to
-  `SatiLogica.Schema`.
-- **K0** foundation: organization tenant, sites, programs, users, capabilities, devices, enrolment,
-  care-team access, emergency access, audit, isolation layers.
+- **Prerequisites** (in Sati's repository, before any Karuna code):
+  - **P0** root-project exclusions;
+  - **P1** the dependency-graph guardrail;
+  - **P2** one clock;
+  - **P3** product-neutral platform contracts;
+  - **P4** the hosting library;
+  - **P5** schema-aware tooling and the chain's move to `SatiLogica.Schema`;
+  - **P6** the Local migration runner, which lands before any Karuna entity joins the chain;
+  - **P7** the Maine business-day calendar, which lands before K3.
+- **K0** foundation: a row-level security lifecycle spike first; then Karuna-owned identity and audit
+  tables, organization tenant, sites, programs, capabilities, devices, enrolment, care-team access,
+  emergency access and isolation layers.
 - **K1** person record and face sheet. **K2** staff qualifications. **K3** event reports.
 - **K4** eMAR (its own internal order in the eMAR design). **K5** daily documentation and service
   records. **K6** behaviour support. **K7** scheduling, time, EVV phase 1.
@@ -1026,7 +1076,8 @@ Where a default is proposed, it is a placeholder that must be confirmed before r
 - **KQ-1** Per diem billable day: admission, discharge, hospital and leave-of-absence days.
 - **KQ-2** Which Section 21/29 procedure codes require EVV — obtain the State's impacted-services
   spreadsheet.
-- **KQ-3** EVV phase 1 (reconcile with State Sandata) versus becoming an alternate vendor at launch.
+- **KQ-3** *Resolved 2026-09-28 by D-6:* EVV phase 1 reconciles with the State's Sandata EVV;
+  alternate-vendor certification comes later.
 - **KQ-4** The exact reading of "within one (1) business day of the Reportable Event", including events
   late on a Friday or before a holiday, and whether the clock runs from event or awareness when they
   differ.
