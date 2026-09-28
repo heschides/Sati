@@ -40,6 +40,8 @@
       Unbilled work at both billing boundaries while retaining ordinary supervisor review, and
       publish the contract change as `annual-pcp-and-unbilled-note-v1`. Migration
       `20260928140919_AddAnnualPcpAndUnbilledNotes` is generated but unapplied.
+      The identity-guarded Demo runner is prepared; preflight, rollback rehearsal,
+      application, reset-baseline recapture, and verification reset remain pending.
 - [x] Default Goal Progress to None for Form work without overwriting a deliberate choice, and
       restore the All Persons sentinel after the Notes Log replaces its filter collection so the
       default filter never renders blank.
