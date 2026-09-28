@@ -42,12 +42,44 @@ must ship before a 1.3.30 Demo client because the new contract shape and promoti
       signatures 119, portal 8, and Carika 4, for 3,698 passed and 12 skipped overall. Portal
       browser behavior passed 9/9, all 88 PowerShell files parsed, and `git diff --check` found no
       whitespace errors.
-- [ ] Push the exact validated source normally to `origin/master`.
-- [ ] Build, inspect, publish, and verify the 1.3.30 package against only the existing Demo API.
-- [ ] Build and accept the 1.3.30 Demo and Local installers, then publish each installer and
-      checksum atomically to its exact distribution folder without overwriting an existing file.
-- [ ] Record final hashes, deployment/health evidence, test totals, acceptance cleanup, retained
-      branches, and Local Production migration follow-up in a pushed evidence commit.
+- [x] Push the exact validated source normally to `origin/master`: commit
+      `9d22650427689e8c347428e48ed4f3988e197e3e`.
+- [x] Build the API package from that pushed source. The 70-entry, 10,594,675-byte
+      `artifacts/SatiApi-1.3.30-fx-x86.zip` has SHA-256
+      `9AB9F1B3F54D6700F3C059928E3FA7BCF4771EB90837EBB5BE0EF082A7205E44`, file version
+      1.3.30.0, and product version
+      `1.3.30+9d22650427689e8c347428e48ed4f3988e197e3e`; it contains no settings file,
+      unsafe ZIP path, duplicate entry, or secret-like configuration text. OneDeploy deployment
+      `30ba277cf5cd47818a8b0a927f817eeb` published it only to the existing Demo API. Liveness and
+      schema-aware readiness are healthy, `/health/version` reports Sati.Api 1.3.30 and contract
+      revision `7DD94A01B162`, and the new one-off promotion route returns 401 anonymously.
+      Health-only evidence is in `artifacts/release-1.3.30-demo-readiness.json`; authenticated
+      checks remain skipped because synthetic Admin credentials are not configured.
+- [x] Build and accept both 1.3.30 installers without overwrite. The 103,268,352-byte
+      `SatiDemoSetup-1.3.30.exe` has SHA-256
+      `718D35F7800390C38D1C49F962DE525E0F1BCFF393260B752460B507CC12F5DA`; five responsive
+      15-second launches, exact version 1.3.30.0, graceful closes, and cleanup passed. Evidence is
+      in `artifacts/release-1.3.30-demo-installer-acceptance.json`; this is a build-workstation
+      test, not an external-machine attestation. The 205,570,089-byte
+      `SatiLocalSetup-1.3.30.exe` has SHA-256
+      `19119DFAA1E77308CCF2E4969C684C3BB109BFE67CBFD209DCC70C1D6134D561`; exact version,
+      `SatiProduction`, Windows integrated security, and cleanup passed. Its embedded prerequisite
+      is the durable Valid Microsoft-signed 63,508,480-byte `SqlLocalDB.msi`, SHA-256
+      `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+- [x] Publish only those accepted installers and their checksum files by verified temporary copy
+      and no-overwrite rename. Final hashes and checksum contents match in
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop` and
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`; no
+      temporary staging file remains.
+- [x] Retain every non-default remote branch because its deletion status remains uncertain:
+      `codex/annual-compliance`, `codex/clarify-project-notes`,
+      `claude/local-vs-github-workflow-dlcqpb`, `second-machine-setup`, and `team-chat-design`.
+      No branch was merged or deleted during this release.
+- [x] Record the Local Production follow-up without accessing Production. The latest durable
+      observation for Joshua's workstation is client 1.3.27, and the other SatiLogica workstation
+      remains 1.3.2; migration 120 is pending on each until 1.3.30 is installed and launched there.
+      Demo is already at migration 120. This checklist's final pushed commit is the release-
+      evidence commit.
 
 ## Release 1.3.29 — 2026-09-27
 
