@@ -141,6 +141,7 @@ namespace Sati
                         services.AddSingleton<Sati.Forms.MedicalReleasePdfGenerator>();
                         services.AddSingleton<Sati.Forms.CwicPacketPdfGenerator>();
                         services.AddSingleton<Sati.Forms.HousingSupportFundsPdfGenerator>();
+                        services.AddSingleton<Sati.Forms.SafetyDevicePdfGenerator>();
 
                         if (dataEnvironment.UsesCloudApi)
                             AddCloudDataServices(services, dataEnvironment);
@@ -204,6 +205,7 @@ namespace Sati
                         services.AddTransient<ViewModels.ClientDocuments.ReleaseObligationsViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.CwicPacketViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.HousingSupportFundsViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.SafetyDeviceViewModel>();
                         services.AddSingleton<Sati.Forms.DocumentTemplatePdfComposer>();
                         services.AddSingleton<Sati.Forms.SafetyPlanPdfGenerator>();
                         services.AddSingleton<Sati.Forms.DhhsFormFiller>();
@@ -563,6 +565,7 @@ namespace Sati
             services.AddTransient<IDhhsFormService, DhhsFormService>();
             services.AddTransient<ICwicPacketService, CwicPacketService>();
             services.AddTransient<IHousingSupportFundsService, HousingSupportFundsService>();
+            services.AddTransient<ISafetyDeviceService, SafetyDeviceService>();
             // Local SSN protection: the same envelope the API uses, wrapped by the
             // Windows user account key instead of Key Vault. Singleton because none
             // of the three holds per-request state.
@@ -630,6 +633,7 @@ namespace Sati
             services.AddTransient<IDhhsFormService, CloudDhhsFormService>();
             services.AddTransient<ICwicPacketService, CloudCwicPacketService>();
             services.AddTransient<IHousingSupportFundsService, CloudHousingSupportFundsService>();
+            services.AddTransient<ISafetyDeviceService, CloudSafetyDeviceService>();
             services.AddTransient<IApiCompatibilityService, CloudApiCompatibilityService>();
             services.AddTransient<IAgencyReleaseService, CloudAgencyReleaseService>();
             services.AddTransient<IDocumentTemplateService, CloudDocumentTemplateService>();

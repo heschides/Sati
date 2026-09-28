@@ -5,7 +5,7 @@
 | Billing | `POST /billing/remittance-deposits/{depositId}/eft` | Deposit `AgencyId` | Billing permission and a re-validated current actor. Appends one bank-deposit entry; nothing is edited. The caller must name the entry it saw (`PreviousRecordId`), so a concurrent entry or correction returns 409 rather than stacking silently; a filtered unique index enforces the same race server-side. Amount, date, and correction-note rules are `EftDepositRules`. Reconciliation is derived from the latest entry, never stored. |
 # API authorization and tenant ownership
 
-*Route manifest updated 2026-09-24: 224 protected routes. The table is maintained with
+*Route manifest updated 2026-09-28: 225 protected routes. The table is maintained with
 `ApiSurface.Routes` after excluding health and anonymous login, and `ApiSurfaceTests` checks that
 manifest against live endpoint registration. Every route added, removed, or rescoped must be
 reflected here in the same change.*
@@ -75,6 +75,7 @@ incentives are separate own-user information, not an extension of consumer casel
 |---|---|---|---|
 | CWIC packet | `POST /people/{personId}/cwic-referral.pdf` | Person and assigned user's `AgencyId` | Current case manager must own the consumer. Identity/SSN are server-derived; the SSN never appears in the request or a JSON response. Generation returns a non-cacheable PDF, appends audit events, and records a versioned Draft artifact in the actor's agency. Cross-agency and non-caseload records return 404. |
 | Housing Support Funds | `POST /people/{personId}/housing-support-funds.pdf` | Person and assigned user's `AgencyId` | Current case manager must own the consumer. Consumer identity, waiver, Shared Living, guardian, assigned case manager, and provider facts are server-derived. Generation returns a non-cacheable PDF, appends audits, and records a versioned Draft artifact. Signatures, dates, and DHHS-only fields stay blank. Cross-agency and non-caseload records return 404. |
+| Safety Device Request | `POST /people/{personId}/safety-device-request.pdf` | Person and assigned user's `AgencyId` | Current case manager must own the consumer. Member identity and assigned case manager are server-derived. Generation fills OADS's April 2026 AcroForm, returns a non-cacheable PDF, appends audits, and records a versioned Draft artifact. Medical provider and member or guardian signature fields remain blank. Cross-agency and non-caseload records return 404. |
 | Signatures | `GET /signatures/availability` | Validated actor and actor agency settings | Reports the independent environment gate, the agency's internal-signing opt-in, and private external-upload storage availability. It grants no consumer access and cannot enable a disabled environment. |
 | Signatures | `GET /signatures/catalog` | Validated actor | Shared document-purpose catalog; no consumer information or legal clearance. |
 | External signatures | `GET /people/{personId}/external-signatures` | Evidence/person agency and owning user agency | Existing live consumer-access rule; returns only immutable verification metadata for the selected consumer. |

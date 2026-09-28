@@ -119,6 +119,8 @@ CalendarViewModel calendarViewModel,
                 Clients, ClientDocumentHubMode.CwicPacket);
             HousingSupportFunds = new ClientDocumentHubViewModel(
                 Clients, ClientDocumentHubMode.HousingSupportFunds);
+            SafetyDevice = new ClientDocumentHubViewModel(
+                Clients, ClientDocumentHubMode.SafetyDevice);
 
             // Mirror the module's client selection onto the dashboard. One-way:
             // the CLIENT combobox lives in the module now, but the notes grid and
@@ -245,12 +247,13 @@ CalendarViewModel calendarViewModel,
         public bool IsReleasesSubActive => ReferenceEquals(CurrentSubViewModel, Releases);
         public bool IsCwicPacketSubActive => ReferenceEquals(CurrentSubViewModel, CwicPacket);
         public bool IsHousingSupportFundsSubActive => ReferenceEquals(CurrentSubViewModel, HousingSupportFunds);
+        public bool IsSafetyDeviceSubActive => ReferenceEquals(CurrentSubViewModel, SafetyDevice);
         public GuidanceViewModel Guidance { get; }
         public HelperReferenceViewModel Reference { get; }
         public bool IsGuidanceSubActive => ReferenceEquals(CurrentSubViewModel, Guidance);
         public bool IsReferenceSubActive => ReferenceEquals(CurrentSubViewModel, Reference);
         public bool IsHelpSubActive => IsGuidanceSubActive || IsReferenceSubActive;
-        public bool IsDocumentsSubActive => IsATRequestsSubActive || IsAuthorizedRepresentativeSubActive || IsReleasesSubActive || IsCwicPacketSubActive || IsHousingSupportFundsSubActive;
+        public bool IsDocumentsSubActive => IsATRequestsSubActive || IsAuthorizedRepresentativeSubActive || IsReleasesSubActive || IsCwicPacketSubActive || IsHousingSupportFundsSubActive || IsSafetyDeviceSubActive;
         public ReviewsViewModel Reviews { get; }
         public ProvidersViewModel Providers { get; }
         public ATRequestViewModel ATRequests { get; }
@@ -258,6 +261,7 @@ CalendarViewModel calendarViewModel,
         public ClientDocumentHubViewModel Releases { get; }
         public ClientDocumentHubViewModel CwicPacket { get; }
         public ClientDocumentHubViewModel HousingSupportFunds { get; }
+        public ClientDocumentHubViewModel SafetyDevice { get; }
         public FormAttestationViewModel Attestation { get; }
         public CalendarViewModel Calendar { get; }
         public StatisticsViewModel Statistics { get; }
@@ -298,6 +302,7 @@ CalendarViewModel calendarViewModel,
             OnPropertyChanged(nameof(IsReleasesSubActive));
             OnPropertyChanged(nameof(IsCwicPacketSubActive));
             OnPropertyChanged(nameof(IsHousingSupportFundsSubActive));
+            OnPropertyChanged(nameof(IsSafetyDeviceSubActive));
             OnPropertyChanged(nameof(IsSubViewActive));
             OnPropertyChanged(nameof(IsGuidanceSubActive));
             OnPropertyChanged(nameof(IsReferenceSubActive));
@@ -1064,6 +1069,13 @@ CalendarViewModel calendarViewModel,
         {
             HousingSupportFunds.Prepare();
             CurrentSubViewModel = HousingSupportFunds;
+        }
+
+        [RelayCommand]
+        private void NavigateToSafetyDevice()
+        {
+            SafetyDevice.Prepare();
+            CurrentSubViewModel = SafetyDevice;
         }
 
         [RelayCommand]

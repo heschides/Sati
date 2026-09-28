@@ -76,7 +76,7 @@ public sealed class ReleaseUiStructureTests
             toolbar.Elements(presentation + "Button").Select(e => (string?)e.Attribute("Content")));
         foreach (var (name, destinations) in new[] {
             ("Help navigation", new[] { "Guidance", "Reference" }),
-            ("Documents navigation", new[] { "AT Requests", "Authorized Rep", "Releases", "CWIC Packet", "Housing Funds" }) })
+            ("Documents navigation", new[] { "AT Requests", "Authorized Rep", "Releases", "CWIC Packet", "Housing Funds", "Safety Device" }) })
         {
             var sidebar = view.Descendants(presentation + "StackPanel")
                 .Single(e => (string?)e.Attribute("AutomationProperties.Name") == name);
@@ -88,6 +88,7 @@ public sealed class ReleaseUiStructureTests
         Assert.Contains("NavigateToReleasesCommand", dashboard);
         Assert.Contains("NavigateToCwicPacketCommand", dashboard);
         Assert.Contains("NavigateToHousingSupportFundsCommand", dashboard);
+        Assert.Contains("NavigateToSafetyDeviceCommand", dashboard);
         Assert.Contains("HorizontalScrollBarVisibility=\"Auto\"", dashboard);
 
         Assert.Contains("Header=\"Annual Forms\"", clients);

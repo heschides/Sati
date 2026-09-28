@@ -61,6 +61,10 @@
                 DataContext="{Binding Clients.HousingSupportFunds}"
                 Visibility="{Binding IsHousingSupportFunds, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+            <documents:SafetyDeviceWorkspace
+                DataContext="{Binding Clients.SafetyDevice}"
+                Visibility="{Binding IsSafetyDevice, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
             <TabControl Margin="12"
                         Visibility="{Binding IsReleases, Converter={StaticResource BooleanToVisibilityConverter}}"
                         AutomationProperties.Name="Release form choices">

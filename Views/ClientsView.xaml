@@ -2656,6 +2656,11 @@
                             <clientDocuments:HousingSupportFundsWorkspace DataContext="{Binding HousingSupportFunds}" />
                         </TabItem>
 
+                        <TabItem Header="Safety Device"
+                                 Style="{StaticResource ClientWorkspaceTabItemStyle}">
+                            <clientDocuments:SafetyDeviceWorkspace DataContext="{Binding SafetyDevice}" />
+                        </TabItem>
+
                         <TabItem Header="Check Requests" Style="{StaticResource ClientWorkspaceTabItemStyle}">
                             <clientDocuments:CheckRequestsWorkspace DataContext="{Binding CheckRequests}" />
                         </TabItem>

@@ -103,6 +103,7 @@ builder.Services.AddSingleton<PersonAuditPdfGenerator>();
 builder.Services.AddSingleton<DhhsFormFiller>();
 builder.Services.AddSingleton<CwicPacketPdfGenerator>();
 builder.Services.AddSingleton<HousingSupportFundsPdfGenerator>();
+builder.Services.AddSingleton<SafetyDevicePdfGenerator>();
 builder.Services.AddSingleton<AgencyReleasePdfGenerator>();
 builder.Services.AddSingleton<MedicalReleasePdfGenerator>();
 builder.Services.AddSingleton<DocumentTemplatePdfComposer>();

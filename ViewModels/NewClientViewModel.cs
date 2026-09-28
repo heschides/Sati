@@ -85,6 +85,7 @@ namespace Sati.ViewModels
         public AgencyReleaseViewModel AgencyRelease { get; }
         public CwicPacketViewModel? CwicPacket { get; }
         public HousingSupportFundsViewModel? HousingSupportFunds { get; }
+        public SafetyDeviceViewModel? SafetyDevice { get; }
         public SafetyPlanViewModel? SafetyPlan { get; }
         public AnnualDocumentsViewModel? AnnualDocuments { get; }
         public CheckRequestsViewModel? CheckRequests { get; }
@@ -416,6 +417,7 @@ namespace Sati.ViewModels
             ReleaseObligations?.SetPerson(value);
             CwicPacket?.SetPerson(value);
             HousingSupportFunds?.SetPerson(value);
+            SafetyDevice?.SetPerson(value);
             CheckRequests?.SetPerson(value);
             SafetyPlan?.SetPerson(value);
             AnnualDocuments?.SetPerson(value);
@@ -697,7 +699,8 @@ namespace Sati.ViewModels
                            ReleaseObligationsViewModel? releaseObligations = null,
                            IPersonPhotoService? personPhotoService = null,
                            CwicPacketViewModel? cwicPacket = null,
-                           HousingSupportFundsViewModel? housingSupportFunds = null)
+                           HousingSupportFundsViewModel? housingSupportFunds = null,
+                           SafetyDeviceViewModel? safetyDevice = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -714,6 +717,7 @@ namespace Sati.ViewModels
             AgencyRelease = agencyRelease;
             CwicPacket = cwicPacket;
             HousingSupportFunds = housingSupportFunds;
+            SafetyDevice = safetyDevice;
             SafetyPlan = safetyPlan;
             AnnualDocuments = annualDocuments;
             CheckRequests = checkRequests;

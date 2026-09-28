@@ -1,5 +1,21 @@
 # Sati — Refactor Agenda
 
+## Unreleased — OADS Safety Device Request Form (2026-09-28)
+
+- [x] Add a Safety Device tab under Clients and Documents, with member and program details,
+      ten device rows across the main form and Appendix B, the three planning questions, and
+      the team meeting date. The case manager enters answers; identity comes from the current
+      consumer record.
+- [x] Fill the April 2026 OADS AcroForm and retain its six original pages. Leave medical
+      provider and member or guardian signatures blank. Local and cloud generation both apply
+      caseload authorization, audit generation, and retain a versioned Draft artifact.
+- [x] Allow the case manager to fill the form and save the draft PDF without an approval gate.
+      Sati does not submit the PDF, create Evergreen meeting notes, approve an HCBS modification,
+      or attest that signatures were obtained.
+- [ ] A future Sati-native signature feature requires Josh's separate approval and review of
+      signer authority and evidence requirements. The current draft leaves signature fields blank
+      for signing outside Sati.
+
 ## Unreleased corrections — 2026-09-28
 
 - [x] Close the remaining Work Agenda duplicate path after the 1.3.23 transition repair. The

@@ -2,6 +2,19 @@
 
 *Living document. Updated during structured review sessions. Last updated: 2026-09-28.*
 
+## OADS Safety Device Request draft — September 28 (unreleased)
+
+The Clients and Documents tabs share one `SafetyDeviceViewModel` for the selected consumer.
+`SafetyDeviceRules` in `Sati.Contracts.V1` owns bounded request validation and fixed-box PDF
+wrapping. The local `SafetyDeviceService` or cloud `CloudSafetyDeviceService` forwards the
+case manager's answers to the authoritative writer; the API route rechecks current caseload
+ownership and derives member and assigned-case-manager facts server-side. Both writers use
+`SafetyDevicePdfGenerator` to fill the embedded April 2026 OADS AcroForm, retain the original
+six-page content, audit generation, and stage a versioned Draft document artifact. Signature
+fields remain blank. This is a document draft, not a safety-device approval or an annual
+compliance attestation. PDF generation has no approval gate; a future Sati-native signature
+workflow is separate and requires explicit approval before implementation.
+
 ## Multi-activity notes — September 22 (unreleased)
 
 `NoteActivityRules` in `Sati.Contracts.V1` owns activity flags and the historical

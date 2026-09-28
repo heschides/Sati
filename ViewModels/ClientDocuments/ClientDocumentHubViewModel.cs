@@ -7,7 +7,8 @@ public enum ClientDocumentHubMode
     AuthorizedRepresentative,
     Releases,
     CwicPacket,
-    HousingSupportFunds
+    HousingSupportFunds,
+    SafetyDevice
 }
 
 /// <summary>
@@ -32,21 +33,25 @@ public sealed class ClientDocumentHubViewModel
     public bool IsReleases => Mode == ClientDocumentHubMode.Releases;
     public bool IsCwicPacket => Mode == ClientDocumentHubMode.CwicPacket;
     public bool IsHousingSupportFunds => Mode == ClientDocumentHubMode.HousingSupportFunds;
+    public bool IsSafetyDevice => Mode == ClientDocumentHubMode.SafetyDevice;
     public string Title => IsAuthorizedRepresentative
         ? "DHHS Authorized Representative"
         : IsCwicPacket ? "CWIC Referral Packet"
-        : IsHousingSupportFunds ? "Housing Support Funds Application" : "Releases";
+        : IsHousingSupportFunds ? "Housing Support Funds Application"
+        : IsSafetyDevice ? "Safety Device Request Form" : "Releases";
     public string Description => IsAuthorizedRepresentative
         ? "Prepare Maine DHHS's Appointment of Authorized Representative form for the selected consumer."
         : IsCwicPacket
             ? "Prepare MaineHealth's ten-page Benefits Counseling Services referral packet from consumer profile information and answers entered here."
         : IsHousingSupportFunds
             ? "Prepare Maine DHHS OADS's editable three-page Housing Support Funds application from verified profile facts and answers entered here."
+        : IsSafetyDevice
+            ? "Prepare Maine DHHS OADS's six-page Safety Device Request Form from the selected consumer and answers entered here."
         : "Prepare either the official Maine DHHS release or Sati's agency release for the selected consumer.";
 
     public void Prepare()
     {
-        if (IsCwicPacket || IsHousingSupportFunds)
+        if (IsCwicPacket || IsHousingSupportFunds || IsSafetyDevice)
             return;
         var key = IsAuthorizedRepresentative
             ? DhhsFormDefinition.FormKey.AuthorizedRepresentative

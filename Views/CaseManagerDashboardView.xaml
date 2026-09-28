@@ -58,6 +58,8 @@
                         views:NavTab.IsActive="{Binding IsCwicPacketSubActive}" Command="{Binding NavigateToCwicPacketCommand}" />
                 <Button Content="Housing Funds" Style="{StaticResource NavTabButton}" AutomationProperties.Name="Housing Support Funds application"
                         views:NavTab.IsActive="{Binding IsHousingSupportFundsSubActive}" Command="{Binding NavigateToHousingSupportFundsCommand}" />
+                <Button Content="Safety Device" Style="{StaticResource NavTabButton}" AutomationProperties.Name="Safety Device Request Form"
+                        views:NavTab.IsActive="{Binding IsSafetyDeviceSubActive}" Command="{Binding NavigateToSafetyDeviceCommand}" />
      </StackPanel>
     </ScrollViewer>
    </Border>

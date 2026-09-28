@@ -69,6 +69,7 @@ internal static class AuditActions
     public const string AgencyReleaseGenerated = "agency-release.generated";
     public const string CwicPacketGenerated = "cwic-packet.generated";
     public const string HousingSupportFundsGenerated = "housing-support-funds.generated";
+    public const string SafetyDeviceRequestGenerated = "safety-device-request.generated";
     public const string PersonHistoryViewed = "person-history.viewed";
     public const string PersonHistoryPdfGenerated = "person-history-pdf.generated";
     public const string TestConsumerDeleted = "test-data.consumer-deleted";

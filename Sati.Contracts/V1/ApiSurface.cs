@@ -113,6 +113,7 @@ public static class ApiSurface
         "case-note-goal-progress-v1",
         "cwic-referral-packet-v1",
         "housing-support-funds-v1",
+        "safety-device-request-v1",
         "person-photo-v1",
         // The counted-service-day read gained a userId, so a reviewer can see a case manager's
         // settled days with no billable work. An older server ignores the parameter and answers
@@ -312,6 +313,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/release-obligations/{obligationId:guid}/attest",
         "POST /api/v1/people/{personId:int}/release-obligations/{obligationId:guid}/attestation/revoke",
         "POST /api/v1/people/{personId:int}/release-obligations/{obligationId:guid}/withdraw",
+        "POST /api/v1/people/{personId:int}/safety-device-request.pdf",
         "POST /api/v1/people/{personId:int}/safety-plans/draft",
         "POST /api/v1/providers",
         "POST /api/v1/providers/{providerId:int}/contacts",

@@ -5956,3 +5956,20 @@ The rules are these:
 - KQ-3 moved to a resolved list.
 - P0 adds `Page` removes, confirmed by evaluating the real project; `Content` needs none. The P0 and P1
   plans in the handoff are approved to start.
+
+## 2026-09-28 — Safety device requests fill the OADS form as drafts
+
+The supplied Safety Device Request Form is an OADS document, so Sati fills the published April
+2026 AcroForm instead of drawing a similar page. Its original six page-content streams remain
+unchanged. The case manager can prepare the member, program, device, and planning answers in one
+workspace; the selected member's identity and assigned case manager are read by the local or API
+writer from the current record. The API accepts no caller-supplied identity facts or scope.
+
+This document contains a medical provider recommendation and member or guardian approval. Data
+entry cannot stand in for those people: Sati never fills the provider date/signature cells or
+the member signature/date fields. Filling and saving the PDF needs no approval gate. Generation
+saves an audited, versioned Draft artifact, not an approval or attestation. Signing outside Sati
+remains possible; adding Sati-native signature capture is a separate feature that Josh must
+approve. The UI names the remaining Evergreen and HCBS steps without claiming to perform them.
+Fixed PDF boxes have bounded answer lengths and explicit wrapping so a PDF that passes validation
+prints the entered text rather than silently clipping it.
