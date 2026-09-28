@@ -13,7 +13,8 @@ public static class FormNoteLinkRules
         string? status,
         int? formId,
         string? correctionReason,
-        int? activities = null)
+        int? activities = null,
+        bool isAnnualPlan = false)
     {
         if (correctionReason?.Length > 1_000)
             return "A form date correction explanation cannot exceed 1,000 characters.";
@@ -23,6 +24,13 @@ public static class FormNoteLinkRules
 
         if (string.IsNullOrWhiteSpace(formType))
             return "Choose the form type for this note.";
+
+        if (string.Equals(formType, AnnualPcpNoteRules.FormTypeName, StringComparison.Ordinal))
+        {
+            if (isAnnualPlan && formId is not > 0)
+                return "Choose the Annual PCP plan year.";
+            return null;
+        }
 
         if (formId is <= 0)
             return "Choose a valid form obligation.";

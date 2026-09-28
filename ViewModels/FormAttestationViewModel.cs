@@ -46,6 +46,10 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     private string revocationReason = string.Empty;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RevokeAttestationCommand))]
+    private bool isRevocationPromptVisible;
+
+    [ObservableProperty]
     private string revocationReasonError = string.Empty;
 
     [ObservableProperty]
@@ -78,6 +82,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     private bool isSaving;
 
     public Func<Task>? AttestationChangedAsync { get; set; }
+    public event EventHandler<FormAttestationCompletedEventArgs>? AttestationCompleted;
 
     public bool IsComplete => _form?.CompletedDate is not null;
     public bool IsIncomplete => !IsComplete;
@@ -177,6 +182,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         ComprehensiveAssessmentCompletionDateError = string.Empty;
         RevocationReason = string.Empty;
         RevocationReasonError = string.Empty;
+        IsRevocationPromptVisible = false;
         PrerequisiteError = string.Empty;
         ScheduledNoteConversionPrompt = string.Empty;
         AttestationHistory = [];
@@ -341,7 +347,9 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
             ScheduledNoteConversionPrompt = string.Empty;
             if (AttestationChangedAsync is not null)
                 await AttestationChangedAsync();
-            await LoadHistoryAsync(_form, _loadVersion);
+            IsVisible = false;
+            AttestationCompleted?.Invoke(this, new FormAttestationCompletedEventArgs(
+                ContextLabel, completedOn.Date));
         }
         catch (ScheduledFormNoteConversionRequiredException exception)
         {
@@ -449,7 +457,28 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     }
 
     private bool CanRevokeAttestation() =>
-        !IsSaving && _form?.CompletedDate is not null;
+        !IsSaving && IsRevocationPromptVisible && _form?.CompletedDate is not null;
+
+    private bool CanShowRevocationPrompt() =>
+        !IsSaving && _form?.CompletedDate is not null && !IsRevocationPromptVisible;
+
+    [RelayCommand(CanExecute = nameof(CanShowRevocationPrompt))]
+    private void ShowRevocationPrompt()
+    {
+        RevocationReason = string.Empty;
+        RevocationReasonError = string.Empty;
+        IsRevocationPromptVisible = true;
+        ShowRevocationPromptCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand]
+    private void CancelRevocation()
+    {
+        RevocationReason = string.Empty;
+        RevocationReasonError = string.Empty;
+        IsRevocationPromptVisible = false;
+        ShowRevocationPromptCommand.NotifyCanExecuteChanged();
+    }
 
     [RelayCommand(CanExecute = nameof(CanRevokeAttestation))]
     private async Task RevokeAttestation()
@@ -470,6 +499,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
                 await AttestationChangedAsync();
             CompletionDate = null;
             HasConfirmedEvergreenCompletion = false;
+            IsRevocationPromptVisible = false;
             await LoadHistoryAsync(_form, _loadVersion);
         }
         finally
@@ -500,6 +530,7 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         NotifyHistoryChanged();
         CompleteAttestationCommand.NotifyCanExecuteChanged();
         RevokeAttestationCommand.NotifyCanExecuteChanged();
+        ShowRevocationPromptCommand.NotifyCanExecuteChanged();
     }
 
     private void NotifyHistoryChanged()
@@ -511,6 +542,10 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         OnPropertyChanged(nameof(CurrentAttestationEvidenceText));
     }
 }
+
+public sealed record FormAttestationCompletedEventArgs(
+    string ContextLabel,
+    DateTime CompletedOn);
 
 public sealed record FormAttestationHistoryItemViewModel(
     long Id,

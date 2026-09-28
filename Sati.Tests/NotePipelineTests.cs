@@ -971,6 +971,32 @@ public sealed class NotePipelineTests
         Assert.Equal(0, await db.ClaimLines.CountAsync(line => line.NoteId == noteId));
     }
 
+    [Fact]
+    public async Task UnbilledNoteStillReachesApprovalButNeverEntersBilling()
+    {
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var noteId = await fixture.SeedNoteAsync(
+            fixture.PersonOneId, NoteStatus.Logged, fixture.BillableDate);
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            (await db.Notes.SingleAsync(note => note.Id == noteId)).IsUnbilled = true;
+            await db.SaveChangesAsync();
+        }
+
+        var supervisor = fixture.SupervisionAs(fixture.SupervisorOne);
+        Assert.Contains(await supervisor.GetPendingNotesAsync(fixture.SupervisorOne.Id),
+            note => note.Id == noteId);
+        await supervisor.ApproveNoteAsync(noteId, fixture.SupervisorOne.Id,
+            await fixture.RevisionOfAsync(noteId));
+
+        var billing = fixture.BillingAs(fixture.AdminOne);
+        Assert.DoesNotContain(await billing.GetApprovedUnbilledNotesAsync(),
+            note => note.Id == noteId);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            billing.CreateClaimLineAsync(noteId));
+        Assert.Contains("Unbilled", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ---------------------------------------------------------------------
     // The whole pipeline
     // ---------------------------------------------------------------------
@@ -1158,9 +1184,16 @@ public sealed class NotePipelineTests
         note.NoteType = NoteType.Form;
         note.FormType = FormType.PCP;
         await using (var lookup = fixture.Factory.CreateDbContext())
-            note.FormId = await lookup.Forms.Where(form => form.PersonId == fixture.PersonOneId &&
-                    form.Type == FormType.PCP && form.DueDate == dueDate)
-                .Select(form => form.Id).SingleAsync();
+        {
+            var form = await lookup.Forms.SingleAsync(form =>
+                form.PersonId == fixture.PersonOneId &&
+                form.Type == FormType.PCP && form.DueDate == dueDate);
+            form.OpenedDate = activityDate.AddDays(-1);
+            note.FormId = form.Id;
+            await lookup.SaveChangesAsync();
+        }
+        note.IsAnnualPlan = true;
+        note.AnnualPcpAction = AnnualPcpProgressAction.Complete;
 
         if (update) await service.UpdateNoteAsync(note);
         else await service.AddNoteAsync(note);
@@ -1170,6 +1203,7 @@ public sealed class NotePipelineTests
         var completedForm = await verification.Forms.SingleAsync(candidate => candidate.Id == note.FormId);
         Assert.Equal(NoteStatus.Logged, savedNote.Status);
         Assert.Null(savedNote.CaseManagerJustification);
+        Assert.True(savedNote.IsUnbilled);
         Assert.Equal(activityDate, completedForm.CompletedDate);
         Assert.False(FormWorkBillingRules.Evaluate(
             new FormWorkNoteFact(savedNote.PersonId, savedNote.FormType!.Value.ToString(),

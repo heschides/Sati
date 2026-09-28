@@ -284,6 +284,8 @@ namespace Sati.ViewModels.Supervisor
         /// </summary>
         public Task InitializeAsync() => LoadAsync(forceRefresh: false);
 
+        public Task RefreshAfterSettingsChangedAsync() => RefreshIfLoadedAsync();
+
         private Task RefreshIfLoadedAsync()
         {
             var account = _sessionService.CurrentUser;

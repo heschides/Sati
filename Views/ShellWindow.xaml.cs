@@ -146,12 +146,12 @@ namespace Sati.Views
             {
                 var win = settingsWindowFactory();
                 win.Owner = this;
+                win.SettingsSavedAsync = _shellViewModel.RefreshAfterSettingsChangedAsync;
 
                 var switchRequested = false;
                 win.SwitchUserRequested += (_, _) => switchRequested = true;
 
                 win.ShowDialog();
-                await _shellViewModel.NotesViewModel.Clients.ReloadProfileSettingsAsync();
 
                 // Started only after the window is gone: the flow replaces the session
                 // user and rebuilds every view model the window was bound to.

@@ -160,9 +160,22 @@ public sealed class WorkAgendaService(INoteService notes) : IWorkAgendaService
                 item.FormType,
                 NoteType.Form,
                 formId: item.FormId);
+            note.IsAgendaGenerated = item.FormId is not null;
             var saved = await notes.AddNoteAsync(note);
-            day.Add(saved);
-            added++;
+            if (saved.Status == NoteStatus.Scheduled &&
+                saved.EventDate?.Date == agendaDate &&
+                saved.PersonId == item.PersonId &&
+                saved.FormId == item.FormId)
+            {
+                day.Add(saved);
+                added++;
+            }
+            else
+            {
+                // The authoritative writer found an active note for this exact
+                // obligation (for example, a Pending draft on an earlier date).
+                existing++;
+            }
         }
 
         return new WorkAgendaAddResult(added, existing);

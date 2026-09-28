@@ -417,6 +417,11 @@ namespace Sati.ViewModels
                 _peopleSnapshot = people;
                 _hasPeopleSnapshot = true;
 
+                var selectedFilterId = ReferenceEquals(
+                    SelectedFilterPerson, AllPersonsSentinel)
+                        ? null
+                        : SelectedFilterPerson?.Id;
+
                 // Publish only after the full replacement is available. A failed
                 // refresh leaves the previously loaded notes visible rather than
                 // clearing the screen and then throwing through shell startup.
@@ -429,6 +434,13 @@ namespace Sati.ViewModels
                     foreach (var note in person.Notes)
                         _allNotes.Add(note);
                 }
+                // Clearing the ItemsSource causes WPF to publish a transient null
+                // selection. Restore the sentinel explicitly so the default is
+                // visible as "All Persons", never as a blank filter.
+                SelectedFilterPerson = selectedFilterId is int personId
+                    ? FilterPeople.FirstOrDefault(person => person?.Id == personId)
+                        ?? AllPersonsSentinel
+                    : AllPersonsSentinel;
 
                 // Real people only — the sentinel would render as a bogus "All Persons"
                 // client in the module's combobox.

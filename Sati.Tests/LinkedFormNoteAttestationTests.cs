@@ -8,6 +8,44 @@ namespace Sati.Tests;
 public sealed class LinkedFormNoteAttestationTests
 {
     [Fact]
+    public async Task AgendaGeneratedFormNoteReusesAnExistingPendingExactNote()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var today = DateTime.Today;
+        int formId;
+        int existingNoteId;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var form = new Form(FormType.Reclassification, today.AddDays(30),
+                targetEffectiveDate: today.AddDays(60))
+            {
+                PersonId = fixture.PersonOneId
+            };
+            db.Forms.Add(form);
+            await db.SaveChangesAsync();
+            formId = form.Id;
+
+            var pending = Note.Create("Existing draft.", today.AddDays(-2),
+                NoteStatus.Pending, 15, fixture.PersonOneId,
+                FormType.Reclassification, NoteType.Form, formId);
+            pending.AgencyId = fixture.CaseManagerOne.AgencyId;
+            db.Notes.Add(pending);
+            await db.SaveChangesAsync();
+            existingNoteId = pending.Id;
+        }
+
+        var generated = Note.Create("Agenda suggestion.", today, NoteStatus.Scheduled, 15,
+            fixture.PersonOneId, FormType.Reclassification, NoteType.Form, formId);
+        generated.IsAgendaGenerated = true;
+
+        var result = await fixture.NotesFromAnotherSession().AddNoteAsync(generated);
+
+        Assert.Equal(existingNoteId, result.Id);
+        await using var verification = fixture.Factory.CreateDbContext();
+        Assert.Equal(1, await verification.Notes.CountAsync(note => note.FormId == formId));
+    }
+
+    [Fact]
     public async Task SubmittingLinkedReviewNoteAttestsExactFormOnActivityDate()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();

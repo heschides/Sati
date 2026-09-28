@@ -144,6 +144,51 @@ public sealed class DhhsFormsViewModelTests
         Assert.Contains($"Annual effective date: {target:MMM d, yyyy}", viewModel.StatusMessage);
     }
 
+    [Fact]
+    public void Every_visible_choice_is_classified_as_consent_on_its_form()
+    {
+        var viewModel = new DhhsFormsViewModel(new RecordingDhhsFormService(false));
+
+        foreach (var form in viewModel.FormChoices)
+        {
+            viewModel.SelectedFormChoice = form;
+            var consent = DhhsFormDefinition.ConsentFields(form.Key);
+            var visibleFields = viewModel.ActiveConsentGroups
+                .SelectMany(group => group.Checks.Select(option => option.FieldName)
+                    .Concat(group.Text.Select(option => option.FieldName)));
+
+            Assert.All(visibleFields, field => Assert.Contains(field, consent));
+        }
+    }
+
+    [Fact]
+    public async Task Coordinate_care_purpose_is_sent_as_a_valid_release_choice()
+    {
+        var service = new RecordingDhhsFormService(false);
+        var viewModel = new DhhsFormsViewModel(service);
+        var person = PersonFor(82, "ReleasePurpose");
+        var target = person.EffectiveDate!.Value.AddYears(1).Date;
+        viewModel.SetPerson(person);
+        viewModel.SetReleaseObligations(
+        [
+            new ReleaseObligationDto(
+                903, Guid.NewGuid(), person.Id,
+                $"release:v1:{target:yyyy-MM-dd}:dhhs:annual",
+                nameof(ReleaseObligationCategory.Dhhs),
+                nameof(ReleaseObligationTrigger.AnnualRenewal),
+                target, null, null, target.AddDays(-90), target, target,
+                null, null, null, false, [])
+        ]);
+        viewModel.SelectForm(DhhsFormDefinition.FormKey.AuthorizationToRelease);
+        viewModel.ActiveConsentGroups.SelectMany(group => group.Checks)
+            .Single(option => option.FieldName == "undefined_4")
+            .IsSelected = true;
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        Assert.True(service.GeneratedSelections!.Checks!["undefined_4"]);
+    }
+
     private static Person PersonFor(int id, string lastName)
     {
         var person = Person.CreatePerson(

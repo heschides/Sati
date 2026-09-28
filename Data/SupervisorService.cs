@@ -265,6 +265,8 @@ public sealed class SupervisorService(
         Note note,
         BillingCompliancePolicyContext policy)
     {
+        if (note.IsUnbilled)
+            return new BillingComplianceResult(true, [], []);
         var historical = note.EventDate is DateTime serviceDate
             ? note.Person.EvaluateBillingWindowDetailed(
                 serviceDate,

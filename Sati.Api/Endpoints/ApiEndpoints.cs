@@ -4786,6 +4786,25 @@ internal static partial class ApiEndpoints
             var formLinkProblem = await FindFormLinkProblemAsync(db, actor, request, cancellationToken);
             if (formLinkProblem is not null)
                 return formLinkProblem;
+            var annualPcp = await PrepareAnnualPcpNoteAsync(
+                db, actor, request, clock, cancellationToken);
+            if (annualPcp.Problem is not null)
+                return annualPcp.Problem;
+            request = annualPcp.Request;
+
+            if (request.IsAgendaGenerated && request.FormId is int agendaFormId)
+            {
+                var existingAgendaNote = await db.Notes.AsNoTracking()
+                    .Where(note => note.AgencyId == actor.AgencyId &&
+                        note.PersonId == request.PersonId &&
+                        note.FormId == agendaFormId &&
+                        note.Status != NoteWorkflow.Cancelled &&
+                        note.Status != NoteWorkflow.Abandoned)
+                    .OrderBy(note => note.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (existingAgendaNote is not null)
+                    return Results.Ok(ContractMapper.ToNote(existingAgendaNote));
+            }
 
             var attestsFormOnLog = IsNonReleaseLoggedFormNote(request);
             if (!attestsFormOnLog)
@@ -4815,6 +4834,8 @@ internal static partial class ApiEndpoints
                 FormType = formType,
                 FormId = request.FormId,
                 ReleaseObligationId = request.ReleaseObligationId,
+                IsAnnualPlan = request.IsAnnualPlan,
+                IsUnbilled = request.IsUnbilled,
                 FormDateCorrectionReason = request.FormDateCorrectionReason,
                 NoteType = noteType,
                 Activities = request.Activities,
@@ -4825,6 +4846,10 @@ internal static partial class ApiEndpoints
             };
             db.Notes.Add(note);
             await db.SaveChangesAsync(cancellationToken);
+            ApplyAnnualPcpProgress(
+                db, actor, note, annualPcp.Plan, clock, auditTrail);
+            if (annualPcp.Plan is not null)
+                await db.SaveChangesAsync(cancellationToken);
             var formAttestationProblem = await AttestFormFromLoggedNoteAsync(
                 db, note, actor, clock, auditTrail, cancellationToken);
             if (formAttestationProblem is not null)
@@ -4897,6 +4922,11 @@ internal static partial class ApiEndpoints
             var formLinkProblem = await FindFormLinkProblemAsync(db, actor, request, cancellationToken);
             if (formLinkProblem is not null)
                 return formLinkProblem;
+            var annualPcp = await PrepareAnnualPcpNoteAsync(
+                db, actor, request, clock, cancellationToken);
+            if (annualPcp.Problem is not null)
+                return annualPcp.Problem;
+            request = annualPcp.Request;
 
             var attestsFormOnLog = IsNonReleaseLoggedFormNote(request);
             if (!attestsFormOnLog)
@@ -4924,6 +4954,8 @@ internal static partial class ApiEndpoints
             row.Note.FormType = formType;
             row.Note.FormId = request.FormId;
             row.Note.ReleaseObligationId = request.ReleaseObligationId;
+            row.Note.IsAnnualPlan = request.IsAnnualPlan;
+            row.Note.IsUnbilled = request.IsUnbilled;
             row.Note.FormDateCorrectionReason = request.FormDateCorrectionReason;
             row.Note.NoteType = noteType;
             row.Note.Activities = request.Activities;
@@ -4947,6 +4979,10 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                ApplyAnnualPcpProgress(
+                    db, actor, row.Note, annualPcp.Plan, clock, auditTrail);
+                if (annualPcp.Plan is not null)
+                    await db.SaveChangesAsync(cancellationToken);
                 var formAttestationProblem = await AttestFormFromLoggedNoteAsync(
                     db, row.Note, actor, clock, auditTrail, cancellationToken);
                 if (formAttestationProblem is not null)
@@ -6510,7 +6546,7 @@ internal static partial class ApiEndpoints
             var row = await (from note in db.Notes
                              join person in db.People on note.PersonId equals person.Id
                              join owner in db.Users on person.UserId equals owner.Id
-                             where note.Id == request.NoteId && note.Status == 6 &&
+                             where note.Id == request.NoteId && note.Status == 6 && !note.IsUnbilled &&
                                    owner.AgencyId == actor.AgencyId &&
                                    person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId
                              select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
@@ -6535,7 +6571,7 @@ internal static partial class ApiEndpoints
             row = await (from note in db.Notes
                          join person in db.People on note.PersonId equals person.Id
                          join owner in db.Users on person.UserId equals owner.Id
-                         where note.Id == request.NoteId && note.Status == 6 &&
+                         where note.Id == request.NoteId && note.Status == 6 && !note.IsUnbilled &&
                                owner.AgencyId == actor.AgencyId &&
                                person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId
                          select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
@@ -9036,7 +9072,7 @@ internal static partial class ApiEndpoints
         AuditTrail? auditTrail = null)
     {
         ContractMapper.TryParseNoteStatus(request.Status, out var status);
-        if (status != NoteWorkflow.Logged) return null;
+        if (status != NoteWorkflow.Logged || request.IsUnbilled) return null;
 
         // Ownership has already been checked. Read the target consumer's current
         // persisted evidence, never the client's displayed forms or FormType tag.
@@ -9218,6 +9254,8 @@ internal static partial class ApiEndpoints
         ServerBillingCompliancePolicyContext policy,
         IReadOnlyList<ReleaseProviderLinkFact> providerLinks)
     {
+        if (note.IsUnbilled)
+            return new BillingComplianceResult(true, [], []);
         var historical = EvaluateNoteCompliance(
             note, person, forms, releases, policy, providerLinks);
         var formWorkReasons = EvaluateFormWorkBilling(note, forms);
@@ -9401,6 +9439,8 @@ internal static partial class ApiEndpoints
         var errors = new List<string>();
         if (note.Status != 6)
             errors.Add("Service note is not approved.");
+        if (note.IsUnbilled)
+            errors.Add("Service note is marked Unbilled.");
         if (note.EventDate is null)
             errors.Add("No service date.");
         if (BillingRules.CalculateSection13Units(note.Minutes) < 1)
@@ -9578,6 +9618,7 @@ internal static partial class ApiEndpoints
             .Where(note => note.PersonId == personId &&
                            note.AgencyId == agencyId &&
                            note.Status == 6 &&
+                           !note.IsUnbilled &&
                            !db.ClaimLines.Any(line => line.NoteId == note.Id))
             .OrderBy(note => note.EventDate)
             .ThenBy(note => note.Id)
@@ -10001,6 +10042,7 @@ internal static partial class ApiEndpoints
         join person in db.People.AsNoTracking() on note.PersonId equals person.Id
         join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
         where note.Status == 6 &&
+              !note.IsUnbilled &&
               owner.AgencyId == agencyId &&
               person.AgencyId == agencyId &&
               note.AgencyId == agencyId &&
@@ -10534,9 +10576,18 @@ internal static partial class ApiEndpoints
             errors["activities"] = [activityError];
         var formLinkError = FormNoteLinkRules.Validate(
             request.NoteType, request.FormType, request.Status, request.FormId,
-            request.FormDateCorrectionReason, request.Activities);
+            request.FormDateCorrectionReason, request.Activities, request.IsAnnualPlan);
         if (formLinkError is not null)
             errors["formId"] = [formLinkError];
+        if (!ScheduledAgendaNoteRules.IsValidCreateIntent(
+                request.IsAgendaGenerated,
+                request.Status,
+                request.NoteType,
+                request.FormId,
+                request.ReleaseObligationId))
+        {
+            errors["isAgendaGenerated"] = [ScheduledAgendaNoteRules.InvalidIntentMessage];
+        }
         if (!ContractMapper.TryParseGoalProgress(request.GoalProgress, out _))
             errors["goalProgress"] = ["Goal progress must be None, Minimal, Moderate, or Substantial."];
         else if (string.Equals(request.Status, "Logged", StringComparison.Ordinal) &&

@@ -1,6 +1,6 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-09-21.*
+*Living document. Updated during structured review sessions. Last updated: 2026-09-28.*
 
 ## Multi-activity notes — September 22 (unreleased)
 
@@ -69,6 +69,15 @@ external-artifact records, safety-plan approval, and privacy receipts do not the
 change form completion. Releases follow their separate authorization workflow.
 
 `FormNoteAttestationRules` owns the exact Logged/non-release/Form-activity predicate.
+Annual PCP notes are the deliberate exception to that generic Logged-only completion predicate.
+`AnnualPcpNoteRules` in `Sati.Contracts.V1` owns their state machine. The note carries an explicit
+annual marker and exact `FormId`; a Pending or Logged save advances at most one confirmed step:
+unopened to opened, then opened to completed. The note service/API validates the service date
+against the configured opening window and applies the note plus form transition atomically.
+Before availability the editor can convert the draft to unlinked, non-annual PCP revision work,
+but neither writer will persist it as annual. Existing exact-linked PCP notes are treated as annual
+for compatibility and are backfilled by the migration.
+
 `AnnualFormCycleDisambiguationRules` protects renewal-overlap types: if a note selects an older
 annual target after a later same-type incomplete renewal has entered its configured availability
 window, both desktop preflights and the local/API write paths retain that exact selection but
@@ -92,6 +101,12 @@ PCP completion, Comprehensive Assessment, and all four reviews. PCP opening, Com
 Assessment start, and monthly contact are separate optional requirements and are off by default. Reclassification, Safety Plan, Privacy Practices, and Agency,
 DHHS, and Medical releases remain selectable soft requirements; each can gate billing only when an
 administrator includes it in an effective-dated policy version.
+
+`Note.IsUnbilled` is an explicit durable opt-out from billing, not a clinical-review bypass.
+Unbilled Logged notes enter the ordinary supervisor queue and can be approved, but local and API
+billing candidate reads exclude them and claim-line creation rejects them again. Annual PCP work
+whose service date is after its due date is forced Unbilled by the authoritative writer; users may
+also select Unbilled for any service note.
 
 Policy versions are append-only and are resolved by the note's service date. Every change requires
 an enforcement date. Past enforcement dates are refused by default; the separate agency switch may
@@ -837,7 +852,15 @@ The lowest-ID exact-linked row remains active; the legacy row and all other link
 retained as Cancelled, with an incremented revision and one system audit event apiece. Prior
 revision values do not define identity. Multiple-form, multiple-legacy, edited, claimed,
 attested, flagged, meaningfully audited, or otherwise referenced groups are left untouched. The
-read-before-add service boundary is still not an atomic cross-process uniqueness guarantee.
+repair remains deliberately narrower than later workflow states.
+
+Agenda creation now carries a transport-only generated-work intent to the authoritative note
+writer. Local Production and the API validate that it is a Scheduled, exact-linked Form note, then
+reuse any active note already linked to that person and Form. The check and insert run inside the
+existing serializable, database-owned case-manager schedule lock, so a Pending draft on another
+date and two simultaneous clients cannot fan out a second agenda note. Cancelled and Abandoned
+notes do not claim new planned work. The marker is not persisted clinical data, and ordinary
+non-agenda form notes retain their existing semantics.
 
 Starting an agenda item opens that same row in the current-note panel as an unsaved Pending draft.
 It fills the client and type, uses today's date, brackets the planned narrative as replaceable
@@ -2944,6 +2967,13 @@ SQLite strategy to exercise EF's transaction guard, which ordinary SQLite tests 
 and Reference pages. Help and Documents sidebar visibility derives from that selection, so leaving
 Overview also updates the shell's scratchpad placement through the existing notification path.
 Document destinations retain their existing preparation and loading commands and shared instances.
+
+Settings persistence remains behind `ISettingsService`. The modal Settings window supplies an
+awaited shell callback after a successful save; the shell refreshes the case-management and any
+already-loaded supervisory projections from a newly loaded snapshot. The dashboard owns the
+specific cascade for Upcoming Due Dates, Reviews, calendar, profile reminders, workday-derived
+productivity, and annual reminders. This is presentation synchronization only: it neither moves
+settings rules into the client nor changes the API/local persistence boundary.
 
 ## Paged supervisory review (2026-09-05)
 

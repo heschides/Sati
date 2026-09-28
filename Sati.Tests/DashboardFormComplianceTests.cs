@@ -166,6 +166,7 @@ public sealed class DashboardFormComplianceTests
 
         var revisionBeforeRevocation = clients.CompliancePresentationRevision;
         await clients.ToggleFormForAsync(person, FormType.Q3R);
+        clients.Attestation.ShowRevocationPromptCommand.Execute(null);
         clients.Attestation.RevocationReason = "Recorded against the wrong review.";
         await clients.Attestation.RevokeAttestationCommand.ExecuteAsync(null);
 
@@ -311,6 +312,72 @@ public sealed class DashboardFormComplianceTests
         Assert.True(viewModel.CompleteAttestationCommand.CanExecute(null));
         await viewModel.CompleteAttestationCommand.ExecuteAsync(null);
         Assert.Equal(DateTime.Today, form.CompletedDate);
+        Assert.False(viewModel.IsVisible);
+    }
+
+    [Fact]
+    public async Task SuccessfulAttestationClosesThePanelAndPublishesConfirmationDetails()
+    {
+        var viewModel = new FormAttestationViewModel(new RecordingFormService());
+        var form = new Form(FormType.Q2R, DateTime.Today.AddDays(5)) { PersonId = 42 };
+        FormAttestationCompletedEventArgs? completion = null;
+        viewModel.AttestationCompleted += (_, args) => completion = args;
+
+        viewModel.Begin(form, DateTime.Today.AddMonths(-6), "Q2R attestation — Demo Consumer");
+        viewModel.CompletionDate = DateTime.Today;
+        await viewModel.CompleteAttestationCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsVisible);
+        Assert.NotNull(completion);
+        Assert.Equal("Q2R attestation — Demo Consumer", completion.ContextLabel);
+        Assert.Equal(DateTime.Today, completion.CompletedOn);
+    }
+
+    [Fact]
+    public void CompletedAttestationHidesRevocationFieldsUntilTheUserInvokesThem()
+    {
+        var viewModel = new FormAttestationViewModel(new RecordingFormService());
+        var form = new Form(FormType.Q2R, DateTime.Today.AddDays(-1)) { PersonId = 42 };
+        form.SetInitialCompletion(DateTime.Today.AddDays(-2));
+
+        viewModel.Begin(form, DateTime.Today.AddMonths(-6), "Q2R attestation — Demo Consumer");
+
+        Assert.False(viewModel.IsRevocationPromptVisible);
+        Assert.False(viewModel.RevokeAttestationCommand.CanExecute(null));
+        Assert.True(viewModel.ShowRevocationPromptCommand.CanExecute(null));
+
+        viewModel.ShowRevocationPromptCommand.Execute(null);
+
+        Assert.True(viewModel.IsRevocationPromptVisible);
+        Assert.True(viewModel.RevokeAttestationCommand.CanExecute(null));
+        viewModel.CancelRevocationCommand.Execute(null);
+        Assert.False(viewModel.IsRevocationPromptVisible);
+    }
+
+    [Fact]
+    public async Task SettingsRefreshImmediatelyRebuildsTheReviewOpenWindow()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        var (person, form) = harness.AddOverdueQuarterlyReview(FormType.Q3R);
+        form.DueDate = DateTime.Today.AddDays(30);
+        harness.SetReviewOpenDaysBefore(10);
+
+        await harness.Dashboard.RefreshAfterSettingsChangedAsync();
+        Assert.DoesNotContain(harness.Dashboard.UpcomingEvents,
+            item => item.PersonId == person.Id && item.FormType == FormType.Q3R);
+        await harness.Dashboard.NavigateToReviewsCommand.ExecuteAsync(null);
+        Assert.Equal(form.DueDate.AddDays(-10),
+            harness.Dashboard.Reviews.Rows.Single().WindowStart);
+
+        harness.SetReviewOpenDaysBefore(40);
+        await harness.Dashboard.RefreshAfterSettingsChangedAsync();
+
+        Assert.Contains(harness.Dashboard.UpcomingEvents,
+            item => item.PersonId == person.Id && item.FormType == FormType.Q3R &&
+                    item.Kind == UpcomingEventKind.OpenReview);
+        Assert.Equal(form.DueDate.AddDays(-40),
+            harness.Dashboard.Reviews.Rows.Single().WindowStart);
     }
 
     [Fact]
@@ -448,6 +515,9 @@ public sealed class DashboardFormComplianceTests
             people.Items.Add(person);
         }
 
+        public void SetReviewOpenDaysBefore(int days) =>
+            settings.ReviewOpenDaysBefore = days;
+
         public static async Task<DashboardHarness> CreateAsync(
             NoteEntryFixture fixture,
             ConsumerPickerSortPreferenceService? preferences = null)
@@ -481,7 +551,8 @@ public sealed class DashboardFormComplianceTests
                 null!,
                 null!);
             var calendar = new CalendarViewModel(exemptDates, notes, session);
-            var reviews = new ReviewsViewModel(session, people, null!, settingsService, forms);
+            var reviews = new ReviewsViewModel(
+                session, people, new EmptyReviewItemService(), settingsService, forms);
             var dashboard = new CaseManagerDashboardViewModel(
                 people,
                 notes,
@@ -621,6 +692,24 @@ public sealed class DashboardFormComplianceTests
         public Task SaveAsync(Settings value) => Task.CompletedTask;
     }
 
+    private sealed class EmptyReviewItemService : IReviewItemService
+    {
+        public Task<List<ReviewItem>> GetForCaseloadAsync(int userId) =>
+            Task.FromResult<List<ReviewItem>>([]);
+        public Task<List<ReviewItem>> GetForPersonAsync(int personId) =>
+            Task.FromResult<List<ReviewItem>>([]);
+        public Task<int> EnsureCurrentCycleItemsAsync(IEnumerable<Person> people, DateTime today) =>
+            Task.FromResult(0);
+        public Task<ReviewItem> SetStageDateAsync(
+            int reviewItemId, ReviewStage stage, DateTime? date) =>
+            throw new NotSupportedException();
+        public Task<ReviewItem> SetAppointmentAsync(
+            int reviewItemId, DateTime? date, string? providerName) =>
+            throw new NotSupportedException();
+        public Task<(Appointment? Medical, Appointment? Dental)> GetLatestAppointmentsAsync(
+            int personId) => Task.FromResult<(Appointment?, Appointment?)>((null, null));
+    }
+
     private sealed class CountingNoteService(INoteService inner) : INoteService
     {
         public int YearLoads { get; private set; }
@@ -638,6 +727,7 @@ public sealed class DashboardFormComplianceTests
             YearLoads++;
             return inner.GetByYearAsync(userId, year);
         }
+
         public Task<List<Note>> GetDayScheduleAsync(int userId, DateTime date) =>
             inner.GetDayScheduleAsync(userId, date);
     }

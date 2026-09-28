@@ -64,6 +64,7 @@ namespace Sati.Views
             if (_subscribedViewModel is not null)
             {
                 _subscribedViewModel.NoteReassignmentConfirmationRequested -= ConfirmReassignment;
+                _subscribedViewModel.AnnualPcpConfirmationRequested -= ConfirmAnnualPcp;
                 _subscribedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
             }
 
@@ -71,6 +72,7 @@ namespace Sati.Views
             if (_subscribedViewModel is not null)
             {
                 _subscribedViewModel.NoteReassignmentConfirmationRequested += ConfirmReassignment;
+                _subscribedViewModel.AnnualPcpConfirmationRequested += ConfirmAnnualPcp;
                 _subscribedViewModel.PropertyChanged += OnViewModelPropertyChanged;
             }
         }
@@ -186,6 +188,25 @@ namespace Sati.Views
                     MessageBoxImage.Warning,
                     MessageBoxResult.No);
             e.Confirmed = answer == MessageBoxResult.Yes;
+        }
+
+        private void ConfirmAnnualPcp(
+            object? sender,
+            AnnualPcpConfirmationEventArgs e)
+        {
+            var noticeOnly = e.Kind == AnnualPcpConfirmationKind.LateNotice;
+            var buttons = noticeOnly ? MessageBoxButton.OK : MessageBoxButton.YesNo;
+            var image = e.Kind is AnnualPcpConfirmationKind.CreateRevision or
+                AnnualPcpConfirmationKind.LateNotice
+                    ? MessageBoxImage.Warning
+                    : MessageBoxImage.Question;
+            var owner = Window.GetWindow(this);
+            var answer = owner is null
+                ? MessageBox.Show(e.Message, e.Title, buttons, image,
+                    noticeOnly ? MessageBoxResult.OK : MessageBoxResult.No)
+                : MessageBox.Show(owner, e.Message, e.Title, buttons, image,
+                    noticeOnly ? MessageBoxResult.OK : MessageBoxResult.No);
+            e.Confirmed = noticeOnly || answer == MessageBoxResult.Yes;
         }
 
         private enum NoteEditorSection

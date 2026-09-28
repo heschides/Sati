@@ -1079,6 +1079,8 @@ internal sealed class ServerNote
     public int? FormType { get; set; }
     public int? FormId { get; set; }
     public long? ReleaseObligationId { get; set; }
+    public bool IsAnnualPlan { get; set; }
+    public bool IsUnbilled { get; set; }
     public string? FormDateCorrectionReason { get; set; }
     public int? NoteType { get; set; }
     public int? Activities { get; set; }

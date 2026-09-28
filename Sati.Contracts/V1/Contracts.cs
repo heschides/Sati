@@ -328,7 +328,9 @@ public sealed record NoteDto(
     int? FormId = null,
     string? FormDateCorrectionReason = null,
     int? Activities = null,
-    long? ReleaseObligationId = null);
+    long? ReleaseObligationId = null,
+    bool IsAnnualPlan = false,
+    bool IsUnbilled = false);
 
 public sealed record SaveNoteRequest(
     string Narrative,
@@ -346,7 +348,11 @@ public sealed record SaveNoteRequest(
     int? FormId = null,
     string? FormDateCorrectionReason = null,
     int? Activities = null,
-    long? ReleaseObligationId = null);
+    long? ReleaseObligationId = null,
+    bool IsAgendaGenerated = false,
+    bool IsAnnualPlan = false,
+    bool IsUnbilled = false,
+    AnnualPcpProgressAction AnnualPcpAction = AnnualPcpProgressAction.None);
 
 public sealed record PersonReferenceDto(int Id, int UserId, string? FirstName, string? LastName);
 

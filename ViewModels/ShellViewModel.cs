@@ -160,6 +160,12 @@ namespace Sati.ViewModels
         // that Case Management owns it.
         public CaseManagerDashboardViewModel NotesViewModel => _caseManagementViewModel.Dashboard;
 
+        public async Task RefreshAfterSettingsChangedAsync()
+        {
+            await NotesViewModel.RefreshAfterSettingsChangedAsync();
+            await _supervisorDashboardViewModel.RefreshAfterSettingsChangedAsync();
+        }
+
         // -------------------------------------------------------------------------
         // Computed properties
         // -------------------------------------------------------------------------

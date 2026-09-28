@@ -157,7 +157,9 @@ internal static class ContractMapper
         note.FormId,
         note.FormDateCorrectionReason,
         note.Activities,
-        note.ReleaseObligationId);
+        note.ReleaseObligationId,
+        note.IsAnnualPlan,
+        note.IsUnbilled);
 
     private static IReadOnlyList<string> ParseStringArray(string? json)
     {

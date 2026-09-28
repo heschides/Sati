@@ -13,9 +13,11 @@ public static class FormNoteAttestationRules
         int? activities,
         string? noteType,
         string? formType,
-        int? formId) =>
+        int? formId,
+        bool isAnnualPlan = false) =>
         string.Equals(status, "Logged", StringComparison.Ordinal) &&
-        IsExactNonReleaseFormActivity(activities, noteType, formType, formId);
+        IsExactNonReleaseFormActivity(activities, noteType, formType, formId) &&
+        !AnnualPcpNoteRules.IsAnnualSelection(isAnnualPlan, formType, formId);
 
     public static bool IsExactNonReleaseFormActivity(
         int? activities,

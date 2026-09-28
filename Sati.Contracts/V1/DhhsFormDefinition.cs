@@ -343,8 +343,18 @@ public static class DhhsFormDefinition
         "Address CityState Zip Code",
         "Telephone Email address optional",
 
+        // Purpose of disclosure. The state's PDF gives three of these opaque
+        // field names, but each is still a consumer-directed choice.
+        "undefined_3",
+        "undefined_4",
+        "For a legal matter including testimony",
+        "To see whether I qualify for insurance coverage services or benefits",
+        "undefined_5",
+
         // Record categories, including 42 CFR Part 2 substance-use material and the
         // mental-health review election.
+        "All health information from the offices checked",
+        "Insurance Claims or encounter data information",
         "Include all drugalcohol information in the release",
         "Include only the specific drugalcohol records checked",
         "Diagnosis and treatment",

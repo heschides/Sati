@@ -21,6 +21,15 @@ namespace Sati.Models
         public int? FormId { get; set; }
         // Exact recipient-specific release obligation for a release-work note.
         public long? ReleaseObligationId { get; set; }
+        public bool IsAnnualPlan { get; set; }
+        public bool IsUnbilled { get; set; }
+        [NotMapped]
+        public AnnualPcpProgressAction AnnualPcpAction { get; set; }
+        // Transport-only intent marker. Daily-agenda creation uses this so the
+        // authoritative write boundary can atomically reuse an existing active
+        // note for the same exact form. It is deliberately not clinical data.
+        [NotMapped]
+        public bool IsAgendaGenerated { get; set; }
         public string? FormDateCorrectionReason { get; set; }
         public NoteType? NoteType { get; set; }
         // Null means this is a historical single-type note. New notes store the

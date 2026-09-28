@@ -10,13 +10,172 @@ namespace Sati.Api.Endpoints;
 
 internal static partial class ApiEndpoints
 {
+    private sealed record AnnualPcpServerPlan(
+        ServerForm Form,
+        AnnualPcpNoteDecision Decision);
+
+    private sealed record AnnualPcpPreparation(
+        SaveNoteRequest Request,
+        AnnualPcpServerPlan? Plan,
+        IResult? Problem);
+
+    private static async Task<AnnualPcpPreparation> PrepareAnnualPcpNoteAsync(
+        ApiDbContext db,
+        Actor actor,
+        SaveNoteRequest request,
+        ApiClock clock,
+        CancellationToken cancellationToken)
+    {
+        var isAnnual = AnnualPcpNoteRules.IsAnnualSelection(
+            request.IsAnnualPlan, request.FormType, request.FormId);
+        if (!isAnnual)
+        {
+            return request.AnnualPcpAction == AnnualPcpProgressAction.None
+                ? new(request, null, null)
+                : new(request, null, FormNoteProblem(
+                    "Only an Annual PCP note may advance an annual plan."));
+        }
+
+        if (request.FormId is not int formId)
+            return new(request, null, FormNoteProblem(
+                "Choose the Annual PCP plan year before saving."));
+        var form = await db.Forms
+            .Include(candidate => candidate.Attestations)
+            .SingleOrDefaultAsync(candidate =>
+                candidate.Id == formId &&
+                candidate.PersonId == request.PersonId &&
+                candidate.Type == AnnualPcpNoteRules.FormTypeName,
+                cancellationToken);
+        if (form is null)
+            return new(request, null, FormNoteProblem(
+                "The selected Annual PCP no longer matches this note. Refresh the note."));
+
+        var settings = await db.Settings.AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.AgencyId == actor.AgencyId,
+                cancellationToken)
+            ?? new ServerSettings { AgencyId = actor.AgencyId };
+        var availableOn = form.DueDate.Date.AddDays(
+            -OpenDaysBefore(form.Type, settings));
+        var decision = AnnualPcpNoteRules.Evaluate(
+            true,
+            form.Type,
+            form.Id,
+            request.Status,
+            request.EventDate,
+            availableOn,
+            form.DueDate,
+            form.OpenedDate,
+            form.CompletedDate);
+        var confirmationError = AnnualPcpNoteRules.ValidateConfirmation(
+            decision, request.AnnualPcpAction);
+        if (confirmationError is not null)
+            return new(request, null, FormNoteProblem(confirmationError));
+
+        if (decision.RequiredAction == AnnualPcpProgressAction.Open)
+        {
+            var dateError = FormOpeningRules.Validate(
+                request.EventDate!.Value, availableOn, clock.Today);
+            if (dateError is not null)
+                return new(request, null, FormNoteProblem(dateError));
+        }
+        else if (decision.RequiredAction == AnnualPcpProgressAction.Complete)
+        {
+            var effectiveDate = await db.People.AsNoTracking()
+                .Where(person => person.Id == request.PersonId &&
+                                 person.AgencyId == actor.AgencyId)
+                .Select(person => person.EffectiveDate)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (effectiveDate is null)
+                return new(request, null, FormNoteProblem(
+                    "The client's effective date is required for Annual PCP completion."));
+            var cycle = FormAttestationRules.ResolveCycleForForm(
+                effectiveDate.Value, form.Type, form.DueDate,
+                form.TargetEffectiveDate == default ? null : form.TargetEffectiveDate);
+            if (cycle is null)
+                return new(request, null, FormNoteProblem(
+                    "The selected Annual PCP is not attached to a valid plan cycle."));
+            var dateDecision = FormAttestationRules.Evaluate(
+                form.Type, request.EventDate!.Value, cycle.Value.CycleStart,
+                clock.Today, AttestationActorKind.CaseManager, [],
+                [new FormFact(form.Id, form.PersonId, form.Type, form.DueDate,
+                    form.CompletedDate, form.TargetEffectiveDate)],
+                targetEffectiveDate: form.TargetEffectiveDate,
+                availableOn: availableOn);
+            if (!dateDecision.Accepted)
+            {
+                return new(request, null, FormNoteProblem(
+                    dateDecision.DateError ?? string.Join(" ",
+                        dateDecision.UnmetPrerequisites.Select(item => item.Message))));
+            }
+        }
+
+        request = request with
+        {
+            IsAnnualPlan = true,
+            IsUnbilled = request.IsUnbilled || decision.MustBeUnbilled
+        };
+        return new(request, new AnnualPcpServerPlan(form, decision), null);
+    }
+
+    private static void ApplyAnnualPcpProgress(
+        ApiDbContext db,
+        Actor actor,
+        ServerNote note,
+        AnnualPcpServerPlan? plan,
+        ApiClock clock,
+        AuditTrail auditTrail)
+    {
+        if (plan is null || note.EventDate is not DateTime activityDate)
+            return;
+        var occurredOn = activityDate.Date;
+        if (plan.Decision.RequiredAction == AnnualPcpProgressAction.Open)
+        {
+            plan.Form.OpenedDate = occurredOn;
+            auditTrail.Record(actor, AuditActions.FormOpened, "Form", plan.Form.Id,
+                JsonSerializer.Serialize(new
+                {
+                    formType = AnnualPcpNoteRules.FormTypeName,
+                    targetEffectiveDate = plan.Form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
+                    openedOn = occurredOn.ToString("yyyy-MM-dd"),
+                    evidenceNoteId = note.Id
+                }));
+            return;
+        }
+
+        if (plan.Decision.RequiredAction != AnnualPcpProgressAction.Complete)
+            return;
+        plan.Form.ApplyAttestation(occurredOn);
+        db.FormAttestations.Add(new ServerFormAttestation
+        {
+            FormId = plan.Form.Id,
+            Kind = "Attested",
+            CompletedOn = occurredOn,
+            ActorKind = AttestationActorKind.CaseManager.ToString(),
+            ActorUserId = actor.UserId,
+            RecordedAtUtc = clock.UtcNow.UtcDateTime,
+            EvidenceNoteId = note.Id,
+            PrerequisiteStateJson = FormAttestationRules.NoPrerequisitesStateJson,
+            Reason = "Annual PCP note confirmation."
+        });
+        auditTrail.Record(actor, AuditActions.FormAttested, "Form", plan.Form.Id,
+            JsonSerializer.Serialize(new
+            {
+                formType = AnnualPcpNoteRules.FormTypeName,
+                targetEffectiveDate = plan.Form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
+                completedOn = occurredOn.ToString("yyyy-MM-dd"),
+                evidenceNoteId = note.Id,
+                annualPcpNote = true
+            }));
+    }
+
     private static bool IsNonReleaseLoggedFormNote(SaveNoteRequest request) =>
         FormNoteAttestationRules.AttestsExactFormOnLog(
             request.Status,
             request.Activities,
             request.NoteType,
             request.FormType,
-            request.FormId);
+            request.FormId,
+            request.IsAnnualPlan);
 
     private static async Task<HashSet<int>> SafelyCancelledScheduledDuplicateNoteIdsAsync(
         ApiDbContext db,

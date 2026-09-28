@@ -185,6 +185,18 @@ public sealed class DhhsFormFillerTests
         Assert.Equal("/On", Raw(release, "Office of Aging and Disability Services"));
     }
 
+    [Fact]
+    public void Coordinate_care_purpose_uses_the_release_forms_checked_state()
+    {
+        var release = FieldsOf(new DhhsFormFiller().Fill(
+            DhhsFormDefinition.FormKey.AuthorizationToRelease,
+            Subject,
+            new DhhsFormDefinition.Selections(
+                Checks: new Dictionary<string, bool> { ["undefined_4"] = true })));
+
+        Assert.Equal("/On", Raw(release, "undefined_4"));
+    }
+
     /// <summary>
     /// A selection naming something that is not a consent field is a typo or an
     /// attempt to drive a demographic box through the human-choice channel. Ignoring

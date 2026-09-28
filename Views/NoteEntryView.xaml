@@ -528,6 +528,11 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <!-- Reminder remains a distinct non-service choice. With
                              no date it is a journal entry; with a future date it
                              is a calendar reminder. -->
@@ -601,8 +606,25 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <StackPanel Grid.Row="6" Grid.ColumnSpan="4" Margin="0,8,0,0"
-                                Visibility="{Binding IsFormNote,
+                    <CheckBox Grid.Row="6" Grid.ColumnSpan="4"
+                              Margin="0,8,0,0"
+                              Content="Annual"
+                              IsChecked="{Binding IsAnnualPlan, Mode=TwoWay}"
+                              AutomationProperties.Name="Annual Person-Centered Plan"
+                              AutomationProperties.HelpText="Links this note to an annual plan year and records opening or completion when a draft or submitted note is saved."
+                              Visibility="{Binding IsAnnualPcpOptionVisible,
+                                  Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <TextBlock Grid.Row="7" Grid.ColumnSpan="4"
+                               Margin="20,4,0,0"
+                               Text="{Binding AnnualPcpYearText}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               AutomationProperties.Name="Annual PCP year under development"
+                               AutomationProperties.LiveSetting="Polite"
+                               Visibility="{Binding HasAnnualPcpYear,
+                                   Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <StackPanel Grid.Row="8" Grid.ColumnSpan="4" Margin="0,8,0,0"
+                                Visibility="{Binding IsFormObligationVisible,
                                     Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="FORM OBLIGATION / PLAN YEAR"
                                    Style="{StaticResource LabelStyle}" />
@@ -614,17 +636,32 @@
                                    Margin="0,4,0,0" FontSize="11" TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextSecondaryBrush}" />
                     </StackPanel>
-                    <TextBlock Grid.Row="7" Grid.ColumnSpan="4" Margin="0,6,0,0"
+                    <TextBlock Grid.Row="9" Grid.ColumnSpan="4" Margin="0,6,0,0"
                                Text="Reason for changing a prior attested date (if applicable)"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Visibility="{Binding IsFormNote,
                                    Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <TextBox Grid.Row="8" Grid.ColumnSpan="4"
+                    <TextBox Grid.Row="10" Grid.ColumnSpan="4"
                              AutomationProperties.Name="Reason for form completion date correction"
                              MaxLength="1000"
                              Text="{Binding FormDateCorrectionReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Visibility="{Binding IsFormNote,
                                  Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <CheckBox Grid.Row="11" Grid.ColumnSpan="4"
+                              Margin="0,12,0,0"
+                              Content="Unbilled"
+                              IsChecked="{Binding IsUnbilled, Mode=TwoWay}"
+                              IsEnabled="{Binding IsUnbilledEnabled}"
+                              AutomationProperties.Name="Unbilled note"
+                              AutomationProperties.HelpText="The note still goes to the supervisor, but approval does not send it to billing." />
+                    <TextBlock Grid.Row="12" Grid.ColumnSpan="4"
+                               Margin="20,3,0,0"
+                               Text="{Binding UnbilledGuidance}"
+                               TextWrapping="Wrap"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               AutomationProperties.Name="Unbilled workflow explanation"
+                               AutomationProperties.LiveSetting="Polite" />
                 </Grid>
 
                         <Grid x:Name="NoteBodyGrid"

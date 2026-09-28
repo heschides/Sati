@@ -1,5 +1,33 @@
 # Sati — Refactor Agenda
 
+## Unreleased corrections — 2026-09-28
+
+- [x] Close the remaining Work Agenda duplicate path after the 1.3.23 transition repair. The
+      earlier 1.3.26 fix reconciled and prevented Scheduled upgrade fan-out, but a linked note that
+      had already become Pending on another date was outside the retry read. Agenda-created exact
+      form work now declares its intent to the authoritative local/API writer, which reuses an
+      active note for the same person and Form under the serializable database schedule lock.
+      `agenda-generated-exact-form-note-v1` changes `ApiSurface.Revision`, preventing a newer Demo
+      client from sending the intent to an older API that would ignore it. Focused desktop and API
+      tests cover the Pending cross-date case.
+- [x] Fix official DHHS Authorization to Release generation for Purpose of disclosure and two
+      general-record choices. The UI exposed genuine consumer choices whose PDF field names were
+      absent from the shared consent allowlist, so the safety boundary correctly refused them.
+      The allowlist now includes all seven omitted official fields; a whole-UI coverage test proves
+      every visible choice is classified as consent, and the PDF test proves “Coordinate or manage
+      care” writes the form's own checked state. Signatures and profile/consent separation are
+      unchanged.
+- [x] Add an explicit Annual option for Person-Centered Plan notes. A Pending or Logged annual
+      note advances exactly one confirmed state (not opened → opened, opened → completed), shows
+      its plan year, rejects pre-window annual identity while offering a non-annual revision, and
+      forces late annual work to Unbilled. Persist `IsAnnualPlan` and `IsUnbilled`, exclude
+      Unbilled work at both billing boundaries while retaining ordinary supervisor review, and
+      publish the contract change as `annual-pcp-and-unbilled-note-v1`. Migration
+      `20260928140919_AddAnnualPcpAndUnbilledNotes` is generated but unapplied.
+- [x] Default Goal Progress to None for Form work without overwriting a deliberate choice, and
+      restore the All Persons sentinel after the Notes Log replaces its filter collection so the
+      default filter never renders blank.
+
 ## Release 1.3.30 — 2026-09-27
 
 “A release for every recipient.” Adds durable one-off releases beside provider requirements,
@@ -7946,6 +7974,15 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
       generated output (currently AT and Check Requests).
 - [ ] Optional: embed an actual generated-PDF viewer if the added dependency and accessibility
       behavior are justified. It must display the same bytes Sati saves, never a second rendering.
+
+## Unreleased — review settings and attestation feedback (2026-09-28)
+
+- [x] Await a post-save settings refresh so Upcoming Due Dates and every already-loaded derived
+      surface use the newly persisted review window without restarting Sati.
+- [x] Close the attestation panel after a successful completion and show an accessible information
+      confirmation with the system information cue.
+- [x] Keep revocation reason and confirmation controls hidden until the user explicitly invokes
+      Revoke attestation on an already-completed form.
 
 ## Unreleased — note activities and manual attestation links (2026-09-22)
 

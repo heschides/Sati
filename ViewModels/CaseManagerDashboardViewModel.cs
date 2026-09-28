@@ -1211,6 +1211,29 @@ CalendarViewModel calendarViewModel,
             await LoadAsync();
         }
 
+        /// <summary>
+        /// Rebuilds every live projection whose dates or availability derive from agency
+        /// settings. Settings saves await this cascade, so the dashboard never continues to
+        /// present a stale compliance window from the startup snapshot.
+        /// </summary>
+        public async Task RefreshAfterSettingsChangedAsync()
+        {
+            if (LoggedInUser is null)
+                return;
+
+            var settings = await _settingsService.LoadAsync();
+            _settings = settings;
+            Matrix?.Rebuild(People, DateTime.Today, MatrixSchedule);
+            await LoadUpcomingEventsAsync(settings);
+            await Clients.ReloadProfileSettingsAsync();
+            if (IsReviewsSubActive)
+                await Reviews.LoadAsync();
+            await RefreshCalendarIfLoadedAsync();
+            await RefreshFutureEligibleDaysAsync();
+            NotifyProductivityChanged();
+            await RefreshAnnualReminderAsync();
+        }
+
         // -------------------------------------------------------------------------
         // Private methods
         // -------------------------------------------------------------------------

@@ -3,6 +3,7 @@ using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Data.Cloud;
 using Sati.Models;
+using Sati.ViewModels.Children;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -12,6 +13,96 @@ namespace Sati.Tests;
 
 public sealed class NoteSubmissionFeedbackTests
 {
+    [Fact]
+    public async Task PendingAnnualPcpAsksBeforeOpeningAndShowsSelectedYear()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var serviceDate = DateTime.Today;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            db.Forms.Add(new Form(FormType.PCP, serviceDate.AddDays(30),
+                targetEffectiveDate: serviceDate.AddDays(30))
+            {
+                PersonId = fixture.PersonOneId
+            });
+            await db.SaveChangesAsync();
+        }
+        var person = (await fixture.PeopleAs(fixture.CaseManagerOne)
+            .GetAllPeopleAsync(fixture.CaseManagerOne.Id))
+            .Single(row => row.Id == fixture.PersonOneId);
+        var panel = fixture.NoteEntry();
+        panel.SetPeople([person]);
+        panel.SelectedPerson = person;
+        panel.IsFormSelected = true;
+        panel.SelectedFormType = FormType.PCP;
+        panel.IsAnnualPlan = true;
+        panel.SelectedFormObligation = Assert.Single(panel.FormObligations);
+        panel.EventDate = serviceDate;
+        panel.Status = NoteStatus.Pending;
+        panel.Narrative = "Opened the annual PCP.";
+        panel.Minutes = 15;
+        AnnualPcpConfirmationKind? prompt = null;
+        panel.AnnualPcpConfirmationRequested += (_, args) =>
+        {
+            prompt = args.Kind;
+            args.Confirmed = true;
+        };
+
+        Assert.True(panel.HasAnnualPcpYear);
+        Assert.Contains(serviceDate.AddDays(30).Year.ToString(), panel.AnnualPcpYearText);
+        await panel.SubmitNoteCommand.ExecuteAsync(null);
+
+        Assert.Equal(AnnualPcpConfirmationKind.Open, prompt);
+        await using var verification = fixture.Factory.CreateDbContext();
+        Assert.Equal(serviceDate, (await verification.Forms.SingleAsync()).OpenedDate);
+        var saved = await verification.Notes.SingleAsync();
+        Assert.True(saved.IsAnnualPlan);
+        Assert.Equal(GoalProgressLevel.None, saved.GoalProgress);
+    }
+
+    [Fact]
+    public async Task PreWindowAnnualPcpCanOnlySaveAsUnlinkedRevision()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var serviceDate = DateTime.Today;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            db.Forms.Add(new Form(FormType.PCP, serviceDate.AddDays(100),
+                targetEffectiveDate: serviceDate.AddDays(100))
+            {
+                PersonId = fixture.PersonOneId
+            });
+            await db.SaveChangesAsync();
+        }
+        var person = (await fixture.PeopleAs(fixture.CaseManagerOne)
+            .GetAllPeopleAsync(fixture.CaseManagerOne.Id))
+            .Single(row => row.Id == fixture.PersonOneId);
+        var panel = fixture.NoteEntry();
+        panel.SetPeople([person]);
+        panel.SelectedPerson = person;
+        panel.IsFormSelected = true;
+        panel.SelectedFormType = FormType.PCP;
+        panel.IsAnnualPlan = true;
+        panel.SelectedFormObligation = Assert.Single(panel.FormObligations);
+        panel.EventDate = serviceDate;
+        panel.Status = NoteStatus.Pending;
+        panel.Narrative = "Discussed a PCP revision.";
+        panel.Minutes = 15;
+        panel.AnnualPcpConfirmationRequested += (_, args) =>
+        {
+            Assert.Equal(AnnualPcpConfirmationKind.CreateRevision, args.Kind);
+            args.Confirmed = true;
+        };
+
+        await panel.SubmitNoteCommand.ExecuteAsync(null);
+
+        await using var verification = fixture.Factory.CreateDbContext();
+        var saved = await verification.Notes.SingleAsync();
+        Assert.False(saved.IsAnnualPlan);
+        Assert.Null(saved.FormId);
+        Assert.Null((await verification.Forms.SingleAsync()).OpenedDate);
+    }
+
     [Fact]
     public async Task PendingPcpNoteExplainsWhereToSelectItsExactFormBeforeLogging()
     {
@@ -27,6 +118,7 @@ public sealed class NoteSubmissionFeedbackTests
         panel.SelectedPerson = person;
         panel.IsFormSelected = true;
         panel.SelectedFormType = FormType.PCP;
+        panel.IsAnnualPlan = true;
         panel.EventDate = target;
         panel.Status = NoteStatus.Logged;
         panel.GoalProgress = GoalProgressLevel.None;
@@ -36,7 +128,7 @@ public sealed class NoteSubmissionFeedbackTests
         Assert.Single(panel.FormObligations);
         await panel.SubmitNoteCommand.ExecuteAsync(null);
 
-        Assert.Contains("FORM OBLIGATION / PLAN YEAR", panel.SubmissionFailureMessage);
+        Assert.Contains("Annual PCP plan year", panel.SubmissionFailureMessage);
         Assert.Equal("The PCP work was completed.", panel.Narrative);
         await using var verification = fixture.Factory.CreateDbContext();
         Assert.Empty(await verification.Notes.ToListAsync());

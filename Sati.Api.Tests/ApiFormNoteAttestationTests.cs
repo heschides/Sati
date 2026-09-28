@@ -12,6 +12,111 @@ namespace Sati.Api.Tests;
 public sealed class ApiFormNoteAttestationTests(SatiApiFactory factory)
 {
     [Fact]
+    public async Task ConfirmedPendingAnnualPcpOpensExactPlanAndRoundTripsMarkers()
+    {
+        using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var serviceDate = DateTime.Today;
+        int personId;
+        int formId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            personId = await db.People.MaxAsync(row => row.Id) + 1;
+            var person = new ServerPerson
+            {
+                Id = personId,
+                UserId = 12,
+                AgencyId = 1,
+                FirstName = "Annual",
+                LastName = "PCP Test",
+                BirthDate = new DateTime(1990, 1, 1),
+                EffectiveDate = serviceDate.AddYears(-1).AddDays(30)
+            };
+            var form = new ServerForm
+            {
+                PersonId = personId,
+                Type = "PCP",
+                DueDate = serviceDate.AddDays(30),
+                TargetEffectiveDate = serviceDate.AddDays(30)
+            };
+            db.People.Add(person);
+            db.Forms.Add(form);
+            await db.SaveChangesAsync();
+            formId = form.Id;
+        }
+
+        try
+        {
+            using var response = await client.PostAsJsonAsync("/api/v1/notes",
+                new SaveNoteRequest(
+                    "Opened the annual PCP.", serviceDate, "Pending", 15, null,
+                    personId, "PCP", "Form", null, null,
+                    GoalProgress: "None", FormId: formId,
+                    Activities: (int)NoteActivity.Form,
+                    IsAnnualPlan: true,
+                    AnnualPcpAction: AnnualPcpProgressAction.Open));
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var returned = (await response.Content.ReadFromJsonAsync<NoteDto>())!;
+            Assert.True(returned.IsAnnualPlan);
+            Assert.False(returned.IsUnbilled);
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            Assert.Equal(serviceDate, (await db.Forms.AsNoTracking()
+                .SingleAsync(form => form.Id == formId)).OpenedDate);
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
+    public async Task AgendaGeneratedFormNoteReusesAnExistingPendingExactNote()
+    {
+        using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var (personId, formId) = await CreateReviewAsync(DateTime.Today.AddDays(30), null);
+        int existingNoteId;
+        try
+        {
+            await using (var setupScope = factory.Services.CreateAsyncScope())
+            {
+                var setup = setupScope.ServiceProvider.GetRequiredService<ApiDbContext>();
+                var existing = new ServerNote
+                {
+                    AgencyId = 1,
+                    PersonId = personId,
+                    FormId = formId,
+                    Status = NoteWorkflow.Pending,
+                    EventDate = DateTime.Today.AddDays(-2),
+                    Minutes = 15,
+                    Narrative = "Existing draft."
+                };
+                setup.Notes.Add(existing);
+                await setup.SaveChangesAsync();
+                existingNoteId = existing.Id;
+            }
+
+            using var response = await client.PostAsJsonAsync("/api/v1/notes",
+                new SaveNoteRequest(
+                    "Agenda suggestion.", DateTime.Today, "Scheduled", 15, null,
+                    personId, "Q3R", "Form", null, null,
+                    FormId: formId, IsAgendaGenerated: true));
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var returned = (await response.Content.ReadFromJsonAsync<NoteDto>())!;
+            Assert.Equal(existingNoteId, returned.Id);
+            await using var verifyScope = factory.Services.CreateAsyncScope();
+            var verify = verifyScope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            Assert.Equal(1, await verify.Notes.CountAsync(note => note.FormId == formId));
+        }
+        finally
+        {
+            await RemoveReviewAsync(personId);
+        }
+    }
+
+    [Fact]
     public async Task OlderCycleFormNoteRequiresWrittenJustificationAndRetainsExactEvidence()
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");

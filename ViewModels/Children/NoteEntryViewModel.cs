@@ -169,6 +169,11 @@ namespace Sati.ViewModels.Children
         public event EventHandler<NoteReassignmentConfirmationEventArgs>?
             NoteReassignmentConfirmationRequested;
 
+        // The view owns the modal confirmation. The authoritative service repeats
+        // the transition check, so a missing handler cannot advance a plan.
+        public event EventHandler<AnnualPcpConfirmationEventArgs>?
+            AnnualPcpConfirmationRequested;
+
         // The panel went back to a blank New Note. Hosts use this to drop the row
         // their grid still has highlighted, so the highlight and the panel never
         // describe different things.
@@ -250,6 +255,9 @@ namespace Sati.ViewModels.Children
             ApplyActivitySelectionEffects(SelectedNoteType);
         }
         [ObservableProperty] private FormType? selectedFormType;
+        [ObservableProperty] private bool isAnnualPlan;
+        [ObservableProperty] private bool isUnbilled;
+        private AnnualPcpProgressAction _annualPcpAction;
         private int? _selectedFormId;
         public ObservableCollection<FormObligationOption> FormObligations { get; } = [];
         [ObservableProperty] private FormObligationOption? selectedFormObligation;
@@ -473,6 +481,31 @@ namespace Sati.ViewModels.Children
         public Array FormTypes => Enum.GetValues(typeof(FormType));
         public bool IsFormNote => HasActivity(NoteActivity.Form);
         public bool IsVisitNote => HasActivity(NoteActivity.Visit);
+        public bool IsAnnualPcpOptionVisible =>
+            IsFormNote && SelectedFormType == FormType.PCP;
+        public bool IsFormObligationVisible =>
+            IsFormNote && (SelectedFormType != FormType.PCP || IsAnnualPlan);
+        private Form? SelectedFormRecord => _selectedFormId is int formId
+            ? SelectedPerson?.Forms.SingleOrDefault(form => form.Id == formId)
+            : null;
+        public bool HasAnnualPcpYear => IsAnnualPcpOptionVisible &&
+            IsAnnualPlan && SelectedFormRecord is not null;
+        public string AnnualPcpYearText
+        {
+            get
+            {
+                if (SelectedFormRecord is not Form form)
+                    return "Choose the plan year under development.";
+                var year = form.TargetEffectiveDate == default
+                    ? form.DueDate.Year
+                    : form.TargetEffectiveDate.Year;
+                return $"PCP year under development: {year}";
+            }
+        }
+        public bool IsUnbilledEnabled => AreNoteFieldsEnabled;
+        public string UnbilledGuidance => IsUnbilled
+            ? "Unbilled — this note still goes to the supervisor, but approval will not send it to billing."
+            : "Select Unbilled when this work should be reviewed but must not go to billing.";
 
         // A reminder is not service documentation. It has no place in the review
         // workflow, no billable minutes, no service date, and no visit facts, so
@@ -527,6 +560,7 @@ namespace Sati.ViewModels.Children
         {
             OnPropertyChanged(nameof(IsUnlocked));
             OnPropertyChanged(nameof(AreNoteFieldsEnabled));
+            OnPropertyChanged(nameof(IsUnbilledEnabled));
             OnPropertyChanged(nameof(EditorHeading));
             OnPropertyChanged(nameof(LockGlyph));
             OnPropertyChanged(nameof(LockToggleLabel));
@@ -535,6 +569,7 @@ namespace Sati.ViewModels.Children
             OnPropertyChanged(nameof(IsStatusEnabled));
             OnPropertyChanged(nameof(IsServiceTimeEnabled));
             OnPropertyChanged(nameof(IsGoalProgressEnabled));
+            OnPropertyChanged(nameof(IsUnbilledEnabled));
             SubmitNoteCommand.NotifyCanExecuteChanged();
             FormatNarrativeWithAiCommand.NotifyCanExecuteChanged();
             BuildCaseNoteTemplateCommand.NotifyCanExecuteChanged();
@@ -576,6 +611,7 @@ namespace Sati.ViewModels.Children
             OnPropertyChanged(nameof(IsServiceTimeEnabled));
             OnPropertyChanged(nameof(IsGoalProgressEnabled));
             NotifyReminderModeChanged();
+            NotifyAnnualPcpPresentationChanged();
             MarkDirty();
             _ = RefreshServiceDayAsync();
         }
@@ -678,6 +714,7 @@ namespace Sati.ViewModels.Children
                 }
 
                 MarkDirty();
+                IsAnnualPlan = false;
                 _selectedFormId = null;
                 RefreshFormObligations();
                 _ = LoadVisitAttendeesAsync(newValue);
@@ -694,6 +731,9 @@ namespace Sati.ViewModels.Children
             EventDate = null;
             SelectedNoteType = null;
             SelectedFormType = null;
+            IsAnnualPlan = false;
+            IsUnbilled = false;
+            _annualPcpAction = AnnualPcpProgressAction.None;
             _selectedFormId = null;
             RefreshFormObligations();
             Minutes = null;
@@ -755,6 +795,7 @@ namespace Sati.ViewModels.Children
             OnPropertyChanged(nameof(SuggestedFollowUpToolTip));
             OnPropertyChanged(nameof(SaveActionLabel));
             OnPropertyChanged(nameof(StatusGuidance));
+            NotifyAnnualPcpPresentationChanged();
             FormatNarrativeWithAiCommand.NotifyCanExecuteChanged();
             BuildCaseNoteTemplateCommand.NotifyCanExecuteChanged();
             AcceptSuggestedFollowUpCommand.NotifyCanExecuteChanged();
@@ -791,8 +832,13 @@ namespace Sati.ViewModels.Children
 
             if (!IsFormNote)
             {
+                IsAnnualPlan = false;
                 SelectedFormType = null;
                 FormDateCorrectionReason = string.Empty;
+            }
+            else if (GoalProgress is null)
+            {
+                GoalProgress = GoalProgressLevel.None;
             }
 
             if (!IsVisitNote)
@@ -912,7 +958,36 @@ namespace Sati.ViewModels.Children
         partial void OnSelectedFormObligationChanged(FormObligationOption? value)
         {
             _selectedFormId = value?.FormId;
+            NotifyAnnualPcpPresentationChanged();
             MarkDirty();
+        }
+
+        partial void OnIsAnnualPlanChanged(bool value)
+        {
+            if (value && SelectedFormType != FormType.PCP)
+                IsAnnualPlan = false;
+            if (!value && SelectedFormType == FormType.PCP)
+            {
+                _selectedFormId = null;
+                RefreshFormObligations();
+            }
+            _annualPcpAction = AnnualPcpProgressAction.None;
+            NotifyAnnualPcpPresentationChanged();
+            MarkDirty();
+        }
+
+        partial void OnIsUnbilledChanged(bool value)
+        {
+            OnPropertyChanged(nameof(UnbilledGuidance));
+            MarkDirty();
+        }
+
+        private void NotifyAnnualPcpPresentationChanged()
+        {
+            OnPropertyChanged(nameof(IsAnnualPcpOptionVisible));
+            OnPropertyChanged(nameof(IsFormObligationVisible));
+            OnPropertyChanged(nameof(HasAnnualPcpYear));
+            OnPropertyChanged(nameof(AnnualPcpYearText));
         }
 
         private void RefreshFormObligations()
@@ -938,8 +1013,11 @@ namespace Sati.ViewModels.Children
 
         partial void OnSelectedFormTypeChanged(FormType? value)
         {
+            if (value != FormType.PCP)
+                IsAnnualPlan = false;
             _selectedFormId = null;
             RefreshFormObligations();
+            NotifyAnnualPcpPresentationChanged();
             InvalidateAiGeneration();
             MarkDirty();
             if (value is null || SelectedPerson is null || !string.IsNullOrWhiteSpace(Narrative))
@@ -1757,8 +1835,12 @@ namespace Sati.ViewModels.Children
                 SetSelectedActivities(note.Activities ?? NoteActivityRules.FromLegacy(note.NoteType?.ToString()),
                     reminder: note.NoteType == NoteType.Reminder);
                 SelectedFormType = note.FormType;
+                IsAnnualPlan = note.IsAnnualPlan ||
+                    AnnualPcpNoteRules.IsAnnualSelection(false,
+                        note.FormType?.ToString(), note.FormId);
                 _selectedFormId = note.FormId;
                 RefreshFormObligations();
+                IsUnbilled = note.IsUnbilled;
                 FormDateCorrectionReason = note.FormDateCorrectionReason ?? string.Empty;
                 ApplyVisitDocumentation(note.VisitDocumentation);
             }
@@ -2110,7 +2192,10 @@ namespace Sati.ViewModels.Children
 
             try
             {
-                if (Status == NoteStatus.Logged)
+                if (!PrepareAnnualPcpSave())
+                    return;
+
+                if (Status == NoteStatus.Logged && !IsUnbilled)
                 {
                     // A later paperwork deadline cannot reach backward and make an
                     // earlier service non-billable. Resolve the append-only policy
@@ -2147,7 +2232,8 @@ namespace Sati.ViewModels.Children
                             (int)_selectedActivities,
                             SelectedNoteType?.ToString(),
                             SelectedFormType?.ToString(),
-                            _selectedFormId);
+                            _selectedFormId,
+                            IsAnnualPlan);
                     var windowReasons = selectedPerson.EvaluateBillingWindow(
                         serviceDate,
                         requirements,
@@ -2182,7 +2268,7 @@ namespace Sati.ViewModels.Children
                 var formLinkError = FormNoteLinkRules.Validate(
                     SelectedNoteType?.ToString(), SelectedFormType?.ToString(),
                     Status?.ToString(), _selectedFormId, FormDateCorrectionReason,
-                    (int)_selectedActivities);
+                    (int)_selectedActivities, IsAnnualPlan);
                 if (formLinkError is not null)
                 {
                     ShowSubmissionRefusal(formLinkError);
@@ -2214,6 +2300,63 @@ namespace Sati.ViewModels.Children
                     "Sati encountered an error saving your note. Please try again.",
                     "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private bool PrepareAnnualPcpSave()
+        {
+            _annualPcpAction = AnnualPcpProgressAction.None;
+            if (!IsAnnualPlan || SelectedFormType != FormType.PCP ||
+                Status is not (NoteStatus.Pending or NoteStatus.Logged))
+            {
+                return true;
+            }
+
+            if (SelectedFormRecord is not Form form || EventDate is not DateTime serviceDate)
+                return true; // Normal validation supplies the field-specific error.
+
+            var availableOn = FormDueDateCalculator.ComputeAvailableDateForDueDate(
+                form.Type, form.DueDate, _settings ?? new Settings());
+            var decision = AnnualPcpNoteRules.Evaluate(
+                true, form.Type.ToString(), form.Id, Status?.ToString(), serviceDate,
+                availableOn, form.DueDate, form.OpenedDate, form.CompletedDate);
+
+            if (decision.IsBeforeAvailableWindow)
+            {
+                var revision = new AnnualPcpConfirmationEventArgs(
+                    AnnualPcpConfirmationKind.CreateRevision,
+                    decision.Message + " Do you want to save it as PCP revision work instead?");
+                AnnualPcpConfirmationRequested?.Invoke(this, revision);
+                if (!revision.Confirmed)
+                    return false;
+
+                IsAnnualPlan = false;
+                _selectedFormId = null;
+                RefreshFormObligations();
+                NotifyAnnualPcpPresentationChanged();
+                return true;
+            }
+
+            if (decision.RequiredAction != AnnualPcpProgressAction.None)
+            {
+                var kind = decision.RequiredAction == AnnualPcpProgressAction.Open
+                    ? AnnualPcpConfirmationKind.Open
+                    : AnnualPcpConfirmationKind.Complete;
+                var confirmation = new AnnualPcpConfirmationEventArgs(kind, decision.Message);
+                AnnualPcpConfirmationRequested?.Invoke(this, confirmation);
+                if (!confirmation.Confirmed)
+                    return false;
+                _annualPcpAction = decision.RequiredAction;
+            }
+            else if (decision.MustBeUnbilled)
+            {
+                var notice = new AnnualPcpConfirmationEventArgs(
+                    AnnualPcpConfirmationKind.LateNotice, decision.Message);
+                AnnualPcpConfirmationRequested?.Invoke(this, notice);
+            }
+
+            if (decision.MustBeUnbilled)
+                IsUnbilled = true;
+            return true;
         }
 
         // Client and reminder text are the only inputs, so they are the only
@@ -2336,6 +2479,9 @@ namespace Sati.ViewModels.Children
                 note.Activities = _selectedActivities;
                 note.FormType = SelectedFormType;
                 note.FormId = _selectedFormId;
+                note.IsAnnualPlan = IsAnnualPlan;
+                note.IsUnbilled = IsUnbilled;
+                note.AnnualPcpAction = _annualPcpAction;
                 note.FormDateCorrectionReason = string.IsNullOrWhiteSpace(FormDateCorrectionReason)
                     ? null : FormDateCorrectionReason.Trim();
                 note.GoalProgress = GoalProgress;
@@ -2368,6 +2514,9 @@ namespace Sati.ViewModels.Children
                     SelectedPerson!.Id, SelectedFormType, SelectedNoteType, _selectedFormId);
                 note.Activities = _selectedActivities;
                 note.StartTime = SelectedStartTime?.Minutes;
+                note.IsAnnualPlan = IsAnnualPlan;
+                note.IsUnbilled = IsUnbilled;
+                note.AnnualPcpAction = _annualPcpAction;
                 note.FormDateCorrectionReason = string.IsNullOrWhiteSpace(FormDateCorrectionReason)
                     ? null : FormDateCorrectionReason.Trim();
                 note.VisitDocumentation = BuildVisitDocumentation();
@@ -2506,6 +2655,8 @@ namespace Sati.ViewModels.Children
             if (draft.NoteType != latest.NoteType) fields.Add("note type");
             if (draft.FormType != latest.FormType) fields.Add("form type");
             if (draft.FormId != latest.FormId) fields.Add("form obligation");
+            if (draft.IsAnnualPlan != latest.IsAnnualPlan) fields.Add("annual PCP selection");
+            if (draft.IsUnbilled != latest.IsUnbilled) fields.Add("unbilled selection");
             if (draft.FormDateCorrectionReason != latest.FormDateCorrectionReason) fields.Add("form date correction reason");
             if (draft.GoalProgress != latest.GoalProgress) fields.Add("goal progress");
             if (draft.CaseManagerJustification != latest.CaseManagerJustification) fields.Add("justification");
@@ -2523,6 +2674,9 @@ namespace Sati.ViewModels.Children
             Narrative = string.Empty;
             EventDate = null;
             SelectedFormType = null;
+            IsAnnualPlan = false;
+            IsUnbilled = false;
+            _annualPcpAction = AnnualPcpProgressAction.None;
             _selectedFormId = null;
             RefreshFormObligations();
             FormDateCorrectionReason = string.Empty;
@@ -2645,5 +2799,29 @@ namespace Sati.ViewModels.Children
         public string Message { get; } =
             $"Are you sure you want to reassign this note from {previousClientName} to {newClientName}?";
         public bool Confirmed { get; set; }
+    }
+
+    public enum AnnualPcpConfirmationKind
+    {
+        Open,
+        Complete,
+        CreateRevision,
+        LateNotice
+    }
+
+    public sealed class AnnualPcpConfirmationEventArgs(
+        AnnualPcpConfirmationKind kind,
+        string message) : EventArgs
+    {
+        public AnnualPcpConfirmationKind Kind { get; } = kind;
+        public string Message { get; } = message;
+        public bool Confirmed { get; set; }
+        public string Title => Kind switch
+        {
+            AnnualPcpConfirmationKind.Open => "Open Annual PCP",
+            AnnualPcpConfirmationKind.Complete => "Complete Annual PCP",
+            AnnualPcpConfirmationKind.CreateRevision => "Annual PCP Not Yet Available",
+            _ => "Annual PCP Is Past Due"
+        };
     }
 }

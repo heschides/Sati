@@ -1,4 +1,5 @@
 using Sati.Data;
+using Sati.Contracts.V1;
 using Sati.Models;
 using Sati.Services;
 using Xunit;
@@ -97,6 +98,29 @@ public sealed class WorkAgendaServiceTests
             item.FormType,
             item.FormId);
         var notes = new RecordingNoteService(linked);
+
+        var result = await new WorkAgendaService(notes).AddFromDailyAgendaAsync(
+            41, Today, [item]);
+
+        Assert.Single(notes.Notes);
+        Assert.Equal(0, result.AddedCount);
+        Assert.Equal(1, result.ExistingCount);
+    }
+
+    [Fact]
+    public async Task PendingExactFormOnAnotherDatePreventsAnotherAgendaNote()
+    {
+        var item = AgendaItem();
+        var pending = Note.Create(
+            "Draft reclassification narrative.",
+            Today.AddDays(-4),
+            NoteStatus.Pending,
+            30,
+            item.PersonId,
+            item.FormType,
+            NoteType.Form,
+            item.FormId);
+        var notes = new RecordingNoteService(pending);
 
         var result = await new WorkAgendaService(notes).AddFromDailyAgendaAsync(
             41, Today, [item]);
@@ -228,6 +252,14 @@ public sealed class WorkAgendaServiceTests
 
         public Task<Note> AddNoteAsync(Note note)
         {
+            if (note.IsAgendaGenerated && note.FormId is int exactFormId)
+            {
+                var existing = Notes.FirstOrDefault(candidate =>
+                    ScheduledAgendaNoteRules.ClaimsExactForm(
+                        (int?)candidate.Status, candidate.FormId, exactFormId));
+                if (existing is not null)
+                    return Task.FromResult(existing);
+            }
             Notes.Add(note);
             return Task.FromResult(note);
         }
@@ -237,7 +269,8 @@ public sealed class WorkAgendaServiceTests
 
         public Task DeleteNoteAsync(Note note) => throw new NotSupportedException();
         public Task UpdateNoteAsync(Note note) => throw new NotSupportedException();
-        public Task<List<Note>> GetAllByPersonAsync(int personId) => throw new NotSupportedException();
+        public Task<List<Note>> GetAllByPersonAsync(int personId) =>
+            Task.FromResult(Notes.Where(note => note.PersonId == personId).ToList());
         public Task UpdateAbandonedNotesAsync(int abandonedAfterDays) => throw new NotSupportedException();
         public Task<List<Note>> GetMonthlyNotesAsync(int userId) => throw new NotSupportedException();
         public Task<List<Note>> GetByYearAsync(int userId, int year) => throw new NotSupportedException();

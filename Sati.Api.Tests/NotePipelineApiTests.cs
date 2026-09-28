@@ -258,6 +258,27 @@ public sealed class NotePipelineApiTests
     }
 
     [Fact]
+    public async Task UnbilledApprovedNoteNeverEntersApiBilling()
+    {
+        var noteId = await _factory.CreateNoteInStatusAsync(Approved);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+            (await db.Notes.SingleAsync(note => note.Id == noteId)).IsUnbilled = true;
+            await db.SaveChangesAsync();
+        }
+
+        using var billing = await _factory.CreateAuthenticatedClientAsync("admin-one");
+        var candidates = await billing.GetFromJsonAsync<List<BillingCandidateDto>>(
+            "/api/v1/billing/candidates");
+        Assert.DoesNotContain(candidates!, candidate => candidate.NoteId == noteId);
+
+        using var claim = await billing.PostAsJsonAsync("/api/v1/billing/claim-lines",
+            new CreateClaimLineRequest(noteId, false, null));
+        Assert.Equal(HttpStatusCode.NotFound, claim.StatusCode);
+    }
+
+    [Fact]
     public async Task SupervisorCanReturnAnUnclaimedApprovedLinkedFormNote()
     {
         using var supervisor = await _factory.CreateAuthenticatedClientAsync("supervisor-one");

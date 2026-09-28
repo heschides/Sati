@@ -79,6 +79,12 @@ public static class ApiSurface
         // writes that form's completion evidence. An older server would ignore
         // the ID and could permit a late note into billing.
         "exact-form-note-attestation-v1",
+        // SaveNoteRequest identifies agenda-generated exact-form work so an
+        // older server cannot silently ignore the idempotency guard.
+        "agenda-generated-exact-form-note-v1",
+        // Notes can explicitly represent Annual PCP progression and can opt out
+        // of billing without leaving the ordinary supervisor-review workflow.
+        "annual-pcp-and-unbilled-note-v1",
         "multi-activity-note-v1",
         "manual-attestation-note-link-v1",
         "form-work-billing-v1",

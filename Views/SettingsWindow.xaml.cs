@@ -36,6 +36,12 @@ namespace Sati.Views
         /// <summary>Raised after the window has closed because the user asked to switch accounts.</summary>
         public event EventHandler? SwitchUserRequested;
 
+        public Func<Task>? SettingsSavedAsync
+        {
+            get => _viewModel.SettingsSavedAsync;
+            set => _viewModel.SettingsSavedAsync = value;
+        }
+
         private void OnSwitchUserRequested(object? sender, EventArgs e)
         {
             // Whatever is unsaved on the account tabs is discarded by the switch, so

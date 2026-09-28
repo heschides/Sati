@@ -8,6 +8,7 @@ using Sati.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -1075,6 +1076,18 @@ namespace Sati.ViewModels
                 SaveStatus = BuildBillingComplianceRequirements() == _settings.BillingComplianceRequirements
                     ? "Settings saved."
                     : "Settings saved. Billing-policy selections are still a draft; enter an enforcement date and use Apply billing policy.";
+                if (SettingsSavedAsync is not null)
+                {
+                    try
+                    {
+                        await SettingsSavedAsync();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.WriteLine($"Settings post-save refresh failed: {exception.Message}");
+                        SaveStatus = "Settings saved, but one or more open views could not refresh. Reopen them to load the new values.";
+                    }
+                }
                 return true;
             }
             catch (SettingsConcurrencyException ex)
@@ -1088,6 +1101,13 @@ namespace Sati.ViewModels
                 return false;
             }
         }
+
+        /// <summary>
+        /// The shell supplies the one application-level refresh cascade while this window is
+        /// open. Awaiting it keeps every already-loaded settings projection synchronized before
+        /// Save reports completion; persistence remains successful if a presentation refresh fails.
+        /// </summary>
+        public Func<Task>? SettingsSavedAsync { get; set; }
 
         [RelayCommand]
         private async Task PreviewBillingCompliancePolicyImpactAsync()

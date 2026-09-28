@@ -5658,3 +5658,82 @@ Project, namespace and assembly names may use `Karuna`. Anything public until Jo
 a neutral name. That covers Azure resource names (which become DNS names), web app titles and
 manifests, install names on devices, and marketing. This keeps `AGENDA.md`'s rule that the program
 names stay internal until the quarter before each ships.
+
+## 2026-09-28 — agenda-generated exact-form work is idempotent at the write boundary
+
+The 1.3.26 compatibility repair correctly handled duplicate Scheduled rows created while exact
+`FormId` links were introduced, but its runtime retry read was scoped to one day's Scheduled work.
+Once that row became Pending or moved dates, the still-incomplete form could be selected from a
+later sign-in agenda and produce another exact-linked note. This is a write-boundary identity
+problem, not a presentation problem.
+
+Agenda creation now declares a transport-only intent that is valid only for a Scheduled Form note
+with one exact `FormId`. Both the local and API writers reuse an active same-person/same-form note
+inside the existing serializable schedule transaction. The marker is not stored in the clinical
+record. Cancelled and Abandoned work may be planned again; ordinary notes created outside the
+agenda are unchanged.
+
+**Rejected:** loading every client narrative at sign-in to search in the desktop, because that
+would regress startup privacy and performance and would still race another client; and a unique
+database constraint on `FormId`, because more than one independently authored form-work note can
+be legitimate even though agenda generation must be idempotent.
+
+## 2026-09-28 — every displayed DHHS release choice must be in the shared consent inventory
+
+The official Authorization to Release PDF uses opaque field names for several real checkboxes.
+The UI exposed the Purpose of disclosure choices and two general-record choices, but the shared
+consent inventory omitted them. The filler therefore did the safe thing and refused the request.
+Those seven official fields are now explicitly classified as consent, and a regression test walks
+every visible check and text option for both DHHS forms to prove the UI cannot drift outside that
+inventory. This does not auto-select consent, fill a signature, or turn profile data into a choice.
+
+**Rejected:** weakening the filler to accept any PDF field name. Its allowlist failure prevented a
+mapping mistake from silently writing demographic or signature fields and remains the correct
+safety boundary.
+
+## 2026-09-28 — settings saves refresh every loaded projection before reporting success
+
+Agency settings such as the quarterly-review opening window are authoritative persisted inputs,
+but the dashboard deliberately keeps one settings snapshot for its deadline board and form
+presentations. Saving a new value therefore left already-open Upcoming Due Dates, Reviews,
+calendar, profile reminders, and supervisor summaries on the old snapshot until a restart or
+manual reload.
+
+The Settings window now awaits one shell-owned post-save cascade. That cascade reloads the saved
+snapshot and rebuilds every already-loaded projection that derives from it; views that have not
+been opened continue to load fresh settings on first navigation. A projection failure does not
+misreport the durable save as failed, but the Settings status explicitly tells the user to reopen
+the affected view.
+
+Form-attestation capture also now has a distinct successful terminal state. After the service and
+dependent projections refresh, the shared panel closes and raises a presentation event. Its WPF
+control shows an accessible information confirmation with the ordinary Windows information cue.
+Opening an already-complete attestation shows status and history first; revocation reason fields
+are disclosed only after the user explicitly chooses Revoke attestation.
+
+**Rejected:** refreshing only Upcoming Due Dates, which would leave other readers disagreeing;
+reporting a settings save as failed after persistence had already committed; and leaving the
+revocation form visible as the default completed state.
+
+## 2026-09-28 — Annual PCP notes advance one confirmed state; Unbilled is durable
+
+Person-Centered Plan work can be annual-cycle work or revision work for another purpose. Treating
+every PCP note as annual would attach revision narratives to the compliance ledger; treating none
+as annual would leave opening and completion as unrelated manual actions. The note editor therefore
+exposes Annual only for PCP and requires an exact plan year when selected. A Pending or Logged save
+advances one state after confirmation: unopened becomes opened, and a later save while open becomes
+completed. The note's service date is the evidence date. Before availability the user may convert
+the draft to unlinked non-annual revision work, but the annual identity is never retained.
+
+Late annual PCP work is forced Unbilled. `IsUnbilled` is also available on every service note and
+means only that approval must not forward the note to billing; it does not remove supervisor review.
+Both local and API candidate queries filter it and claim creation rejects it again. The annual
+transition and note write share one transaction, and the shared `AnnualPcpNoteRules` owns the
+state/date decision for both clients and server.
+
+Exact-linked PCP notes created before the explicit marker are interpreted and migrated as annual,
+preserving their established meaning. The API shape marker prevents a newer client from silently
+sending annual, unbilled, or confirmation fields to an older server.
+
+**Rejected:** inferring annual intent from narrative text; completing an unopened plan in one save;
+silently relabeling pre-window work as annual; and hiding Unbilled notes from supervisors.

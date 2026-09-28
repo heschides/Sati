@@ -209,6 +209,9 @@ namespace Sati.Services.Billing
 
             if (note.Status != NoteStatus.Approved)
                 throw new InvalidOperationException("Only an approved service note can become a claim line.");
+            if (note.IsUnbilled)
+                throw new InvalidOperationException(
+                    "This note was marked Unbilled and cannot become a claim line.");
 
             var complianceContext = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, actor.AgencyId);
@@ -436,6 +439,7 @@ namespace Sati.Services.Billing
                               join owner in context.Users.AsNoTracking()
                                   on person.UserId equals owner.Id
                               where note.Status == NoteStatus.Approved &&
+                                    !note.IsUnbilled &&
                                     note.AgencyId == actor.AgencyId &&
                                     person.AgencyId == actor.AgencyId &&
                                     owner.AgencyId == actor.AgencyId &&
@@ -806,6 +810,8 @@ namespace Sati.Services.Billing
             var errors = new List<string>();
             if (note.Status != NoteStatus.Approved)
                 errors.Add("Service note is not approved.");
+            if (note.IsUnbilled)
+                errors.Add("Service note is marked Unbilled.");
             if (note.EventDate is null)
                 errors.Add("No service date.");
             if (BillingRules.CalculateSection13Units(note.Minutes) < 1)
@@ -955,6 +961,7 @@ namespace Sati.Services.Billing
             var notes = await context.Notes
                 .Where(note => note.PersonId == personId &&
                                note.Status == NoteStatus.Approved &&
+                               !note.IsUnbilled &&
                                !context.ClaimLines.Any(line => line.NoteId == note.Id))
                 .OrderBy(note => note.EventDate)
                 .ThenBy(note => note.Id)

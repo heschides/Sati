@@ -24,6 +24,32 @@ public sealed class NotePanelModeTests
     // -------------------------------------------------------------------------
 
     [Fact]
+    public async Task NotesLogLoadsWithAllPersonsSelected()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var log = fixture.NotesWindow();
+
+        await log.ReloadAsync();
+
+        Assert.Equal("All Persons", log.SelectedFilterPerson?.FullName);
+    }
+
+    [Fact]
+    public async Task SelectingFormDefaultsGoalProgressToNoneWithoutOverwritingAChoice()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var panel = fixture.NoteEntry();
+        panel.GoalProgress = null;
+
+        panel.IsFormSelected = true;
+
+        Assert.Equal(GoalProgressLevel.None, panel.GoalProgress);
+        panel.GoalProgress = GoalProgressLevel.Substantial;
+        panel.IsVisitSelected = true;
+        Assert.Equal(GoalProgressLevel.Substantial, panel.GoalProgress);
+    }
+
+    [Fact]
     public async Task ThePanelOpensAsANewNote()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
