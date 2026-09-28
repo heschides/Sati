@@ -219,14 +219,39 @@ wait. That is what "decisions in Karuna and Upekkha affect decisions in Sati" me
 
 Derived from the above rather than guessed:
 
-**Platform.** Identity and authentication. Tenancy and membership. Authority grants and the audit of
-their use. The person and organization registries. Audit events and record versions. Documents,
-signatures and envelope protection. Incidents and health telemetry. Chat. Legal hold and retention.
-**The authorization**, and **the sharing policy that decides what crosses a tenant boundary**.
+*Updated 2026-09-28 so these two paragraphs carry the Karuna decisions directly. The amendment below
+and "Answered 2026-09-28" give the reasoning.*
 
-**Sati.** Notes and the service timeline. Billing, claims and remittance. Caseload and transfer.
-Compliance forms and annual cycles. Comprehensive assessments and person-centred plans. Provider
-directory entries. Everything the `Sati.Contracts` classification put in the case-management column.
+**Platform.**
+
+- **Identity, authentication and tenancy mechanics** — password hashing, tokens, lockout, revocation,
+  membership rules — identified by opaque, product-tagged identifiers. Storage stays with each product
+  for now (D-10): Sati keeps its `dbo` identity and Karuna its own.
+- **Authority grants** and the audit of their use.
+- **The person and organization registries.**
+- **The audit envelope** (each product keeps its own audit rows and export format) and record
+  versions.
+- **Documents, signatures and envelope protection, and legal hold and retention.** Today's types for
+  these are Sati-shaped and stay in Sati; platform versions are designed when a second product needs
+  them (D-11).
+- **Incidents and health telemetry. Chat.**
+- **The tenant clock and the Maine business-day calendar.**
+- **Billing mechanics:** the 837P formatter, trading-partner profiles, the clearinghouse outbox and
+  connectors, response and 835 ingestion, remittance and deposit reconciliation (D-4).
+- **The authorization**, and **the sharing policy that decides what crosses a tenant boundary**.
+
+**Sati.**
+
+- Notes and the service timeline.
+- **Billing rules**: claim readiness, units, compliance gates and corrections policy. The mechanics
+  are platform.
+- Caseload and transfer.
+- Compliance forms and annual cycles.
+- Comprehensive assessments and person-centred plans.
+- Provider directory entries.
+- Its own identity and audit storage, and its Sati-shaped contracts (permissions, envelope binding,
+  legal hold, document artifacts, the audit export row).
+- Everything else the `Sati.Contracts` classification put in the case-management column.
 
 The last two platform entries are the ones that could not have been found by looking at Sati alone,
 and they are why this document had to come before the extraction.
@@ -246,13 +271,16 @@ Karuna and Upekkha will each add their own product column. The platform column i
 and it stays the intersection only if a test enforces the direction, which is stage one of the
 restructure plan.
 
-**Amended 2026-09-28.** Designing Karuna moved two more things into the platform column. **Billing
-mechanics** move: the 837P formatter, trading-partner profiles, the clearinghouse outbox and
-connectors, response and 835 ingestion, remittance and deposit reconciliation. Karuna bills MaineCare
-on the same transaction sets. The rules deciding whether a record may become a claim stay with each
-product, so "Billing, claims and remittance" above now means Sati's billing *rules*. **The tenant
-clock and Maine business-day calendar** also move, because Karuna's State filing deadlines are
-business-day arithmetic.
+**Amended 2026-09-28.** Designing Karuna moved two things into the platform column, now reflected
+above.
+
+- **Billing mechanics**, because Karuna bills MaineCare on the same transaction sets. The rules
+  deciding whether a record may become a claim stay with each product.
+- **The tenant clock and the Maine business-day calendar**, because Karuna's State filing deadlines
+  are business-day arithmetic.
+
+The same review narrowed "identity" to mechanics with per-product storage (D-10), and left today's
+Sati-shaped contracts in Sati (D-11).
 
 ## Answered 2026-09-07
 

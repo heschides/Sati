@@ -140,14 +140,15 @@ Following the target shape in `PLATFORM_RESTRUCTURE_PLAN.md`:
 ```
 SatiLogica.slnx
 ├── platform/
-│   ├── SatiLogica.Contracts      product-neutral only (D-11): tenant actor with no permission
-│   │                             enum, audit envelope and AuditCsv, tenant clock, business-day
-│   │                             calendar; later billing mechanics, authorization, sharing policy
+│   ├── SatiLogica.Contracts      product-neutral only (D-11): opaque principal and tenant ids,
+│   │                             tenant actor with no permission enum, audit envelope, spreadsheet-
+│   │                             safe CSV encoding, tenant clock, business-day calendar; later
+│   │                             billing mechanics, authorization, sharing policy
 │   ├── SatiLogica.Persistence    platform entities only (no product types; none yet, D-10)
 │   ├── SatiLogica.Hosting        token issuance, actor validation, TenantAccess core, AuditTrail,
 │   │                             LoginAttemptGuard behind host-supplied seams; outbox and workers
 │   ├── SatiLogica.Schema         design-time composition context and the single migration chain
-│   │                             (§3.3); referenced by no runtime project
+│   │                             (§3.3); referenced only by SatiLogica.Migrator and tests
 │   └── SatiLogica.Migrator       installer-run migration runner for Local Production (D-12)
 ├── sati/                         unchanged in this design
 └── karuna/
@@ -201,7 +202,8 @@ the model snapshot that EF migrations compare against needs every entity type at
 
 **Decided (D-1):** a composition assembly, `SatiLogica.Schema`, references the platform and all
 product persistence assemblies. It owns the one chain through a design-time composition context that
-is **separate from every runtime context**, so no client or product host references it.
+is **separate from every runtime context**. Only `SatiLogica.Migrator` and test projects reference
+it; no product library, host or client does, and the P1 guardrail enforces that.
 `SatiLogica.Persistence` stays product-agnostic. Runtime contexts per product (`KarunaDbContext`,
 `SatiContext`, `ApiDbContext`) map only their own tables. A separate Karuna migration chain was
 considered and rejected. The contradiction is also recorded as a structural finding (S-5), because it
@@ -216,8 +218,12 @@ exists:
   today, so `dbo.X` and `karuna.X` would be conflated;
 - a CI check that each runtime model is a subset of the composed model.
 
-Both are part of restructure stage 4 (handoff P5). Because Local Production still migrates itself at
-startup, the desktop stops doing so before the chain gains any Karuna entity (D-12, handoff P6).
+Both are part of restructure stage 4 (handoff P5).
+
+**Order: P6 before P5.** The desktop finds its migrations in `SatiContext`'s own assembly, because
+nothing sets `MigrationsAssembly`. Moving the chain first would leave Local Production with nothing to
+apply. So the Local migration runner (D-12, handoff P6) is built against today's chain and ships
+first. P5 then moves the chain and repoints the runner in the same commit.
 
 ### 3.4 What becomes platform because Karuna exists
 
@@ -262,6 +268,12 @@ revocation through a security version, and the audit envelope. It does not suppl
 `dbo` identity is not relocated. A platform identity store becomes necessary only when something must
 span products, such as `PlatformOperator` or the OADS authority grants in `PLATFORM_DOMAIN.md`. It is
 designed then.
+
+**Identifiers crossing into platform code are opaque.** Sati's user and agency keys are integers;
+Karuna's user and organization keys are UUIDv7 `Guid`s (§11.2). The platform's tenant actor, audit
+envelope and hosting seams identify principals and tenants by product plus an opaque string. Each
+product converts its typed keys at the boundary, and platform code only compares and serializes them.
+Tokens already carry the user id as a string. Inside Karuna, keys stay typed.
 
 ### 4.2 Isolation that does not depend on remembering a predicate
 
@@ -959,7 +971,9 @@ first screen so the answer can be yes later.
 
 ## 14. Audit
 
-The platform envelope (`AUDIT_EVENTS.md`) with `karuna.` actions. No narratives, names, drug names,
+The platform envelope (`AUDIT_EVENTS.md`), stored in Karuna's own `karuna` audit table (D-10), with
+`karuna.` actions. Karuna's audit export defines its own row with `Guid` ids and uses the platform's
+spreadsheet-safe CSV encoder; Sati's `AuditCsv` row is not reused. No narratives, names, drug names,
 reasons or funds amounts in metadata.
 
 - Every successful protected write records an action in the same transaction.
@@ -1049,8 +1063,9 @@ Detailed with acceptance criteria in `CODEX_HANDOFF.md`. In short:
   - **P2** one clock;
   - **P3** product-neutral platform contracts;
   - **P4** the hosting library;
-  - **P5** schema-aware tooling and the chain's move to `SatiLogica.Schema`;
-  - **P6** the Local migration runner, which lands before any Karuna entity joins the chain;
+  - **P6** the Local migration runner, built against today's chain and shipped **before** P5;
+  - **P5** schema-aware tooling, then the chain's move to `SatiLogica.Schema`, repointing the runner
+    in the same commit;
   - **P7** the Maine business-day calendar, which lands before K3.
 - **K0** foundation: a row-level security lifecycle spike first; then Karuna-owned identity and audit
   tables, organization tenant, sites, programs, capabilities, devices, enrolment, care-team access,
@@ -1076,8 +1091,6 @@ Where a default is proposed, it is a placeholder that must be confirmed before r
 - **KQ-1** Per diem billable day: admission, discharge, hospital and leave-of-absence days.
 - **KQ-2** Which Section 21/29 procedure codes require EVV — obtain the State's impacted-services
   spreadsheet.
-- **KQ-3** *Resolved 2026-09-28 by D-6:* EVV phase 1 reconciles with the State's Sandata EVV;
-  alternate-vendor certification comes later.
 - **KQ-4** The exact reading of "within one (1) business day of the Reportable Event", including events
   late on a Friday or before a holiday, and whether the clock runs from event or awareness when they
   differ.
@@ -1098,6 +1111,11 @@ Where a default is proposed, it is a placeholder that must be confirmed before r
 - **KQ-15** Retention periods for MAR, event report, service documentation and funds records.
 - **KQ-16** Whether the OADS adult reportable-events matrix differs from the rule text in categories or
   timing; obtain it and Evergreen's field list before building the taxonomy.
+
+### Resolved
+
+- **KQ-3** *Resolved 2026-09-28 by D-6:* EVV phase 1 reconciles with the State's Sandata EVV;
+  alternate-vendor certification comes later.
 
 ---
 

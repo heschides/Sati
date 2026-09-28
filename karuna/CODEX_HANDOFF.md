@@ -2,10 +2,11 @@
 
 **For:** Codex, or whoever implements this next, starting with no prior context.
 **Written:** 2026-09-28 against `master` @ `b2d249a` (Sati release 1.3.30).
-**Revised:** 2026-09-28 after Codex's review of the prerequisites. §9 lists what that review changed.
+**Revised:** 2026-09-28, twice, after two Codex reviews of the prerequisites. §9 lists what each
+changed.
 **Status:** design only; no Karuna code exists. Decisions D-1 to D-13 in §2 are confirmed by Josh and
-recorded in `DECISIONS.md`. This handoff authorizes P0 and P1 once Josh approves their plan (§3), and
-the later steps in order, against synthetic data only. The open questions it names (KQ-*, MQ-*) are
+recorded in `DECISIONS.md`. Josh approved the P0 and P1 plans in §3 on 2026-09-28, so they may start.
+Later steps proceed in order, each with a review-before-build gate, against synthetic data only. The open questions it names (KQ-*, MQ-*) are
 still open.
 
 ## 0. Read before writing code
@@ -44,13 +45,19 @@ mode — one application-service implementation from the first commit.
 
 ## 2. Decisions (confirmed 2026-09-28)
 
-All are recorded, with reasoning and rejected alternatives, in `DECISIONS.md`: D-1 to D-9 under
-"Karuna's foundational decisions", D-10 to D-13 under "Karuna prerequisite corrections". Treat them as
-fixed; if implementation shows one is wrong, stop and tell Josh rather than working around it.
+All are recorded, with reasoning and rejected alternatives, in `DECISIONS.md`:
+
+- D-1 to D-9 under "Karuna's foundational decisions";
+- D-10 to D-13 under "Karuna prerequisite corrections";
+- four implementation refinements, approved by Josh, under "Karuna prerequisite refinements after the
+  second review". The table below includes them.
+
+Treat them as fixed; if implementation shows one is wrong, stop and tell Josh rather than working
+around it.
 
 | # | Decided | What it means for implementation | Step |
 |---|---|---|---|
-| D-1 | One migration chain, owned by a design-time composition context in `SatiLogica.Schema` | No separate Karuna chain. Runtime contexts never reference the composition context. | P5 |
+| D-1 | One migration chain, owned by a design-time composition context in `SatiLogica.Schema` | No separate Karuna chain. Only `SatiLogica.Migrator` and test projects may reference `SatiLogica.Schema`; no product library, host or client does (enforced in P1). | P5 |
 | D-2 | Each product is its own host on a shared `SatiLogica.Hosting` library | The library supplies mechanics behind host-supplied seams. `Sati.Api` keeps its entry assembly. Each host has its own token audience and signing key. | P4 |
 | D-3 | Blazor WebAssembly PWA client, conditional on the device spike (`KARUNA_DESIGN.md` §13.1) | Run and record the spike in K0 before building module screens. If it fails, stop and report. | K0 |
 | D-4 | Billing mechanics are platform; billing rules stay per product | Extract before K8. | K8 |
@@ -60,14 +67,17 @@ fixed; if implementation shows one is wrong, stop and tell Josh rather than work
 | D-8 | One tenant per product, even for an organization holding both roles | A person working on both sides has two accounts. | K0 |
 | D-9 | `Karuna` is fine in code; anything publicly hosted uses a neutral name | Ask Josh for the public name when the first resource is needed. | First public resource |
 | D-10 | Karuna keeps its own users, memberships and audit events in the `karuna` schema | The platform owns the mechanics (password hashing format, tokens, lockout, revocation, the audit envelope), not the tables. No relocation of Sati's `dbo` identity. | K0 |
-| D-11 | Platform contracts are introduced, not moved | `SatiLogica.Contracts` starts with product-neutral types only. Sati's `UserPermissions`, `AgencyActor`, `EnvelopeProtection`, `LegalHold` and `DocumentArtifactDto` stay in Sati, unchanged. | P3 |
-| D-12 | Local Production's migrations move to an installer-run `SatiLogica.Migrator` | The desktop stops migrating itself before the chain gains any non-Sati entity. Local Production's database will carry other products' empty tables. | P6 |
+| D-11 | Platform contracts are introduced, not moved | `SatiLogica.Contracts` starts with product-neutral types only, using **opaque product-tagged identifiers** (Sati's keys are `int`, Karuna's `Guid`). Sati's `UserPermissions`, `AgencyActor`, `EnvelopeProtection`, `LegalHold`, `DocumentArtifactDto` **and `AuditCsv`** stay in Sati, unchanged; only `AuditCsv`'s spreadsheet-safe field encoding is extracted. | P3 |
+| D-12 | Local Production's migrations move to an installer-run `SatiLogica.Migrator` | **P6 lands before P5.** The runner grows from `tools/SatiUpdateReport`, is built against today's chain, and ships first. P5 then moves the chain and repoints the runner in the same commit. Local Production's database will carry other products' empty tables. | P6, then P5 |
 | D-13 | The Maine business-day calendar is its own step before K3 | A new State holiday dataset; not `WorkdayHelper` (agency productivity exclusions) or `ExemptDate` (a user's days off). | P7 |
 
 ## 3. Prerequisites
 
-In order. Each is independently committable. **Only P0 and P1 are authorized to start, and only after
-Josh approves their plan.** Stop and report after each step.
+**Order: P0, P1, P2, P3, P4, P6, P5, P7.** P6 precedes P5, and the sections below appear in that
+order. The numbers are identities, not positions, so earlier references stay valid. Each step is
+independently committable in this order. **P0 and P1 are authorized to start now**, on the plans below,
+which incorporate Codex's second-review proposals as Josh approved them. Stop and report after each
+step.
 
 ### P0 — keep `karuna\` and `platform\` out of the Sati WPF build (review S-8)
 
@@ -75,25 +85,43 @@ Josh approves their plan.** Stop and report after each step.
 exclusion list: `Compile` (lines 46–60), `EmbeddedResource` (61–75) and `None` (76–90) for each sibling
 project. There are no `Content` or `Page` removes, and there is no `Directory.Build.props`.
 
-**Change.** Beside the existing entries, add `Compile Remove` for `karuna\**\*.cs` and
-`platform\**\*.cs`, and `EmbeddedResource Remove` and `None Remove` for `karuna\**\*` and
-`platform\**\*`. Add `Page` or `Content` removes only if the test shows those item types pick the
-sentinels up. Karuna's localization `.resx` files make `EmbeddedResource` the one that matters most.
+**Evidence (Codex, 2026-09-28).** Evaluating a temporary copy of `Sati.csproj` in the Debug and Demo
+configurations picked up `.cs` as `Compile`, `.resx` as `EmbeddedResource`, `.txt` as `None` and `.xaml`
+as `Page`; `Content` was empty. `Page` removes are therefore needed, and `Content` removes are not.
 
-**Test** (`RootProjectItemBoundaryTests` in `Sati.Tests`). Evaluate the real items instead of looking for
-types, because an assembly check passes vacuously while no Karuna types exist.
+**Change.** Beside the existing entries, add exactly:
+
+```xml
+<Compile Remove="karuna\**\*.cs" />
+<Compile Remove="platform\**\*.cs" />
+<EmbeddedResource Remove="karuna\**\*" />
+<EmbeddedResource Remove="platform\**\*" />
+<None Remove="karuna\**\*" />
+<None Remove="platform\**\*" />
+<Page Remove="karuna\**\*" />
+<Page Remove="platform\**\*" />
+```
+
+**Test:** `RootProjectItemBoundaryTests.ExcludesKarunaAndPlatformItems` in `Sati.Tests`, a theory over
+Debug and Demo. It evaluates the real items instead of looking for types, because an assembly check
+passes vacuously while no Karuna types exist.
 
 1. Copy `Sati.csproj` into a fresh temporary directory.
-2. Create sentinel files under `karuna\` and `platform\` there: `Sentinel.cs`, `Sentinel.resx`,
-   `Sentinel.xaml`, `Sentinel.txt`. Add a control, `RootSentinel.cs`, at the root.
-3. Run `dotnet msbuild <temp>\Sati.csproj -getItem:Compile,EmbeddedResource,None,Page,Content` for the
-   Debug and Demo configurations. This is evaluation only: no build, no restore. Confirm the exact
-   syntax on the first run; the SDK here is 10.0.401.
-4. Assert that no item lies under `karuna\` or `platform\`, and that the control appears in `Compile`.
-   The control keeps a broken evaluation from passing vacuously.
-5. Delete the temporary directory in a `finally`.
+2. Create `Sentinel.cs`, `Sentinel.resx`, `Sentinel.xaml` and `Sentinel.txt` under each of `karuna\` and
+   `platform\` there. Add a control, `RootSentinel.cs`, at the root.
+3. Run `dotnet msbuild <temp>\Sati.csproj -getItem:Compile,EmbeddedResource,None,Page,Content
+   -property:Configuration=<config>`. This is evaluation only: no build, no restore.
+   - Locate `dotnet` through `DOTNET_HOST_PATH` (set by the test host), falling back to `PATH`.
+   - Use a bounded timeout, and include MSBuild's standard error in any failure message.
+4. **Parse the JSON; don't match text.** Assert that none of the eight nested sentinels appears in any
+   of the five item lists. Compare both the normalized `Identity` and the `FullPath` under the
+   temporary root, case-insensitively, so link metadata cannot hide one.
+5. Assert that the control appears in `Compile`, so a broken evaluation cannot pass vacuously.
+6. Delete the temporary directory in a `finally`.
 
-**Fail first:** red before the `.csproj` change, green after. Nothing is created inside the repository.
+**Fail first:** red against today's `Sati.csproj`, reporting the leaked items; green after the eight
+entries. Record the leaked-item list from the red run in the commit notes. Nothing is created inside
+the repository.
 
 ### P1 — the project-reference guardrail (restructure stage 1)
 
@@ -102,32 +130,84 @@ The solution lists 13 projects, but the repository has 18 project files. Five si
 and `SatiUpdateReport`. The guardrail must cover all of them, or a new project added outside the
 solution escapes it.
 
-**Data.** `architecture/project-graph.json` lists every project with a role (`platform`, `sati`,
-`karuna`, `test`, `tool`) and every approved `ProjectReference` edge.
+**Data.** `architecture/project-graph.json`, with repository-relative, forward-slash paths. Each
+project has two separate fields:
+
+- `product`: `platform`, `sati` or `karuna`;
+- `kind`: `library`, `host`, `client`, `test` or `tool`.
+
+Its `references` array is the **complete approved outgoing `ProjectReference` set**. Keeping product
+and kind separate answers the question Codex raised: a test belongs to its subject's product, so
+future `Karuna.Tests` is product `karuna`, kind `test`.
+
+The initial 18 nodes. Codex's edge list matches every real `ProjectReference` exactly, and none are
+conditional. All 18 are product `sati`:
+
+| Project | kind | references |
+|---|---|---|
+| `Carika/Carika.csproj` | client | Sati.Contracts |
+| `Carika.Tests/Carika.Tests.csproj` | test | Carika, Sati.Contracts |
+| `installer/Sati.LocalBootstrap/Sati.LocalBootstrap.csproj` | tool | — |
+| `Sati.csproj` | client | Sati.Contracts, Sati.Forms, Sati.Persistence |
+| `Sati.Api/Sati.Api.csproj` | host | Sati.Contracts, Sati.Forms, Sati.Persistence, Sati.Signatures |
+| `Sati.Api.Tests/Sati.Api.Tests.csproj` | test | Sati.Api, Sati.Contracts, Sati.Signatures |
+| `Sati.Contracts/Sati.Contracts.csproj` | library | — |
+| `Sati.Forms/Sati.Forms.csproj` | library | Sati.Contracts |
+| `Sati.Persistence/Sati.Persistence.csproj` | library | Sati.Contracts |
+| `Sati.Portal/Sati.Portal.csproj` | host | Sati.Signatures |
+| `Sati.Portal.Tests/Sati.Portal.Tests.csproj` | test | Sati.Portal |
+| `Sati.Signatures/Sati.Signatures.csproj` | library | Sati.Contracts, Sati.Persistence, Sati.Forms |
+| `Sati.Signatures.Tests/Sati.Signatures.Tests.csproj` | test | Sati.Signatures |
+| `Sati.Tests/Sati.Tests.csproj` | test | Sati.csproj, Sati.Api |
+| `tools/BrochureBackdrop/BrochureBackdrop.csproj` | tool | — |
+| `tools/BrochureDecompile/BrochureDecompile.csproj` | tool | — |
+| `tools/SatiComplianceSeed/SatiComplianceSeed.csproj` | tool | Sati.Persistence |
+| `tools/SatiUpdateReport/SatiUpdateReport.csproj` | tool | Sati.Persistence |
+
+In the JSON, each reference is the full repository-relative path (for example
+`Sati.Contracts/Sati.Contracts.csproj`).
 
 **Rules, in code; the data file cannot override them:**
 
 - no `sati` ↔ `karuna` reference in either direction;
-- no `platform` → product reference, except `SatiLogica.Schema`;
+- no `platform` → product reference, except from `SatiLogica.Schema`;
+- only `SatiLogica.Migrator` and projects of kind `test` may reference `SatiLogica.Schema`;
+- a `test` project may reference only its own product and `platform`;
+- only `tool` projects may reference a `tool`;
 - `Karuna.Web` references only `Karuna.Contracts` and `SatiLogica.Contracts`;
-- no product project references a `tool`;
-- a `SatiLogica.*` project must have the role `platform`, and a `Karuna.*` project the role `karuna`,
-  so a misclassification cannot dodge a rule.
+- a `SatiLogica.*` project must be product `platform`, and a `Karuna.*` project product `karuna`, so a
+  misclassification cannot dodge a rule;
+- a `ProjectReference` with a `Condition` is an error until the reader supports it, so a conditional
+  reference cannot slip past the check.
 
 **Tests:**
 
-1. **Checker unit tests** on synthetic graphs, written before the checker so they start red. Each of
-   these must be reported: a Sati→Karuna edge; a Karuna→Sati edge; a platform→product edge; an edge
-   missing from the data file; an approved edge missing from the repository; a project missing from the
-   data file; a misclassified `SatiLogica.*` or `Karuna.*` project. `SatiLogica.Schema` → product must
-   be allowed.
-2. **Reader test:** two temporary project files with a relative `ProjectReference`; the parsed edge is
-   correct and normalized.
-3. **Repository test:** read every project file (excluding `bin`, `obj`, `.codex-build` and `tmp`),
-   check the graph against the data file — green today.
+1. **`ProjectGraphRulesTests`** on synthetic graphs, each written against an initial checker that
+   returns no diagnostics, so each fails for its own missing diagnostic before its rule is added:
+   - `RejectsSatiToKarunaReference`
+   - `RejectsKarunaToSatiReference`
+   - `RejectsPlatformToProductReference`
+   - `AllowsSchemaToProductReference` — fails against the initial blanket platform rule, then passes
+     once the named exception is added
+   - `RejectsSchemaReferenceFromProductProject`
+   - `RejectsTestReferenceToOtherProduct`
+   - `RejectsNonToolReferenceToTool`
+   - `RejectsKarunaWebNonContractReference`
+   - `RejectsUnapprovedRepositoryEdge`
+   - `RejectsStaleApprovedEdge`
+   - `RejectsUnlistedProject`
+   - `RejectsMisclassifiedPrefixedProject`
+   - `RejectsConditionalReference`
+2. **`ProjectGraphReaderTests.NormalizesRelativeProjectReference`**, using two temporary project files.
+   It fails before relative-path normalization exists.
+3. **`RepositoryProjectGraphTests.MatchesAllProjectFilesAndReferences`** scans every project file,
+   excluding `bin`, `obj`, `.codex-build`, `.vs` and `tmp`.
+   - Show it red by comparing against an in-memory copy of the manifest with one existing edge removed,
+     and against a synthetic project absent from the manifest.
+   - Then show it green against the real manifest.
 
-**Future projects** land with their node and edges in the data file in the same commit; reviewing that
-diff is the approval. No isolated checkout is needed to prove the checker red.
+**Future projects** land with their node and edges in the manifest in the same commit; reviewing that
+diff is the approval.
 
 ### P2 — one clock (review S-3)
 
@@ -151,7 +231,8 @@ diff is the approval. No isolated checkout is needed to prove the checker red.
 
 **One change Demo will see:** EDI `generatedAt` (`ApiEndpoints.cs:6894`, `BillingCorrectionEndpoints.cs:312`)
 moves from UTC to Eastern, which changes the ISA/GS date and time in newly generated 837 files. Josh
-accepted this. Confirm the 837 fixture-hash test injects its timestamp.
+accepted this. The 837 fixture-hash test injects a fixed timestamp
+(`Sati.Tests/SyntheticClaimExchangeTests.cs:16`), so it is unaffected.
 
 **Test:** pin a UTC instant of 00:30 in July and assert every changed API path uses the previous Maine
 date.
@@ -160,13 +241,23 @@ date.
 
 Add to `SatiLogica.Contracts` only:
 
-- a tenant actor carrying user id, tenant id, product and security version, with no permission enum;
-- the audit envelope contract;
-- `AuditCsv`, moved, because its header is already product-neutral (`AuditCsv.cs:43-45`). Verify
-  nothing else in it is Sati-specific first.
+- **opaque principal and tenant identifiers**: product plus an opaque string. Sati's user and agency
+  keys are `int`, Karuna's are UUIDv7 `Guid`, so platform code must not assume either. Each product
+  converts its typed keys at the boundary; platform code only compares and serializes;
+- a **tenant actor** carrying those identifiers, the product and the security version, with no
+  permission enum;
+- the **audit envelope** contract, using the same identifiers;
+- the **spreadsheet-safe CSV field encoding** — RFC 4180 quoting plus formula neutralization —
+  extracted from `AuditCsv`'s field logic.
+
+**`AuditCsv` stays in `Sati.Contracts`.** Its `AuditCsvRow` has an `int ActorUserId`
+(`AuditCsv.cs:10`, written at `:67`), and its comments describe Sati's export (`:17-30`). It keeps its
+row, header and export method, and calls the shared encoder. Add a golden-output test first: pin Sati's
+exact export bytes for a fixed set of rows, including every formula trigger, then extract the encoder
+and show the bytes unchanged.
 
 **Do not move** `UserPermissions`, `AgencyActor`, `EnvelopeProtection`, `LegalHold` or
-`DocumentArtifactDto`. `FieldBinding` binds integer ids under the literal `sati.v1`
+`DocumentArtifactDto` either. `FieldBinding` binds integer ids under the literal `sati.v1`
 (`EnvelopeProtection.cs:44, 52`); changing that encoding would make existing ciphertext unreadable.
 
 **Pin stored permissions** (regression guards; prove each red by changing one value in a scratch copy):
@@ -185,7 +276,7 @@ Extract `TokenIssuer`, `ValidatedActorFilter`, the core of `TenantAccess`, `Audi
 takes seams the host supplies:
 
 - an actor store returning a user's security facts (enabled, security version, tenant, product
-  permissions as an opaque integer);
+  permissions as an opaque integer), keyed by the P3 opaque identifiers;
 - an audit writer enlisted in the host's own transaction;
 - the expected environment name from startup-validated configuration, replacing the `"Demo"` literal
   in `TenantAccess.cs:123` and `ApiEndpoints.cs:1300, 1343`.
@@ -198,36 +289,59 @@ product claim or persisted product is needed, so this step has no migration.
 accepted. That supports "no intended change for Sati"; do not claim more. It ships as its own Sati
 release with an acceptance run.
 
-### P5 — move the migration chain (D-1; restructure stage 4)
+### P6 — the Local migration runner (D-12), before P5
+
+**Why first.** The desktop migrates through `SatiContext`, and nothing sets `MigrationsAssembly`
+(`App.xaml.cs:580`, `SatiContextFactory.cs:30`), so EF finds migrations in `SatiContext`'s own
+assembly. If P5 moved the chain first, the desktop's provisioning and updater would find nothing to
+apply: fresh databases would stay empty, and later migrations would never reach Local Production. So
+the runner is built against **today's** chain in `Sati.Persistence` and ships before anything moves.
+Details are in stage 4 of the restructure plan.
+
+- **Grow `SatiLogica.Migrator` from `tools/SatiUpdateReport`**, which already runs the startup
+  analyzer and, with `--apply`, backs up, fingerprints protected data and migrates
+  (`Program.cs:5-17, 140`). Don't write a new tool.
+- Move into it both of the desktop's migration paths:
+  - fresh-database provisioning (`App.xaml.cs:270-274`, `LocalDatabaseProvisioner.cs:34-51`);
+  - the backed-up update of an existing database (`App.xaml.cs:289-303`).
+- Keep the database identity check before any write.
+- The desktop stops migrating. It records the head migration id it was built with, and refuses to open
+  a database that is behind, telling the user to run the updater.
+- A developer launch runs the migrator as a separate process.
+- The WPF project never references `SatiLogica.Schema`, now or after P5.
+
+Changing the Local installer is part of this step, and so is a Local release; the installer's own
+acceptance applies.
+
+### P5 — move the migration chain (D-1; restructure stage 4), after P6
 
 Follow `PLATFORM_RESTRUCTURE_PLAN.md` stage 4 exactly. It has three parts:
 
-1. **Preparation.** Schema-aware comparison in `SchemaComparison` and `SchemaSnapshotReader`, which key
-   tables by name alone today. Add a CI check that each runtime model is a subset of the composed model.
-2. **The move.** Create the composition context in `SatiLogica.Schema`, re-point the `[DbContext]`
-   attribute in all 122 migration and snapshot files, and update `MigrationEffectAnalyzer` and
-   `PersistenceAssemblyBoundaryTests`.
-3. **The five-part proof:** identical migration ids; a byte-identical idempotent script; no
-   model-differ difference and no pending model changes; a scratch synthetic local database with zero
-   pending migrations; a read-only Demo check after an ordinary deploy.
+1. **Preparation.** Make `SchemaComparison` and `SchemaSnapshotReader` schema-aware; today they key
+   tables by name alone. Add a CI check that each runtime model is a subset of the composed model.
+2. **The move, in one commit.**
+   - Create the composition context in `SatiLogica.Schema`.
+   - Re-point the `[DbContext]` attribute in all 122 migration and snapshot files.
+   - Repoint everything that finds migrations through `SatiContext`'s assembly:
+     - `SatiLogica.Migrator`;
+     - `MigrationEffectAnalyzer`;
+     - `PersistenceAssemblyBoundaryTests`;
+     - the migration-assembly tests in `Sati.Tests/StabilizationTests.cs:1630-1756`;
+     - `tools/SatiComplianceSeed/Seeder.cs:175-176`;
+     - `scripts/Test-SchemaDrift.ps1:11`.
+   - Mark `scripts/Apply-Release1311Migrations.ps1:309-310` as historical.
+
+   The per-migration Demo runners (`scripts/Apply-*Migration.ps1`) apply SQL keyed by migration id and
+   are unaffected.
+3. **The five-part proof:**
+   - identical migration ids;
+   - a byte-identical idempotent script;
+   - no model-differ difference and no pending model changes;
+   - a scratch synthetic local database, migrated through the runner, with zero pending migrations;
+   - a read-only Demo check after an ordinary deploy.
 
 **P5 adds no migration and writes nothing to any database schema.** Its Demo check is read-only. It
 does not need any change to database access.
-
-### P6 — the Local migration runner (D-12)
-
-Must land before the chain gains its first non-Sati entity, which is K0's first Karuna table. Details
-are in stage 4 of the restructure plan:
-
-- move fresh-database provisioning (`App.xaml.cs:270-274`, `LocalDatabaseProvisioner.cs:34-51`) and the
-  backed-up update (`App.xaml.cs:289-303`) into `SatiLogica.Migrator`;
-- keep the database identity check before any write;
-- the desktop refuses to open a database that is behind the head migration id it was built with, and
-  tells the user to run the updater;
-- a developer launch runs the migrator as a separate process;
-- WPF never references `SatiLogica.Schema`.
-
-Changing the Local installer is part of this step; the installer's own acceptance applies.
 
 ### P7 — the Maine business-day calendar (D-13)
 
@@ -432,3 +546,27 @@ confirmed; two were refined.
 8. **K0** now uses Karuna-owned identity tables (D-10), and a row-level security lifecycle spike comes
    first.
 9. **Superseded statements** in the design and the restructure plan are corrected.
+
+**Second review (2026-09-28).** Codex checked the revised documents and proposed concrete P0 and P1
+plans. All six findings were confirmed, and four refinements were approved by Josh.
+
+1. **`AuditCsv` stays in Sati** (integer `ActorUserId`, Sati-specific comments); only its CSV field
+   encoding is extracted.
+2. **P6 precedes P5.** Moving the chain first would strand the desktop's startup migration.
+3. **Only `SatiLogica.Migrator` and tests may reference `SatiLogica.Schema`**, replacing "referenced by
+   no runtime project".
+4. **The restructure plan's opening inventory** is labelled historical instead of recounted.
+5. **Summary rules carry their exceptions inline**: the `SatiLogica.Schema` exception, and platform
+   identity as mechanics only.
+6. **KQ-3 moved** to a resolved list.
+
+Claude added four items:
+
+- platform identifiers are opaque, because `int` and `Guid` keys both cross into platform code;
+- a list of everything else that finds migrations through `SatiContext`'s assembly;
+- P1 splits `product` from `kind`;
+- conditional references are rejected.
+
+Codex's verification is folded into P0: `Page` removes are needed, `Content` removes are not, and the
+`-getItem` syntax is confirmed on SDK 10.0.401. The 837 fixture test injects its timestamp, so P2 cannot
+disturb it.
