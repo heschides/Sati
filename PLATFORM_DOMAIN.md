@@ -3,7 +3,9 @@
 *Status: design, nothing implemented. Written 2026-09-07. This is the document
 `PLATFORM_RESTRUCTURE_PLAN.md` waits on: what belongs to the platform cannot be decided from one
 product, so the shape of Karuna and Upekkha is settled first and the code boundary is derived from
-it. Two decisions were taken on 2026-09-07 and are recorded in `DECISIONS.md`.*
+it. Two decisions were taken on 2026-09-07 and are recorded in `DECISIONS.md`. Amended 2026-09-28 by
+the Karuna design (`karuna/KARUNA_DESIGN.md`) and its confirmed decisions; see "Answered 2026-09-28"
+below.*
 
 ---
 
@@ -244,6 +246,14 @@ Karuna and Upekkha will each add their own product column. The platform column i
 and it stays the intersection only if a test enforces the direction, which is stage one of the
 restructure plan.
 
+**Amended 2026-09-28.** Designing Karuna moved two more things into the platform column. **Billing
+mechanics** move: the 837P formatter, trading-partner profiles, the clearinghouse outbox and
+connectors, response and 835 ingestion, remittance and deposit reconciliation. Karuna bills MaineCare
+on the same transaction sets. The rules deciding whether a record may become a claim stay with each
+product, so "Billing, claims and remittance" above now means Sati's billing *rules*. **The tenant
+clock and Maine business-day calendar** also move, because Karuna's State filing deadlines are
+business-day arithmetic.
+
 ## Answered 2026-09-07
 
 1. **Karuna documentation flows back to the case manager.** Answered yes. This is what produced the
@@ -253,6 +263,24 @@ restructure plan.
 3. **Provider documentation for a shared person is visible to case managers and OADS by default,
    with some sharing disableable.** Answered, with the two-layer qualification above: the default
    holds for ordinary documentation and cannot hold for the three specially protected categories.
+
+## Answered 2026-09-28
+
+Karuna's design (`karuna/KARUNA_DESIGN.md`) was confirmed with nine decisions, recorded in
+`DECISIONS.md` under "2026-09-28 — Karuna's foundational decisions". The four that change this
+document:
+
+1. **Tenancy is per product.** An organization that provides both case management and direct services
+   holds one Sati tenant and one Karuna tenant (D-8). Membership stays single, so a person working on
+   both sides holds two accounts.
+2. **Billing mechanics are platform** (D-4), as amended in the section above.
+3. **Each product is its own host** on a shared `SatiLogica.Hosting` library (D-2), rather than one
+   platform host with product endpoint libraries.
+4. **One migration chain lives in a composition assembly**, `SatiLogica.Schema` (D-1), so platform
+   persistence never references a product.
+
+Karuna's access model inside its tenant is enrolment- and shift-derived care-team reach, not caseload
+ownership (`karuna/KARUNA_DESIGN.md` §4.4). That is a product rule, not a platform one.
 
 ## Open questions
 

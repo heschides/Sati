@@ -615,6 +615,10 @@ without preventing it.
 
 ## 2026-08-15 — Provider directory entries are local knowledge about a shared organization
 
+> Partially superseded 2026-09-28 (Karuna decision D-8): an organization has at most one tenant
+> **per product**, so one that provides both case management and direct services holds a Sati tenant
+> and a Karuna tenant. The organization/directory-entry/tenant distinction below is unchanged.
+
 A `Provider` row is not "an organization." It is **one agency's local record of** an organization:
 its contacts there, its notes, whether that organization acts as a passthrough agency *for it*.
 Several agencies each holding a Spurwink row is therefore correct, not redundant. The rows differ
@@ -5532,3 +5536,125 @@ cannot change them without first converting those values to named resources.
 for as long as both themes exist; a separate build, which would not carry real work; and a
 clickable mockup, which cannot show how the screen feels on a real caseload. The pilot ends with
 a decision, after which one layout is deleted.
+
+## 2026-09-28 — Karuna's foundational decisions
+
+Josh confirmed nine decisions for Karuna, the direct-service program, on 2026-09-28. The reasoning is
+in `karuna/KARUNA_DESIGN.md`; the implementation order is in `karuna/CODEX_HANDOFF.md`. No Karuna code
+exists. These are recorded now because five of them cannot be changed cheaply once the first Karuna
+table or route exists.
+
+### D-1. One migration chain, owned by a composition assembly
+
+Sati and Karuna share one database and one migration chain. EF can generate a migration only from a
+model that contains every entity type. The restructure plan put the chain in `SatiLogica.Persistence`
+while also forbidding platform projects from referencing products, and those cannot both hold. A new
+`SatiLogica.Schema` assembly therefore references the platform and every product persistence assembly
+and owns the one chain and the design-time model. `SatiLogica.Persistence` stays product-agnostic.
+The chain moves there before Karuna's first table, under stage 4's existing rules: no renumbering, no
+rewritten migrations, unchanged `__EFMigrationsHistory`.
+
+**Rejected:** a separate Karuna migration chain. It is faster to start, but it would mean two histories
+deployed in order, no foreign keys from Karuna into platform tables, and a painful merge later.
+
+### D-2. Each product is its own host on a shared hosting library
+
+Karuna runs as its own API deployable, because a medication pass cannot wait on a Sati deployment, a
+Sati defect must not take down a MAR, and Karuna's database identity should reach only Karuna's tables.
+Token issuance, actor validation, the core of `TenantAccess`, `AuditTrail` and `LoginAttemptGuard`
+move into a `SatiLogica.Hosting` library that both hosts reference.
+
+**Consequence for the restructure plan.** Stage 5 changes from "fold `Sati.Api` into one platform host
+with product endpoint libraries" to "extract the hosting library; each product keeps its own host".
+`Sati.Api` keeps its entry assembly, so stage 5 no longer changes Sati's deployed artifact.
+
+**Rejected:** hosting Karuna endpoints inside `Sati.Api`, which couples Karuna to the product the
+restructure is separating it from; and a Karuna host with its own copy of authentication.
+
+### D-3. Karuna's client is a Blazor WebAssembly web app, conditional on a device test
+
+Direct support staff work on shared Android tablets and their own phones. A Blazor WebAssembly app,
+installable as a PWA, runs on those devices and references `Karuna.Contracts`, so previews call the
+same C# rule owners the server uses. It is one client for field and office. The choice holds only if a
+spike passes on a low-cost Android tablet over LTE: cold load under five seconds, and a six-person
+medication pass completed with TalkBack and with a keyboard. If it fails, the choice is revisited
+before any module is built on it.
+
+**Rejected:** WPF, which does not run on those devices; Blazor Server, where a dropped connection
+interrupts a medication pass; and a native mobile client before the offline design exists.
+
+### D-4. Billing mechanics are platform; billing rules stay with each product
+
+Karuna bills MaineCare on the same 837P and 835 transaction sets as Sati. The 837P formatter,
+trading-partner profiles, clearinghouse outbox and connectors, response and 835 ingestion, remittance
+and deposit reconciliation, and correction mechanics are therefore platform. Whether a record may
+become a claim, and how many units it is, remains product rules. This corrects the classification in
+`PLATFORM_DOMAIN.md` and the restructure plan, which placed claims and remittance in Sati's column.
+
+**Rejected:** leaving the mechanics in Sati, which forces Karuna to reference `Sati.Contracts`; and a
+second formatter for Karuna.
+
+### D-5. Device-generated keys, a `karuna` schema, and database-enforced tenancy
+
+Karuna aggregates use time-ordered UUIDv7 `Guid` keys that the client may generate, so a record's id
+is its idempotency key: a retried "dose given" returns the original record instead of creating a
+second one. Karuna tables live in a `karuna` SQL schema so its runtime identity can be limited to
+them. Tenancy is enforced in four layers: non-null `OrganizationId` on every table; composite
+`(OrganizationId, Id)` foreign keys; EF global query filters, with a test that fails for any entity
+without one; and SQL Server row-level security keyed to the validated actor.
+
+**Rejected:** database-generated integer keys, which make safe retry depend on luck; and route-level
+tenant checks alone (see `SATI_STRUCTURAL_REVIEW_2026-09-28.md`, S-2).
+
+### D-6. EVV starts by reconciling with the State's Sandata system
+
+Agencies keep using the State-offered Sandata EVV for in-home services. Karuna records the Sandata
+visit identifier and verification state against the service record. Where EVV is required, a verified,
+matching visit is a billing blocker. Becoming a certified alternate EVV vendor, a State process of at
+least eight weeks, comes later.
+
+**Rejected at launch:** building alternate-vendor capture and transmission before Karuna's core
+documentation exists.
+
+### D-7. The record says what happened; rules decide what happens next
+
+This is a governing rule for Karuna, and it deliberately differs from Sati's habit. Karuna has two
+kinds of record.
+
+**Clinical facts** are never refused for violating a clinical rule. A dose given, refused or given
+twice, a PRN over its maximum, a restraint, a fall, or an administration by someone whose credential
+lapsed is always accepted, then classified, flagged and routed to a nurse, a supervisor or an
+event-report draft.
+
+**Claims** on money, staff time, schedules, and order activation are gated and fail closed, exactly
+as in Sati.
+
+Integrity refusals remain for both kinds: no reach, wrong tenant, stale revision, idempotency
+conflict, or a future instant. Prevention belongs before the fact: the screen shows that a dose was
+already given before anyone can record it again. An explicit "record it anyway" confirmation is
+acceptable. Refusing the truthful entry is not.
+
+**Rejected:** refusing clinical records that break policy. A refused entry does not undo the event. It
+moves the record to paper, into someone else's name, or out of existence, and removes the evidence
+auditors most need.
+
+### D-8. One tenant per product, including for an organization that holds both roles
+
+Some Maine organizations provide case management to some people and direct services to others. Such
+an organization has one Sati tenant and one Karuna tenant, and the wall between its case-management
+and direct-service records is a tenant boundary the database enforces. Federal conflict-free case
+management is easier to demonstrate with that wall than with separation rules inside one tenant.
+Membership stays single (`PLATFORM_DOMAIN.md` decision 1), so a person who works on both sides holds
+two accounts. That is an accepted cost.
+
+This supersedes "One organization has many directory entries and at most one tenant" in the
+2026-08-15 provider-directory entry. It now reads **at most one tenant per product**.
+
+**Rejected:** one tenant with both products enabled, which puts both record sets inside one wall.
+
+### D-9. The Karuna name stays out of anything publicly hosted
+
+Project, namespace and assembly names may use `Karuna`. Anything public until Josh says otherwise uses
+a neutral name. That covers Azure resource names (which become DNS names), web app titles and
+manifests, install names on devices, and marketing. This keeps `AGENDA.md`'s rule that the program
+names stay internal until the quarter before each ships.

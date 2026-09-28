@@ -3,7 +3,9 @@
 *Status: stages 0 and 2 implemented; stages 1 and 3–6 remain proposed. Written 2026-09-07 against branch
 `ui-legibility-and-accessibility` at commit `6e78c6d`, restaged the same day and updated 2026-09-09. Read
 `PLATFORM_DOMAIN.md` first: it decides what the platform is, and this document only moves code to
-match. `ARCHITECTURE.md` says what owns what today and `DECISIONS.md` says why.*
+match. `ARCHITECTURE.md` says what owns what today and `DECISIONS.md` says why. **Amended 2026-09-28**
+by Karuna decisions D-1 and D-2, which change the target shape and stages 4 and 5; see "Amended
+2026-09-28" below.*
 
 ---
 
@@ -79,6 +81,42 @@ SatiLogica.slnx
 ├── karuna/                       designed in PLATFORM_DOMAIN.md, no code yet
 └── upekkha/                      designed in PLATFORM_DOMAIN.md, no code yet
 ```
+
+## Amended 2026-09-28 — two changes from designing Karuna
+
+Recorded in `DECISIONS.md`, "2026-09-28 — Karuna's foundational decisions". The shape above is
+superseded in two places.
+
+**The migration chain lives in a composition assembly (D-1).** Stage 4 as written put the chain in
+`SatiLogica.Persistence` while stage 1 forbids platform projects from referencing products. EF needs
+every entity type in the model that owns the chain, so both cannot hold. The chain moves instead to a
+new `SatiLogica.Schema`, which references the platform and every product persistence assembly and owns
+the design-time model. `SatiLogica.Persistence` holds platform entities only, with no product
+references. Stage 1's rule gains one named exception, `SatiLogica.Schema`.
+
+**Each product keeps its own host (D-2).** `SatiLogica.Api` becomes a library, `SatiLogica.Hosting`,
+holding token issuance, actor validation, the core of `TenantAccess`, `AuditTrail`,
+`LoginAttemptGuard`, and the endpoint and outbox primitives. `Sati.Api` stays Sati's host and
+references it; Karuna gets its own `Karuna.Api` host. Stage 5 therefore no longer renames Sati's entry
+assembly or changes its deployed artifact. It becomes a library extraction with no behaviour change.
+
+The revised platform folder:
+
+```
+platform/
+├── SatiLogica.Contracts      identity, permissions shape, audit, tenant clock and business days,
+│                             legal hold, envelope protection, documents, signatures, billing mechanics
+├── SatiLogica.Persistence    platform entities only
+├── SatiLogica.Hosting        library: auth, actor validation, TenantAccess core, audit, seams
+├── SatiLogica.Schema         composition root: the one migration chain
+├── SatiLogica.Forms
+└── SatiLogica.Signatures  ── SatiLogica.Portal
+```
+
+The prerequisite work Karuna needs from these stages, in order, is §3 of `karuna/CODEX_HANDOFF.md`.
+Its first item is not in this plan and should precede every stage that creates files under
+`platform/`: the root `Sati.csproj` compiles every `.cs` file beneath it unless excluded
+(`SATI_STRUCTURAL_REVIEW_2026-09-28.md`, S-8).
 
 ## Superseded: the staging changed on 2026-09-07
 
@@ -188,6 +226,9 @@ The 1,536-test suite plus the `API_AUTHORIZATION.md` route inventory catch the r
 
 ### Stage 4 — extract platform persistence
 
+> Amended 2026-09-28 (D-1): the migration chain moves to `SatiLogica.Schema`, not
+> `SatiLogica.Persistence`. The migration rules in this stage are unchanged.
+
 Move `SatiContext`, the migration chain, and the platform entities (`User`, `Agency`, `AuditEvent`,
 and the Organization registry when it lands) into `SatiLogica.Persistence`. Case-management entities
 move to `Sati.Persistence` and register through `IEntityTypeConfiguration`.
@@ -202,6 +243,12 @@ rule only you can add. Do this stage alone, against Demo, with the drift health 
 and after.*
 
 ### Stage 5 — split the API
+
+> Amended 2026-09-28 (D-2): stage 5 is now a library extraction. `SatiLogica.Hosting` receives the
+> platform pieces named below; `Sati.Api` stays Sati's host and keeps its entry assembly; Karuna has
+> its own host. The deployment risk described below applied to renaming the entry assembly, which no
+> longer happens. It still ships as a release with its own acceptance run, because authentication code
+> moves.
 
 `SatiLogica.Api` keeps hosting, `TokenIssuer`, `TenantAccess`, `AuditTrail`, `LoginAttemptGuard`,
 `ValidatedActorFilter` and the endpoint-registration seam. `Sati.Api` becomes a library of
