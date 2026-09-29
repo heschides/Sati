@@ -214,20 +214,22 @@ diff is the approval.
 **Scope: the clock only.** The business-day calendar is P7.
 
 1. **One zone owner.** Add `TenantClock` in a new `SatiLogica.Contracts` (with its node in the P1 data
-   file). `ApiClock` delegates to it. `BillingRules.MaineBusinessDate` keeps its signature, delegates,
-   and is marked obsolete. Today the two choose the zone separately: `ApiOptions.cs:41` defaults to
-   `"Eastern Standard Time"`, and `BillingRules.cs:28-32` hard-codes `America/New_York`.
+   file). `ApiClock` delegates to it. Josh's 2026-09-29 P2 amendment replaces every in-repository
+   `BillingRules.MaineBusinessDate` call with `TenantClock.MaineDate` and removes the shim. Before P2,
+   `ApiOptions.cs:41` defaulted to `"Eastern Standard Time"`, and `BillingRules.cs:28-32` hard-coded
+   `America/New_York`.
 2. **Shared rules stop reading the clock.** `AnnualPacket.cs:93` (`asOf ?? DateTime.Today`) makes `asOf`
    required. `RepresentativePayee.cs:197, 201` takes `today` as a parameter. `ServiceTimeline.cs:156`
    formats a time of day without today's date.
-3. **Desktop callers pass `DateTime.Today` explicitly**, so Local Production's dates cannot change. A
-   missed caller becomes a compile error, not a silent change.
+3. **Desktop form and document callers pass `DateTime.Today` explicitly.** Billing, note, settings,
+   EDI, and admin-correction callers keep the Maine date through `TenantClock.MaineDate`. A missed
+   shared-rule caller becomes a compile error, not a silent change.
 4. **The API uses `ApiClock` everywhere:** `AnnualPacketEndpoints.cs:34, 72, 135, 177`;
    `ApiEndpoints.cs:6894, 8296, 8368, 8740, 8854`; `BillingCorrectionEndpoints.cs:312`. Search again;
    the list may have grown.
-5. **Ban the host clock** with `Microsoft.CodeAnalysis.BannedApiAnalyzers` (`DateTime.Now`,
-   `DateTime.Today`, `TimeZoneInfo.Local`) in `Sati.Api` and `Sati.Contracts` only. Never in the WPF
-   project.
+5. **Ban the host clock** with `Microsoft.CodeAnalysis.BannedApiAnalyzers` in `Sati.Api` and
+   `Sati.Contracts` only. The list includes `DateTime.Now`, `DateTime.Today`, `DateTimeOffset.Now`,
+   host-local conversions and implicit local-to-UTC conversions. Never apply it to the WPF project.
 
 **One change Demo will see:** EDI `generatedAt` (`ApiEndpoints.cs:6894`, `BillingCorrectionEndpoints.cs:312`)
 moves from UTC to Eastern, which changes the ISA/GS date and time in newly generated 837 files. Josh

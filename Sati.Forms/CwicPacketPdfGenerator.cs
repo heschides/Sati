@@ -18,7 +18,8 @@ public sealed class CwicPacketPdfGenerator
     private static readonly XFont SmallFieldFont = new("Arial", 7, XFontStyleEx.Regular);
     private static readonly XPen MarkPen = new(XColors.Black, 1.15);
 
-    public byte[] Generate(CwicPacketSubject subject, CwicPacketRequest request, DateTime generatedAtUtc)
+    public byte[] Generate(CwicPacketSubject subject, CwicPacketRequest request,
+        DateTime generatedAtUtc, DateTime businessDate)
     {
         ArgumentNullException.ThrowIfNull(subject);
         ArgumentNullException.ThrowIfNull(request);
@@ -43,7 +44,7 @@ public sealed class CwicPacketPdfGenerator
             page.Height = XUnit.FromPoint(792);
             using var graphics = XGraphics.FromPdfPage(page);
             graphics.DrawImage(background, 0, 0, page.Width.Point, page.Height.Point);
-            DrawPage(graphics, pageNumber, subject, request, generatedAtUtc);
+            DrawPage(graphics, pageNumber, subject, request, businessDate.Date);
         }
 
         using var output = new MemoryStream();
@@ -56,11 +57,11 @@ public sealed class CwicPacketPdfGenerator
         int pageNumber,
         CwicPacketSubject subject,
         CwicPacketRequest request,
-        DateTime generatedAtUtc)
+        DateTime businessDate)
     {
         switch (pageNumber)
         {
-            case 1: DrawReferralPageOne(graphics, subject, request, generatedAtUtc); break;
+            case 1: DrawReferralPageOne(graphics, subject, request, businessDate); break;
             case 2: DrawReferralPageTwo(graphics, request); break;
             case 3: Text(graphics, subject.FullName, 113, 661, 300); break;
             case 4:
@@ -74,10 +75,10 @@ public sealed class CwicPacketPdfGenerator
         XGraphics graphics,
         CwicPacketSubject subject,
         CwicPacketRequest request,
-        DateTime generatedAtUtc)
+        DateTime businessDate)
     {
         Text(graphics, subject.FullName, 121, 218, 300);
-        Text(graphics, AgeOn(subject.BirthDate, generatedAtUtc.ToLocalTime().Date).ToString(CultureInfo.InvariantCulture), 459, 218, 82);
+        Text(graphics, AgeOn(subject.BirthDate, businessDate).ToString(CultureInfo.InvariantCulture), 459, 218, 82);
         Text(graphics, request.MailingAddress, 149, 243, 415);
         Text(graphics, request.City, 86, 268, 180);
         Text(graphics, request.Zip, 299, 268, 92);

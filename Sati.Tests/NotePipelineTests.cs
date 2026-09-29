@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Sati.Data;
 using Sati.Data.Billing;
 using Sati.Models;
@@ -1127,7 +1128,7 @@ public sealed class NotePipelineTests
     public async Task LoggedSubmissionRefusesComplianceFailuresWithoutWriting(bool update, string contingency)
     {
         await using var fixture = await PipelineFixture.CreateAsync();
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         await SeedSubmissionRequirementAsync(fixture, today.AddDays(-5),
             contingency == "historical" ? today : null);
         var service = fixture.NotesAs(fixture.CaseManagerOne);
@@ -1168,7 +1169,7 @@ public sealed class NotePipelineTests
     public async Task LoggedFormNoteCompletesItsOwnOverdueObligation(bool update)
     {
         await using var fixture = await PipelineFixture.CreateAsync();
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         var activityDate = today.AddDays(-2);
         var dueDate = today.AddDays(-5);
         await SeedSubmissionRequirementAsync(fixture, dueDate, null);
@@ -1220,7 +1221,7 @@ public sealed class NotePipelineTests
     public async Task NoncompliantSubmissionDocumentationStillSavesAndEdits(NoteStatus status)
     {
         await using var fixture = await PipelineFixture.CreateAsync();
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         await SeedSubmissionRequirementAsync(fixture, today.AddDays(-5), null);
         var service = fixture.NotesAs(fixture.CaseManagerOne);
         var saved = await service.AddNoteAsync(Note.Create("Clinical documentation", today, status, 30,
@@ -1241,7 +1242,7 @@ public sealed class NotePipelineTests
     public async Task LoggedSubmissionPreservesConfiguredDateBoundaries(string contingency)
     {
         await using var fixture = await PipelineFixture.CreateAsync();
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         await SeedSubmissionRequirementAsync(fixture,
             contingency == "due-today" ? today : contingency == "future-due" ? today.AddDays(1) : today.AddDays(-5),
             contingency == "completed-today" ? today : null,

@@ -83,14 +83,14 @@ public static class AnnualDocumentReminder
         bool windowOpen,
         bool pcpAttested,
         IEnumerable<DocumentArtifactDto> artifacts,
+        DateTime asOf,
         IEnumerable<ReleaseComplianceFact>? releaseObligations = null,
         bool safetyPlanAttested = false,
-        bool privacyPracticesAttested = false,
-        DateTime? asOf = null)
+        bool privacyPracticesAttested = false)
     {
         if (!windowOpen && !pcpAttested) return "";
         _ = artifacts;
-        var today = (asOf ?? DateTime.Today).Date;
+        var today = asOf.Date;
         var exactReleases = (releaseObligations ?? [])
             .Where(item => item.RetiredOn is null || today < item.RetiredOn.Value.Date)
             .ToList();

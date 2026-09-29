@@ -192,7 +192,8 @@ public partial class CheckRequestsViewModel(
             TemplatePayableTo,
             TemplateMailingAddress,
             TemplateAmount,
-            TemplateReason);
+            TemplateReason,
+            DateTime.Today);
         if (errors.Count > 0)
         {
             TemplateMessage = string.Join(" ", errors);

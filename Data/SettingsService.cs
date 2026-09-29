@@ -3,6 +3,7 @@ using Sati.Models;
 using Sati.Services;
 using Sati.Services.Billing;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using System.Text.Json;
 using System.Data;
 
@@ -83,7 +84,7 @@ namespace Sati.Data
                 BillingCompliancePolicyRules.ResolveForServiceDate(
                     policyRows.Select(version => version.ToSnapshot()),
                     agencyId,
-                    BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow))
+                    TenantClock.MaineDate(DateTimeOffset.UtcNow))
                     ?.Requirements ?? settings.BillingComplianceRequirements;
 
             return settings;
@@ -132,7 +133,7 @@ namespace Sati.Data
             var activeRequirements = BillingCompliancePolicyRules.ResolveForServiceDate(
                     policyRows.Select(version => version.ToSnapshot()),
                     agencyId,
-                    BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow))
+                    TenantClock.MaineDate(DateTimeOffset.UtcNow))
                 ?.Requirements ?? tracked.BillingComplianceRequirements;
             if (settings.BillingComplianceRequirements != activeRequirements)
             {
@@ -297,7 +298,7 @@ namespace Sati.Data
                     new InvalidOperationException());
             }
 
-            var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+            var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
             var decision = BillingCompliancePolicyRules.ValidateChange(
                 request.Requirements,
                 request.EffectiveOn,

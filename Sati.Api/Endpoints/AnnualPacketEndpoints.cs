@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
+using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Forms;
@@ -14,16 +15,18 @@ internal static partial class ApiEndpoints
     private static void MapAnnualPackets(RouteGroupBuilder api)
     {
         api.MapGet("/people/{personId:int}/annual-documents", async Task<IResult> (
-            int personId, DateTime cycleStart, ClaimsPrincipal principal, ApiDbContext db, CancellationToken ct) =>
+            int personId, DateTime cycleStart, ClaimsPrincipal principal, ApiDbContext db,
+            ApiClock clock, CancellationToken ct) =>
         {
             var actor = Actor.From(principal);
             var person = await AccessibleSafetyPerson(db, actor, personId, ct);
             if (person is null) return Results.NotFound();
-            try { return Results.Ok(await AnnualStatus(db, actor, person, cycleStart, ct)); }
+            try { return Results.Ok(await AnnualStatus(db, actor, person, cycleStart, clock.Today, ct)); }
             catch (ArgumentException) { return InvalidSafetyCycle(); }
         });
         api.MapPost("/people/{personId:int}/documents/privacy-practices/acknowledgment", async Task<IResult> (
-            int personId, AcknowledgeDocumentRequest request, ClaimsPrincipal principal, ApiDbContext db, AuditTrail audit, CancellationToken ct) =>
+            int personId, AcknowledgeDocumentRequest request, ClaimsPrincipal principal, ApiDbContext db,
+            AuditTrail audit, ApiClock clock, CancellationToken ct) =>
         {
             var actor = Actor.From(principal);
             if (await AccessibleSafetyPerson(db, actor, personId, ct) is null) return Results.NotFound();
@@ -31,7 +34,8 @@ internal static partial class ApiEndpoints
                 x.PersonId == personId && x.AgencyId == actor.AgencyId && x.Kind == "PrivacyPractices" && x.Origin == "GeneratedInSati" &&
                 x.SupersededByArtifactId == null, ct);
             if (artifact is null) return Results.NotFound();
-            var error = DocumentAcknowledgmentRules.Validate(request, artifact.GeneratedAtUtc.ToLocalTime(), DateTime.Today);
+            var error = DocumentAcknowledgmentRules.Validate(
+                request, clock.ToAgencyDate(artifact.GeneratedAtUtc), clock.Today);
             if (error is not null) return Results.ValidationProblem(new Dictionary<string, string[]> { ["receipt"] = [error] });
             var receipt = new ServerDocumentAcknowledgment { DocumentArtifactId = artifact.Id, ReceivedOn = request.ReceivedOn?.Date,
                 GoodFaithEffortReason = request.GoodFaithEffortReason?.Trim(), RecordedAtUtc = DateTime.UtcNow, RecordedByUserId = actor.UserId };
@@ -56,20 +60,21 @@ internal static partial class ApiEndpoints
         });
         api.MapPost("/people/{personId:int}/annual-packet", async Task<IResult> (
             int personId, SaveAnnualPacketRequest request, ClaimsPrincipal principal, HttpContext http,
-            ApiDbContext db, AuditTrail audit, AnnualPacketComposer composer, CancellationToken ct) =>
+            ApiDbContext db, AuditTrail audit, AnnualPacketComposer composer, ApiClock clock,
+            CancellationToken ct) =>
         {
             // Keep authorization, medical-release attestation and artifact replacement in one snapshot.
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
             var actor = Actor.From(principal);
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, ct)) return Results.NotFound();
             var person = await db.People.AsNoTracking().SingleAsync(x => x.Id == personId, ct);
+            var today = clock.Today;
             AnnualDocumentsStatusDto status;
-            try { status = await AnnualStatus(db, actor, person, request.CycleStart, ct); }
+            try { status = await AnnualStatus(db, actor, person, request.CycleStart, today, ct); }
             catch (ArgumentException) { return InvalidSafetyCycle(); }
             if (!status.Window.IsOpen) return Results.ValidationProblem(
                 new Dictionary<string, string[]> { ["packet"] = [$"The packet opens on {status.Window.OpensOn:yyyy-MM-dd}."] });
             var cycle = request.CycleStart.Date;
-            var today = DateTime.Today;
             var releaseResolution = await ResolveReleaseAssignmentsAsync(
                 db, person, actor.AgencyId, cycle, today, ct);
             var releaseRows = await LoadReleaseRowsAsync(db, personId, cycle, ct);
@@ -132,7 +137,7 @@ internal static partial class ApiEndpoints
                     x.Attestations.Any() &&
                     !x.AuthorizationEvents.Any(change =>
                         change.Kind == ReleaseAuthorizationEventKind.Withdrawn &&
-                        change.OccurredOn <= DateTime.Today), ct)
+                        change.OccurredOn <= today), ct)
                 : await db.Forms.AnyAsync(x => x.PersonId == personId &&
                     x.Type == "Release_Medical" &&
                     x.TargetEffectiveDate == cycle && x.CompletedDate != null, ct);
@@ -171,10 +176,10 @@ internal static partial class ApiEndpoints
         });
     }
     private static async Task<AnnualDocumentsStatusDto> AnnualStatus(ApiDbContext db, Actor actor,
-        ServerPerson person, DateTime cycle, CancellationToken ct)
+        ServerPerson person, DateTime cycle, DateTime today, CancellationToken ct)
     {
         var days = await db.Settings.Where(x => x.AgencyId == actor.AgencyId).Select(x => (int?)x.AnnualPacketOpenDaysBefore).FirstOrDefaultAsync(ct) ?? 30;
-        var window = AnnualPacketWindow.ForCycle(person.EffectiveDate ?? throw new ArgumentException("Set an effective date first."), cycle.Date, DateTime.Today, days);
+        var window = AnnualPacketWindow.ForCycle(person.EffectiveDate ?? throw new ArgumentException("Set an effective date first."), cycle.Date, today, days);
         var activeArtifacts = await db.DocumentArtifacts.AsNoTracking().Where(x => x.PersonId == person.Id &&
             x.SupersededByArtifactId == null &&
             (x.CycleStart == cycle.Date || x.Kind == nameof(AnnualDocumentKind.DhhsAuthorizedRepresentative)))
@@ -208,6 +213,7 @@ internal static partial class ApiEndpoints
             window.IsOpen,
             completedTypes.Contains("PCP", StringComparer.Ordinal),
             artifacts,
+            today,
             releases.Select(x => x.ToComplianceFact()),
             completedTypes.Contains("SafetyPlan", StringComparer.Ordinal),
             completedTypes.Contains("PrivacyPractices", StringComparer.Ordinal)),

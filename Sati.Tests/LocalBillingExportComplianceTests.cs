@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Sati.Data;
 using Sati.Edi;
 using Sati.Models;
@@ -54,7 +55,7 @@ public sealed class LocalBillingExportComplianceTests
         var note = await db.Notes.SingleAsync();
         var person = await db.People.SingleAsync(x => x.Id == fixture.Inner.PersonOneId);
         var frozen = (await db.ClaimLines.SingleAsync()).ClaimSnapshotJson;
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         if (change is "uncompleted" or "historical" or "settings")
         {
             db.Forms.Add(new Form(
@@ -133,7 +134,7 @@ public sealed class LocalBillingExportComplianceTests
             await using var db = inner.Factory.CreateDbContext();
             (await db.Users.SingleAsync(x => x.Id == inner.CaseManagerOne.Id)).Permissions = inner.CaseManagerOne.Permissions;
             db.Settings.Add(new Settings { AgencyId = inner.CaseManagerOne.AgencyId });
-            var serviceDate = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow).AddDays(-7);
+            var serviceDate = TenantClock.MaineDate(DateTimeOffset.UtcNow).AddDays(-7);
             var note = Note.Create("Synthetic export regression", serviceDate, NoteStatus.Approved, 15, inner.PersonOneId);
             note.AgencyId = inner.CaseManagerOne.AgencyId;
             db.Notes.Add(note);

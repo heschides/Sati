@@ -183,6 +183,24 @@ public sealed class PlanYearOverviewTests
     }
 
     [Fact]
+    public void GeneratedArtifactLabelsUseMaineDateAtUtcMidnight()
+    {
+        var target = new DateTime(2026, 8, 11);
+        var generatedAt = new DateTime(2026, 7, 1, 0, 30, 0, DateTimeKind.Utc);
+        var notice = Artifact(7, AnnualDocumentKind.PrivacyPractices,
+            DocumentArtifactOrigin.GeneratedInSati, target) with { GeneratedAtUtc = generatedAt };
+        var safetyPlan = Artifact(8, AnnualDocumentKind.SafetyPlan,
+            DocumentArtifactOrigin.Draft, target) with { GeneratedAtUtc = generatedAt };
+        var year = PlanYearOverview.Build(Effective, target, Today, [], [], Schedule,
+            new PlanYearDocumentFacts([notice, safetyPlan], [], true));
+
+        Assert.Contains("Jun 30, 2026", Assert.Single(year.Items,
+            item => item.Title == "Privacy Practices notice").Detail);
+        Assert.Contains("Jun 30, 2026", Assert.Single(year.Items,
+            item => item.Title == "Safety Plan").Detail);
+    }
+
+    [Fact]
     public void PositionsAndCountsDescribeTheYear()
     {
         var past = PlanYearOverview.Build(Effective, new DateTime(2025, 8, 11), Today, [], [], Schedule);

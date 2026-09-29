@@ -57,7 +57,7 @@ public partial class SafetyDeviceViewModel(ISafetyDeviceService service) : Obser
     {
         if (person is null) return;
         var request = BuildRequest();
-        var errors = SafetyDeviceRules.Validate(request);
+        var errors = SafetyDeviceRules.Validate(request, DateOnly.FromDateTime(DateTime.Today));
         if (errors.Count > 0)
         {
             StatusMessage = string.Join(Environment.NewLine,

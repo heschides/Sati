@@ -58,6 +58,8 @@
     <Compile Remove="installer\Sati.LocalBootstrap\**\*.cs" />
     <Compile Remove="tools\**\*.cs" />
     <Compile Remove="tmp\**\*.cs" />
+    <Compile Remove="karuna\**\*.cs" />
+    <Compile Remove="platform\**\*.cs" />
     <EmbeddedResource Remove="Sati.Api\**\*" />
     <EmbeddedResource Remove="Sati.Signatures\**\*" />
     <EmbeddedResource Remove="Sati.Portal\**\*" />
@@ -73,6 +75,8 @@
     <EmbeddedResource Remove="installer\Sati.LocalBootstrap\**\*" />
     <EmbeddedResource Remove="tools\**\*" />
     <EmbeddedResource Remove="tmp\**\*" />
+    <EmbeddedResource Remove="karuna\**\*" />
+    <EmbeddedResource Remove="platform\**\*" />
     <None Remove="Sati.Api\**\*" />
     <None Remove="Sati.Signatures\**\*" />
     <None Remove="Sati.Portal\**\*" />
@@ -88,6 +92,10 @@
     <None Remove="installer\Sati.LocalBootstrap\**\*" />
     <None Remove="tools\**\*" />
     <None Remove="tmp\**\*" />
+    <None Remove="karuna\**\*" />
+    <None Remove="platform\**\*" />
+    <Page Remove="karuna\**\*" />
+    <Page Remove="platform\**\*" />
   </ItemGroup>
 
   <ItemGroup>

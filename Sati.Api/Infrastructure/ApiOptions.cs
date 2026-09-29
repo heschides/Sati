@@ -38,7 +38,7 @@ internal sealed class SatiApiOptions
     public const string SectionName = "Sati";
     public string ExpectedDatabaseName { get; init; } = "SatiDemo";
     public string ExpectedEnvironment { get; init; } = "Demo";
-    public string TimeZoneId { get; init; } = "Eastern Standard Time";
+    public string TimeZoneId { get; init; } = SatiLogica.Contracts.TenantClock.MaineTimeZoneId;
     public int AuditRetentionDays { get; init; } = OperationalPolicyDefaults.AuditRetentionDays;
     public int EdiReplayRetentionDays { get; init; } = OperationalPolicyDefaults.EdiReplayRetentionDays;
     // Server-only, opt-in synthetic dispatch. The exact Demo/Testing identity gate is separate.

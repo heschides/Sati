@@ -42,7 +42,7 @@ public static class SafetyDeviceRules
     public const string SourceRevision = "OADS Safety Device Request Form (4/2026)";
     public const int MaximumDevices = 10; // Five on page 2 and five in Appendix B.
 
-    public static IReadOnlyDictionary<string, string[]> Validate(SafetyDeviceRequest request)
+    public static IReadOnlyDictionary<string, string[]> Validate(SafetyDeviceRequest request, DateOnly today)
     {
         ArgumentNullException.ThrowIfNull(request);
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -88,7 +88,7 @@ public static class SafetyDeviceRules
             if (!string.IsNullOrWhiteSpace(device.Level) && device.Level is not ("1" or "2"))
                 errors[$"Devices[{i}].Level"] = ["Safety device level must be 1 or 2."];
         }
-        if (request.PlanningTeamMeetingDate is DateOnly date && date > DateOnly.FromDateTime(DateTime.Today))
+        if (request.PlanningTeamMeetingDate is DateOnly date && date > today)
             errors[nameof(request.PlanningTeamMeetingDate)] = ["The planning team meeting date cannot be in the future."];
         return errors;
 

@@ -5828,11 +5828,12 @@ clock alone.
 
 - **P2 is the clock only.**
   - One zone owner.
-  - `ApiClock` and `BillingRules.MaineBusinessDate` delegate to it.
+  - `ApiClock` delegates to it. On 2026-09-29 Josh approved replacing every in-repository
+    `BillingRules.MaineBusinessDate` caller with `TenantClock.MaineDate` and removing that shim.
   - Shared contract rules take today's date as a parameter instead of reading it
     (`AnnualPacket.cs:93`, `RepresentativePayee.cs:197, 201`, `ServiceTimeline.cs:156`).
-  - Desktop callers pass `DateTime.Today` explicitly, so Local Production's dates cannot change
-    silently.
+  - Desktop form and document callers pass `DateTime.Today` explicitly. Existing billing, note,
+    settings, EDI, and admin-correction paths keep the Maine date through `TenantClock.MaineDate`.
   - The banned-API analyzer applies to `Sati.Api` and `Sati.Contracts` only.
   - Josh accepted one Demo-visible change: EDI `generatedAt` moves from UTC to Eastern, which changes
     the ISA/GS date and time of newly generated 837 files.

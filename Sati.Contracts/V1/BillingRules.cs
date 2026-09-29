@@ -25,12 +25,6 @@ public static partial class BillingRules
     public static decimal CalculateCharge(decimal units, decimal unitRate) =>
         Math.Round(units * unitRate, 2, MidpointRounding.AwayFromZero);
 
-    public static DateTime MaineBusinessDate(DateTimeOffset utcNow)
-    {
-        var eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
-        return TimeZoneInfo.ConvertTime(utcNow, eastern).Date;
-    }
-
     public static bool IsValidNpi(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || !TenDigits().IsMatch(value))

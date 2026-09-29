@@ -187,18 +187,19 @@ public static class CheckRequestTemplateRules
         string? payableTo,
         string? mailingAddress,
         decimal amount,
-        string? reason)
+        string? reason,
+        DateTime today)
     {
         var errors = new List<string>();
         if (!Enum.IsDefined(generateOn)) errors.Add("Choose a valid weekly generation day.");
         if (neededByDaysAfterRequest is < 0 or > MaximumNeededByDaysAfterRequest)
             errors.Add($"The needed-by offset must be between 0 and {MaximumNeededByDaysAfterRequest} days.");
         errors.AddRange(CheckRequestPublication.FindDraftErrors(
-            DateTime.Today,
+            today.Date,
             payableTo,
             mailingAddress,
             amount,
-            DateTime.Today.AddDays(Math.Clamp(neededByDaysAfterRequest, 0, MaximumNeededByDaysAfterRequest)),
+            today.Date.AddDays(Math.Clamp(neededByDaysAfterRequest, 0, MaximumNeededByDaysAfterRequest)),
             reason));
         return errors;
     }

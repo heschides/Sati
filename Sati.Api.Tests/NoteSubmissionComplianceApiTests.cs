@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sati.Api.Data;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Xunit;
 
 namespace Sati.Api.Tests;
@@ -25,7 +26,7 @@ public sealed class NoteSubmissionComplianceApiTests(SatiApiFactory factory)
     public async Task LoggedSubmissionRefusesComplianceFailuresWithoutWriting(bool update, string contingency)
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         var personId = await SeedPersonAsync(today.AddDays(-5),
             contingency == "historical" ? today : null);
         var noteId = update ? await factory.CreateNoteInStatusAsync(NoteWorkflow.Pending, personId) : 0;
@@ -52,7 +53,7 @@ public sealed class NoteSubmissionComplianceApiTests(SatiApiFactory factory)
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
         using var billing = await factory.CreateAuthenticatedClientAsync("admin-one");
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         var personId = await SeedPersonAsync(today.AddDays(-5), null);
         var request = Request(personId, "Logged", today.AddDays(-2)) with
         {
@@ -85,7 +86,7 @@ public sealed class NoteSubmissionComplianceApiTests(SatiApiFactory factory)
     public async Task NoncompliantServiceDocumentationCanStillBeSavedAndEdited(string status)
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         var personId = await SeedPersonAsync(today.AddDays(-5), null);
         var request = Request(personId, status, today);
         var created = await client.PostAsJsonAsync("/api/v1/notes", request);
@@ -109,7 +110,7 @@ public sealed class NoteSubmissionComplianceApiTests(SatiApiFactory factory)
     public async Task LoggedSubmissionPreservesConfiguredDateBoundaries(string contingency)
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         var dueDate = contingency switch
         {
             "due-today" => today,
@@ -132,7 +133,7 @@ public sealed class NoteSubmissionComplianceApiTests(SatiApiFactory factory)
     public async Task ReturnedAndReassignedNotesCannotEnterReviewForABlockedTarget(bool reassign)
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         var blockedPerson = await SeedPersonAsync(today.AddDays(-5), null);
         var originalPerson = reassign ? await factory.CreateBillingWorkflowPersonAsync() : blockedPerson;
         var noteId = await factory.CreateNoteInStatusAsync(NoteWorkflow.Returned, originalPerson);

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
+using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Forms;
@@ -22,9 +23,13 @@ internal static partial class ApiEndpoints
             ApiDbContext db,
             SafetyDevicePdfGenerator generator,
             AuditTrail audit,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
-            var errors = SafetyDeviceRules.Validate(request);
+            var generatedAtUtc = clock.UtcNow.UtcDateTime;
+            var businessDate = clock.ToAgencyDate(generatedAtUtc);
+            var today = DateOnly.FromDateTime(businessDate);
+            var errors = SafetyDeviceRules.Validate(request, today);
             if (errors.Count > 0)
                 return Results.ValidationProblem(errors);
             var actor = Actor.From(principal);
@@ -42,16 +47,15 @@ internal static partial class ApiEndpoints
                 person.EvergreenId, person.MaineCareId, person.Address,
                 person.HasGuardian ? person.GuardianName : null,
                 caseManager?.DisplayName, caseManager?.Email);
-            var generatedAtUtc = DateTime.UtcNow;
-            var pdf = generator.Generate(subject, request, generatedAtUtc);
+            var pdf = generator.Generate(subject, request, generatedAtUtc, today);
             var reviewItems = SafetyDeviceRules.FindReviewItems(subject, request);
             var safeName = SafeFileName($"{person.LastName}-{person.FirstName}");
             var fileName = string.IsNullOrWhiteSpace(safeName)
                 ? $"Safety-Device-Request-DRAFT-{personId}.pdf"
                 : $"Safety-Device-Request-DRAFT-{personId}-{safeName}.pdf";
             var cycleStart = person.EffectiveDate is DateTime effective
-                ? AnnualDocumentCycle.CurrentStart(effective, generatedAtUtc.ToLocalTime())
-                : generatedAtUtc.ToLocalTime().Date;
+                ? AnnualDocumentCycle.CurrentStart(effective, businessDate)
+                : businessDate;
 
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await DocumentArtifactPersistence.StageGeneratedAsync(db, personId, actor.AgencyId,

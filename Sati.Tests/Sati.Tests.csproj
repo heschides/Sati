@@ -21,5 +21,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Sati.csproj" />
     <ProjectReference Include="..\Sati.Api\Sati.Api.csproj" />
+    <ProjectReference Include="..\platform\SatiLogica.Contracts\SatiLogica.Contracts.csproj" />
   </ItemGroup>
 </Project>

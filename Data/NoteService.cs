@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Sati.Models;
 
 namespace Sati.Data;
@@ -12,7 +13,7 @@ public class NoteService(
     public async Task<Note> AddNoteAsync(Note note)
     {
         ArgumentNullException.ThrowIfNull(note);
-        var today = BillingRules.MaineBusinessDate((timeProvider ?? TimeProvider.System).GetUtcNow());
+        var today = TenantClock.MaineDate((timeProvider ?? TimeProvider.System).GetUtcNow());
         NormalizeScheduling(note, today);
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();
@@ -95,7 +96,7 @@ public class NoteService(
     public async Task UpdateNoteAsync(Note note)
     {
         ArgumentNullException.ThrowIfNull(note);
-        var today = BillingRules.MaineBusinessDate((timeProvider ?? TimeProvider.System).GetUtcNow());
+        var today = TenantClock.MaineDate((timeProvider ?? TimeProvider.System).GetUtcNow());
         NormalizeScheduling(note, today);
         ValidateCaseManagerInput(note);
         var actor = CurrentActor();

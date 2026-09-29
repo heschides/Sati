@@ -257,6 +257,7 @@ internal static partial class ApiEndpoints
         api.MapPost("/billing/periods/{periodId:int}/corrections/edi", async Task<IResult> (
             int periodId, GenerateEdiRequest request, ClaimsPrincipal principal, ApiDbContext db,
             AuditTrail auditTrail, ClearinghouseDispatchGate clearinghouseGate,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -309,7 +310,7 @@ internal static partial class ApiEndpoints
                 return Results.Conflict(new ApiErrorDto("no_corrections_waiting",
                     "There are no corrections waiting to be sent for this billing period.", string.Empty));
 
-            var generatedAt = DateTime.Now;
+            var generatedAt = clock.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
             if (await db.EdiGenerations.AnyAsync(item => item.AgencyId == actor.AgencyId &&
                     item.IsTest == request.IsTest && item.ControlNumber == controlNumber, cancellationToken))

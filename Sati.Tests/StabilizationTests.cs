@@ -1,4 +1,5 @@
 using Sati.Api.Security;
+using SatiLogica.Contracts;
 using Sati.Data;
 using Sati.Data.Billing;
 using Sati.Edi;
@@ -483,7 +484,7 @@ public sealed class StabilizationTests
     {
         var utc = new DateTimeOffset(2026, 8, 13, 2, 30, 0, TimeSpan.Zero);
 
-        Assert.Equal(new DateTime(2026, 8, 12), BillingRules.MaineBusinessDate(utc));
+        Assert.Equal(new DateTime(2026, 8, 12), TenantClock.MaineDate(utc));
     }
 
     [Fact]

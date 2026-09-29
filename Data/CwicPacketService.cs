@@ -47,7 +47,8 @@ public sealed class CwicPacketService(
             person.BirthDate,
             ssn);
         var generatedAtUtc = DateTime.UtcNow;
-        var pdf = generator.Generate(subject, request, generatedAtUtc);
+        var pdf = generator.Generate(subject, request, generatedAtUtc,
+            generatedAtUtc.ToLocalTime().Date);
         var blankFields = CwicPacketRules.BlankFields(subject, request);
         var fileName = SuggestedFileName(personId, person.LastName, person.FirstName);
         var cycleStart = person.EffectiveDate is DateTime effective

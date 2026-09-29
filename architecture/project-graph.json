@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "projects": [
+    { "path": "Carika/Carika.csproj", "product": "sati", "kind": "client", "references": ["Sati.Contracts/Sati.Contracts.csproj"] },
+    { "path": "Carika.Tests/Carika.Tests.csproj", "product": "sati", "kind": "test", "references": ["Carika/Carika.csproj", "Sati.Contracts/Sati.Contracts.csproj"] },
+    { "path": "installer/Sati.LocalBootstrap/Sati.LocalBootstrap.csproj", "product": "sati", "kind": "tool", "references": [] },
+    { "path": "Sati.csproj", "product": "sati", "kind": "client", "references": ["Sati.Contracts/Sati.Contracts.csproj", "Sati.Forms/Sati.Forms.csproj", "Sati.Persistence/Sati.Persistence.csproj"] },
+    { "path": "Sati.Api/Sati.Api.csproj", "product": "sati", "kind": "host", "references": ["Sati.Contracts/Sati.Contracts.csproj", "Sati.Forms/Sati.Forms.csproj", "Sati.Persistence/Sati.Persistence.csproj", "Sati.Signatures/Sati.Signatures.csproj", "platform/SatiLogica.Contracts/SatiLogica.Contracts.csproj"] },
+    { "path": "Sati.Api.Tests/Sati.Api.Tests.csproj", "product": "sati", "kind": "test", "references": ["Sati.Api/Sati.Api.csproj", "Sati.Contracts/Sati.Contracts.csproj", "Sati.Signatures/Sati.Signatures.csproj"] },
+    { "path": "Sati.Contracts/Sati.Contracts.csproj", "product": "sati", "kind": "library", "references": ["platform/SatiLogica.Contracts/SatiLogica.Contracts.csproj"] },
+    { "path": "Sati.Forms/Sati.Forms.csproj", "product": "sati", "kind": "library", "references": ["Sati.Contracts/Sati.Contracts.csproj"] },
+    { "path": "Sati.Persistence/Sati.Persistence.csproj", "product": "sati", "kind": "library", "references": ["Sati.Contracts/Sati.Contracts.csproj"] },
+    { "path": "Sati.Portal/Sati.Portal.csproj", "product": "sati", "kind": "host", "references": ["Sati.Signatures/Sati.Signatures.csproj"] },
+    { "path": "Sati.Portal.Tests/Sati.Portal.Tests.csproj", "product": "sati", "kind": "test", "references": ["Sati.Portal/Sati.Portal.csproj"] },
+    { "path": "Sati.Signatures/Sati.Signatures.csproj", "product": "sati", "kind": "library", "references": ["Sati.Contracts/Sati.Contracts.csproj", "Sati.Persistence/Sati.Persistence.csproj", "Sati.Forms/Sati.Forms.csproj"] },
+    { "path": "Sati.Signatures.Tests/Sati.Signatures.Tests.csproj", "product": "sati", "kind": "test", "references": ["Sati.Signatures/Sati.Signatures.csproj"] },
+    { "path": "Sati.Tests/Sati.Tests.csproj", "product": "sati", "kind": "test", "references": ["Sati.csproj", "Sati.Api/Sati.Api.csproj", "platform/SatiLogica.Contracts/SatiLogica.Contracts.csproj"] },
+    { "path": "platform/SatiLogica.Contracts/SatiLogica.Contracts.csproj", "product": "platform", "kind": "library", "references": [] },
+    { "path": "tools/BrochureBackdrop/BrochureBackdrop.csproj", "product": "sati", "kind": "tool", "references": [] },
+    { "path": "tools/BrochureDecompile/BrochureDecompile.csproj", "product": "sati", "kind": "tool", "references": [] },
+    { "path": "tools/SatiComplianceSeed/SatiComplianceSeed.csproj", "product": "sati", "kind": "tool", "references": ["Sati.Persistence/Sati.Persistence.csproj"] },
+    { "path": "tools/SatiUpdateReport/SatiUpdateReport.csproj", "product": "sati", "kind": "tool", "references": ["Sati.Persistence/Sati.Persistence.csproj"] }
+  ]
+}

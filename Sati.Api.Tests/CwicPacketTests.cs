@@ -32,7 +32,8 @@ public sealed class CwicPacketTests(SatiApiFactory factory)
         var bytes = generator.Generate(
             new CwicPacketSubject(7, "Demo Consumer", new DateTime(1985, 4, 3), "123-45-6789"),
             ValidRequest(),
-            new DateTime(2026, 9, 13, 14, 0, 0, DateTimeKind.Utc));
+            new DateTime(2026, 9, 13, 14, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 9, 13));
 
         using var stream = new MemoryStream(bytes);
         using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);

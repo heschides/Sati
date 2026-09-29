@@ -1,5 +1,7 @@
 <Solution>
-  <Folder Name="/platform/" />
+  <Folder Name="/platform/">
+    <Project Path="platform/SatiLogica.Contracts/SatiLogica.Contracts.csproj" />
+  </Folder>
   <Folder Name="/sati/">
     <Project Path="Carika/Carika.csproj" />
     <Project Path="Carika.Tests/Carika.Tests.csproj" />

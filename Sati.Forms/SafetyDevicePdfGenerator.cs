@@ -13,11 +13,12 @@ public sealed class SafetyDevicePdfGenerator
 {
     public const string ResourceName = "Sati.Forms.Safety-Device-Request-Form-2026-04.pdf";
 
-    public byte[] Generate(SafetyDeviceSubject subject, SafetyDeviceRequest request, DateTime generatedAtUtc)
+    public byte[] Generate(SafetyDeviceSubject subject, SafetyDeviceRequest request,
+        DateTime generatedAtUtc, DateOnly today)
     {
         ArgumentNullException.ThrowIfNull(subject);
         ArgumentNullException.ThrowIfNull(request);
-        var errors = SafetyDeviceRules.Validate(request);
+        var errors = SafetyDeviceRules.Validate(request, today);
         if (errors.Count > 0)
             throw new ArgumentException(string.Join(" ", errors.SelectMany(entry => entry.Value)), nameof(request));
 

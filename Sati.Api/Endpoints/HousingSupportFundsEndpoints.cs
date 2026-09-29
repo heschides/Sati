@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
+using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Data;
@@ -23,6 +24,7 @@ internal static partial class ApiEndpoints
             ApiDbContext db,
             HousingSupportFundsPdfGenerator generator,
             AuditTrail audit,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var validation = HousingSupportFundsRules.Validate(request);
@@ -56,7 +58,8 @@ internal static partial class ApiEndpoints
                 AgencyAddress(agency),
                 caseManager?.Phone,
                 caseManager?.Email);
-            var generatedAtUtc = DateTime.UtcNow;
+            var generatedAtUtc = clock.UtcNow.UtcDateTime;
+            var businessDate = clock.ToAgencyDate(generatedAtUtc);
             var pdf = generator.Generate(subject, request, generatedAtUtc);
             var reviewItems = HousingSupportFundsRules.FindReviewItems(subject, request);
             var safeName = SafeFileName($"{person.LastName}-{person.FirstName}");
@@ -64,8 +67,8 @@ internal static partial class ApiEndpoints
                 ? $"Housing-Support-Funds-Application-DRAFT-{personId}.pdf"
                 : $"Housing-Support-Funds-Application-DRAFT-{personId}-{safeName}.pdf";
             var cycleStart = person.EffectiveDate is DateTime effective
-                ? AnnualDocumentCycle.CurrentStart(effective, generatedAtUtc.ToLocalTime())
-                : generatedAtUtc.ToLocalTime().Date;
+                ? AnnualDocumentCycle.CurrentStart(effective, businessDate)
+                : businessDate;
 
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await DocumentArtifactPersistence.StageGeneratedAsync(

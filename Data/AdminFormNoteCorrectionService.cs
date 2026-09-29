@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Sati.Models;
 
 namespace Sati.Data;
@@ -168,7 +169,7 @@ public sealed class AdminFormNoteCorrectionService(
                 candidate.Id, candidate.PersonId, candidate.Type.ToString(),
                 candidate.DueDate, candidate.CompletedDate, candidate.TargetEffectiveDate))
             .ToListAsync(cancellationToken);
-        var today = BillingRules.MaineBusinessDate(TimeProvider.System.GetUtcNow());
+        var today = TenantClock.MaineDate(TimeProvider.System.GetUtcNow());
         var decision = FormAttestationRules.Evaluate(
             form.Type.ToString(), correctedDate, cycle.CycleStart, today,
             AttestationActorKind.Supervisor, [], facts,

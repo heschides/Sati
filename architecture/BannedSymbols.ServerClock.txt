@@ -1,0 +1,9 @@
+P:System.DateTime.Now;Use ApiClock in Sati.Api or an explicit date in shared rules.
+P:System.DateTime.Today;Use ApiClock in Sati.Api or an explicit date in shared rules.
+P:System.TimeZoneInfo.Local;Use TenantClock for tenant-local time.
+M:System.DateTime.ToLocalTime;Use TenantClock for tenant-local time.
+M:System.DateTimeOffset.ToLocalTime;Use TenantClock for tenant-local time.
+P:System.DateTimeOffset.Now;Use TenantClock for tenant-local time.
+P:System.DateTimeOffset.LocalDateTime;Use TenantClock for tenant-local time.
+M:System.DateTime.ToUniversalTime;Treat UTC inputs as UTC explicitly.
+M:System.TimeZoneInfo.ConvertTimeToUtc(System.DateTime);Use explicit UTC conversion without the host zone.

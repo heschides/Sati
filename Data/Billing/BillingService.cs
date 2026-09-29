@@ -4,6 +4,7 @@ using Sati.Data.Billing;
 using Sati.Models;
 using Sati.Models.Billing;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Sati.Helpers;
 using System.Data;
 
@@ -739,7 +740,7 @@ namespace Sati.Services.Billing
             var (person, notes, policy) = await LoadRecoveryInputsAsync(
                 context, actor.AgencyId, personId, cancellationToken);
             return PrepareRecoveryPlan(person, notes, policy,
-                BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow));
+                TenantClock.MaineDate(DateTimeOffset.UtcNow));
         }
 
         public async Task<Sati.Contracts.V1.BillingComplianceRecoveryDecision> RecordComplianceRecoveryAsync(
@@ -757,7 +758,7 @@ namespace Sati.Services.Billing
                 context, actor.AgencyId, personId, cancellationToken);
             var recordedAtUtc = DateTime.UtcNow;
             var plan = PrepareRecoveryPlan(
-                person, notes, policy, BillingRules.MaineBusinessDate(recordedAtUtc));
+                person, notes, policy, TenantClock.MaineDate(recordedAtUtc));
             var result = BillingComplianceRecoveryRules.CreateDecision(
                 plan,
                 request.SelectedNoteIds ?? [],

@@ -3,5 +3,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
+    <AdditionalFiles Include="..\architecture\BannedSymbols.ServerClock.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\platform\SatiLogica.Contracts\SatiLogica.Contracts.csproj" />
+  </ItemGroup>
 </Project>

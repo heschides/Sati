@@ -60,6 +60,7 @@ public sealed class AnnualDocumentService(IDbContextFactory<SatiContext> factory
             window.IsOpen,
             completedTypes.Contains(FormType.PCP),
             artifacts,
+            DateTime.Today,
             releases.Select(x => x.ToComplianceFact()),
             completedTypes.Contains(FormType.SafetyPlan),
             completedTypes.Contains(FormType.PrivacyPractices)),

@@ -1,4 +1,5 @@
 using System.Globalization;
+using SatiLogica.Contracts;
 
 namespace Sati.Contracts.V1;
 
@@ -337,7 +338,7 @@ public static class PlanYearOverview
                     return "";
                 return documents.AcknowledgedArtifactIds.Contains(notice.Id)
                     ? "Receipt recorded"
-                    : $"Notice generated {Date(notice.GeneratedAtUtc.ToLocalTime())}; record receipt";
+                    : $"Notice generated {Date(TenantClock.MaineDate(notice.GeneratedAtUtc))}; record receipt";
             default:
                 return "";
         }
@@ -351,7 +352,7 @@ public static class PlanYearOverview
 
     private static string DescribeArtifact(DocumentArtifactDto artifact)
     {
-        var on = Date(artifact.GeneratedAtUtc.ToLocalTime());
+        var on = Date(TenantClock.MaineDate(artifact.GeneratedAtUtc));
         return artifact.Origin switch
         {
             nameof(DocumentArtifactOrigin.Draft) => $"Draft saved {on}",

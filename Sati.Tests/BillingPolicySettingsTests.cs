@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Sati.Data;
 using Sati.Models;
 using Sati.Models.Billing;
@@ -75,7 +76,7 @@ public sealed class BillingPolicySettingsTests : IDisposable
         settings.AllowPastBillingPolicyEffectiveDates = true;
         await service.SaveAsync(settings);
 
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         var first = await service.AppendBillingCompliancePolicyAsync(
             new AppendBillingCompliancePolicyRequest(
                 Guid.NewGuid(), today.AddDays(-1), BillingComplianceRequirements.Pcp,

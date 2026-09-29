@@ -9,7 +9,7 @@ public sealed class CloudSafetyDeviceService(CloudApiClient client) : ISafetyDev
     public async Task<SafetyDeviceResult> GenerateAsync(int personId, SafetyDeviceRequest request,
         CancellationToken cancellationToken = default)
     {
-        var errors = SafetyDeviceRules.Validate(request);
+        var errors = SafetyDeviceRules.Validate(request, DateOnly.FromDateTime(DateTime.Today));
         if (errors.Count > 0)
             throw new ArgumentException(string.Join(" ", errors.SelectMany(entry => entry.Value)), nameof(request));
         var (pdf, headers) = await client.PostBytesWithHeaderAsync(

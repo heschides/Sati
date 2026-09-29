@@ -13,7 +13,8 @@ public sealed class SafetyDeviceService(
     public async Task<SafetyDeviceResult> GenerateAsync(int personId, SafetyDeviceRequest request,
         CancellationToken cancellationToken = default)
     {
-        var errors = SafetyDeviceRules.Validate(request);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var errors = SafetyDeviceRules.Validate(request, today);
         if (errors.Count > 0)
             throw new ArgumentException(string.Join(" ", errors.SelectMany(entry => entry.Value)), nameof(request));
         var actor = session.CurrentUser
@@ -33,7 +34,7 @@ public sealed class SafetyDeviceService(
             person.User?.DisplayName ?? actor.DisplayName,
             person.User?.Email ?? actor.Email);
         var generatedAtUtc = DateTime.UtcNow;
-        var pdf = generator.Generate(subject, request, generatedAtUtc);
+        var pdf = generator.Generate(subject, request, generatedAtUtc, today);
         var reviewItems = SafetyDeviceRules.FindReviewItems(subject, request);
         var fileName = SuggestedFileName(personId, person.LastName, person.FirstName);
         var cycleStart = person.EffectiveDate is DateTime effective

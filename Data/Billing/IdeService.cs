@@ -6,6 +6,7 @@ using Sati.Services.Billing;
 using System.IO;
 using System.Data;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 
 namespace Sati.Edi
 {
@@ -153,7 +154,7 @@ namespace Sati.Edi
             var agencyApprovers = await context.Users.AsNoTracking()
                 .Where(user => user.AgencyId == actor.AgencyId && approverIds.Contains(user.Id))
                 .Select(user => user.Id).ToListAsync();
-            var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+            var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
             var errors = new List<string>();
             foreach (var line in period.Lines)
             {

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
+using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Data;
@@ -24,6 +25,7 @@ internal static partial class ApiEndpoints
             EnvelopeProtector protector,
             CwicPacketPdfGenerator generator,
             AuditTrail audit,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var validation = CwicPacketRules.Validate(request);
@@ -59,16 +61,17 @@ internal static partial class ApiEndpoints
                 $"{person.FirstName} {person.LastName}".Trim(),
                 person.BirthDate,
                 ssn);
-            var generatedAtUtc = DateTime.UtcNow;
-            var pdf = generator.Generate(subject, request, generatedAtUtc);
+            var generatedAtUtc = clock.UtcNow.UtcDateTime;
+            var businessDate = clock.ToAgencyDate(generatedAtUtc);
+            var pdf = generator.Generate(subject, request, generatedAtUtc, businessDate);
             var blankFields = CwicPacketRules.BlankFields(subject, request);
             var safeName = SafeFileName($"{person.LastName}-{person.FirstName}");
             var fileName = string.IsNullOrWhiteSpace(safeName)
                 ? $"CWIC-Referral-Packet-DRAFT-{personId}.pdf"
                 : $"CWIC-Referral-Packet-DRAFT-{personId}-{safeName}.pdf";
             var cycleStart = person.EffectiveDate is DateTime effective
-                ? AnnualDocumentCycle.CurrentStart(effective, generatedAtUtc.ToLocalTime())
-                : generatedAtUtc.ToLocalTime().Date;
+                ? AnnualDocumentCycle.CurrentStart(effective, businessDate)
+                : businessDate;
 
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await DocumentArtifactPersistence.StageGeneratedAsync(

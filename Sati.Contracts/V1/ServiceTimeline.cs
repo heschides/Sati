@@ -153,8 +153,7 @@ public static class ServiceTimeline
 
     /// <summary>Formats an offset from the window start as a clock time, e.g. "9:15 AM".</summary>
     public static string Describe(int minutesFromWindowStart) =>
-        DateTime.Today
-            .Add(WindowStart)
+        TimeOnly.FromTimeSpan(WindowStart)
             .AddMinutes(minutesFromWindowStart)
             .ToString("h:mm tt", CultureInfo.CurrentCulture);
 

@@ -31,6 +31,14 @@ internal sealed record CaseloadNoteSummaryRow(
 
 internal static partial class ApiEndpoints
 {
+    private static DateTime NormalizeUtcInput(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        // A JSON offset can materialize as Local; DateTimeOffset preserves its instant.
+        DateTimeKind.Local => new DateTimeOffset(value).UtcDateTime,
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
+
     public static void MapSatiApi(this WebApplication app)
     {
         MapAuth(app);
@@ -232,8 +240,8 @@ internal static partial class ApiEndpoints
             if (!actor.HasAdminPermissions)
                 return Results.Forbid();
 
-            var start = from?.ToUniversalTime() ?? DateTime.UtcNow.AddDays(-30);
-            var end = to?.ToUniversalTime() ?? DateTime.UtcNow;
+            var start = from is DateTime fromUtc ? NormalizeUtcInput(fromUtc) : DateTime.UtcNow.AddDays(-30);
+            var end = to is DateTime toUtc ? NormalizeUtcInput(toUtc) : DateTime.UtcNow;
             var limit = take ?? 100;
             if (end < start || (end - start).TotalDays > 366 || limit is < 1 or > 500 || action?.Length > 100)
             {
@@ -1187,8 +1195,8 @@ internal static partial class ApiEndpoints
                 return Results.Forbid();
 
             PreventSensitiveResponseCaching(httpContext);
-            var start = request.FromUtc.ToUniversalTime();
-            var end = request.ToUtc.ToUniversalTime();
+            var start = NormalizeUtcInput(request.FromUtc);
+            var end = NormalizeUtcInput(request.ToUtc);
             var reason = request.Reason?.Trim() ?? string.Empty;
             if (end < start || (end - start).TotalDays > 366 || end > DateTime.UtcNow.AddMinutes(5) ||
                 reason.Length is < 10 or > 250)
@@ -2171,7 +2179,9 @@ internal static partial class ApiEndpoints
             ApiClock clock,
             CancellationToken cancellationToken) =>
         {
-            var validation = ValidatePerson(request, requireNewForms: request.EffectiveDate.HasValue);
+            var today = clock.Today;
+            var validation = ValidatePerson(request, today,
+                requireNewForms: request.EffectiveDate.HasValue);
             if (validation.Count > 0)
                 return Results.ValidationProblem(validation);
 
@@ -2201,7 +2211,7 @@ internal static partial class ApiEndpoints
                 var settings = await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken);
                 person.Forms = BuildInitialForms(request.Forms, effectiveDate, settings);
                 AddInitialFormAttestations(
-                    db, auditTrail, actor, effectiveDate, settings,
+                    db, auditTrail, actor, effectiveDate, today, settings,
                     person.Forms, person.Forms);
             }
 
@@ -2235,10 +2245,13 @@ internal static partial class ApiEndpoints
             ApiDbContext db,
             PersonLifecycle lifecycle,
             AuditTrail auditTrail,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
+            var today = clock.Today;
             var newForms = request.Forms.Where(form => form.Id == 0).ToList();
-            var validation = ValidatePerson(request, requireNewForms: newForms.Count > 0);
+            var validation = ValidatePerson(request, today,
+                requireNewForms: newForms.Count > 0);
             if (validation.Count > 0)
                 return Results.ValidationProblem(validation);
 
@@ -2298,7 +2311,7 @@ internal static partial class ApiEndpoints
                     .ToListAsync(cancellationToken);
                 allForms.AddRange(addedForms);
                 AddInitialFormAttestations(
-                    db, auditTrail, actor, effectiveDate, settings,
+                    db, auditTrail, actor, effectiveDate, today, settings,
                     addedForms, allForms);
                 additionalChanges.Add(new PersonFieldChangeDto(
                     "forms",
@@ -2935,7 +2948,7 @@ internal static partial class ApiEndpoints
                 // Authorized Representative form keeps the current period as placement.
                 var cycleStart = dhhsTargetEffectiveDate ?? AnnualDocumentCycle.CurrentStart(
                     person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
-                    generatedAtUtc.ToLocalTime());
+                    clock.ToAgencyDate(generatedAtUtc));
                 var artifactFileName = $"{form}-{personId}-{SafeFileName($"{person.LastName}-{person.FirstName}")}.pdf";
                 var documentKind = form == DhhsFormDefinition.FormKey.AuthorizationToRelease
                     ? AnnualDocumentKind.ReleaseDhhs
@@ -3018,7 +3031,7 @@ internal static partial class ApiEndpoints
             var pdf = generator.Generate(subject, request, generatedAtUtc);
             var cycleStart = AnnualDocumentCycle.CurrentStart(
                 person.EffectiveDate ?? throw new InvalidOperationException("The consumer has no effective date."),
-                generatedAtUtc.ToLocalTime());
+                clock.ToAgencyDate(generatedAtUtc));
             var safeName = SafeFileName($"{person.LastName}-{person.FirstName}");
             var prefix = request.IsRevocation ? "Agency-Release-Revocation" : "Agency-Release";
             if (request.IsDraft)
@@ -4216,7 +4229,7 @@ internal static partial class ApiEndpoints
                 });
             var errors = CheckRequestTemplateRules.Validate(
                 input.GenerateOn, input.NeededByDaysAfterRequest, input.PayableTo,
-                input.MailingAddress, input.Amount, input.Reason);
+                input.MailingAddress, input.Amount, input.Reason, clock.Today);
             if (errors.Count > 0)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["template"] = [.. errors] });
 
@@ -6850,6 +6863,7 @@ internal static partial class ApiEndpoints
             ApiDbContext db,
             AuditTrail auditTrail,
             ClearinghouseDispatchGate clearinghouseGate,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -6892,7 +6906,7 @@ internal static partial class ApiEndpoints
             if (previous is not null)
                 return ReplayEdiOrConflict(previous, periodId, request.IsTest, profile);
 
-            var generatedAt = DateTime.Now;
+            var generatedAt = clock.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
             if (await db.EdiGenerations.AnyAsync(item => item.AgencyId == actor.AgencyId &&
                     item.IsTest == request.IsTest && item.ControlNumber == controlNumber, cancellationToken))
@@ -7131,7 +7145,7 @@ internal static partial class ApiEndpoints
             var generatedAtUtc = clock.UtcNow.UtcDateTime;
             var requestedCycleStart = request.CycleStart?.Date;
             var cycleStart = requestedCycleStart ??
-                AnnualDocumentCycle.CurrentStart(effectiveDate, generatedAtUtc.ToLocalTime());
+                AnnualDocumentCycle.CurrentStart(effectiveDate, clock.ToAgencyDate(generatedAtUtc));
             var releaseLink = await ResolveDocumentReleaseObligationAsync(
                 db, actor, personId, documentKind, requestedCycleStart,
                 request.ReleaseObligationId, clock.Today, cancellationToken);
@@ -8259,6 +8273,7 @@ internal static partial class ApiEndpoints
             int personId,
             ClaimsPrincipal principal,
             ApiDbContext db,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -8294,7 +8309,7 @@ internal static partial class ApiEndpoints
                 note.FormId))
                 .ToList();
             var pending = FormAttestationRules.PendingAttestations(
-                facts, forms, person.EffectiveDate, DateTime.Today)
+                facts, forms, person.EffectiveDate, clock.Today)
                 .Select(item => new PendingAttestationDto(
                     item.FormId, item.PersonId, item.FormType, item.CycleStart, item.CycleEnd,
                     item.DueDate, item.EvidenceNoteId, item.EvidenceDate,
@@ -8355,6 +8370,7 @@ internal static partial class ApiEndpoints
             UpdateFormRequest request,
             ClaimsPrincipal principal,
             ApiDbContext db,
+            ApiClock clock,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
@@ -8366,7 +8382,7 @@ internal static partial class ApiEndpoints
                 return TypedResults.NotFound();
 
             if (request.CompletedDate is DateTime completedOn &&
-                FormCompletionRules.Validate(completedOn, DateTime.Today) is string error)
+                FormCompletionRules.Validate(completedOn, clock.Today) is string error)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
@@ -8737,8 +8753,9 @@ internal static partial class ApiEndpoints
 
     private static Dictionary<string, string[]> ValidatePerson(
         SavePersonRequest request,
+        DateTime today,
         bool requireNewForms) =>
-        PersonSaveRules.Validate(request, DateTime.Today, requireNewForms);
+        PersonSaveRules.Validate(request, today, requireNewForms);
 
     private static void ApplyPerson(ServerPerson person, SavePersonRequest request, int gender, int waiver)
     {
@@ -8831,6 +8848,7 @@ internal static partial class ApiEndpoints
         AuditTrail auditTrail,
         Actor actor,
         DateTime effectiveDate,
+        DateTime today,
         ServerSettings settings,
         IEnumerable<ServerForm> forms,
         IReadOnlyCollection<ServerForm> allForms)
@@ -8852,7 +8870,7 @@ internal static partial class ApiEndpoints
             var availableOn = form.DueDate.Date.AddDays(
                 -OpenDaysBefore(form.Type, settings));
             var decision = FormAttestationRules.Evaluate(
-                form.Type, completedOn, cycle.CycleStart, DateTime.Today,
+                form.Type, completedOn, cycle.CycleStart, today,
                 AttestationActorKind.CaseManager, [],
                 allForms.Select(candidate => new FormFact(
                     candidate.Id, candidate.PersonId, candidate.Type,

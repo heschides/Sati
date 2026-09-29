@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Sati.Data;
 using Sati.Helpers;
 using Sati.Models;
@@ -1175,7 +1176,7 @@ namespace Sati.ViewModels
             }
 
             var requirements = BuildBillingComplianceRequirements();
-            var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+            var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
             var validation = BillingCompliancePolicyRules.ValidateChange(
                 requirements,
                 BillingPolicyEffectiveOn,

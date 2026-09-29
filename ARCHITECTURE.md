@@ -1402,15 +1402,22 @@ justify them; they will consume the same API rather than inventing separate busi
 ### Current solution boundaries
 
 `SatiLogica.slnx` is the repository-wide solution. Its solution folders describe product ownership
-without moving source files: all projects that exist today are under `sati`, while `platform`,
-`karuna`, and `upekkha` reserve the agreed future shape. This metadata does not rename the Sati
-product, its assemblies or namespaces, or either database environment.
+without moving Sati source files. `platform` now contains `SatiLogica.Contracts`; `karuna` and
+`upekkha` reserve the agreed future shape. This metadata does not rename the Sati product, its
+assemblies or namespaces, or either database environment.
 
 - `Sati.csproj` is the existing WPF client. It retains presentation, local EF service
   implementations, and local-development workflows, but no longer owns the entity assembly or
   migration chain.
 - `Sati.Api` is the ASP.NET Core server boundary for cloud workflows.
 - `Sati.Contracts` contains versioned network DTOs and has no WPF or EF dependency.
+- `SatiLogica.Contracts` owns the tenant-local clock and time-zone conversion used by both the API
+  and shared Sati rules. The API injects `ApiClock`, which delegates to this owner; shared rules
+  accept their decision date from callers. `Sati.Api` and `Sati.Contracts` ban direct host-local
+  clock reads through `BannedApiAnalyzers`. Desktop form and document rules receive the workstation
+  date (`DateTime.Today`). Desktop billing, note, settings, EDI, and admin-correction rules receive
+  the Maine date through `TenantClock.MaineDate`, as before P2; `PlanYearOverview` labels stored
+  instants with the Maine date. This split predates P2 and remains for a deliberate later change.
 - `Sati.Persistence` is the cross-platform EF/domain assembly containing the entities,
   `SatiContext`, and the complete migration chain. It does not make `SatiContext` the API's
   request context; `ApiDbContext` remains the current server model.

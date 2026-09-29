@@ -34,7 +34,8 @@ public sealed class SafetyDeviceRequestTests(SatiApiFactory factory)
                     new SafetyDeviceEntry("Helmet", "Prevent injury", "During seizures", "2")],
                 LessRestrictiveStrategies: "Verbal prompts were tried.",
                 PlanningTeamMeetingDate: new DateOnly(2026, 9, 20)),
-            new DateTime(2026, 9, 28, 12, 0, 0, DateTimeKind.Utc));
+            new DateTime(2026, 9, 28, 12, 0, 0, DateTimeKind.Utc),
+            new DateOnly(2026, 9, 28));
         var qaDirectory = Environment.GetEnvironmentVariable("SATI_DOCUMENT_QA_OUTPUT");
         if (!string.IsNullOrWhiteSpace(qaDirectory))
         {
@@ -64,12 +65,14 @@ public sealed class SafetyDeviceRequestTests(SatiApiFactory factory)
     public void Validation_rejects_unknown_level_and_more_than_ten_devices()
     {
         var errors = SafetyDeviceRules.Validate(new SafetyDeviceRequest(Devices:
-            Enumerable.Repeat(new SafetyDeviceEntry(Level: "3"), 11).ToArray()));
+            Enumerable.Repeat(new SafetyDeviceEntry(Level: "3"), 11).ToArray()),
+            new DateOnly(2026, 9, 28));
         Assert.Contains(nameof(SafetyDeviceRequest.Devices), errors.Keys);
         Assert.Contains("Devices[0].Level", errors.Keys);
         var overflow = SafetyDeviceRules.Validate(new SafetyDeviceRequest(
             LessRestrictiveStrategies: new string('x', 200),
-            Devices: [new SafetyDeviceEntry(Purpose: "An answer that cannot fit in this fixed cell")]));
+            Devices: [new SafetyDeviceEntry(Purpose: "An answer that cannot fit in this fixed cell")]),
+            new DateOnly(2026, 9, 28));
         Assert.Contains(nameof(SafetyDeviceRequest.LessRestrictiveStrategies), overflow.Keys);
         Assert.Contains("Devices[0].Purpose", overflow.Keys);
     }

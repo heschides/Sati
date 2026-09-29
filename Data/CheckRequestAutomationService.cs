@@ -33,7 +33,7 @@ public sealed class CheckRequestAutomationService(
         var actor = Actor;
         var errors = CheckRequestTemplateRules.Validate(
             request.GenerateOn, request.NeededByDaysAfterRequest, request.PayableTo,
-            request.MailingAddress, request.Amount, request.Reason);
+            request.MailingAddress, request.Amount, request.Reason, DateTime.Today);
         if (errors.Count > 0) throw new InvalidOperationException(string.Join(" ", errors));
 
         await using var db = contextFactory.CreateDbContext();

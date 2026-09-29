@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sati.Api.Data;
 using Sati.Contracts.V1;
+using SatiLogica.Contracts;
 using Xunit;
 
 namespace Sati.Api.Tests;
@@ -65,7 +66,7 @@ public sealed class BillingExportComplianceTests
         var line = await db.ClaimLines.SingleAsync(x => x.Id == 1402);
         var frozen = line.ClaimSnapshotJson;
         var note = await db.Notes.SingleAsync(x => x.Id == 603);
-        var today = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        var today = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         if (change is "uncompleted" or "historical" or "settings")
         {
             db.Forms.Add(new ServerForm
@@ -182,7 +183,7 @@ public sealed class BillingExportComplianceTests
         form.CompletedDate = null;
         await db.SaveChangesAsync();
         Assert.Equal(HttpStatusCode.Conflict, (await ExportAsync(client, key)).StatusCode);
-        form.CompletedDate = BillingRules.MaineBusinessDate(DateTimeOffset.UtcNow);
+        form.CompletedDate = TenantClock.MaineDate(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync();
         Assert.Equal(HttpStatusCode.Conflict, (await ExportAsync(client, key)).StatusCode);
         Assert.Single(await db.EdiGenerations.ToListAsync());

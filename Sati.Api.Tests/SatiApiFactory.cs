@@ -34,6 +34,8 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
     private readonly Dictionary<string, string> _tokens = new(StringComparer.Ordinal);
     private bool _seeded;
 
+    internal TimeProvider? ClockOverride { get; init; }
+
     /// <summary>
     /// The in-memory stand-in for this environment's Key Vault key. Exposed so a test
     /// can rotate it and confirm rows wrapped under the old version still decrypt.
@@ -80,6 +82,12 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
         });
         builder.ConfigureServices(services =>
         {
+            if (ClockOverride is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(ClockOverride);
+            }
+
             var identityHostedService = services.SingleOrDefault(descriptor =>
                 descriptor.ServiceType == typeof(IHostedService) &&
                 descriptor.ImplementationType == typeof(DatabaseIdentityHostedService));
