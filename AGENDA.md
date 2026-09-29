@@ -19,12 +19,37 @@ Local Production databases are separate and migrate only when their desktop is l
 The latest durable observations remain Joshua's workstation at 1.3.27 and the other
 SatiLogica workstation at 1.3.2; both are behind until individually upgraded and launched.
 
-- [ ] Validate and push the 1.3.31 source release; record the source commit and test results.
-- [ ] Publish and verify the 1.3.31 Demo API; record package hash, deployment ID, health,
-      version, and contract revision.
+- [x] Validate and push the 1.3.31 source release as
+      `31171c71953d58917fda02a899a34019a132d646`. The full Release solution build
+      passed with 0 errors and 19 existing warnings; 3,739 tests passed with 12 documented
+      external-prerequisite skips. The staged diff and whitespace check passed. The deferred
+      project-boundary work remains outside this commit.
+- [x] Publish the 70-entry, 10,758,180-byte `artifacts/SatiApi-1.3.31-fx-x86.zip`,
+      SHA-256 `57D6864FC1A92949436E772C79AB040FC01267F3A75E3AAD246C266DCA17C216`,
+      from the pushed source to the existing Demo API. Its file version is 1.3.31.0 and
+      product version includes source commit `31171c7`; ZIP structure and configuration
+      inspection found no private settings or secret-like configuration. OneDeploy operation
+      `26b87be7e5a14cf083de28a17723116e` succeeded. `/health/live` and schema-aware
+      `/health/ready` are Healthy; `/health/version` reports Sati.Api 1.3.31 and contract
+      revision `657D6D2087C7`, equal to the source manifest. Health-only evidence is in
+      `artifacts/release-1.3.31-demo-readiness.json`; authenticated checks were skipped
+      because synthetic Admin credentials are not configured.
 - [ ] Build and accept the 1.3.31 Demo and Local installers; publish each with its checksum
       to its exact distribution folder without overwrite. Record hashes, sizes, and cleanup.
 - [ ] Commit and push the final release evidence.
+
+Both installer candidates were built from the clean source checkout: Demo is 103,387,136
+bytes with SHA-256 `7BD27B28B8A0672127BC41B105D1B45A4758E7FD3499746B8A8DCA172596B7ED`;
+Local is 205,449,257 bytes with SHA-256
+`B80AB4BC897F4B621933AFA0A22E76ADA5E467BF31CCD044B4DBE25EA13E3B18`.
+The embedded LocalDB prerequisite was recovered from the accepted 1.3.30 installer,
+matched its recorded SHA-256
+`224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`,
+and retained a Valid Microsoft Authenticode signature. Installer acceptance is pending
+because a pre-existing `Sati.exe` process is running; the acceptance scripts refuse to
+test while any Sati process is open. No 1.3.31 installer has been distributed yet.
+No branch was merged or deleted; the five non-default remote branches remain retained
+because their completed/ephemeral status is uncertain or their work is unrelated.
 
 ## Unreleased — OADS Safety Device Request Form (2026-09-28)
 
