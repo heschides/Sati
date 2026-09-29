@@ -50,8 +50,9 @@
       `demo.reset.completed` and worker marker `DEMO_COMPLIANCE_HISTORY_COMPLETE`.
       Post-reset checks found 121 migrations, 76 baseline tables, all 177 People,
       both new `Notes` columns in live and baseline tables, and healthy API readiness.
-- [ ] The user-added exact-IP `SatiDemo` firewall rule
-      `josh-migration-20260928` must be removed by Josh and verified absent.
+- [x] Josh removed the temporary exact-IP `SatiDemo` firewall rule
+      `josh-migration-20260928`. A read-only Azure rule listing verified both
+      the rule name and workstation IP `72.95.106.10` absent afterward.
 - [x] Default Goal Progress to None for Form work without overwriting a deliberate choice, and
       restore the All Persons sentinel after the Notes Log replaces its filter collection so the
       default filter never renders blank.
