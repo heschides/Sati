@@ -1,5 +1,31 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.31 — 2026-09-28
+
+“Safety devices and clearer annual notes.” Adds the April 2026 OADS Safety Device request
+drafting workflow, annual Person-Centered Plan note identity and Unbilled handling, and the
+September 28 form and Notes Log corrections. The API and client contract revision changes,
+so the matching Demo API must be verified before distributing the Demo installer.
+
+Migration `20260928140919_AddAnnualPcpAndUnbilledNotes` was separately approved and applied
+to identity-marked `SatiDemo` with a guarded preflight, rollback rehearsal, application, and
+idempotency rerun. The read-only compliance check found 177 synthetic consumers and zero
+planned changes. Baseline capture returned `DEMO_FULL_RESET_BASELINE_CAPTURED` with anchor
+`2026-09-28`. Verification reset `0127695a-5e50-4137-8598-9e410ed137fd` recorded
+`demo.reset.completed` and `DEMO_COMPLIANCE_HISTORY_COMPLETE`; post-reset checks found
+121 migrations, 76 baseline tables, all 177 People, and both new Notes columns in live and
+baseline tables. The temporary exact-IP rule was removed by Josh and verified absent.
+Local Production databases are separate and migrate only when their desktop is launched.
+The latest durable observations remain Joshua's workstation at 1.3.27 and the other
+SatiLogica workstation at 1.3.2; both are behind until individually upgraded and launched.
+
+- [ ] Validate and push the 1.3.31 source release; record the source commit and test results.
+- [ ] Publish and verify the 1.3.31 Demo API; record package hash, deployment ID, health,
+      version, and contract revision.
+- [ ] Build and accept the 1.3.31 Demo and Local installers; publish each with its checksum
+      to its exact distribution folder without overwrite. Record hashes, sizes, and cleanup.
+- [ ] Commit and push the final release evidence.
+
 ## Unreleased — OADS Safety Device Request Form (2026-09-28)
 
 - [x] Add a Safety Device tab under Clients and Documents, with member and program details,

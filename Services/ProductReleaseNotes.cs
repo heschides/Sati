@@ -6,11 +6,29 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "A release for every recipient";
-    public const string ReleaseDate = "September 27, 2026";
+    public const string ReleaseName = "Safety devices and clearer annual notes";
+    public const string ReleaseDate = "September 28, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Prepare the OADS Safety Device request",
+            [
+                "Clients and Documents now has a Safety Device tab for entering device details, planning answers, and the team meeting date.",
+                "Generate PDF fills the April 2026 OADS form and saves a versioned draft. Review and obtain the required signatures outside Sati before submission."
+            ]),
+        new(
+            "Annual plan notes show their year and billing status",
+            [
+                "A Person-Centered Plan note can be marked Annual for one confirmed plan-year step. Sati shows which year it belongs to and offers a non-annual revision when the date is outside that year's window.",
+                "Late annual work stays in the clinical record as Unbilled. Form notes also reuse the existing active note for the same work instead of creating a duplicate."
+            ]),
+        new(
+            "Form and notes corrections",
+            [
+                "The DHHS Authorization to Release PDF now accepts every disclosure-purpose and general-record choice shown in the form workspace.",
+                "Goal Progress starts at None for form work unless you chose another value, and the Notes Log keeps its All Persons filter after loading."
+            ]),
         new(
             "Create a one-off release without provider setup",
             [
