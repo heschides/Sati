@@ -34,9 +34,21 @@ SatiLogica workstation at 1.3.2; both are behind until individually upgraded and
       revision `657D6D2087C7`, equal to the source manifest. Health-only evidence is in
       `artifacts/release-1.3.31-demo-readiness.json`; authenticated checks were skipped
       because synthetic Admin credentials are not configured.
-- [ ] Build and accept the 1.3.31 Demo and Local installers; publish each with its checksum
-      to its exact distribution folder without overwrite. Record hashes, sizes, and cleanup.
-- [ ] Commit and push the final release evidence.
+- [x] Build and accept the 1.3.31 Demo and Local installers. The Demo installer passed five
+      responsive 15-second launches, graceful closes, exact installed version 1.3.31.0,
+      and isolated cleanup; evidence is in
+      `artifacts/release-1.3.31-demo-installer-acceptance.json`. This is a build-workstation
+      check, not an external-machine attestation. The Local installer passed exact version
+      1.3.31.0, `SatiProduction`, Windows integrated security, the embedded Microsoft MSI
+      signature, and isolated cleanup.
+- [x] Publish only the accepted 1.3.31 installers and their `.sha256` files by verified
+      temporary sibling copy and no-overwrite rename. Local is in
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop`; Demo is in
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`.
+      Final hashes and checksum contents match the accepted artifacts, and no temporary copy
+      remains. Neither API ZIP nor private configuration was placed in those folders.
+- [x] Commit and push the final release evidence; the commit containing this checklist is
+      the final evidence commit.
 
 Both installer candidates were built from the clean source checkout: Demo is 103,387,136
 bytes with SHA-256 `7BD27B28B8A0672127BC41B105D1B45A4758E7FD3499746B8A8DCA172596B7ED`;
@@ -45,13 +57,14 @@ Local is 205,449,257 bytes with SHA-256
 The embedded LocalDB prerequisite was recovered from the accepted 1.3.30 installer,
 matched its recorded SHA-256
 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`,
-and retained a Valid Microsoft Authenticode signature. Installer acceptance is pending
-because a pre-existing `Sati.exe` process is running; the acceptance scripts refuse to
-test while any Sati process is open. No 1.3.31 installer has been distributed yet.
+and retained a Valid Microsoft Authenticode signature. The Local checksum file is 93 bytes
+and the Demo checksum file is 92 bytes; both were verified after distribution.
+An existing Sati process initially blocked acceptance; Josh closed it, and both gates
+then passed without changing the normal installation.
 No branch was merged or deleted; the five non-default remote branches remain retained
 because their completed/ephemeral status is uncertain or their work is unrelated.
 
-## Unreleased — OADS Safety Device Request Form (2026-09-28)
+## Safety Device Request Form — shipped in 1.3.31 (2026-09-28)
 
 - [x] Add a Safety Device tab under Clients and Documents, with member and program details,
       ten device rows across the main form and Appendix B, the three planning questions, and
@@ -67,7 +80,7 @@ because their completed/ephemeral status is uncertain or their work is unrelated
       signer authority and evidence requirements. The current draft leaves signature fields blank
       for signing outside Sati.
 
-## Unreleased corrections — 2026-09-28
+## Corrections shipped in 1.3.31 — 2026-09-28
 
 - [x] Close the remaining Work Agenda duplicate path after the 1.3.23 transition repair. The
       earlier 1.3.26 fix reconciled and prevented Scheduled upgrade fan-out, but a linked note that
