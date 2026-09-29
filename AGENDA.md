@@ -39,9 +39,19 @@
       forces late annual work to Unbilled. Persist `IsAnnualPlan` and `IsUnbilled`, exclude
       Unbilled work at both billing boundaries while retaining ordinary supervisor review, and
       publish the contract change as `annual-pcp-and-unbilled-note-v1`. Migration
-      `20260928140919_AddAnnualPcpAndUnbilledNotes` is generated but unapplied.
-      The identity-guarded Demo runner is prepared; preflight, rollback rehearsal,
-      application, reset-baseline recapture, and verification reset remain pending.
+      `20260928140919_AddAnnualPcpAndUnbilledNotes` was applied to identity-marked
+      `SatiDemo` on September 28 through its guarded runner: exact 120-row preflight,
+      rollback rehearsal, application to 121 rows, and idempotency rerun passed.
+      Local Production databases remain separate and cannot be assumed upgraded.
+      The read-only compliance check found 177 synthetic consumers, zero planned
+      changes, and no unexpected billing blockers. The Demo reset baseline was
+      recaptured with anchor `2026-09-28`; verification reset
+      `0127695a-5e50-4137-8598-9e410ed137fd` completed in 229 seconds with audited
+      `demo.reset.completed` and worker marker `DEMO_COMPLIANCE_HISTORY_COMPLETE`.
+      Post-reset checks found 121 migrations, 76 baseline tables, all 177 People,
+      both new `Notes` columns in live and baseline tables, and healthy API readiness.
+- [ ] The user-added exact-IP `SatiDemo` firewall rule
+      `josh-migration-20260928` must be removed by Josh and verified absent.
 - [x] Default Goal Progress to None for Form work without overwriting a deliberate choice, and
       restore the All Persons sentinel after the Notes Log replaces its filter collection so the
       default filter never renders blank.
