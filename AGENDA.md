@@ -1,6 +1,6 @@
 # Sati — Refactor Agenda
 
-## Release 1.3.32 — 2026-09-29 (blocked at Demo reset verification)
+## Release 1.3.32 — 2026-09-29 (completed after Demo reset recovery)
 
 “Resumable forms and calmer workspaces.” Includes encrypted wizard progress, the
 April 2024 OFI benefits application wizard, assessment/PCP opening-date corrections,
@@ -35,16 +35,19 @@ neither is assumed upgraded. Local schema updates occur on a later installed lau
       SHA-256 `806D9702BD70D36EFF72A24E01EC5DCEC22C9D478B46373B79E59013D67F5B0A`.
       Assembly 1.3.32.0 includes the pushed source hash; no private settings were packaged.
 - [x] Check Demo compliance and capture the approved baseline.
-- [ ] Verify a full Demo reset. Both the initial request and the separately approved
+- [x] Verify a full Demo reset. Both the initial request and the separately approved
       replacement reached the poison queue without a success/failure database audit.
       The bounded restart/replacement approval was exhausted. Josh subsequently requested
-      diagnosis and repair; the correction and its deliberate verification are tracked below.
+      diagnosis and repair. The corrected worker's verification completed in 253 seconds,
+      with the matching database audit and compliance marker (evidence below).
 - [x] Josh removed `Temporary-DATT-FormWizardProgress`; a read-only Azure firewall
       listing independently confirmed the rule is absent.
 - [x] Build and accept both installers, including isolated cleanup.
-- [ ] Publish exact distribution files and hashes (held; no 1.3.32 files distributed).
-- [ ] Complete release evidence after the reset gate is resolved. The commit containing
-      this blocked-release report records partial progress, not release completion.
+- [x] Publish both accepted installers and checksums to the exact distribution paths below;
+      final hashes match the accepted artifacts, with no existing artifact overwritten.
+- [x] Complete release evidence. The earlier blocked report is commit `ba1b5ff`;
+      this completion entry supersedes its pending gates. Desktop/API source is `64634e6`,
+      and the separately deployed Function correction is `5f2eb79`.
 
 The approved baseline capture returned `DEMO_FULL_RESET_BASELINE_CAPTURED`, anchor
 2026-09-29, 77 baseline tables and 177 synthetic consumers. Pre-capture read-only
@@ -63,9 +66,9 @@ is zero; poison count is two and both exact request ids are preserved. There is 
 evidence for either request. The deployed worker has a ten-minute timeout and
 maxDequeueCount=1. After restart, telemetry recorded dispatch, but no final outcome
 or useful exception was available. The cause is not established: do not attribute
-the failure conclusively to Azure or to the new schema. Stop without another retry;
-diagnose the worker and complete this gate before distributing the accepted installers.
-The final telemetry recheck still showed only worker dispatch, without an outcome or
+the failure conclusively to Azure or to the new schema. That recovery stopped without
+another retry; Josh subsequently requested the diagnosis and repair recorded below.
+The telemetry recheck at that point still showed only worker dispatch, without an outcome or
 exception. Post-recovery API liveness and schema readiness remained Healthy at
 2026-09-30 02:02:47 UTC, with version 1.3.32 and the expected contract revision.
 
@@ -84,22 +87,56 @@ at 07:19:27 UTC on September 29 (266 seconds), as did release 1.3.31 (229 second
       Relevant desktop suite: 27/27 passed, including 11 new runtime cases and seven
       publisher cases under PowerShell 7.6.5. The original script fails the timeout,
       stage-marker, and cleanup-masking checks; the former publisher lacks code-only mode.
-- [ ] Publish the reviewed correction to the existing reset Function and verify one
-      deliberate reset before resuming installer distribution. Preserve both poison messages.
+- [x] Publish the reviewed correction to the existing reset Function and verify one
+      deliberate reset before resuming installer distribution. Both poison messages preserved.
+
+Correction source `5f2eb79f7c41fb2c2625d2f3857966d11ae8167b` was pushed and its clean
+13-entry Function package retained at
+`artifacts/SatiDemoRefresh-20260930T022824214Z-5f2eb79f7c41-70ad5047.zip` (39,924,108 bytes,
+SHA-256 `C53C555DA92CF35047142C2F200DBC132E3A48E26CBCD4D59B6C18E0C24151CA`).
+Code-only deployment `d3166937eaa84a3880f02d7a0babefc0` completed successfully;
+the hosted shared script matches source and the host reports Running. No identities,
+firewall rules, or app settings were changed. The main queue was empty and both earlier
+poison messages remained intact before verification request
+`5c702907-9350-412a-9524-dbea8102623e` was accepted at 2026-09-30 02:33:52 UTC.
+The worker completed at 02:38:08 UTC in 253 seconds and emitted
+`DEMO_COMPLIANCE_HISTORY_COMPLETE`. A separate database query verified
+`demo.reset.completed` with that exact request id, stage Completed, and duration 253;
+177 synthetic People and 122 migrations remain. Authentication/open/lock took about two
+seconds, baseline restore 156 seconds, showcase roll 44 seconds, and compliance 51 seconds.
+Completion telemetry arrived roughly two minutes late; the operation itself was within
+its normal duration. The original host shutdown's cause remains unconfirmed, so this is
+a verified recovery with improved diagnostics, not evidence that platform interruptions
+cannot recur. Post-reset live/readiness checks passed at 02:42:27 UTC with version 1.3.32
+and contract `9A471CC48B50`; authenticated checks remain skipped for absent credentials.
+The temporary workstation firewall rule was independently confirmed absent again.
+The nested session/transaction SQL lock pattern was also
+reproduced successfully on a disposable LocalDB database (185 ms; fixture removed).
 
 Both installer candidates passed isolated acceptance and cleanup. Demo passed five
 responsive 15-second launches with graceful closes and exact version 1.3.32.0;
 this is workstation evidence, not an external-machine attestation. Local passed
 version 1.3.32.0, embedded Microsoft LocalDB signature, SatiProduction selection,
 and Windows integrated security. Neither installer is represented as code-signed.
-Candidates remain in the repository artifacts directory pending reset verification:
+Accepted originals remain in the repository artifacts directory. Published copies and
+their `.sha256` files were verified byte-for-byte in the approved distribution folders:
 
 | Candidate | Bytes | SHA-256 |
 |---|---:|---|
 | `artifacts/SatiDemoInstaller/SatiDemoSetup-1.3.32.exe` | 104,079,360 | `A6917370A2881459164FDEC590583CDF604AD0D854361B44C78CE1B02E5A2FFE` |
 | `artifacts/SatiLocalInstaller/SatiLocalSetup-1.3.32.exe` | 206,411,305 | `3014F539A87225FE6AE03992338B4D523790DDE05A336CF4D42774763D773A9E` |
 
-## Unreleased — Modern earth-tone themes (2026-09-29)
+- Demo: `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files\SatiDemoSetup-1.3.32.exe`
+- Local: `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop\SatiLocalSetup-1.3.32.exe`
+
+Full release validation remains 3,815 passes/one optional model skip, supplemented by
+27/27 focused repair tests (18 new cases). Existing compiler/analyzer warnings remain.
+No branch was merged or deleted during this release; the detached 1.3.31 checkout remains.
+Local machines still require installing and launching this release before their versions
+and schema can be recorded as upgraded. External reset-failure notification remains deferred
+until an approved destination is supplied; the current audit and stage logs remain available.
+
+## Shipped in 1.3.32 — Modern earth-tone themes (2026-09-29)
 
 - [x] Add Modern Stone from the approved gray-shell mockup, plus Modern Sand,
       Modern Taupe, Modern Sage, and Modern Clay in the existing theme picker.
@@ -108,7 +145,7 @@ Candidates remain in the repository artifacts directory pending reset verificati
       keeping the Modern earth tones together and preserving the saved selection.
 - [x] Verify all five palettes with the existing contrast and rendered-view checks,
       and exercise the grouped Settings picker with a WPF selection/order test.
-- [ ] Ship the desktop themes in a future release.
+- [x] Ship the desktop themes in release 1.3.32.
 
 ## Repository cleanup — 2026-09-29
 
@@ -134,7 +171,7 @@ worktree were left intact, including the unmerged video-conferencing design. The
 detached `sati-release-1-3-31` worktree also remains; it is not attached to this chat and
 was not deleted as part of branch cleanup.
 
-## Unreleased — assessment opening and completion dates (2026-09-29)
+## Shipped in 1.3.32 — assessment opening and completion dates (2026-09-29)
 
 - [x] Prevent legacy zero/short availability settings from blocking PCP or assessment work
       on its required opening day; use the shared fixed opening leads of 90 and 30 days.
@@ -144,22 +181,23 @@ was not deleted as part of branch cleanup.
 - [x] Explain effective availability minimums and reminder-only late windows in Settings.
 - [x] Reproduce the zero-window failure before the fix and pass 140 focused desktop/domain
       and render tests plus 18 API tests, including the September 22 / October 22 example.
-- [ ] Ship the matching desktop and API correction; source work does not change an installed
-      application or write completion evidence to a real client record. No data migration is
-      needed for this date correction.
+- [x] Ship the matching desktop and API correction in 1.3.32. Desktop installations still
+      require upgrading; this correction writes no completion evidence to a real client record.
+      No data migration is needed for the date correction.
 
-## Unreleased — resumable form wizard progress (2026-09-29)
+## Shipped in 1.3.32 — resumable form wizard progress (2026-09-29)
 
 - [x] Store encrypted, actor/consumer/form-bound answers and the current OFI step,
       with current-caseload authorization and optimistic revision checks in Demo
       and local Production.
 - [x] Add save and resume controls to the DHHS, release, CWIC, Housing
       Support Funds, Safety Device, and OFI Benefits Application workspaces.
-- [ ] Apply `AddFormWizardProgress` through the controlled Demo and Production
-      migration process. No database migration or deployment occurred during source work.
+- [x] Apply `AddFormWizardProgress` through the separately approved Demo migration process.
+- [ ] Verify each Local Production machine after the 1.3.32 installer is installed and launched;
+      no working Production database was changed during this release.
 - [ ] Set a reviewed retention and legal-hold policy for abandoned answer drafts.
 
-## Unreleased — OFI Application for Benefits wizard (2026-09-29)
+## Shipped in 1.3.32 — OFI Application for Benefits wizard (2026-09-29)
 
 - [x] Add the supplied 20-page April 30, 2024 OFI application as a hash-pinned
       resource and a Clients page wizard for SNAP, TANF, MaineCare, and related
