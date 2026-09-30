@@ -278,6 +278,15 @@ public sealed class WorkAgendaMigrationTests
             {
                 await setup.GetService<IMigrator>().MigrateAsync(PreviousMigration);
 
+                // Seed and inspect through today's Note model while retaining the
+                // historical migration boundary under test. These later flags do
+                // not participate in the duplicate repair; don't run later data
+                // migrations before exercising that repair on the seeded rows.
+                await setup.Database.ExecuteSqlRawAsync("""
+                    ALTER TABLE dbo.Notes ADD IsAnnualPlan bit NOT NULL DEFAULT CAST(0 AS bit);
+                    ALTER TABLE dbo.Notes ADD IsUnbilled bit NOT NULL DEFAULT CAST(0 AS bit);
+                    """);
+
                 var agency = new Agency { Name = "Synthetic Work Agenda repair agency" };
                 setup.Agencies.Add(agency);
                 await setup.SaveChangesAsync();

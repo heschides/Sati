@@ -20,6 +20,47 @@ namespace Sati.Tests;
 /// </summary>
 public sealed class ComboBoxTemplateTests
 {
+    [Fact]
+    public void SettingsThemeGroupsPreserveSelectionAndAlphabetizeChoices()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            var content = RenderedViews.TryLoad(Path.Combine(RepositoryRoot(), "Views", "SettingsWindow.xaml"));
+            Assert.True(content is not null, RenderedViews.LastLoadFailure);
+            var selected = new Sati.Services.ThemeOption("Modern Stone", "ModernStone");
+            var options = new[]
+            {
+                selected,
+                new Sati.Services.ThemeOption("Legacy", "Legacy"),
+                new Sati.Services.ThemeOption("Modern Clay", "ModernClay"),
+                new Sati.Services.ThemeOption("Modern", "Modern")
+            };
+            var window = System.Windows.Window.GetWindow(content!);
+            Assert.NotNull(window);
+            window.DataContext = new ThemePickerData { ThemeOptions = options, SelectedTheme = selected };
+            WpfUiHarness.Realize(content!);
+            var tabs = WpfUiHarness.Descendants(content!).OfType<System.Windows.Controls.TabControl>().Single();
+            tabs.SelectedItem = tabs.Items.Cast<System.Windows.Controls.TabItem>()
+                .Single(tab => Equals(tab.Header, "Appearance"));
+            WpfUiHarness.Realize(content!);
+            var picker = WpfUiHarness.Descendants(content!)
+                .OfType<System.Windows.Controls.ComboBox>()
+                .Single(control => System.Windows.Automation.AutomationProperties.GetName(control) == "Theme");
+            Assert.Same(selected, picker.SelectedItem);
+            Assert.Equal(new[] { "Modern", "Modern Clay", "Modern Stone", "Legacy" },
+                picker.Items.Cast<Sati.Services.ThemeOption>().Select(theme => theme.DisplayName));
+            Assert.Equal(new[] { "Modern", "Modern · earth tones", "Classic & branded" },
+                picker.Items.Groups!.Cast<System.Windows.Data.CollectionViewGroup>().Select(group => group.Name));
+            Assert.Single(picker.GroupStyle);
+        });
+    }
+
+    public sealed class ThemePickerData
+    {
+        public IReadOnlyList<Sati.Services.ThemeOption> ThemeOptions { get; init; } = [];
+        public Sati.Services.ThemeOption? SelectedTheme { get; set; }
+    }
+
     private static readonly string[] MustNotUseTemplateBinding =
     [
         "SelectionBoxItem",

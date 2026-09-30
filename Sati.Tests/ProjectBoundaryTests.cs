@@ -24,7 +24,8 @@ public sealed class ProjectBoundaryTests
             ["/karuna/", "/platform/", "/sati/", "/upekkha/"],
             folders.Keys.Order(StringComparer.Ordinal).ToArray());
         Assert.Equal(13, folders["/sati/"].Elements("Project").Count());
-        Assert.Empty(folders["/platform/"].Elements("Project"));
+        Assert.Equal("platform/SatiLogica.Contracts/SatiLogica.Contracts.csproj",
+            (string?)Assert.Single(folders["/platform/"].Elements("Project")).Attribute("Path"));
         Assert.Empty(folders["/karuna/"].Elements("Project"));
         Assert.Empty(folders["/upekkha/"].Elements("Project"));
     }

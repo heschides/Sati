@@ -3,11 +3,37 @@ using System.Windows;
 
 namespace Sati.Services
 {
-    public sealed record ThemeOption(string DisplayName, string ResourceName);
+    public sealed record ThemeOption(string DisplayName, string ResourceName)
+    {
+        public string Group => ResourceName switch
+        {
+            "ModernStone" or "ModernSand" or "ModernTaupe" or "ModernSage" or "ModernClay" => "Modern · earth tones",
+            "Modern" or "ModernGray" or "ModernPink" or "ModernBlue" or "ModernDark" => "Modern",
+            "SunlitShell" or "ApricotPearl" or "RosewaterPearl" or "PearlescentCream" or
+                "BlueberryMist" or "BlueGrayPearl" or "MoonlitPearl" or "IridescentJewel" => "Pearlescent",
+            "WarmEarth" or "PineCoast" or "CedarGrove" or "WalnutLinen" or "RedwoodBlush" => "Nature",
+            "IndustrialMatte" or "Paisley" or "ArtNouveau" or "MidCenturyModern" or
+                "VanillaBean" or "BodhiWatercolor" or "UmberFacets" => "Illustrated",
+            "MidnightOpal" or "HarborNight" or "DeepCurrent" => "Dark",
+            _ => "Classic & branded"
+        };
+
+        public int GroupOrder => Group switch
+        {
+            "Modern" => 0,
+            "Modern · earth tones" => 1,
+            "Pearlescent" => 2,
+            "Nature" => 3,
+            "Illustrated" => 4,
+            "Dark" => 5,
+            _ => 6
+        };
+    }
 
     /// <summary>
     /// Applies one of the app's interchangeable theme dictionaries and persists the
-    /// choice per Windows user. Functional state colors remain in States.xaml.
+    /// choice per Windows user. States.xaml supplies default functional colors;
+    /// palettes may adjust their ink for contrast while preserving their meaning.
     /// </summary>
     public sealed class ThemeService
     {
@@ -21,6 +47,11 @@ namespace Sati.Services
         [
             new("Sunlit Shell", "SunlitShell"),
             new("Modern", "Modern"),
+            new("Modern Stone", "ModernStone"),
+            new("Modern Sand", "ModernSand"),
+            new("Modern Taupe", "ModernTaupe"),
+            new("Modern Sage", "ModernSage"),
+            new("Modern Clay", "ModernClay"),
             new("Modern Gray", "ModernGray"),
             new("Modern Pink", "ModernPink"),
             new("Modern Blue", "ModernBlue"),

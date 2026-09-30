@@ -370,7 +370,8 @@ public sealed class ReleaseUiStructureTests
                      "PineCoast", "BlueberryMist", "BlueGrayPearl", "CedarGrove", "HarborNight",
                      "IndustrialMatte", "Paisley", "ArtNouveau", "MidCenturyModern", "VanillaBean",
                      "WalnutLinen", "DeepCurrent", "RedwoodBlush", "BodhiWatercolor", "UmberFacets", "Legacy",
-                     "Modern", "ModernGray", "ModernPink", "ModernBlue", "ModernDark"
+                     "Modern", "ModernGray", "ModernPink", "ModernBlue", "ModernDark",
+                     "ModernStone", "ModernSand", "ModernTaupe", "ModernSage", "ModernClay"
                  })
         {
             var supplied = ResourceKeys(Path.Combine(Root, "Themes", $"{name}.xaml"));

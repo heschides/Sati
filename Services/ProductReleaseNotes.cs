@@ -6,11 +6,35 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Safety devices and clearer annual notes";
-    public const string ReleaseDate = "September 28, 2026";
+    public const string ReleaseName = "Resumable forms and calmer workspaces";
+    public const string ReleaseDate = "September 29, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Save form answers and return later",
+            [
+                "Save progress preserves your entered answers in the DHHS, release, CWIC, Housing Support Funds, Safety Device, and Benefits Application workspaces.",
+                "Resume saved restores your last saved answers and Benefits Application step. Saving progress does not sign or complete a form."
+            ]),
+        new(
+            "Prepare the OFI benefits application",
+            [
+                "The Clients Forms tab now includes a step-by-step wizard for the April 2024 SNAP, TANF, and MaineCare application.",
+                "Generate a draft PDF for applicant review and signing. Additional household members and insurance plans may require continuation sheets."
+            ]),
+        new(
+            "Opening dates and completion dates are distinct",
+            [
+                "Comprehensive Assessments are available at least 30 days before completion is due; PCPs are available at least 90 days before completion is due, including with older zero-day settings.",
+                "Form choices show Open by and Complete by separately. PCPs also show their effective date."
+            ]),
+        new(
+            "Choose a quieter Modern palette",
+            [
+                "Modern Stone, Sand, Taupe, Sage, and Clay combine deeper neutral surroundings with light reading areas.",
+                "Settings groups themes by style and alphabetizes choices within each group."
+            ]),
         new(
             "Prepare the OADS Safety Device request",
             [

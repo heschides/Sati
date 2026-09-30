@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
         mc:Ignorable="d"
         Title="Settings"
         Height="720"
@@ -14,6 +15,15 @@
         Background="{DynamicResource SurfaceBrush}">
 
     <Window.Resources>
+        <CollectionViewSource x:Key="GroupedThemes" Source="{Binding ThemeOptions}">
+            <CollectionViewSource.SortDescriptions>
+                <scm:SortDescription PropertyName="GroupOrder" Direction="Ascending" />
+                <scm:SortDescription PropertyName="DisplayName" Direction="Ascending" />
+            </CollectionViewSource.SortDescriptions>
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="Group" />
+            </CollectionViewSource.GroupDescriptions>
+        </CollectionViewSource>
         <Style x:Key="LabelStyle"
                TargetType="TextBlock">
             <Setter Property="FontSize"
@@ -460,12 +470,28 @@
 
                 <TextBlock Text="THEME"
                            Style="{StaticResource LabelStyle}" />
-                <ComboBox AutomationProperties.Name="Theme" ItemsSource="{Binding ThemeOptions}"
+                <ComboBox AutomationProperties.Name="Theme"
+                          AutomationProperties.HelpText="Themes are grouped by style and alphabetized within each group."
+                          ItemsSource="{Binding Source={StaticResource GroupedThemes}}"
                           SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                           DisplayMemberPath="DisplayName"
+                          TextSearch.TextPath="DisplayName"
+                          MaxDropDownHeight="440"
                           Width="250"
                           HorizontalAlignment="Left"
-                          Margin="0,0,0,16" />
+                          Margin="0,0,0,16">
+                    <ComboBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Margin="10,12,10,5" />
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ComboBox.GroupStyle>
+                </ComboBox>
 
                 <TextBlock Text="Changes are previewed immediately and remembered for this Windows user."
                            FontSize="11"

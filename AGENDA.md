@@ -1,5 +1,46 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.32 — 2026-09-29 (in progress)
+
+“Resumable forms and calmer workspaces.” Includes encrypted wizard progress, the
+April 2024 OFI benefits application wizard, assessment/PCP opening-date corrections,
+five Modern earth-tone palettes, grouped theme selection, and the shared tenant clock.
+
+Josh separately approved `20260929185110_AddFormWizardProgress` on SatiDemo,
+baseline recapture, and a verification reset. He added the temporary exact-IP rule;
+identity-guarded preflight found 121 migrations and no FormWizardProgress table.
+No Production database operation is authorized. Known Local machines retain their
+last observed versions: Joshua's workstation 1.3.27 and SatiLogica workstation 1.3.2;
+neither is assumed upgraded. Local schema updates occur on a later installed launch.
+
+- [x] Full Release solution build: 0 errors, 19 existing warnings (incremental recheck 10).
+      Desktop full sweep passed 2,703 tests; three stale release/architecture assertions were
+      corrected and the affected suites plus disposable SQL tests passed (105/105).
+      The remaining historical Work Agenda SQL fixture needed the two later note flags
+      to seed through today's model; its corrected suite passed 5/5. Resolved desktop
+      coverage is 2,712 passes; one skipped theory expands to two SQL cases when enabled.
+      API 972, Carika 4, Portal 8, and Signatures 119 passed, including optional SQL rehearsals.
+      Only the opt-in Foundry model evaluation remains skipped: model initialization/download
+      authorization is absent. No real-data test connection was used.
+      Total resolved coverage: 3,815 passes and one documented model-evaluation skip.
+- [ ] Push verified source; no branch reconciliation needed (master only).
+- [ ] Guarded Demo migration: rollback rehearsal, apply, idempotency rerun.
+- [ ] Publish matching Demo API and verify health/version/contract.
+- [ ] Check Demo compliance, capture baseline, verify one reset, and have Josh remove access.
+- [ ] Build and accept both installers, publish exact distribution files and hashes.
+- [ ] Push final release evidence and confirm clean local/remote equality.
+
+## Unreleased — Modern earth-tone themes (2026-09-29)
+
+- [x] Add Modern Stone from the approved gray-shell mockup, plus Modern Sand,
+      Modern Taupe, Modern Sage, and Modern Clay in the existing theme picker.
+      Preserve Modern typography, light reading/entry surfaces, and the clay accent.
+- [x] Group Settings themes by style and alphabetize choices within each group,
+      keeping the Modern earth tones together and preserving the saved selection.
+- [x] Verify all five palettes with the existing contrast and rendered-view checks,
+      and exercise the grouped Settings picker with a WPF selection/order test.
+- [ ] Ship the desktop themes in a future release.
+
 ## Repository cleanup — 2026-09-29
 
 Under the explicit repository-cleanup request, pushed `e949c1d` and `e39c602` to
