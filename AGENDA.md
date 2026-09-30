@@ -1,6 +1,6 @@
 # Sati — Refactor Agenda
 
-## Release 1.3.32 — 2026-09-29 (in progress)
+## Release 1.3.32 — 2026-09-29 (blocked at Demo reset verification)
 
 “Resumable forms and calmer workspaces.” Includes encrypted wizard progress, the
 April 2024 OFI benefits application wizard, assessment/PCP opening-date corrections,
@@ -23,12 +23,62 @@ neither is assumed upgraded. Local schema updates occur on a later installed lau
       Only the opt-in Foundry model evaluation remains skipped: model initialization/download
       authorization is absent. No real-data test connection was used.
       Total resolved coverage: 3,815 passes and one documented model-evaluation skip.
-- [ ] Push verified source; no branch reconciliation needed (master only).
-- [ ] Guarded Demo migration: rollback rehearsal, apply, idempotency rerun.
-- [ ] Publish matching Demo API and verify health/version/contract.
-- [ ] Check Demo compliance, capture baseline, verify one reset, and have Josh remove access.
-- [ ] Build and accept both installers, publish exact distribution files and hashes.
-- [ ] Push final release evidence and confirm clean local/remote equality.
+- [x] Push verified source `64634e6f2d6814f7f3277ce26968a89448135f79`;
+      no branch reconciliation needed (master only; detached 1.3.31 checkout retained).
+- [x] Guarded Demo migration: rollback rehearsal retained 121 migrations/no new table;
+      apply reached 122; rerun returned `IDEMPOTENCY_VERIFIED` without changes.
+- [x] Publish matching Demo API: OneDeploy `12371b60549b40b798bfe9282e87bf90`
+      succeeded. Live and schema readiness are Healthy; version 1.3.32 and contract
+      `9A471CC48B50` match the source manifest. Authenticated readiness credentials
+      are absent, so only health/version/contract checks ran on the hosted API.
+      API ZIP: `artifacts/SatiApi-1.3.32-fx-x86.zip`, 72 entries, 11,432,586 bytes,
+      SHA-256 `806D9702BD70D36EFF72A24E01EC5DCEC22C9D478B46373B79E59013D67F5B0A`.
+      Assembly 1.3.32.0 includes the pushed source hash; no private settings were packaged.
+- [x] Check Demo compliance and capture the approved baseline.
+- [ ] Verify a full Demo reset. Both the initial request and the separately approved
+      replacement reached the poison queue without a success/failure database audit.
+      No further reset or Function restart is authorized by this recovery approval.
+- [x] Josh removed `Temporary-DATT-FormWizardProgress`; a read-only Azure firewall
+      listing independently confirmed the rule is absent.
+- [x] Build and accept both installers, including isolated cleanup.
+- [ ] Publish exact distribution files and hashes (held; no 1.3.32 files distributed).
+- [ ] Complete release evidence after the reset gate is resolved. The commit containing
+      this blocked-release report records partial progress, not release completion.
+
+The approved baseline capture returned `DEMO_FULL_RESET_BASELINE_CAPTURED`, anchor
+2026-09-29, 77 baseline tables and 177 synthetic consumers. Pre-capture read-only
+compliance review planned three routine PCP openings and found no unexpected billing
+holds. Verification reset `70057039-2023-4871-a6f8-507320126157` was accepted (202)
+at 2026-09-30 01:30:54 UTC, but produced no audit outcome and moved to the poison
+queue (message `8bed73c8-ab9f-469f-8e78-d2546fc1e4f4`). Josh separately approved a
+bounded restart/recovery and at most one replacement. Only the existing Demo reset
+Function was restarted; no firewall/security setting was changed. The original
+poison message remains preserved. Replacement `7b4707c2-28fb-4f04-ae40-d679958f5c96`
+was accepted at 01:48:03 UTC; telemetry confirms ResetDemoWorker invocation
+`52c402b8-4198-47cb-8f5a-ee261312594d` started at 01:48:06 UTC.
+The replacement also reached the poison queue by 02:01:46 UTC. Main reset queue count
+is zero; poison count is two and both exact request ids are preserved. There is no
+`demo.reset.completed`, `demo.reset.failed`, or `DEMO_COMPLIANCE_HISTORY_COMPLETE`
+evidence for either request. The deployed worker has a ten-minute timeout and
+maxDequeueCount=1. After restart, telemetry recorded dispatch, but no final outcome
+or useful exception was available. The cause is not established: do not attribute
+the failure conclusively to Azure or to the new schema. Stop without another retry;
+diagnose the worker and complete this gate before distributing the accepted installers.
+The final telemetry recheck still showed only worker dispatch, without an outcome or
+exception. Post-recovery API liveness and schema readiness remained Healthy at
+2026-09-30 02:02:47 UTC, with version 1.3.32 and the expected contract revision.
+
+Both installer candidates passed isolated acceptance and cleanup. Demo passed five
+responsive 15-second launches with graceful closes and exact version 1.3.32.0;
+this is workstation evidence, not an external-machine attestation. Local passed
+version 1.3.32.0, embedded Microsoft LocalDB signature, SatiProduction selection,
+and Windows integrated security. Neither installer is represented as code-signed.
+Candidates remain in the repository artifacts directory pending reset verification:
+
+| Candidate | Bytes | SHA-256 |
+|---|---:|---|
+| `artifacts/SatiDemoInstaller/SatiDemoSetup-1.3.32.exe` | 104,079,360 | `A6917370A2881459164FDEC590583CDF604AD0D854361B44C78CE1B02E5A2FFE` |
+| `artifacts/SatiLocalInstaller/SatiLocalSetup-1.3.32.exe` | 206,411,305 | `3014F539A87225FE6AE03992338B4D523790DDE05A336CF4D42774763D773A9E` |
 
 ## Unreleased — Modern earth-tone themes (2026-09-29)
 
