@@ -1,5 +1,29 @@
 # Sati — Refactor Agenda
 
+## Repository cleanup — 2026-09-29
+
+Under the explicit repository-cleanup request, pushed `e949c1d` and `e39c602` to
+`origin/master`, then reduced this checkout and GitHub's branch list to `master`.
+This was source publication and branch housekeeping, not a release or migration.
+
+| Removed remote branch | Exact former tip | History preservation |
+|---|---|---|
+| `codex/annual-compliance` | `0c906753b20f44bd7b5c5869b320c1e8d343653c` | Fully merged into master |
+| `codex/clarify-project-notes` | `d60f4d0d8ddb1748b3d9cc6fc67e7257cf15bed2` | Fully merged into master |
+| `claude/local-vs-github-workflow-dlcqpb` | `62b2f8359f30ec78e6be11180e31d78d0af9af6f` | Remote tag `archive/2026-09-29/claude/local-vs-github-workflow-dlcqpb` |
+| `second-machine-setup` | `f31fdf08e889ff5d59c60898aa75ef619c79983c` | Remote tag `archive/2026-09-29/second-machine-setup` |
+| `team-chat-design` | `e7d80ca0de1e6d71b8a2e2b9f5caad0f7e15a895` | Remote tag `archive/2026-09-29/team-chat-design` |
+
+The three divergent historical tips were archived, not merged or discarded. Their
+older setup instructions, maintenance/admin/password changes, and initial chat design
+have newer implementations or documentation on master. Verified remote annotated tags
+retain every original commit before removal of the branch names. No force push occurred.
+
+The separate SatiLogica-profile clone was inspected read-only. Its local branches and
+worktree were left intact, including the unmerged video-conferencing design. The clean,
+detached `sati-release-1-3-31` worktree also remains; it is not attached to this chat and
+was not deleted as part of branch cleanup.
+
 ## Unreleased — assessment opening and completion dates (2026-09-29)
 
 - [x] Prevent legacy zero/short availability settings from blocking PCP or assessment work
