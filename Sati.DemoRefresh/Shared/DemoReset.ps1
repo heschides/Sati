@@ -17,7 +17,7 @@ function Get-DemoSqlToken {
     $resource = [Uri]::EscapeDataString('https://database.windows.net/')
     $separator = if ($identityEndpoint.Contains('?')) { '&' } else { '?' }
     $tokenUri = "$identityEndpoint${separator}api-version=2019-08-01&resource=$resource"
-    $result = Invoke-RestMethod -Method Get -Uri $tokenUri -Headers @{
+    $result = Invoke-RestMethod -Method Get -Uri $tokenUri -TimeoutSec 30 -Headers @{
         'X-IDENTITY-HEADER' = $identityHeader
         'Metadata' = 'true'
     }
@@ -53,6 +53,14 @@ function Get-SafeFailureDetail($ErrorRecord) {
     }
 }
 
+# These markers contain only reset identifiers and fixed stage names. Emit them before
+# blocking work so a host interruption still leaves the last entered stage in telemetry.
+function Write-DemoResetStage {
+    param([Guid]$RequestId, [string]$Trigger, [string]$Stage, [double]$Seconds)
+
+    Write-Host "DEMO_RESET_STAGE RequestId=$RequestId Trigger=$Trigger Stage=$Stage Seconds=$([Math]::Round($Seconds))"
+}
+
 # Written after the restore, so it survives it; a reset that failed before restoring
 # writes into the database as it stood. Never allowed to hide the reset's own outcome.
 function Write-DemoResetOutcome {
@@ -77,6 +85,7 @@ function Write-DemoResetOutcome {
                 $metadata.sqlErrorNumbers = $Detail.SqlErrorNumbers
             }
             $command = $connection.CreateCommand()
+            $command.CommandTimeout = 15
             $command.CommandText = @'
 IF DB_NAME() <> N'SatiDemo' OR NOT EXISTS
    (SELECT 1 FROM dbo.SatiDatabaseIdentity WHERE Id=1 AND EnvironmentName=N'Demo')
@@ -117,11 +126,15 @@ function Invoke-DemoFullReset {
     $stage = 'AcquireManagedIdentityToken'
     $token = $null
     try {
+        Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
         $token = Get-DemoSqlToken
         $stage = 'OpenDemoDatabase'
+        Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
         $connection = New-DemoConnection $server $token
+        $operationFailed = $false
         try {
             $stage = 'AcquireExclusiveResetLock'
+            Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
             $lock = $connection.CreateCommand()
             $lock.CommandTimeout = 70
             $lock.CommandText = @'
@@ -133,14 +146,18 @@ SELECT @result;
             if ([int]$lock.ExecuteScalar() -lt 0) { throw 'The Demo is busy; reset did not begin.' }
 
             $stage = 'RestoreCanonicalBaseline'
+            Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
             $command = $connection.CreateCommand()
-            $command.CommandTimeout = 900
+            # The Function host has a ten-minute lifetime. Leave time for the rolling
+            # seed, compliance check, cleanup, and an audited failure if SQL stalls.
+            $command.CommandTimeout = 240
             $command.CommandText = 'EXEC dbo.SatiResetToCanonicalBaseline @RequestId, @ActorUserId;'
             [void]$command.Parameters.AddWithValue('@RequestId', $RequestId)
             [void]$command.Parameters.AddWithValue('@ActorUserId', $ActorUserId)
             [void]$command.ExecuteNonQuery()
 
             $stage = 'RollShowcaseDates'
+            Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
             $seed = Join-Path $PSScriptRoot 'Seed-DemoShowcaseData.ps1'
             if (-not (Test-Path -LiteralPath $seed -PathType Leaf)) {
                 throw "The versioned Demo seed is missing at '$seed'."
@@ -148,25 +165,54 @@ SELECT @result;
             & $seed -SqlServer $server -Database 'SatiDemo' -AccessToken $token -AsOfDate ([DateTime]::Today)
 
             $stage = 'CompleteComplianceHistory'
+            Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
             Invoke-DemoComplianceSeed -Server $server -Token $token -AsOfDate ([DateTime]::Today)
             $stage = 'Completed'
         }
+        catch {
+            $operationFailed = $true
+            throw
+        }
         finally {
-            if ($connection.State -eq [System.Data.ConnectionState]::Open) {
-                $release = $connection.CreateCommand()
-                $release.CommandText = "EXEC sys.sp_releaseapplock @Resource=N'SatiDemo.FullReset', @LockOwner=N'Session';"
-                [void]$release.ExecuteNonQuery()
+            $cleanupFailure = $null
+            try {
+                if ($connection.State -eq [System.Data.ConnectionState]::Open) {
+                    $release = $connection.CreateCommand()
+                    $release.CommandTimeout = 10
+                    $release.CommandText = "EXEC sys.sp_releaseapplock @Resource=N'SatiDemo.FullReset', @LockOwner=N'Session';"
+                    [void]$release.ExecuteNonQuery()
+                }
             }
-            $connection.Dispose()
+            catch {
+                $cleanupFailure = $_
+            }
+            try {
+                $connection.Dispose()
+            }
+            catch {
+                if ($null -eq $cleanupFailure) { $cleanupFailure = $_ }
+            }
+            if ($null -ne $cleanupFailure) {
+                $cleanupDetail = Get-SafeFailureDetail $cleanupFailure
+                Write-Warning "Demo reset cleanup failed. RequestId=$RequestId ExceptionTypes=$($cleanupDetail.ExceptionTypes -join ',') SqlErrorNumbers=$($cleanupDetail.SqlErrorNumbers -join ',')"
+                # Preserve the stage and original exception if the reset already failed.
+                # If cleanup is the only failure, report it through the same audit path.
+                if (-not $operationFailed) {
+                    $stage = 'ReleaseExclusiveResetLock'
+                    throw $cleanupFailure
+                }
+            }
         }
     }
     catch {
         $detail = Get-SafeFailureDetail $_
+        Write-DemoResetStage $RequestId $Trigger 'RecordFailureOutcome' $clock.Elapsed.TotalSeconds
         Write-DemoResetOutcome -Server $server -Token $token -RequestId $RequestId -ActorUserId $ActorUserId `
             -Trigger $Trigger -Succeeded $false -Stage $stage -Seconds $clock.Elapsed.TotalSeconds -Detail $detail
         throw "Demo reset failed. RequestId=$RequestId Trigger=$Trigger Stage=$stage ExceptionTypes=$($detail.ExceptionTypes -join ',') SqlErrorNumbers=$($detail.SqlErrorNumbers -join ',')"
     }
 
+    Write-DemoResetStage $RequestId $Trigger 'RecordSuccessOutcome' $clock.Elapsed.TotalSeconds
     Write-DemoResetOutcome -Server $server -Token $token -RequestId $RequestId -ActorUserId $ActorUserId `
         -Trigger $Trigger -Succeeded $true -Stage $stage -Seconds $clock.Elapsed.TotalSeconds -Detail $null
     Write-Host "Full Demo reset completed. RequestId=$RequestId Trigger=$Trigger ActorUserId=$ActorUserId Seconds=$([Math]::Round($clock.Elapsed.TotalSeconds))"

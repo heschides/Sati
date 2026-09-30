@@ -37,7 +37,8 @@ neither is assumed upgraded. Local schema updates occur on a later installed lau
 - [x] Check Demo compliance and capture the approved baseline.
 - [ ] Verify a full Demo reset. Both the initial request and the separately approved
       replacement reached the poison queue without a success/failure database audit.
-      No further reset or Function restart is authorized by this recovery approval.
+      The bounded restart/replacement approval was exhausted. Josh subsequently requested
+      diagnosis and repair; the correction and its deliberate verification are tracked below.
 - [x] Josh removed `Temporary-DATT-FormWizardProgress`; a read-only Azure firewall
       listing independently confirmed the rule is absent.
 - [x] Build and accept both installers, including isolated cleanup.
@@ -67,6 +68,24 @@ diagnose the worker and complete this gate before distributing the accepted inst
 The final telemetry recheck still showed only worker dispatch, without an outcome or
 exception. Post-recovery API liveness and schema readiness remained Healthy at
 2026-09-30 02:02:47 UTC, with version 1.3.32 and the expected contract revision.
+
+Follow-up diagnosis (requested by Josh): subscription Enabled; Function Running with
+normal availability/usage and no daily memory quota. A read-only probe from the reset
+service obtained its managed-identity token, opened SatiDemo, and verified EXECUTE on
+the reset procedure and INSERT on AuditEvents. The existing firewall remained closed
+to the workstation. An intentionally invalid worker invocation stopped at validation in
+1.4 seconds without entering SQL. No billing or login change is indicated. On-disk host
+logs show shutdown at 01:50:30 UTC, 144 seconds after the replacement worker started;
+the reason for that shutdown is not established. Earlier nightly verification succeeded
+at 07:19:27 UTC on September 29 (266 seconds), as did release 1.3.31 (229 seconds).
+
+- [x] Add safe stage logging and bounded token/restore/cleanup/audit waits; preserve the
+      original error when cleanup also fails. Add executable failure-path regression tests.
+      Relevant desktop suite: 27/27 passed, including 11 new runtime cases and seven
+      publisher cases under PowerShell 7.6.5. The original script fails the timeout,
+      stage-marker, and cleanup-masking checks; the former publisher lacks code-only mode.
+- [ ] Publish the reviewed correction to the existing reset Function and verify one
+      deliberate reset before resuming installer distribution. Preserve both poison messages.
 
 Both installer candidates passed isolated acceptance and cleanup. Demo passed five
 responsive 15-second launches with graceful closes and exact version 1.3.32.0;

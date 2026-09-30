@@ -573,8 +573,7 @@ then validates the Demo identity marker, caseload presence, deliberate-exception
 profile completeness, and claim readiness on a new connection. The cloud run and an immediate
 idempotency run passed on 2026-09-06.
 
-The source now extends that refresh into a full reset, but this stronger path is not live until its
-first controlled baseline capture, Function/API configuration, deployment, and acceptance test.
+The full reset is deployed and was verified through release 1.3.31 and the September 29 nightly run.
 `scripts/Initialize-DemoFullReset.ps1` copies the explicitly approved current `dbo` contents into a
 protected `demo_baseline` schema and creates one owner-executed reset procedure. It refuses any
 database except the identity-checked `SatiDemo`, requires an explicit replacement switch, fails if
@@ -592,9 +591,12 @@ makes the route absent. Completion rotates `SatiDatabaseIdentity.InstanceId`, wh
 each access token and checked on every authorized request, so all sessions from the replaced
 database instance fail immediately and must sign in again.
 
-Failure still needs an approved external notification destination before the stronger reset can be
-described as operationally complete. Until deployment and a live destructive acceptance exercise,
-the currently hosted behavior remains the previously verified daily caseload refresh.
+The shared runner logs safe request/stage markers before blocking operations, bounds token and
+restore waits, and preserves the original failure if lock cleanup also fails. These diagnostics
+supplement the outcome audit; a host interruption can still prevent a final audit from being written.
+The manual queue permits one delivery only. A failed or interrupted request requires review before
+another reset. Release 1.3.32 recovery evidence is tracked in `AGENDA.md`. Failure notification still
+needs an approved external destination.
 
 ## Electronic signatures (synthetic-data build)
 
