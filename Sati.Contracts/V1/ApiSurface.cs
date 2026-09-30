@@ -114,6 +114,8 @@ public static class ApiSurface
         "cwic-referral-packet-v1",
         "housing-support-funds-v1",
         "safety-device-request-v1",
+        "ofi-benefits-application-v1",
+        "form-wizard-progress-v1",
         "person-photo-v1",
         // The counted-service-day read gained a userId, so a reviewer can see a case manager's
         // settled days with no billable work. An older server ignores the parameter and answers
@@ -201,6 +203,7 @@ public static class ApiSurface
         "GET /api/v1/people/{personId:int}/external-signatures",
         "GET /api/v1/people/{personId:int}/forms/{type}/attestations",
         "GET /api/v1/people/{personId:int}/forms/{type}/prerequisite",
+        "GET /api/v1/people/{personId:int}/form-wizards/{formKey}/progress",
         "GET /api/v1/people/{personId:int}/history",
         "GET /api/v1/people/{personId:int}/history.pdf",
         "GET /api/v1/people/{personId:int}/journal",
@@ -296,6 +299,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/assessments/draft",
         "POST /api/v1/people/{personId:int}/contacts",
         "POST /api/v1/people/{personId:int}/cwic-referral.pdf",
+        "POST /api/v1/people/{personId:int}/benefits-application.pdf",
         "POST /api/v1/people/{personId:int}/documents/privacy-practices/acknowledgment",
         "POST /api/v1/people/{personId:int}/documents/verify",
         "POST /api/v1/people/{personId:int}/documents/{artifactId:int}/freeze",
@@ -346,6 +350,7 @@ public static class ApiSurface
         "PUT /api/v1/people/{personId:int}",
         "PUT /api/v1/people/{personId:int}/check-request-template",
         "PUT /api/v1/people/{personId:int}/contacts/{contactId:int}",
+        "PUT /api/v1/people/{personId:int}/form-wizards/{formKey}/progress",
         "PUT /api/v1/people/{personId:int}/journal",
         "PUT /api/v1/people/{personId:int}/owner",
         "PUT /api/v1/people/{personId:int}/photo",

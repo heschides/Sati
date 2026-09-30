@@ -1,5 +1,46 @@
 # Sati — Refactor Agenda
 
+## Unreleased — assessment opening and completion dates (2026-09-29)
+
+- [x] Prevent legacy zero/short availability settings from blocking PCP or assessment work
+      on its required opening day; use the shared fixed opening leads of 90 and 30 days.
+- [x] Present assessment Open by / Complete by dates in form selection, the profile, and
+      attestation. Show PCP Open by / Complete by and its effective date in the same surfaces;
+      preserve exact annual record identity.
+- [x] Explain effective availability minimums and reminder-only late windows in Settings.
+- [x] Reproduce the zero-window failure before the fix and pass 140 focused desktop/domain
+      and render tests plus 18 API tests, including the September 22 / October 22 example.
+- [ ] Ship the matching desktop and API correction; source work does not change an installed
+      application or write completion evidence to a real client record. No data migration is
+      needed for this date correction.
+
+## Unreleased — resumable form wizard progress (2026-09-29)
+
+- [x] Store encrypted, actor/consumer/form-bound answers and the current OFI step,
+      with current-caseload authorization and optimistic revision checks in Demo
+      and local Production.
+- [x] Add save and resume controls to the DHHS, release, CWIC, Housing
+      Support Funds, Safety Device, and OFI Benefits Application workspaces.
+- [ ] Apply `AddFormWizardProgress` through the controlled Demo and Production
+      migration process. No database migration or deployment occurred during source work.
+- [ ] Set a reviewed retention and legal-hold policy for abandoned answer drafts.
+
+## Unreleased — OFI Application for Benefits wizard (2026-09-29)
+
+- [x] Add the supplied 20-page April 30, 2024 OFI application as a hash-pinned
+      resource and a Clients page wizard for SNAP, TANF, MaineCare, and related
+      program answers. Local Production and Demo API generation use the same
+      source and field placement rules, current-caseload authorization, audit,
+      and versioned Draft artifact storage.
+- [x] Keep applicant identity server/local-writer derived and signature lines
+      empty; label the PDF as a draft requiring full applicant review and signing.
+- [ ] Confirm the April 2024 application revision and generated box placement
+      with the receiving OFI office before real submission. This source change
+      does not establish intake acceptance or eligibility.
+- [ ] Add continuation sheets for a household larger than six and for additional
+      health insurance plans; the current wizard points users to the source form's
+      manual continuation instructions.
+
 ## Release 1.3.31 — 2026-09-28
 
 “Safety devices and clearer annual notes.” Adds the April 2026 OADS Safety Device request

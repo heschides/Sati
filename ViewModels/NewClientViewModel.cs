@@ -84,6 +84,7 @@ namespace Sati.ViewModels
         public ConsumerImportViewModel ConsumerImport { get; }
         public AgencyReleaseViewModel AgencyRelease { get; }
         public CwicPacketViewModel? CwicPacket { get; }
+        public BenefitsApplicationViewModel? BenefitsApplication { get; }
         public HousingSupportFundsViewModel? HousingSupportFunds { get; }
         public SafetyDeviceViewModel? SafetyDevice { get; }
         public SafetyPlanViewModel? SafetyPlan { get; }
@@ -416,6 +417,7 @@ namespace Sati.ViewModels
             AgencyRelease?.SetPerson(value);
             ReleaseObligations?.SetPerson(value);
             CwicPacket?.SetPerson(value);
+            BenefitsApplication?.SetPerson(value);
             HousingSupportFunds?.SetPerson(value);
             SafetyDevice?.SetPerson(value);
             CheckRequests?.SetPerson(value);
@@ -700,7 +702,8 @@ namespace Sati.ViewModels
                            IPersonPhotoService? personPhotoService = null,
                            CwicPacketViewModel? cwicPacket = null,
                            HousingSupportFundsViewModel? housingSupportFunds = null,
-                           SafetyDeviceViewModel? safetyDevice = null)
+                           SafetyDeviceViewModel? safetyDevice = null,
+                           BenefitsApplicationViewModel? benefitsApplication = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -716,6 +719,7 @@ namespace Sati.ViewModels
             SsnPanel = ssnPanel;
             AgencyRelease = agencyRelease;
             CwicPacket = cwicPacket;
+            BenefitsApplication = benefitsApplication;
             HousingSupportFunds = housingSupportFunds;
             SafetyDevice = safetyDevice;
             SafetyPlan = safetyPlan;

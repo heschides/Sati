@@ -104,8 +104,9 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
             var completedOn = assessment.CompletedDate ?? CompletionDate;
             return completedOn is DateTime date &&
                    date.Date > assessment.TargetEffectiveDate.Date
-                ? $"This assessment is attached to the plan starting {assessment.TargetEffectiveDate:MM/dd/yy}, " +
-                  $"but its completion date is {date:MM/dd/yy}. Check the plan year; the next plan has a separate renewal."
+                ? $"This assessment was due {assessment.DueDate:MM/dd/yy}, " +
+                  $"but its completion date is {date:MM/dd/yy}. Check the selected assessment; " +
+                  $"its related PCP is effective {assessment.TargetEffectiveDate:MM/dd/yy}, and the next cycle has a separate renewal."
                 : string.Empty;
         }
     }
@@ -113,10 +114,10 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
     public string AttestationStatement => _form?.Type switch
     {
         FormType.PCP =>
-            $"I attest that the Person-Centered Plan for the plan starting {_form.TargetEffectiveDate:MM/dd/yy} " +
+            $"I attest that the Person-Centered Plan ({FormDocumentLabels.PcpDates(_form)}) " +
             "was completed in Evergreen on the date entered above.",
         FormType.ComprehensiveAssessment =>
-            $"I attest that the Comprehensive Assessment for the plan starting {_form.TargetEffectiveDate:MM/dd/yy} " +
+            $"I attest that the Comprehensive Assessment ({FormDocumentLabels.AssessmentDates(_form.DueDate)}) " +
             "was completed in Evergreen on the date entered above.",
         _ => string.Empty
     };
@@ -124,7 +125,11 @@ public partial class FormAttestationViewModel(IFormService formService) : Observ
         ? string.Empty
         : _form.CompletedDate is DateTime completed
             ? $"Attested complete on {completed:MMM d, yyyy}."
-            : $"Due {_form.DueDate:MMM d, yyyy}; completion has not been attested.";
+            : _form.Type == FormType.ComprehensiveAssessment
+                ? $"Assessment: {FormDocumentLabels.AssessmentDates(_form.DueDate, "MMM d, yyyy")}; completion has not been attested."
+                : _form.Type == FormType.PCP
+                    ? $"PCP: {FormDocumentLabels.PcpDates(_form, "MMM d, yyyy")}; completion has not been attested."
+                : $"Due {_form.DueDate:MMM d, yyyy}; completion has not been attested.";
     public string PrerequisiteSummary =>
         _prerequisiteStatus?.Summary ?? "Checking the prerequisite…";
     public bool IsPrerequisiteMissing => _prerequisiteStatus is { IsSatisfied: false };

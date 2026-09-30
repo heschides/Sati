@@ -2244,6 +2244,9 @@
                                 <Setter Property="TextWrapping" Value="Wrap" />
                                 <Setter Property="Margin" Value="20,0,0,1" />
                             </Style>
+                            <DataTemplate x:Key="AnnualFormLabelTemplate">
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                            </DataTemplate>
                             <!-- One annual document type. The first checkbox is the plan in
                                  force; the indented one appears only while the renewal is
                                  being prepared and disappears on its target date. Each names
@@ -2255,6 +2258,7 @@
                             <DataTemplate x:Key="AnnualFormRowTemplate">
                                 <StackPanel>
                                     <views:AttestationCheckBox Content="{Binding Current.CheckBoxLabel, FallbackValue=''}"
+                                              ContentTemplate="{StaticResource AnnualFormLabelTemplate}"
                                               AutomationProperties.Name="{Binding Current.AutomationName, FallbackValue=''}"
                                               IsChecked="{Binding Current.IsComplete, Mode=OneWay, FallbackValue=False}"
                                               IsEnabled="{Binding DataContext.IsFormsEditingUnlocked, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -2275,6 +2279,7 @@
                                     <StackPanel Margin="20,2,0,0"
                                                 Visibility="{Binding HasRenewal, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <views:AttestationCheckBox Content="{Binding Renewal.CheckBoxLabel}"
+                                                  ContentTemplate="{StaticResource AnnualFormLabelTemplate}"
                                                   AutomationProperties.Name="{Binding Renewal.AutomationName}"
                                                   IsChecked="{Binding Renewal.IsComplete, Mode=OneWay, FallbackValue=False}"
                                                   IsEnabled="{Binding DataContext.IsFormsEditingUnlocked, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -2649,6 +2654,11 @@
                         <TabItem Header="CWIC Packet"
                                  Style="{StaticResource ClientWorkspaceTabItemStyle}">
                             <clientDocuments:CwicPacketWorkspace DataContext="{Binding CwicPacket}" />
+                        </TabItem>
+
+                        <TabItem Header="Benefits Application"
+                                 Style="{StaticResource ClientWorkspaceTabItemStyle}">
+                            <clientDocuments:BenefitsApplicationWorkspace DataContext="{Binding BenefitsApplication}" />
                         </TabItem>
 
                         <TabItem Header="Housing Funds"

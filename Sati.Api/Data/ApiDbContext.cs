@@ -15,6 +15,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerForm> Forms => Set<ServerForm>();
     public DbSet<ServerFormAttestation> FormAttestations => Set<ServerFormAttestation>();
     public DbSet<ServerDocumentArtifact> DocumentArtifacts => Set<ServerDocumentArtifact>();
+    public DbSet<FormWizardProgress> FormWizardProgress => Set<FormWizardProgress>();
     public DbSet<ExternalSignatureEvidence> ExternalSignatureEvidence => Set<ExternalSignatureEvidence>();
     public DbSet<FrozenSignatureDocument> FrozenSignatureDocuments => Set<FrozenSignatureDocument>();
     public DbSet<SignatureRequest> SignatureRequests => Set<SignatureRequest>();
@@ -87,6 +88,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        FormWizardProgressPersistenceModel.Configure<ServerPerson>(modelBuilder);
         ClearinghousePersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration>(modelBuilder);
         BillingCorrectionPersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration, ServerClaimLine, ServerRemittanceDeposit>(modelBuilder);
         modelBuilder.Entity<ServerDatabaseIdentity>(entity =>

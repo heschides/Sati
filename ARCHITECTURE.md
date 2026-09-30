@@ -1,6 +1,37 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-09-28.*
+*Living document. Updated during structured review sessions. Last updated: 2026-09-29.*
+
+## Resumable form wizard answers — September 29 (unreleased)
+
+The six PDF entry workspaces (two DHHS forms, two Sati releases, CWIC, Housing
+Support Funds, Safety Device, and OFI Benefits Application) use
+`IFormWizardProgressService`. A draft row is keyed by consumer, author, and form;
+tracked releases include the exact obligation id, while annual DHHS releases
+include the exact target date. Demo reads and writes through
+`Sati.Api`; local Production uses its transitional EF service. The answer JSON is
+encrypted in `FormWizardProgress` with the existing envelope protector and a
+tenant/person/author/form binding. It stores the last explicitly saved step and
+answers, never a PDF signature or completion attestation. Every API operation
+rechecks current caseload ownership. Save requires an expected revision; a stale
+session must reload before writing. Draft reads and saves are audited without
+answer text. The UI loads saved answers on consumer selection and exposes
+Save progress, Resume saved, and Reload saved. This new table requires a controlled
+migration before the feature can run in either database.
+
+## OFI Application for Benefits draft — September 29 (unreleased)
+
+The Clients page has a page-by-page wizard for the supplied April 30, 2024 Maine OFI
+SNAP/TANF/MaineCare general application. `BenefitsApplicationRules` in
+`Sati.Contracts.V1` owns the whitelist of questions, printed coordinates, bounded
+answer types, and review reminders. The desktop sends only entered answers through
+`IBenefitsApplicationService`; the local and Demo API writers derive applicant name,
+date of birth, and any on-file SSN after current-caseload authorization. Both use
+`BenefitsApplicationPdfGenerator` and the SHA-pinned 20-page source. The PDF is
+staged as a versioned Draft artifact and generation is audited without answer text.
+It is not an eligibility decision, signed application, or submission. The page 3
+signature and Appendix B signatures stay blank. Additional household members and
+health plans still need the source form's continuation sheets.
 
 ## OADS Safety Device Request draft — September 28 (unreleased)
 
@@ -55,7 +86,12 @@ All dates are calendar dates. With the confirmed defaults:
 | Safety Plan, Privacy Practices, annual releases | target − 90 days | target |
 | Q1/Q2/Q3/Q4 review | 10 days before its due date | target + 90/180/270/360 days |
 
-The open-window values remain agency settings. Changing a window changes availability, not the
+The open-window values remain agency settings. For PCP and Comprehensive Assessment,
+`ComplianceScheduleRules.OpenDaysBefore` uses at least the fixed opening lead from
+`BillingComplianceGate` (90 and 30 days before the stored completion deadline, respectively).
+A smaller legacy setting, including zero, cannot postpone availability past the required opening
+day; a larger value still permits earlier work. Opening and completion use that same availability
+in the desktop, API, reminders, and renewal selection. Changing a window changes availability, not the
 obligation's annual identity. Generation creates outstanding obligations only; it never treats the
 passage of an effective date as evidence of completion. `EnsureCurrentCycleForms` creates missing
 rows through the upcoming target, while displays keep current and upcoming rows distinct.

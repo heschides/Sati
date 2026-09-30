@@ -7,6 +7,72 @@ public sealed class ComplianceScheduleRulesTests
 {
     private static readonly ComplianceScheduleSettings Defaults = new();
 
+    [Theory]
+    [InlineData("ComprehensiveAssessment", 0, 30)]
+    [InlineData("ComprehensiveAssessment", 10, 30)]
+    [InlineData("ComprehensiveAssessment", 30, 30)]
+    [InlineData("ComprehensiveAssessment", 45, 45)]
+    [InlineData("PCP", 0, 90)]
+    [InlineData("PCP", 90, 90)]
+    [InlineData("PCP", 120, 120)]
+    public void AvailabilityCannotFallAfterTheRequiredOpeningDeadline(
+        string type, int configuredLead, int expectedLead)
+    {
+        var settings = Defaults with
+        {
+            ComprehensiveAssessmentOpenDaysBefore = configuredLead,
+            PcpOpenDaysBefore = configuredLead
+        };
+        var due = new DateTime(2026, 10, 22);
+
+        Assert.Equal(expectedLead, ComplianceScheduleRules.OpenDaysBefore(type, settings));
+        Assert.Equal(due.AddDays(-expectedLead),
+            ComplianceScheduleRules.AvailableOn(type, due, settings));
+        // Configuring earlier availability never moves the fixed opening obligation.
+        Assert.Equal(due.AddDays(type == "PCP" ? -90 : -30),
+            BillingComplianceGate.OpeningDeadline(type, due));
+    }
+
+    [Fact]
+    public void LegacyZeroWindowAllowsAssessmentOpeningAndCompletionOnSeptember22()
+    {
+        var target = new DateTime(2027, 1, 20);
+        var settings = Defaults with { ComprehensiveAssessmentOpenDaysBefore = 0 };
+        var due = ComplianceScheduleRules.DueDate("ComprehensiveAssessment", target, settings);
+        var available = ComplianceScheduleRules.AvailableOn("ComprehensiveAssessment", due, settings);
+        var completed = new DateTime(2026, 9, 22);
+        var today = new DateTime(2026, 9, 29);
+
+        Assert.Equal(new DateTime(2026, 10, 22), due);
+        Assert.Null(FormOpeningRules.Validate(completed, available, today));
+        var decision = FormAttestationRules.Evaluate(
+            "ComprehensiveAssessment", completed, target.AddYears(-1), today,
+            AttestationActorKind.CaseManager, [], targetEffectiveDate: target, availableOn: available);
+        Assert.True(decision.Accepted, decision.DateError);
+        Assert.NotNull(FormOpeningRules.Validate(completed.AddDays(-1), available, today));
+        Assert.NotNull(FormAttestationRules.ValidateCompletionDate(
+            completed.AddDays(-1), target.AddYears(-1), today, available));
+        Assert.NotNull(FormAttestationRules.ValidateCompletionDate(
+            today.AddDays(1), target.AddYears(-1), today, available));
+    }
+
+    [Theory]
+    [InlineData("Q1R")]
+    [InlineData("Reclassification")]
+    [InlineData("SafetyPlan")]
+    public void FormsWithoutAnOpeningDeadlineKeepTheirConfiguredWindow(string type)
+    {
+        var settings = Defaults with
+        {
+            ReviewOpenDaysBefore = 0,
+            ReclassificationOpenDaysBefore = 0,
+            SafetyPlanOpenDaysBefore = 0
+        };
+        var due = new DateTime(2026, 10, 22);
+
+        Assert.Equal(due, ComplianceScheduleRules.AvailableOn(type, due, settings));
+    }
+
     [Fact]
     public void MarchSeventhAnnualScheduleUsesTheConfirmedCalendarDayRules()
     {

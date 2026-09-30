@@ -11,7 +11,8 @@ public enum AnnualDocumentKind
     CwicReferralPacket,
     HousingSupportFundsApplication,
     DhhsAuthorizedRepresentative,
-    SafetyDeviceRequest
+    SafetyDeviceRequest,
+    BenefitsApplication
 }
 
 public enum DocumentArtifactOrigin
@@ -42,7 +43,8 @@ public static class AnnualDocumentCatalog
         new(AnnualDocumentKind.CwicReferralPacket, "CWIC referral packet", null, false, false),
         new(AnnualDocumentKind.HousingSupportFundsApplication, "Housing Support Funds application", null, false, false),
         new(AnnualDocumentKind.DhhsAuthorizedRepresentative, "DHHS Authorized Representative", null, false, false),
-        new(AnnualDocumentKind.SafetyDeviceRequest, "Safety Device Request Form", null, false, false)
+        new(AnnualDocumentKind.SafetyDeviceRequest, "Safety Device Request Form", null, false, false),
+        new(AnnualDocumentKind.BenefitsApplication, "OFI Application for Benefits", null, false, false)
     ];
 
     public static AnnualDocumentCatalogEntry? ForFormType(string formType) =>

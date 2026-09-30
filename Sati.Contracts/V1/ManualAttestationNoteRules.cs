@@ -11,8 +11,8 @@ public static class ManualAttestationNoteRules
 
     public const string UnlinkedFormNoteMessage =
         "An existing unlinked form note may already document this work, so Sati cannot create a second note. " +
-        "Open that note and confirm its actual activity date. If it is editable, use FORM OBLIGATION / PLAN YEAR " +
-        "below Form Type to select this plan. Submit it as Logged only after the work is complete. " +
+        "Open that note and confirm its actual activity date. If it is editable, use FORM TO DOCUMENT " +
+        "below Form Type to select this form. Submit it as Logged only after the work is complete. " +
         "If it is no longer editable, ask a supervisor to return it for correction. " +
         "If a billing claim line exists, contact Admin instead.";
 

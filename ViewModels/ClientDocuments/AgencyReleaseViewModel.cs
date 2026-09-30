@@ -10,12 +10,16 @@ namespace Sati.ViewModels.ClientDocuments;
 public partial class AgencyReleaseViewModel : ObservableObject
 {
     private readonly IAgencyReleaseService _service;
+    private Person? _person;
+    private Guid? _savedObligationId;
+    private bool _restoringProgress;
     private readonly List<ReleaseObligationDto> _knownReleaseObligations = [];
     private int? _personId;
     private int _personVersion;
     private Guid? _oneOffReleaseId;
 
-    public AgencyReleaseViewModel(IAgencyReleaseService service)
+    public AgencyReleaseViewModel(IAgencyReleaseService service,
+        IFormWizardProgressService progressService)
     {
         _service = service;
         ReleaseKindChoices =
@@ -45,7 +49,13 @@ public partial class AgencyReleaseViewModel : ObservableObject
             .Select(value => new AgencyReleaseCategoryOption(value, AgencyReleaseInformation.DisplayName(value)))
             .ToList();
         ResetInputs();
+        Progress = new FormWizardProgressViewModel(progressService,
+            CaptureProgress, RestoreProgress);
+        Progress.Watch(this);
+        Progress.WatchChildren(InformationCategories);
     }
+
+    public FormWizardProgressViewModel Progress { get; }
 
     public IReadOnlyList<YesNoChoice> YesNoChoices { get; }
     public IReadOnlyList<ReleaseKindChoice> ReleaseKindChoices { get; }
@@ -195,18 +205,28 @@ public partial class AgencyReleaseViewModel : ObservableObject
         ClearCommand.NotifyCanExecuteChanged();
     }
 
-    partial void OnSelectedReleaseKindChanged(ReleaseKindChoice value) =>
+    partial void OnSelectedReleaseKindChanged(ReleaseKindChoice value)
+    {
         RebuildReleaseObligationChoices();
+        if (IsEditorOpen && !_restoringProgress)
+        {
+            _restoringProgress = true;
+            try { ResetInputs(); }
+            finally { _restoringProgress = false; }
+            Progress.SetPerson(_person, ProgressKey);
+        }
+    }
 
     partial void OnSelectedReleaseObligationChanged(ReleaseDocumentObligationChoice? value)
     {
-        if (value is null || !string.IsNullOrWhiteSpace(ContactName))
-            return;
-
-        ContactName = value.RecipientDisplayName;
-        ContactType = value.DocumentKind == AnnualDocumentKind.ReleaseMedical
-            ? "Healthcare provider"
-            : "Service provider";
+        if (value is not null && string.IsNullOrWhiteSpace(ContactName))
+        {
+            ContactName = value.RecipientDisplayName;
+            ContactType = value.DocumentKind == AnnualDocumentKind.ReleaseMedical
+                ? "Healthcare provider" : "Service provider";
+        }
+        if (IsEditorOpen && !_restoringProgress && Progress.CurrentKey != ProgressKey)
+            Progress.SetPerson(_person, ProgressKey);
     }
 
     partial void OnSelectedScopeChanged(AgencyReleaseScopeChoice? value)
@@ -240,6 +260,8 @@ public partial class AgencyReleaseViewModel : ObservableObject
     public void SetPerson(Person? person)
     {
         _personVersion++;
+        _person = person;
+        _savedObligationId = null;
         _personId = person?.Id;
         PersonName = person?.FullName ?? "Select a consumer";
         _knownReleaseObligations.Clear();
@@ -251,6 +273,7 @@ public partial class AgencyReleaseViewModel : ObservableObject
         OnPropertyChanged(nameof(HasPerson));
         OnPropertyChanged(nameof(CanGenerate));
         GenerateCommand.NotifyCanExecuteChanged();
+        Progress.SetPerson(person, ProgressKey);
     }
 
     public void BeginPreparation(ReleaseObligationItemViewModel item)
@@ -276,6 +299,7 @@ public partial class AgencyReleaseViewModel : ObservableObject
         ValidationMessage = string.Empty;
         StatusMessage = "Complete the release, save a draft if needed, then prepare the final signing copy.";
         IsEditorOpen = true;
+        Progress.SetPerson(_person, ProgressKey);
     }
 
     public void BeginOneOffPreparation()
@@ -291,6 +315,7 @@ public partial class AgencyReleaseViewModel : ObservableObject
         ValidationMessage = string.Empty;
         StatusMessage = "Enter the recipient directly. This release will not create a provider-directory entry or an annual compliance obligation.";
         IsEditorOpen = true;
+        Progress.SetPerson(_person, ProgressKey);
     }
 
     /// <summary>
@@ -310,6 +335,7 @@ public partial class AgencyReleaseViewModel : ObservableObject
                 .Select(group => group.First()));
         }
         RebuildReleaseObligationChoices();
+        RestoreObligationSelection();
     }
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
@@ -502,6 +528,61 @@ public partial class AgencyReleaseViewModel : ObservableObject
         DidObtainRoi,
         IsDraft: !DidObtainRoi);
 
+    private string ProgressKey
+    {
+        get
+        {
+            var prefix = SelectedReleaseKind.Kind == AnnualDocumentKind.ReleaseMedical
+                ? "medical-release" : "agency-release";
+            return SelectedReleaseObligation is { } selected
+                ? $"{prefix}.{selected.ObligationId:D}"
+                : IsOneOffPreparation ? $"{prefix}-one-off" : prefix;
+        }
+    }
+
+    private string CaptureProgress() => FormWizardProgressJson.Capture(new AgencyReleaseWizardAnswers(
+        BuildRequest(), SelectedReleaseKind.Kind,
+        SelectedReleaseObligation?.ObligationId,
+        IsOneOffPreparation, _oneOffReleaseId));
+
+    private void RestoreProgress(string json, int _)
+    {
+        var answers = System.Text.Json.JsonSerializer.Deserialize<AgencyReleaseWizardAnswers>(json)
+            ?? throw new InvalidOperationException("The saved release is empty.");
+        var request = answers.Request;
+        if (request is null) throw new InvalidOperationException("The saved release has no answers.");
+        if (answers.Kind != SelectedReleaseKind.Kind)
+            throw new InvalidOperationException("The saved release type does not match the selected form.");
+        _restoringProgress = true;
+        try
+        {
+            FormWizardProgressJson.ApplyScalars(this, request);
+            AuthorizationChoice = YesNoChoices.FirstOrDefault(choice => choice.Value == request.AuthorizationGranted);
+            DrugAlcoholChoice = YesNoChoices.FirstOrDefault(choice => choice.Value == request.IncludeDrugAlcohol);
+            MentalHealthChoice = YesNoChoices.FirstOrDefault(choice => choice.Value == request.IncludeMentalHealth);
+            HivAidsChoice = YesNoChoices.FirstOrDefault(choice => choice.Value == request.IncludeHivAids);
+            ReleaseWithoutReviewChoice = YesNoChoices.FirstOrDefault(choice => choice.Value == request.ReleaseWithoutReview);
+            foreach (var option in InformationCategories)
+                option.IsSelected = request.InformationCategories?.Contains(option.Value) == true;
+            SelectedScope = ScopeChoices.FirstOrDefault(choice =>
+                string.Equals(choice.Value.ToString(), request.Scope, StringComparison.Ordinal));
+            ExpirationDate = request.ExpirationDate?.ToDateTime(TimeOnly.MinValue);
+            DidObtainRoi = request.ConfirmedObtainedRoi;
+            IsOneOffPreparation = answers.IsOneOffPreparation;
+            _oneOffReleaseId = answers.OneOffReleaseId;
+            _savedObligationId = answers.ReleaseObligationId;
+            RestoreObligationSelection();
+        }
+        finally { _restoringProgress = false; }
+    }
+
+    private void RestoreObligationSelection()
+    {
+        if (_savedObligationId is not Guid id) return;
+        var match = ReleaseObligationChoices.FirstOrDefault(item => item.ObligationId == id);
+        if (match is not null) SelectedReleaseObligation = match;
+    }
+
     private void ResetInputs()
     {
         AuthorizationChoice = null;
@@ -534,6 +615,12 @@ public partial class AgencyReleaseViewModel : ObservableObject
 }
 
 public sealed record YesNoChoice(string DisplayName, bool Value);
+internal sealed record AgencyReleaseWizardAnswers(
+    AgencyReleaseRequest? Request,
+    AnnualDocumentKind Kind,
+    Guid? ReleaseObligationId,
+    bool IsOneOffPreparation,
+    Guid? OneOffReleaseId);
 public sealed record AgencyReleaseScopeChoice(string DisplayName, AgencyReleaseScope Value);
 public sealed record ReleaseKindChoice(AnnualDocumentKind Kind, string DisplayName);
 

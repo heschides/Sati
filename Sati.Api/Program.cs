@@ -102,6 +102,7 @@ builder.Services.AddScoped<ILegalHoldRegistry, ApiLegalHoldRegistry>();
 builder.Services.AddSingleton<PersonAuditPdfGenerator>();
 builder.Services.AddSingleton<DhhsFormFiller>();
 builder.Services.AddSingleton<CwicPacketPdfGenerator>();
+builder.Services.AddSingleton<BenefitsApplicationPdfGenerator>();
 builder.Services.AddSingleton<HousingSupportFundsPdfGenerator>();
 builder.Services.AddSingleton<SafetyDevicePdfGenerator>();
 builder.Services.AddSingleton<AgencyReleasePdfGenerator>();

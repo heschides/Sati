@@ -626,12 +626,18 @@
                     <StackPanel Grid.Row="8" Grid.ColumnSpan="4" Margin="0,8,0,0"
                                 Visibility="{Binding IsFormObligationVisible,
                                     Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="FORM OBLIGATION / PLAN YEAR"
+                        <TextBlock Text="FORM TO DOCUMENT"
                                    Style="{StaticResource LabelStyle}" />
-                        <ComboBox AutomationProperties.Name="Form obligation and plan year"
+                        <ComboBox AutomationProperties.Name="Form to document"
                                   ItemsSource="{Binding FormObligations}"
-                                  DisplayMemberPath="Label"
-                                  SelectedItem="{Binding SelectedFormObligation, Mode=TwoWay}" />
+                                  TextSearch.TextPath="Label"
+                                  SelectedItem="{Binding SelectedFormObligation, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                         <TextBlock Text="Choose the specific form this note documents. Required before submitting a Form note for supervisor review."
                                    Margin="0,4,0,0" FontSize="11" TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextSecondaryBrush}" />

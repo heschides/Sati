@@ -15,13 +15,17 @@ namespace Sati.ViewModels.ClientDocuments;
 public partial class DhhsFormsViewModel : ObservableObject
 {
     private readonly IDhhsFormService _formService;
+    private Person? _person;
+    private Guid? _savedTargetId;
+    private DateTime? _savedTargetDate;
     private readonly IReadOnlyDictionary<DhhsFormDefinition.FormKey, IReadOnlyList<DhhsConsentGroup>> _groups;
     private readonly List<ReleaseObligationDto> _knownReleaseObligations = [];
     private int? _personId;
     private DateTime? _personEffectiveDate;
     private int _personVersion;
 
-    public DhhsFormsViewModel(IDhhsFormService formService)
+    public DhhsFormsViewModel(IDhhsFormService formService,
+        IFormWizardProgressService progressService)
     {
         _formService = formService;
         _groups = CreateConsentGroups();
@@ -39,7 +43,15 @@ public partial class DhhsFormsViewModel : ObservableObject
         selectedFormChoice = FormChoices[0];
         activeConsentGroups = _groups[selectedFormChoice.Key];
         ssnMasked = SsnMask.NotOnFile;
+        Progress = new FormWizardProgressViewModel(progressService,
+            CaptureProgress, RestoreProgress);
+        Progress.Watch(this);
+        Progress.WatchChildren(_groups.Values.SelectMany(groups => groups)
+            .SelectMany(group => group.Checks.Cast<System.ComponentModel.INotifyPropertyChanged>()
+                .Concat(group.Text)));
     }
+
+    public FormWizardProgressViewModel Progress { get; }
 
     public IReadOnlyList<DhhsFormChoice> FormChoices { get; }
     public ObservableCollection<DhhsReleaseTargetChoice> ReleaseTargetChoices { get; } = [];
@@ -125,6 +137,13 @@ public partial class DhhsFormsViewModel : ObservableObject
         OnPropertyChanged(nameof(CanGenerate));
         OnPropertyChanged(nameof(ReleaseTargetGuidance));
         GenerateCommand.NotifyCanExecuteChanged();
+        Progress.SetPerson(_person, ProgressKey);
+    }
+
+    partial void OnSelectedReleaseTargetChanged(DhhsReleaseTargetChoice? value)
+    {
+        if (_person is not null && Progress.CurrentKey != ProgressKey)
+            Progress.SetPerson(_person, ProgressKey);
     }
 
     partial void OnIsBusyChanged(bool value)
@@ -142,6 +161,9 @@ public partial class DhhsFormsViewModel : ObservableObject
     public void SetPerson(Person? person)
     {
         _personVersion++;
+        _person = person;
+        _savedTargetId = null;
+        _savedTargetDate = null;
         _personId = person?.Id;
         _personEffectiveDate = person?.EffectiveDate?.Date;
         PersonName = person?.FullName ?? "Select a consumer";
@@ -163,6 +185,7 @@ public partial class DhhsFormsViewModel : ObservableObject
 
         if (person is not null && SupportsSsnStorage)
             _ = LoadSsnStatusAsync(person.Id, _personVersion);
+        Progress.SetPerson(person, ProgressKey);
     }
 
     /// <summary>
@@ -183,6 +206,7 @@ public partial class DhhsFormsViewModel : ObservableObject
                 .Select(group => group.First()));
         }
         RebuildReleaseTargets();
+        RestoreTargetSelection();
     }
 
     private async Task LoadSsnStatusAsync(int personId, int version)
@@ -402,6 +426,47 @@ public partial class DhhsFormsViewModel : ObservableObject
         GenerateCommand.NotifyCanExecuteChanged();
     }
 
+    private string ProgressKey => IsDhhsReleaseForm
+        ? SelectedReleaseTarget is { } target
+            ? "dhhs-authorization-to-release." + target.TargetEffectiveDate.ToString(
+                "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture)
+            : "dhhs-authorization-to-release"
+        : "dhhs-authorized-representative";
+
+    private string CaptureProgress() => FormWizardProgressJson.Capture(new DhhsWizardAnswers(
+        ActiveConsentGroups.SelectMany(group => group.Checks)
+            .Where(option => option.IsSelected)
+            .ToDictionary(option => option.FieldName, _ => true, StringComparer.Ordinal),
+        ActiveConsentGroups.SelectMany(group => group.Text)
+            .Where(option => !string.IsNullOrWhiteSpace(option.Value))
+            .ToDictionary(option => option.FieldName, option => option.Value, StringComparer.Ordinal),
+        IsDhhsReleaseForm ? SelectedReleaseTarget?.ReleaseObligationId : null,
+        IsDhhsReleaseForm ? SelectedReleaseTarget?.TargetEffectiveDate : null));
+
+    private void RestoreProgress(string json, int _)
+    {
+        var answers = System.Text.Json.JsonSerializer.Deserialize<DhhsWizardAnswers>(json)
+            ?? throw new InvalidOperationException("The saved DHHS form is empty.");
+        foreach (var check in ActiveConsentGroups.SelectMany(group => group.Checks))
+            check.IsSelected = answers.Checks?.ContainsKey(check.FieldName) == true;
+        foreach (var item in ActiveConsentGroups.SelectMany(group => group.Text))
+            item.Value = answers.Text?.GetValueOrDefault(item.FieldName) ?? string.Empty;
+        _savedTargetId = answers.ReleaseObligationId;
+        _savedTargetDate = answers.TargetEffectiveDate;
+        RestoreTargetSelection();
+    }
+
+    private void RestoreTargetSelection()
+    {
+        if (!IsDhhsReleaseForm) return;
+        var matching = _savedTargetId is Guid id
+            ? ReleaseTargetChoices.FirstOrDefault(item => item.ReleaseObligationId == id)
+            : _savedTargetDate is DateTime date
+                ? ReleaseTargetChoices.FirstOrDefault(item => item.TargetEffectiveDate.Date == date.Date)
+                : null;
+        if (matching is not null) SelectedReleaseTarget = matching;
+    }
+
     private static string FriendlyBlankField(string name) => name switch
     {
         "Individual's SSN" => "Social Security number",
@@ -560,6 +625,12 @@ public sealed record DhhsConsentGroup(
     string Description,
     IReadOnlyList<DhhsConsentCheckOption> Checks,
     IReadOnlyList<DhhsConsentTextOption> Text);
+
+internal sealed record DhhsWizardAnswers(
+    Dictionary<string, bool>? Checks,
+    Dictionary<string, string>? Text,
+    Guid? ReleaseObligationId,
+    DateTime? TargetEffectiveDate);
 
 public partial class DhhsConsentCheckOption(string fieldName, string label) : ObservableObject
 {

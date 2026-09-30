@@ -2,7 +2,7 @@
 
 *Living document. The "why" behind choices that no diagram preserves. ARCHITECTURE.md
 says what owns what; this says why it was built that way and what was rejected. Newest
-sections at the bottom. Last updated: 2026-09-14.*
+sections at the bottom. Last updated: 2026-09-29.*
 
 ---
 
@@ -5974,3 +5974,63 @@ remains possible; adding Sati-native signature capture is a separate feature tha
 approve. The UI names the remaining Evergreen and HCBS steps without claiming to perform them.
 Fixed PDF boxes have bounded answer lengths and explicit wrapping so a PDF that passes validation
 prints the entered text rather than silently clipping it.
+
+## 2026-09-29 — OFI benefits application uses a controlled page overlay
+
+The supplied April 30, 2024 OFI Application for Benefits has 20 pages but an empty
+AcroForm field tree; its printed blanks are not editable PDF fields. The Clients
+wizard therefore asks the questions by source page and writes entered answers over
+the hash-pinned original page artwork. The shared question catalog is the only
+authority for accepted answer keys, types, and placements. Identity and an on-file
+SSN are derived by the authorized local or API writer. The request cannot provide
+the applicant's name, birth date, SSN, or signature. Other household details are
+user-entered. The whole output is an audited, versioned Draft, with no eligibility,
+submission, or attestation claim. The applicant or properly appointed representative
+must review every page and sign; Appendix B needs its own two signatures if used.
+For more than six household members or another insurance plan, use the source
+application's continuation instructions.
+
+This is deliberately a form draft rather than an internal eligibility record.
+Sati does not store the questionnaire as Person facts or infer program choices from
+profile data. The source revision and rendered box positions must be reviewed when
+OFI publishes a replacement; silently swapping the PDF is rejected by the hash.
+
+## September 29 — Form wizard progress belongs in an encrypted author draft
+
+Partially answered PDF wizards need a durable answer set before they can generate a
+valid document. One mutable `FormWizardProgress` row per consumer, author, and form
+stores the current answer JSON and section index under envelope encryption. Tracked
+release keys include their obligation id; DHHS annual release keys include the exact
+target date. Save requires the revision that was read,
+so two sessions cannot silently overwrite each other. Each operation rechecks the
+current caseload; the client does not choose author or agency scope. Reads and
+writes receive answer-free audit events. Draft deletion waits for a reviewed
+retention and legal-hold policy.
+
+The row is editor state, not a signed record, submitted application, or completion
+attestation. Generated PDF artifacts retain their existing versioned history.
+Rejected: unencrypted client preferences or a workstation-only file. Those would
+expose sensitive household answers or leave Demo drafts tied to one computer and
+would not enforce current caseload ownership on a later read.
+
+## 2026-09-29 — Availability cannot come after a required opening deadline
+
+An existing zero-day assessment window made the October 22 completion deadline also
+the first permitted date of work, even though the same assessment had to be opened
+by September 22. Defaults alone did not repair saved agency settings.
+
+`ComplianceScheduleRules.OpenDaysBefore` now takes the greater of the configured
+lead and the fixed lead owned by `BillingComplianceGate` for PCP (90 days) and
+Comprehensive Assessment (30 days). This covers both the desktop's shared schedule
+projection and API paths that subtract the lead directly. Larger early-work windows
+remain effective; other form types keep their configured windows. Completion on
+the opening day is valid, and dates before availability or after today remain invalid.
+The opening deadline, completion deadline, effective-dated billing policy, and stored
+annual identity are unchanged. No settings/data migration or inferred completion is needed.
+
+Assessment selection and attestation emphasize Open by and Complete by. PCP selection,
+profile, and attestation show Open by and Complete by alongside its effective date, using
+the same fixed opening-deadline owner. The related PCP date remains the assessment's internal annual
+identity and appears when needed to explain a missing record or a cycle warning;
+selection still carries the exact FormId. Settings names availability and reminder
+windows separately and explains the minimum opening leads even for legacy zero values.

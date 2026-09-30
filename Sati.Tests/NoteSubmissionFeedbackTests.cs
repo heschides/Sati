@@ -14,6 +14,52 @@ namespace Sati.Tests;
 public sealed class NoteSubmissionFeedbackTests
 {
     [Fact]
+    public async Task AnnualSelectorNamesItsOwnDeadlinesAndKeepsTheExactRecord()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var person = await fixture.PersonOneAsync();
+        var target = new DateTime(2027, 1, 20);
+        var assessment = new Form(FormType.ComprehensiveAssessment,
+            new DateTime(2026, 10, 22), targetEffectiveDate: target)
+        {
+            Id = 901,
+            PersonId = person.Id
+        };
+        person.Forms.Add(assessment);
+        person.Forms.Add(new Form(FormType.ComprehensiveAssessment,
+            new DateTime(2025, 10, 22), targetEffectiveDate: target.AddYears(-1))
+        {
+            Id = 900,
+            PersonId = person.Id
+        });
+        var panel = fixture.NoteEntry();
+        panel.SetPeople([person]);
+        panel.SelectedPerson = person;
+        panel.IsFormSelected = true;
+        panel.SelectedFormType = FormType.ComprehensiveAssessment;
+
+        var selected = Assert.Single(panel.FormObligations, item => item.FormId == assessment.Id);
+        Assert.Equal("Comprehensive Assessment — open by 9/22/26; complete by 10/22/26", selected.Label);
+        Assert.DoesNotContain("1/20/27", selected.Label);
+        panel.SelectedFormObligation = selected;
+        Assert.Equal(assessment.Id, panel.SelectedFormObligation!.FormId);
+
+        var pcp = new Form(FormType.PCP, new DateTime(2026, 12, 21),
+            targetEffectiveDate: new DateTime(2026, 12, 21))
+        {
+            Id = 902,
+            PersonId = person.Id
+        };
+        person.Forms.Add(pcp);
+        panel.SelectedFormType = FormType.PCP;
+        panel.IsAnnualPlan = true;
+        var selectedPcp = Assert.Single(panel.FormObligations);
+        Assert.Equal("PCP — open by 9/22/26; complete by 12/21/26; effective 12/21/26", selectedPcp.Label);
+        panel.SelectedFormObligation = selectedPcp;
+        Assert.Equal(pcp.Id, panel.SelectedFormObligation!.FormId);
+    }
+
+    [Fact]
     public async Task PendingAnnualPcpAsksBeforeOpeningAndShowsSelectedYear()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();

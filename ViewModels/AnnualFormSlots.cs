@@ -74,13 +74,25 @@ public sealed class AnnualFormSlotViewModel
 
     public bool NeedsAttention => IsOverdue || IsOpeningLate || IsMissing;
 
-    public string CheckBoxLabel => Role == AnnualFormSlotRole.Renewal
-        ? $"Renewal: {AnnualFormSlots.Label(Type)} for plan starting {TargetEffectiveDate:MM/dd/yy}"
-        : $"{AnnualFormSlots.Label(Type)} for plan starting {TargetEffectiveDate:MM/dd/yy}";
+    private string DocumentDates => Type switch
+    {
+        FormType.ComprehensiveAssessment when Form is not null =>
+            FormDocumentLabels.AssessmentDates(Form.DueDate),
+        FormType.ComprehensiveAssessment => $"related PCP effective {TargetEffectiveDate:MM/dd/yy}",
+        FormType.PCP when Form is not null => FormDocumentLabels.PcpDates(Form),
+        FormType.PCP => $"effective {TargetEffectiveDate:MM/dd/yy}",
+        _ => $"for plan starting {TargetEffectiveDate:MM/dd/yy}"
+    };
 
-    public string PlanPhrase => Role == AnnualFormSlotRole.Renewal
-        ? $"renewal for the plan starting {TargetEffectiveDate:MM/dd/yy}"
-        : $"plan starting {TargetEffectiveDate:MM/dd/yy}";
+    public string CheckBoxLabel =>
+        $"{(IsRenewal ? "Renewal: " : string.Empty)}{AnnualFormSlots.Label(Type)}" +
+        $"{(Type is FormType.ComprehensiveAssessment or FormType.PCP ? " — " : " ")}{DocumentDates}";
+
+    public string PlanPhrase => Type is FormType.ComprehensiveAssessment or FormType.PCP
+        ? $"{(IsRenewal ? "renewal; " : string.Empty)}{DocumentDates}"
+        : IsRenewal
+            ? $"renewal for the plan starting {TargetEffectiveDate:MM/dd/yy}"
+            : $"plan starting {TargetEffectiveDate:MM/dd/yy}";
 
     public string StatusText { get; }
 
@@ -90,7 +102,9 @@ public sealed class AnnualFormSlotViewModel
     private string BuildStatusText(DateTime today)
     {
         if (Form is null)
-            return "No record exists for this plan";
+            return Type == FormType.ComprehensiveAssessment
+                ? "No assessment record exists for this related PCP"
+                : "No record exists for this plan";
 
         var parts = new List<string>();
         if (Form.CompletedDate is DateTime completed)
@@ -101,9 +115,12 @@ public sealed class AnnualFormSlotViewModel
 
         parts.Add(IsOverdue
             ? $"OVERDUE, was due {Form.DueDate:MM/dd/yy}"
-            : $"Due {Form.DueDate:MM/dd/yy}");
+            : Type is FormType.ComprehensiveAssessment or FormType.PCP
+                ? $"Complete by {Form.DueDate:MM/dd/yy}"
+                : $"Due {Form.DueDate:MM/dd/yy}");
 
-        var (past, verb) = OpeningWords(Type);
+        const string past = "Opened";
+        const string verb = "open";
         if (Form.OpenedDate is DateTime opened)
         {
             parts.Add($"{past} {opened:MM/dd/yy}");
@@ -119,11 +136,6 @@ public sealed class AnnualFormSlotViewModel
         return string.Join(" · ", parts);
     }
 
-    // The assessment is "started" in the agency's own vocabulary; plans are "opened".
-    private static (string Past, string Verb) OpeningWords(FormType type) =>
-        type == FormType.ComprehensiveAssessment
-            ? ("Started", "start")
-            : ("Opened", "open");
 }
 
 /// <summary>

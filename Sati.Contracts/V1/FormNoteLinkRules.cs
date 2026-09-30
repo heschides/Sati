@@ -37,8 +37,8 @@ public static class FormNoteLinkRules
 
         if (string.Equals(status, "Logged", StringComparison.Ordinal) &&
             !IsRelease(formType) && formId is null)
-            return "In the note panel, use FORM OBLIGATION / PLAN YEAR (the dropdown below Form Type) " +
-                "to choose the specific review or annual plan before submitting this Form note.";
+            return "In the note panel, use FORM TO DOCUMENT (the dropdown below Form Type) " +
+                "to choose the specific form before submitting this Form note.";
 
         return null;
     }

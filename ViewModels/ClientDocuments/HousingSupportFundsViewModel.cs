@@ -5,12 +5,24 @@ using Sati.Data;
 
 namespace Sati.ViewModels.ClientDocuments;
 
-public partial class HousingSupportFundsViewModel(
-    IHousingSupportFundsService service,
-    ISessionService session) : ObservableObject
+public partial class HousingSupportFundsViewModel : ObservableObject
 {
+    private readonly IHousingSupportFundsService service;
+    private readonly ISessionService session;
     private Person? person;
     private int personVersion;
+
+    public HousingSupportFundsViewModel(IHousingSupportFundsService service,
+        ISessionService session, IFormWizardProgressService progressService)
+    {
+        this.service = service;
+        this.session = session;
+        Progress = new FormWizardProgressViewModel(progressService,
+            () => FormWizardProgressJson.Capture(BuildRequest()), RestoreProgress);
+        Progress.Watch(this);
+    }
+
+    public FormWizardProgressViewModel Progress { get; }
 
     public IReadOnlyList<string> HousingTypes => HousingSupportFundsRules.HousingTypes;
     public IReadOnlyList<HousingNullableChoice> YesNoChoices { get; } =
@@ -94,6 +106,7 @@ public partial class HousingSupportFundsViewModel(
         OnPropertyChanged(nameof(HasEligibilityConflict));
         OnPropertyChanged(nameof(EligibilityMessage));
         GenerateCommand.NotifyCanExecuteChanged();
+        Progress.SetPerson(value, "housing-support-funds");
     }
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
@@ -155,6 +168,13 @@ public partial class HousingSupportFundsViewModel(
         GuardianAddress, GuardianTelephone, GuardianEmail,
         RepresentativePayeeName, RepresentativePayeeAddress,
         AdditionalDetails, SupportingDocumentReady);
+
+    private void RestoreProgress(string json, int _)
+    {
+        var request = System.Text.Json.JsonSerializer.Deserialize<HousingSupportFundsRequest>(json)
+            ?? throw new InvalidOperationException("The saved Housing Support Funds application is empty.");
+        FormWizardProgressJson.ApplyScalars(this, request);
+    }
 
     private void ApplyProfileDefaults()
     {

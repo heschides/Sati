@@ -1,6 +1,7 @@
 <UserControl x:Class="Sati.Views.ClientDocuments.HousingSupportFundsWorkspace"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:documents="clr-namespace:Sati.Views.ClientDocuments"
  Background="{DynamicResource WindowBackgroundBrush}" DataContextChanged="OnDataContextChanged">
  <UserControl.Resources>
   <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
@@ -32,6 +33,7 @@
 
   <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Housing Support Funds application answers">
     <StackPanel>
+     <documents:FormWizardProgressWorkspace DataContext="{Binding Progress}"/>
      <Border Padding="12" Margin="0,0,0,8" CornerRadius="6" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
       <StackPanel>
        <TextBlock Text="PROFILE FACTS USED BY THE FORM" Style="{StaticResource HousingLabel}"/>

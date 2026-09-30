@@ -34,7 +34,7 @@ public sealed class AnnualFormSlotsTests
 
         Assert.NotNull(current);
         Assert.True(current.IsComplete);
-        Assert.Equal("Comp Assessment for plan starting 10/15/25", current.CheckBoxLabel);
+        Assert.Equal("Comp Assessment — open by 06/17/25; complete by 07/17/25", current.CheckBoxLabel);
         Assert.NotNull(renewal);
         Assert.Equal(UpcomingTarget, renewal.TargetEffectiveDate);
         Assert.False(renewal.IsComplete);
@@ -62,8 +62,8 @@ public sealed class AnnualFormSlotsTests
         var renewal = AnnualFormSlots.Resolve(
             person, FormType.PCP, new DateTime(2026, 7, 17), Schedule).Renewal;
         Assert.NotNull(renewal);
-        Assert.Equal("Renewal: PCP for plan starting 10/15/26", renewal.CheckBoxLabel);
-        Assert.Contains("renewal for the plan starting 10/15/26", renewal.AutomationName);
+        Assert.Equal("Renewal: PCP — open by 07/17/26; complete by 10/15/26; effective 10/15/26", renewal.CheckBoxLabel);
+        Assert.Contains("renewal; open by 07/17/26; complete by 10/15/26; effective 10/15/26", renewal.AutomationName);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public sealed class AnnualFormSlotsTests
             person, FormType.ComprehensiveAssessment, new DateTime(2026, 6, 17), Schedule).Renewal;
         Assert.NotNull(onTime);
         Assert.False(onTime.IsOpeningLate);
-        Assert.Equal("Due 07/17/26 · Start by 06/17/26", onTime.StatusText);
+        Assert.Equal("Complete by 07/17/26 · Open by 06/17/26", onTime.StatusText);
 
         var late = AnnualFormSlots.Resolve(
             person, FormType.ComprehensiveAssessment, new DateTime(2026, 6, 18), Schedule).Renewal;
@@ -166,8 +166,19 @@ public sealed class AnnualFormSlotsTests
         Assert.True(late.IsOpeningLate);
         Assert.True(late.NeedsAttention);
         Assert.Equal(
-            "Due 07/17/26 · LATE, not started; was due to start by 06/17/26",
+            "Complete by 07/17/26 · LATE, not opened; was due to open by 06/17/26",
             late.StatusText);
+    }
+
+    [Fact]
+    public void MissingAssessmentUsesRelatedPcpDateWithoutInventingAssessmentDeadlines()
+    {
+        var slot = new AnnualFormSlotViewModel(FormType.ComprehensiveAssessment,
+            AnnualFormSlotRole.Renewal, UpcomingTarget, null, new DateTime(2026, 8, 1));
+
+        Assert.Equal("Renewal: Comp Assessment — related PCP effective 10/15/26", slot.CheckBoxLabel);
+        Assert.Equal("No assessment record exists for this related PCP", slot.StatusText);
+        Assert.Null(slot.OpeningDeadline);
     }
 
     [Theory]
@@ -201,7 +212,7 @@ public sealed class AnnualFormSlotsTests
 
         Assert.Same(pcp, current!.Form);
         Assert.Null(renewal);
-        Assert.Equal("Due 10/15/26 · Open by 07/17/26", current.StatusText);
+        Assert.Equal("Complete by 10/15/26 · Open by 07/17/26", current.StatusText);
 
         // The pre-service plan has the same opening deadline as any other.
         var late = AnnualFormSlots.Resolve(

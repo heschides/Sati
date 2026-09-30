@@ -187,8 +187,13 @@ public static class ComplianceScheduleRules
         return formType switch
         {
             "Q1R" or "Q2R" or "Q3R" or "Q4R" => settings.ReviewOpenDaysBefore,
-            "PCP" => settings.PcpOpenDaysBefore,
-            "ComprehensiveAssessment" => settings.ComprehensiveAssessmentOpenDaysBefore,
+            // A saved notification/availability setting must never prevent work
+            // on the required opening day. Reuse the fixed deadline owner's lead
+            // times while still honoring a configured earlier start.
+            "PCP" => Math.Max(settings.PcpOpenDaysBefore,
+                BillingComplianceGate.PcpOpeningBillingLeadDays),
+            "ComprehensiveAssessment" => Math.Max(settings.ComprehensiveAssessmentOpenDaysBefore,
+                BillingComplianceGate.ComprehensiveAssessmentOpeningBillingLeadDays),
             "Reclassification" => settings.ReclassificationOpenDaysBefore,
             "SafetyPlan" => settings.SafetyPlanOpenDaysBefore,
             "PrivacyPractices" => settings.PrivacyPracticesOpenDaysBefore,

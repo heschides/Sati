@@ -228,7 +228,9 @@ public sealed class DashboardFormComplianceTests
 
         Assert.True(clients.Attestation.IsVisible);
         Assert.Contains($"{upcomingTarget:MMM d, yyyy}", clients.Attestation.StatusText);
-        Assert.Contains("renewal for the plan starting", clients.Attestation.ContextLabel);
+        Assert.Contains($"renewal; open by {upcomingTarget.AddDays(-90):MM/dd/yy}", clients.Attestation.ContextLabel);
+        Assert.Contains($"complete by {upcomingTarget:MM/dd/yy}", clients.Attestation.AttestationStatement);
+        Assert.Contains($"open by {upcomingTarget.AddDays(-90):MMM d, yyyy}", clients.Attestation.StatusText);
 
         var completedOn = DateTime.Today;
         clients.Attestation.CompletionDate = completedOn;
@@ -392,7 +394,8 @@ public sealed class DashboardFormComplianceTests
             "Comprehensive Assessment, plan starting 12/16/25");
         viewModel.CompletionDate = new DateTime(2026, 9, 17);
 
-        Assert.Contains("plan starting 12/16/25", viewModel.AttestationStatement);
+        Assert.Contains("open by 08/18/25; complete by 09/17/25", viewModel.AttestationStatement);
+        Assert.DoesNotContain("12/16/25", viewModel.AttestationStatement);
         Assert.True(viewModel.HasPlanYearWarning);
         Assert.Contains("12/16/25", viewModel.PlanYearWarning);
         Assert.Contains("separate renewal", viewModel.PlanYearWarning);

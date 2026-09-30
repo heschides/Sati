@@ -68,6 +68,9 @@ internal static class AuditActions
     public const string DhhsFormGenerated = "dhhs-form.generated";
     public const string AgencyReleaseGenerated = "agency-release.generated";
     public const string CwicPacketGenerated = "cwic-packet.generated";
+    public const string BenefitsApplicationGenerated = "benefits-application.generated";
+    public const string FormWizardProgressSaved = "form-wizard-progress.saved";
+    public const string FormWizardProgressViewed = "form-wizard-progress.viewed";
     public const string HousingSupportFundsGenerated = "housing-support-funds.generated";
     public const string SafetyDeviceRequestGenerated = "safety-device-request.generated";
     public const string PersonHistoryViewed = "person-history.viewed";

@@ -6,10 +6,23 @@ using Sati.Data;
 
 namespace Sati.ViewModels.ClientDocuments;
 
-public partial class SafetyDeviceViewModel(ISafetyDeviceService service) : ObservableObject
+public partial class SafetyDeviceViewModel : ObservableObject
 {
+    private readonly ISafetyDeviceService service;
     private Person? person;
     private int personVersion;
+
+    public SafetyDeviceViewModel(ISafetyDeviceService service,
+        IFormWizardProgressService progressService)
+    {
+        this.service = service;
+        Progress = new FormWizardProgressViewModel(progressService,
+            () => FormWizardProgressJson.Capture(BuildRequest()), RestoreProgress);
+        Progress.Watch(this);
+        Progress.WatchChildren(Devices);
+    }
+
+    public FormWizardProgressViewModel Progress { get; }
 
     [ObservableProperty] private string personName = "Select a consumer";
     [ObservableProperty] private string memberOrGuardianContact = "";
@@ -50,6 +63,7 @@ public partial class SafetyDeviceViewModel(ISafetyDeviceService service) : Obser
         ResetAnswers();
         OnPropertyChanged(nameof(CanGenerate));
         GenerateCommand.NotifyCanExecuteChanged();
+        Progress.SetPerson(value, "safety-device");
     }
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
@@ -112,6 +126,22 @@ public partial class SafetyDeviceViewModel(ISafetyDeviceService service) : Obser
         Devices.Select(row => row.ToEntry()).ToArray(),
         LessRestrictiveStrategies, EvaluationPlan, OtherResidentsAccommodations,
         PlanningTeamMeetingDate is DateTime date ? DateOnly.FromDateTime(date) : null);
+
+    private void RestoreProgress(string json, int _)
+    {
+        var request = System.Text.Json.JsonSerializer.Deserialize<SafetyDeviceRequest>(json)
+            ?? throw new InvalidOperationException("The saved Safety Device Request is empty.");
+        FormWizardProgressJson.ApplyScalars(this, request);
+        for (var index = 0; index < Devices.Count; index++)
+        {
+            var source = request.Devices is { Count: > 0 } && index < request.Devices.Count
+                ? request.Devices[index] : null;
+            Devices[index].NameAndType = source?.NameAndType ?? "";
+            Devices[index].Purpose = source?.Purpose ?? "";
+            Devices[index].WhenUsed = source?.WhenUsed ?? "";
+            Devices[index].Level = source?.Level;
+        }
+    }
 }
 
 public partial class SafetyDeviceRowViewModel : ObservableObject

@@ -6,10 +6,24 @@ using Sati.Models;
 
 namespace Sati.ViewModels.ClientDocuments;
 
-public partial class CwicPacketViewModel(ICwicPacketService service) : ObservableObject
+public partial class CwicPacketViewModel : ObservableObject
 {
+    private readonly ICwicPacketService service;
     private Person? person;
     private int personVersion;
+
+    public CwicPacketViewModel(ICwicPacketService service,
+        IFormWizardProgressService progressService)
+    {
+        this.service = service;
+        Progress = new FormWizardProgressViewModel(progressService,
+            () => FormWizardProgressJson.Capture(BuildRequest()), RestoreProgress);
+        Progress.Watch(this);
+        Progress.WatchChildren(MeetingMethods.Concat(EmploymentSituations)
+            .Concat(Benefits).Concat(Accommodations));
+    }
+
+    public FormWizardProgressViewModel Progress { get; }
 
     public IReadOnlyList<string> MaritalStatuses => CwicPacketRules.MaritalStatuses;
     public IReadOnlyList<string> JobSatisfactionChoices => CwicPacketRules.JobSatisfactionChoices;
@@ -124,6 +138,7 @@ public partial class CwicPacketViewModel(ICwicPacketService service) : Observabl
         OnPropertyChanged(nameof(HasPerson));
         OnPropertyChanged(nameof(CanGenerate));
         GenerateCommand.NotifyCanExecuteChanged();
+        Progress.SetPerson(value, "cwic-packet");
     }
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
@@ -194,6 +209,24 @@ public partial class CwicPacketViewModel(ICwicPacketService service) : Observabl
         VrOfficeAddress, DateOnlyOf(DolReleaseStart), DateOnlyOf(DolReleaseEnd),
         AuthorizeSubstanceUseDisclosure, AuthorizeMentalHealthDisclosure, ReviewBeforeRelease,
         AuthorizeHivDisclosure);
+
+    private void RestoreProgress(string json, int _)
+    {
+        var request = System.Text.Json.JsonSerializer.Deserialize<CwicPacketRequest>(json)
+            ?? throw new InvalidOperationException("The saved CWIC packet is empty.");
+        FormWizardProgressJson.ApplyScalars(this, request);
+        RestoreOptions(MeetingMethods, request.MeetingMethods);
+        RestoreOptions(EmploymentSituations, request.EmploymentSituations);
+        RestoreOptions(Benefits, request.Benefits);
+        RestoreOptions(Accommodations, request.Accommodations);
+    }
+
+    private static void RestoreOptions(IEnumerable<CwicChoiceOption> options,
+        IReadOnlyList<string>? selected)
+    {
+        var values = selected?.ToHashSet(StringComparer.Ordinal) ?? [];
+        foreach (var option in options) option.IsSelected = values.Contains(option.Value);
+    }
 
     private void ApplyProfileDefaults()
     {

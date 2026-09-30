@@ -19,6 +19,7 @@ namespace Sati.Data
         public DbSet<Form> Forms { get; set; }
         public DbSet<FormAttestation> FormAttestations { get; set; }
         public DbSet<DocumentArtifact> DocumentArtifacts { get; set; }
+        public DbSet<FormWizardProgress> FormWizardProgress => Set<FormWizardProgress>();
         public DbSet<ExternalSignatureEvidence> ExternalSignatureEvidence { get; set; }
         public DbSet<FrozenSignatureDocument> FrozenSignatureDocuments => Set<FrozenSignatureDocument>();
         public DbSet<SignatureRequest> SignatureRequests => Set<SignatureRequest>();
@@ -165,6 +166,7 @@ namespace Sati.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            FormWizardProgressPersistenceModel.Configure<Person>(modelBuilder);
             base.OnModelCreating(modelBuilder);
             ClearinghousePersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration>(modelBuilder);
             BillingCorrectionPersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration, ClaimLine, RemittanceDeposit>(modelBuilder);

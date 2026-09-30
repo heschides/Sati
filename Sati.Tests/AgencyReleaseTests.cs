@@ -486,9 +486,29 @@ public sealed class AgencyReleaseTests
         Assert.Equal("Completed", completed.WorkflowStage);
     }
 
+    [Fact]
+    public async Task One_off_release_answers_resume_for_the_same_consumer()
+    {
+        var drafts = new TestFormWizardProgressService();
+        var person = PersonFor(73, "Draft");
+        var first = new AgencyReleaseViewModel(new RecordingAgencyReleaseService(), drafts);
+        first.SetPerson(person);
+        first.BeginOneOffPreparation();
+        first.ContactName = "Community provider";
+        first.InformationCategories[0].IsSelected = true;
+        await first.Progress.SaveCommand.ExecuteAsync(null);
+
+        var resumed = new AgencyReleaseViewModel(new RecordingAgencyReleaseService(), drafts);
+        resumed.SetPerson(person);
+        resumed.BeginOneOffPreparation();
+        Assert.Equal("Community provider", resumed.ContactName);
+        Assert.True(resumed.InformationCategories[0].IsSelected);
+        Assert.True(resumed.IsOneOffPreparation);
+    }
+
     private static AgencyReleaseViewModel ReadyViewModel(IAgencyReleaseService service)
     {
-        var viewModel = new AgencyReleaseViewModel(service);
+        var viewModel = new AgencyReleaseViewModel(service, new TestFormWizardProgressService());
         viewModel.SetPerson(PersonFor(31, "First"));
         viewModel.AuthorizationChoice = viewModel.YesNoChoices.Single(choice => choice.Value);
         viewModel.ContactType = viewModel.ContactTypeChoices[0];

@@ -1209,6 +1209,12 @@
            Style="{StaticResource SectionHeader}"
            Margin="0,16,0,8"/>
 
+<TextBlock Text="Availability is counted back from the form's completion due date. Larger values allow earlier work. PCP uses at least 90 days and Comp. Assessment at least 30 days, even when a saved value is smaller. Days after due controls reminder visibility; it does not extend the deadline."
+           TextWrapping="Wrap"
+           MaxWidth="440"
+           HorizontalAlignment="Left"
+           Margin="0,0,0,12"/>
+
 <Grid>
     <Grid.ColumnDefinitions>
         <ColumnDefinition Width="180"/>
@@ -1231,11 +1237,15 @@
 
     <!-- Column headers -->
     <TextBlock Grid.Row="0" Grid.Column="1"
-               Text="Open Days Before"
+               Text="Available days before due"
+               TextWrapping="Wrap"
+               MaxWidth="110"
                Style="{StaticResource LabelStyle}"
                HorizontalAlignment="Center"/>
     <TextBlock Grid.Row="0" Grid.Column="2"
-               Text="Days After Due"
+               Text="Reminder days after due"
+               TextWrapping="Wrap"
+               MaxWidth="110"
                Style="{StaticResource LabelStyle}"
                HorizontalAlignment="Center"/>
 
@@ -1252,24 +1262,32 @@
              Margin="4,0,0,8"/>
 
     <!-- PCP -->
-    <TextBlock Grid.Row="2" Grid.Column="0"
-               Text="PCP"
-               Style="{StaticResource LabelStyle}"
-               VerticalAlignment="Center"/>
-    <TextBox AutomationProperties.Name="PCP open days before due" Grid.Row="2" Grid.Column="1"
+    <StackPanel Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,0,8">
+        <TextBlock Text="PCP" Style="{StaticResource LabelStyle}"/>
+        <TextBlock Text="Minimum lead: 90 days" FontSize="11"/>
+    </StackPanel>
+    <TextBox AutomationProperties.Name="PCP available days before due"
+             AutomationProperties.HelpText="PCP is available at least 90 days before its completion due date. A larger value allows earlier work; a smaller value still uses 90 days."
+             ToolTip="Effective availability uses at least 90 days before the completion due date."
+             Grid.Row="2" Grid.Column="1"
              Text="{Binding PcpOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             VerticalAlignment="Center"
              Margin="4,0,4,8"/>
     <TextBox AutomationProperties.Name="PCP days after due" Grid.Row="2" Grid.Column="2"
              Text="{Binding PcpDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"
              Margin="4,0,0,8"/>
 
     <!-- Comprehensive Assessment -->
-    <TextBlock Grid.Row="3" Grid.Column="0"
-               Text="Comp. Assessment"
-               Style="{StaticResource LabelStyle}"
-               VerticalAlignment="Center"/>
-    <TextBox AutomationProperties.Name="Comprehensive assessment open days before due" Grid.Row="3" Grid.Column="1"
+    <StackPanel Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,0,8">
+        <TextBlock Text="Comp. Assessment" Style="{StaticResource LabelStyle}"/>
+        <TextBlock Text="Minimum lead: 30 days" FontSize="11"/>
+    </StackPanel>
+    <TextBox AutomationProperties.Name="Comprehensive assessment available days before due"
+             AutomationProperties.HelpText="The assessment is available at least 30 days before its completion due date. A larger value allows earlier work; a smaller value still uses 30 days."
+             ToolTip="Effective availability uses at least 30 days before the completion due date."
+             Grid.Row="3" Grid.Column="1"
              Text="{Binding CompAssessmentOpenDaysBefore, UpdateSourceTrigger=PropertyChanged}"
+             VerticalAlignment="Center"
              Margin="4,0,4,8"/>
     <TextBox AutomationProperties.Name="Comprehensive assessment days after due" Grid.Row="3" Grid.Column="2"
              Text="{Binding CompAssessmentDaysAfterDue, UpdateSourceTrigger=PropertyChanged}"

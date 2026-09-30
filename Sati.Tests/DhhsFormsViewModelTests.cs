@@ -9,10 +9,30 @@ namespace Sati.Tests;
 public sealed class DhhsFormsViewModelTests
 {
     [Fact]
+    public async Task Both_DHHS_form_types_resume_their_own_consent_answers()
+    {
+        var drafts = new TestFormWizardProgressService();
+        var person = PersonFor(71, "Draft");
+        var first = new DhhsFormsViewModel(new RecordingDhhsFormService(false), drafts);
+        first.SetPerson(person);
+        first.ActiveConsentGroups[0].Checks[0].IsSelected = true;
+        await first.Progress.SaveCommand.ExecuteAsync(null);
+        first.SelectedFormChoice = first.FormChoices[1];
+        first.ActiveConsentGroups[0].Text[0].Value = "Release recipient";
+        await first.Progress.SaveCommand.ExecuteAsync(null);
+
+        var resumed = new DhhsFormsViewModel(new RecordingDhhsFormService(false), drafts);
+        resumed.SetPerson(person);
+        Assert.True(resumed.ActiveConsentGroups[0].Checks[0].IsSelected);
+        resumed.SelectedFormChoice = resumed.FormChoices[1];
+        Assert.Equal("Release recipient", resumed.ActiveConsentGroups[0].Text[0].Value);
+    }
+
+    [Fact]
     public async Task Generation_sends_only_the_visible_form_choices_and_surfaces_the_pdf()
     {
         var service = new RecordingDhhsFormService(supportsSsnStorage: true);
-        var viewModel = new DhhsFormsViewModel(service);
+        var viewModel = new DhhsFormsViewModel(service, new TestFormWizardProgressService());
         viewModel.SetPerson(PersonFor(31, "First"));
 
         var guardianship = viewModel.ActiveConsentGroups
@@ -42,7 +62,7 @@ public sealed class DhhsFormsViewModelTests
     [Fact]
     public void Changing_consumer_clears_every_consent_choice_in_both_forms()
     {
-        var viewModel = new DhhsFormsViewModel(new RecordingDhhsFormService(false));
+        var viewModel = new DhhsFormsViewModel(new RecordingDhhsFormService(false), new TestFormWizardProgressService());
         viewModel.SetPerson(PersonFor(41, "First"));
         viewModel.ActiveConsentGroups[0].Checks[0].IsSelected = true;
         viewModel.ActiveConsentGroups[0].Text[0].Value = "First consumer's choice";
@@ -69,7 +89,7 @@ public sealed class DhhsFormsViewModelTests
     public async Task Valid_ssn_is_sent_once_but_only_the_mask_reaches_observable_state()
     {
         var service = new RecordingDhhsFormService(true);
-        var viewModel = new DhhsFormsViewModel(service);
+        var viewModel = new DhhsFormsViewModel(service, new TestFormWizardProgressService());
         viewModel.SetPerson(PersonFor(51, "Ssn"));
 
         await viewModel.SaveSsnAsync("123-45-6789");
@@ -85,7 +105,7 @@ public sealed class DhhsFormsViewModelTests
     public async Task Invalid_ssn_never_reaches_the_service()
     {
         var service = new RecordingDhhsFormService(true);
-        var viewModel = new DhhsFormsViewModel(service);
+        var viewModel = new DhhsFormsViewModel(service, new TestFormWizardProgressService());
         viewModel.SetPerson(PersonFor(61, "Invalid"));
 
         await viewModel.SaveSsnAsync("666-12-3456");
@@ -97,7 +117,7 @@ public sealed class DhhsFormsViewModelTests
     [Fact]
     public void Local_production_explains_that_ssn_storage_is_unavailable()
     {
-        var viewModel = new DhhsFormsViewModel(new RecordingDhhsFormService(false));
+        var viewModel = new DhhsFormsViewModel(new RecordingDhhsFormService(false), new TestFormWizardProgressService());
         viewModel.SetPerson(PersonFor(71, "Local"));
 
         Assert.False(viewModel.CanUpdateSsn);
@@ -109,7 +129,7 @@ public sealed class DhhsFormsViewModelTests
     public async Task Dhhs_release_generation_carries_the_exact_target_and_obligation()
     {
         var service = new RecordingDhhsFormService(false);
-        var viewModel = new DhhsFormsViewModel(service);
+        var viewModel = new DhhsFormsViewModel(service, new TestFormWizardProgressService());
         var person = PersonFor(81, "Release");
         var target = person.EffectiveDate!.Value.AddYears(1).Date;
         var obligationId = Guid.NewGuid();
@@ -147,7 +167,7 @@ public sealed class DhhsFormsViewModelTests
     [Fact]
     public void Every_visible_choice_is_classified_as_consent_on_its_form()
     {
-        var viewModel = new DhhsFormsViewModel(new RecordingDhhsFormService(false));
+        var viewModel = new DhhsFormsViewModel(new RecordingDhhsFormService(false), new TestFormWizardProgressService());
 
         foreach (var form in viewModel.FormChoices)
         {
@@ -165,7 +185,7 @@ public sealed class DhhsFormsViewModelTests
     public async Task Coordinate_care_purpose_is_sent_as_a_valid_release_choice()
     {
         var service = new RecordingDhhsFormService(false);
-        var viewModel = new DhhsFormsViewModel(service);
+        var viewModel = new DhhsFormsViewModel(service, new TestFormWizardProgressService());
         var person = PersonFor(82, "ReleasePurpose");
         var target = person.EffectiveDate!.Value.AddYears(1).Date;
         viewModel.SetPerson(person);

@@ -140,6 +140,7 @@ namespace Sati
                         services.AddSingleton<Sati.Forms.AgencyReleasePdfGenerator>();
                         services.AddSingleton<Sati.Forms.MedicalReleasePdfGenerator>();
                         services.AddSingleton<Sati.Forms.CwicPacketPdfGenerator>();
+                        services.AddSingleton<Sati.Forms.BenefitsApplicationPdfGenerator>();
                         services.AddSingleton<Sati.Forms.HousingSupportFundsPdfGenerator>();
                         services.AddSingleton<Sati.Forms.SafetyDevicePdfGenerator>();
 
@@ -204,6 +205,7 @@ namespace Sati
                         services.AddTransient<ViewModels.ClientDocuments.AgencyReleaseViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.ReleaseObligationsViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.CwicPacketViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.BenefitsApplicationViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.HousingSupportFundsViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.SafetyDeviceViewModel>();
                         services.AddSingleton<Sati.Forms.DocumentTemplatePdfComposer>();
@@ -564,6 +566,8 @@ namespace Sati
             services.AddTransient<IProviderService, ProviderService>();
             services.AddTransient<IDhhsFormService, DhhsFormService>();
             services.AddTransient<ICwicPacketService, CwicPacketService>();
+            services.AddTransient<IBenefitsApplicationService, BenefitsApplicationService>();
+            services.AddTransient<IFormWizardProgressService, FormWizardProgressService>();
             services.AddTransient<IHousingSupportFundsService, HousingSupportFundsService>();
             services.AddTransient<ISafetyDeviceService, SafetyDeviceService>();
             // Local SSN protection: the same envelope the API uses, wrapped by the
@@ -632,6 +636,8 @@ namespace Sati
             services.AddTransient<IProviderService, CloudProviderService>();
             services.AddTransient<IDhhsFormService, CloudDhhsFormService>();
             services.AddTransient<ICwicPacketService, CloudCwicPacketService>();
+            services.AddTransient<IBenefitsApplicationService, CloudBenefitsApplicationService>();
+            services.AddTransient<IFormWizardProgressService, CloudFormWizardProgressService>();
             services.AddTransient<IHousingSupportFundsService, CloudHousingSupportFundsService>();
             services.AddTransient<ISafetyDeviceService, CloudSafetyDeviceService>();
             services.AddTransient<IApiCompatibilityService, CloudApiCompatibilityService>();

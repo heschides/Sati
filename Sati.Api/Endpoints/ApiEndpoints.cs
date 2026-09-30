@@ -59,6 +59,8 @@ internal static partial class ApiEndpoints
         MapAssessments(api);
         MapSafetyPlans(api);
         MapCwicPackets(api);
+        MapBenefitsApplications(api);
+        MapFormWizardProgress(api);
         MapHousingSupportFunds(api);
         MapSafetyDeviceRequests(api);
         MapChat(api);

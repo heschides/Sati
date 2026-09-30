@@ -1001,9 +1001,7 @@ namespace Sati.ViewModels.Children
                     .OrderByDescending(form => form.TargetEffectiveDate)
                     .ThenByDescending(form => form.DueDate))
                 {
-                    var label = form.TargetEffectiveDate == default
-                        ? $"{Person.FormDisplayName(type)} — due {form.DueDate:M/d/yy}"
-                        : $"{Person.FormDisplayName(type)} — plan starting {form.TargetEffectiveDate:M/d/yy}; due {form.DueDate:M/d/yy}";
+                    var label = FormDocumentLabels.NoteSelection(form);
                     FormObligations.Add(new FormObligationOption(form.Id, label));
                 }
             }
