@@ -610,13 +610,14 @@ public sealed record TestConsumerDeletionResultDto(
     int DocumentArtifactsDeleted = 0,
     int SafetyPlansDeleted = 0,
     int DocumentAcknowledgmentsDeleted = 0,
-    int CheckRequestsDeleted = 0)
+    int CheckRequestsDeleted = 0,
+    int ConsumerScheduleEntriesDeleted = 0)
 {
     public int RelatedRecordsDeleted =>
         FormsDeleted + NotesDeleted + ContactsDeleted + ReviewsDeleted +
         AppointmentsDeleted + AssessmentsDeleted + AtRequestsDeleted +
         AtRequestItemsDeleted + PersonVersionsDeleted + PersonProvidersDeleted +
-        FormAttestationsDeleted + DocumentArtifactsDeleted + SafetyPlansDeleted + DocumentAcknowledgmentsDeleted + CheckRequestsDeleted;
+        FormAttestationsDeleted + DocumentArtifactsDeleted + SafetyPlansDeleted + DocumentAcknowledgmentsDeleted + CheckRequestsDeleted + ConsumerScheduleEntriesDeleted;
 }
 
 /// <summary>Rule-3 deletion: delete a consumer created within the window. See <c>ConsumerDeletionRules</c>.</summary>
@@ -644,13 +645,14 @@ public sealed record ConsumerDeletionResultDto(
     int ClaimLinesDeleted,
     int SafetyPlansDeleted = 0,
     int DocumentAcknowledgmentsDeleted = 0,
-    int CheckRequestsDeleted = 0)
+    int CheckRequestsDeleted = 0,
+    int ConsumerScheduleEntriesDeleted = 0)
 {
     public int RelatedRecordsDeleted =>
         FormsDeleted + NotesDeleted + ContactsDeleted + ReviewsDeleted +
         AppointmentsDeleted + AssessmentsDeleted + AtRequestsDeleted +
         AtRequestItemsDeleted + PersonVersionsDeleted + PersonProvidersDeleted +
-        FormAttestationsDeleted + DocumentArtifactsDeleted + ClaimLinesDeleted + SafetyPlansDeleted + DocumentAcknowledgmentsDeleted + CheckRequestsDeleted;
+        FormAttestationsDeleted + DocumentArtifactsDeleted + ClaimLinesDeleted + SafetyPlansDeleted + DocumentAcknowledgmentsDeleted + CheckRequestsDeleted + ConsumerScheduleEntriesDeleted;
 }
 
 public sealed record AdminActivityDto(
@@ -682,6 +684,8 @@ public sealed record ProductivityMonthUnitsDto(
     int Year,
     int Month,
     int Units);
+
+public sealed record ProductivityDayUnitsDto(DateTime Date, int Units, int NoteCount);
 
 public sealed record BillingPeriodDto(
     int Id,

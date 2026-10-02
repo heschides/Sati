@@ -76,6 +76,7 @@ namespace Sati.Data
         public DbSet<ProviderContact> ProviderContacts { get; set; }
         public DbSet<PersonContact> PersonContacts { get; set; }
         public DbSet<PersonProvider> PersonProviders { get; set; }
+        public DbSet<ConsumerScheduleEntry> ConsumerScheduleEntries => Set<ConsumerScheduleEntry>();
         public DbSet<ComprehensiveAssessment> ComprehensiveAssessments { get; set; }
         public DbSet<SafetyPlan> SafetyPlans { get; set; }
         public DbSet<DocumentAcknowledgment> DocumentAcknowledgments { get; set; }
@@ -167,6 +168,7 @@ namespace Sati.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             FormWizardProgressPersistenceModel.Configure<Person>(modelBuilder);
+            ConsumerSchedulePersistenceModel.Configure<Person>(modelBuilder);
             base.OnModelCreating(modelBuilder);
             ClearinghousePersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration>(modelBuilder);
             BillingCorrectionPersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration, ClaimLine, RemittanceDeposit>(modelBuilder);

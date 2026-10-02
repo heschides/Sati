@@ -5,6 +5,12 @@ namespace Sati.Data.Cloud;
 public sealed class CloudProductivityReportService(CloudApiClient api)
     : IProductivityReportService
 {
+    public async Task<IReadOnlyList<ProductivityDayUnits>> GetDaysAsync(int year, int month) =>
+        (await api.GetAsync<List<ProductivityDayUnitsDto>>(
+            $"/api/v1/reports/productivity-days/{year}/{month}"))
+        .Select(row => new ProductivityDayUnits(row.Date, row.Units, row.NoteCount))
+        .ToList();
+
     public async Task<IReadOnlyList<ProductivityMonthUnits>> GetUnitsAsync(
         DateTime windowStart,
         DateTime windowEnd)

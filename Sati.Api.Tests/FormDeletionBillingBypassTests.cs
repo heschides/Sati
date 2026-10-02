@@ -46,7 +46,7 @@ public sealed class FormDeletionBillingBypassTests(SatiApiFactory factory)
     [Theory]
     [InlineData("PCP", 3, false)]
     [InlineData("Release_Medical", -2, false)]
-    [InlineData("PCP", -30, true)]
+    [InlineData("PCP", -40, true)]
     public async Task FutureOptionalAndLegacyCompletedFormsAreRetained(
         string type, int daysUntilDue, bool completed)
     {

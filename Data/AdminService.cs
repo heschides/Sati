@@ -410,6 +410,11 @@ public sealed class AdminService(
             .Where(version => version.PersonId == personId)
             .Select(version => new { version.Id, version.ChangeKind, version.ChangedAtUtc })
             .ToListAsync(cancellationToken);
+        var consumerScheduleInventory = await context.ConsumerScheduleEntries.AsNoTracking()
+            .Where(entry => entry.PersonId == personId)
+            .Select(entry => new { entry.Id, entry.Kind, entry.Date,
+                entry.EffectiveStart, entry.EffectiveEnd })
+            .ToListAsync(cancellationToken);
 
         // Cascade delete, in dependency order. ClaimLines before Notes: A1 permits draft and
         // synthetic claim lines inside the window, unlike test-consumer deletion, which never
@@ -426,6 +431,9 @@ public sealed class AdminService(
             .ExecuteDeleteAsync(cancellationToken);
         var personProvidersDeleted = await context.PersonProviders
             .Where(link => link.PersonId == personId)
+            .ExecuteDeleteAsync(cancellationToken);
+        var consumerScheduleEntriesDeleted = await context.ConsumerScheduleEntries
+            .Where(entry => entry.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
         var documentAcknowledgmentsDeleted = await context.DocumentAcknowledgments
             .Where(receipt => context.DocumentArtifacts.Any(artifact => artifact.Id == receipt.DocumentArtifactId && artifact.PersonId == personId && artifact.AgencyId == actor.AgencyId))
@@ -489,7 +497,8 @@ public sealed class AdminService(
             personId, formsDeleted, notesDeleted, contactsDeleted, reviewsDeleted, appointmentsDeleted,
             assessmentsDeleted, atRequestsDeleted, atRequestItemsDeleted, personVersionsDeleted,
             personProvidersDeleted, formAttestationsDeleted, documentArtifactsDeleted, claimLinesDeleted,
-            safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted);
+            safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted,
+            consumerScheduleEntriesDeleted);
 
         LocalAuditTrail.Record(
             context,
@@ -505,6 +514,7 @@ public sealed class AdminService(
                 deletedAtUtc = DateTime.UtcNow,
                 billingIntegrityCheck = billingFacts,
                 counts = result,
+                consumerSchedule = consumerScheduleInventory,
                 notes = noteInventory,
                 claimLines = claimLineRows,
                 forms = formInventory,
@@ -676,6 +686,9 @@ public sealed class AdminService(
         var personProvidersDeleted = await context.PersonProviders
             .Where(link => link.PersonId == personId)
             .ExecuteDeleteAsync(cancellationToken);
+        var consumerScheduleEntriesDeleted = await context.ConsumerScheduleEntries
+            .Where(entry => entry.PersonId == personId)
+            .ExecuteDeleteAsync(cancellationToken);
         var documentAcknowledgmentsDeleted = await context.DocumentAcknowledgments
             .Where(receipt => context.DocumentArtifacts.Any(artifact => artifact.Id == receipt.DocumentArtifactId && artifact.PersonId == personId && artifact.AgencyId == actor.AgencyId))
             .ExecuteDeleteAsync(cancellationToken);
@@ -742,7 +755,8 @@ public sealed class AdminService(
             personVersionsDeleted,
             personProvidersDeleted,
             formAttestationsDeleted,
-            documentArtifactsDeleted, safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted);
+            documentArtifactsDeleted, safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted,
+            consumerScheduleEntriesDeleted);
         LocalAuditTrail.Record(
             context,
             actor,
@@ -757,6 +771,7 @@ public sealed class AdminService(
                 notesDeleted = result.NotesDeleted,
                 contactsDeleted = result.ContactsDeleted,
                 personProvidersDeleted = result.PersonProvidersDeleted,
+                consumerScheduleEntriesDeleted = result.ConsumerScheduleEntriesDeleted,
                 formAttestationsDeleted = result.FormAttestationsDeleted,
                 documentArtifactsDeleted = result.DocumentArtifactsDeleted,
                 safetyPlansDeleted = result.SafetyPlansDeleted,

@@ -72,174 +72,186 @@
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="2">
+                    <DockPanel Margin="0,0,0,6" LastChildFill="False">
+                        <TextBlock Text="YOUR MONTHLY PRODUCTIVITY"
+                                   Style="{StaticResource SectionHeader}"
+                                   DockPanel.Dock="Left"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,14,0" />
+                        <Button DockPanel.Dock="Left"
+                                Style="{StaticResource IconButton}"
+                                Content="&#xE76B;"
+                                FontFamily="Segoe MDL2 Assets"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                Width="26" Height="24"
+                                Command="{Binding PreviousProductivityMonthCommand}"
+                                ToolTip="Previous productivity month"
+                                AutomationProperties.Name="Previous productivity month" />
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="{Binding ProductivityPeriodLabel}"
+                                   FontWeight="SemiBold"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   Margin="9,0"
+                                   MinWidth="96"
+                                   TextAlignment="Center"
+                                   AutomationProperties.Name="Selected productivity month" />
+                        <Button DockPanel.Dock="Left"
+                                Style="{StaticResource IconButton}"
+                                Content="&#xE76C;"
+                                FontFamily="Segoe MDL2 Assets"
+                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                Width="26" Height="24"
+                                Command="{Binding NextProductivityMonthCommand}"
+                                ToolTip="Next productivity month"
+                                AutomationProperties.Name="Next productivity month" />
+                    </DockPanel>
 
-                <!-- Monthly productivity -->
-                <TextBlock Text="YOUR MONTHLY PRODUCTIVITY"
-                           Style="{StaticResource SectionHeader}" />
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="RECOVERABLE"
-                                   Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding RecoverableUnits}"
-                                   FontSize="20"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                        <TextBlock Text="SECURED"
-                                   Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding SecuredUnits}"
-                                   FontSize="20"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="ABANDONED"
-                                   Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding AbandonedUnits}"
-                                   FontSize="20"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="3">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="DOCUMENTED AVG"
-                                       Style="{StaticResource LabelStyle}" />
-                            <TextBlock Text="ⓘ"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource InfoBrush}"
-                                       Margin="4,0,0,0"
-                                       VerticalAlignment="Top"
-                                       Cursor="Help">
-                                <TextBlock.ToolTip>
-                                    <ToolTip>
-                                        <TextBlock MaxWidth="220"
-                                                   TextWrapping="Wrap">
-                                            <Run Text="Average known units on this month's service days, through today, that already have pending, logged, or approved notes. The calendar tints those days green."/>
-                                            <LineBreak />
-                                            <LineBreak />
-                                            <Run Text="A blank past day is not silently treated as future capacity. Recoverable pending notes and future workdays are shown separately below." />
-                                             <LineBreak />
-                                        </TextBlock>
-                                    </ToolTip>
-                                </TextBlock.ToolTip>
+                    <!-- The calendar shares the top row with the numbers. Its width is fixed
+                         so the seven day columns stay legible at wide window sizes. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="172" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0"
+                                    Visibility="{Binding IsCurrentProductivityMonth, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <UniformGrid Columns="4" Margin="0,0,0,4">
+                                <StackPanel>
+                                    <TextBlock Text="RECOVERABLE" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock Text="{Binding RecoverableUnits}" FontSize="18"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="SECURED" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock Text="{Binding SecuredUnits}" FontSize="18"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="ABANDONED" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock Text="{Binding AbandonedUnits}" FontSize="18"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="DOCUMENTED AVG" Style="{StaticResource LabelStyle}"
+                                               ToolTip="Average known units on documented service days this month." />
+                                    <TextBlock Text="{Binding DailyAverageUnits, StringFormat={}{0:F1}}"
+                                               FontSize="18" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding DailyAverageBasis}" FontSize="10"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                                </StackPanel>
+                            </UniformGrid>
+                            <TextBlock Style="{StaticResource LabelStyle}" Margin="0">
+                                <Run Text="{Binding SecuredUnits, Mode=OneWay}" />
+                                <Run Text=" / " />
+                                <Run Text="{Binding Threshold, Mode=OneWay}" />
+                                <Run Text=" units secured" />
                             </TextBlock>
+                            <ProgressBar Minimum="0"
+                                         Maximum="{Binding SafeThreshold, TargetNullValue=1, FallbackValue=1}"
+                                         Value="{Binding SecuredUnits, Mode=OneWay}"
+                                         Height="6" Margin="0,3,0,6"
+                                         Foreground="{DynamicResource AccentBrush}"
+                                         Background="{DynamicResource BorderBrush}"
+                                         BorderThickness="0" />
+                            <UniformGrid Columns="4">
+                                <StackPanel>
+                                    <TextBlock Text="PROJECTED / DAY" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock Text="{Binding ProjectedPace, StringFormat={}{0:F1}, TargetNullValue='—'}"
+                                               FontSize="17" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="SECURED / DAY" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock Text="{Binding SecuredPace, StringFormat={}{0:F1}, TargetNullValue='—'}"
+                                               FontSize="17" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="DAYS TO CAPTURE" Style="{StaticResource LabelStyle}"
+                                               ToolTip="{Binding PaceCapacityBasis}" />
+                                    <TextBlock Text="{Binding PaceCapacityDays}"
+                                               FontSize="17" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="EST. INCENTIVE" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock Text="{Binding EstimatedIncentive, StringFormat=C}"
+                                               FontSize="17" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                </StackPanel>
+                            </UniformGrid>
                         </StackPanel>
-                        <TextBlock Text="{Binding DailyAverageUnits, StringFormat={}{0:F1}}"
-                                   FontSize="20"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <!-- What the average divided by, so an open day is never a mystery. -->
-                        <TextBlock Text="{Binding DailyAverageBasis}"
-                                   FontSize="11"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextSecondaryBrush}" />
-                    </StackPanel>
-                </Grid>
 
-                <TextBlock Style="{StaticResource LabelStyle}">
-                    <Run Text="{Binding SecuredUnits, Mode=OneWay}" />
-                    <Run Text=" / " />
-                    <Run Text="{Binding Threshold, Mode=OneWay}" />
-                    <Run Text=" units" />
-                </TextBlock>
-                <ProgressBar Minimum="0"
-                             Maximum="{Binding SafeThreshold, TargetNullValue=1, FallbackValue=1}"
-                             Value="{Binding SecuredUnits, Mode=OneWay}"
-                             Height="10"
-                             Margin="0,4,0,8"
-                             Foreground="{DynamicResource AccentBrush}"
-                             Background="{DynamicResource BorderBrush}"
-                             BorderThickness="0" />
-
-                <views:ProductivityCalendarThumbnail DataContext="{Binding ProductivityMonth}"
-                                                     Margin="0,0,0,10"
-                                                     MaxWidth="280"
-                                                     HorizontalAlignment="Left"
-                                                     AutomationProperties.Name="{Binding DataContext.ProductivityMonthSummary,
-                                                         RelativeSource={RelativeSource AncestorType=UserControl, AncestorLevel=1}}"
-                                                     ToolTip="Green: logged or approved units counted in the daily average. Pale with a pink border: counted through pending notes only." />
-
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="PROJECTED / DAY"
-                                   Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding ProjectedPace, StringFormat={}{0:F1}, TargetNullValue='—'}"
-                                   FontSize="20"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                        <TextBlock Text="SECURED / DAY"
-                                   Style="{StaticResource LabelStyle}" />
-                        <TextBlock Text="{Binding SecuredPace, StringFormat={}{0:F1}, TargetNullValue='—'}"
-                                   FontSize="20"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="DAYS TO CAPTURE"
-                                       Style="{StaticResource LabelStyle}" />
-                            <TextBlock Text="ⓘ"
-                                       FontSize="12"
+                        <StackPanel Grid.Column="0"
+                                    Visibility="{Binding IsHistoricalProductivityMonth, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel Visibility="{Binding HasHistoricalProductivityData, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="SECURED PRODUCTIVITY"
+                                           Style="{StaticResource LabelStyle}" Margin="0,0,0,5" />
+                                <UniformGrid Columns="4">
+                                    <StackPanel>
+                                        <TextBlock Text="SECURED UNITS" Style="{StaticResource LabelStyle}" />
+                                        <TextBlock Text="{Binding HistoricalSecuredUnits}" FontSize="18"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="DOCUMENTED DAYS" Style="{StaticResource LabelStyle}" />
+                                        <TextBlock Text="{Binding HistoricalDocumentedDays}" FontSize="18"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="SECURED / DAY" Style="{StaticResource LabelStyle}" />
+                                        <TextBlock Text="{Binding HistoricalSecuredPerDay, StringFormat={}{0:F1}}"
+                                                   FontSize="18" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="MONTH GOAL" Style="{StaticResource LabelStyle}" />
+                                        <TextBlock Text="{Binding HistoricalGoalLabel}" FontSize="18"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock Margin="0,12,0,0"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="11">
+                                    <Run Text="Goal reached: " />
+                                    <Run Text="{Binding HistoricalAttainmentLabel, Mode=OneWay}" />
+                                    <Run Text="  ·  Logged and approved notes only" />
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBlock Text="Loading month…"
+                                       Margin="0,5,0,0"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="4,0,0,0"
-                                       VerticalAlignment="Center"
-                                       Cursor="Help">
-                                <TextBlock.ToolTip>
-                                    <ToolTip>
-                                        <TextBlock MaxWidth="240"
-                                                   TextWrapping="Wrap">
-                                            <Run Text="Every day this month's units can still land on: eligible workdays from today to month end, plus past workdays whose notes are not written yet and whose documentation window is still open." />
-                                            <LineBreak />
-                                            <LineBreak />
-                                            <Run Text="Excludes weekends, holidays, and days marked exempt. A past day leaves this count once you write it up or mark it as having no billable work." />
-                                        </TextBlock>
-                                    </ToolTip>
-                                </TextBlock.ToolTip>
-                            </TextBlock>
+                                       Visibility="{Binding IsHistoricalProductivityLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <TextBlock Text="{Binding HistoricalProductivityError}"
+                                       Margin="0,5,0,0"
+                                       Foreground="{DynamicResource DangerStrongBrush}"
+                                       TextWrapping="Wrap"
+                                       AutomationProperties.LiveSetting="Polite"
+                                       Visibility="{Binding HasHistoricalProductivityError, Converter={StaticResource BoolToVisibilityConverter}}" />
                         </StackPanel>
-                        <TextBlock Text="{Binding PaceCapacityDays}"
-                                   FontSize="20"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="{Binding PaceCapacityBasis}"
-                                   FontSize="11"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+
+                        <views:ProductivityCalendarThumbnail Grid.Column="2"
+                                                             DataContext="{Binding ProductivityMonth}"
+                                                             Width="172"
+                                                             HorizontalAlignment="Right"
+                                                             VerticalAlignment="Top"
+                                                             AutomationProperties.Name="{Binding DataContext.ProductivityMonthSummary, RelativeSource={RelativeSource AncestorType={x:Type views:CaseManagerDashboardContentView}}}"
+                                                             ToolTip="Highlighted days have logged or approved units. In the current month, a pale highlighted day has pending notes only." />
+                    </Grid>
+                    <StackPanel Visibility="{Binding IsCurrentProductivityMonth, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Border Background="{DynamicResource WarningFillBrush}"
+                                BorderBrush="{DynamicResource WarningBrush}"
+                                BorderThickness="1" CornerRadius="4" Padding="6"
+                                Margin="0,5,0,0"
+                                AutomationProperties.Name="Documentation deadline warning"
+                                Visibility="{Binding HasDueTodayRisk, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding DueTodayRiskMessage}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                        </Border>
+                        <TextBlock Text="{Binding PendingItemsWithoutUnitsMessage}"
+                                   Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   AutomationProperties.Name="Unestimated pending notes warning"
+                                   Visibility="{Binding HasPendingItemsWithoutUnits, Converter={StaticResource BoolToVisibilityConverter}}" />
                     </StackPanel>
-                </Grid>
-
-                <Border Background="{DynamicResource WarningFillBrush}"
-                        BorderBrush="{DynamicResource WarningBrush}"
-                        BorderThickness="1"
-                        CornerRadius="4"
-                        Padding="8"
-                        Margin="0,0,0,8"
-                        AutomationProperties.Name="Documentation deadline warning"
-                        Visibility="{Binding HasDueTodayRisk, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock Text="{Binding DueTodayRiskMessage}"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextPrimaryBrush}" />
-                </Border>
-
-                <TextBlock Text="{Binding PendingItemsWithoutUnitsMessage}"
-                           Margin="0,0,0,8"
-                           TextWrapping="Wrap"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           AutomationProperties.Name="Unestimated pending notes warning"
-                           Visibility="{Binding HasPendingItemsWithoutUnits, Converter={StaticResource BoolToVisibilityConverter}}" />
-
-                <TextBlock Text="ESTIMATED INCENTIVE"
-                           Style="{StaticResource LabelStyle}" />
-                <TextBlock Text="{Binding EstimatedIncentive, StringFormat=C}"
-                           FontSize="20"
-                           Foreground="{DynamicResource TextPrimaryBrush}" />
                 </StackPanel>
             </ScrollViewer>
         </Border>

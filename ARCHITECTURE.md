@@ -1,6 +1,51 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-09-29.*
+*Living document. Updated during structured review sessions. Last updated: 2026-10-02.*
+
+## Admin status changes refresh the desktop caseload — October 2 (unreleased)
+
+After `AdminDashboardViewModel` saves a Person status through `IPersonService`, the
+shell asks `CaseManagerDashboardViewModel` to reload the authoritative active caseload.
+The dashboard publishes that snapshot to the Clients menu, note pickers, and Notes
+Log, then rebuilds its matrix and deadline board. This happens for archive and
+return-to-Active changes without restarting. A failed status write triggers no
+refresh; a later refresh failure is reported as a saved status with stale client UI.
+
+## Desktop process lifetime — October 1 (unreleased)
+
+`App.OnStartup` acquires a Windows named mutex before the environment chooser,
+host creation, database validation, or migration. The name is shared by the Demo
+and Local desktop builds and spans Windows sessions on the same computer. A second
+launch shows an informational message and exits without starting a work session.
+`App.OnExit` releases the mutex on the WPF dispatcher thread, including when startup
+ends early. An abandoned mutex can be acquired after an unclean process exit.
+
+## Consumer appointments, weekly schedules, and ModivCare tracking — September 30 (unreleased)
+
+The consumer profile's Appointments & Schedule tab owns dated doctor appointments and
+effective-dated weekly day program/work entries. `ConsumerScheduleRules` in
+`Sati.Contracts.V1` validates the mutually exclusive date/weekday shapes, times, and
+ModivCare tracking state. These are consumer activities, not case-manager service-day
+reservations, note evidence, billable time, or the Medical/Dental quarterly review
+`Appointment` rows. The ModivCare state is staff-entered; Sati does not contact or
+book with the broker. A Needs booking state is visible on the selected profile.
+Doctor visits can be date-only or have a start time without a known end time;
+weekly program/work patterns require both start and end times.
+The tab's month calendar expands only the selected consumer's saved entries over
+the displayed grid dates, respecting weekly effective dates and weekdays. This
+is a read-only presentation projection: the selected day's details show entered
+ride status and pickup times, while no occurrence, attendance, exception, or
+broker booking is written by calendar navigation.
+
+`IConsumerScheduleService` is the desktop seam. Demo uses `CloudConsumerScheduleService`
+and the API; local Production uses the transitional `ConsumerScheduleService` with a
+short-lived context. Each API operation rechecks current caseload ownership and the
+request's person ID also scopes the row ID. Both writers use revision tokens for edits
+and removals. Reads and mutations audit without storing titles, locations, pickup
+times, or ride references in metadata. `ConsumerScheduleEntry` has a cascade foreign
+key to Person; both approved consumer-deletion paths explicitly count and remove these
+rows before deleting Person, and rule-3 tombstones retain a minimal ID/type/date
+inventory. Migration `AddConsumerSchedule` is source-only until controlled deployment.
 
 ## Resumable form wizard answers — September 29 (unreleased)
 
@@ -873,6 +918,15 @@ narratives and person object graphs never enter this report path. Productivity, 
 incentive-history, exempt-date, and partial-month reads start together, while `LatestRequestTracker`
 allows only the newest filter request to update the screen. The view appears immediately with a
 loading or load-failure message while those reads complete.
+
+Overview's compact productivity panel can navigate to completed months. Its historical calendar
+uses `IProductivityReportService.GetDaysAsync` (`GET /reports/productivity-days/{year}/{month}` in
+Demo), which projects only note date and minutes from the signed-in worker's logged or approved
+notes and returns daily units and note counts. The panel loads the month's incentive snapshot and
+exempt days separately for its goal. `LatestRequestTracker` rejects a late month result after
+another arrow press or account reset. Recoverable work, abandoned work, and forecasts remain
+current-month presentation; a prior month shows secured facts only. The Clients journal's text
+size buttons change the local editor font size without changing its stored document or autosave.
 
 ## Structured Today's Work
 

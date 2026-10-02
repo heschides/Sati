@@ -219,6 +219,29 @@ public sealed class AdminTestDataDeletionViewModelTests
     }
 
     [Fact]
+    public async Task MarkingDeceasedRefreshesTheSharedCaseloadAfterTheStatusWrite()
+    {
+        var adminService = new RecordingAdminService();
+        var personService = new RecordingPersonService();
+        var viewModel = CreateViewModel(adminService, personService);
+        SelectTestConsumer(viewModel, adminService.Person);
+        viewModel.SelectedTargetStatus = PersonStatusRules.Deceased;
+        var refreshes = 0;
+        viewModel.PersonStatusChangedAsync = () =>
+        {
+            Assert.Equal(1, personService.SetStatusCalls);
+            Assert.Equal(PersonStatusRules.Deceased, personService.SetStatusTargetStatus);
+            refreshes++;
+            return Task.CompletedTask;
+        };
+
+        await viewModel.SetPersonStatusCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, refreshes);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
     public void CannotSetTheStatusItAlreadyHas()
     {
         // ExecuteAsync called directly bypasses CanExecute — that gate only protects a UI-bound
@@ -246,10 +269,17 @@ public sealed class AdminTestDataDeletionViewModelTests
         var viewModel = CreateViewModel(adminService, personService);
         SelectTestConsumer(viewModel, adminService.Person);
         viewModel.SelectedTargetStatus = PersonStatusRules.Ghost;
+        var refreshes = 0;
+        viewModel.PersonStatusChangedAsync = () =>
+        {
+            refreshes++;
+            return Task.CompletedTask;
+        };
 
         await viewModel.SetPersonStatusCommand.ExecuteAsync(null);
 
         Assert.Equal(1, personService.SetStatusCalls);
+        Assert.Equal(0, refreshes);
         Assert.True(viewModel.HasError);
         Assert.Contains(PersonStatusRules.OnlyAdminMayGhostMessage, viewModel.StatusMessage);
     }

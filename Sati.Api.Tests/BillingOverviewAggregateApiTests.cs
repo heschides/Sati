@@ -14,6 +14,7 @@ public sealed class BillingOverviewAggregateApiTests(SatiApiFactory factory)
     [Fact]
     public async Task OverviewReturnsSixScopedMonthsAndAllScopedDraftValueInABoundedPayload()
     {
+        using var biller = await factory.CreateAuthenticatedClientAsync("billing-only-one");
         int[] noteIds = [];
         int[] periodIds = [];
         try
@@ -26,8 +27,8 @@ public sealed class BillingOverviewAggregateApiTests(SatiApiFactory factory)
                 var facts = new[]
                 {
                     new OverviewFact(1, 101, 12, 2026, 5, 2, 23m),
-                    new OverviewFact(1, 101, 12, 2026, 3, 0, 37m),
-                    new OverviewFact(1, 101, 12, 2026, 10, 0, 43m),
+                    new OverviewFact(1, 101, 13, 2026, 3, 0, 37m),
+                    new OverviewFact(1, 101, 15, 2026, 10, 0, 43m),
                     new OverviewFact(2, 201, 22, 2026, 9, 0, 999m)
                 };
 
@@ -92,7 +93,6 @@ public sealed class BillingOverviewAggregateApiTests(SatiApiFactory factory)
                     .ToDictionary(group => group.Key, group => group.Sum(row => row.ChargeAmount));
             }
 
-            using var biller = await factory.CreateAuthenticatedClientAsync("billing-only-one");
             using var response = await biller.GetAsync("/api/v1/billing/overview-periods/2026/9");
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync();

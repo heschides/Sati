@@ -55,6 +55,7 @@ internal static partial class ApiEndpoints
         MapCaseload(api);
         MapPeople(api);
         MapPersonPhotos(api);
+        MapConsumerSchedule(api);
         MapReviews(api);
         MapAssessments(api);
         MapSafetyPlans(api);
@@ -577,6 +578,9 @@ internal static partial class ApiEndpoints
                 var personProvidersDeleted = await db.PersonProviders
                     .Where(link => link.PersonId == personId)
                     .ExecuteDeleteAsync(cancellationToken);
+                var consumerScheduleEntriesDeleted = await db.ConsumerScheduleEntries
+                    .Where(entry => entry.PersonId == personId)
+                    .ExecuteDeleteAsync(cancellationToken);
                 var documentAcknowledgmentsDeleted = await db.DocumentAcknowledgments
                     .Where(receipt => db.DocumentArtifacts.Any(artifact => artifact.Id == receipt.DocumentArtifactId && artifact.PersonId == personId && artifact.AgencyId == actor.AgencyId))
                     .ExecuteDeleteAsync(cancellationToken);
@@ -646,7 +650,8 @@ internal static partial class ApiEndpoints
                     personVersionsDeleted,
                     personProvidersDeleted,
                     formAttestationsDeleted,
-                    documentArtifactsDeleted, safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted);
+                    documentArtifactsDeleted, safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted,
+                    consumerScheduleEntriesDeleted);
                 auditTrail.Record(
                     actor,
                     AuditActions.TestConsumerDeleted,
@@ -660,6 +665,7 @@ internal static partial class ApiEndpoints
                         notesDeleted = result.NotesDeleted,
                         contactsDeleted = result.ContactsDeleted,
                         personProvidersDeleted = result.PersonProvidersDeleted,
+                        consumerScheduleEntriesDeleted = result.ConsumerScheduleEntriesDeleted,
                         formAttestationsDeleted = result.FormAttestationsDeleted,
                         documentArtifactsDeleted = result.DocumentArtifactsDeleted,
                         safetyPlansDeleted = result.SafetyPlansDeleted,
@@ -974,6 +980,11 @@ internal static partial class ApiEndpoints
                 .Where(version => version.PersonId == personId)
                 .Select(version => new { version.Id, version.ChangeKind, version.ChangedAtUtc })
                 .ToListAsync(cancellationToken);
+            var consumerScheduleInventory = await db.ConsumerScheduleEntries.AsNoTracking()
+                .Where(entry => entry.PersonId == personId)
+                .Select(entry => new { entry.Id, entry.Kind, entry.Date,
+                    entry.EffectiveStart, entry.EffectiveEnd })
+                .ToListAsync(cancellationToken);
 
             // Cascade delete, in dependency order. ClaimLines before Notes: A1 permits draft
             // and synthetic claim lines inside the window, unlike test-consumer deletion, which
@@ -990,6 +1001,9 @@ internal static partial class ApiEndpoints
                 .ExecuteDeleteAsync(cancellationToken);
             var personProvidersDeleted = await db.PersonProviders
                 .Where(link => link.PersonId == personId)
+                .ExecuteDeleteAsync(cancellationToken);
+            var consumerScheduleEntriesDeleted = await db.ConsumerScheduleEntries
+                .Where(entry => entry.PersonId == personId)
                 .ExecuteDeleteAsync(cancellationToken);
             var documentAcknowledgmentsDeleted = await db.DocumentAcknowledgments
                 .Where(receipt => db.DocumentArtifacts.Any(artifact => artifact.Id == receipt.DocumentArtifactId && artifact.PersonId == personId && artifact.AgencyId == actor.AgencyId))
@@ -1050,7 +1064,8 @@ internal static partial class ApiEndpoints
                 personId, formsDeleted, notesDeleted, contactsDeleted, reviewsDeleted, appointmentsDeleted,
                 assessmentsDeleted, atRequestsDeleted, atRequestItemsDeleted, personVersionsDeleted,
                 personProvidersDeleted, formAttestationsDeleted, documentArtifactsDeleted, claimLinesDeleted,
-                safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted);
+                safetyPlansDeleted, documentAcknowledgmentsDeleted, checkRequestsDeleted,
+                consumerScheduleEntriesDeleted);
 
             auditTrail.Record(
                 actor,
@@ -1073,7 +1088,8 @@ internal static partial class ApiEndpoints
                     atRequests = atRequestRows,
                     checkRequests = checkRequestRows,
                     contacts = contactRows,
-                    personVersions = personVersionInventory
+                    personVersions = personVersionInventory,
+                    consumerSchedule = consumerScheduleInventory
                 }));
 
             try
@@ -5794,6 +5810,49 @@ internal static partial class ApiEndpoints
 
     private static void MapReports(RouteGroupBuilder api)
     {
+        api.MapGet("/reports/productivity-days/{year:int}/{month:int}", async Task<IResult> (
+            int year,
+            int month,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            if (year is < 2000 or > 2200 || month is < 1 or > 12)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["month"] = ["Choose a month from 2000 through 2200."]
+                });
+
+            var actor = Actor.From(principal);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
+
+            var start = new DateTime(year, month, 1);
+            var end = start.AddMonths(1);
+            var rows = await (from note in db.Notes.AsNoTracking()
+                              join person in TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+                                  on note.PersonId equals person.Id
+                              where person.UserId == actor.UserId &&
+                                    person.AgencyId == actor.AgencyId &&
+                                    note.AgencyId == actor.AgencyId &&
+                                    note.EventDate.HasValue &&
+                                    note.EventDate.Value >= start &&
+                                    note.EventDate.Value < end &&
+                                    (note.Status == (int)NoteStatus.Logged ||
+                                     note.Status == (int)NoteStatus.Approved)
+                              select new { Date = note.EventDate!.Value, note.Minutes })
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(rows
+                .GroupBy(row => row.Date.Date)
+                .OrderBy(group => group.Key)
+                .Select(group => new ProductivityDayUnitsDto(
+                    group.Key,
+                    group.Sum(row => CalculateUnits(row.Minutes)),
+                    group.Count()))
+                .ToList());
+        });
+
         api.MapGet("/reports/productivity-units", async Task<IResult> (
             DateTime start,
             DateTime end,

@@ -79,6 +79,7 @@ namespace Sati.ViewModels
         // practice and network are derived from the agency directory on every read, and
         // that loading and resolution has nothing to do with the rest of this class.
         public ConsumerProvidersViewModel ConsumerProviders { get; }
+        public ConsumerScheduleViewModel? ConsumerSchedule { get; }
 
         /// <summary>The Credible import review panel. Fills this form; never saves.</summary>
         public ConsumerImportViewModel ConsumerImport { get; }
@@ -413,6 +414,7 @@ namespace Sati.ViewModels
             _ = LoadSelectedPersonWorkspaceSafelyAsync(value, _workspaceLoads.Begin());
             SsnPanel?.SetPerson(value?.Id);
             ConsumerProviders?.SetPerson(value);
+            ConsumerSchedule?.SetPerson(value);
             DhhsForms?.SetPerson(value);
             AgencyRelease?.SetPerson(value);
             ReleaseObligations?.SetPerson(value);
@@ -703,7 +705,8 @@ namespace Sati.ViewModels
                            CwicPacketViewModel? cwicPacket = null,
                            HousingSupportFundsViewModel? housingSupportFunds = null,
                            SafetyDeviceViewModel? safetyDevice = null,
-                           BenefitsApplicationViewModel? benefitsApplication = null)
+                           BenefitsApplicationViewModel? benefitsApplication = null,
+                           ConsumerScheduleViewModel? consumerSchedule = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -727,6 +730,7 @@ namespace Sati.ViewModels
             CheckRequests = checkRequests;
             ReleaseObligations = releaseObligations;
             ConsumerProviders = consumerProviders;
+            ConsumerSchedule = consumerSchedule;
             ConsumerImport = consumerImport;
             PersonPhoto = new PersonPhotoViewModel(personPhotoService, session);
             JournalPages.DocumentEdited += (_, _) => ApplyJournalPagesEdit();

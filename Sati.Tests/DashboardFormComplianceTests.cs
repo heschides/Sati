@@ -11,6 +11,70 @@ namespace Sati.Tests;
 public sealed class DashboardFormComplianceTests
 {
     [Fact]
+    public async Task ProductivityArrowsShowACompletedMonthAndReturnToCurrentForecast()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(
+            fixture, reportService: new FixedProductivityDays());
+        var dashboard = harness.Dashboard;
+        var previousMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-1);
+
+        await dashboard.PreviousProductivityMonthCommand.ExecuteAsync(null);
+
+        Assert.True(dashboard.IsHistoricalProductivityMonth);
+        Assert.Equal(previousMonth.ToString("MMMM yyyy"), dashboard.ProductivityPeriodLabel);
+        Assert.Equal(6, dashboard.HistoricalSecuredUnits);
+        Assert.Equal(1, dashboard.HistoricalDocumentedDays);
+        Assert.True(dashboard.ProductivityMonth.Cells.OfType<CalendarDay>()
+            .Single(day => day.Date.Day == 3).CountsWithSecuredUnits);
+
+        await dashboard.NextProductivityMonthCommand.ExecuteAsync(null);
+
+        Assert.True(dashboard.IsCurrentProductivityMonth);
+        Assert.False(dashboard.NextProductivityMonthCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task LateHistoricalLoadCannotReplaceTheCurrentMonthState()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var report = new DelayedProductivityDays();
+        var dashboard = (await DashboardHarness.CreateAsync(fixture, reportService: report)).Dashboard;
+
+        var olderRequest = dashboard.PreviousProductivityMonthCommand.ExecuteAsync(null);
+        await report.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await dashboard.NextProductivityMonthCommand.ExecuteAsync(null);
+        report.Fail(new InvalidOperationException("Simulated late report failure"));
+        await olderRequest;
+
+        Assert.True(dashboard.IsCurrentProductivityMonth);
+        Assert.Equal(string.Empty, dashboard.HistoricalProductivityError);
+        Assert.False(dashboard.IsHistoricalProductivityLoading);
+    }
+
+    [Fact]
+    public async Task PersonStatusRefreshUpdatesTheClientsMenuWithoutRestarting()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        var person = Person.CreatePerson(
+            harness.Dashboard.LoggedInUser!.Id,
+            "Jamie", "River", string.Empty, new DateTime(1990, 1, 1),
+            DateTime.Today.AddYears(-1), WaiverType.None, new Settings());
+        harness.ReplacePerson(person);
+        await harness.Dashboard.LoadPeopleAsync();
+        Assert.Contains(harness.Dashboard.Clients.People, item => item.Id == person.Id);
+
+        harness.ClearPeople(); // GetAllPeopleAsync excludes the newly archived consumer.
+        await harness.Dashboard.RefreshAfterPersonStatusChangedAsync();
+        Assert.DoesNotContain(harness.Dashboard.Clients.People, item => item.Id == person.Id);
+
+        harness.ReplacePerson(person); // An Admin may restore Active later.
+        await harness.Dashboard.RefreshAfterPersonStatusChangedAsync();
+        Assert.Contains(harness.Dashboard.Clients.People, item => item.Id == person.Id);
+    }
+
+    [Fact]
     public void TaskBoardUsesTargetEffectiveDateAndKeepsPredueAnnualWorkInItsCycle()
     {
         var today = new DateTime(2026, 4, 1);
@@ -518,12 +582,15 @@ public sealed class DashboardFormComplianceTests
             people.Items.Add(person);
         }
 
+        public void ClearPeople() => people.Items.Clear();
+
         public void SetReviewOpenDaysBefore(int days) =>
             settings.ReviewOpenDaysBefore = days;
 
         public static async Task<DashboardHarness> CreateAsync(
             NoteEntryFixture fixture,
-            ConsumerPickerSortPreferenceService? preferences = null)
+            ConsumerPickerSortPreferenceService? preferences = null,
+            IProductivityReportService? reportService = null)
         {
             var session = new SessionService();
             session.SetUser(fixture.CaseManagerOne);
@@ -575,7 +642,8 @@ public sealed class DashboardFormComplianceTests
                 null!,
                 new GuidanceViewModel(),
                 new HelperReferenceViewModel(),
-                consumerPickerSortPreferences: preferences);
+                consumerPickerSortPreferences: preferences,
+                productivityReportService: reportService);
 
             await dashboard.InitializeAsync();
             return new DashboardHarness(dashboard, settings, upcomingEvents, people, notes);
@@ -791,5 +859,37 @@ public sealed class DashboardFormComplianceTests
             HashSet<DateTime> exemptDates) => Task.FromResult(0);
         public Task<int> GetEligibleDaysAsync(DateTime startInclusive, DateTime endInclusive) => Task.FromResult(0);
         public Task<List<Incentive>> GetHistoryAsync(int userId) => Task.FromResult<List<Incentive>>([]);
+    }
+
+    private sealed class FixedProductivityDays : IProductivityReportService
+    {
+        public Task<IReadOnlyList<ProductivityDayUnits>> GetDaysAsync(int year, int month) =>
+            Task.FromResult<IReadOnlyList<ProductivityDayUnits>>(
+                [new ProductivityDayUnits(new DateTime(year, month, 3), 6, 2)]);
+
+        public Task<IReadOnlyList<ProductivityMonthUnits>> GetUnitsAsync(
+            DateTime windowStart, DateTime windowEnd) =>
+            Task.FromResult<IReadOnlyList<ProductivityMonthUnits>>([]);
+    }
+
+    private sealed class DelayedProductivityDays : IProductivityReportService
+    {
+        private readonly TaskCompletionSource<IReadOnlyList<ProductivityDayUnits>> result =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Started { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<IReadOnlyList<ProductivityDayUnits>> GetDaysAsync(int year, int month)
+        {
+            Started.TrySetResult();
+            return result.Task;
+        }
+
+        public void Fail(Exception error) => result.TrySetException(error);
+
+        public Task<IReadOnlyList<ProductivityMonthUnits>> GetUnitsAsync(
+            DateTime windowStart, DateTime windowEnd) =>
+            Task.FromResult<IReadOnlyList<ProductivityMonthUnits>>([]);
     }
 }

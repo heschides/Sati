@@ -26,6 +26,10 @@ internal sealed class AuditTrail(ApiDbContext db, IHttpContextAccessor httpConte
 
 internal static class AuditActions
 {
+    public const string ConsumerScheduleViewed = "consumer-schedule.viewed";
+    public const string ConsumerScheduleCreated = "consumer-schedule.created";
+    public const string ConsumerScheduleUpdated = "consumer-schedule.updated";
+    public const string ConsumerScheduleDeleted = "consumer-schedule.deleted";
     public const string AuthenticationSucceeded = "authentication.succeeded";
     public const string UserCreated = "user.created";
     public const string UserUpdated = "user.updated";

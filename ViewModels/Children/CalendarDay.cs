@@ -13,6 +13,9 @@ public sealed class CalendarDay
     public List<CalendarNoteItem> Notes { get; init; } = [];
     public List<ImportedOutlookEvent> OutlookEvents { get; init; } = [];
     public int NoteCount => Notes.Count;
+    // Historical productivity thumbnails use a narrative-free daily report.
+    public string? ThumbnailAccessibleLabel { get; init; }
+    public string ProductivityThumbnailLabel => ThumbnailAccessibleLabel ?? AccessibleLabel;
     public bool HasNotes => NoteCount > 0;
     public int OutlookEventCount => OutlookEvents.Count;
     public bool HasOutlookEvents => OutlookEventCount > 0;

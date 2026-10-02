@@ -2,7 +2,7 @@
 
 *Living document. The "why" behind choices that no diagram preserves. ARCHITECTURE.md
 says what owns what; this says why it was built that way and what was rejected. Newest
-sections at the bottom. Last updated: 2026-09-29.*
+sections at the bottom. Last updated: 2026-10-02.*
 
 ---
 
@@ -6074,3 +6074,70 @@ an interrupted reset is reviewed before a deliberate new verification request.
 Rejected: increasing retry counts on a destructive reset, extending the Function timeout
 without locating the stalled stage, or changing SQL permissions/firewall rules when the
 existing identity already has the required access.
+
+## 2026-09-30 — Consumer schedules track activities and ride work separately
+
+The consumer profile keeps dated doctor appointments and effective-dated weekly day
+program/work patterns in `ConsumerScheduleEntry`. A weekly pattern has explicit
+weekdays and a start date, with an optional end date; it is not expanded into
+persisted future occurrences. This avoids silently treating an ordinary holiday,
+cancellation, or one-off change as a real attendance event. Time is local wall-clock
+minutes on the consumer's day, not a UTC instant or a case-manager service window.
+Doctor appointments may be recorded before their times are known; requiring a
+guessed end time would make the schedule less trustworthy.
+
+The entry's ModivCare status is an explicit staff-entered tracking fact (none, needs
+booking, requested, confirmed). Optional pickup times and reference help a case
+manager follow up; no state transition sends a request to ModivCare or proves broker
+acceptance. The separate quarterly-review `Appointment` remains a historical
+medical/dental review fact. These schedule entries do not alter billing, note status,
+or review compliance. Draft-like schedule corrections use optimistic revision and
+minimized audit events; consumer-deletion paths count them and rule-3 deletion
+inventories them without copying free text into the tombstone.
+
+## 2026-09-30 — Safety Device entry reveals one task at a time
+
+The Safety Device Request workspace uses four navigable steps: member and program,
+provider and devices, planning team, and review. The case manager sees one device
+editor at a time and adds another row only when needed. A compact list permits
+returning to earlier rows, including rows 6–10 on Appendix B. This is presentation
+state: the original ten-row request, validation, official PDF mapping, draft status,
+and signature boundaries remain unchanged. Saved wizard progress now remembers the
+current section; on resume, populated device rows are revealed. A review step
+links back to each section and repeats the outside signature and planning work.
+
+## 2026-10-01 — One desktop launch owns the workstation
+
+The WPF process takes a single Windows global named mutex at the start of
+`App.OnStartup`. Demo and Local use the same name, so changing the bootstrap
+environment cannot create a second desktop session. The mutex is acquired before
+the chooser and any host or database work, then released by `App.OnExit` on the
+dispatcher thread. A later launch can take an abandoned mutex after a crash.
+The second process displays a short explanation and exits; it does not attempt to
+switch environments or move a partially started window between processes.
+
+## 2026-10-02 — Admin status writes invalidate the shared desktop caseload
+
+The Admin list and Clients menu use separate snapshots. An Admin status change
+previously refreshed only the Admin list, leaving a newly Deceased consumer in
+Clients until restart. The shell now connects the successful status command to the
+dashboard's existing `GetAllPeopleAsync` publication path, which updates Clients,
+note pickers, and Notes Log together. The matrix and deadline board follow that
+same list. This is a client presentation cascade after the authoritative local or
+API write; it grants no new access. A failed write does not refresh, and a failed
+refresh is described as a saved status with stale UI so staff do not repeat the
+mutation as though it failed.
+
+## 2026-10-02 — Overview month history uses secured daily facts
+
+The Overview productivity panel now places its calendar beside the headline numbers and lets
+the case manager step backward through months, up to the current month. Past months read a
+narrative-free daily projection of logged and approved units scoped to the signed-in worker and
+tenant. The panel combines this with that month's incentive snapshot and exempt dates to show
+the saved goal when one exists. It does not apply the current month's recoverable-unit or future
+capacity forecast to an earlier month. A later selection wins over an older in-flight read.
+The daily route follows the validated actor and owned-person checks used by the monthly report.
+
+The Clients journal's A− and A+ buttons change only the editor's display size. Font size is not
+part of the journal document contract; treating this as stored rich-text formatting would cause
+a misleading visual edit that disappears on the next load.

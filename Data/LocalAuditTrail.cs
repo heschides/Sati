@@ -27,6 +27,10 @@ internal static class LocalAuditTrail
 
 internal static class LocalAuditActions
 {
+    public const string ConsumerScheduleViewed = "consumer-schedule.viewed";
+    public const string ConsumerScheduleCreated = "consumer-schedule.created";
+    public const string ConsumerScheduleUpdated = "consumer-schedule.updated";
+    public const string ConsumerScheduleDeleted = "consumer-schedule.deleted";
     public const string CheckRequestPublished = "check-request.published";
     public const string CheckRequestSubmitted = "check-request.submitted";
     public const string CheckRequestApproved = "check-request.approved";

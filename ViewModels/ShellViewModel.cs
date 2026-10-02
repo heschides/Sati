@@ -68,6 +68,11 @@ namespace Sati.ViewModels
             Chat = chatViewModel;
             _billingDashboardViewModel = billingDashboardViewModel;
             _adminDashboardViewModel = adminDashboardViewModel;
+            _adminDashboardViewModel.PersonStatusChangedAsync = async () =>
+            {
+                if (IsCaseManagementAvailable)
+                    await NotesViewModel.RefreshAfterPersonStatusChangedAsync();
+            };
             _representativePayeeDashboardViewModel = representativePayeeDashboardViewModel;
             _platformHealthViewModel = platformHealthViewModel;
             _dataEnvironment = dataEnvironment;

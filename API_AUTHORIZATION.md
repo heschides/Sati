@@ -5,7 +5,7 @@
 | Billing | `POST /billing/remittance-deposits/{depositId}/eft` | Deposit `AgencyId` | Billing permission and a re-validated current actor. Appends one bank-deposit entry; nothing is edited. The caller must name the entry it saw (`PreviousRecordId`), so a concurrent entry or correction returns 409 rather than stacking silently; a filtered unique index enforces the same race server-side. Amount, date, and correction-note rules are `EftDepositRules`. Reconciliation is derived from the latest entry, never stored. |
 # API authorization and tenant ownership
 
-*Route manifest updated 2026-09-28: 225 protected routes. The table is maintained with
+*Route manifest updated 2026-09-30: 229 protected routes. The table is maintained with
 `ApiSurface.Routes` after excluding health and anonymous login, and `ApiSurfaceTests` checks that
 manifest against live endpoint registration. Every route added, removed, or rescoped must be
 reflected here in the same change.*
@@ -163,6 +163,7 @@ incentives are separate own-user information, not an extension of consumer casel
 | Reviews | `PUT /reviews/{reviewItemId}/stage` | Review person's assigned user and agency | Accessible case manager only. |
 | Reviews | `PUT /reviews/{reviewItemId}/appointment` | Review person's assigned user and agency | Accessible case manager only. |
 | Reviews | `GET /people/{personId}/appointments/latest` | Appointment review's person, assigned user, and agency | Accessible case manager only. |
+| Consumer schedule | `GET`, `POST /people/{personId}/schedule`; `PUT`, `DELETE /people/{personId}/schedule/{entryId}` | Person's assigned user and agency; entry's `PersonId` | Current owning case manager on every operation. Row IDs are resolved only within the route's person. Shared validation bounds dates, times, weekdays, and ModivCare state. PUT and DELETE require the current revision; stale requests return 409. Reads and writes are audited without clinical text or ride details in metadata. GET and write responses are non-cacheable. |
 | Assessments | `POST /people/{personId}/assessments/draft` | Person's assigned user and agency | Assigned case manager alone may author; `authorUserId` must equal actor. |
 | Assessments | `GET /people/{personId}/assessments/latest` | Person's assigned user and agency | Read-only agenda progress source; assigned case manager alone, no draft creation. |
 | Assessments | `PUT /assessments/{assessmentId}/document` | Assessment author plus owned person | Author alone may edit; approved/superseded versions are locked. |
@@ -240,6 +241,7 @@ incentives are separate own-user information, not an extension of consumer casel
 | Incentives | `POST /incentives/remaining-days` | Settings `AgencyId` | Compatibility route; calculates today-through-month-end future capacity with actor-agency settings and caller-supplied personal exemptions. The legacy worked-date list is ignored. |
 | Reports | `GET /reports/consumer-billing-loss` | Each person's assigned user and agency | Own caseload only. |
 | Reports | `GET /reports/productivity-units` | Validated actor's user and agency | Own caseload only; both Person and Note agency markers must match, the request accepts no user id, and the response contains narrative-free monthly aggregates. |
+| Reports | `GET /reports/productivity-days/{year}/{month}` | Validated actor's user and agency | Own caseload only; both Person and Note agency markers must match, the request accepts no user id, and the response contains narrative-free daily secured-unit totals and note counts. |
 | Billing | `POST /billing/periods/{year}/{month}` | Billing period user's `AgencyId` | Billing permission; target user must be in actor agency. |
 | Billing | `GET /billing/periods` | Billing period user's `AgencyId` | Billing permission; response joined to actor agency. Each returned line includes only its frozen client display name and shared 837P-readiness errors; raw note narrative is not returned. |
 | Billing | `GET /billing/overview-periods/{year}/{month}` | Billing period owner's `AgencyId` | Billing permission. Returns only the actor agency's all-time draft charge total and exactly six grouped monthly charge totals ending in the requested month. It never returns period, claim-line, note, or consumer rows, so Overview payload size is independent of billing-history length. |

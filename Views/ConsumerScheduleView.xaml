@@ -1,0 +1,361 @@
+<UserControl x:Class="Sati.Views.ConsumerScheduleView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             TextElement.FontFamily="{DynamicResource AppFont}">
+    <UserControl.Resources>
+        <Style x:Key="ConsumerCalendarDayButton" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="DayCard" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="DayCard" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsCurrentMonth}" Value="False">
+                                <Setter TargetName="DayCard" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="DayCard" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="DayCard" Property="BorderThickness" Value="2" />
+                            </DataTrigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="DayCard" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="DayCard" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ConsumerCalendarActivityStripe" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Entry.Kind}" Value="DayProgram">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AiAccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Entry.Kind}" Value="Work">
+                    <Setter Property="BorderBrush" Value="{DynamicResource TextSecondaryBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                  AutomationProperties.Name="Consumer appointments and weekly schedule">
+        <StackPanel Margin="16" IsEnabled="{Binding CanEdit}">
+            <TextBlock Text="APPOINTMENTS &amp; WEEKLY SCHEDULE"
+                       Style="{StaticResource SectionHeader}"
+                       AutomationProperties.HeadingLevel="Level2" />
+            <TextBlock Text="Record doctor visits, day program hours, and work hours. ModivCare status is a staff-entered reminder; Sati does not book rides."
+                       TextWrapping="Wrap" Margin="0,4,0,12"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+            <Border Padding="10" Margin="0,0,0,12" CornerRadius="5"
+                    BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                    Visibility="{Binding HasRideAction, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="One or more ModivCare rides still need booking. Review the entries below."
+                           TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+            </Border>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="2*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Type" Style="{StaticResource LabelStyle}" />
+                    <ComboBox ItemsSource="{Binding KindOptions}" DisplayMemberPath="Label"
+                              SelectedValuePath="Value" SelectedValue="{Binding Kind}"
+                              AutomationProperties.Name="Schedule type" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Name or purpose" Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" MaxLength="120"
+                             AutomationProperties.Name="Appointment or schedule name" />
+                </StackPanel>
+                <StackPanel Grid.Column="4">
+                    <TextBlock Text="Location" Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding Location, UpdateSourceTrigger=PropertyChanged}" MaxLength="160"
+                             AutomationProperties.Name="Schedule location" />
+                </StackPanel>
+            </Grid>
+            <StackPanel Margin="0,10,0,0"
+                        Visibility="{Binding IsWeekly, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                <TextBlock Text="Appointment date" Style="{StaticResource LabelStyle}" />
+                <DatePicker SelectedDate="{Binding Date}" Width="170" HorizontalAlignment="Left"
+                            AutomationProperties.Name="Doctor appointment date" />
+            </StackPanel>
+            <StackPanel Margin="0,10,0,0"
+                        Visibility="{Binding IsWeekly, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel Margin="0,0,16,0">
+                        <TextBlock Text="Starts" Style="{StaticResource LabelStyle}" />
+                        <DatePicker SelectedDate="{Binding EffectiveStart}" Width="150"
+                                    AutomationProperties.Name="Weekly schedule start date" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Ends (optional)" Style="{StaticResource LabelStyle}" />
+                        <DatePicker SelectedDate="{Binding EffectiveEnd}" Width="150"
+                                    AutomationProperties.Name="Weekly schedule end date" />
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Text="Days each week" Style="{StaticResource LabelStyle}" Margin="0,9,0,2" />
+                <WrapPanel>
+                    <CheckBox Content="Mon" IsChecked="{Binding Monday}" Margin="0,0,12,0" AutomationProperties.Name="Monday" />
+                    <CheckBox Content="Tue" IsChecked="{Binding Tuesday}" Margin="0,0,12,0" AutomationProperties.Name="Tuesday" />
+                    <CheckBox Content="Wed" IsChecked="{Binding Wednesday}" Margin="0,0,12,0" AutomationProperties.Name="Wednesday" />
+                    <CheckBox Content="Thu" IsChecked="{Binding Thursday}" Margin="0,0,12,0" AutomationProperties.Name="Thursday" />
+                    <CheckBox Content="Fri" IsChecked="{Binding Friday}" Margin="0,0,12,0" AutomationProperties.Name="Friday" />
+                    <CheckBox Content="Sat" IsChecked="{Binding Saturday}" Margin="0,0,12,0" AutomationProperties.Name="Saturday" />
+                    <CheckBox Content="Sun" IsChecked="{Binding Sunday}" AutomationProperties.Name="Sunday" />
+                </WrapPanel>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="Start time" Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding StartTime, UpdateSourceTrigger=PropertyChanged}" Width="105"
+                             AutomationProperties.Name="Activity start time" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="End time" Style="{StaticResource LabelStyle}" />
+                    <TextBox Text="{Binding EndTime, UpdateSourceTrigger=PropertyChanged}" Width="105"
+                             AutomationProperties.Name="Activity end time" />
+                </StackPanel>
+            </StackPanel>
+            <TextBlock Text="For doctor appointments, times may be left blank until known. Weekly hours need both times."
+                       TextWrapping="Wrap" Margin="0,3,0,0"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="5"
+                    Padding="10" Margin="0,14,0,0">
+                <StackPanel>
+                    <TextBlock Text="MODIVCARE RIDE" Style="{StaticResource SectionHeader}"
+                               AutomationProperties.HeadingLevel="Level3" />
+                    <TextBlock Text="Choose the current booking status. Pickup times and a confirmation reference are optional."
+                               TextWrapping="Wrap" Margin="0,2,0,8"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <ComboBox ItemsSource="{Binding RideOptions}" DisplayMemberPath="Label"
+                              SelectedValuePath="Value" SelectedValue="{Binding RideStatus}"
+                              Width="190" HorizontalAlignment="Left"
+                              AutomationProperties.Name="ModivCare ride status" />
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0"
+                                Visibility="{Binding HasRide, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel Margin="0,0,14,0">
+                            <TextBlock Text="Outbound pickup" Style="{StaticResource LabelStyle}" />
+                            <TextBox Text="{Binding OutboundPickupTime, UpdateSourceTrigger=PropertyChanged}" Width="110"
+                                     AutomationProperties.Name="ModivCare outbound pickup time" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,14,0">
+                            <TextBlock Text="Return pickup" Style="{StaticResource LabelStyle}" />
+                            <TextBox Text="{Binding ReturnPickupTime, UpdateSourceTrigger=PropertyChanged}" Width="110"
+                                     AutomationProperties.Name="ModivCare return pickup time" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Confirmation / reference" Style="{StaticResource LabelStyle}" />
+                            <TextBox Text="{Binding RideReference, UpdateSourceTrigger=PropertyChanged}" Width="190"
+                                     MaxLength="80" AutomationProperties.Name="ModivCare ride reference" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                <Button Content="Save entry" Style="{StaticResource PrimaryButton}" Padding="16,6"
+                        Command="{Binding SaveCommand}" AutomationProperties.Name="Save consumer schedule entry" />
+                <Button Content="New entry" Style="{StaticResource SmallButton}" Padding="14,6" Margin="8,0,0,0"
+                        Command="{Binding NewEntryCommand}" AutomationProperties.Name="Start a new schedule entry" />
+                <Button Content="Remove selected" Style="{StaticResource SmallButton}" Padding="14,6" Margin="8,0,0,0"
+                        Command="{Binding RemoveCommand}"
+                        IsEnabled="{Binding IsEditing}"
+                        AutomationProperties.Name="Remove selected consumer schedule entry" />
+            </StackPanel>
+            <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,8,0,10"
+                       AutomationProperties.Name="Consumer schedule status"
+                       AutomationProperties.LiveSetting="Polite" />
+            <DockPanel Margin="0,8,0,5">
+                <TextBlock Text="RECORDED SCHEDULE" Style="{StaticResource SectionHeader}"
+                           AutomationProperties.HeadingLevel="Level3" DockPanel.Dock="Left" />
+                <Button Content="Refresh" Style="{StaticResource SmallButton}" Padding="10,4"
+                        HorizontalAlignment="Right" Command="{Binding RefreshCommand}"
+                        AutomationProperties.Name="Reload consumer schedule" />
+            </DockPanel>
+            <TextBlock Text="Select a row to edit it. Ride status and pickup times are entered by staff."
+                       TextWrapping="Wrap" Margin="0,0,0,5"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+            <DataGrid ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedRow}"
+                      AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                      MinHeight="180" MaxHeight="360"
+                      AutomationProperties.Name="Consumer schedule entries">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Type" Binding="{Binding Kind}" Width="130" />
+                    <DataGridTextColumn Header="Name" Binding="{Binding Entry.Title}" Width="*" />
+                    <DataGridTextColumn Header="When" Binding="{Binding When}" Width="2*" />
+                    <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="115" />
+                    <DataGridTextColumn Header="ModivCare" Binding="{Binding Ride}" Width="170" />
+                </DataGrid.Columns>
+            </DataGrid>
+            <Border Margin="0,22,0,18" Padding="18" CornerRadius="12"
+                    Background="{DynamicResource SurfaceAltBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="ACTIVITY CALENDAR" Style="{StaticResource SectionHeader}"
+                                       AutomationProperties.HeadingLevel="Level3" />
+                            <TextBlock Text="Doctor appointments, day program, and work for this consumer"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap" Margin="0,3,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="Today" Style="{StaticResource SmallButton}" Padding="12,6"
+                                    Command="{Binding CalendarTodayCommand}"
+                                    AutomationProperties.Name="Show current month in consumer activity calendar" />
+                            <Button Content="‹" Style="{StaticResource SmallButton}" Padding="12,6" Margin="8,0,0,0"
+                                    Command="{Binding PreviousCalendarMonthCommand}"
+                                    AutomationProperties.Name="Previous month in consumer activity calendar" />
+                            <TextBlock Text="{Binding CalendarMonthLabel}" FontSize="17" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" MinWidth="165"
+                                       TextAlignment="Center" VerticalAlignment="Center" Margin="8,0" />
+                            <Button Content="›" Style="{StaticResource SmallButton}" Padding="12,6"
+                                    Command="{Binding NextCalendarMonthCommand}"
+                                    AutomationProperties.Name="Next month in consumer activity calendar" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,10">
+                        <TextBlock Text="DR  Doctor" Margin="0,0,18,0" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="DAY  Day program" Margin="0,0,18,0" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="WORK  Work" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold" />
+                    </StackPanel>
+                    <UniformGrid Columns="7" Margin="0,0,0,4">
+                        <TextBlock Text="MON" TextAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="TUE" TextAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="WED" TextAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="THU" TextAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="FRI" TextAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="SAT" TextAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="SUN" TextAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    </UniformGrid>
+                    <ItemsControl ItemsSource="{Binding CalendarDays}"
+                                  AutomationProperties.Name="Selected consumer activity month">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><UniformGrid Columns="7" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource ConsumerCalendarDayButton}" MinHeight="112" Margin="2"
+                                        Command="{Binding DataContext.SelectCalendarDayCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding AutomationName}">
+                                    <StackPanel>
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock Text="{Binding DayNumber}" FontSize="17" FontWeight="SemiBold"
+                                                       DockPanel.Dock="Left">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="TODAY" FontSize="10" FontWeight="Bold" Margin="6,4,0,0"
+                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       Visibility="{Binding IsToday, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        </DockPanel>
+                                        <TextBlock Text="SELECTED" FontSize="10" FontWeight="Bold"
+                                                   Foreground="{DynamicResource AccentBrush}" Margin="0,2,0,0"
+                                                   Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        <TextBlock Text="RIDE NEEDS BOOKING" FontSize="10" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap"
+                                                   Margin="0,3,0,0"
+                                                   Visibility="{Binding HasRideToBook, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        <ItemsControl ItemsSource="{Binding PreviewActivities}" Margin="0,5,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource ConsumerCalendarActivityStripe}"
+                                                            BorderThickness="3,0,0,0" CornerRadius="3"
+                                                            Background="{DynamicResource SurfaceRaisedBrush}" Padding="4,3"
+                                                            Margin="0,2,0,0">
+                                                        <TextBlock Text="{Binding PreviewLabel}" TextTrimming="CharacterEllipsis"
+                                                                   FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="{Binding OverflowLabel}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}" Margin="4,3,0,0"
+                                                   Visibility="{Binding HasOverflow, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border Background="{DynamicResource SurfaceRaisedBrush}" CornerRadius="8"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                            Padding="16" Margin="2,14,2,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedDayLabel}" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       AutomationProperties.HeadingLevel="Level4" />
+                            <TextBlock Text="No activities recorded for this day."
+                                       Margin="0,8,0,0" Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Visibility="{Binding SelectedDayHasActivities, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                            <ItemsControl ItemsSource="{Binding SelectedDayActivities}" Margin="0,6,0,0"
+                                          AutomationProperties.Name="Selected day consumer activities">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource ConsumerCalendarActivityStripe}"
+                                                Background="{DynamicResource SurfaceAltBrush}"
+                                                BorderThickness="4,0,0,0" CornerRadius="5"
+                                                Padding="12,8" Margin="0,4,0,0"
+                                                AutomationProperties.Name="{Binding AutomationName}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding HeaderLabel}" TextWrapping="Wrap"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                <TextBlock Text="{Binding TimeLabel}" Margin="0,2,0,0" />
+                                                <TextBlock Text="{Binding LocationLabel}" Margin="0,2,0,0"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                <TextBlock Text="{Binding RideLabel}" Margin="0,4,0,0"
+                                                           FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding PickupLabel}" Margin="0,2,0,0"
+                                                           Visibility="{Binding HasPickup, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                <TextBlock Text="{Binding RideReferenceLabel}" Margin="0,2,0,0"
+                                                           TextWrapping="Wrap"
+                                                           Visibility="{Binding HasRideReference, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

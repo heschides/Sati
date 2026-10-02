@@ -15,16 +15,37 @@
         <Style x:Key="SafetyLabel" TargetType="TextBlock" BasedOn="{StaticResource LabelStyle}">
             <Setter Property="Margin" Value="0,2,8,0" />
         </Style>
+        <Style x:Key="SafetyStepButton" TargetType="Button">
+            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="BorderThickness" Value="1,1,1,3" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="12" />
             <RowDefinition Height="*" />
             <RowDefinition Height="12" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Border Padding="16" CornerRadius="8" Background="{DynamicResource SurfaceBrush}"
+        <Border Grid.Row="0" Padding="16" CornerRadius="8" Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
             <StackPanel>
                 <TextBlock Text="SAFETY DEVICE REQUEST" FontSize="11" FontWeight="Bold"
@@ -33,105 +54,232 @@
                            FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1" />
                 <TextBlock Text="{Binding SourceRevision}" Foreground="{DynamicResource TextSecondaryBrush}" />
                 <TextBlock Margin="0,7,0,0" TextWrapping="Wrap"
-                           Text="This is an entry workspace. Generate the editable PDF to review the six-page OADS form. The PDF retains Appendix A's safety device levels and Appendix B's additional device rows." />
-                <TextBlock Margin="0,5,0,0" TextWrapping="Wrap" FontWeight="SemiBold"
-                           Text="Medical provider dates and signatures and member or guardian approval remain blank. The planning team notes and any required HCBS modification must be handled outside this draft." />
+                           Text="Work through four short steps. You can save answers and return later. The editable PDF keeps the official six-page OADS form and its appendices." />
             </StackPanel>
         </Border>
-
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+        <StackPanel Grid.Row="2">
+            <TextBlock Text="{Binding StepProgress}" FontWeight="SemiBold" FontSize="12"
+                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,7"
+                       AutomationProperties.LiveSetting="Polite" />
+            <UniformGrid Columns="4" Margin="0,0,0,10">
+                <Button Content="1  Member &amp; program" Command="{Binding ShowMemberStepCommand}"
+                        Tag="{Binding IsMemberStep}" Style="{StaticResource SafetyStepButton}"
+                        AutomationProperties.Name="Step 1 of 4, member and program" />
+                <Button Content="2  Devices" Command="{Binding ShowDeviceStepCommand}"
+                        Tag="{Binding IsDeviceStep}" Style="{StaticResource SafetyStepButton}"
+                        AutomationProperties.Name="Step 2 of 4, medical provider and safety devices" />
+                <Button Content="3  Planning team" Command="{Binding ShowPlanningStepCommand}"
+                        Tag="{Binding IsPlanningStep}" Style="{StaticResource SafetyStepButton}"
+                        AutomationProperties.Name="Step 3 of 4, planning team questions" />
+                <Button Content="4  Review &amp; draft" Command="{Binding ShowReviewStepCommand}"
+                        Tag="{Binding IsReviewStep}" Style="{StaticResource SafetyStepButton}"
+                        AutomationProperties.Name="Step 4 of 4, review and create draft" />
+            </UniformGrid>
+            <documents:FormWizardProgressWorkspace DataContext="{Binding Progress}" />
+        </StackPanel>
+        <ScrollViewer x:Name="AnswerScroll" Grid.Row="4" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
                       AutomationProperties.Name="Safety device request answers">
             <StackPanel>
-                <documents:FormWizardProgressWorkspace DataContext="{Binding Progress}" />
-                <Expander Header="1. Member and program" IsExpanded="True" Margin="0,0,0,8">
-                    <Border Padding="12" Background="{DynamicResource SurfaceBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                <TextBlock x:Name="StepHeading" Text="{Binding StepTitle}" FontSize="18"
+                           FontWeight="SemiBold" Margin="0,0,0,12" Focusable="True"
+                           AutomationProperties.HeadingLevel="Level2" />
+                <Border Visibility="{Binding IsMemberStep, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Padding="16" Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="7">
+                    <StackPanel>
+                        <TextBlock Text="Member identity, address, guardian, and assigned case manager come from the current consumer profile. Correct those facts in the profile before generating a draft."
+                                   TextWrapping="Wrap" Margin="0,0,0,12" />
+                        <TextBlock Text="Member or guardian contact information" Style="{StaticResource SafetyLabel}" />
+                        <TextBox Text="{Binding MemberOrGuardianContact, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="Member or guardian contact information" Width="460" HorizontalAlignment="Left"
+                                 MaxLength="200" Style="{StaticResource SafetyField}" />
+                        <TextBlock Text="Service or waiver program name and address" Style="{StaticResource SafetyLabel}" />
+                        <TextBox Text="{Binding ProgramNameAndAddress, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="Service or waiver program name and address" Width="560" HorizontalAlignment="Left"
+                                 MaxLength="300" Style="{StaticResource SafetyField}" />
+                        <WrapPanel>
+                            <StackPanel><TextBlock Text="Program contact names" Style="{StaticResource SafetyLabel}" />
+                                <TextBox Text="{Binding ProgramContacts, UpdateSourceTrigger=PropertyChanged}" Tag="Program contact names" Width="250" MaxLength="200" Style="{StaticResource SafetyField}" /></StackPanel>
+                            <StackPanel><TextBlock Text="Contact numbers" Style="{StaticResource SafetyLabel}" />
+                                <TextBox Text="{Binding ProgramContactNumbers, UpdateSourceTrigger=PropertyChanged}" Tag="Program contact numbers" Width="220" MaxLength="200" Style="{StaticResource SafetyField}" /></StackPanel>
+                            <StackPanel><TextBlock Text="Contact email addresses" Style="{StaticResource SafetyLabel}" />
+                                <TextBox Text="{Binding ProgramContactEmails, UpdateSourceTrigger=PropertyChanged}" Tag="Program contact email addresses" Width="270" MaxLength="200" Style="{StaticResource SafetyField}" /></StackPanel>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+                <Border Visibility="{Binding IsDeviceStep, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Padding="16" Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="7">
+                    <StackPanel>
+                        <TextBlock Text="Medical provider name (DO, MD, PA, or NP)" Style="{StaticResource SafetyLabel}" />
+                        <TextBox Text="{Binding MedicalProviderName, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="Medical provider name" Width="340" HorizontalAlignment="Left"
+                                 MaxLength="200" Style="{StaticResource SafetyField}" />
+                        <TextBlock Text="Add only the devices you need. Each recommendation has four short answers. Devices 1–5 fill the main form; devices 6–10 fill Appendix B. Check Appendix A for the level; OADS directs applicants to use Level 2 if a device is not listed."
+                                   TextWrapping="Wrap" Margin="0,3,0,12" />
+                        <TextBlock Text="{Binding DeviceCountSummary}" FontWeight="SemiBold" Margin="0,0,0,9"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="260" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <ListBox ItemsSource="{Binding VisibleDevices}"
+                                         SelectedItem="{Binding SelectedDevice, Mode=TwoWay}"
+                                         Background="{DynamicResource SurfaceAltBrush}"
+                                         BorderBrush="{DynamicResource BorderBrush}"
+                                         MinHeight="64" MaxHeight="310"
+                                         AutomationProperties.Name="Safety device recommendations">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding NavigationLabel}" TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding NavigationLabel}" Width="225"
+                                                       AutomationProperties.Name="{Binding NavigationLabel}" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <Button Content="+ Add another device" Command="{Binding AddDeviceCommand}"
+                                        IsEnabled="{Binding CanAddDevice}" Margin="0,8,0,0" Padding="10,7"
+                                        HorizontalAlignment="Stretch"
+                                        AutomationProperties.Name="Add another safety device recommendation" />
+                            </StackPanel>
+                            <Border Grid.Column="2" Padding="15" CornerRadius="6"
+                                    Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding DevicePosition}" FontSize="15" FontWeight="SemiBold"
+                                               Margin="0,0,0,10" AutomationProperties.HeadingLevel="Level3" />
+                                    <StackPanel DataContext="{Binding CurrentDevice}">
+                                        <TextBlock Text="Name and type" Style="{StaticResource SafetyLabel}" />
+                                        <TextBox Text="{Binding NameAndType, UpdateSourceTrigger=PropertyChanged}"
+                                                 Tag="Safety device name and type" MaxLength="200"
+                                                 Style="{StaticResource SafetyField}" />
+                                        <TextBlock Text="Purpose" Style="{StaticResource SafetyLabel}" />
+                                        <TextBox Text="{Binding Purpose, UpdateSourceTrigger=PropertyChanged}"
+                                                 Tag="Safety device purpose" MaxLength="300"
+                                                 Style="{StaticResource SafetyField}" />
+                                        <TextBlock Text="When used" Style="{StaticResource SafetyLabel}" />
+                                        <TextBox Text="{Binding WhenUsed, UpdateSourceTrigger=PropertyChanged}"
+                                                 Tag="When safety device is used" MaxLength="200"
+                                                 Style="{StaticResource SafetyField}" />
+                                        <TextBlock Text="Level from Appendix A" Style="{StaticResource SafetyLabel}" />
+                                        <ComboBox ItemsSource="{Binding Levels}" SelectedItem="{Binding Level}"
+                                                  Width="100" HorizontalAlignment="Left" Margin="0,3,0,10"
+                                                  AutomationProperties.Name="Safety device level from Appendix A" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Previous device" Command="{Binding PreviousDeviceCommand}"
+                                                IsEnabled="{Binding CanPreviousDevice}" Padding="11,6" Margin="0,0,8,0" />
+                                        <Button Content="Next device" Command="{Binding NextDeviceCommand}"
+                                                IsEnabled="{Binding CanNextDevice}" Padding="11,6" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border Visibility="{Binding IsPlanningStep, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Padding="16" Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="7">
+                    <StackPanel>
+                        <TextBlock Text="Answer the planning questions in your own words. The generated PDF has limited space, so keep each answer concise."
+                                   TextWrapping="Wrap" Margin="0,0,0,12" />
+                        <TextBlock Text="Less restrictive strategies tried and why they did not work" Style="{StaticResource SafetyLabel}" />
+                        <TextBox Text="{Binding LessRestrictiveStrategies, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="Less restrictive strategies tried" Width="650" HorizontalAlignment="Left"
+                                 MinHeight="75" MaxLength="1500" AcceptsReturn="True" TextWrapping="Wrap" Style="{StaticResource SafetyField}" />
+                        <TextBlock Text="How effectiveness will be evaluated, documented, and reviewed by the Team" Style="{StaticResource SafetyLabel}" />
+                        <TextBox Text="{Binding EvaluationPlan, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="Safety device evaluation and team review plan" Width="650" HorizontalAlignment="Left"
+                                 MinHeight="75" MaxLength="1500" AcceptsReturn="True" TextWrapping="Wrap" Style="{StaticResource SafetyField}" />
+                        <TextBlock Text="Accommodations for effects on the rights of other people" Style="{StaticResource SafetyLabel}" />
+                        <TextBox Text="{Binding OtherResidentsAccommodations, UpdateSourceTrigger=PropertyChanged}"
+                                 Tag="Accommodations for other people's rights" Width="650" HorizontalAlignment="Left"
+                                 MinHeight="75" MaxLength="1500" AcceptsReturn="True" TextWrapping="Wrap" Style="{StaticResource SafetyField}" />
+                        <TextBlock Text="Date the Planning Team met and approved the provider recommendations" Style="{StaticResource SafetyLabel}" />
+                        <DatePicker SelectedDate="{Binding PlanningTeamMeetingDate}" Margin="0,3,0,8" Width="170"
+                                    HorizontalAlignment="Left" AutomationProperties.Name="Planning team meeting date" />
+                    </StackPanel>
+                </Border>
+                <StackPanel Visibility="{Binding IsReviewStep, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="Review each section before creating the draft. You can return to any step without losing the answers already entered."
+                               TextWrapping="Wrap" Margin="0,0,0,12" />
+                    <Border Padding="14" Background="{DynamicResource SurfaceBrush}" CornerRadius="6"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,0,8">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Edit" Command="{Binding ShowMemberStepCommand}"
+                                    Padding="12,6" Margin="12,0,0,0" AutomationProperties.Name="Edit member and program answers" />
+                            <StackPanel>
+                                <TextBlock Text="Member and program" FontWeight="SemiBold" />
+                                <TextBlock Text="Check contact and waiver program details against the consumer profile."
+                                           TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Padding="14" Background="{DynamicResource SurfaceBrush}" CornerRadius="6"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,0,8">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Edit" Command="{Binding ShowDeviceStepCommand}"
+                                    Padding="12,6" Margin="12,0,0,0" AutomationProperties.Name="Edit provider and safety device answers" />
+                            <StackPanel>
+                                <TextBlock Text="Provider and devices" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding DeviceCountSummary}" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="Check every device level against Appendix A in the official PDF."
+                                           TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Padding="14" Background="{DynamicResource SurfaceBrush}" CornerRadius="6"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,0,8">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Edit" Command="{Binding ShowPlanningStepCommand}"
+                                    Padding="12,6" Margin="12,0,0,0" AutomationProperties.Name="Edit planning team answers" />
+                            <StackPanel>
+                                <TextBlock Text="Planning team" FontWeight="SemiBold" />
+                                <TextBlock Text="Check the explanations and the meeting date."
+                                           TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Padding="14" Background="{DynamicResource WarningSoftBrush}" CornerRadius="6"
+                            BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1" Margin="4,6,4,0">
                         <StackPanel>
-                            <TextBlock Text="Member identity, address, guardian, and assigned case manager come from the current consumer profile. Correct those facts in the profile before generating a draft." TextWrapping="Wrap" Margin="0,0,0,7" />
-                            <TextBlock Text="Member or guardian contact information" Style="{StaticResource SafetyLabel}" />
-                            <TextBox Text="{Binding MemberOrGuardianContact, UpdateSourceTrigger=PropertyChanged}"
-                                     Tag="Member or guardian contact information" Width="460" HorizontalAlignment="Left"
-                                     MaxLength="200" Style="{StaticResource SafetyField}" />
-                            <TextBlock Text="Service or waiver program name and address" Style="{StaticResource SafetyLabel}" />
-                            <TextBox Text="{Binding ProgramNameAndAddress, UpdateSourceTrigger=PropertyChanged}"
-                                     Tag="Service or waiver program name and address" Width="560" HorizontalAlignment="Left"
-                                     MaxLength="300" Style="{StaticResource SafetyField}" />
-                            <WrapPanel>
-                                <StackPanel><TextBlock Text="Program contact names" Style="{StaticResource SafetyLabel}" />
-                                    <TextBox Text="{Binding ProgramContacts, UpdateSourceTrigger=PropertyChanged}" Tag="Program contact names" Width="250" MaxLength="200" Style="{StaticResource SafetyField}" /></StackPanel>
-                                <StackPanel><TextBlock Text="Contact numbers" Style="{StaticResource SafetyLabel}" />
-                                    <TextBox Text="{Binding ProgramContactNumbers, UpdateSourceTrigger=PropertyChanged}" Tag="Program contact numbers" Width="220" MaxLength="200" Style="{StaticResource SafetyField}" /></StackPanel>
-                                <StackPanel><TextBlock Text="Contact email addresses" Style="{StaticResource SafetyLabel}" />
-                                    <TextBox Text="{Binding ProgramContactEmails, UpdateSourceTrigger=PropertyChanged}" Tag="Program contact email addresses" Width="270" MaxLength="200" Style="{StaticResource SafetyField}" /></StackPanel>
-                            </WrapPanel>
+                            <TextBlock Text="Draft only — signatures and outside steps remain" FontWeight="SemiBold" />
+                            <TextBlock Margin="0,5,0,0" TextWrapping="Wrap"
+                                       Text="Medical provider dates and signatures and member or guardian approval stay blank. Planning team notes and any required HCBS modification must be handled outside this draft. Review all six PDF pages before submission." />
                         </StackPanel>
                     </Border>
-                </Expander>
-
-                <Expander Header="2. Medical provider and safety devices" IsExpanded="True" Margin="0,0,0,8">
-                    <Border Padding="12" Background="{DynamicResource SurfaceBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
-                        <StackPanel>
-                            <TextBlock Text="Medical provider name (DO, MD, PA, or NP)" Style="{StaticResource SafetyLabel}" />
-                            <TextBox Text="{Binding MedicalProviderName, UpdateSourceTrigger=PropertyChanged}" Tag="Medical provider name" Width="340" HorizontalAlignment="Left" MaxLength="200" Style="{StaticResource SafetyField}" />
-                            <TextBlock Text="Enter up to ten recommendations. Rows 1–5 fill the main form; rows 6–10 fill Appendix B. Check Appendix A for the level. If a device is not listed there, OADS directs applicants to use Level 2." TextWrapping="Wrap" Margin="0,4,0,8" />
-                            <ItemsControl ItemsSource="{Binding Devices}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Padding="10" Margin="0,0,0,7" Background="{DynamicResource SurfaceAltBrush}"
-                                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="5">
-                                            <StackPanel>
-                                                <TextBlock FontWeight="SemiBold"><Run Text="Device "/><Run Text="{Binding Number, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding PageLabel, Mode=OneWay}"/></TextBlock>
-                                                <WrapPanel Margin="0,6,0,0">
-                                                    <StackPanel><TextBlock Text="Name and type" Style="{StaticResource SafetyLabel}" />
-                                                        <TextBox Text="{Binding NameAndType, UpdateSourceTrigger=PropertyChanged}" Tag="Safety device name and type" Width="210" MaxLength="200" Style="{StaticResource SafetyField}" /></StackPanel>
-                                                    <StackPanel><TextBlock Text="Purpose" Style="{StaticResource SafetyLabel}" />
-                                                        <TextBox Text="{Binding Purpose, UpdateSourceTrigger=PropertyChanged}" Tag="Safety device purpose" Width="230" MaxLength="300" Style="{StaticResource SafetyField}" /></StackPanel>
-                                                    <StackPanel><TextBlock Text="When used" Style="{StaticResource SafetyLabel}" />
-                                                        <TextBox Text="{Binding WhenUsed, UpdateSourceTrigger=PropertyChanged}" Tag="When safety device is used" Width="210" MaxLength="200" Style="{StaticResource SafetyField}" /></StackPanel>
-                                                    <StackPanel><TextBlock Text="Level" Style="{StaticResource SafetyLabel}" />
-                                                        <ComboBox ItemsSource="{Binding Levels}" SelectedItem="{Binding Level}"
-                                                                  Width="65" Margin="0,3,8,8" AutomationProperties.Name="Safety device level" /></StackPanel>
-                                                </WrapPanel>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-                </Expander>
-
-                <Expander Header="3. Planning team questions" IsExpanded="True" Margin="0,0,0,8">
-                    <Border Padding="12" Background="{DynamicResource SurfaceBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
-                        <StackPanel>
-                            <TextBlock Text="Less restrictive strategies tried and why they did not work" Style="{StaticResource SafetyLabel}" />
-                            <TextBox Text="{Binding LessRestrictiveStrategies, UpdateSourceTrigger=PropertyChanged}" Tag="Less restrictive strategies tried" Width="650" HorizontalAlignment="Left" MinHeight="75" MaxLength="1500" AcceptsReturn="True" TextWrapping="Wrap" Style="{StaticResource SafetyField}" />
-                            <TextBlock Text="How effectiveness will be evaluated, documented, and reviewed by the Team" Style="{StaticResource SafetyLabel}" />
-                            <TextBox Text="{Binding EvaluationPlan, UpdateSourceTrigger=PropertyChanged}" Tag="Safety device evaluation and team review plan" Width="650" HorizontalAlignment="Left" MinHeight="75" MaxLength="1500" AcceptsReturn="True" TextWrapping="Wrap" Style="{StaticResource SafetyField}" />
-                            <TextBlock Text="Accommodations for effects on the rights of other people" Style="{StaticResource SafetyLabel}" />
-                            <TextBox Text="{Binding OtherResidentsAccommodations, UpdateSourceTrigger=PropertyChanged}" Tag="Accommodations for other people's rights" Width="650" HorizontalAlignment="Left" MinHeight="75" MaxLength="1500" AcceptsReturn="True" TextWrapping="Wrap" Style="{StaticResource SafetyField}" />
-                            <TextBlock Text="Date the Planning Team met and approved the provider recommendations" Style="{StaticResource SafetyLabel}" />
-                            <DatePicker SelectedDate="{Binding PlanningTeamMeetingDate}" Margin="0,3,0,8" Width="170" HorizontalAlignment="Left" AutomationProperties.Name="Planning team meeting date" />
-                        </StackPanel>
-                    </Border>
-                </Expander>
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
-
-        <Border Grid.Row="4" Padding="12" CornerRadius="7" Background="{DynamicResource SurfaceBrush}"
+        <Border Grid.Row="6" Padding="12" CornerRadius="7" Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" />
-                    <TextBlock Text="{Binding ReviewItemsMessage}" TextWrapping="Wrap" Margin="0,3,10,0" Foreground="{DynamicResource WarningBrush}" />
-                    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,7,12,0" Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" FontWeight="SemiBold"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <TextBlock Text="{Binding ReviewItemsMessage}" TextWrapping="Wrap" Margin="0,3,10,0"
+                               Foreground="{DynamicResource WarningBrush}" />
+                    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,7,12,0"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Content="Reset answers" Command="{Binding ResetAnswersCommand}" Padding="13,7" Margin="0,0,8,0" />
-                    <Button Content="Generate editable draft PDF" Command="{Binding GenerateCommand}" IsEnabled="{Binding CanGenerate}" Padding="16,7" FontWeight="SemiBold" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Reset answers" Command="{Binding ResetAnswersCommand}" Padding="12,7" Margin="0,0,16,0" />
+                    <Button Content="Back" Command="{Binding BackCommand}" IsEnabled="{Binding CanBack}"
+                            Padding="14,7" Margin="0,0,8,0" AutomationProperties.Name="Previous safety device form step" />
+                    <Button Content="Next" Command="{Binding NextCommand}" IsEnabled="{Binding CanNext}"
+                            Padding="14,7" Margin="0,0,8,0"
+                            Visibility="{Binding CanNext, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            AutomationProperties.Name="Next safety device form step" />
+                    <Button Content="Generate editable draft PDF" Command="{Binding GenerateCommand}"
+                            IsEnabled="{Binding CanGenerate}" Padding="16,7" FontWeight="SemiBold"
+                            Style="{StaticResource PrimaryButton}"
+                            Visibility="{Binding IsReviewStep, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            AutomationProperties.Name="Generate editable OADS Safety Device Request draft PDF" />
                 </StackPanel>
             </Grid>
         </Border>

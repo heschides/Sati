@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sati.Api.Data;
 using Sati.Contracts.V1;
+using Sati.Models;
 using Xunit;
 
 namespace Sati.Api.Tests;
@@ -36,6 +37,12 @@ public sealed class ConsumerDeletionInWindowApiTests(SatiApiFactory factory)
             db.DocumentArtifacts.Add(artifact);
             db.SafetyPlans.Add(new ServerSafetyPlan { PersonId = person.Id, AuthorUserId = person.UserId,
                 CycleStart = DateTime.Today, DocumentJson = SafetyPlanRules.EmptyDocumentJson() });
+            db.ConsumerScheduleEntries.Add(new ConsumerScheduleEntry
+            {
+                PersonId = person.Id, Kind = ConsumerScheduleKind.DoctorAppointment,
+                Title = "Private medical appointment", Date = DateTime.Today,
+                StartMinute = 540, EndMinute = 600, Revision = 1
+            });
             await db.SaveChangesAsync();
             db.DocumentAcknowledgments.Add(new ServerDocumentAcknowledgment { DocumentArtifactId = artifact.Id,
                 RecordedByUserId = person.UserId, RecordedAtUtc = DateTime.UtcNow, ReceivedOn = DateTime.Today });
@@ -51,7 +58,12 @@ public sealed class ConsumerDeletionInWindowApiTests(SatiApiFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(person.Id, result!.PersonId);
         Assert.Equal(1, result.SafetyPlansDeleted);
+        Assert.Equal(1, result.ConsumerScheduleEntriesDeleted);
         Assert.Equal(1, result.DocumentAcknowledgmentsDeleted);
+        var deletionEvent = (await factory.GetAuditEventsAsync("consumer.deleted-in-window"))
+            .Single(x => x.ResourceId == person.Id.ToString());
+        Assert.Contains("consumerSchedule", deletionEvent.MetadataJson);
+        Assert.DoesNotContain("Private medical appointment", deletionEvent.MetadataJson);
         var caseload = await admin.GetFromJsonAsync<List<PersonDto>>($"/api/v1/caseload?userId={person.UserId}");
         Assert.DoesNotContain(caseload!, p => p.Id == person.Id);
     }

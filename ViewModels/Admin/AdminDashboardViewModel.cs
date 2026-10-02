@@ -132,6 +132,10 @@ public partial class AdminDashboardViewModel(
     public event EventHandler<AdminConsumerDeletionConfirmationEventArgs>? ConsumerDeletionConfirmationRequested;
     public event EventHandler<AdminDemoResetConfirmationEventArgs>? DemoResetConfirmationRequested;
 
+    // The shell connects this to the case-management caseload. Status writes are
+    // authoritative in the service; this only refreshes already loaded client UI.
+    public Func<Task>? PersonStatusChangedAsync { get; set; }
+
     private bool CanResetDemo() => IsDemoEnvironment && !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanResetDemo))]
@@ -597,6 +601,7 @@ public partial class AdminDashboardViewModel(
         NoticeMessage = string.Empty;
         var fromStatus = person.Status;
         var toStatus = SelectedTargetStatus;
+        var account = sessionService.CurrentUser;
         try
         {
             _historyCancellation?.Cancel();
@@ -615,11 +620,25 @@ public partial class AdminDashboardViewModel(
             IsBusy = false;
         }
 
-        if (HasError)
+        if (HasError || !ReferenceEquals(sessionService.CurrentUser, account))
             return;
 
         StatusChangeNote = string.Empty;
         await RefreshAsync();
+        if (!ReferenceEquals(sessionService.CurrentUser, account))
+            return;
+        if (PersonStatusChangedAsync is { } refreshCaseload)
+        {
+            try
+            {
+                await refreshCaseload();
+            }
+            catch (Exception ex)
+            {
+                AppErrorLog.Record(ex, "admin.person-status.caseload-refresh");
+                StatusMessage = "The status was saved, but the Clients menu and related views could not be fully refreshed. Please restart Sati to reload them.";
+            }
+        }
         if (!HasError)
             NoticeMessage = $"{person.DisplayName} moved from {fromStatus} to {toStatus}.";
     }

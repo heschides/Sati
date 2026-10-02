@@ -1,5 +1,7 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Sati.ViewModels.ClientDocuments;
 
 namespace Sati.Views.ClientDocuments;
@@ -16,13 +18,26 @@ public partial class SafetyDeviceWorkspace : UserControl
         {
             viewModel.PdfReady -= SavePdf;
             viewModel.Problem -= ShowProblem;
+            viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         }
         viewModel = e.NewValue as SafetyDeviceViewModel;
         if (viewModel is not null)
         {
             viewModel.PdfReady += SavePdf;
             viewModel.Problem += ShowProblem;
+            viewModel.PropertyChanged += OnViewModelPropertyChanged;
         }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(SafetyDeviceViewModel.StepTitle) || !IsVisible) return;
+        _ = Dispatcher.InvokeAsync(() =>
+        {
+            if (!IsVisible) return;
+            AnswerScroll.ScrollToTop();
+            StepHeading.Focus();
+        }, DispatcherPriority.Loaded);
     }
 
     private async void SavePdf(object? sender, SafetyDevicePdfReadyEventArgs args)

@@ -1,5 +1,85 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.33 — October 2, 2026 (in progress)
+
+"Schedules and clearer daily work." Scope: consumer schedules and month calendar,
+Safety Device entry flow, one desktop instance, immediate Admin-to-Clients status refresh,
+compact Overview productivity with past-month navigation, and journal text-size controls.
+The only new schema object is `dbo.ConsumerScheduleEntries` from
+`20260930142103_AddConsumerSchedule`.
+
+Josh separately approved the controlled `SatiDemo` migration, replacement reset-baseline
+capture, and one verification reset. Josh added the temporary exact-IP firewall rule for
+`72.95.106.10`; read-only Azure verification confirmed `datt-workstation-temp` on the
+Demo SQL server. The release workflow must never alter that rule. `SatiDemo` identified
+itself as Demo with 122 migrations and no schedule table before migration. No Production
+database operation is approved. The latest observed Local versions remain Joshua's
+workstation 1.3.27 and SatiLogica workstation 1.3.2; both remain behind until each
+machine is independently observed after installation and launch.
+
+- [x] Full Release solution build passed. Across the five projects, 3,851 tests
+      passed. Eleven opt-in disposable LocalDB cases then passed; the only remaining
+      skip is the Foundry Local model evaluation, which requires separate model
+      initialization/download authorization. Total resolved coverage: 3,862 passes
+      and one documented skip. The theme contrast sweep passed 153/153.
+- [ ] Commit and push verified 1.3.33 source on the remote default branch.
+- [ ] Run the guarded Demo schedule migration with rollback rehearsal, application, and
+      idempotency check; record the migration count and result.
+- [ ] Publish the matching Demo API, then verify live, ready, version, and contract revision.
+- [ ] Review Demo compliance, capture the approved replacement baseline, and verify one full
+      reset with its audit event and compliance marker.
+- [ ] Have Josh remove the temporary SQL firewall rule and verify it is absent.
+- [ ] Build and acceptance-test Demo and Local installers, including cleanup; record paths,
+      sizes, and SHA-256 hashes.
+- [ ] Publish accepted installers and checksums to the two designated distribution folders.
+- [ ] Commit and push final release evidence; confirm clean local/remote equality.
+
+## Admin status changes update Clients immediately — October 2, 2026 (source complete; unreleased)
+
+- [x] After a successful Admin status change, reload the shared active caseload so
+      Deceased and other archived consumers leave Clients without a restart and a
+      return to Active can add them back.
+- [x] Refresh the dashboard matrix and deadline board from the same caseload;
+      report a UI refresh failure without implying the status write failed.
+- [x] Cover successful and failed status writes and Clients menu removal/restoration
+      in focused desktop tests.
+
+## One desktop instance per computer — October 1, 2026 (source complete; unreleased)
+
+- [x] Acquire a shared Demo/Local Windows mutex before the environment chooser or
+      data startup; tell a second launcher Sati is already open and exit.
+- [x] Release the mutex on WPF shutdown and cover contention and reacquisition in
+      a focused desktop test.
+
+## Consumer schedule — September 30, 2026 (source complete; unreleased)
+
+- [x] Add a consumer-profile tab for dated doctor visits and effective-dated weekly
+      day program/work hours, with staff-entered ModivCare booking state, optional
+      pickup times, and a reference. No broker integration or ride booking is implied.
+- [x] Add a shared contract/rule, local and API service paths, caseload and tenant
+      checks, audit, revision conflicts, schema migration, and deletion accounting.
+- [x] Show a selected-consumer month calendar beneath Recorded Schedule, with
+      bounded weekly expansion and a selected-day activity/ride summary.
+- [ ] Apply `AddConsumerSchedule` through the controlled Demo migration process and
+      deploy a matching API/client; local Production receives its migration only via
+      the approved local schema path. No database was changed during this work.
+- [ ] Decide whether a later operational daily agenda should record attendance,
+      cancellations, or holiday exceptions against standing patterns. The month
+      calendar is display-only and does not create occurrence records.
+- [ ] Before operational reliance on ModivCare state, define a verification workflow
+      for confirmations and reconcile it with the broker's accepted standing-order
+      and single-trip processes. The status here is a staff assertion, not broker
+      confirmation.
+
+## Safety Device entry flow — September 30, 2026 (source complete; unreleased)
+
+- [x] Replace the all-open OADS Safety Device Request workspace with four navigable
+      steps, one visible device editor, a compact device list, and a review screen.
+- [x] Keep explicit save/resume and the existing ten-row PDF mapping; restore the
+      saved step and reveal populated Appendix B rows when progress resumes.
+- [x] Render-check the member, device, and review steps and cover navigation,
+      resume, and validation routing in focused desktop tests.
+
 ## Release 1.3.32 — 2026-09-29 (completed after Demo reset recovery)
 
 “Resumable forms and calmer workspaces.” Includes encrypted wizard progress, the
@@ -6781,8 +6861,9 @@ Before any shared or production release:
   approved, even if a development `appsettings.json` is copied accidentally.
 *Parked for post-OADS or v2.0+*
 
-- [ ] **Historical productivity viewer** — query past Incentive rows paired with monthly
-  note data to display a full productivity history per user; infrastructure already exists
+- [ ] **Full historical productivity viewer** — Overview now has month arrows, a daily secured
+  calendar, and its saved monthly goal. A full history workspace with deeper per-month detail and
+  incentive analysis remains deferred.
 - [ ] Per-client detail view — all notes, forms, compliance status, and upcoming events
   scoped to one client
 - [ ] User management / admin panel — add, edit, deactivate users

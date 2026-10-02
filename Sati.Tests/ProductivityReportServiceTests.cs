@@ -44,6 +44,32 @@ public sealed class ProductivityReportServiceTests
             new DateTime(2026, 7, 31)));
     }
 
+    [Fact]
+    public async Task DailyReportGroupsOnlyOwnSecuredNotesWithoutReadingNarratives()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var service = new ProductivityReportService(fixture.Factory, fixture.Session);
+        fixture.Commands.Clear();
+
+        var days = await service.GetDaysAsync(2026, 7);
+
+        Assert.Collection(days,
+            day =>
+            {
+                Assert.Equal(new DateTime(2026, 7, 3), day.Date);
+                Assert.Equal(4, day.Units);
+                Assert.Equal(1, day.NoteCount);
+            },
+            day =>
+            {
+                Assert.Equal(new DateTime(2026, 7, 4), day.Date);
+                Assert.Equal(2, day.Units);
+                Assert.Equal(1, day.NoteCount);
+            });
+        Assert.DoesNotContain("Narrative", fixture.Commands.LastReaderCommand,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly SqliteConnection _connection;

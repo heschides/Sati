@@ -4,13 +4,46 @@ using Sati.Models;
 namespace Sati.Data;
 
 /// <summary>
-/// Local-production implementation of the lightweight Statistics read. It
+/// Local-production implementation of the lightweight productivity reads. It
 /// projects only date and minutes; note narratives never leave SQL Server.
 /// </summary>
 public sealed class ProductivityReportService(
     IDbContextFactory<SatiContext> contextFactory,
     ISessionService sessionService) : IProductivityReportService
 {
+    public async Task<IReadOnlyList<ProductivityDayUnits>> GetDaysAsync(int year, int month)
+    {
+        if (year is < 2000 or > 2200 || month is < 1 or > 12)
+            throw new ArgumentOutOfRangeException(nameof(month), "Choose a month from 2000 through 2200.");
+
+        var actor = sessionService.CurrentUser
+            ?? throw new UnauthorizedAccessException("A signed-in user is required.");
+        await using var context = contextFactory.CreateDbContext();
+        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        if (!await LocalTenantAccess.CanAccessUserAsync(context, actor, actor.Id))
+            throw new UnauthorizedAccessException("Current case-management permission is required.");
+
+        var start = new DateTime(year, month, 1);
+        var end = start.AddMonths(1);
+        var rows = await context.Notes.AsNoTracking()
+            .Where(note => note.Person.UserId == actor.Id &&
+                           note.Person.AgencyId == actor.AgencyId &&
+                           note.AgencyId == actor.AgencyId &&
+                           note.EventDate.HasValue &&
+                           note.EventDate.Value >= start && note.EventDate.Value < end &&
+                           (note.Status == NoteStatus.Logged || note.Status == NoteStatus.Approved))
+            .Select(note => new { Date = note.EventDate!.Value, note.Minutes })
+            .ToListAsync();
+
+        return rows.GroupBy(row => row.Date.Date)
+            .OrderBy(group => group.Key)
+            .Select(group => new ProductivityDayUnits(
+                group.Key,
+                group.Sum(row => Note.CalculateUnits(row.Minutes) ?? 0),
+                group.Count()))
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<ProductivityMonthUnits>> GetUnitsAsync(
         DateTime windowStart,
         DateTime windowEnd)

@@ -1974,6 +1974,71 @@ namespace Sati.Migrations
                     b.ToTable("CheckRequestWorkflowEvents");
                 });
 
+            modelBuilder.Entity("Sati.Models.ConsumerScheduleEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("EffectiveEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("EffectiveStart")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("EndMinute")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<int?>("OutboundPickupMinute")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PersonId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ReturnPickupMinute")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
+                    b.Property<string>("RideReference")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<int>("RideStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StartMinute")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int>("Weekdays")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId", "Kind", "Date");
+
+                    b.ToTable("ConsumerScheduleEntries", (string)null);
+                });
+
             modelBuilder.Entity("Sati.Models.DocumentAcknowledgment", b =>
                 {
                     b.Property<int>("Id")
@@ -5476,6 +5541,15 @@ namespace Sati.Migrations
                         .IsRequired();
 
                     b.Navigation("CheckRequest");
+                });
+
+            modelBuilder.Entity("Sati.Models.ConsumerScheduleEntry", b =>
+                {
+                    b.HasOne("Sati.Person", null)
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sati.Models.DocumentAcknowledgment", b =>

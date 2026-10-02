@@ -28,6 +28,7 @@ namespace Sati
     public partial class App : Application
     {
         private IHost? _host;
+        private SingleInstanceGuard? _singleInstanceGuard;
         private bool _isShowingUnhandledException;
         private bool _globalFailureHandlersRegistered;
         private readonly HashSet<string> _shownUnhandledExceptionFingerprints = new(StringComparer.Ordinal);
@@ -41,6 +42,18 @@ namespace Sati
             try
             {
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                _singleInstanceGuard = SingleInstanceGuard.TryAcquire();
+                if (_singleInstanceGuard is null)
+                {
+                    MessageBox.Show(
+                        "Sati is already running on this computer. Return to the open Sati window to continue.",
+                        "Sati Already Running",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    Shutdown();
+                    return;
+                }
+
                 GlobalFontSettings.UseWindowsFontsUnderWindows = true;
 
                 // The distributable Demo build is intentionally cloud-only: it never
@@ -200,6 +213,7 @@ namespace Sati
                         services.AddTransient<SchedulerViewModel>();
                         services.AddTransient<SsnPanelViewModel>();
                         services.AddTransient<ConsumerProvidersViewModel>();
+                        services.AddTransient<ViewModels.Children.ConsumerScheduleViewModel>();
                         services.AddTransient<NewClientViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.DhhsFormsViewModel>();
                         services.AddTransient<ViewModels.ClientDocuments.AgencyReleaseViewModel>();
@@ -513,13 +527,17 @@ namespace Sati
             }
             finally
             {
-                if (_globalFailureHandlersRegistered)
+                try
                 {
-                    DispatcherUnhandledException -= OnDispatcherUnhandledException;
-                    AppDomain.CurrentDomain.UnhandledException -= OnDomainUnhandledException;
-                    TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
-                    _globalFailureHandlersRegistered = false;
+                    if (_globalFailureHandlersRegistered)
+                    {
+                        DispatcherUnhandledException -= OnDispatcherUnhandledException;
+                        AppDomain.CurrentDomain.UnhandledException -= OnDomainUnhandledException;
+                        TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
+                        _globalFailureHandlersRegistered = false;
+                    }
                 }
+                finally { _singleInstanceGuard?.Dispose(); }
             }
 
             base.OnExit(e);
@@ -537,6 +555,7 @@ namespace Sati
             services.AddSingleton<PersonAuditPdfExporter>();
             services.AddTransient<IPersonContactService, PersonContactService>();
             services.AddTransient<IConsumerProviderService, ConsumerProviderService>();
+            services.AddTransient<IConsumerScheduleService, ConsumerScheduleService>();
             services.AddTransient<IReleaseObligationService, ReleaseObligationService>();
             services.AddTransient<INoteService, NoteService>();
             services.AddTransient<IAuthService, AuthService>();
@@ -626,6 +645,7 @@ namespace Sati
             services.AddTransient<IUserService, CloudUserService>();
             services.AddTransient<IPersonContactService, CloudPersonContactService>();
             services.AddTransient<IConsumerProviderService, CloudConsumerProviderService>();
+            services.AddTransient<IConsumerScheduleService, CloudConsumerScheduleService>();
             services.AddTransient<IReleaseObligationService, CloudReleaseObligationService>();
             services.AddTransient<ISupervisorService, CloudSupervisorService>();
             services.AddTransient<IReviewItemService, CloudReviewItemService>();

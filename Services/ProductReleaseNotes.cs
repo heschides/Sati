@@ -6,11 +6,40 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Resumable forms and calmer workspaces";
-    public const string ReleaseDate = "September 29, 2026";
+    public const string ReleaseName = "Schedules and clearer daily work";
+    public const string ReleaseDate = "October 2, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Record a consumer's schedule",
+            [
+                "The Clients profile now records doctor appointments and recurring day program or work hours, with a month calendar for a quick view.",
+                "ModivCare ride status, pickup times, and a reference are staff-entered tracking fields; Sati does not book a ride with the broker."
+            ]),
+        new(
+            "See productivity by month",
+            [
+                "Overview's productivity panel is more compact, with its calendar beside the headline numbers and arrows for previous months.",
+                "Past months show secured units and the saved goal when available; current-month forecasts stay with the current month."
+            ]),
+        new(
+            "Work with the client journal",
+            [
+                "The journal toolbar has smaller and larger text buttons. They change the reading size without changing the saved journal."
+            ]),
+        new(
+            "Keep the active caseload current",
+            [
+                "Changing a consumer to Deceased or another archived status in Admin now updates the Clients menu without restarting Sati.",
+                "Sati allows one desktop instance at a time on a computer, including across Demo and Local."
+            ]),
+        new(
+            "Move through the Safety Device request",
+            [
+                "The Safety Device workspace reveals one section and one device editor at a time, then offers a review screen before saving the draft.",
+                "Saved progress restores the section and populated device rows. Required signatures remain outside Sati."
+            ]),
         new(
             "Save form answers and return later",
             [

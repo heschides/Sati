@@ -57,7 +57,7 @@
                         <Border Height="14" Margin="1.5"
                                 Visibility="{Binding Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=inverse}" />
                         <Border Style="{StaticResource ThumbnailDayStyle}"
-                                ToolTip="{Binding AccessibleLabel}"
+                                ToolTip="{Binding ProductivityThumbnailLabel}"
                                 Visibility="{Binding Converter={StaticResource NullToVisibilityConverter}}" />
                     </Grid>
                 </DataTemplate>

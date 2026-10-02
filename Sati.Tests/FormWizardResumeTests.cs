@@ -47,6 +47,62 @@ public sealed class FormWizardResumeTests
     }
 
     [Fact]
+    public async Task Safety_device_progress_restores_the_step_and_reveals_only_entered_device_rows()
+    {
+        var drafts = new TestFormWizardProgressService();
+        var person = PersonFor(314);
+        var first = new SafetyDeviceViewModel(new UnusedSafetyDeviceService(), drafts);
+        first.SetPerson(person);
+
+        Assert.True(first.IsMemberStep);
+        Assert.Single(first.VisibleDevices);
+        first.NextCommand.Execute(null);
+        Assert.True(first.IsDeviceStep);
+        first.Devices[0].NameAndType = "Door alarm";
+        first.AddDeviceCommand.Execute(null);
+        first.Devices[1].Purpose = "Alerts staff";
+        Assert.Equal(2, first.CurrentDevice.Number);
+        Assert.Equal(2, first.VisibleDevices.Count);
+        first.NextCommand.Execute(null);
+        first.NextCommand.Execute(null);
+        Assert.True(first.IsReviewStep);
+        await first.Progress.SaveCommand.ExecuteAsync(null);
+
+        var resumed = new SafetyDeviceViewModel(new UnusedSafetyDeviceService(), drafts);
+        resumed.SetPerson(person);
+        Assert.True(resumed.IsReviewStep);
+        Assert.Equal("Step 4 of 4", resumed.StepProgress);
+        Assert.Equal(2, resumed.VisibleDevices.Count);
+        Assert.Equal(2, resumed.CurrentDevice.Number);
+        Assert.Equal("Door alarm", resumed.Devices[0].NameAndType);
+        Assert.Equal("Alerts staff", resumed.Devices[1].Purpose);
+
+        resumed.ShowDeviceStepCommand.Execute(null);
+        Assert.True(resumed.IsDeviceStep);
+        resumed.PreviousDeviceCommand.Execute(null);
+        Assert.Equal(1, resumed.CurrentDevice.Number);
+        resumed.NextDeviceCommand.Execute(null);
+        Assert.Equal(2, resumed.CurrentDevice.Number);
+    }
+
+    [Fact]
+    public async Task Safety_device_validation_returns_to_the_device_that_needs_correction()
+    {
+        var model = new SafetyDeviceViewModel(
+            new UnusedSafetyDeviceService(), new TestFormWizardProgressService());
+        model.SetPerson(PersonFor(315));
+        model.Devices[6].NameAndType = new string('x', 100);
+        model.ShowReviewStepCommand.Execute(null);
+
+        await model.GenerateCommand.ExecuteAsync(null);
+
+        Assert.True(model.IsDeviceStep);
+        Assert.Equal(7, model.CurrentDevice.Number);
+        Assert.Equal(7, model.VisibleDevices.Count);
+        Assert.Contains("will not fit", model.StatusMessage);
+    }
+
+    [Fact]
     public async Task Housing_support_funds_resumes_amounts_and_landlord_answers()
     {
         var drafts = new TestFormWizardProgressService();

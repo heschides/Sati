@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Sati.Api.Data;
 using Sati.Contracts.V1;
+using Sati.Models;
 using Xunit;
 
 namespace Sati.Api.Tests;
@@ -8,6 +11,37 @@ namespace Sati.Api.Tests;
 [Collection(SatiApiCollection.Name)]
 public sealed class AdminTestDataDeletionApiTests(SatiApiFactory factory)
 {
+    [Fact]
+    public async Task TestConsumerDeletionCountsScheduleRows()
+    {
+        var seed = await factory.CreateTestConsumerGraphAsync();
+        try
+        {
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+                db.ConsumerScheduleEntries.Add(new ConsumerScheduleEntry
+                {
+                    PersonId = seed.PersonId, Kind = ConsumerScheduleKind.Work,
+                    Title = "Synthetic shift", EffectiveStart = DateTime.Today,
+                    Weekdays = ScheduleWeekdays.Monday, StartMinute = 540,
+                    EndMinute = 1020, Revision = 1
+                });
+                await db.SaveChangesAsync();
+            }
+            using var admin = await factory.CreateAuthenticatedClientAsync("admin-one");
+            var response = await admin.PostAsJsonAsync(
+                $"/api/v1/admin/test-data/consumers/{seed.PersonId}/delete", Request(seed));
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<TestConsumerDeletionResultDto>();
+            Assert.Equal(1, result!.ConsumerScheduleEntriesDeleted);
+        }
+        finally
+        {
+            await factory.RemoveTestConsumerGraphAsync(seed.PersonId);
+        }
+    }
+
     [Fact]
     public async Task AdminAffirmationDeletesTheWholeTestConsumerGraphAndRetainsAuditEvidence()
     {

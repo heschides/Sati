@@ -217,6 +217,17 @@
                         ToolTip="Check the selected text and choose whether to put it on the calendar (Ctrl+Shift+C)"
                         AutomationProperties.Name="Add checkbox"
                         AutomationProperties.AcceleratorKey="Ctrl+Shift+C" />
+                <Border Width="1" Margin="5,4" Background="{DynamicResource DividerBrush}" />
+                <Button Style="{StaticResource JournalToolButton}"
+                        Click="DecreaseFontButton_Click"
+                        Content="A−"
+                        ToolTip="Decrease journal text size"
+                        AutomationProperties.Name="Decrease journal text size" />
+                <Button Style="{StaticResource JournalToolButton}"
+                        Click="IncreaseFontButton_Click"
+                        Content="A+"
+                        ToolTip="Increase journal text size"
+                        AutomationProperties.Name="Increase journal text size" />
             </StackPanel>
         </Border>
 
@@ -235,6 +246,7 @@
                  keeps bold, italic, underline, and checkboxes, and nothing else. -->
             <RichTextBox x:Name="Editor"
                          MinHeight="150"
+                         FontSize="14"
                          AcceptsReturn="True"
                          IsDocumentEnabled="True"
                          VerticalScrollBarVisibility="Auto"

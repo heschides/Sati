@@ -2755,6 +2755,10 @@
                                 </DataGrid>
                             </Grid>
                         </TabItem>
+                        <TabItem Header="Appointments &amp; Schedule"
+                                 Style="{StaticResource ClientWorkspaceTabItemStyle}">
+                            <views:ConsumerScheduleView DataContext="{Binding ConsumerSchedule}" />
+                        </TabItem>
                     </TabControl>
                 </Grid>
             </Border>

@@ -243,7 +243,7 @@ public sealed class TenantAuthorizationTests
 
         Assert.NotNull(release);
         Assert.Equal("Sati.Api", release["product"]);
-        Assert.Equal("1.3.32", release["releaseVersion"]);
+        Assert.Equal("1.3.33", release["releaseVersion"]);
     }
 
     [Fact]
@@ -781,6 +781,22 @@ public sealed class TenantAuthorizationTests
             Assert.Equal(2198, november.Year);
             Assert.Equal(11, november.Month);
             Assert.Equal(6, november.Units);
+
+            var days = await client.GetFromJsonAsync<List<ProductivityDayUnitsDto>>(
+                "/api/v1/reports/productivity-days/2198/11");
+            Assert.Collection(days!,
+                day =>
+                {
+                    Assert.Equal(reportDate, day.Date);
+                    Assert.Equal(4, day.Units);
+                    Assert.Equal(1, day.NoteCount);
+                },
+                day =>
+                {
+                    Assert.Equal(reportDate.AddDays(1), day.Date);
+                    Assert.Equal(2, day.Units);
+                    Assert.Equal(1, day.NoteCount);
+                });
         }
         finally
         {

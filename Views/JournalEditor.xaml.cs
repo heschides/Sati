@@ -28,6 +28,8 @@ public partial class JournalEditor : UserControl
     private NewClientViewModel? _viewModel;
     private JournalPageViewModel? _shownPage;
     private bool _rebuilding;
+    private const double MinimumJournalFontSize = 10;
+    private const double MaximumJournalFontSize = 28;
 
     public JournalEditor()
     {
@@ -176,6 +178,14 @@ public partial class JournalEditor : UserControl
         CheckSelection();
         Editor.Focus();
     }
+
+    // Zoom is a view preference. The journal contract stores emphasis and checkboxes,
+    // never font size, so these buttons must not issue rich-text formatting commands.
+    private void DecreaseFontButton_Click(object sender, RoutedEventArgs e) =>
+        Editor.FontSize = Math.Max(MinimumJournalFontSize, Editor.FontSize - 2);
+
+    private void IncreaseFontButton_Click(object sender, RoutedEventArgs e) =>
+        Editor.FontSize = Math.Min(MaximumJournalFontSize, Editor.FontSize + 2);
 
     /// <summary>
     /// With text selected: puts a checkbox in front of it, sparkles over it, and asks whether

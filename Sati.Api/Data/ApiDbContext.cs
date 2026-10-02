@@ -46,6 +46,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ServerIncentive> Incentives => Set<ServerIncentive>();
     public DbSet<ServerPersonContact> PersonContacts => Set<ServerPersonContact>();
     public DbSet<ServerPersonProvider> PersonProviders => Set<ServerPersonProvider>();
+    public DbSet<ConsumerScheduleEntry> ConsumerScheduleEntries => Set<ConsumerScheduleEntry>();
     public DbSet<ServerProviderContact> ProviderContacts => Set<ServerProviderContact>();
     public DbSet<ServerAgency> Agencies => Set<ServerAgency>();
     public DbSet<ServerBillingPeriod> BillingPeriods => Set<ServerBillingPeriod>();
@@ -89,6 +90,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         FormWizardProgressPersistenceModel.Configure<ServerPerson>(modelBuilder);
+        ConsumerSchedulePersistenceModel.Configure<ServerPerson>(modelBuilder);
         ClearinghousePersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration>(modelBuilder);
         BillingCorrectionPersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration, ServerClaimLine, ServerRemittanceDeposit>(modelBuilder);
         modelBuilder.Entity<ServerDatabaseIdentity>(entity =>

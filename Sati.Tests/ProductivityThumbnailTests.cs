@@ -1,8 +1,12 @@
 using System.IO;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Automation;
 using System.Windows.Media;
 using Sati.Models;
+using Sati.Data;
+using Sati.ViewModels;
 using Sati.ViewModels.Children;
 using Sati.Views;
 using Xunit;
@@ -54,6 +58,58 @@ public sealed class ProductivityThumbnailTests
         Assert.Contains("<views:ProductivityCalendarThumbnail", overview);
         Assert.Contains("DataContext=\"{Binding ProductivityMonth}\"", overview);
         Assert.Contains("ProductivityMonthSummary", overview);
+    }
+
+    [Fact]
+    public void HistoricalThumbnailUsesOnlyTheDailySummaryAndLabelsEveryDay()
+    {
+        var month = CaseManagerDashboardViewModel.BuildHistoricalProductivityMonth(
+            new DateTime(2026, 8, 1),
+            [new ProductivityDayUnits(new DateTime(2026, 8, 3), 6, 2)]);
+        var third = Assert.Single(month.Cells.OfType<CalendarDay>(), day => day.Date.Day == 3);
+        var fourth = Assert.Single(month.Cells.OfType<CalendarDay>(), day => day.Date.Day == 4);
+
+        Assert.True(third.CountsWithSecuredUnits);
+        Assert.Equal(0, third.NoteCount);
+        Assert.Contains("6 secured units from 2 documented notes", third.ProductivityThumbnailLabel);
+        Assert.False(fourth.CountsWithSecuredUnits);
+        Assert.Contains("0 secured units", fourth.ProductivityThumbnailLabel);
+    }
+
+    [Fact]
+    public void WideOverviewShowsTheCalendarAlongsideMetricsWithoutVerticalScrolling()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            var view = new CaseManagerDashboardContentView
+            {
+                DataContext = new
+                {
+                    IsCurrentProductivityMonth = true,
+                    IsHistoricalProductivityMonth = false,
+                    IsHistoricalProductivityLoading = false,
+                    HasHistoricalProductivityError = false,
+                    HasDueTodayRisk = false,
+                    HasPendingItemsWithoutUnits = false,
+                    ProductivityPeriodLabel = "October 2026",
+                    ProductivityMonth = new CalendarMonth { Month = 10, Year = 2026 }
+                }
+            };
+            WpfUiHarness.Realize(view, 1900, 900);
+            var scroll = WpfUiHarness.FindByAutomationName<ScrollViewer>(view, "Monthly productivity summary");
+            var calendar = WpfUiHarness.Descendants(scroll)
+                .OfType<ProductivityCalendarThumbnail>().Single();
+            var recoverable = WpfUiHarness.Descendants(scroll)
+                .OfType<TextBlock>().Single(block => block.Text == "RECOVERABLE");
+            var calendarTop = calendar.TransformToAncestor(scroll).Transform(new System.Windows.Point()).Y;
+            var metricsTop = recoverable.TransformToAncestor(scroll).Transform(new System.Windows.Point()).Y;
+
+            Assert.InRange(Math.Abs(calendarTop - metricsTop), 0, 6);
+            Assert.True(scroll.ExtentHeight <= scroll.ViewportHeight + 1,
+                $"Summary content {scroll.ExtentHeight} exceeded viewport {scroll.ViewportHeight}. " +
+                string.Join(", ", ((StackPanel)scroll.Content).Children.OfType<FrameworkElement>()
+                    .Select(element => $"{element.GetType().Name}:{element.ActualHeight:0.#}/{element.Visibility}")));
+        });
     }
 
     private static Border Square(ProductivityCalendarThumbnail view, DateTime date) =>

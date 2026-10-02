@@ -36,6 +36,7 @@ public static class ApiSurface
     public static IReadOnlyList<string> ContractShapes { get; } =
     [
         "person-representative-payee-v1",
+        "consumer-schedule-and-modivcare-tracking-v1",
         "future-note-reminder-v1",
         "billing-compliance-settings-v1",
         "effective-dated-billing-compliance-policy-v1",
@@ -54,7 +55,8 @@ public static class ApiSurface
         "claim-response-ingestion-v2",
         "form-retention-v1",
         "schema-drift-report-v1",
-        "admin-test-consumer-deletion-v2",
+        "admin-test-consumer-deletion-v3",
+        "consumer-deletion-in-window-v2",
         "person-test-data-v1",
         // SavePersonRequest gained CredibleClientId. A newer client sending it to an older
         // server would have the import dedupe key silently dropped.
@@ -138,6 +140,7 @@ public static class ApiSurface
         "DELETE /api/v1/exempt-dates/{id:int}",
         "DELETE /api/v1/notes/{id:int}",
         "DELETE /api/v1/people/{personId:int}/photo",
+        "DELETE /api/v1/people/{personId:int}/schedule/{entryId:int}",
         "DELETE /api/v1/people/{personId:int}/providers/{linkId:int}",
         "DELETE /api/v1/providers/{id:int}",
         "DELETE /api/v1/providers/{providerId:int}/contacts/{contactId:int}",
@@ -210,6 +213,7 @@ public static class ApiSurface
         "GET /api/v1/people/{personId:int}/notes",
         "GET /api/v1/people/{personId:int}/pcp-source",
         "GET /api/v1/people/{personId:int}/photo",
+        "GET /api/v1/people/{personId:int}/schedule",
         "GET /api/v1/people/{personId:int}/providers",
         "GET /api/v1/people/{personId:int}/release-obligations",
         "GET /api/v1/people/{personId:int}/reviews",
@@ -221,6 +225,7 @@ public static class ApiSurface
         "GET /api/v1/providers",
         "GET /api/v1/providers/{providerId:int}/contacts",
         "GET /api/v1/reports/consumer-billing-loss",
+        "GET /api/v1/reports/productivity-days/{year:int}/{month:int}",
         "GET /api/v1/reports/productivity-units",
         "GET /api/v1/representative-payee/check-requests",
         "GET /api/v1/representative-payee/consumers",
@@ -313,6 +318,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/housing-support-funds.pdf",
         "POST /api/v1/people/{personId:int}/journal/entries",
         "POST /api/v1/people/{personId:int}/providers",
+        "POST /api/v1/people/{personId:int}/schedule",
         "POST /api/v1/people/{personId:int}/release-obligations/reconcile",
         "POST /api/v1/people/{personId:int}/release-obligations/{obligationId:guid}/attest",
         "POST /api/v1/people/{personId:int}/release-obligations/{obligationId:guid}/attestation/revoke",
@@ -355,6 +361,7 @@ public static class ApiSurface
         "PUT /api/v1/people/{personId:int}/owner",
         "PUT /api/v1/people/{personId:int}/photo",
         "PUT /api/v1/people/{personId:int}/providers/{linkId:int}",
+        "PUT /api/v1/people/{personId:int}/schedule/{entryId:int}",
         "PUT /api/v1/people/{personId:int}/ssn",
         "PUT /api/v1/people/{personId:int}/status",
         "PUT /api/v1/providers/{id:int}",

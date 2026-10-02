@@ -36,6 +36,14 @@ namespace Sati.ViewModels
         private readonly IServiceDayInclusionService? _serviceDayInclusionService;
         private readonly IFormOpeningPrompt? _formOpeningPrompt;
         private readonly ConsumerPickerSortPreferenceService? _consumerPickerSortPreferences;
+        private readonly IProductivityReportService? _productivityReportService;
+        private readonly LatestRequestTracker _productivityMonthRequests = new();
+        private DateTime _selectedProductivityMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+        private IReadOnlyList<ProductivityDayUnits> _historicalProductivityDays = [];
+        private int? _historicalProductivityGoal;
+        [ObservableProperty] private bool isHistoricalProductivityLoading;
+        [ObservableProperty] private bool hasHistoricalProductivityData;
+        [ObservableProperty] private string historicalProductivityError = string.Empty;
         private Settings? _settings;
         private Incentive? _incentive;
         private List<Note> _monthlyNotes = [];
@@ -81,9 +89,11 @@ CalendarViewModel calendarViewModel,
             IAnnualDocumentService? annualDocuments = null,
             ConsumerPickerSortPreferenceService? consumerPickerSortPreferences = null,
             IFormOpeningPrompt? formOpeningPrompt = null,
-            IServiceDayInclusionService? serviceDayInclusionService = null
+            IServiceDayInclusionService? serviceDayInclusionService = null,
+            IProductivityReportService? productivityReportService = null
             )
         {
+            _productivityReportService = productivityReportService;
             _serviceDayInclusionService = serviceDayInclusionService;
             _personService = personService;
             _noteService = noteService;
@@ -375,6 +385,124 @@ CalendarViewModel calendarViewModel,
         public ObservableCollection<PendingAttestation> PendingAttestations { get; } = [];
         public bool HasPendingAttestations => PendingAttestations.Count > 0;
         public record EffectiveDateGroup(string Label, bool IsCurrent, List<string> ClientNames);
+        public string ProductivityPeriodLabel => _selectedProductivityMonth.ToString("MMMM yyyy");
+        public bool IsCurrentProductivityMonth =>
+            _selectedProductivityMonth.Year == DateTime.Today.Year &&
+            _selectedProductivityMonth.Month == DateTime.Today.Month;
+        public bool IsHistoricalProductivityMonth => !IsCurrentProductivityMonth;
+        public bool HasHistoricalProductivityError => HistoricalProductivityError.Length > 0;
+        public int HistoricalSecuredUnits => _historicalProductivityDays.Sum(day => day.Units);
+        public int HistoricalDocumentedDays => _historicalProductivityDays.Count(day => day.NoteCount > 0);
+        public double HistoricalSecuredPerDay => HistoricalDocumentedDays == 0
+            ? 0
+            : Math.Round((double)HistoricalSecuredUnits / HistoricalDocumentedDays, 1);
+        public string HistoricalGoalLabel => _historicalProductivityGoal?.ToString() ?? "—";
+        public string HistoricalAttainmentLabel => _historicalProductivityGoal is > 0
+            ? $"{Math.Round(100m * HistoricalSecuredUnits / _historicalProductivityGoal.Value, 0)}%"
+            : "—";
+
+        private bool CanGoToPreviousProductivityMonth() => _selectedProductivityMonth.Year > 2000;
+        private bool CanGoToNextProductivityMonth() =>
+            _selectedProductivityMonth < new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+        [RelayCommand(CanExecute = nameof(CanGoToPreviousProductivityMonth))]
+        private Task PreviousProductivityMonthAsync() => MoveProductivityMonthAsync(-1);
+
+        [RelayCommand(CanExecute = nameof(CanGoToNextProductivityMonth))]
+        private Task NextProductivityMonthAsync() => MoveProductivityMonthAsync(1);
+
+        private async Task MoveProductivityMonthAsync(int offset)
+        {
+            if (offset < 0 && !CanGoToPreviousProductivityMonth() ||
+                offset > 0 && !CanGoToNextProductivityMonth())
+                return;
+
+            var request = _productivityMonthRequests.Begin();
+            var account = LoggedInUser;
+            _selectedProductivityMonth = _selectedProductivityMonth.AddMonths(offset);
+            _historicalProductivityDays = [];
+            _historicalProductivityGoal = null;
+            HasHistoricalProductivityData = false;
+            HistoricalProductivityError = string.Empty;
+            IsHistoricalProductivityLoading = IsHistoricalProductivityMonth;
+            NotifyProductivityPeriodChanged();
+            if (IsCurrentProductivityMonth)
+                return;
+            if (account is null || _productivityReportService is null)
+            {
+                HistoricalProductivityError = "Past productivity is unavailable in this session.";
+                IsHistoricalProductivityLoading = false;
+                return;
+            }
+
+            try
+            {
+                var month = _selectedProductivityMonth;
+                var daysTask = _productivityReportService.GetDaysAsync(month.Year, month.Month);
+                var historyTask = _incentiveService.GetHistoryAsync(account.Id);
+                var exemptTask = _exemptDateService.GetByYearAsync(account.Id, month.Year);
+                await Task.WhenAll(daysTask, historyTask, exemptTask);
+                if (!_productivityMonthRequests.IsCurrent(request) ||
+                    !ReferenceEquals(LoggedInUser, account))
+                    return;
+
+                _historicalProductivityDays = await daysTask;
+                var snapshot = (await historyTask).FirstOrDefault(item =>
+                    item.Year == month.Year && item.Month == month.Month);
+                if (snapshot is not null)
+                {
+                    var exemptDays = (await exemptTask).Count(item =>
+                        item.Date.Year == month.Year && item.Date.Month == month.Month);
+                    _historicalProductivityGoal =
+                        Math.Max(0, snapshot.DaysScheduled - exemptDays) * snapshot.UnitsPerDay;
+                }
+                HasHistoricalProductivityData = true;
+                NotifyProductivityPeriodChanged();
+            }
+            catch (Exception ex)
+            {
+                if (_productivityMonthRequests.IsCurrent(request) &&
+                    ReferenceEquals(LoggedInUser, account))
+                {
+                    Debug.WriteLine($"Historical productivity load failed: {ex.GetType().Name}");
+                    HistoricalProductivityError = "This month's productivity could not be loaded. Use the arrows to retry.";
+                }
+            }
+            finally
+            {
+                if (_productivityMonthRequests.IsCurrent(request) &&
+                    ReferenceEquals(LoggedInUser, account))
+                    IsHistoricalProductivityLoading = false;
+            }
+        }
+
+        private void NotifyProductivityPeriodChanged()
+        {
+            OnPropertyChanged(nameof(ProductivityPeriodLabel));
+            OnPropertyChanged(nameof(IsCurrentProductivityMonth));
+            OnPropertyChanged(nameof(IsHistoricalProductivityMonth));
+            OnPropertyChanged(nameof(HistoricalSecuredUnits));
+            OnPropertyChanged(nameof(HistoricalDocumentedDays));
+            OnPropertyChanged(nameof(HistoricalSecuredPerDay));
+            OnPropertyChanged(nameof(HistoricalGoalLabel));
+            OnPropertyChanged(nameof(HistoricalAttainmentLabel));
+            OnPropertyChanged(nameof(ProductivityMonth));
+            OnPropertyChanged(nameof(ProductivityMonthSummary));
+            PreviousProductivityMonthCommand.NotifyCanExecuteChanged();
+            NextProductivityMonthCommand.NotifyCanExecuteChanged();
+        }
+
+        partial void OnHistoricalProductivityErrorChanged(string value) =>
+            NotifyHistoricalProductivityMessageChanged();
+
+        partial void OnIsHistoricalProductivityLoadingChanged(bool value) =>
+            OnPropertyChanged(nameof(ProductivityMonthSummary));
+
+        private void NotifyHistoricalProductivityMessageChanged()
+        {
+            OnPropertyChanged(nameof(HasHistoricalProductivityError));
+            OnPropertyChanged(nameof(ProductivityMonthSummary));
+        }
         /// <summary>
         /// This month as the calendar tints it, for the read-only Overview thumbnail. Built
         /// from the notes and exempt days the productivity totals already use.
@@ -383,6 +511,8 @@ CalendarViewModel calendarViewModel,
         {
             get
             {
+                if (IsHistoricalProductivityMonth)
+                    return BuildHistoricalProductivityMonth(_selectedProductivityMonth, _historicalProductivityDays);
                 var today = DateTime.Today;
                 return CalendarViewModel.BuildMonth(
                     today.Year, today.Month, _monthlyNotes, _exemptDatesForMonth, today,
@@ -390,10 +520,50 @@ CalendarViewModel calendarViewModel,
             }
         }
 
+        internal static CalendarMonth BuildHistoricalProductivityMonth(
+            DateTime month, IReadOnlyList<ProductivityDayUnits> reportedDays)
+        {
+            var daysByDate = reportedDays.ToDictionary(day => day.Date.Date);
+            var cells = new List<CalendarDay?>();
+            for (var blank = 0; blank < (int)month.DayOfWeek; blank++)
+                cells.Add(null);
+            for (var dayNumber = 1; dayNumber <= DateTime.DaysInMonth(month.Year, month.Month); dayNumber++)
+            {
+                var date = new DateTime(month.Year, month.Month, dayNumber);
+                daysByDate.TryGetValue(date, out var reported);
+                var units = reported?.Units ?? 0;
+                var notes = reported?.NoteCount ?? 0;
+                cells.Add(new CalendarDay
+                {
+                    Date = date,
+                    IsWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday,
+                    ProductivityKind = units > 0
+                        ? ProductivityDayKind.CountedWithSecuredUnits
+                        : ProductivityDayKind.NotCounted,
+                    ThumbnailAccessibleLabel = $"{date:dddd, MMMM d, yyyy}: {units} secured units from {notes} documented {(notes == 1 ? "note" : "notes")}."
+                });
+            }
+            return new CalendarMonth
+            {
+                Name = month.ToString("MMMM"),
+                Month = month.Month,
+                Year = month.Year,
+                Cells = cells
+            };
+        }
+
         public string ProductivityMonthSummary
         {
             get
             {
+                if (IsHistoricalProductivityMonth)
+                {
+                    if (IsHistoricalProductivityLoading)
+                        return $"Loading {ProductivityPeriodLabel} productivity.";
+                    if (HasHistoricalProductivityError)
+                        return $"{ProductivityPeriodLabel} productivity could not be loaded.";
+                    return $"{ProductivityPeriodLabel}: {HistoricalSecuredUnits} secured units on {HistoricalDocumentedDays} documented days.";
+                }
                 var days = ProductivityMonth.Cells.OfType<CalendarDay>().ToList();
                 var secured = days.Count(day => day.CountsWithSecuredUnits);
                 var pendingOnly = days.Count(day => day.CountsWithoutSecuredUnits);
@@ -1298,6 +1468,20 @@ CalendarViewModel calendarViewModel,
                 await Scratchpad.RefreshScheduledWorkAsync();
         }
 
+        // The Admin status command changes who belongs in the active caseload.
+        // LoadPeopleAsync publishes one authoritative snapshot to the Clients menu,
+        // note pickers, and Notes Log; the matrix and deadline board use that same list.
+        public async Task RefreshAfterPersonStatusChangedAsync()
+        {
+            var account = LoggedInUser;
+            await LoadPeopleAsync(reportFailure: true);
+            if (account is null || !ReferenceEquals(LoggedInUser, account))
+                return;
+
+            Matrix?.Rebuild(People, DateTime.Today, MatrixSchedule);
+            await LoadUpcomingEventsAsync();
+        }
+
         private async Task LoadNotesForPersonAsync(Person? person)
         {
             var request = _notesLoadRequests.Begin();
@@ -1361,7 +1545,7 @@ CalendarViewModel calendarViewModel,
             return matchesText && matchesStatus;
         }
 
-        public async Task LoadPeopleAsync()
+        public async Task LoadPeopleAsync(bool reportFailure = false)
         {
             try
             {
@@ -1401,6 +1585,8 @@ CalendarViewModel calendarViewModel,
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to load people: {ex.Message}");
+                if (reportFailure)
+                    throw;
             }
         }
 
@@ -1816,6 +2002,14 @@ CalendarViewModel calendarViewModel,
 
         public void Reset()
         {
+            _productivityMonthRequests.Invalidate();
+            _selectedProductivityMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            _historicalProductivityDays = [];
+            _historicalProductivityGoal = null;
+            HasHistoricalProductivityData = false;
+            HistoricalProductivityError = string.Empty;
+            IsHistoricalProductivityLoading = false;
+            NotifyProductivityPeriodChanged();
             _notesLoadRequests.Invalidate();
             _upcomingEventLoadRequests.Invalidate();
             _peopleLoadRequests.Invalidate();
