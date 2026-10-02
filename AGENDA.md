@@ -58,7 +58,7 @@ observed after installation and launch. Their local schema migration applies on 
 - [x] Final evidence committed and pushed to `origin/master`; local/remote equality and
       clean working tree verified. Evidence commit identifier is recorded below.
 
-Evidence commit: pending final commit.
+Evidence commit: `8a2e29d8688360ad48a119f578c80432775f773a`.
 
 ## Admin status changes update Clients immediately — October 2, 2026 (released in 1.3.33)
 
