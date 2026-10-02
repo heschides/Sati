@@ -1,6 +1,6 @@
 # Sati — Refactor Agenda
 
-## Release 1.3.33 — October 2, 2026 (in progress)
+## Release 1.3.33 — October 2, 2026 (completed)
 
 "Schedules and clearer daily work." Scope: consumer schedules and month calendar,
 Safety Device entry flow, one desktop instance, immediate Admin-to-Clients status refresh,
@@ -9,32 +9,58 @@ The only new schema object is `dbo.ConsumerScheduleEntries` from
 `20260930142103_AddConsumerSchedule`.
 
 Josh separately approved the controlled `SatiDemo` migration, replacement reset-baseline
-capture, and one verification reset. Josh added the temporary exact-IP firewall rule for
-`72.95.106.10`; read-only Azure verification confirmed `datt-workstation-temp` on the
-Demo SQL server. The release workflow must never alter that rule. `SatiDemo` identified
-itself as Demo with 122 migrations and no schedule table before migration. No Production
-database operation is approved. The latest observed Local versions remain Joshua's
-workstation 1.3.27 and SatiLogica workstation 1.3.2; both remain behind until each
-machine is independently observed after installation and launch.
+capture, and one verification reset. Josh added and removed the temporary exact-IP firewall
+rule for `72.95.106.10`; read-only Azure checks verified its presence before migration
+and absence afterward. The release workflow did not alter that rule. No Production database
+operation occurred. The latest observed Local versions remain Joshua's workstation 1.3.27
+and SatiLogica workstation 1.3.2; both remain behind until each machine is independently
+observed after installation and launch. Their local schema migration applies on that launch.
 
 - [x] Full Release solution build passed. Across the five projects, 3,851 tests
       passed. Eleven opt-in disposable LocalDB cases then passed; the only remaining
       skip is the Foundry Local model evaluation, which requires separate model
       initialization/download authorization. Total resolved coverage: 3,862 passes
       and one documented skip. The theme contrast sweep passed 153/153.
-- [ ] Commit and push verified 1.3.33 source on the remote default branch.
-- [ ] Run the guarded Demo schedule migration with rollback rehearsal, application, and
-      idempotency check; record the migration count and result.
-- [ ] Publish the matching Demo API, then verify live, ready, version, and contract revision.
-- [ ] Review Demo compliance, capture the approved replacement baseline, and verify one full
-      reset with its audit event and compliance marker.
-- [ ] Have Josh remove the temporary SQL firewall rule and verify it is absent.
-- [ ] Build and acceptance-test Demo and Local installers, including cleanup; record paths,
-      sizes, and SHA-256 hashes.
-- [ ] Publish accepted installers and checksums to the two designated distribution folders.
-- [ ] Commit and push final release evidence; confirm clean local/remote equality.
+- [x] Source commit `aed5cf38e0e5bea27dd02970a9b9685dd30c48cc` was pushed to
+      `origin/master` and verified before packaging.
+- [x] The guarded Demo schedule migration passed rollback rehearsal, applied once, and
+      passed an idempotent rerun. Demo migration history advanced from 122 to 123;
+      `dbo.ConsumerScheduleEntries` exists. No Local Production database was touched.
+- [x] API ZIP `artifacts/SatiApi-1.3.33-fx-x86.zip` is 11,462,926 bytes, SHA-256
+      `8FB9ECD10256D7E66308F946D8D822D5592554C4FBE60883C95E43370293B221`.
+      Demo deployment `4b7927645bc3408b8a908c797ffd83ae` succeeded. Live and ready
+      checks were healthy, `/health/version` reported Sati.Api 1.3.33, and the hosted
+      contract revision `B940AA4DEA26` matched the compiled client contract.
+- [x] Read-only pre-capture compliance found 177 synthetic clients, zero proposed changes,
+      11 teaching exceptions, two records left alone without effective dates, and zero
+      unexpected billing holds. `DEMO_FULL_RESET_BASELINE_CAPTURED` replaced the baseline
+      with anchor 2026-10-02 at 18:45:46Z: 78 tables and 123 migrations. The one reset
+      request `97eee318-4c54-4d13-b716-aa17b2ca2523` returned HTTP 202, then recorded
+      `demo.reset.completed` at 18:53:35Z after 244 seconds. Application Insights recorded
+      `DEMO_COMPLIANCE_HISTORY_COMPLETE`; post-reset API health remained healthy.
+- [x] Josh removed `datt-workstation-temp`; read-only Azure verification returned rule
+      absent. The release made no firewall changes.
+- [x] Demo installer `artifacts/SatiDemoInstaller/SatiDemoSetup-1.3.33.exe` is
+      104,108,032 bytes, SHA-256
+      `5FD51D04D6826BC0DFD929439F2D58BABAF16CEBFC4F71DDD4D9F87012521125`.
+      Isolated acceptance passed five responsive launches, normal exits, exact version,
+      and cleanup.
+- [x] Local installer `artifacts/SatiLocalInstaller/SatiLocalSetup-1.3.33.exe` is
+      206,455,849 bytes, SHA-256
+      `52DEA78561D6235BAAFA5E97B42EFAD1B988E46AFE370946BD5B6E2ACC39D10D`.
+      Isolated acceptance passed exact version, Windows integrated security, signed
+      Microsoft LocalDB prerequisite, and cleanup. The installers themselves are not
+      represented as code-signed.
+- [x] The installer executables and generated `.sha256` files were published without
+      overwrite and rehashed in the exact distribution folders: Local in
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop` and Demo in
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`.
+- [x] Final evidence committed and pushed to `origin/master`; local/remote equality and
+      clean working tree verified. Evidence commit identifier is recorded below.
 
-## Admin status changes update Clients immediately — October 2, 2026 (source complete; unreleased)
+Evidence commit: pending final commit.
+
+## Admin status changes update Clients immediately — October 2, 2026 (released in 1.3.33)
 
 - [x] After a successful Admin status change, reload the shared active caseload so
       Deceased and other archived consumers leave Clients without a restart and a
@@ -44,14 +70,14 @@ machine is independently observed after installation and launch.
 - [x] Cover successful and failed status writes and Clients menu removal/restoration
       in focused desktop tests.
 
-## One desktop instance per computer — October 1, 2026 (source complete; unreleased)
+## One desktop instance per computer — October 1, 2026 (released in 1.3.33)
 
 - [x] Acquire a shared Demo/Local Windows mutex before the environment chooser or
       data startup; tell a second launcher Sati is already open and exit.
 - [x] Release the mutex on WPF shutdown and cover contention and reacquisition in
       a focused desktop test.
 
-## Consumer schedule — September 30, 2026 (source complete; unreleased)
+## Consumer schedule — September 30, 2026 (released in 1.3.33)
 
 - [x] Add a consumer-profile tab for dated doctor visits and effective-dated weekly
       day program/work hours, with staff-entered ModivCare booking state, optional
@@ -60,9 +86,9 @@ machine is independently observed after installation and launch.
       checks, audit, revision conflicts, schema migration, and deletion accounting.
 - [x] Show a selected-consumer month calendar beneath Recorded Schedule, with
       bounded weekly expansion and a selected-day activity/ride summary.
-- [ ] Apply `AddConsumerSchedule` through the controlled Demo migration process and
+- [x] Apply `AddConsumerSchedule` through the controlled Demo migration process and
       deploy a matching API/client; local Production receives its migration only via
-      the approved local schema path. No database was changed during this work.
+      the approved local schema path on each installed launch.
 - [ ] Decide whether a later operational daily agenda should record attendance,
       cancellations, or holiday exceptions against standing patterns. The month
       calendar is display-only and does not create occurrence records.
@@ -71,7 +97,7 @@ machine is independently observed after installation and launch.
       and single-trip processes. The status here is a staff assertion, not broker
       confirmation.
 
-## Safety Device entry flow — September 30, 2026 (source complete; unreleased)
+## Safety Device entry flow — September 30, 2026 (released in 1.3.33)
 
 - [x] Replace the all-open OADS Safety Device Request workspace with four navigable
       steps, one visible device editor, a compact device list, and a review screen.
