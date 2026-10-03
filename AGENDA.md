@@ -1,6 +1,6 @@
 # Sati — Refactor Agenda
 
-## Release 1.3.34 — October 3, 2026 (in progress; not published)
+## Release 1.3.34 — October 3, 2026 (published)
 
 "Clearer notes, calendar, and statistics." Scope: a consumer-scoped Notes
 workspace, compact note-list previews and roomier Notes Log dates, configurable
@@ -10,9 +10,9 @@ schedule-move history table; moves made before this release cannot be recovered.
 The detailed feature work is recorded in the four sections immediately below.
 
 Josh separately authorized the controlled `SatiDemo` migration and replacement
-reset-baseline capture. Josh created the temporary exact-IP firewall rule and
-read-only verification found it active. The release workflow must not change
-that rule; Josh removes it after the baseline capture and verification reset.
+reset-baseline capture. Josh created and later removed the temporary exact-IP
+firewall rule; read-only Azure listings verified both states. The release
+workflow made no firewall or other security-setting change.
 No Production database operation is authorized. The latest recorded Local
 Production versions remain Joshua's workstation 1.3.27 and SatiLogica
 workstation 1.3.2; neither is assumed to have migrated until independently
@@ -33,29 +33,73 @@ this release.
       one documented skip. The narrow consumer Notes render assertion, focused
       Overview responsive-layout cases (6/6), and Demo reset runtime success
       case also passed.
-- [ ] Source commit pushed and verified on the resolved default branch; record
-      its identifier before producing deployment artifacts.
-- [ ] Guarded Demo migration passes rollback-only rehearsal, real application,
-      and idempotent rerun with database/environment identity and resulting
-      schema verified. Record the migration evidence; do not touch Local Production.
-- [ ] Publish the matching Demo API from the pushed source. Record the API ZIP
-      path, byte size, SHA-256, deployment identifier, live/ready health, reported
-      1.3.34 version, and client/API contract revision parity.
-- [ ] Read-only compliance pre-capture check is acceptable; replace the Demo
-      reset baseline using today's anchor, then run one full reset and verify
-      `demo.reset.completed` and `DEMO_COMPLIANCE_HISTORY_COMPLETE`. Record the
-      capture marker, anchor, reset request ID, and outcome.
-- [ ] Josh removes the temporary exact-IP firewall rule; verify its absence
-      without changing it as part of the release.
-- [ ] Build and acceptance-test new Demo and Local 1.3.34 installers, including
-      five responsive Demo launches, exact versions, signed Microsoft LocalDB
-      prerequisite, Local integrated security, and cleanup. Record paths, byte
-      sizes, SHA-256 hashes, and acceptance results; do not claim the installers
-      themselves are code-signed.
-- [ ] Publish accepted installers and `.sha256` files without overwrite to the
-      two exact distribution folders, then rehash the published copies.
+- [x] Source commit `1c0d6af004316ab6733d610b3054dec2b3ac9418` was
+      pushed to `origin/master` and verified before packaging.
+- [x] The guarded Demo migration passed rollback-only rehearsal (123 persisted
+      history rows), applied once (124 rows), and passed an idempotent rerun with
+      the reviewed table/FK/index shape. The database and Demo marker were
+      checked; no Local Production database was touched.
+- [x] Demo API ZIP `artifacts/SatiApi-1.3.34-fx-x86.zip` is 11,502,207 bytes,
+      SHA-256 `2C7E419AAC57AFC274D7D5A8F15DCBD30000AB8E49BA10B209C26E6F3C3B6E02`.
+      It has 70 safe file entries, assembly version 1.3.34.0, no private settings
+      or detected credential patterns. OneDeploy `0164e7d00c714ca0bed6457b321e6edc`
+      succeeded to the existing Demo API. Live/ready are healthy; `/health/version`
+      reports 1.3.34 and contract revision `5DDFDDADF80C`, matching the built
+      source assembly.
+- [x] The read-only pre-capture compliance check found 177 synthetic clients,
+      zero proposed changes, 11 teaching exceptions, two without effective dates,
+      and zero unexpected billing holds. `DEMO_FULL_RESET_BASELINE_CAPTURED`
+      replaced the baseline at anchor 2026-10-03 (captured 15:21:25Z) with 79
+      tables, 124 migrations, and zero move rows. The first verification reset,
+      request `f7bfa6c7-1940-41e1-aaf2-711c78cfd69c`, was accepted with HTTP
+      202 but reached the poison queue at 15:34:36Z without a completion/failure
+      audit or compliance marker. The main queue was empty, the baseline state
+      remained at capture time, and Demo API readiness was Healthy. The new
+      poison entry is preserved beside two older entries. The ten-minute gap
+      between request acceptance and poison arrival is consistent with Azure
+      Queue's visibility window after a host interruption; the actual cause is
+      unconfirmed. Josh separately authorized one bounded Demo-only recovery.
+      Replacement request `23aee7a8-64e8-4fd0-8d48-3e0ff27de5bc` was accepted
+      at 15:52:29Z. `ResetDemoWorker` completed in 211 seconds with the
+      `DEMO_COMPLIANCE_HISTORY_COMPLETE` marker and an exact matching
+      `demo.reset.completed` audit at 15:56:03Z, stage Completed. Main queue
+      count is zero; all three prior poison messages remain preserved. The API
+      is live and ready (HTTP 200), reports 1.3.34 and matching contract
+      `5DDFDDADF80C`. No Function source or hosting setting was changed for
+      this recovery.
+- [x] Josh removed `SatiDatt20261003Josh`. A read-only Azure listing independently
+      found neither that rule nor any exact 72.95.106.10 rule on the Demo SQL
+      server. The helper script's default rule name differs from this release's
+      named rule, so removal required an explicit `-RuleName` argument.
+- [x] Built and accepted both 1.3.34 installers. Demo
+      `artifacts/SatiDemoInstaller/SatiDemoSetup-1.3.34.exe` is 104,161,280
+      bytes, SHA-256 `81F35979262F72672D2048F7582E5134D5E5B69EF8F3793FFAAD4ED451FCB576`.
+      It passed five 15-second responsive sign-in launches, normal closes,
+      exact 1.3.34.0 installed version, and isolated cleanup. The first
+      sandboxed acceptance attempt stalled before payload installation and
+      cleaned up; the rerun with required process/filesystem access passed.
+      Local `artifacts/SatiLocalInstaller/SatiLocalSetup-1.3.34.exe` is
+      206,509,097 bytes, SHA-256
+      `3074F6BA16FB47FA01BD7D90D5DAA402E754C26A83AD08A9D250CB2D7C49EFB6`.
+      Its isolated acceptance verified 1.3.34.0, SatiProduction with Windows
+      integrated security, valid Microsoft signature on embedded LocalDB,
+      and cleanup. The installers themselves are not claimed code-signed.
+- [x] Published only each accepted installer and `.sha256` to the exact
+      distribution folders, using temporary sibling copies, matching hashes,
+      and no overwrite. Local:
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop`.
+      Demo:
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`.
+      Final published installer hashes match the accepted artifacts; checksum
+      files match too.
 - [ ] Push final evidence commit and verify local/remote equality and a clean
       working tree. Record both commit identifiers and any retained branches.
+
+Deferred after publication: investigate the reset host interruption that left
+the first verification request in the poison queue, without replaying any
+preserved message. Harden `Set-DemoWorkstationFirewallRule.ps1` so a removal
+fails on a nonzero Azure CLI exit and cannot report success for the default
+rule name while a separately named exact-IP workstation rule remains open.
 
 ## Unreleased — consumer Notes workspace (2026-10-02)
 
