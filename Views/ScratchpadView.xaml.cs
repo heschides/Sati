@@ -27,6 +27,14 @@ namespace Sati.Views
             InitializeComponent();
         }
 
+        /// <summary>
+        /// Whether Windows allows client-area animation. Off honors a reduced-motion
+        /// preference. Tests replace it because a CI runner's session setting is not
+        /// the behavior under test.
+        /// </summary>
+        internal Func<bool> IsClientAreaAnimationEnabled { get; set; } =
+            static () => SystemParameters.ClientAreaAnimation;
+
         public bool IsHistoryAvailable
         {
             get => (bool)GetValue(IsHistoryAvailableProperty);
@@ -66,7 +74,7 @@ namespace Sati.Views
         {
             if (previousIndex == selectedIndex ||
                 !IsLoaded ||
-                !SystemParameters.ClientAreaAnimation)
+                !IsClientAreaAnimationEnabled())
                 return;
 
             var version = ++_tabAnimationVersion;

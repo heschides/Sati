@@ -6216,3 +6216,21 @@ there is no fallback to the shared instance. `scripts/Test-IsolatedLocalDb.ps1`
 creates that instance, runs the API and desktop SQL test filters with its name in
 the process environment, then stops and deletes only the instance it created.
 Its ownership checks prevent cleanup from acting on an existing instance.
+
+## 2026-10-03 — Theme-derived brushes live in the theme, not States.xaml
+
+`States.xaml` used to derive the seven form-control brushes (`InputSurfaceBrush` … `InputSelectionTextBrush`)
+from the active theme with `Color="{DynamicResource TextSubtleColor}"` and similar. A `DynamicResource`
+inside a brush held in an application-level merged dictionary resolves once, against whichever theme is
+active when the brush is first used, and does not follow later theme swaps. In CI every theme reported
+MoonlitPearl's `#525C67` after MoonlitPearl happened to run first; in the app, switching theme could leave
+text-box ink, placeholders, input surfaces and selection colors from the first theme until restart.
+
+Every theme now defines the seven brushes itself, from its own colors with `StaticResource`, using the same
+mapping `States.xaml` used. A theme dictionary is loaded fresh on every swap, so they are always current.
+`ReleaseUiStructureTests.EveryThemeSuppliesItsOwnInputBrushes` requires them in every theme and forbids
+theme-derived `DynamicResource` brushes in `States.xaml`. All 26 affected themes clear 4.5:1 for input text
+on input surface (lowest: IndustrialMatte, 5.04:1).
+
+**Rejected:** re-creating `States.xaml` after each swap, which depends on the same lazy resolution;
+and leaving the fallback in place for future themes, which would silently reintroduce the defect.

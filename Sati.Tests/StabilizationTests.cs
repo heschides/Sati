@@ -1078,8 +1078,9 @@ public sealed class StabilizationTests
         }
 
         const string guardCall = "Exit-IfSatiIsRunning -SuppressMessage:$isTest";
-        Assert.Equal(2, Regex.Matches(local, "(?m)^    " + Regex.Escape(guardCall) + "$").Count);
-        Assert.Equal(2, Regex.Matches(demo, "(?m)^    " + Regex.Escape(guardCall) + "$").Count);
+        // Multiline "$" matches only before "\n", so a CRLF checkout needs "\r?".
+        Assert.Equal(2, Regex.Matches(local, "(?m)^    " + Regex.Escape(guardCall) + "\r?$").Count);
+        Assert.Equal(2, Regex.Matches(demo, "(?m)^    " + Regex.Escape(guardCall) + "\r?$").Count);
         Assert.True(
             local.IndexOf("    " + guardCall, StringComparison.Ordinal) <
             local.IndexOf("Start-SatiInstallerProgress", StringComparison.Ordinal));

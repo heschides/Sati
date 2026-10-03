@@ -475,14 +475,42 @@ public sealed class ThemeLegibilityTests
                 .position;
 
             var swap = new ThemeSwap(index, dictionaries[index]);
-            dictionaries[index] = new ResourceDictionary
+            var themeDictionary = new ResourceDictionary
             {
                 Source = new Uri($"/Sati;component/Themes/{theme}.xaml", UriKind.Relative),
             };
+            dictionaries[index] = themeDictionary;
+            Settle();
+
+            // Input ink and surfaces must come from the theme just applied. When they were
+            // derived in States.xaml they kept the first theme's colors, and every view then
+            // reported a contrast failure that was really a stale resource. Say so directly.
+            foreach (var key in new[] { "InputSurfaceBrush", "InputTextBrush", "InputMutedTextBrush" })
+            {
+                var resolved = Application.Current.FindResource(key) as SolidColorBrush;
+                var own = themeDictionary.Contains(key) ? themeDictionary[key] as SolidColorBrush : null;
+                if (own is null || resolved is null || resolved.Color != own.Color)
+                {
+                    throw new InvalidOperationException(
+                        $"After switching to {theme}, {key} resolves to {resolved?.Color.ToString() ?? "nothing"} " +
+                        $"rather than the theme's own {own?.Color.ToString() ?? "(undefined)"}.");
+                }
+            }
+
             return swap;
         }
 
-        public void Dispose() =>
+        public void Dispose()
+        {
             Application.Current.Resources.MergedDictionaries[_index] = _original;
+            Settle();
+        }
+
+        // Replacing a merged dictionary invalidates resource references through the
+        // dispatcher. Measure the settled state, which is what a person sees after
+        // changing theme, rather than whatever has been re-resolved so far.
+        private static void Settle() =>
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
+                () => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 }
