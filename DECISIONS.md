@@ -6217,6 +6217,48 @@ creates that instance, runs the API and desktop SQL test filters with its name i
 the process environment, then stops and deletes only the instance it created.
 Its ownership checks prevent cleanup from acting on an existing instance.
 
+## 2026-10-03 — `SatiProduction` is a personal working environment, not a deployment target
+
+`SatiProduction` holds real PHI from Josh's daily case-management use, run alongside the employing
+agency's system, which remains the official record. It is not deployed to anyone else and does not
+need production hardening. It is still a PHI store, so the workstation rules in `OPERATIONS.md`
+govern anything that copies it. The colleague installation once tracked in `AGENDA.md` is retired.
+
+"Production" as a product environment means the future cloud deployment. Server-side capabilities
+such as background workers, alerting and restore verification are built for that environment and
+proven in Demo. Where the local EF path needs the same behavior, it calls the same
+`Sati.Contracts.V1` rule from its existing triggers. It does not get a second scheduler.
+`BACKGROUND_WORKERS_HANDOFF.md` applies this to the planned workers.
+
+**Rejected:** hardening the local EF path as though it were a deployed product (scheduled local
+jobs, local alerting), which would maintain a second operations stack for one workstation; and
+treating LocalDB data loss as a records-integrity risk, since the official record lives elsewhere.
+
+## 2026-10-03 — Background worker operating decisions
+
+Recorded for `BACKGROUND_WORKERS_HANDOFF.md`. Josh deferred these to the reviewer's recommendation.
+
+- **Alerts email Josh through an Azure Monitor action group**, driven by two log-search rules on
+  the Demo Function App's existing Application Insights: a watchdog finding was logged, and no
+  watchdog result has arrived in 26 hours. The second rule catches a watchdog that stopped
+  running. A dashboard is visibility; this is the notification route `OPERATIONS.md` requires.
+- **The Demo watchdog runs once a day in the Function App**, after the nightly reset, as its own
+  timer function. It reads `AuditEvents` and the poison queue's count with the identity and
+  storage connection the app already has, so it needs no new role assignment.
+- **No wake ping.** `SatiDemo` is serverless on a free monthly allowance and pauses when the
+  allowance is exhausted. Polling SQL around the clock to keep App Service F1 awake would spend
+  that allowance and could take Demo offline for the rest of the month. API workers catch up when
+  Demo is in use. Revisit when cloud Production runs on a tier with Always On.
+- **System-initiated audit events use `ActorUserId` 0 behind one named Contracts constant**, with
+  `actorKind: system` and the job name in the metadata. This matches the existing reset precedent.
+- **Code and scripts are written for Josh to run.** Anything that creates or changes an Azure
+  resource ships as an idempotent script with `-WhatIf`.
+
+**Rejected:** an API `/health/operations` endpoint probed by an availability test, because the probe
+either keeps the serverless database awake or reports stale state; per-worker heartbeat rows,
+because outcome checks (overdue Pending notes, stuck dispatches) detect a stalled worker without a
+new table; and SMS or paging services, which are disproportionate for a synthetic Demo.
+
 ## 2026-10-03 — Theme-derived brushes live in the theme, not States.xaml
 
 `States.xaml` used to derive the seven form-control brushes (`InputSurfaceBrush` … `InputSelectionTextBrush`)

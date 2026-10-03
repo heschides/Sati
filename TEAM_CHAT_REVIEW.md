@@ -2,7 +2,7 @@
 
 Reviewed 2026-09-05. Original: `team-chat-design`, commit
 `e7d80ca0de1e6d71b8a2e2b9f5caad0f7e15a895`, `TEAM_CHAT_DESIGN.md` and
-`HANDOFF_TEAM_CHAT.md`. This review supersedes the original where they disagree.
+`archive/HANDOFF_TEAM_CHAT.md`. This review supersedes the original where they disagree.
 The user authorized both review and implementation, with safest practical defaults.
 
 This is an engineering review, not an agency approval or legal opinion. See

@@ -4,7 +4,7 @@ Source review: September 2026. Implemented safeguards and test limits are record
 [SIGNATURE_PORTAL_VALIDATION.md](SIGNATURE_PORTAL_VALIDATION.md).
 
 This review preserves the original [design](SIGNATURE_PORTAL_DESIGN.md) and
-[handoff](HANDOFF_SIGNATURE_PORTAL.md). The electronic-signature section of [AGENDA.md](AGENDA.md)
+[handoff](archive/HANDOFF_SIGNATURE_PORTAL.md). The electronic-signature section of [AGENDA.md](AGENDA.md)
 remains the governing prior direction where the original design conflicts with it. The choices
 below are the revised implementation direction. None establishes legal or production approval.
 The practical guide is [SIGNATURE_PORTAL_GUIDE.md](SIGNATURE_PORTAL_GUIDE.md).

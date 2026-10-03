@@ -110,15 +110,16 @@ The following are product constraints, not optional enhancements:
 | [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) / [DEMO_ACCEPTANCE.md](DEMO_ACCEPTANCE.md) | Running and accepting a company demonstration. |
 | [API_SECURITY_AUDIT.md](API_SECURITY_AUDIT.md) | Point-in-time review of authorization and data exposure (2026-08-14). |
 | [CONCURRENCY_AUDIT.md](CONCURRENCY_AUDIT.md) | Point-in-time review of overlapping-operation hazards (2026-08-14). |
-| [DASHBOARD_DESIGN_REVIEW.md](DASHBOARD_DESIGN_REVIEW.md) | Visual and accessibility review of the dashboard (2026-08-14). |
+| [BACKGROUND_WORKERS_HANDOFF.md](BACKGROUND_WORKERS_HANDOFF.md) | Scoped implementation brief for the server-side background workers. |
+| [archive/](archive/README.md) | Completed handoffs and superseded point-in-time reviews, kept for history. |
 
-The three audit documents are dated reviews of the code at a point in time, not certifications.
+The audit documents are dated reviews of the code at a point in time, not certifications.
 
 ## Current technology
 
 - **Client:** WPF on .NET 10 for Windows
 - **Presentation:** MVVM with CommunityToolkit.Mvvm
-- **Current data access:** Local Production uses EF Core 10/LocalDB; Demo uses the deployed HTTPS API
+- **Current data access:** the developer's local working environment (`SatiProduction`) uses EF Core 10/LocalDB; Demo uses the deployed HTTPS API
 - **Composition:** Microsoft.Extensions.Hosting and constructor dependency injection
 - **Local databases:** SQL Server LocalDB with isolated Production and Demo development identities
 - **Demo cloud:** ASP.NET Core API on App Service Free F1, Azure SQL, and managed identity
@@ -162,20 +163,21 @@ Sati is under active development. Its current priority is establishing the platf
 2. formal tenant ownership and server-side authorization;
 3. append-only audit events, record versions, and concurrency control;
 4. HTTP implementations of the existing data-service interfaces;
-5. Azure-hosted Demo with a canonical nightly reset;
+5. Azure-hosted Demo with a canonical nightly reset (running; failure alerting not yet routed);
 6. automated tests, clean-machine packaging, and controlled releases.
 
 Feature development continues, but new work should reinforce rather than bypass these
 foundations.
 
-### Verification as of 2026-08-15
+### Verification as of 2026-10-03 (release 1.3.34)
 
-- 136 desktop and domain tests (`Sati.Tests`) and 65 API integration tests (`Sati.Api.Tests`),
-  the latter exercising the real HTTP and JWT pipeline against two isolated agencies.
+- 3,886 tests passing across the five test projects (`Sati.Tests`, `Sati.Api.Tests`,
+  `Sati.Signatures.Tests`, `Sati.Portal.Tests`, `Carika.Tests`), with documented opt-in skips.
+  The API suite exercises the real HTTP and JWT pipeline against isolated agencies.
 - Rules that decide permission, billability, or record status live in `Sati.Contracts.V1` and are
   evaluated by both the desktop client and the API, so neither can drift from the other.
-- Three dated reviews — authorization and data exposure, concurrency, and dashboard design — are
-  linked in the index above. Each records what was found sound as well as what was fixed.
+- Dated reviews of authorization, data exposure, and concurrency are linked in the index above.
+  Each records what was found sound as well as what was fixed.
 
 None of this establishes HIPAA compliance or production readiness. See
 [REGULATORY_CONCERNS.md](REGULATORY_CONCERNS.md).

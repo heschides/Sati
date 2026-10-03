@@ -896,8 +896,8 @@ No schema change, so no machine is newly behind on migrations because of this re
       `1.3.27+0abd021` and was running from 11:43 that day, so it has launched at 1.3.27 at least
       once. Migration 117's application to its `SatiProduction` was not independently inspected.
       Installing 1.3.28 adds no migration.
-- [ ] **SatiLogica workstation / colleague installation.** Latest durable record is 1.3.2; treat
-      it as behind.
+- [x] **SatiLogica workstation / colleague installation.** Retired 2026-10-03: that installation
+      is no longer in use and is not tracked. Latest durable record was 1.3.2.
 
 ## Unreleased — visible, bounded workspace preparation (2026-09-24)
 
@@ -1140,9 +1140,8 @@ receives the migration only when each machine first launches the new Local clien
 - [ ] **Joshu workstation.** Installed Local client is 1.3.25. Treat its real
       `SatiProduction` as pending migration 117 until 1.3.27 is installed and a
       successful backed-up startup is verified.
-- [ ] **SatiLogica workstation / colleague installation.** Latest durable record is
-      1.3.2 and has not been rechecked during this release. Treat both its installed
-      version and Local migration state as behind rather than assuming it caught up.
+- [x] **SatiLogica workstation / colleague installation.** Retired 2026-10-03: that installation
+      is no longer in use and is not tracked. Latest durable record was 1.3.2.
 
 ## Superseded staging build 1.3.26 — 2026-09-24 (not distributed)
 
@@ -4109,7 +4108,7 @@ so publishing it is routine version-parity, not a functional deploy.
 "Room to undo a duplicate." Consumer-deletion, archive, and legal-hold foundation from the
 [[Ordinary-consumer deletion, archive status, and bulk-import dedupe (2026-09-03)]] work, plus the
 safety-plan/annual-document/privacy-notice workflow from
-`ANNUAL_DOCUMENT_RELEASE_READINESS.md` and `NOTE_FORM_ATTESTATION_DESIGN.md`. Invoked via `invoke
+`archive/ANNUAL_DOCUMENT_RELEASE_READINESS.md` and `NOTE_FORM_ATTESTATION_DESIGN.md`. Invoked via `invoke
 DATT!`; preflight paused once for a concurrent-edit check (the working tree was still moving under
 a second, independently running agent) and once for explicit authorization of the schema-changing
 Demo migration below, both confirmed by Josh before continuing.
@@ -4194,7 +4193,7 @@ clean.
 > opening portions below. This section remains the implementation history of the earlier slice.
 
 **Steps 1–9 implemented in source on 2026-09-03; not released or deployed.** Release preparation
-and remaining operational gates are recorded in `ANNUAL_DOCUMENT_RELEASE_READINESS.md`. Full design in
+and remaining operational gates are recorded in `archive/ANNUAL_DOCUMENT_RELEASE_READINESS.md`. Full design in
 `NOTE_FORM_ATTESTATION_DESIGN.md`.
 
 The removed note-to-form bridge used a message box in `Views/ShellWindow.xaml.cs`. Saving a note
