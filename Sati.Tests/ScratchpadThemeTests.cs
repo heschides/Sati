@@ -15,7 +15,13 @@ public sealed class ScratchpadThemeTests
     {
         WpfUiHarness.Run(() =>
         {
-            var view = new ScratchpadView { IsHistoryAvailable = true };
+            // Pin animation on: a CI runner's session may have client-area
+            // animation disabled, which is a different, separately tested path.
+            var view = new ScratchpadView
+            {
+                IsHistoryAvailable = true,
+                IsClientAreaAnimationEnabled = static () => true
+            };
             var window = new Window
             {
                 Content = view,
@@ -55,6 +61,54 @@ public sealed class ScratchpadThemeTests
                 Assert.NotSame(firstTransform, secondTransform);
                 Assert.False(secondTransform.IsFrozen);
                 Assert.True(secondTransform.HasAnimatedProperties);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void TabChangesDoNotSlideWhenWindowsAnimationIsOff()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            var view = new ScratchpadView
+            {
+                IsHistoryAvailable = true,
+                IsClientAreaAnimationEnabled = static () => false
+            };
+            var window = new Window
+            {
+                Content = view,
+                Width = 820,
+                Height = 700,
+                Left = -32000,
+                Top = -32000,
+                ShowActivated = false,
+                ShowInTaskbar = false
+            };
+
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                Assert.True(view.IsLoaded);
+
+                var tabs = Assert.Single(
+                    WpfUiHarness.Descendants(view).OfType<TabControl>());
+                var presenter = Assert.IsType<ContentPresenter>(
+                    tabs.Template.FindName("AgendaContentHost", tabs));
+                var templateTransform = presenter.RenderTransform;
+
+                tabs.SelectedIndex = 1;
+                Dispatcher.CurrentDispatcher.Invoke(
+                    () => { }, DispatcherPriority.ApplicationIdle);
+
+                // A reduced-motion preference leaves the template's transform alone.
+                Assert.Same(templateTransform, presenter.RenderTransform);
+                Assert.False(presenter.RenderTransform.HasAnimatedProperties);
             }
             finally
             {

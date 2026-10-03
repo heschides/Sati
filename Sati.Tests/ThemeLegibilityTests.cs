@@ -475,14 +475,40 @@ public sealed class ThemeLegibilityTests
                 .position;
 
             var swap = new ThemeSwap(index, dictionaries[index]);
-            dictionaries[index] = new ResourceDictionary
+            var themeDictionary = new ResourceDictionary
             {
                 Source = new Uri($"/Sati;component/Themes/{theme}.xaml", UriKind.Relative),
             };
+            dictionaries[index] = themeDictionary;
+            Settle();
+
+            // States.xaml's fallback input brushes take the theme's color through
+            // DynamicResource. If one still carries the previous theme, every view
+            // reports a contrast failure that is really a stale resource, so say so.
+            if (!themeDictionary.Contains("InputMutedTextBrush") &&
+                themeDictionary["TextSubtleColor"] is Color expected &&
+                Application.Current.FindResource("InputMutedTextBrush") is SolidColorBrush muted &&
+                muted.Color != expected)
+            {
+                throw new InvalidOperationException(
+                    $"After switching to {theme}, InputMutedTextBrush is {muted.Color} rather than " +
+                    $"the theme's TextSubtleColor {expected}; a previous theme's resource is still applied.");
+            }
+
             return swap;
         }
 
-        public void Dispose() =>
+        public void Dispose()
+        {
             Application.Current.Resources.MergedDictionaries[_index] = _original;
+            Settle();
+        }
+
+        // Replacing a merged dictionary invalidates resource references through the
+        // dispatcher. Measure the settled state, which is what a person sees after
+        // changing theme, rather than whatever has been re-resolved so far.
+        private static void Settle() =>
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
+                () => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 }
