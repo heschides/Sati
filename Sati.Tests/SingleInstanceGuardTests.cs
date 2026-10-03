@@ -54,7 +54,18 @@ public sealed class SingleInstanceGuardTests
             Assert.Null(failure);
             Assert.True(acquired);
 
-            using var nextLaunch = SingleInstanceGuard.TryAcquire(name);
+            // Windows abandons the mutex when the owner's OS thread terminates, which
+            // can trail Thread.Join on a loaded machine. Wait for that, bounded: a guard
+            // that mishandled abandonment would still return null for the whole wait.
+            SingleInstanceGuard? nextLaunch = null;
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while ((nextLaunch = SingleInstanceGuard.TryAcquire(name)) is null &&
+                   DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(25);
+            }
+
+            using var _ = nextLaunch;
             Assert.NotNull(nextLaunch);
         }
         finally { abandonedOwner?.Dispose(); }

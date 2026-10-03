@@ -165,7 +165,10 @@ public sealed class WorkAgendaMigrationTests
             COMMIT;
             GO
             """;
-        Assert.Equal(expectedEnvelope, generatedEnvelope.TrimEnd());
+        // The raw literal takes this source file's line endings, which follow the
+        // checkout (CRLF on a Windows runner with autocrlf). The generated side is
+        // already normalized, so normalize the expectation the same way.
+        Assert.Equal(NormalizeLineEndings(expectedEnvelope), generatedEnvelope.TrimEnd());
 
         var normalizedLineEndings = NormalizeLineEndings(generated);
         var expectedHash = Convert.ToHexString(
