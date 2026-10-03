@@ -1,10 +1,23 @@
 # Production and Demo Data Environments
 
-*Current as of 2026-09-06. The daily Demo caseload refresh is running; the stronger full-baseline
-reset described below remains future work — see the checklist at the end of this file.*
+*Current as of 2026-10-03 (release 1.3.34). The full-baseline Demo reset runs nightly and on Admin
+request; failure alerting is not yet routed to anyone — see the checklist at the end of this file.*
 
 Sati maintains deliberately separate Production and Demo identities. This separation protects
 real working data during development and prepares the synthetic Demo environment for Azure.
+
+## What `SatiProduction` is
+
+`SatiProduction` is the developer's personal working environment. It holds real PHI from daily
+case-management use, run alongside the employing agency's system, which remains the official
+record. It is not a deployment target and does not need production hardening. It is a PHI store:
+the workstation rules in `OPERATIONS.md` apply in full, and anything that creates copies
+(backups, exports, logs, crash dumps) must follow them.
+
+"Production" as a product environment means the future cloud deployment, which does not exist yet
+and will be separately approved. Server-side capabilities are built for that environment and proven
+in Demo. The local EF path shares their rules through `Sati.Contracts.V1` rather than duplicating
+the server's scheduling or operations.
 
 | Startup choice | Transport | Required target | Required marker |
 |---|---|---|---|
@@ -106,6 +119,13 @@ readiness after each transaction. The first live run and an immediate idempotenc
 This does not yet stop mutations, delete all user-created Demo activity, or reset demonstration
 passwords. Those stronger full-reset requirements and a notification action for failure alerts
 remain outstanding.
+
+> **Superseded.** The same timer now runs the full-baseline reset in
+> `Sati.DemoRefresh/Shared/DemoReset.ps1`, under an exclusive lock with the API's mutation lease
+> turning sign-ins away while it runs. Admin-requested resets go through the single-delivery
+> `demo-reset-requests` queue. Every outcome is recorded as `demo.reset.completed` or
+> `demo.reset.failed` (`DECISIONS.md`, 2026-09-26). A reset that dies before writing its outcome
+> leaves only a poison-queue entry; nothing alerts a person.
 
 ## Current Azure Demo database
 
@@ -331,7 +351,8 @@ again removed and verified absent by the operator.
 - [x] Move the initial Demo workflows to HTTP-backed service implementations.
 - [x] Remove client-side `Database.Migrate()` and EF registration from Demo.
 - [x] Configure and live-test the daily canonical caseload refresh with its own identity and validation.
-- [ ] Configure full-baseline restoration, mutation pause, login reset, and failure notifications.
+- [x] Configure full-baseline restoration and mutation pause, with every outcome audited.
+- [ ] Route reset failures, including a missing outcome, to a named person.
 - [ ] Test from a clean computer outside the development network.
 - [x] Verify that the Demo client configuration contains no database credential or Azure SQL connection.
 - [ ] Exercise backup, restore, and environment-rejection procedures.

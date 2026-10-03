@@ -21,7 +21,7 @@ manifest instead of replaced with blank drafts. When no completed release is rec
 includes an identity-only draft; partial input still in a release editor is not a persisted packet
 source. Safety-plan drafts are persisted and render their saved content. Each new privacy PDF
 requires its own receipt/effort record. The profile and dashboard reminder are read-time, not a job.
-See `ANNUAL_DOCUMENT_RELEASE_READINESS.md` for verified scope and the remaining release gates.
+See `archive/ANNUAL_DOCUMENT_RELEASE_READINESS.md` for verified scope and the remaining release gates.
 
 This replaces the note-to-form bridge, adds the prerequisite checks that must pass before
 compliance can be asserted, and adds the annual document packet. It does not change how
@@ -57,7 +57,7 @@ Confirmed defects, all of which this design dissolves rather than patches:
 Defect 1 is the serious one. `BillingComplianceGate.IsBillingWindowBlocked` is date-keyed
 against `CompletedDate`, so a synthesized date silently changes which past service dates were
 billable. `Form.MarkComplete`'s own comment forbids exactly this. The 2026-08-31 quarterly
-review decision in `HANDOFF_90DAY_REVIEW_FLAG.md` rejected auto-derivation for the Reviews tab
+review decision in `archive/HANDOFF_90DAY_REVIEW_FLAG.md` rejected auto-derivation for the Reviews tab
 for the same reason; the note bridge has been doing it all along, from code-behind.
 
 ---
@@ -631,7 +631,7 @@ note.
 | `FormBulkCompletion:88` | stamps `DueDate` | requires one captured date for the batch |
 | `FormDuplicateRepair:154` | preserves existing | `ActorKind.System` with a reason |
 
-`HANDOFF_90DAY_REVIEW_FLAG.md` recorded the `DueDate` default as the weaker of the two
+`archive/HANDOFF_90DAY_REVIEW_FLAG.md` recorded the `DueDate` default as the weaker of the two
 defaults and a candidate for a later sweep, and explained why it is not neutral: setting
 `CompletedDate = DueDate` collapses the `IsBillingWindowBlocked` window to empty, so nothing is
 ever blocked. This is that sweep. Landing it changes billing behavior on the dashboard

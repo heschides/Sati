@@ -89,8 +89,9 @@ services repeat the same restrictions rather than relying on the API being the o
 
 Rules that decide permission, billability, approval, or record status belong in
 `Sati.Contracts.V1`, which both the desktop client and `Sati.Api` reference, so a rule cannot be
-enforced two different ways. Current owners: `BillingComplianceGate`, `BillingRules`,
-`ServiceTimeline`, `AuditCsv`, `IncidentHealthScoring`. A second hand-written copy of one of these
+enforced two different ways. Current owners: `BillingComplianceGate`, `MonthlyContactRules`, `BillingRules`,
+`ServiceTimeline`, `AuditCsv`, `IncidentHealthScoring`, `JournalEntry`, `ChatAccess`,
+`ProductivityForecast`. A second hand-written copy of one of these
 rules is a defect, not a convenience.
 
 Pure presentation and local concerns may stay in the client. Any calculation that controls
@@ -104,13 +105,24 @@ persistence, permission, approval, billability, or official record status belong
 - A selected Demo session displays a permanent Demo indicator.
 - The original mixed local database is retained as an archive and is not a runtime target.
 
-See `DATABASE_ENVIRONMENTS.md`. Production data must never be copied, queried, transformed, or
-uploaded as part of Demo work without explicit authorization.
+`SatiProduction` is the developer's personal working environment. It holds real PHI from daily
+case-management use, run alongside the employing agency's system, which remains the official
+record. It is not a deployment target and does not need production hardening. It is a PHI store:
+the workstation rules in `OPERATIONS.md` apply in full, and anything that creates copies
+(backups, exports, logs, crash dumps) must follow them.
+
+"Production" as a product environment means the future cloud deployment, which does not exist
+yet. Server-side work (background workers, alerting, backup verification) targets that and is
+proven in Demo first. Where the local EF path needs the same behavior, it calls the same
+`Sati.Contracts.V1` rule from its existing triggers rather than growing a second scheduler.
+
+See `DATABASE_ENVIRONMENTS.md`. `SatiProduction` data must never be copied, queried,
+transformed, or uploaded as part of Demo work without explicit authorization.
 
 ## Near-term priority
 
 The cloud platform foundation in `AGENDA.md` takes precedence over broad feature expansion. Most of
-the original eight-item foundation is now in place; state as of 2026-08-15:
+the original eight-item foundation is now in place; state as of 2026-10-03 (release 1.3.34):
 
 | Foundation item | State |
 |---|---|
@@ -118,15 +130,16 @@ the original eight-item foundation is now in place; state as of 2026-08-15:
 | Server-side authentication, short-lived tokens | In place. JWT, 30-minute lifetime, server-side verification. |
 | Tenant ownership and authorization | In place. `TenantAccess` + `ValidatedActorFilter`; inventory in `API_AUTHORIZATION.md`. |
 | Audit events, record versions, optimistic concurrency | In place. Append-only `AuditEvent`, `PersonVersion`, `Revision` tokens with typed 409s. |
-| Desktop services from EF to HTTP | In place for Demo — every service interface has a `Cloud*` HTTP implementation. Local Production still uses EF by design. |
-| Automated tests | In place. 136 desktop and 65 API tests. Controlled migrations remain manual. |
-| Azure-hosted Demo with managed identity | Hosted with managed identity. **The nightly reset job is not yet configured** — `DECISIONS.md` describes the intended design, and both checklists still list it as outstanding. Do not describe it as running. |
-| Clean-machine packaging | In place and verified through release 1.2.17. |
+| Desktop services from EF to HTTP | In place for Demo — every service interface has a `Cloud*` HTTP implementation. The local `SatiProduction` working environment still uses EF by design. |
+| Automated tests | In place. 3,886 passing across five test projects at release 1.3.34. Controlled migrations remain manual. |
+| Azure-hosted Demo with managed identity | Hosted with managed identity. The full Demo reset runs nightly (`Sati.DemoRefresh/RefreshCaseload`, 03:15 Eastern) and on Admin request through a single-delivery queue; each outcome is written as a `demo.reset.*` audit event. **Failures are not alerted to anyone**: a reset that dies before writing its audit leaves only a poison-queue entry (see `AGENDA.md`, release 1.3.34). |
+| Clean-machine packaging | In place and verified through release 1.3.34. |
 
-Remaining foundation work is therefore narrower than the original list: the nightly Demo reset,
-controlled migration deployment, legal-hold and retention enforcement (`OPERATIONS.md`), and
-external monitoring. Feature work may proceed when it reinforces these boundaries or is explicitly
-prioritized.
+Remaining foundation work: alerting routed to a named owner (including detection of a missing
+reset outcome), controlled migration deployment, backup restore verification, legal-hold and
+retention enforcement (`OPERATIONS.md`), and external monitoring. `BACKGROUND_WORKERS_HANDOFF.md`
+scopes the server-side workers. Feature work may proceed when it reinforces these boundaries or
+is explicitly prioritized.
 
 ## Engineering rules
 
@@ -202,4 +215,4 @@ qualified counsel, agency stakeholders, and the appropriate Maine authorities.
 Sati is simultaneously a working tool and the seed of a much larger product. Protect the working
 system while deliberately moving the platform boundary in the intended direction.
 
-*Last updated: August 15, 2026, against release 1.2.17.*
+*Last updated: October 3, 2026, against release 1.3.34.*

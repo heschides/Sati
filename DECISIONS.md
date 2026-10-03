@@ -6216,3 +6216,20 @@ there is no fallback to the shared instance. `scripts/Test-IsolatedLocalDb.ps1`
 creates that instance, runs the API and desktop SQL test filters with its name in
 the process environment, then stops and deletes only the instance it created.
 Its ownership checks prevent cleanup from acting on an existing instance.
+
+## 2026-10-03 — `SatiProduction` is a personal working environment, not a deployment target
+
+`SatiProduction` holds real PHI from Josh's daily case-management use, run alongside the employing
+agency's system, which remains the official record. It is not deployed to anyone else and does not
+need production hardening. It is still a PHI store, so the workstation rules in `OPERATIONS.md`
+govern anything that copies it. The colleague installation once tracked in `AGENDA.md` is retired.
+
+"Production" as a product environment means the future cloud deployment. Server-side capabilities
+such as background workers, alerting and restore verification are built for that environment and
+proven in Demo. Where the local EF path needs the same behavior, it calls the same
+`Sati.Contracts.V1` rule from its existing triggers. It does not get a second scheduler.
+`BACKGROUND_WORKERS_HANDOFF.md` applies this to the planned workers.
+
+**Rejected:** hardening the local EF path as though it were a deployed product (scheduled local
+jobs, local alerting), which would maintain a second operations stack for one workstation; and
+treating LocalDB data loss as a records-integrity risk, since the official record lives elsewhere.

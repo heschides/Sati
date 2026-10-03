@@ -14,7 +14,7 @@
 Read `CLAUDE.md`, `REGULATORY_CONCERNS.md`, and the "Electronic signature portal — vetted
 direction" section of `AGENDA.md` before implementing this. That AGENDA section was reviewed
 2026-08-07 with policy citations and is **binding on this design**; where the two disagree, AGENDA
-wins and this document is wrong. `HANDOFF_SIGNATURE_PORTAL.md` is the brief for whoever builds it.
+wins and this document is wrong. `archive/HANDOFF_SIGNATURE_PORTAL.md` is the brief for whoever builds it.
 
 Scope decided with Josh on 2026-09-05: all six `AnnualDocumentKind` values, a separate
 `Sati.Portal` application, one signer per request.
