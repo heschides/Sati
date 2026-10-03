@@ -2,7 +2,8 @@
 
 **For:** Codex, or any implementer starting without prior context.
 **Written:** 2026-10-03, against release 1.3.34 (`master` @ `9d2d06a`).
-**Status:** scoped and verified against the code. Nothing here is implemented yet.
+**Status:** scoped and verified against the code; operating decisions D1–D4 made (§4). Nothing
+here is implemented yet.
 
 Read `AGENTS.md` (or `CLAUDE.md`) first, then `ARCHITECTURE.md`, `DECISIONS.md`, and the
 release 1.3.34 section at the top of `AGENDA.md`. This brief is a map with file references, not a
@@ -52,6 +53,14 @@ These are facts about the current deployment. Design around them; do not change 
    `DECISIONS.md`. Don't invent a fake user row.
 5. **Agency time:** use `ApiClock` / `TenantClock`, never `DateTime.Now`. The banned-symbol list
    is `architecture/BannedSymbols.ServerClock.txt`.
+6. **The Demo database is serverless on a free monthly allowance** (`GP_S_Gen5_2`, 0.5 minimum
+   vCore, auto-pause when the allowance is exhausted; `DATABASE_ENVIRONMENTS.md`). Anything that
+   queries SQL every few minutes around the clock keeps the database from pausing and spends that
+   allowance. Once it runs out, Demo pauses for the rest of the month. **Nothing in this brief may
+   poll SQL on a short fixed interval while nobody is using Demo.**
+7. **The Function App already reports to Application Insights.** The 1.3.33 release notes
+   (`AGENDA.md`) record the reset's `DEMO_COMPLIANCE_HISTORY_COMPLETE` marker arriving there. Its
+   managed identity can already read `dbo` and its own storage queues.
 
 ## 3. The common worker pattern
 
@@ -61,9 +70,9 @@ Every server worker in this brief must:
   local service;
 - be idempotent and safe to run twice or concurrently: take an `sp_getapplock` per job, and leave
   scale-out to the database lock, not the host;
-- catch up on wake (constraint 1), and record each run that changes data as **one summary audit
-  event** per agency (counts and ids, no narratives). The last such event is the run ledger: no
-  new table is needed for "when did this last run";
+- catch up on wake (constraint 1) without polling SQL while idle (constraint 6). Record each
+  run that changes data as **one summary audit event** per agency (counts and ids, no
+  narratives), using the system actor from D3;
 - work in bounded batches with a cancellation token, and stop at the batch limit;
 - respect optimistic concurrency: increment `Revision`, and never overwrite a row whose revision
   changed since it was read;
@@ -73,14 +82,18 @@ Every server worker in this brief must:
 - take its clock from `TimeProvider`/`ApiClock` so tests can drive it;
 - have tests that **fail against the code before the change** (an `AGENTS.md` rule).
 
-## 4. Decisions Josh must make — ask before building the affected item
+## 4. Decisions (made 2026-10-03)
 
-| # | Decision | Affects | Recommended default |
+Josh deferred these to the reviewer's recommendation. They are recorded in `DECISIONS.md`
+(2026-10-03, "Background worker operating decisions"). Build to them; raise a concern with Josh
+rather than silently departing from one.
+
+| # | Decision | Affects | Outcome |
 |---|---|---|---|
-| D1 | Where alerts go (who gets paged, by what channel) | W1, W4 | Application Insights availability test on `/health/operations`, with an action group that emails Josh. Check current pricing first. |
-| D2 | Whether a wake ping is acceptable on F1 (a timer that requests `/health/live`) | W1, W2 | A ping from the existing Function App every 30–60 minutes, bounded against the CPU quota. |
-| D3 | How system-initiated audit events identify their actor | W2, W3 | Follow the `0` precedent behind a named constant, and document it in `AUDIT_EVENTS.md`. |
-| D4 | Approval to create Azure resources, roles, or app settings | W1, W4, W6 | Codex writes the script and code. Josh runs or approves anything that touches Azure. |
+| D1 | Where alerts go | W1, W4 | **Email to Josh through an Azure Monitor action group**, driven by log-search alert rules on the Function App's **existing** Application Insights (constraint 7). No new monitoring resource and no SMS or paging service. Two rules: a watchdog finding was logged; and **no** watchdog result at all in 26 hours, which catches a watchdog that itself stopped running. Codex confirms current alert-rule and email pricing in the script's header before Josh runs it. |
+| D2 | Wake ping | W1, W2 | **No wake ping.** A ping that keeps F1 awake buys little, and one that touches SQL breaks constraint 6. Detection runs once a day in the Function App, after the nightly reset, when the database is awake anyway. API workers catch up whenever someone uses Demo. A day's delay in Demo is acceptable. Cloud Production will run on a tier with Always On, so revisit this then rather than engineering around F1. |
+| D3 | System actor in audit events | W2, W4 | **`ActorUserId` 0 behind one named constant** in Contracts (for example `SystemActor.UserId`), matching the reset's existing precedent. `MetadataJson` carries `"actorKind":"system"` and the job name. `AgencyId` is the affected agency. The Admin activity feed must show it as an automatic action, not a person; verify how it renders the reset's existing actor-0 rows and reuse that. Document it in `AUDIT_EVENTS.md`. |
+| D4 | Azure changes | W1, W6 | **Codex writes code and idempotent scripts with a `-WhatIf` mode; Josh runs anything that touches Azure.** Under the D1/D2 design, W1 needs **no new role assignment**: the watchdog uses the Function App's existing SQL identity and storage connection. The only Azure change is the action group plus two alert rules. W6 rehearsal waits for a separate go-ahead. |
 
 ---
 
@@ -95,30 +108,46 @@ and alerts" lists alert routing as pre-pilot work. The reset writes its own outc
 crash leaves nothing behind. Detection has to look for a **missing** outcome.
 
 **Build:**
-1. An `OperationsWatchdog` rule owner in Contracts. It takes facts (last nightly outcome time,
-   poison count, worker heartbeats, the expected schedule) and returns a list of named, PHI-free
-   conditions with a severity.
-2. An API health check (`OperationsWatchdogHealthCheck`) exposed on a **separate** route,
-   `/health/operations`, not `/health/ready`. A watchdog finding must not make the API look
-   unready. The anonymous response is a status word only; detail goes behind Admin
-   (`/admin/operations`, `ApiEndpoints.cs:391`, extended in `AdminOperationsDto`).
-3. Conditions to start with:
-   - no `demo.reset.completed` or `demo.reset.failed` audit since the most recent scheduled run
-     plus a grace period (e.g. 45 minutes after 03:15 Eastern);
+1. A new timer function, `DemoWatchdog`, in `Sati.DemoRefresh/`. Run it once a day at 04:00
+   Eastern, 45 minutes after the nightly reset (its own app setting, like
+   `DemoRefreshSchedule`). It reuses `Get-DemoSqlToken`/`New-DemoConnection` from
+   `Shared/DemoReset.ps1`; split those into a shared helper if that keeps the reset script
+   unchanged in behavior. Keep it separate from the reset functions so a reset that hangs
+   doesn't stop the watchdog.
+2. It checks, read-only:
+   - no `demo.reset.completed` or `demo.reset.failed` audit since today's scheduled run;
    - the latest outcome is `demo.reset.failed`;
-   - poison-queue count above zero. This needs read access to the Function App's storage queue:
-     a new least-privilege role assignment (**D4**). If D4 is not granted, ship the audit-based
-     conditions and leave this one documented as pending;
-   - a registered API worker (W2, W4) has not reported a heartbeat within twice its interval.
-4. A provisioning script for the alert (**D1**). Josh runs it; the code path must not create
-   Azure resources.
+   - `demo-reset-requests-poison` holds messages. Read the approximate count through the app's
+     existing `AzureWebJobsStorage` connection. Never read message bodies into logs, and never
+     dequeue or delete;
+   - W2 outcome check: Pending notes older than their agency's window plus two days. If any
+     exist, the sweep is not running. This checks the outcome, so no worker heartbeat table is
+     needed;
+   - W4 conditions, once those features are activated (below).
+3. It writes exactly one trace per run: `SATI_WATCHDOG_OK`, or `SATI_WATCHDOG_FINDING` followed
+   by the condition names. Use names and counts only. No request ids beyond the reset's own GUID,
+   no people, and no queue payloads.
+4. `scripts/Set-DemoWatchdogAlerts.ps1`, run by Josh (D4), with `-WhatIf`. It creates or updates
+   the action group (email to Josh) and the two log-search alert rules from D1 on the Function
+   App's Application Insights. It must be idempotent and must not touch firewall rules or any
+   other resource.
+5. Optional, and only if cheap: show the latest `demo.reset.*` outcome prominently on the Admin
+   operations panel (`/admin/operations`, `ApiEndpoints.cs:391`). That data is already in
+   `AuditEvents`. Don't build a second watchdog evaluator in the API.
+
+The Function App's publication is not part of this brief. 1.3.34 deliberately did not republish
+it, and the next publication must carry the updated seed source (`AGENDA.md`, release 1.3.34).
+Codex prepares the change; Josh publishes it through the normal release path.
 
 **Never** replay a poison message or start a reset automatically. Alert a person.
 
-**Accept when:** a test clock past the grace period with no outcome audit turns
-`/health/operations` Unhealthy, and the Admin detail names the condition. A failed outcome does
-the same. A completed outcome clears it. The anonymous route leaks no detail.
-`OPERATIONS.md` names the alert owner and acknowledgement expectation.
+**Accept when:** script-level tests show that a missing outcome, a failed outcome, and a nonempty poison queue each produce
+`SATI_WATCHDOG_FINDING` with the right condition name, and a clean state produces
+`SATI_WATCHDOG_OK`. Follow the existing pattern: `scripts/Test-DemoResetRuntime.ps1` runs the
+real orchestrator against in-process fakes, driven by `Sati.Tests/DemoResetRuntimeTests.cs`. Each
+check is confirmed failing before its fix. `OPERATIONS.md` names Josh as
+the alert owner, says that an alert means "investigate and recover manually," and links the
+1.3.34 recovery as the worked example.
 
 ### W2 — Overdue-note abandonment sweep *(Significant)*
 
@@ -137,8 +166,8 @@ item. The rule has also drifted: the local service checks `NoteWorkflow.CanSyste
    shared-case test that runs both implementations against the same inputs.
 2. An API `NoteAbandonmentWorker`. Once per agency-local day, per agency, it applies the rule
    using that agency's `AbandonedAfterDays`. It writes one summary audit event per agency
-   (`note.abandoned-by-system` or similar; count plus note ids). Add the action to
-   `AUDIT_EVENTS.md`.
+   (`note.abandoned-by-system` or similar; count plus note ids) with the D3 system actor. Add
+   the action to `AUDIT_EVENTS.md`.
 3. Replace `ExecuteUpdateAsync` with a revision-checked update, so a note saved between read and
    write is skipped and picked up on the next run.
 4. Keep `POST /notes/abandon-overdue` for the desktop's existing trigger, but route it through the
@@ -183,17 +212,20 @@ against the current code. (This repeats a suggested task already queued; do it o
 signed copies and failed notifications. Uncertain clearinghouse uploads need reconciliation, not
 resubmission.
 
-**Build:** watchdog conditions fed into W1's `OperationsWatchdog`:
-- dispatches stuck in a non-final state beyond a threshold;
+**Build:** read-only conditions added to W1's daily `DemoWatchdog`, each one checking the
+feature's own state tables for rows stuck past a threshold:
+- dispatches in a non-final state;
 - uploads whose outcome is uncertain;
-- signed requests with no prepared package after a threshold;
+- signed requests with no prepared package;
 - notifications that exhausted retries.
 
-Each worker reports a heartbeat. **Never** resubmit an uncertain upload or resend a notification
-automatically. Surface it for an operator.
+Each condition runs only when its feature is enabled for some agency. Confirm the Function's
+`SELECT` grant covers those tables, and list any missing grant for Josh rather than widening it
+yourself. **Never** resubmit an uncertain upload or resend a notification automatically. Surface
+it for an operator.
 
-**Accept when:** each condition can be produced in a test and appears on `/health/operations` and
-in the Admin detail. A disabled feature produces no condition.
+**Accept when:** each condition can be produced in a test and yields `SATI_WATCHDOG_FINDING`
+with its name. A disabled feature produces no condition.
 
 ### W5 — Desktop day-change refresh *(Trivial; client-side, so both environments get it)*
 
@@ -263,7 +295,8 @@ A schema change needs Josh's approval and the controlled migration process in
 
 - Code, fail-first tests, and a green full solution test run.
 - `ARCHITECTURE.md`: the new rule owners and workers, and where each runs.
-- `DECISIONS.md`: D1–D4 outcomes, the system-actor choice, and the abandoned-envelope policy.
+- `DECISIONS.md`: anything that departs from D1–D4, the system-actor constant's final name, and the
+  abandoned-envelope policy.
 - `AUDIT_EVENTS.md`: every new action. `API_AUTHORIZATION.md`: any new or rescoped route.
 - `OPERATIONS.md`: the alert owner, the conditions, and the operator response for each.
 - `AGENDA.md`: anything deferred, with the reason.
