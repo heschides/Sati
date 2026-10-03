@@ -92,8 +92,12 @@ this release.
       `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`.
       Final published installer hashes match the accepted artifacts; checksum
       files match too.
-- [ ] Push final evidence commit and verify local/remote equality and a clean
-      working tree. Record both commit identifiers and any retained branches.
+- [x] Evidence commit `2c09b42596c629a34df5ab5625cb5ab68040f702` was
+      pushed to `origin/master`. No branches were merged or deleted. The clean,
+      detached 1.3.31 worktree at
+      `C:\Users\Joshu\.codex\worktrees\sati-release-1-3-31\Sati` was retained.
+      The final ledger update closed with local/remote equality and a clean
+      working tree.
 
 Deferred after publication: investigate the reset host interruption that left
 the first verification request in the poison queue, without replaying any
