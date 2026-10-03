@@ -747,6 +747,35 @@ public sealed class ReleaseUiStructureTests
     }
 
     [Fact]
+    public void EveryThemeSuppliesItsOwnInputBrushes()
+    {
+        var required = new[]
+        {
+            "InputSurfaceBrush", "InputTextBrush", "InputMutedTextBrush", "InputHoverBrush",
+            "InputPressedBrush", "InputSelectionBrush", "InputSelectionTextBrush"
+        };
+
+        foreach (var theme in Directory.GetFiles(Path.Combine(Root, "Themes"), "*.xaml"))
+        {
+            if (Path.GetFileName(theme).Equals("States.xaml", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var supplied = ResourceKeys(theme);
+            foreach (var key in required)
+                Assert.True(supplied.Contains(key), $"{Path.GetFileName(theme)} is missing {key}.");
+        }
+
+        // A brush in States.xaml whose Color is a DynamicResource resolves once, against
+        // whichever theme is active first, and keeps that color after every later theme
+        // swap. Theme-derived brushes therefore belong in the theme, not here.
+        var statesPath = Path.Combine(Root, "Themes", "States.xaml");
+        var states = ResourceKeys(statesPath);
+        foreach (var key in required)
+            Assert.DoesNotContain(key, states);
+        Assert.DoesNotContain("Color=\"{DynamicResource", File.ReadAllText(statesPath));
+    }
+
+    [Fact]
     public void EveryThemeSuppliesTheButtonFillTokensThePrimaryButtonBindsTo()
     {
         var required = new[]

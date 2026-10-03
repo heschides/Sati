@@ -31,4 +31,15 @@
     <SolidColorBrush x:Key="OpenedFormBrush" Color="#FFB36B"/><SolidColorBrush x:Key="OpenedFormFillBrush" Color="#493522"/>
     <SolidColorBrush x:Key="MatrixGoodBrush" Color="#2D4933"/><SolidColorBrush x:Key="MatrixWatchBrush" Color="#514622"/><SolidColorBrush x:Key="MatrixConcernBrush" Color="#563B28"/><SolidColorBrush x:Key="MatrixUrgentBrush" Color="#533034"/><SolidColorBrush x:Key="MatrixEmptyBrush" Color="#343B43"/>
     <Color x:Key="MatrixGoodColor">#FF2D4933</Color><Color x:Key="MatrixWatchColor">#FF514622</Color><Color x:Key="MatrixUrgentColor">#FF533034</Color><Color x:Key="MatrixEmptyColor">#FF343B43</Color>
+
+    <!-- Form-control pair, resolved from this theme's own colors when it loads. A
+         DynamicResource inside an application-level brush resolves once and never
+         follows a theme swap, so these cannot live in States.xaml. -->
+    <SolidColorBrush x:Key="InputSurfaceBrush" Color="{StaticResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputTextBrush" Color="{StaticResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputMutedTextBrush" Color="{StaticResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputHoverBrush" Color="{StaticResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputPressedBrush" Color="{StaticResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputSelectionBrush" Color="{StaticResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputSelectionTextBrush" Color="{StaticResource SurfaceRaisedColor}" />
 </ResourceDictionary>

@@ -124,4 +124,15 @@
     <Color x:Key="SurfaceRaisedColor">#FFFFFDF5</Color>
     <Color x:Key="TextSubtleColor">#FF59483A</Color>
     <SolidColorBrush x:Key="PatternScrimBrush" Color="#EBFFF9EC" />
+
+    <!-- Form-control pair, resolved from this theme's own colors when it loads. A
+         DynamicResource inside an application-level brush resolves once and never
+         follows a theme swap, so these cannot live in States.xaml. -->
+    <SolidColorBrush x:Key="InputSurfaceBrush" Color="{StaticResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputTextBrush" Color="{StaticResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputMutedTextBrush" Color="{StaticResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputHoverBrush" Color="{StaticResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputPressedBrush" Color="{StaticResource SurfaceRaisedColor}" />
+    <SolidColorBrush x:Key="InputSelectionBrush" Color="{StaticResource TextSubtleColor}" />
+    <SolidColorBrush x:Key="InputSelectionTextBrush" Color="{StaticResource SurfaceRaisedColor}" />
 </ResourceDictionary>

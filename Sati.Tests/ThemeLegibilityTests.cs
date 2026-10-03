@@ -482,17 +482,19 @@ public sealed class ThemeLegibilityTests
             dictionaries[index] = themeDictionary;
             Settle();
 
-            // States.xaml's fallback input brushes take the theme's color through
-            // DynamicResource. If one still carries the previous theme, every view
-            // reports a contrast failure that is really a stale resource, so say so.
-            if (!themeDictionary.Contains("InputMutedTextBrush") &&
-                themeDictionary["TextSubtleColor"] is Color expected &&
-                Application.Current.FindResource("InputMutedTextBrush") is SolidColorBrush muted &&
-                muted.Color != expected)
+            // Input ink and surfaces must come from the theme just applied. When they were
+            // derived in States.xaml they kept the first theme's colors, and every view then
+            // reported a contrast failure that was really a stale resource. Say so directly.
+            foreach (var key in new[] { "InputSurfaceBrush", "InputTextBrush", "InputMutedTextBrush" })
             {
-                throw new InvalidOperationException(
-                    $"After switching to {theme}, InputMutedTextBrush is {muted.Color} rather than " +
-                    $"the theme's TextSubtleColor {expected}; a previous theme's resource is still applied.");
+                var resolved = Application.Current.FindResource(key) as SolidColorBrush;
+                var own = themeDictionary.Contains(key) ? themeDictionary[key] as SolidColorBrush : null;
+                if (own is null || resolved is null || resolved.Color != own.Color)
+                {
+                    throw new InvalidOperationException(
+                        $"After switching to {theme}, {key} resolves to {resolved?.Color.ToString() ?? "nothing"} " +
+                        $"rather than the theme's own {own?.Color.ToString() ?? "(undefined)"}.");
+                }
             }
 
             return swap;
