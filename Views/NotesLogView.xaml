@@ -4,10 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:helpers="clr-namespace:Sati.Helpers"
+             xmlns:converters="clr-namespace:Sati.Converters"
              mc:Ignorable="d">
 
     <UserControl.Resources>
         <helpers:BindingProxy x:Key="LayoutProxy" Data="{Binding}" />
+        <converters:SingleLineNotePreviewConverter x:Key="SingleLineNotePreviewConverter" />
     </UserControl.Resources>
 
     <!-- Escape returns the note panel to a blank New Note and drops the grid's
@@ -160,11 +162,13 @@
                         <TextBlock Text="DATE RANGE"
                                    Style="{StaticResource LabelStyle}" />
                         <StackPanel Orientation="Horizontal">
-                            <DatePicker Width="128"
+                            <DatePicker Width="160"
+                                        SelectedDateFormat="Short"
                                         SelectedDate="{Binding RangeStart, Mode=TwoWay}"
                                         AutomationProperties.Name="Range start date" />
-                            <DatePicker Width="128"
-                                        Margin="6,0,0,0"
+                            <DatePicker Width="160"
+                                        SelectedDateFormat="Short"
+                                        Margin="8,0,0,0"
                                         SelectedDate="{Binding RangeEnd, Mode=TwoWay}"
                                         AutomationProperties.Name="Range end date" />
                         </StackPanel>
@@ -366,6 +370,7 @@
                       GridLinesVisibility="Horizontal"
                       HorizontalGridLinesBrush="{DynamicResource DividerBrush}"
                       HeadersVisibility="Column"
+                      RowHeight="32"
                       SelectionMode="Single">
                 <DataGrid.ContextMenu>
                     <ContextMenu>
@@ -391,9 +396,19 @@
                                         Binding="{Binding Units}"
                                         Width="50" />
                     <DataGridTextColumn Header="Narrative"
-                                        Binding="{Binding Narrative}"
+                                        Binding="{Binding Narrative, Converter={StaticResource SingleLineNotePreviewConverter}}"
                                         Visibility="{Binding Data.ShowNarrativeColumn, Source={StaticResource LayoutProxy}, Converter={StaticResource BoolToVisibilityConverter}}"
-                                        Width="*" />
+                                        Width="*">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="TextWrapping" Value="NoWrap" />
+                                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                                <Setter Property="ToolTip" Value="{Binding Narrative}" />
+                                <Setter Property="AutomationProperties.HelpText" Value="{Binding Narrative}" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
                 </DataGrid.Columns>
             </DataGrid>
         </Border>

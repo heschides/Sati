@@ -12,6 +12,7 @@
 
     <UserControl.Resources>
         <helpers:BindingProxy x:Key="LayoutProxy" Data="{Binding}" />
+        <converters:SingleLineNotePreviewConverter x:Key="SingleLineNotePreviewConverter" />
         <!-- Client roster type. The new layout preview raises the smallest text to a
              comfortable reading size; the standard layout keeps its original sizes. -->
         <Style x:Key="RosterNameText" TargetType="TextBlock">
@@ -2573,6 +2574,7 @@
                                       ItemsSource="{Binding SelectedPersonNotes}"
                                       AutoGenerateColumns="False"
                                       IsReadOnly="True"
+                                      RowHeight="32"
                                       Background="Transparent"
                                       BorderThickness="0"
                                       RowBackground="{DynamicResource SurfaceBrush}"
@@ -2587,9 +2589,19 @@
                                                         Binding="{Binding Status}"
                                                         Width="80" />
                                     <DataGridTextColumn Header="Narrative"
-                                        Binding="{Binding Narrative}"
+                                        Binding="{Binding Narrative, Converter={StaticResource SingleLineNotePreviewConverter}}"
                                         Visibility="{Binding Data.ShowNarrativeColumn, Source={StaticResource LayoutProxy}, Converter={StaticResource BoolToVisibilityConverter}}"
-                                        Width="*" />
+                                        Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="TextWrapping" Value="NoWrap" />
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                                <Setter Property="VerticalAlignment" Value="Center" />
+                                                <Setter Property="ToolTip" Value="{Binding Narrative}" />
+                                                <Setter Property="AutomationProperties.HelpText" Value="{Binding Narrative}" />
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>
@@ -2625,6 +2637,108 @@
                     </Grid>
                             </Grid>
                             </DockPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem Header="Notes"
+                                 Style="{StaticResource ClientWorkspaceTabItemStyle}"
+                                 AutomationProperties.Name="Consumer notes">
+                            <ScrollViewer x:Name="ConsumerNotesScroller"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          AutomationProperties.Name="Consumer notes workspace">
+                            <Border Padding="16"
+                                    MinWidth="724"
+                                    Width="{Binding ElementName=ConsumerNotesScroller, Path=ViewportWidth}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="5*" MinWidth="340" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="7*" MinWidth="340" />
+                                </Grid.ColumnDefinitions>
+
+                                <ContentControl Grid.Column="0"
+                                                Content="{Binding ClientNoteEntry}"
+                                                AutomationProperties.Name="Note editor for selected consumer" />
+
+                                <DockPanel Grid.Column="2"
+                                           LastChildFill="True">
+                                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                                        <TextBlock Text="CASE NOTES"
+                                                   Style="{StaticResource SectionHeader}" />
+                                        <TextBlock Text="Select a note to read it. Use Edit selected note, Enter, or double-click to change it."
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Margin="0,0,0,8" />
+                                        <TextBlock Text="{Binding ClientNoteLoadError}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource DangerStrongBrush}"
+                                                   AutomationProperties.LiveSetting="Assertive"
+                                                   Visibility="{Binding HasClientNoteLoadError, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                   Margin="0,0,0,8" />
+                                        <Button Content="Edit selected note"
+                                                Command="{Binding EditSelectedClientNoteCommand}"
+                                                HorizontalAlignment="Left"
+                                                Padding="12,6"
+                                                AutomationProperties.Name="Edit selected consumer note" />
+                                    </StackPanel>
+
+                                    <Border Background="{DynamicResource SurfaceBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6">
+                                        <DataGrid ItemsSource="{Binding SelectedPersonNotes}"
+                                                  SelectedItem="{Binding SelectedClientNote, Mode=TwoWay}"
+                                                  MouseDoubleClick="ClientNoteList_MouseDoubleClick"
+                                                  AutomationProperties.Name="Notes for selected consumer"
+                                                  AutomationProperties.HelpText="Select a note to read it. Press Enter or use Edit selected note to edit it."
+                                                  AutoGenerateColumns="False"
+                                                  IsReadOnly="True"
+                                                  SelectionMode="Single"
+                                                  HeadersVisibility="Column"
+                                                  RowHeight="32"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  RowBackground="{DynamicResource SurfaceBrush}"
+                                                  AlternatingRowBackground="{DynamicResource WindowBackgroundBrush}"
+                                                  GridLinesVisibility="Horizontal"
+                                                  HorizontalGridLinesBrush="{DynamicResource DividerBrush}">
+                                            <DataGrid.InputBindings>
+                                                <KeyBinding Key="Enter" Command="{Binding EditSelectedClientNoteCommand}" />
+                                            </DataGrid.InputBindings>
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Date"
+                                                                    Binding="{Binding EventDate, StringFormat={}{0:MM/dd/yyyy}}"
+                                                                    Width="90" />
+                                                <DataGridTextColumn Header="Status"
+                                                                    Binding="{Binding Status}"
+                                                                    Width="84" />
+                                                <DataGridTextColumn Header="Type"
+                                                                    Binding="{Binding ActivityLabel}"
+                                                                    Width="120" />
+                                                <DataGridTextColumn Header="Units"
+                                                                    Binding="{Binding Units}"
+                                                                    Width="55" />
+                                                <DataGridTextColumn Header="Narrative"
+                                                                    Binding="{Binding Narrative, Converter={StaticResource SingleLineNotePreviewConverter}}"
+                                                                    Visibility="{Binding Data.ShowNarrativeColumn, Source={StaticResource LayoutProxy}, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                    Width="*">
+                                                    <DataGridTextColumn.ElementStyle>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="TextWrapping" Value="NoWrap" />
+                                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                                            <Setter Property="VerticalAlignment" Value="Center" />
+                                                            <Setter Property="ToolTip" Value="{Binding Narrative}" />
+                                                            <Setter Property="AutomationProperties.HelpText" Value="{Binding Narrative}" />
+                                                        </Style>
+                                                    </DataGridTextColumn.ElementStyle>
+                                                </DataGridTextColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Border>
+                                </DockPanel>
+                            </Grid>
+                            </Border>
                             </ScrollViewer>
                         </TabItem>
 

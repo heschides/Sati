@@ -1,4 +1,5 @@
 using Sati.Contracts.V1;
+using Sati.Models;
 using Sati.Services;
 
 namespace Sati.ViewModels.Children;
@@ -11,12 +12,15 @@ public sealed class CalendarDay
     public bool IsWeekend { get; init; }
     public bool IsToday => Date.Date == DateTime.Today;
     public List<CalendarNoteItem> Notes { get; init; } = [];
+    public List<ScheduledNoteMoveDto> RescheduledMoves { get; init; } = [];
     public List<ImportedOutlookEvent> OutlookEvents { get; init; } = [];
     public int NoteCount => Notes.Count;
     // Historical productivity thumbnails use a narrative-free daily report.
     public string? ThumbnailAccessibleLabel { get; init; }
     public string ProductivityThumbnailLabel => ThumbnailAccessibleLabel ?? AccessibleLabel;
     public bool HasNotes => NoteCount > 0;
+    public bool HasRescheduledMoves => RescheduledMoves.Count > 0;
+    public int RescheduledUnits => RescheduledMoves.Sum(move => move.ScheduledUnits ?? 0);
     public int OutlookEventCount => OutlookEvents.Count;
     public bool HasOutlookEvents => OutlookEventCount > 0;
 
@@ -49,16 +53,36 @@ public sealed class CalendarDay
         _ => $"Count {Date:MMMM d} in the daily average"
     };
 
-    public int TotalUnits => Notes.Sum(note => note.Units ?? 0);
+    public int TotalUnits => Notes.Where(note => note.CountsTowardDayTotal)
+        .Sum(note => note.Units ?? 0);
     public bool HasUnits => TotalUnits > 0;
+    public bool HasStatusUnits => Notes.Any(note => note.Units is > 0) || RescheduledUnits > 0;
     public string UnitsLabel => TotalUnits == 1 ? "1 unit" : $"{TotalUnits} units";
 
     /// <summary>Units per note status, in status order: "Pending 2 · Logged 4".</summary>
-    public string UnitsByStatusLabel => string.Join(" · ", Notes
-        .Where(note => note.Units is > 0)
-        .GroupBy(note => (note.StatusOrder, note.StatusLabel))
-        .OrderBy(group => group.Key.StatusOrder)
-        .Select(group => $"{group.Key.StatusLabel} {group.Sum(note => note.Units ?? 0)}"));
+    public string UnitsByStatusLabel
+    {
+        get
+        {
+            var rows = Notes.Where(note => note.Units is > 0)
+                .GroupBy(note => (note.StatusOrder, note.StatusLabel))
+                .Select(group => (group.Key.StatusOrder, group.Key.StatusLabel,
+                    Units: group.Sum(note => note.Units ?? 0)))
+                .ToList();
+            if (RescheduledUnits > 0)
+            {
+                var existing = rows.FindIndex(row => row.StatusLabel == "Rescheduled");
+                if (existing >= 0)
+                    rows[existing] = (rows[existing].StatusOrder, "Rescheduled",
+                        rows[existing].Units + RescheduledUnits);
+                else
+                    rows.Add(((int)NoteStatus.Scheduled, "Rescheduled", RescheduledUnits));
+            }
+
+            return string.Join(" · ", rows.OrderBy(row => row.StatusOrder)
+                .Select(row => $"{row.StatusLabel} {row.Units}"));
+        }
+    }
 
     /// <summary>The words that carry what the fill colour shows.</summary>
     public string ProductivityLabel => ProductivityKind switch
@@ -79,7 +103,12 @@ public sealed class CalendarDay
         get
         {
             var noteText = NoteCount == 1 ? "1 note" : $"{NoteCount} notes";
-            var unitText = HasUnits ? $", {UnitsLabel} ({UnitsByStatusLabel})" : string.Empty;
+            var unitText = HasStatusUnits
+                ? $", {UnitsLabel} in daily total ({UnitsByStatusLabel})"
+                : string.Empty;
+            var rescheduledText = HasRescheduledMoves
+                ? $", {RescheduledMoves.Count} rescheduled {(RescheduledMoves.Count == 1 ? "item" : "items")}"
+                : string.Empty;
             var outlookText = OutlookEventCount == 1
                 ? ", 1 Outlook event"
                 : OutlookEventCount > 1
@@ -100,7 +129,7 @@ public sealed class CalendarDay
                     ", marked finished with no billable work, counted in the daily average as zero",
                 _ => string.Empty
             };
-            return $"{Date:dddd, MMMM d, yyyy}, {noteText}{unitText}{outlookText}{exemptText}{productivityText}";
+            return $"{Date:dddd, MMMM d, yyyy}, {noteText}{unitText}{rescheduledText}{outlookText}{exemptText}{productivityText}";
         }
     }
 }

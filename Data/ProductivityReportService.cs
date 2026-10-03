@@ -28,6 +28,7 @@ public sealed class ProductivityReportService(
         var rows = await context.Notes.AsNoTracking()
             .Where(note => note.Person.UserId == actor.Id &&
                            note.Person.AgencyId == actor.AgencyId &&
+                           note.Person.Status != PersonStatus.Ghost &&
                            note.AgencyId == actor.AgencyId &&
                            note.EventDate.HasValue &&
                            note.EventDate.Value >= start && note.EventDate.Value < end &&
@@ -64,6 +65,7 @@ public sealed class ProductivityReportService(
             .AsNoTracking()
             .Where(note => note.Person.UserId == actor.Id &&
                            note.Person.AgencyId == actor.AgencyId &&
+                           note.Person.Status != PersonStatus.Ghost &&
                            note.AgencyId == actor.AgencyId &&
                            note.EventDate.HasValue &&
                            note.EventDate.Value >= start &&

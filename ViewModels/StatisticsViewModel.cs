@@ -4,10 +4,12 @@ using CommunityToolkit.Mvvm.Input;
 using OxyPlot.Axes;
 using OxyPlot.Series;
 using Sati.Data;
+using Sati.Contracts.V1;
 using Sati.Helpers;
 using Sati.Models;
 using Sati.Services;
 using System.Collections.ObjectModel;
+using System.Globalization;
 
 namespace Sati.ViewModels
 {
@@ -18,8 +20,13 @@ namespace Sati.ViewModels
         int Units,
         int? Threshold,
         decimal? AttainmentPercent,
-        decimal? Incentive,
-        string StatusLevel);
+        decimal? Incentive);
+
+    public sealed record StatisticsPeriodChoice(StatisticsPeriod Value, string Label);
+    public sealed record StatisticsConsumerChoice(int? PersonId, string Label);
+    public sealed record StatisticsMetricChoice(string Key, string Label);
+    public sealed record StatisticsPeriodDisplayRow(string Period, StatisticsMetrics Metrics);
+    public sealed record StatisticsFocusRow(string Period, string Value);
 
     public partial class StatisticsViewModel : ObservableObject
     {
@@ -28,7 +35,9 @@ namespace Sati.ViewModels
         private readonly IIncentiveService _incentiveService;
         private readonly IExemptDateService _exemptDateService;
         private readonly IConsumerBillingLossReportService _billingLossReportService;
+        private readonly IStatisticsBreakdownService _statisticsBreakdownService;
         private readonly LatestRequestTracker _loadRequests = new();
+        private int? _consumerChoicesUserId;
 
         public StatisticsViewModel(
             ISessionService sessionService,
@@ -36,6 +45,7 @@ namespace Sati.ViewModels
             IIncentiveService incentiveService,
             IExemptDateService exemptDateService,
             IConsumerBillingLossReportService billingLossReportService,
+            IStatisticsBreakdownService statisticsBreakdownService,
             ThemeService themeService)
         {
             _sessionService = sessionService;
@@ -43,22 +53,66 @@ namespace Sati.ViewModels
             _incentiveService = incentiveService;
             _exemptDateService = exemptDateService;
             _billingLossReportService = billingLossReportService;
+            _statisticsBreakdownService = statisticsBreakdownService;
+            SelectedPeriodChoice = PeriodChoices[1];
+            SelectedConsumerChoice = ConsumerChoices[0];
+            SelectedMetricChoice = MetricChoices[0];
             themeService.ThemeChanged += (_, _) =>
             {
-                if (Months.Count > 0)
-                    UnitsChartModel = BuildUnitsChart(Months);
+                if (HasBreakdownReport)
+                    UnitsChartModel = BuildUnitsChart(BreakdownPeriods);
             };
         }
 
         public ObservableCollection<ProductivityMonth> Months { get; } = [];
         public ObservableCollection<ConsumerBillingLossRow> ConsumerBillingRows { get; } = [];
+        public ObservableCollection<StatisticsPeriodDisplayRow> BreakdownPeriods { get; } = [];
+        public ObservableCollection<StatisticsClientRow> BreakdownClients { get; } = [];
+        public ObservableCollection<StatisticsFocusRow> FocusRows { get; } = [];
+        public ObservableCollection<StatisticsConsumerChoice> ConsumerChoices { get; } =
+            [new(null, "All consumers")];
+
+        public IReadOnlyList<StatisticsPeriodChoice> PeriodChoices { get; } =
+        [
+            new(StatisticsPeriod.Week, "Week"),
+            new(StatisticsPeriod.Month, "Month"),
+            new(StatisticsPeriod.Quarter, "Quarter"),
+            new(StatisticsPeriod.Year, "Year")
+        ];
+
+        public IReadOnlyList<StatisticsMetricChoice> MetricChoices { get; } =
+        [
+            new("documented", "Documented units"),
+            new("billable-marked", "Documented units marked billable"),
+            new("nonbillable", "Intentionally unbilled documented units"),
+            new("pending", "Pending units"),
+            new("blocked", "Compliance blocked units"),
+            new("form", "Form work units"),
+            new("visit", "Visit work units"),
+            new("claimed", "Original payer-transmitted claim units"),
+            new("claimed-form", "Payer-transmitted units on Form notes"),
+            new("claimed-visit", "Payer-transmitted units on Visit notes"),
+            new("locked", "Claim units locked for billing"),
+            new("days", "Documented service days"),
+            new("billable-days", "Service dates with billable-marked documentation"),
+            new("nonbillable-days", "Service dates with intentionally unbilled documentation"),
+            new("expired", "Service dates with expired pending work"),
+            new("abandoned", "Service dates with abandoned work"),
+            new("notes", "Documented notes"),
+            new("forms-count", "Documented notes marked Form"),
+            new("visits-count", "Documented notes marked Visit"),
+            new("claims-count", "Original payer-transmitted claim lines"),
+            new("locked-count", "Claim lines locked for billing")
+        ];
 
         [ObservableProperty] private PlotModel? unitsChartModel;
         [ObservableProperty] private string windowLabel = string.Empty;
         [ObservableProperty] private int totalUnits;
         [ObservableProperty] private decimal? totalIncentive;
         [ObservableProperty] private bool hasData;
+        [ObservableProperty] private bool showProductivityEmpty;
         [ObservableProperty] private bool hasConsumerBillingRows;
+        [ObservableProperty] private bool showConsumerBillingEmpty;
         [ObservableProperty] private int totalBillableWorkUnits;
         [ObservableProperty] private int totalNonBillableWorkUnits;
         [ObservableProperty] private string totalLostWorkPercentageLabel = "—";
@@ -69,31 +123,70 @@ namespace Sati.ViewModels
         [ObservableProperty] private bool isLoading;
         [ObservableProperty] private bool hasLoadError;
         [ObservableProperty] private string loadErrorMessage = string.Empty;
+        [ObservableProperty] private StatisticsPeriodChoice selectedPeriodChoice =
+            new(StatisticsPeriod.Month, "Month");
+        [ObservableProperty] private StatisticsConsumerChoice selectedConsumerChoice =
+            new(null, "All consumers");
+        [ObservableProperty] private StatisticsMetricChoice selectedMetricChoice =
+            new("documented", "Documented units");
+        [ObservableProperty] private StatisticsMetrics? breakdownTotals;
+        [ObservableProperty] private bool hasBreakdownReport;
+        [ObservableProperty] private bool hasLoadedSuccessfully;
+        [ObservableProperty] private bool hasIncompleteClaimUnits;
+        [ObservableProperty] private string incompleteClaimUnitsMessage = string.Empty;
+        [ObservableProperty] private string complianceWindowMessage = string.Empty;
+        [ObservableProperty] private string consumerBillingEmptyMessage = string.Empty;
+        [ObservableProperty] private string focusedMetricLabel = "Documented units";
+
+        partial void OnSelectedMetricChoiceChanged(StatisticsMetricChoice value) =>
+            RefreshFocusRows();
 
         [RelayCommand]
         private async Task ShowThisMonthAsync()
         {
             SelectedStartDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             SelectedEndDate = DateTime.Today;
-            await LoadAsync();
+            await LoadAsync(preserveConsumerSelection: true);
         }
 
         [RelayCommand]
-        private async Task ApplyDateWindowAsync() => await LoadAsync();
+        private async Task ShowLast30DaysAsync()
+        {
+            SelectedStartDate = DateTime.Today.AddDays(-29);
+            SelectedEndDate = DateTime.Today;
+            await LoadAsync(preserveConsumerSelection: true);
+        }
+
+        [RelayCommand]
+        private async Task ShowThisYearAsync()
+        {
+            SelectedStartDate = new DateTime(DateTime.Today.Year, 1, 1);
+            SelectedEndDate = DateTime.Today;
+            await LoadAsync(preserveConsumerSelection: true);
+        }
+
+        [RelayCommand]
+        private async Task ApplyDateWindowAsync() =>
+            await LoadAsync(preserveConsumerSelection: true);
 
         // Rebuilt on every navigation and filter application. Independent reads
         // are started together, and only the newest request may publish results.
-        public async Task LoadAsync()
+        public async Task LoadAsync(bool preserveConsumerSelection = false)
         {
             var request = _loadRequests.Begin();
+            ClearDisplayedReport();
             HasLoadError = false;
             LoadErrorMessage = string.Empty;
             var user = _sessionService.CurrentUser;
             if (user is null)
             {
+                ResetConsumerChoices();
+                _consumerChoicesUserId = null;
                 IsLoading = false;
                 return;
             }
+            if (!preserveConsumerSelection || _consumerChoicesUserId != user.Id)
+                ResetConsumerChoices();
 
             if (SelectedStartDate is not DateTime selectedStart
                 || SelectedEndDate is not DateTime selectedEnd)
@@ -122,15 +215,27 @@ namespace Sati.ViewModels
 
             DateFilterMessage = string.Empty;
             IsLoading = true;
+            WindowLabel = FormatWindowLabel(windowStart, windowEnd);
 
             try
             {
+                var period = SelectedPeriodChoice?.Value ?? StatisticsPeriod.Month;
+                var selectedPersonId = SelectedConsumerChoice?.PersonId;
                 var window = BuildMonthWindow(windowStart, windowEnd);
                 var years = window.Select(m => m.Year).Distinct().ToList();
                 var productivityTask = _productivityReportService.GetUnitsAsync(
                     windowStart, windowEnd);
-                var billingLossTask = _billingLossReportService.GetAsync(
-                    user.Id, windowStart, windowEnd);
+                var complianceEnd = windowEnd < DateTime.Today ? windowEnd : DateTime.Today;
+                var billingLossTask = windowStart <= complianceEnd
+                    ? _billingLossReportService.GetAsync(user.Id, windowStart, complianceEnd)
+                    : Task.FromResult(new ConsumerBillingLossReport([], 0, 0, null));
+                // Validate a retained filter against a fresh authorized caseload.
+                // Future-only windows use today's caseload just for filter choices.
+                var caseloadTask = windowStart <= complianceEnd
+                    ? billingLossTask
+                    : _billingLossReportService.GetAsync(user.Id, DateTime.Today, DateTime.Today);
+                var breakdownTask = GetValidatedBreakdownAsync(
+                    caseloadTask, windowStart, windowEnd, period, selectedPersonId);
                 var historyTask = _incentiveService.GetHistoryAsync(user.Id);
                 var exemptTasks = years
                     .Select(year => _exemptDateService.GetByYearAsync(user.Id, year))
@@ -155,13 +260,34 @@ namespace Sati.ViewModels
                 var eligibleDaysCompletion = Task.WhenAll(eligibleDayTasks.Values);
                 await Task.WhenAll(
                     productivityTask,
+                    breakdownTask,
                     billingLossTask,
+                    caseloadTask,
                     historyTask,
                     exemptResultsTask,
                     eligibleDaysCompletion);
 
-                if (!_loadRequests.IsCurrent(request))
+                if (!_loadRequests.IsCurrent(request) || _sessionService.CurrentUser?.Id != user.Id)
                     return;
+
+                var (breakdown, validatedPersonId) = await breakdownTask;
+                BreakdownTotals = breakdown.Totals;
+                HasBreakdownReport = true;
+                BreakdownPeriods.Clear();
+                foreach (var row in breakdown.Periods)
+                    BreakdownPeriods.Add(new StatisticsPeriodDisplayRow(
+                        FormatWindowLabel(row.Start.Date, row.End.Date), row.Metrics));
+                BreakdownClients.Clear();
+                foreach (var row in breakdown.Clients)
+                    BreakdownClients.Add(row);
+                HasIncompleteClaimUnits = breakdown.Totals.SubmittedClaimsWithoutUnits > 0;
+                IncompleteClaimUnitsMessage = HasIncompleteClaimUnits
+                    ? $"{breakdown.Totals.SubmittedClaimsWithoutUnits:N0} payer-transmitted claim " +
+                      (breakdown.Totals.SubmittedClaimsWithoutUnits == 1 ? "line has" : "lines have") +
+                      " no frozen unit value. Payer-transmitted unit totals are incomplete."
+                    : string.Empty;
+                RefreshFocusRows();
+                UnitsChartModel = BuildUnitsChart(BreakdownPeriods);
 
                 var unitsByMonth = (await productivityTask)
                     .ToDictionary(item => (item.Year, item.Month), item => item.Units);
@@ -203,24 +329,15 @@ namespace Sati.ViewModels
                         ? snapshot.Calculate(units)
                         : null;
 
-                    var statusLevel = attainment switch
-                    {
-                        null => "Unknown",
-                        >= 100 => "Ok",
-                        >= 50 => "Warning",
-                        _ => "Danger"
-                    };
-
                     computedMonths.Add(new ProductivityMonth(
                         MonthLabel: FormatPeriodLabel(periodStart, periodEnd, month, monthEnd),
                         Units: units,
                         Threshold: threshold,
                         AttainmentPercent: attainment,
-                        Incentive: incentive,
-                        StatusLevel: statusLevel));
+                        Incentive: incentive));
                 }
 
-                if (!_loadRequests.IsCurrent(request))
+                if (!_loadRequests.IsCurrent(request) || _sessionService.CurrentUser?.Id != user.Id)
                     return;
 
                 Months.Clear();
@@ -233,7 +350,7 @@ namespace Sati.ViewModels
                     ? computedMonths.Sum(m => m.Incentive!.Value)
                     : null;
                 HasData = computedMonths.Any(m => m.Units > 0);
-                UnitsChartModel = BuildUnitsChart(computedMonths);
+                ShowProductivityEmpty = !HasData;
 
                 var billingLossReport = await billingLossTask;
                 ConsumerBillingRows.Clear();
@@ -246,12 +363,32 @@ namespace Sati.ViewModels
                     ? $"{percentage:0.0}%"
                     : "—";
                 HasConsumerBillingRows = ConsumerBillingRows.Count > 0;
+                ShowConsumerBillingEmpty = !HasConsumerBillingRows;
+                ComplianceWindowMessage = windowStart > DateTime.Today
+                    ? "No elapsed days fall in this window. Compliance day counts begin when those dates occur."
+                    : windowEnd > DateTime.Today
+                        ? $"Compliance day counts stop at {DateTime.Today:MMM d, yyyy}; future days are excluded."
+                        : "Compliance day counts cover the selected window.";
+                ConsumerBillingEmptyMessage = windowStart > DateTime.Today
+                    ? "No elapsed compliance days fall in this future reporting window."
+                    : "No consumers are available for this reporting window.";
+
+                var caseload = await caseloadTask;
+                ConsumerChoices.Clear();
+                ConsumerChoices.Add(new StatisticsConsumerChoice(null, "All consumers"));
+                foreach (var row in caseload.Consumers)
+                    ConsumerChoices.Add(new StatisticsConsumerChoice(row.PersonId, row.ConsumerName));
+                SelectedConsumerChoice = ConsumerChoices.FirstOrDefault(
+                    choice => choice.PersonId == validatedPersonId) ?? ConsumerChoices[0];
+                _consumerChoicesUserId = user.Id;
+                HasLoadedSuccessfully = true;
             }
             catch (Exception ex)
             {
-                if (!_loadRequests.IsCurrent(request))
+                if (!_loadRequests.IsCurrent(request) || _sessionService.CurrentUser?.Id != user.Id)
                     return;
 
+                ClearDisplayedReport();
                 var reference = AppErrorLog.Record(ex, "statistics.load");
                 HasLoadError = true;
                 LoadErrorMessage =
@@ -262,6 +399,93 @@ namespace Sati.ViewModels
             {
                 if (_loadRequests.IsCurrent(request))
                     IsLoading = false;
+            }
+        }
+
+        private void ClearDisplayedReport()
+        {
+            Months.Clear();
+            ConsumerBillingRows.Clear();
+            BreakdownPeriods.Clear();
+            BreakdownClients.Clear();
+            FocusRows.Clear();
+            UnitsChartModel = null;
+            WindowLabel = string.Empty;
+            TotalUnits = 0;
+            TotalIncentive = null;
+            HasData = false;
+            ShowProductivityEmpty = false;
+            HasConsumerBillingRows = false;
+            ShowConsumerBillingEmpty = false;
+            TotalBillableWorkUnits = 0;
+            TotalNonBillableWorkUnits = 0;
+            TotalLostWorkPercentageLabel = "—";
+            BreakdownTotals = null;
+            HasBreakdownReport = false;
+            HasIncompleteClaimUnits = false;
+            IncompleteClaimUnitsMessage = string.Empty;
+            ComplianceWindowMessage = string.Empty;
+            ConsumerBillingEmptyMessage = string.Empty;
+            HasLoadedSuccessfully = false;
+        }
+
+        private void ResetConsumerChoices()
+        {
+            ConsumerChoices.Clear();
+            ConsumerChoices.Add(new StatisticsConsumerChoice(null, "All consumers"));
+            SelectedConsumerChoice = ConsumerChoices[0];
+        }
+
+        private async Task<(StatisticsBreakdownReportDto Report, int? PersonId)>
+            GetValidatedBreakdownAsync(
+                Task<ConsumerBillingLossReport> caseloadTask,
+                DateTime windowStart,
+                DateTime windowEnd,
+                StatisticsPeriod period,
+                int? requestedPersonId)
+        {
+            var caseload = await caseloadTask;
+            var personId = requestedPersonId is int id &&
+                           caseload.Consumers.Any(row => row.PersonId == id)
+                ? id
+                : (int?)null;
+            var report = await _statisticsBreakdownService.GetAsync(
+                windowStart, windowEnd, period, personId);
+            return (report, personId);
+        }
+
+        private void RefreshFocusRows()
+        {
+            FocusRows.Clear();
+            FocusedMetricLabel = SelectedMetricChoice?.Label ?? "Documented units";
+            var metric = SelectedMetricChoice?.Key ?? "documented";
+            foreach (var row in BreakdownPeriods)
+            {
+                var value = metric switch
+                {
+                    "billable-marked" => row.Metrics.BillableMarkedUnits.ToString("N0", CultureInfo.CurrentCulture),
+                    "nonbillable" => row.Metrics.NonBillableUnits.ToString("N0", CultureInfo.CurrentCulture),
+                    "pending" => row.Metrics.PendingUnits.ToString("N0", CultureInfo.CurrentCulture),
+                    "blocked" => row.Metrics.ComplianceBlockedUnits.ToString("N0", CultureInfo.CurrentCulture),
+                    "form" => row.Metrics.FormDocumentedUnits.ToString("N0", CultureInfo.CurrentCulture),
+                    "visit" => row.Metrics.VisitDocumentedUnits.ToString("N0", CultureInfo.CurrentCulture),
+                    "claimed" => row.Metrics.SubmittedClaimUnits.ToString("N2", CultureInfo.CurrentCulture),
+                    "claimed-form" => row.Metrics.SubmittedFormUnits.ToString("N2", CultureInfo.CurrentCulture),
+                    "claimed-visit" => row.Metrics.SubmittedVisitUnits.ToString("N2", CultureInfo.CurrentCulture),
+                    "locked" => row.Metrics.LockedClaimUnits.ToString("N2", CultureInfo.CurrentCulture),
+                    "days" => row.Metrics.DocumentedServiceDays.ToString("N0", CultureInfo.CurrentCulture),
+                    "billable-days" => row.Metrics.BillableMarkedServiceDays.ToString("N0", CultureInfo.CurrentCulture),
+                    "nonbillable-days" => row.Metrics.NonBillableServiceDays.ToString("N0", CultureInfo.CurrentCulture),
+                    "expired" => row.Metrics.ExpiredPendingServiceDays.ToString("N0", CultureInfo.CurrentCulture),
+                    "abandoned" => row.Metrics.AbandonedServiceDays.ToString("N0", CultureInfo.CurrentCulture),
+                    "notes" => row.Metrics.DocumentedNoteCount.ToString("N0", CultureInfo.CurrentCulture),
+                    "forms-count" => row.Metrics.FormNoteCount.ToString("N0", CultureInfo.CurrentCulture),
+                    "visits-count" => row.Metrics.VisitNoteCount.ToString("N0", CultureInfo.CurrentCulture),
+                    "claims-count" => row.Metrics.SubmittedClaimCount.ToString("N0", CultureInfo.CurrentCulture),
+                    "locked-count" => row.Metrics.LockedClaimCount.ToString("N0", CultureInfo.CurrentCulture),
+                    _ => row.Metrics.DocumentedUnits.ToString("N0", CultureInfo.CurrentCulture)
+                };
+                FocusRows.Add(new StatisticsFocusRow(row.Period, value));
             }
         }
 
@@ -306,7 +530,7 @@ namespace Sati.ViewModels
             return $"{start:MMM d, yyyy}–{end:MMM d, yyyy}";
         }
 
-        private static PlotModel BuildUnitsChart(IReadOnlyList<ProductivityMonth> months)
+        private static PlotModel BuildUnitsChart(IReadOnlyList<StatisticsPeriodDisplayRow> periods)
         {
             var textColor = PlotTheme.Color(
                 "TextPrimaryBrush", OxyColor.FromRgb(0x3D, 0x2B, 0x1F));
@@ -320,11 +544,11 @@ namespace Sati.ViewModels
                 Background = OxyColors.Transparent,
                 PlotAreaBackground = OxyColors.Transparent,
                 TextColor = textColor,
-                PlotMargins = new OxyThickness(60, 10, 16, 30),
+                PlotMargins = new OxyThickness(170, 10, 16, 30),
             };
 
-            // Months down the left as a horizontal bar chart — OxyPlot's BarSeries (the one
-            // TeamOverview uses) is horizontal; the vertical ColumnSeries isn't in this build.
+            // Keep the chart compact for long windows; both tables retain every period.
+            var chartPeriods = periods.TakeLast(18).ToList();
             var categoryAxis = new CategoryAxis
             {
                 Position = AxisPosition.Left,
@@ -338,7 +562,7 @@ namespace Sati.ViewModels
             {
                 Position = AxisPosition.Bottom,
                 Minimum = 0,
-                Title = "Units (Logged + Approved)",
+                Title = "Documented units (Logged + Approved)",
                 TitleColor = mutedColor,
                 TextColor = textColor,
                 TicklineColor = inputBorderColor,
@@ -353,21 +577,13 @@ namespace Sati.ViewModels
                 BarWidth = 0.6,
             };
 
-            foreach (var m in months)
+            foreach (var period in chartPeriods)
             {
-                categoryAxis.Labels.Add(m.MonthLabel);
+                categoryAxis.Labels.Add(period.Period);
                 series.Items.Add(new BarItem
                 {
-                    Value = m.Units,
-                    // Same status palette as TeamOverview, plus a muted tone for months with
-                    // no threshold snapshot (we can't judge attainment, so we don't pretend to).
-                    Color = m.StatusLevel switch
-                    {
-                        "Ok" => PlotTheme.Color("CompliantBrush", OxyColor.FromRgb(0x5A, 0x8A, 0x5A)),
-                        "Warning" => PlotTheme.Color("WarningBrush", OxyColor.FromRgb(0xC8, 0x79, 0x41)),
-                        "Danger" => PlotTheme.Color("OverdueBrush", OxyColor.FromRgb(0xA6, 0x60, 0x7A)),
-                        _ => PlotTheme.Color("AccentBrush", OxyColor.FromRgb(0xD4, 0xA8, 0x82)),
-                    },
+                    Value = period.Metrics.DocumentedUnits,
+                    Color = PlotTheme.Color("AccentBrush", OxyColor.FromRgb(0xD4, 0xA8, 0x82)),
                 });
             }
 

@@ -447,6 +447,16 @@ try {
         }
     }
 
+    if ([int](Invoke-SeedScalar "SELECT COUNT(*) FROM sys.tables WHERE object_id=OBJECT_ID(N'dbo.ScheduledNoteMoves', N'U');") -ne 1) {
+        throw 'The Demo database is missing scheduled-note move history. Apply current migrations before refreshing.'
+    }
+
+    # The Demo reset reanchors scheduled Notes.EventDate below. Frozen move rows
+    # from the restored baseline would describe dates that no longer belong to
+    # those notes, so clear Demo-only move history in this same transaction
+    # before any note dates change. Local and Production history is untouched.
+    Invoke-SeedNonQuery "DELETE FROM dbo.ScheduledNoteMoves;" | Out-Null
+
     # The public Demo teaches the real Evergreen handoff: staff attest that the
     # external work occurred, while Sati's in-product OADS builders stay hidden.
     # Billing-compliance flags are deliberately untouched; those gates remain.

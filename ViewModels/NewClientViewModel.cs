@@ -23,8 +23,9 @@ namespace Sati.ViewModels
 {
     public partial class NewClientViewModel : ObservableValidator
     {
-        internal const int AnnualFormsWorkspaceTabIndex = 4;
-        public const int CheckRequestsTabIndex = 7;
+        internal const int ClientNotesWorkspaceTabIndex = 1;
+        internal const int AnnualFormsWorkspaceTabIndex = 5;
+        public const int CheckRequestsTabIndex = 10;
 
         // -------------------------------------------------------------------------
         // Services
@@ -80,6 +81,22 @@ namespace Sati.ViewModels
         // that loading and resolution has nothing to do with the rest of this class.
         public ConsumerProvidersViewModel ConsumerProviders { get; }
         public ConsumerScheduleViewModel? ConsumerSchedule { get; }
+        public NoteEntryViewModel? ClientNoteEntry { get; }
+        public event EventHandler? ClientNoteSaved;
+        private readonly LatestRequestTracker _selectedNotesLoads = new();
+        private User? _clientNoteSettingsLoadedAccount;
+        private Task? _clientNoteSettingsInitialization;
+        private bool _restoringClientSelection;
+        private bool _restoringClientNoteSelection;
+
+        [ObservableProperty]
+        private Note? selectedClientNote;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasClientNoteLoadError))]
+        private string? clientNoteLoadError;
+
+        public bool HasClientNoteLoadError => !string.IsNullOrWhiteSpace(ClientNoteLoadError);
 
         /// <summary>The Credible import review panel. Fills this form; never saves.</summary>
         public ConsumerImportViewModel ConsumerImport { get; }
@@ -375,10 +392,27 @@ namespace Sati.ViewModels
         // flush old, then load new.
         partial void OnSelectedPersonChanged(Person? oldValue, Person? newValue)
         {
+            if (_restoringClientSelection)
+                return;
+
             // A reload can replace this Person instance without changing clients.
             // Keep the current journal draft; there is no outgoing client to flush.
             if (oldValue?.Id == newValue?.Id)
+            {
+                ApplySelectedPersonChange(newValue);
                 return;
+            }
+
+            if (ClientNoteEntry is not null && !ClientNoteEntry.TryReleaseDraft())
+            {
+                _restoringClientSelection = true;
+                try { SelectedPerson = oldValue; }
+                finally { _restoringClientSelection = false; }
+                return;
+            }
+
+            ClientNoteEntry?.ReturnToNewNote();
+            SelectedClientNote = null;
 
             // Flush any pending edit for the person we're leaving. Fire-and-forget is
             // acceptable: the write is a single-column UPDATE and the timer is stopped
@@ -391,10 +425,23 @@ namespace Sati.ViewModels
                 _ = TrySaveJournalAsync(leavingId, Journal);
 
             _ = LoadJournalAsync(newValue);
+            ApplySelectedPersonChange(newValue);
         }
 
-        partial void OnSelectedPersonChanged(Person? value)
+        // CommunityToolkit invokes the single-value Changed hook before the old/new
+        // hook. Keep all selection effects here, called only after the latter has
+        // checked whether a note draft allows the consumer switch.
+        private void ApplySelectedPersonChange(Person? value)
         {
+            if (_restoringClientSelection || !ReferenceEquals(SelectedPerson, value))
+                return;
+
+            ClientNoteEntry?.SetPeople(value is null ? [] : [value]);
+            if (value is not null && ClientNoteEntry is not null)
+                ClientNoteEntry.SelectedPerson = value;
+            if (value is not null && ClientWorkspaceTabIndex == ClientNotesWorkspaceTabIndex)
+                _ = EnsureClientNoteEntryInitializedAsync();
+
             // Form editing is a deliberate, per-profile action. Never carry an
             // unlocked state or an open attestation into another person's record.
             LockFormsEditing();
@@ -587,6 +634,53 @@ namespace Sati.ViewModels
         public Array Genders => Enum.GetValues(typeof(Gender));
 
         public ObservableCollection<Note> SelectedPersonNotes { get; } = [];
+
+        partial void OnSelectedClientNoteChanged(Note? oldValue, Note? newValue)
+        {
+            EditSelectedClientNoteCommand.NotifyCanExecuteChanged();
+            if (_restoringClientNoteSelection || ClientNoteEntry is null)
+                return;
+
+            // The grid can briefly retain an outgoing row during a consumer switch
+            // or a delayed refresh. It must never load a note for another consumer.
+            if (newValue is not null && newValue.PersonId != SelectedPerson?.Id)
+            {
+                RestoreClientNoteSelection(oldValue?.PersonId == SelectedPerson?.Id
+                    ? oldValue : null);
+                return;
+            }
+
+            if (newValue is null)
+            {
+                if (ClientNoteEntry.IsLocked)
+                    ClientNoteEntry.ReturnToNewNote();
+                return;
+            }
+
+            if (!ClientNoteEntry.TryReleaseDraft())
+            {
+                RestoreClientNoteSelection(oldValue);
+                return;
+            }
+
+            ClientNoteEntry.EnterViewMode(newValue);
+        }
+
+        private void RestoreClientNoteSelection(Note? note)
+        {
+            _restoringClientNoteSelection = true;
+            try { SelectedClientNote = note; }
+            finally { _restoringClientNoteSelection = false; }
+        }
+
+        private bool CanEditSelectedClientNote() =>
+            ClientNoteEntry is not null &&
+            SelectedClientNote is { } note &&
+            note.PersonId == SelectedPerson?.Id;
+
+        [RelayCommand(CanExecute = nameof(CanEditSelectedClientNote))]
+        private void EditSelectedClientNote() =>
+            ClientNoteEntry?.OpenForEdit(SelectedClientNote);
         public ObservableCollection<Person> People { get; } = [];
         public ICollectionView PeopleView { get; }
         public IReadOnlyList<string> ConsumerFilters { get; } =
@@ -706,7 +800,8 @@ namespace Sati.ViewModels
                            HousingSupportFundsViewModel? housingSupportFunds = null,
                            SafetyDeviceViewModel? safetyDevice = null,
                            BenefitsApplicationViewModel? benefitsApplication = null,
-                           ConsumerScheduleViewModel? consumerSchedule = null)
+                           ConsumerScheduleViewModel? consumerSchedule = null,
+                           NoteEntryViewModel? clientNoteEntry = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -731,6 +826,12 @@ namespace Sati.ViewModels
             ReleaseObligations = releaseObligations;
             ConsumerProviders = consumerProviders;
             ConsumerSchedule = consumerSchedule;
+            ClientNoteEntry = clientNoteEntry;
+            if (ClientNoteEntry is not null)
+            {
+                ClientNoteEntry.EditorCleared += (_, _) => SelectedClientNote = null;
+                ClientNoteEntry.NoteSaved += (_, _) => _ = HandleClientNoteSavedAsync();
+            }
             ConsumerImport = consumerImport;
             PersonPhoto = new PersonPhotoViewModel(personPhotoService, session);
             JournalPages.DocumentEdited += (_, _) => ApplyJournalPagesEdit();
@@ -1035,6 +1136,43 @@ namespace Sati.ViewModels
         {
             if (value == AnnualFormsWorkspaceTabIndex && AnnualFormsTabIndex == (int)AnnualFormsSection.Overview)
                 AnnualDocuments?.RefreshOverview();
+            if (value == ClientNotesWorkspaceTabIndex)
+                _ = EnsureClientNoteEntryInitializedAsync();
+        }
+
+        private async Task EnsureClientNoteEntryInitializedAsync()
+        {
+            var account = _sessionService.CurrentUser;
+            if (account is null || ClientNoteEntry is null ||
+                ReferenceEquals(_clientNoteSettingsLoadedAccount, account) ||
+                _clientNoteSettingsInitialization is { IsCompleted: false })
+                return;
+
+            var load = ClientNoteEntry.InitializeAsync();
+            _clientNoteSettingsInitialization = load;
+            try
+            {
+                await load;
+                if (ReferenceEquals(_sessionService.CurrentUser, account))
+                {
+                    _clientNoteSettingsLoadedAccount = account;
+                    ClientNoteLoadError = null;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (ReferenceEquals(_sessionService.CurrentUser, account))
+                {
+                    ClientNoteLoadError =
+                        "Note settings could not be loaded. Try opening this tab again.";
+                    Debug.WriteLine($"Consumer note settings load failed: {exception.Message}");
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(_clientNoteSettingsInitialization, load))
+                    _clientNoteSettingsInitialization = null;
+            }
         }
 
         // -------------------------------------------------------------------------
@@ -1050,6 +1188,8 @@ namespace Sati.ViewModels
         {
             ClientSaveErrorMessage = string.Empty;
             SelectedPerson = null;
+            if (SelectedPerson is not null)
+                return;
             IsEditMode = false;
             IsClientEditorOpen = true;
             ClientWorkspaceTabIndex = 0;
@@ -1391,8 +1531,18 @@ namespace Sati.ViewModels
                     People.Insert(index, existing);
                 }
 
-                SelectedPerson = null;
-                SelectedPerson = existing;
+                if (SelectedPerson?.Id == existing.Id && ClientNoteEntry?.HasUnsavedChanges == true)
+                {
+                    // Saving demographic fields must not make an unrelated note
+                    // draft ask to be discarded or lose its content.
+                    OnPropertyChanged(nameof(SelectedPerson));
+                    OnSelectedPersonChanged(existing);
+                }
+                else if (SelectedPerson?.Id == existing.Id)
+                {
+                    SelectedPerson = null;
+                    SelectedPerson = existing;
+                }
                 }
                 else
                 {
@@ -1629,7 +1779,12 @@ namespace Sati.ViewModels
             // contains that completion, but the old SelectedPerson still points to
             // the pre-save form objects unless we rebind it after the reload.
             if (selectedPersonId is int personId)
-                SelectedPerson = People.FirstOrDefault(person => person.Id == personId);
+            {
+                var retained = People.FirstOrDefault(person => person.Id == personId);
+                if (retained is null)
+                    ClientNoteEntry?.Reset();
+                SelectedPerson = retained;
+            }
         }
 
         /// <summary>
@@ -1656,9 +1811,12 @@ namespace Sati.ViewModels
 
             if (!preserveDraft)
             {
-                SelectedPerson = selectedId is int personId
+                var retained = selectedId is int personId
                     ? People.FirstOrDefault(person => person.Id == personId)
                     : null;
+                if (selectedId is not null && retained is null)
+                    ClientNoteEntry?.Reset();
+                SelectedPerson = retained;
             }
             PeopleView.Refresh();
             if (currentPersonId is int currentId)
@@ -1677,10 +1835,40 @@ namespace Sati.ViewModels
                 ? Task.CompletedTask
                 : LoadSelectedPersonNotesAsync(SelectedPerson);
 
+        private async Task HandleClientNoteSavedAsync()
+        {
+            var account = _sessionService.CurrentUser;
+            SelectedClientNote = null;
+            try
+            {
+                await RefreshSelectedNotesIfSelectedAsync();
+                if (ReferenceEquals(_sessionService.CurrentUser, account))
+                    ClientNoteLoadError = null;
+            }
+            catch (Exception exception)
+            {
+                if (ReferenceEquals(_sessionService.CurrentUser, account))
+                {
+                    ClientNoteLoadError =
+                        "The note was saved, but its list could not be refreshed. Reopen this consumer to retry.";
+                    Debug.WriteLine($"Consumer notes refresh failed: {exception.Message}");
+                }
+            }
+
+            if (ReferenceEquals(_sessionService.CurrentUser, account))
+                ClientNoteSaved?.Invoke(this, EventArgs.Empty);
+        }
+
         public void ClearForAccountSwitch()
         {
             _workspaceLoads.Invalidate();
+            _selectedNotesLoads.Invalidate();
             _profileSettingsLoads.Invalidate();
+            _clientNoteSettingsLoadedAccount = null;
+            _clientNoteSettingsInitialization = null;
+            ClientNoteEntry?.Reset();
+            SelectedClientNote = null;
+            ClientNoteLoadError = null;
             _profileSettingsInitialization = null;
             _profileSettingsInitializationUserId = null;
             _profileSettingsLoadedUserId = null;
@@ -1786,16 +1974,23 @@ namespace Sati.ViewModels
         private async Task LoadSelectedPersonNotesAsync(Person? person)
         {
             var account = _sessionService.CurrentUser;
+            if (SelectedPerson?.Id != person?.Id)
+                return;
+
+            var request = _selectedNotesLoads.Begin();
             SelectedPersonNotes.Clear();
+            SelectedClientNote = null;
             if (person is null)
             {
                 OnPropertyChanged(nameof(LastContact));
                 return;
             }
             var notes = await _noteService.GetAllByPersonAsync(person.Id);
-            if (SelectedPerson?.Id != person.Id || !ReferenceEquals(_sessionService.CurrentUser, account))
+            if (!_selectedNotesLoads.IsCurrent(request) ||
+                SelectedPerson?.Id != person.Id ||
+                !ReferenceEquals(_sessionService.CurrentUser, account))
                 return;
-            foreach (var note in notes)
+            foreach (var note in notes.Where(note => note.PersonId == person.Id))
                 SelectedPersonNotes.Add(note);
             RefreshUpcomingItems(person);
 

@@ -471,13 +471,16 @@ namespace Sati.ViewModels
             if (person is null)
                 return;
 
-            NotesViewModel.NoteEntry.SelectedPerson = person;
             if (item.ReleaseObligationId is Guid obligationId)
             {
-                NotesViewModel.SelectedPerson = person;
                 NotesViewModel.Clients.SelectedPerson =
                     NotesViewModel.Clients.People.FirstOrDefault(candidate =>
                         candidate.Id == person.Id) ?? person;
+                if (NotesViewModel.Clients.SelectedPerson?.Id != person.Id)
+                    return;
+
+                NotesViewModel.NoteEntry.SelectedPerson = person;
+                NotesViewModel.SelectedPerson = person;
                 NotesViewModel.NavigateToClientsCommand.Execute(null);
                 await NotesViewModel.Clients.OpenReleaseObligationAsync(
                     obligationId,
@@ -485,6 +488,7 @@ namespace Sati.ViewModels
             }
             else if (item.FormType is FormType formType)
             {
+                NotesViewModel.NoteEntry.SelectedPerson = person;
                 await NotesViewModel.OpenFormAsync(
                     formType,
                     item.FormId,
@@ -499,14 +503,19 @@ namespace Sati.ViewModels
                 return;
 
             CurrentViewModel = _caseManagementViewModel;
-            NotesViewModel.NavigateToClientsCommand.Execute(null);
             var person = NotesViewModel.People.FirstOrDefault(candidate =>
                 candidate.Id == draft.PersonId);
             if (person is null)
                 return;
 
+            NotesViewModel.Clients.SelectedPerson =
+                NotesViewModel.Clients.People.FirstOrDefault(candidate =>
+                    candidate.Id == person.Id) ?? person;
+            if (NotesViewModel.Clients.SelectedPerson?.Id != person.Id)
+                return;
+
             NotesViewModel.NoteEntry.SelectedPerson = person;
-            NotesViewModel.Clients.SelectedPerson = person;
+            NotesViewModel.NavigateToClientsCommand.Execute(null);
             NotesViewModel.Clients.ClientWorkspaceTabIndex =
                 NewClientViewModel.CheckRequestsTabIndex;
             if (NotesViewModel.Clients.CheckRequests is not null)

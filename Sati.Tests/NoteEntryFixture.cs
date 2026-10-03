@@ -105,10 +105,14 @@ internal sealed class NoteEntryFixture : IAsyncDisposable
     /// The client page as Case Manager One, with only the person and note services real —
     /// enough for the journal, which touches nothing else. No client is selected.
     /// </summary>
-    public NewClientViewModel ClientsPage(User? actor = null) => new(
+    public NewClientViewModel ClientsPage(
+        User? actor = null,
+        NoteEntryViewModel? clientNoteEntry = null,
+        INoteService? notes = null,
+        ISessionService? session = null) => new(
         PeopleAs(actor ?? CaseManagerOne),
-        SessionFor(actor ?? CaseManagerOne),
-        new NoteService(Factory, SessionFor(actor ?? CaseManagerOne)),
+        session ?? SessionFor(actor ?? CaseManagerOne),
+        notes ?? new NoteService(Factory, session ?? SessionFor(actor ?? CaseManagerOne)),
         null!,
         new StubSettingsService(),
         null!,
@@ -120,7 +124,8 @@ internal sealed class NoteEntryFixture : IAsyncDisposable
         null!,
         null!,
         null!,
-        null!);
+        null!,
+        clientNoteEntry: clientNoteEntry);
 
     private sealed class SilentIncidentReporter : IIncidentReporter
     {

@@ -414,7 +414,8 @@ public static class ProductivityForecast
             Pace(monthlyTarget - secured - (recoverable - dueToday), capacityAfterToday));
     }
 
-    private static decimal CalculateUnits(int? minutes) => minutes.HasValue
+    /// <summary>The integer 15-minute units used by desktop productivity reporting.</summary>
+    public static decimal CalculateUnits(int? minutes) => minutes.HasValue
         ? Math.Max(1, (int)Math.Ceiling(minutes.Value / 15m))
         : 0;
 

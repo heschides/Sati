@@ -127,7 +127,13 @@ public sealed class ProductivityReportServiceTests
                 new DateTime(1990, 1, 1), new DateTime(2025, 1, 1),
                 WaiverType.Section21, settings);
             mismatchedPerson.AgencyId = 2;
-            context.People.AddRange(ownPerson, otherPerson, mismatchedPerson);
+            var ghostPerson = Person.CreatePerson(
+                actor.Id, "Ghost", "Consumer", string.Empty,
+                new DateTime(1990, 1, 1), new DateTime(2025, 1, 1),
+                WaiverType.Section21, settings);
+            ghostPerson.AgencyId = 1;
+            ghostPerson.Status = PersonStatus.Ghost;
+            context.People.AddRange(ownPerson, otherPerson, mismatchedPerson, ghostPerson);
             await context.SaveChangesAsync();
 
             var mismatchedNoteAgency =
@@ -141,6 +147,7 @@ public sealed class ProductivityReportServiceTests
                 NoteFor(ownPerson.Id, NoteStatus.Pending, new DateTime(2026, 7, 5), 60),
                 NoteFor(ownPerson.Id, NoteStatus.Logged, new DateTime(2026, 8, 1), 60),
                 NoteFor(otherPerson.Id, NoteStatus.Logged, new DateTime(2026, 7, 6), 60),
+                NoteFor(ghostPerson.Id, NoteStatus.Logged, new DateTime(2026, 7, 9), 60),
                 mismatchedNoteAgency,
                 mismatchedPersonAgency);
             await context.SaveChangesAsync();

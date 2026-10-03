@@ -8,6 +8,7 @@ using Xunit;
 
 namespace Sati.Tests;
 
+[Collection(WpfViewCollection.Name)]
 public sealed class ProviderDirectoryViewRenderTests
 {
     [Fact]

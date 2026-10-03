@@ -2,7 +2,7 @@
 
 *Living document. The "why" behind choices that no diagram preserves. ARCHITECTURE.md
 says what owns what; this says why it was built that way and what was rejected. Newest
-sections at the bottom. Last updated: 2026-10-02.*
+sections at the bottom. Last updated: 2026-10-03.*
 
 ---
 
@@ -6141,3 +6141,78 @@ The daily route follows the validated actor and owned-person checks used by the 
 The Clients journal's A− and A+ buttons change only the editor's display size. Font size is not
 part of the journal document contract; treating this as stored rich-text formatting would cause
 a misleading visual edit that disappears on the next load.
+
+## 2026-10-02 — The calendar separates documented and uncompleted planned units
+
+The calendar's daily headline is Pending, Logged, and Approved units. Compliance blocked,
+Cancelled, and other statuses remain in the status breakdown but do not enlarge that
+number. A past Scheduled service note is shown there as Rescheduled; this label means
+its planned units did not become documented work on that date. It does not claim the
+record was actually moved, and the note's persisted status stays Scheduled so the
+leftover-work workflow can still resolve it. The 2026-09-19 decision to hide lapsed
+Scheduled notes is superseded for calendar presentation only. Productivity continues
+to disregard them, and the supervisor's Scheduled count remains current/future only.
+
+A note stores one `EventDate`. When staff move a Scheduled service note, the local
+writer and API now append a `ScheduledNoteMove` with the previous date and frozen
+planned units in the same write. The old square can therefore show Rescheduled
+without pretending the service was delivered there or changing the note's current
+schedule. The calendar scopes history to the signed-in caseload and does not infer
+unknown moves before this history was introduced.
+The history follows its note's deletion lifecycle; a future retention decision
+would need an orphan-safe identity and read rule before preserving deleted-note
+plans independently.
+
+## 2026-10-02 — Statistics names each kind of unit by its evidence
+
+The configurable Statistics report keeps three separate measures. Logged and Approved
+note minutes produce integer productivity units. The compliance-loss report classifies
+performed work units and calendar client-days against the effective billing-compliance
+window for each service date. Payer-submitted claim units come from the decimal value
+frozen on a claim line linked to a billing period with an exact, non-synthetic
+`Transmitted` exchange event. `BillingPeriod.Submitted` only locks work inside Sati,
+so its claim units are a separate pipeline measure; generating an 837P is also
+insufficient. A real transmission is not payer acceptance,
+payment, or a net balance after corrections. Synthetic Demo transmissions are excluded.
+
+Within documented notes, `IsUnbilled` separates intentionally unbilled work from
+work marked for possible billing. Their unit totals partition documented units;
+their distinct service-date counts can overlap when both kinds occur on one date.
+The billing-marked designation alone does not establish compliance eligibility or
+an actual claim. Compliance-eligible and blocked calendar client-days remain a
+separate measure based on the effective service-date obligations.
+
+Period grouping and a consumer filter let one report explain the same own-caseload
+facts by week, month, quarter, or year. The service and API project only the dates,
+status, duration, activity flags, claim units, and scoped client names required for
+these aggregates. `NoteActivityRules` owns the legacy and multi-activity meaning:
+one note with both Form and Visit appears in both slices, so those slices are not
+additive. The claim's units and date are frozen, but the activity label comes from
+the linked note's current flags; it is not a historical claim snapshot field.
+A separate expired-Pending service-day count means a dated Pending note
+remains after the configured documentation window; Abandoned service dates remain
+visible after automated cleanup changes a note's status. Neither count reconstructs
+when a completed note was late. The existing blocked client-day count describes overdue
+compliance gaps, including calendar days without a visit. Neither signal is a
+regulatory conclusion or an official claim denial.
+
+## 2026-10-02 — Consumer Notes reuse the established editor
+
+The Clients page now gives each selected consumer a Notes tab with its own
+`NoteEntryViewModel`. It uses the existing note service, validation, draft prompt,
+and save cascade instead of creating a second note workflow. The editor's people
+list contains only the selected consumer, and a stale note row cannot be opened
+after selection changes. A `LatestRequestTracker` keeps a slow prior-consumer read
+from publishing into the newly selected profile. Account switching resets both
+the editor and its note grid so notes and unsaved drafts do not cross sessions.
+
+## 2026-10-03 — Opt-in SQL tests own an isolated LocalDB instance
+
+SQL-backed integration tests no longer target the workstation's shared
+`MSSQLLocalDB` instance. That instance can contain Local Production data and may
+be unavailable while its databases recover. The opt-in fixtures require an
+explicit `SatiSqlTests_` name followed by a fresh 32-digit hexadecimal identifier;
+there is no fallback to the shared instance. `scripts/Test-IsolatedLocalDb.ps1`
+creates that instance, runs the API and desktop SQL test filters with its name in
+the process environment, then stops and deletes only the instance it created.
+Its ownership checks prevent cleanup from acting on an existing instance.

@@ -2,6 +2,50 @@
 
 *Living document. Updated during structured review sessions. Last updated: 2026-10-02.*
 
+## Configurable Statistics breakdowns — October 2 (unreleased)
+
+Statistics keeps its existing date-window, incentive, and compliance-loss reads and
+adds a bounded, narrative-free report for week, month, quarter, and year comparisons
+with an optional consumer filter. The local transitional service and Demo API both
+scope note, person, and claim-line reads to the current case manager and agency;
+the API revalidates the actor and the requested consumer before reading. Shared
+contract rules aggregate projected facts, not EF entities or note narratives.
+
+Logged/Approved productivity units use Sati's integer note-unit calculation.
+Those documented notes are also partitioned by their current `IsUnbilled` flag
+into billable-marked and intentionally unbilled units and distinct service dates.
+A date with both kinds appears in both slices; their day counts must not be added
+to get the distinct documented-day total. The billable-marked slice is a note
+designation, not proof of compliance, claim submission, or payment.
+Payer-submitted claim units use the decimal units frozen on claim lines linked to a
+billing period with an exact, non-synthetic `Transmitted` exchange event. A separate
+locked-claim measure counts original lines in internally submitted/non-Draft periods;
+that lock or a generated 837P alone is not external submission. Transmission is not
+payment or payer acceptance. Form and Visit slices
+follow `NoteActivityRules` and can overlap when
+one note has both activities. Claim-line units and service dates are frozen; the
+activity slices use the linked note's current flags, because the claim snapshot
+does not freeze those flags. Existing billability day counts are client-days
+classified by the effective service-date compliance window, not actual claims.
+The existing productivity and compliance reports also exclude Ghost consumers,
+matching the new breakdown's caseload scope.
+Expired Pending service days are a current documentation-window backlog signal;
+automated cleanup can move these notes to Abandoned, whose distinct service dates
+are reported separately. Neither measure reconstructs when a completed note was
+late. These measures remain labeled independently on the screen.
+
+## Consumer Notes workspace — October 2 (unreleased)
+
+The selected consumer's Clients page now has a Notes tab using a separate
+`NoteEntryViewModel` instance and the existing note editor template. It offers the
+same create, read, and edit workflow as the dashboard and Notes Log while limiting
+the editor's people list and history grid to the selected consumer. The same
+`INoteService` implementations remain the write boundary, so the tab creates no new
+route or persistence model. A selection or account switch clears the prior editor
+state, and a per-selection request identity prevents an old notes read from filling
+the new consumer's grid. The tab participates in the dashboard's existing note-save
+refresh cascade. The Overview's journal and compact history remain separate views.
+
 ## Admin status changes refresh the desktop caseload — October 2 (unreleased)
 
 After `AdminDashboardViewModel` saves a Person status through `IPersonService`, the
@@ -10,6 +54,28 @@ The dashboard publishes that snapshot to the Clients menu, note pickers, and Not
 Log, then rebuilds its matrix and deadline board. This happens for archive and
 return-to-Active changes without restarting. A failed status write triggers no
 refresh; a later refresh failure is reported as a saved status with stale client UI.
+
+## Calendar daily units — October 2 (unreleased)
+
+`CalendarDay` uses Pending, Logged, and Approved note units for its daily headline and
+focused-day total. Other saved statuses, including Compliance blocked and Cancelled,
+remain visible in the status breakdown without enlarging that total. A past Scheduled
+service note is displayed as Rescheduled on its original date, while today's and future
+Scheduled notes retain their label. The persisted note status is not changed. The
+calendar excludes lapsed Scheduled notes from the `ProductivityForecast` facts, so a
+missed plan cannot count as delivered work or keep the old day open. Past Scheduled
+reminders without service units remain hidden. `CalendarNoteItem` owns these display
+labels; `NoteSchedulingPolicy` still owns the lapsed-date test.
+
+`ScheduledNoteMove` records a Scheduled service note's date change at the local and
+API write boundaries with its previous date, next date, planned minutes and frozen
+integer units. The calendar reads these scoped history facts and shows the previous
+date as Rescheduled even though the note itself now appears on a different date.
+The history is a scheduling fact, not a second note or delivered work: it does not
+increase the daily documented total or productivity. Moves made before this schema
+exists cannot be reconstructed from the note's latest `EventDate`. The move rows
+follow the lifetime of their note; deleting a still-deletable planned note also
+removes its move rows. A retained Cancelled note remains in the day's breakdown.
 
 ## Desktop process lifetime — October 1 (unreleased)
 
@@ -2247,7 +2313,7 @@ rather than in either client.
 | `ReleaseAttestationRules` / `ReleaseSigningRules` / `ReleaseAuthorizationRules` | Separate release completion, guardian-or-consumer signer capacity, and prospective withdrawal. |
 | `BillingRules` | Payer-neutral unit arithmetic, charge rounding, NPI and procedure-code format. |
 | `NoteWorkflow` | Which note status may become which, for the case manager, the supervisor, and the overdue sweep — and therefore which notes can reach approval and billing at all. |
-| `NoteSchedulingPolicy` | Future work becomes non-billable Scheduled work, retaining its type, estimated minutes, and optional form type while clearing actual start time, visit facts, and justification. Reminder remains a separate non-service shape. `IsLapsedScheduled`: Scheduled work dated before today, which the calendar and productivity calculations disregard. |
+| `NoteSchedulingPolicy` | Future work becomes non-billable Scheduled work, retaining its type, estimated minutes, and optional form type while clearing actual start time, visit facts, and justification. Reminder remains a separate non-service shape. `IsLapsedScheduled`: Scheduled work dated before today, which productivity calculations disregard and the calendar displays separately from documented units. |
 | `ServiceTimeline` | The 7:00 AM – 7:00 PM service day, the no-double-claimed-minute rule, and earliest available start calculation. |
 | `AuditCsv` | The audit export's header, column order, escaping, and spreadsheet neutralization. |
 | `AtRequestPublication` | Whether an AT request is complete enough to publish, what the case manager attests to, and whether a published request may still be edited. |

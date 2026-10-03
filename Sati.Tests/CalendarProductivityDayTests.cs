@@ -52,12 +52,74 @@ public sealed class CalendarProductivityDayTests
         Assert.Equal("6 units", day.UnitsLabel);
         Assert.Equal("Pending 2 · Logged 4", day.UnitsByStatusLabel);
         Assert.Equal("In average", day.ProductivityLabel);
-        Assert.Contains("6 units (Pending 2 · Logged 4)", day.AccessibleLabel);
+        Assert.Contains("6 units in daily total (Pending 2 · Logged 4)", day.AccessibleLabel);
         Assert.Contains("counts toward this month's daily average", day.AccessibleLabel);
 
         var pendingOnly = Day(await LoadAsync(alsoPending), Today.AddDays(-2));
         Assert.Equal("In average · none logged", pendingOnly.ProductivityLabel);
         Assert.Contains("nothing logged or approved yet", pendingOnly.AccessibleLabel);
+    }
+
+    [Fact]
+    public async Task DailyHeadlineCountsDocumentedUnitsButStillShowsBlockedAndCancelledUnits()
+    {
+        var date = Today.AddDays(-2);
+        var viewModel = await LoadAsync(
+            Note.Create("Logged.", date, NoteStatus.Logged, 300, 1, noteType: NoteType.Contact),
+            Note.Create("Pending.", date, NoteStatus.Pending, 75, 1, noteType: NoteType.Contact),
+            Note.Create("Blocked.", date, NoteStatus.ComplianceBlocked, 45, 1, noteType: NoteType.Contact),
+            Note.Create("Cancelled.", date, NoteStatus.Cancelled, 30, 1, noteType: NoteType.Contact));
+
+        var day = Day(viewModel, date);
+        Assert.Equal(25, day.TotalUnits);
+        Assert.Equal("25 units", day.UnitsLabel);
+        Assert.Contains("Pending 5", day.UnitsByStatusLabel);
+        Assert.Contains("Logged 20", day.UnitsByStatusLabel);
+        Assert.Contains("Compliance blocked 3", day.UnitsByStatusLabel);
+        Assert.Contains("Cancelled 2", day.UnitsByStatusLabel);
+        Assert.Contains("25 units", day.AccessibleLabel);
+
+        viewModel.SelectDayCommand.Execute(day);
+        Assert.Equal(25, viewModel.SelectedDayTotalUnits);
+        Assert.Equal(375, viewModel.SelectedDayTotalMinutes);
+        Assert.Equal("4 notes · 375 minutes · 25 units", viewModel.SelectedDaySummary);
+
+        var blockedOnly = Day(await LoadAsync(
+            Note.Create("Blocked.", date, NoteStatus.ComplianceBlocked, 45, 1,
+                noteType: NoteType.Contact)), date);
+        Assert.Equal(0, blockedOnly.TotalUnits);
+        Assert.True(blockedOnly.HasStatusUnits);
+        Assert.Equal("Compliance blocked 3", blockedOnly.UnitsByStatusLabel);
+    }
+
+    [Fact]
+    public void ADateMoveLeavesFrozenRescheduledUnitsOutsideTheDailyTotal()
+    {
+        var original = Today.AddDays(-2);
+        var later = Today.AddDays(3);
+        var move = new ScheduledNoteMoveDto(1, 25, 101, "Consumer One",
+            original, later, 45, 3, DateTime.UtcNow);
+        var month = CalendarViewModel.BuildMonth(Today.Year, Today.Month,
+            [], [], Today, rescheduledMoves: [move]);
+        var day = month.Cells.OfType<CalendarDay>()
+            .Single(cell => cell.Date.Date == original);
+
+        Assert.Equal(0, day.TotalUnits);
+        Assert.Equal("0 units", day.UnitsLabel);
+        Assert.Equal("Rescheduled 3", day.UnitsByStatusLabel);
+        Assert.True(day.HasStatusUnits);
+        Assert.Single(day.RescheduledMoves);
+        Assert.Equal(0, day.NoteCount);
+        Assert.Contains("0 units in daily total (Rescheduled 3)", day.AccessibleLabel);
+
+        var anotherPlan = Note.Create("Still on original date.", original,
+            NoteStatus.Scheduled, 15, 101, noteType: NoteType.Visit);
+        var combinedMonth = CalendarViewModel.BuildMonth(Today.Year, Today.Month,
+            [anotherPlan], [], Today, rescheduledMoves: [move]);
+        var combinedDay = combinedMonth.Cells.OfType<CalendarDay>()
+            .Single(cell => cell.Date.Date == original);
+        Assert.Equal("Rescheduled 4", combinedDay.UnitsByStatusLabel);
+        Assert.Equal(0, combinedDay.TotalUnits);
     }
 
     [Fact]
@@ -124,8 +186,8 @@ public sealed class CalendarProductivityDayTests
                 WpfUiHarness.Descendants(settledSquare).OfType<CheckBox>().Single().Visibility);
 
             // Right-click schedules time off from the month view, as it already did in the year view.
-            var binding = Assert.Single(openSquare.InputBindings.OfType<MouseBinding>()
-                .Where(item => item.MouseAction == MouseAction.RightClick));
+            var binding = Assert.Single(openSquare.InputBindings.OfType<MouseBinding>(),
+                item => item.MouseAction == MouseAction.RightClick);
             Assert.Equal(viewModel.ToggleExemptCommand, binding.Command);
         });
     }

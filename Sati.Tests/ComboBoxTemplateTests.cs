@@ -18,6 +18,7 @@ namespace Sati.Tests;
 ///
 /// These properties must therefore be bound with RelativeSource TemplatedParent.
 /// </summary>
+[Collection(WpfViewCollection.Name)]
 public sealed class ComboBoxTemplateTests
 {
     [Fact]

@@ -7,8 +7,8 @@ using Xunit;
 namespace Sati.Tests;
 
 /// <summary>
-/// Scheduled work whose day has passed is lapsed: still stored as Scheduled, still offered by
-/// the leftover-work prompt, but no longer shown on the calendar or counted anywhere.
+/// Scheduled work whose day has passed remains a scheduled record, but the calendar
+/// describes its uncompleted units separately from documented work.
 /// </summary>
 public sealed class LapsedScheduledWorkTests
 {
@@ -28,7 +28,7 @@ public sealed class LapsedScheduledWorkTests
         Assert.False(NoteSchedulingPolicy.IsLapsedScheduled("Scheduled", null, Today));
 
     [Fact]
-    public void TheCalendarLeavesOutScheduledWorkWhoseDayHasPassed()
+    public void TheCalendarShowsPastPlannedUnitsAsRescheduledWithoutCountingThemAsWork()
     {
         var month = CalendarViewModel.BuildMonth(Today.Year, Today.Month,
         [
@@ -36,15 +36,22 @@ public sealed class LapsedScheduledWorkTests
             Note.Create("Written up.", Today.AddDays(-2), NoteStatus.Logged, 30, 1, noteType: NoteType.Contact),
             Note.Create("Old reminder.", Today.AddDays(-1), NoteStatus.Scheduled, null, 1, noteType: NoteType.Reminder),
             Note.Create("This afternoon.", Today, NoteStatus.Scheduled, 60, 1, noteType: NoteType.Visit),
+            Note.Create("Later visit.", Today.AddDays(5), NoteStatus.Scheduled, 30, 1, noteType: NoteType.Visit),
             Note.Create("Next week.", Today.AddDays(5), NoteStatus.Scheduled, null, 1, noteType: NoteType.Reminder)
         ], [], Today);
 
         var days = month.Cells.OfType<CalendarDay>().ToDictionary(day => day.Date);
-        Assert.Equal(["Written up."], days[Today.AddDays(-2)].Notes.Select(note => note.Narrative));
+        Assert.Equal(["Missed visit.", "Written up."],
+            days[Today.AddDays(-2)].Notes.Select(note => note.Narrative));
+        Assert.Equal("Rescheduled 4 · Logged 2", days[Today.AddDays(-2)].UnitsByStatusLabel);
+        Assert.DoesNotContain("Scheduled", days[Today.AddDays(-2)].UnitsByStatusLabel);
+        Assert.Equal(2, days[Today.AddDays(-2)].TotalUnits);
         Assert.Empty(days[Today.AddDays(-1)].Notes);
         Assert.Single(days[Today].Notes);
-        Assert.Single(days[Today.AddDays(5)].Notes);
-        // With the missed visit disregarded, the documented day counts.
+        Assert.Equal(2, days[Today.AddDays(5)].NoteCount);
+        Assert.Equal("Scheduled 4", days[Today].UnitsByStatusLabel);
+        Assert.Equal("Scheduled 2", days[Today.AddDays(5)].UnitsByStatusLabel);
+        // The missed visit is visible, but the documented day still counts.
         Assert.Equal(ProductivityDayKind.CountedWithSecuredUnits, days[Today.AddDays(-2)].ProductivityKind);
     }
 

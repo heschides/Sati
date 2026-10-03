@@ -294,6 +294,8 @@ public sealed class NotePanelRenderTests
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();
         var log = fixture.NotesWindow();
+        log.RangeStart = new DateTime(2026, 10, 1);
+        log.RangeEnd = new DateTime(2026, 10, 31);
 
         WpfUiHarness.Run(() =>
         {
@@ -305,6 +307,7 @@ public sealed class NotePanelRenderTests
             var search = WpfUiHarness.FindByAutomationName<TextBox>(view, "Search Text");
             var start = WpfUiHarness.FindByAutomationName<DatePicker>(view, "Range start date");
             var end = WpfUiHarness.FindByAutomationName<DatePicker>(view, "Range end date");
+            var keep = WpfUiHarness.FindByAutomationName<CheckBox>(view, "Keep note filters after save");
             var summary = FindNamed<Border>(view, "UnitsRangeSummary");
             var filter = FindNamed<Border>(view, "NotesFilterPanel");
 
@@ -313,10 +316,69 @@ public sealed class NotePanelRenderTests
             Assert.Equal(Top(client), Top(status), precision: 1);
             Assert.Equal(Top(client), Top(search), precision: 1);
             Assert.Equal(Top(start), Top(end), precision: 1);
+            Assert.Equal(Top(start), Top(keep), precision: 1);
             Assert.Equal(Top(start), Top(summary), precision: 1);
+            Assert.True(start.ActualWidth >= 160);
+            Assert.True(end.ActualWidth >= 160);
+
+            // The formatted date needs room inside the textbox as well as room
+            // for the calendar button. Resize down to the view's compact range
+            // and verify the controls wrap within the filter border.
+            foreach (var width in new[] { 1400d, 1100d, 850d })
+            {
+                WpfUiHarness.Realize(view, width, 900);
+                foreach (var picker in new[] { start, end })
+                {
+                    var text = Assert.IsAssignableFrom<TextBox>(
+                        picker.Template.FindName("PART_TextBox", picker));
+                    Assert.True(text.ActualWidth >= 110);
+                    Assert.True(Right(picker) <= filter.ActualWidth - 8);
+                }
+                Assert.True(Right(summary) <= filter.ActualWidth - 8);
+            }
 
             double Top(FrameworkElement element) =>
                 element.TranslatePoint(new Point(0, 0), filter).Y;
+            double Right(FrameworkElement element) =>
+                element.TranslatePoint(new Point(element.ActualWidth, 0), filter).X;
+        });
+    }
+
+    [Fact]
+    public async Task NotesLogKeepsMultilineNarrativesInCompactRowsWithFullTextAvailable()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var narrative = "Visit summary first line.\nAdditional visit documentation that stays in the editor.";
+        var note = await fixture.NotesFromAnotherSession().AddNoteAsync(
+            Note.Create(narrative, DateTime.Today, NoteStatus.Pending, 15,
+                fixture.PersonOneId, null, NoteType.Visit));
+        var log = fixture.NotesWindow();
+        await log.ReloadAsync();
+
+        WpfUiHarness.Run(() =>
+        {
+            var view = new NotesLogView { DataContext = log };
+            WpfUiHarness.Realize(view, 1400, 900);
+
+            var grid = WpfUiHarness.FindByAutomationName<DataGrid>(view, "Notes");
+            var row = Assert.Single(WpfUiHarness.Descendants(grid)
+                .OfType<DataGridRow>(),
+                candidate => candidate.Item is Note item && item.Id == note.Id);
+            var column = Assert.Single(grid.Columns,
+                candidate => Equals(candidate.Header, "Narrative"));
+            var cell = Assert.Single(WpfUiHarness.Descendants(row)
+                .OfType<DataGridCell>(),
+                candidate => ReferenceEquals(candidate.Column, column));
+            var preview = Assert.Single(WpfUiHarness.Descendants(cell).OfType<TextBlock>());
+
+            Assert.Equal(32, row.ActualHeight, precision: 1);
+            Assert.Equal(TextWrapping.NoWrap, preview.TextWrapping);
+            Assert.Equal(TextTrimming.CharacterEllipsis, preview.TextTrimming);
+            Assert.Equal(
+                "Visit summary first line. Additional visit documentation that stays in the editor.",
+                preview.Text);
+            Assert.Equal(narrative, preview.ToolTip);
+            Assert.Equal(narrative, System.Windows.Automation.AutomationProperties.GetHelpText(preview));
         });
     }
 

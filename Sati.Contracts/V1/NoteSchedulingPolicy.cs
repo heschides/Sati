@@ -18,8 +18,8 @@ public static class NoteSchedulingPolicy
     /// A Scheduled note whose date has passed. The row is not changed: it stays Scheduled until
     /// the case manager documents, reschedules, or deletes it, and the leftover-work prompt still
     /// offers it for that. But planned work that did not happen on its day is not a fact about
-    /// that day, so the calendar and every calculation built on it disregard the note. Today's
-    /// Scheduled work is still live.
+    /// that day. Productivity calculations disregard it, while the calendar may show its
+    /// planned units separately from documented work. Today's Scheduled work is still live.
     /// </summary>
     public static bool IsLapsedScheduled(string? status, DateTime? eventDate, DateTime today) =>
         string.Equals(status, ScheduledStatus, StringComparison.OrdinalIgnoreCase) &&

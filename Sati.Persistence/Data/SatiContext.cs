@@ -33,6 +33,7 @@ namespace Sati.Data
         public DbSet<SignatureDatabaseEnvironment> SignatureDatabaseEnvironment => Set<SignatureDatabaseEnvironment>();
         public DbSet<DocumentTemplate> DocumentTemplates { get; set; }
         public DbSet<Note> Notes { get; set; }
+        public DbSet<ScheduledNoteMove> ScheduledNoteMoves => Set<ScheduledNoteMove>();
         public DbSet<Settings> Settings { get; set; }
         public DbSet<BillingCompliancePolicyVersion> BillingCompliancePolicyVersions { get; set; }
         public DbSet<Sati.Models.BillingComplianceRecoveryDecision> BillingComplianceRecoveryDecisions { get; set; }
@@ -552,6 +553,7 @@ namespace Sati.Data
                       .HasForeignKey(n => n.AgencyId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
+            ScheduledNoteMovePersistenceModel.Configure<Note>(modelBuilder);
 
             modelBuilder.Entity<Form>(entity =>
             {

@@ -200,9 +200,9 @@ public sealed class WorkAgendaMigrationTests
     [LocalSqlFact]
     public async Task SystemDataSqlClientSessionTempTableSurvivesParameterizedCommands()
     {
-        const string script = """
+        var script = """
             $ErrorActionPreference = 'Stop'
-            $connection = New-Object System.Data.SqlClient.SqlConnection 'Server=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=true;Encrypt=false;Connect Timeout=30;Application Name=Sati temp-table scope test;'
+            $connection = New-Object System.Data.SqlClient.SqlConnection 'Server=__SATI_TEST_LOCALDB_SERVER__;Database=master;Integrated Security=true;Encrypt=false;Connect Timeout=30;Application Name=Sati temp-table scope test;'
             try {
                 $connection.Open()
 
@@ -228,7 +228,7 @@ public sealed class WorkAgendaMigrationTests
                 'TEMP_SCOPE_OK'
             }
             finally { $connection.Dispose() }
-            """;
+            """.Replace("__SATI_TEST_LOCALDB_SERVER__", SqlTestLocalDb.DataSource, StringComparison.Ordinal);
 
         var startInfo = new System.Diagnostics.ProcessStartInfo("powershell.exe")
         {
@@ -516,7 +516,7 @@ public sealed class WorkAgendaMigrationTests
 
     private static string ConnectionTo(string catalog) => new SqlConnectionStringBuilder
     {
-        DataSource = @"(localdb)\MSSQLLocalDB",
+        DataSource = SqlTestLocalDb.DataSource,
         InitialCatalog = catalog,
         IntegratedSecurity = true,
         Encrypt = false,

@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Sati.Tests;
 
+[Collection(WpfViewCollection.Name)]
 public sealed class ProfilePhotoPreparerTests
 {
     private static readonly Color Red = Color.FromRgb(220, 30, 30);

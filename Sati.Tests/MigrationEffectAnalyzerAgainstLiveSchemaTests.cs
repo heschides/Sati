@@ -116,7 +116,7 @@ public sealed class MigrationEffectAnalyzerAgainstLiveSchemaTests(ITestOutputHel
 
     private static string ConnectionTo(string catalog) => new SqlConnectionStringBuilder
     {
-        DataSource = @"(localdb)\MSSQLLocalDB",
+        DataSource = SqlTestLocalDb.DataSource,
         InitialCatalog = catalog,
         IntegratedSecurity = true,
         Encrypt = false,
@@ -167,6 +167,6 @@ public sealed class LocalSqlFactAttribute : FactAttribute
     public LocalSqlFactAttribute()
     {
         if (!OperatingSystem.IsWindows() || Environment.GetEnvironmentVariable("SATI_RUN_SQLSERVER_TESTS") != "1")
-            Skip = "Set SATI_RUN_SQLSERVER_TESTS=1 on Windows to run against disposable synthetic LocalDB databases.";
+            Skip = "Use the isolated LocalDB test wrapper on Windows.";
     }
 }

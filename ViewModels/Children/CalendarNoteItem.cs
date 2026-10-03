@@ -11,10 +11,12 @@ namespace Sati.ViewModels.Children;
 public sealed class CalendarNoteItem
 {
     private readonly Note _note;
+    private readonly DateTime _today;
 
-    public CalendarNoteItem(Note note)
+    public CalendarNoteItem(Note note, DateTime? today = null)
     {
         _note = note ?? throw new ArgumentNullException(nameof(note));
+        _today = (today ?? DateTime.Today).Date;
     }
 
     public int Id => _note.Id;
@@ -27,8 +29,13 @@ public sealed class CalendarNoteItem
         : _note.Narrative;
     public int? Minutes => _note.Minutes;
     public int? Units => _note.Units;
+    /// <summary>Units represented by documented work in the calendar's daily headline.</summary>
+    public bool CountsTowardDayTotal => _note.Status is
+        NoteStatus.Pending or NoteStatus.Logged or NoteStatus.Approved;
     public int? StartTime => _note.StartTime;
     public bool IsReminder => _note.NoteType == NoteType.Reminder;
+    public bool IsLapsedScheduled => NoteSchedulingPolicy.IsLapsedScheduled(
+        _note.Status?.ToString(), _note.EventDate, _today);
     public string NoteTypeLabel => _note.ActivityLabel;
 
     /// <summary>The note as the shared productivity rules read it.</summary>
@@ -40,6 +47,7 @@ public sealed class CalendarNoteItem
 
     public string StatusLabel => _note.Status switch
     {
+        NoteStatus.Scheduled when IsLapsedScheduled => "Rescheduled",
         NoteStatus.HeldForCompliance => "Held for compliance",
         NoteStatus.ComplianceBlocked => "Compliance blocked",
         null => "Status not recorded",

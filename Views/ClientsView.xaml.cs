@@ -169,5 +169,11 @@ namespace Sati.Views
                 vm.IsEditMode = true;
             }
         }
+
+        private void ClientNoteList_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            if (DataContext is NewClientViewModel vm)
+                vm.EditSelectedClientNoteCommand.Execute(null);
+        }
     }
 }

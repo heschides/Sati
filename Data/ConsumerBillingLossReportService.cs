@@ -49,7 +49,8 @@ namespace Sati.Data
             // Those unbounded columns are not needed to classify days or total units.
             var people = await context.People
                 .AsNoTracking()
-                .Where(p => p.UserId == userId && p.AgencyId == agencyId)
+                .Where(p => p.UserId == userId && p.AgencyId == agencyId &&
+                            p.Status != PersonStatus.Ghost)
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .Select(p => new PersonReportItem(

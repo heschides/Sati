@@ -62,7 +62,7 @@ internal sealed class SyntheticPipelineDatabase : IAsyncDisposable
 
     private static string LocalConnection(string catalog) => new SqlConnectionStringBuilder
     {
-        DataSource = @"(localdb)\MSSQLLocalDB", InitialCatalog = catalog,
+        DataSource = SqlTestLocalDb.DataSource, InitialCatalog = catalog,
         IntegratedSecurity = true, Encrypt = false, ConnectTimeout = 15,
         ApplicationName = "Sati synthetic pipeline acceptance tests"
     }.ConnectionString;
@@ -139,7 +139,7 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
         // Same bootstrap-only placeholder as SatiApiFactory; the provider is replaced
         // before startup. No external account or connection settings are consulted.
         Environment.SetEnvironmentVariable("ConnectionStrings__SatiDemo",
-            @"Server=(localdb)\MSSQLLocalDB;Database=SatiApiTests;Trusted_Connection=True;Encrypt=False;");
+            @"Server=(localdb)\SatiUnusedTestPlaceholder;Database=SatiApiTests;Trusted_Connection=True;Encrypt=False;");
         Environment.SetEnvironmentVariable("Authentication__Issuer", "Sati.Api.Tests");
         Environment.SetEnvironmentVariable("Authentication__Audience", "Sati.Api.Tests");
         Environment.SetEnvironmentVariable("Authentication__SigningKey", SigningKey);
@@ -282,6 +282,27 @@ public sealed class SqlServerFactAttribute : FactAttribute
     public SqlServerFactAttribute()
     {
         if (!OperatingSystem.IsWindows() || Environment.GetEnvironmentVariable("SATI_RUN_SQLSERVER_TESTS") != "1")
-            Skip = "Opt-in SQL Server rehearsal: set SATI_RUN_SQLSERVER_TESTS=1 on Windows with MSSQLLocalDB installed.";
+            Skip = "Opt-in SQL Server rehearsal: use the isolated LocalDB test wrapper on Windows.";
+    }
+}
+
+internal static class SqlTestLocalDb
+{
+    public static string DataSource
+    {
+        get
+        {
+            if (!OperatingSystem.IsWindows() ||
+                Environment.GetEnvironmentVariable("SATI_RUN_SQLSERVER_TESTS") != "1")
+                throw new InvalidOperationException("SQL Server tests require explicit Windows opt-in.");
+
+            var instance = Environment.GetEnvironmentVariable("SATI_SQL_TEST_LOCALDB_INSTANCE");
+            if (instance is null || !Regex.IsMatch(instance,
+                    @"\ASatiSqlTests_[0-9a-f]{32}\z", RegexOptions.CultureInvariant))
+                throw new InvalidOperationException(
+                    "SQL Server tests require an isolated SATI_SQL_TEST_LOCALDB_INSTANCE named SatiSqlTests_<32 lowercase hex>.");
+
+            return $@"(localdb)\{instance}";
+        }
     }
 }

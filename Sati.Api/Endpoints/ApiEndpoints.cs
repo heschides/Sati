@@ -4977,6 +4977,25 @@ internal static partial class ApiEndpoints
             ContractMapper.TryParseFormType(request.FormType, out var formType);
             ContractMapper.TryParseNoteType(request.NoteType, out var noteType);
             ContractMapper.TryParseGoalProgress(request.GoalProgress, out var goalProgress);
+            if (NoteScheduleMoveRules.ShouldRecord(
+                    ContractMapper.NullableNameAt(ContractMapper.NoteStatusNames, row.Note.Status),
+                    row.Note.EventDate, request.EventDate,
+                    ContractMapper.NullableNameAt(ContractMapper.NoteTypeNames, row.Note.NoteType)))
+            {
+                db.ScheduledNoteMoves.Add(new ScheduledNoteMove
+                {
+                    NoteId = row.Note.Id,
+                    PersonId = row.Note.PersonId,
+                    AgencyId = actor.AgencyId,
+                    UserId = actor.UserId,
+                    FromDate = row.Note.EventDate!.Value.Date,
+                    ToDate = request.EventDate!.Value.Date,
+                    ScheduledMinutes = row.Note.Minutes,
+                    ScheduledUnits = NoteScheduleMoveRules.FrozenUnits(row.Note.Minutes),
+                    NoteRevision = row.Note.Revision + 1,
+                    MovedAtUtc = clock.UtcNow.UtcDateTime
+                });
+            }
             row.Note.Narrative = request.Narrative;
             row.Note.EventDate = request.EventDate;
             row.Note.Status = status;
@@ -5126,6 +5145,64 @@ internal static partial class ApiEndpoints
             return Results.Ok(rows.Select(x => ContractMapper.ToNote(x.Note, x.Person)).ToList());
         });
 
+        api.MapGet("/notes/schedule-moves/year/{year:int}", async (
+            int year,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            if (year is < 2000 or > 2200)
+                return Results.BadRequest();
+            var actor = Actor.From(principal);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
+
+            var first = new DateTime(year, 1, 1);
+            var end = first.AddYears(1);
+            var rows = await (from move in db.ScheduledNoteMoves.AsNoTracking()
+                              join note in db.Notes.AsNoTracking() on move.NoteId equals note.Id
+                              join person in TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+                                  on move.PersonId equals person.Id
+                              join currentPerson in TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+                                  on note.PersonId equals currentPerson.Id
+                              where move.UserId == actor.UserId &&
+                                    move.AgencyId == actor.AgencyId &&
+                                    note.AgencyId == actor.AgencyId &&
+                                    person.UserId == actor.UserId &&
+                                    person.AgencyId == actor.AgencyId &&
+                                    person.Status != (int)PersonStatus.Ghost &&
+                                    currentPerson.UserId == actor.UserId &&
+                                    currentPerson.AgencyId == actor.AgencyId &&
+                                    currentPerson.Status != (int)PersonStatus.Ghost &&
+                                    move.FromDate >= first && move.FromDate < end
+                              orderby move.FromDate, move.Id
+                              select new
+                              {
+                                  Move = move,
+                                  CurrentNoteDate = note.EventDate,
+                                  person.FirstName,
+                                  person.LastName
+                              }).ToListAsync(cancellationToken);
+            var result = rows
+                .Where(row => row.CurrentNoteDate?.Date != row.Move.FromDate.Date)
+                .GroupBy(row => (row.Move.NoteId, row.Move.FromDate.Date))
+                .Select(group => group.OrderByDescending(row => row.Move.NoteRevision).First())
+                .OrderBy(row => row.Move.FromDate)
+                .ThenBy(row => row.Move.Id)
+                .Select(row => new ScheduledNoteMoveDto(
+                    row.Move.Id,
+                    row.Move.NoteId,
+                    row.Move.PersonId,
+                    ($"{row.LastName}, {row.FirstName}").Trim(' ', ','),
+                    row.Move.FromDate,
+                    row.Move.ToDate,
+                    row.Move.ScheduledMinutes,
+                    row.Move.ScheduledUnits,
+                    row.Move.MovedAtUtc))
+                .ToList();
+            return Results.Ok(result);
+        });
+
         api.MapGet("/notes/year/{year:int}", async (
             int year,
             ClaimsPrincipal principal,
@@ -5142,6 +5219,7 @@ internal static partial class ApiEndpoints
             var rows = await (from note in db.Notes.AsNoTracking()
                               join person in TenantAccess.OwnedPeople(db, actor).AsNoTracking() on note.PersonId equals person.Id
                               where note.AgencyId == actor.AgencyId &&
+                                    person.Status != (int)PersonStatus.Ghost &&
                                     note.EventDate >= first && note.EventDate < end
                               select new { Note = note, Person = person })
                 .ToListAsync(cancellationToken);
@@ -5810,6 +5888,139 @@ internal static partial class ApiEndpoints
 
     private static void MapReports(RouteGroupBuilder api)
     {
+        api.MapGet("/reports/statistics-breakdown", async Task<IResult> (
+            DateTime start,
+            DateTime end,
+            StatisticsPeriod period,
+            int? personId,
+            ClaimsPrincipal principal,
+            ApiDbContext db,
+            ApiClock clock,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                StatisticsBreakdownBuilder.ValidateWindow(start, end, period);
+            }
+            catch (ArgumentException)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["window"] = ["Choose a date window within 2000-2200, no longer than 10 years, and a supported grouping."]
+                });
+            }
+            if (personId is <= 0)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["personId"] = ["Choose a valid consumer."]
+                });
+
+            var actor = Actor.From(principal);
+            if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
+                return Results.Forbid();
+
+            var peopleQuery = TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+                .Where(person => person.Status != (int)PersonStatus.Ghost);
+            if (personId is int selectedPersonId)
+            {
+                if (!await peopleQuery.AnyAsync(person => person.Id == selectedPersonId, cancellationToken))
+                    return Results.Forbid();
+                peopleQuery = peopleQuery.Where(person => person.Id == selectedPersonId);
+            }
+
+            var people = await peopleQuery
+                .Select(person => new { person.Id, person.FirstName, person.LastName })
+                .ToListAsync(cancellationToken);
+            var clients = people.Select(person =>
+            {
+                var name = $"{person.FirstName ?? string.Empty} {person.LastName ?? string.Empty}".Trim();
+                return new StatisticsClientFact(person.Id,
+                    name.Length == 0 ? $"Consumer #{person.Id}" : name);
+            }).ToList();
+            var personIds = clients.Select(client => client.PersonId).ToList();
+            var windowStart = start.Date;
+            var windowEndExclusive = end.Date.AddDays(1);
+
+            var noteRows = await (from note in db.Notes.AsNoTracking()
+                                  join person in peopleQuery on note.PersonId equals person.Id
+                                  where personIds.Contains(person.Id) &&
+                                        note.AgencyId == actor.AgencyId &&
+                                        person.AgencyId == actor.AgencyId &&
+                                        note.EventDate.HasValue &&
+                                        note.EventDate.Value >= windowStart &&
+                                        note.EventDate.Value < windowEndExclusive &&
+                                        (note.Status == (int)NoteStatus.Pending ||
+                                         note.Status == (int)NoteStatus.Logged ||
+                                         note.Status == (int)NoteStatus.Approved ||
+                                         note.Status == (int)NoteStatus.Abandoned ||
+                                         note.Status == (int)NoteStatus.ComplianceBlocked)
+                                  select new
+                                  {
+                                      note.PersonId,
+                                      EventDate = note.EventDate!.Value,
+                                      note.Status,
+                                      note.Minutes,
+                                      note.Activities,
+                                      note.NoteType,
+                                      note.IsUnbilled
+                                  }).ToListAsync(cancellationToken);
+            var notes = noteRows.Select(note => new StatisticsNoteFact(
+                note.PersonId, note.EventDate, ContractMapper.NoteStatusName(note.Status),
+                note.Minutes, note.Activities, ContractMapper.NoteTypeName(note.NoteType),
+                note.IsUnbilled))
+                .ToList();
+
+            var claimRows = await (from line in db.ClaimLines.AsNoTracking()
+                                   join billingPeriod in db.BillingPeriods.AsNoTracking()
+                                       on line.BillingPeriodId equals billingPeriod.Id
+                                   join note in db.Notes.AsNoTracking()
+                                       on line.NoteId equals note.Id
+                                   join person in peopleQuery on note.PersonId equals person.Id
+                                   where personIds.Contains(person.Id) &&
+                                         note.AgencyId == actor.AgencyId &&
+                                         person.AgencyId == actor.AgencyId &&
+                                         billingPeriod.UserId == actor.UserId &&
+                                         (billingPeriod.SubmittedAt != null ||
+                                          billingPeriod.Status != (int)BillingStatus.Draft) &&
+                                         line.DateOfService >= windowStart &&
+                                         line.DateOfService < windowEndExclusive
+                                   select new
+                                   {
+                                       note.PersonId,
+                                       line.DateOfService,
+                                       Units = (decimal?)line.Units,
+                                       note.Activities,
+                                       note.NoteType,
+                                       WasSubmitted = db.BillingSubmissionEvents.AsNoTracking()
+                                           .Any(submission =>
+                                               submission.AgencyId == actor.AgencyId &&
+                                               submission.BillingPeriodId == billingPeriod.Id &&
+                                               submission.Stage == BillingSubmissionStage.Transmitted &&
+                                               !submission.IsSynthetic &&
+                                               submission.EdiGenerationId.HasValue &&
+                                               db.EdiGenerations.AsNoTracking().Any(generation =>
+                                                   generation.Id == submission.EdiGenerationId.Value &&
+                                                   generation.AgencyId == actor.AgencyId &&
+                                                   generation.BillingPeriodId == billingPeriod.Id &&
+                                                   !generation.IsCorrection &&
+                                                   !generation.IsTest))
+                                   }).ToListAsync(cancellationToken);
+            var claims = claimRows.Select(row => new StatisticsClaimFact(
+                row.PersonId, row.DateOfService, row.Units,
+                row.Activities, ContractMapper.NoteTypeName(row.NoteType),
+                row.WasSubmitted, WasLocked: true))
+                .ToList();
+
+            var configuredWindow = await db.Settings.AsNoTracking()
+                .Where(settings => settings.AgencyId == actor.AgencyId)
+                .Select(settings => (int?)settings.AbandonedAfterDays)
+                .SingleOrDefaultAsync(cancellationToken);
+            var documentationWindowDays = ProductivityForecast.NormalizeDocumentationWindowDays(configuredWindow);
+            return Results.Ok(StatisticsBreakdownBuilder.Build(
+                start, end, period, clock.Today, documentationWindowDays,
+                clients, notes, claims));
+        });
+
         api.MapGet("/reports/productivity-days/{year:int}/{month:int}", async Task<IResult> (
             int year,
             int month,
@@ -5834,6 +6045,7 @@ internal static partial class ApiEndpoints
                                   on note.PersonId equals person.Id
                               where person.UserId == actor.UserId &&
                                     person.AgencyId == actor.AgencyId &&
+                                    person.Status != (int)PersonStatus.Ghost &&
                                     note.AgencyId == actor.AgencyId &&
                                     note.EventDate.HasValue &&
                                     note.EventDate.Value >= start &&
@@ -5880,6 +6092,7 @@ internal static partial class ApiEndpoints
                                   on note.PersonId equals person.Id
                               where person.UserId == actor.UserId &&
                                     person.AgencyId == actor.AgencyId &&
+                                    person.Status != (int)PersonStatus.Ghost &&
                                     note.AgencyId == actor.AgencyId &&
                                     note.EventDate.HasValue &&
                                     note.EventDate.Value >= start &&
@@ -5928,6 +6141,7 @@ internal static partial class ApiEndpoints
             var compliancePolicy = await LoadBillingCompliancePolicyContextAsync(
                 db, actor.AgencyId, cancellationToken);
             var people = await TenantAccess.OwnedPeople(db, actor).AsNoTracking()
+                .Where(person => person.Status != (int)PersonStatus.Ghost)
                 .OrderBy(x => x.LastName)
                 .ThenBy(x => x.FirstName)
                 .Select(x => new BillingLossPersonRow(x.Id, x.FirstName, x.LastName, x.EffectiveDate))
@@ -8093,6 +8307,24 @@ internal static partial class ApiEndpoints
                             ManualAttestationNoteRules.ScheduledNoteChangedMessage, string.Empty));
 
                     var plannedOn = linked.EventDate;
+                    if (NoteScheduleMoveRules.ShouldRecord(
+                            ContractMapper.NullableNameAt(ContractMapper.NoteStatusNames, linked.Status),
+                            plannedOn, request.CompletedOn.Date, noteType))
+                    {
+                        db.ScheduledNoteMoves.Add(new ScheduledNoteMove
+                        {
+                            NoteId = linked.Id,
+                            PersonId = linked.PersonId,
+                            AgencyId = actor.AgencyId,
+                            UserId = person.UserId,
+                            FromDate = plannedOn!.Value.Date,
+                            ToDate = request.CompletedOn.Date,
+                            ScheduledMinutes = linked.Minutes,
+                            ScheduledUnits = NoteScheduleMoveRules.FrozenUnits(linked.Minutes),
+                            NoteRevision = linked.Revision + 1,
+                            MovedAtUtc = clock.UtcNow.UtcDateTime
+                        });
+                    }
                     linked.EventDate = request.CompletedOn.Date;
                     linked.Status = NoteWorkflow.Pending;
                     linked.Revision++;
@@ -8103,7 +8335,17 @@ internal static partial class ApiEndpoints
                             actualWorkDate = request.CompletedOn.Date.ToString("yyyy-MM-dd"),
                             newStatus = "Pending"
                         }));
-                    await db.SaveChangesAsync(cancellationToken);
+                    try
+                    {
+                        await db.SaveChangesAsync(cancellationToken);
+                    }
+                    catch (DbUpdateConcurrencyException)
+                    {
+                        return Results.Conflict(new ApiErrorDto(
+                            "scheduled_form_note_changed",
+                            ManualAttestationNoteRules.ScheduledNoteChangedMessage,
+                            string.Empty));
+                    }
                 }
                 else
                 {

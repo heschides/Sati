@@ -3602,6 +3602,53 @@ namespace Sati.Migrations
                     b.ToTable("SafetyPlans");
                 });
 
+            modelBuilder.Entity("Sati.Models.ScheduledNoteMove", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AgencyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FromDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("MovedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("NoteId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NoteRevision")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PersonId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ScheduledMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ScheduledUnits")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ToDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId", "NoteRevision");
+
+                    b.HasIndex("UserId", "FromDate");
+
+                    b.ToTable("ScheduledNoteMoves", (string)null);
+                });
+
             modelBuilder.Entity("Sati.Models.Scratchpad", b =>
                 {
                     b.Property<int>("Id")
@@ -6011,6 +6058,15 @@ namespace Sati.Migrations
                     b.Navigation("AuthorUser");
 
                     b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("Sati.Models.ScheduledNoteMove", b =>
+                {
+                    b.HasOne("Sati.Models.Note", null)
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sati.Models.ScratchpadComment", b =>

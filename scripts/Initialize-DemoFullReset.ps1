@@ -45,6 +45,15 @@ EXEC @captureLockResult=sys.sp_getapplock @Resource=N'SatiDemo.FullReset',
     @LockMode=N'Exclusive', @LockOwner=N'Transaction', @LockTimeout=60000;
 IF @captureLockResult < 0 THROW 51001, 'The Demo is busy; baseline capture did not begin.', 1;
 
+-- The deployed reset Function carries a packaged copy of the seed. Until that
+-- Function is republished, its older seed cannot clear frozen move rows before
+-- reanchoring scheduled note dates. Require an empty move table in the captured
+-- baseline so the existing Function remains safe after this schema migration.
+IF OBJECT_ID(N'dbo.ScheduledNoteMoves', N'U') IS NOT NULL
+    EXEC sys.sp_executesql N'
+        IF EXISTS (SELECT 1 FROM dbo.ScheduledNoteMoves)
+            THROW 51011, ''Scheduled-note moves must be empty before Demo baseline capture.'', 1;';
+
 -- This table deliberately stays outside demo_baseline. The snapshot is a
 -- calendar template; its anchor tells every later reset how far to move that
 -- template. LastAppliedAsOfDate makes a direct same-day seed rerun idempotent.

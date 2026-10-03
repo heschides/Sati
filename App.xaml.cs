@@ -558,6 +558,7 @@ namespace Sati
             services.AddTransient<IConsumerScheduleService, ConsumerScheduleService>();
             services.AddTransient<IReleaseObligationService, ReleaseObligationService>();
             services.AddTransient<INoteService, NoteService>();
+            services.AddTransient<IScheduledNoteMoveService, ScheduledNoteMoveService>();
             services.AddTransient<IAuthService, AuthService>();
             services.AddTransient<IUserService, UserService>();
             services.AddSingleton<ISessionLifetime>(sp => (ISessionLifetime)sp.GetRequiredService<ISessionService>());
@@ -576,6 +577,7 @@ namespace Sati
             services.AddTransient<IServiceDayInclusionService, ServiceDayInclusionService>();
             services.AddTransient<IConsumerBillingLossReportService, ConsumerBillingLossReportService>();
             services.AddTransient<IProductivityReportService, ProductivityReportService>();
+            services.AddTransient<IStatisticsBreakdownService, StatisticsBreakdownService>();
             services.AddTransient<IReviewItemService, ReviewItemService>();
             services.AddSingleton<IClientAiContextService, ClientAiContextService>();
             services.AddTransient<IATRequestService, ATRequestService>();
@@ -633,6 +635,7 @@ namespace Sati
             services.AddTransient<IPersonService, CloudPersonService>();
             services.AddTransient<IPersonPhotoService, CloudPersonPhotoService>();
             services.AddTransient<INoteService, CloudNoteService>();
+            services.AddTransient<IScheduledNoteMoveService, CloudScheduledNoteMoveService>();
             services.AddTransient<ISettingsService, CloudSettingsService>();
             services.AddTransient<IScratchpadService, CloudScratchpadService>();
             services.AddSingleton<IChatService, CloudChatService>();
@@ -670,6 +673,7 @@ namespace Sati
             services.AddTransient<IPersonCenteredPlanSourceService, CloudPersonCenteredPlanSourceService>();
             services.AddTransient<IConsumerBillingLossReportService, CloudConsumerBillingLossReportService>();
             services.AddTransient<IProductivityReportService, CloudProductivityReportService>();
+            services.AddTransient<IStatisticsBreakdownService, CloudStatisticsBreakdownService>();
             services.AddTransient<IBillingService, CloudBillingService>();
             services.AddTransient<IEdiService, CloudEdiService>();
             services.AddSingleton<IClientAiContextService, CloudClientAiContextService>();

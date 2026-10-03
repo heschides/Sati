@@ -754,6 +754,29 @@ public sealed class FormService(
                         ManualAttestationNoteRules.ScheduledNoteChangedMessage);
 
                 var plannedOn = note.EventDate;
+                if (NoteScheduleMoveRules.ShouldRecord(
+                        note.Status?.ToString(), plannedOn, completedOn.Date,
+                        note.NoteType?.ToString()))
+                {
+                    var scheduledOwnerId = await context.People.AsNoTracking()
+                        .Where(person => person.Id == note.PersonId &&
+                                         person.AgencyId == actor.AgencyId)
+                        .Select(person => person.UserId)
+                        .SingleAsync();
+                    context.ScheduledNoteMoves.Add(new ScheduledNoteMove
+                    {
+                        NoteId = note.Id,
+                        PersonId = note.PersonId,
+                        AgencyId = actor.AgencyId,
+                        UserId = scheduledOwnerId,
+                        FromDate = plannedOn!.Value.Date,
+                        ToDate = completedOn.Date,
+                        ScheduledMinutes = note.Minutes,
+                        ScheduledUnits = NoteScheduleMoveRules.FrozenUnits(note.Minutes),
+                        NoteRevision = note.Revision + 1,
+                        MovedAtUtc = DateTime.UtcNow
+                    });
+                }
                 note.EventDate = completedOn.Date;
                 note.Status = NoteStatus.Pending;
                 note.Revision++;
@@ -765,7 +788,15 @@ public sealed class FormService(
                         actualWorkDate = completedOn.Date.ToString("yyyy-MM-dd"),
                         newStatus = "Pending"
                     }));
-                await context.SaveChangesAsync();
+                try
+                {
+                    await context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException exception)
+                {
+                    throw new InvalidOperationException(
+                        ManualAttestationNoteRules.ScheduledNoteChangedMessage, exception);
+                }
                 return note.Id;
             }
 

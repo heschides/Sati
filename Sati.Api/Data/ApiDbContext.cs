@@ -29,6 +29,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<SignatureDatabaseEnvironment> SignatureDatabaseEnvironment => Set<SignatureDatabaseEnvironment>();
     public DbSet<ServerDocumentTemplate> DocumentTemplates => Set<ServerDocumentTemplate>();
     public DbSet<ServerNote> Notes => Set<ServerNote>();
+    public DbSet<ScheduledNoteMove> ScheduledNoteMoves => Set<ScheduledNoteMove>();
     public DbSet<ServerSettings> Settings => Set<ServerSettings>();
     public DbSet<BillingCompliancePolicyVersion> BillingCompliancePolicyVersions => Set<BillingCompliancePolicyVersion>();
     public DbSet<Sati.Models.BillingComplianceRecoveryDecision> BillingComplianceRecoveryDecisions => Set<Sati.Models.BillingComplianceRecoveryDecision>();
@@ -333,6 +334,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .HasForeignKey(x => x.ReleaseObligationId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+        ScheduledNoteMovePersistenceModel.Configure<ServerNote>(modelBuilder);
 
         modelBuilder.Entity<ServerSettings>(entity =>
         {

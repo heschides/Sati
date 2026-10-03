@@ -650,10 +650,10 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.33", version);
+        Assert.Equal("1.3.34", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Schedules and clearer daily work", ProductReleaseNotes.ReleaseName);
-        Assert.Equal("October 2, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Equal("Clearer notes, calendar, and statistics", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("October 3, 2026", ProductReleaseNotes.ReleaseDate);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Prepare the OADS Safety Device request" &&
             section.Items.Any(item => item.Contains("signatures outside Sati", StringComparison.Ordinal)));
@@ -1340,81 +1340,6 @@ public sealed class StabilizationTests
         Assert.StartsWith("OVERDUE", cell.CellText, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void ParameterlessFeatureViewsCanOpenRenderAndCloseOnAnStaThread()
-    {
-        string? currentType = null;
-        var exercisedTypes = new List<string>();
-
-        // The Application and its STA thread belong to WpfUiHarness. WPF allows one
-        // per process for the life of the process, so a test that builds its own
-        // makes whichever test runs second fail — see the remarks on the harness.
-        using var host = Host.CreateDefaultBuilder()
-            .ConfigureServices(services =>
-            {
-                services.AddSingleton<ISessionService, SessionService>();
-                services.AddSingleton<IComprehensiveAssessmentService, SmokeAssessmentService>();
-                services.AddSingleton<IPersonCenteredPlanSourceService, SmokePlanSourceService>();
-                // The assessment workspace resolves these in its constructor to offer the
-                // consumer's providers on a need. Registered here so the smoke test keeps
-                // covering that view rather than skipping it.
-                services.AddSingleton<IConsumerProviderService, SmokeConsumerProviderService>();
-                services.AddSingleton<IProviderService, SmokeProviderService>();
-            })
-            .Build();
-
-        WpfUiHarness.RunWithHost(host, () =>
-        {
-            var viewTypes = typeof(App).Assembly.GetTypes()
-                .Where(type => type.IsPublic && !type.IsAbstract)
-                .Where(type => type.Namespace?.StartsWith("Sati.Views", StringComparison.Ordinal) == true)
-                .Where(type => typeof(System.Windows.FrameworkElement).IsAssignableFrom(type))
-                .Where(type => type.GetConstructor(Type.EmptyTypes) is not null)
-                .OrderBy(type => type.FullName, StringComparer.Ordinal)
-                .ToList();
-
-            foreach (var type in viewTypes)
-            {
-                currentType = type.FullName;
-                try
-                {
-                    var element = Assert.IsAssignableFrom<System.Windows.FrameworkElement>(
-                        Activator.CreateInstance(type));
-                    if (element is System.Windows.Window window)
-                    {
-                        window.Show();
-                        window.UpdateLayout();
-                        window.Close();
-                    }
-                    else
-                    {
-                        element.Measure(new System.Windows.Size(1280, 720));
-                        element.Arrange(new System.Windows.Rect(0, 0, 1280, 720));
-                        element.UpdateLayout();
-                        element.RaiseEvent(new System.Windows.RoutedEventArgs(
-                            System.Windows.FrameworkElement.LoadedEvent));
-                        element.RaiseEvent(new System.Windows.RoutedEventArgs(
-                            System.Windows.FrameworkElement.UnloadedEvent));
-                    }
-
-                    exercisedTypes.Add(type.FullName!);
-                    currentType = null;
-                }
-                catch (Exception ex)
-                {
-                    throw new InvalidOperationException(
-                        $"Feature view '{type.FullName}' could not open, render, and close.", ex);
-                }
-            }
-
-            if (viewTypes.Count < 20)
-                throw new InvalidOperationException($"Only {viewTypes.Count} feature views were discovered.");
-        }, TimeSpan.FromSeconds(60));
-
-        Assert.True(exercisedTypes.Count >= 20,
-            $"Expected at least 20 feature views, exercised {exercisedTypes.Count}. " +
-            $"Current view: {currentType ?? "none"}.");
-    }
     [Fact]
     public void RepeatedUiFailuresHaveAStableTechnicalFingerprint()
     {

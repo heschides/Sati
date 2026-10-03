@@ -88,6 +88,7 @@ public static class ApiSurface
         // of billing without leaving the ordinary supervisor-review workflow.
         "annual-pcp-and-unbilled-note-v1",
         "multi-activity-note-v1",
+        "scheduled-note-move-history-v1",
         "manual-attestation-note-link-v1",
         "form-work-billing-v1",
         "form-attestation-change-review-v1",
@@ -192,6 +193,7 @@ public static class ApiSurface
         "GET /api/v1/me",
         "GET /api/v1/notes/day",
         "GET /api/v1/notes/monthly",
+        "GET /api/v1/notes/schedule-moves/year/{year:int}",
         "GET /api/v1/notes/year/{year:int}",
         "GET /api/v1/people/{personId:int}/ai-context",
         "GET /api/v1/people/{personId:int}/annual-documents",
@@ -227,6 +229,7 @@ public static class ApiSurface
         "GET /api/v1/reports/consumer-billing-loss",
         "GET /api/v1/reports/productivity-days/{year:int}/{month:int}",
         "GET /api/v1/reports/productivity-units",
+        "GET /api/v1/reports/statistics-breakdown",
         "GET /api/v1/representative-payee/check-requests",
         "GET /api/v1/representative-payee/consumers",
         "GET /api/v1/representative-payee/consumers/{personId:int}/ledger",

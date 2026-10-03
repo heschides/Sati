@@ -1,5 +1,113 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.34 — October 3, 2026 (in progress; not published)
+
+"Clearer notes, calendar, and statistics." Scope: a consumer-scoped Notes
+workspace, compact note-list previews and roomier Notes Log dates, configurable
+caseload Statistics, and daily calendar counts that keep past scheduled work
+separate from documented units. `20261002221023_AddScheduledNoteMoves` adds the
+schedule-move history table; moves made before this release cannot be recovered.
+The detailed feature work is recorded in the four sections immediately below.
+
+Josh separately authorized the controlled `SatiDemo` migration and replacement
+reset-baseline capture. Josh created the temporary exact-IP firewall rule and
+read-only verification found it active. The release workflow must not change
+that rule; Josh removes it after the baseline capture and verification reset.
+No Production database operation is authorized. The latest recorded Local
+Production versions remain Joshua's workstation 1.3.27 and SatiLogica
+workstation 1.3.2; neither is assumed to have migrated until independently
+observed after its next installation and launch.
+
+The repository's Demo reset seed source now handles scheduled-note moves, but
+1.3.34 does not publish a new DemoRefresh Function. Baseline capture must fail
+closed if the move table is nonempty under the reset lock, so the existing
+deployed Function is used only with an empty move-table baseline. A future
+Function publication must include the updated seed source; it is not live in
+this release.
+
+- [x] Full Release solution build passed with zero errors and 18 warnings.
+      Across all five test projects, 3,886 passed, 12 documented opt-in skips,
+      and zero failed. All 11 SQL opt-ins passed separately in a fresh isolated
+      LocalDB instance that was stopped and deleted; only the local AI model
+      evaluation remains unavailable. Effective coverage is 3,897 passes and
+      one documented skip. The narrow consumer Notes render assertion, focused
+      Overview responsive-layout cases (6/6), and Demo reset runtime success
+      case also passed.
+- [ ] Source commit pushed and verified on the resolved default branch; record
+      its identifier before producing deployment artifacts.
+- [ ] Guarded Demo migration passes rollback-only rehearsal, real application,
+      and idempotent rerun with database/environment identity and resulting
+      schema verified. Record the migration evidence; do not touch Local Production.
+- [ ] Publish the matching Demo API from the pushed source. Record the API ZIP
+      path, byte size, SHA-256, deployment identifier, live/ready health, reported
+      1.3.34 version, and client/API contract revision parity.
+- [ ] Read-only compliance pre-capture check is acceptable; replace the Demo
+      reset baseline using today's anchor, then run one full reset and verify
+      `demo.reset.completed` and `DEMO_COMPLIANCE_HISTORY_COMPLETE`. Record the
+      capture marker, anchor, reset request ID, and outcome.
+- [ ] Josh removes the temporary exact-IP firewall rule; verify its absence
+      without changing it as part of the release.
+- [ ] Build and acceptance-test new Demo and Local 1.3.34 installers, including
+      five responsive Demo launches, exact versions, signed Microsoft LocalDB
+      prerequisite, Local integrated security, and cleanup. Record paths, byte
+      sizes, SHA-256 hashes, and acceptance results; do not claim the installers
+      themselves are code-signed.
+- [ ] Publish accepted installers and `.sha256` files without overwrite to the
+      two exact distribution folders, then rehash the published copies.
+- [ ] Push final evidence commit and verify local/remote equality and a clean
+      working tree. Record both commit identifiers and any retained branches.
+
+## Unreleased — consumer Notes workspace (2026-10-02)
+
+- [x] Add a Notes tab to the selected consumer's Clients page using the existing
+      editor for new and existing notes, with a per-consumer history grid.
+- [x] Protect unsaved drafts and account/consumer selection boundaries; refresh
+      the grid and dashboard after saves and cover the behavior in desktop tests.
+
+## Unreleased — note grid readability (2026-10-02)
+
+- [x] Widen Notes Log date filters and keep them aligned with the after-save and
+      units summary controls as the filter row wraps.
+- [x] Show one-line narrative previews in Notes Log and both consumer note grids;
+      retain the full narrative in the editor, tooltip, and screen-reader help.
+
+## Unreleased — configurable Statistics breakdowns (2026-10-02)
+
+- [x] Add narrative-free, own-caseload aggregates by week, month, quarter, and year,
+      with an All consumers or one-consumer filter over the selected date window.
+- [x] Separate Logged/Approved productivity units, unfinished units, performed units
+      on compliance-eligible/blocked days, documented units/dates split by the
+      note's billable-marked versus intentionally unbilled designation, and actual
+      decimal units on claim lines
+      with a recorded real transmission. Show separately the units in internally
+      locked claim periods and form-work/visit-work slices with an overlap note for
+      notes carrying both activities; synthetic Demo transmissions are not payer
+      submission or payment.
+- [x] Show distinct documented service days, expired-Pending backlog dates, and
+      Abandoned service dates, plus the existing eligible/blocked client-day detail
+      with more precise labels. These are current status measures, not a complete
+      historical record of late completion.
+- [x] Keep projections tenant-scoped, narrative-free, bounded, and consistent between
+      local and API paths; cover authorization, arithmetic, grouping, and UI refresh.
+- [ ] Establish immutable status-transition timestamps before adding retrospective
+      counts of notes completed late. Existing notes do not reliably record when
+      documentation first became complete; current backlog and blocked-day measures
+      must not be presented as historical completion lateness.
+
+## Unreleased — calendar daily unit accounting (2026-10-02)
+
+- [x] Show only Pending, Logged, and Approved units in the calendar daily headline;
+      retain Compliance blocked, Cancelled, and other unit counts in the breakdown.
+- [x] Show a past Scheduled service note's units as Rescheduled on its original date,
+      without changing its status or its productivity treatment. Correct the square's
+      note-count caption, which previously called every note Scheduled.
+- [x] Record schedule-date changes at the local and API write boundaries so a note
+      moved to another date can also leave an accurate prior-day history on the
+      calendar. The current `Note.EventDate` stores only the latest date; do not
+      infer older dates or units from it.
+- [ ] Decide whether cancelled/deleted planned notes require independent retention
+      of their move history. Current move rows follow the note's deletion lifecycle.
+
 ## Release 1.3.33 — October 2, 2026 (completed)
 
 "Schedules and clearer daily work." Scope: consumer schedules and month calendar,

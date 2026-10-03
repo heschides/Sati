@@ -7,7 +7,7 @@
         <StackPanel Margin="24,20,24,32">
 
             <!-- ── Header ── -->
-            <TextBlock Text="PRODUCTIVITY HISTORY"
+            <TextBlock Text="STATISTICS"
                        FontFamily="Inter"
                        FontSize="11"
                        FontWeight="SemiBold"
@@ -63,19 +63,31 @@
                     Margin="0,0,0,20"
                     IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBoolConverter}}">
                 <StackPanel>
-                    <TextBlock Text="REPORTING WINDOW"
+                    <TextBlock Text="REPORTING WINDOW AND BREAKDOWN"
                                FontFamily="Inter"
                                FontSize="10"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextMutedBrush}"
                                Margin="0,0,0,8" />
+                    <TextBlock Text="Choose a date range, period, and consumer, then Apply. Date presets apply immediately. The detailed work report uses all three; the incentive and compliance history below remains caseload-wide."
+                               FontFamily="Inter" FontSize="11"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               TextWrapping="Wrap" Margin="0,0,0,10" />
                     <WrapPanel>
                         <Button Content="This Month"
                                 Command="{Binding ShowThisMonthCommand}"
                                 AutomationProperties.Name="Show this month"
                                 Padding="12,6"
                                 Height="36"
-                                Margin="0,18,16,0" />
+                                Margin="0,18,8,0" />
+                        <Button Content="Last 30 Days"
+                                Command="{Binding ShowLast30DaysCommand}"
+                                AutomationProperties.Name="Show the last 30 days"
+                                Padding="12,6" Height="36" Margin="0,18,8,0" />
+                        <Button Content="This Year"
+                                Command="{Binding ShowThisYearCommand}"
+                                AutomationProperties.Name="Show this year"
+                                Padding="12,6" Height="36" Margin="0,18,16,0" />
                         <StackPanel Margin="0,0,12,0">
                             <TextBlock Text="Start"
                                        FontFamily="Inter"
@@ -100,10 +112,28 @@
                                         Margin="0"
                                         Width="150" />
                         </StackPanel>
+                        <StackPanel Margin="0,0,12,0">
+                            <TextBlock Text="Group by" FontFamily="Inter" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding PeriodChoices}"
+                                      SelectedItem="{Binding SelectedPeriodChoice, Mode=TwoWay}"
+                                      DisplayMemberPath="Label"
+                                      AutomationProperties.Name="Group statistics by period"
+                                      Height="36" Width="135" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,12,0">
+                            <TextBlock Text="Consumer" FontFamily="Inter" FontSize="11"
+                                       Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding ConsumerChoices}"
+                                      SelectedItem="{Binding SelectedConsumerChoice, Mode=TwoWay}"
+                                      DisplayMemberPath="Label"
+                                      AutomationProperties.Name="Statistics consumer filter"
+                                      Height="36" Width="220" />
+                        </StackPanel>
                         <Button Content="Apply"
                                 Command="{Binding ApplyDateWindowCommand}"
                                 Style="{StaticResource PrimaryButton}"
-                                AutomationProperties.Name="Apply statistics date window"
+                                AutomationProperties.Name="Apply statistics filters"
                                 Padding="14,6"
                                 Margin="0,18,0,0" />
                     </WrapPanel>
@@ -112,10 +142,378 @@
                                FontSize="11"
                                Foreground="{DynamicResource OverdueBrush}"
                                TextWrapping="Wrap"
-                               Margin="0,6,0,0" />
+                               Margin="0,6,0,0"
+                               AutomationProperties.LiveSetting="Assertive" />
                 </StackPanel>
             </Border>
 
+            <StackPanel Visibility="{Binding HasBreakdownReport, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Margin="0,0,0,30">
+                <StackPanel.Resources>
+                    <Style x:Key="StatisticsMetricCard" TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource HoverBrush}" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="CornerRadius" Value="6" />
+                        <Setter Property="Padding" Value="14,12" />
+                        <Setter Property="Margin" Value="0,0,10,10" />
+                    </Style>
+                    <Style x:Key="StatisticsMetricValue" TargetType="TextBlock">
+                        <Setter Property="FontFamily" Value="Inter" />
+                        <Setter Property="FontSize" Value="27" />
+                        <Setter Property="FontWeight" Value="Bold" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                    </Style>
+                    <Style x:Key="StatisticsMetricCaption" TargetType="TextBlock">
+                        <Setter Property="FontFamily" Value="Inter" />
+                        <Setter Property="FontSize" Value="11" />
+                        <Setter Property="TextWrapping" Value="Wrap" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                    </Style>
+                </StackPanel.Resources>
+
+                <TextBlock Text="WORK DETAIL" FontFamily="Inter" FontSize="11"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}"
+                           Margin="0,0,0,4" />
+                <TextBlock Text="Documented means Logged or Approved notes. Pending and compliance blocked units remain separate. Original payer-transmitted units require a recorded, non-synthetic Transmitted event. Internally locked billing periods are shown separately; Demo synthetic transmissions are excluded from payer-transmitted totals. Corrections and payments are not netted."
+                           FontFamily="Inter" FontSize="12"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                <UniformGrid Columns="3" Margin="0,0,0,12">
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.DocumentedUnits, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Documented units" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.PendingUnits, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Pending units" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.ComplianceBlockedUnits, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Compliance blocked units" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.SubmittedClaimUnits, StringFormat={}{0:N2}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Original payer-transmitted claim units" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.DocumentedServiceDays, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Days with documented service" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.ExpiredPendingServiceDays, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Service dates with still-pending work past its documentation window"
+                                       Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.AbandonedServiceDays, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Service dates with abandoned work"
+                                       Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.LockedClaimUnits, StringFormat={}{0:N2}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Claim units locked for billing inside Sati"
+                                       Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.LockedClaimCount, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Claim lines locked for billing inside Sati"
+                                       Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <TextBlock Text="DOCUMENTED BILLING DESIGNATION" FontFamily="Inter" FontSize="11"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}"
+                           Margin="0,0,0,4" />
+                <TextBlock Text="Logged and Approved note units are split by whether the note is marked billable or intentionally unbilled. A billable mark is not proof of compliance eligibility or payer submission. One service date can contain both kinds, so the two date counts can overlap; each is a distinct calendar-date count across selected consumers."
+                           FontFamily="Inter" FontSize="12"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,10" />
+                <UniformGrid Columns="4" Margin="0,0,0,14">
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.BillableMarkedUnits, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Documented units marked billable"
+                                       Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.NonBillableUnits, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Intentionally unbilled documented units"
+                                       Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.BillableMarkedServiceDays, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Service dates with billable-marked documentation"
+                                       Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.NonBillableServiceDays, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Service dates with intentionally unbilled documentation"
+                                       Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <Border Background="{DynamicResource OverdueFillBrush}"
+                        BorderBrush="{DynamicResource OverdueBorderBrush}"
+                        BorderThickness="1" CornerRadius="6" Padding="12,10"
+                        Margin="0,0,0,14"
+                        Visibility="{Binding HasIncompleteClaimUnits, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="{Binding IncompleteClaimUnitsMessage}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               AutomationProperties.LiveSetting="Polite" />
+                </Border>
+
+                <TextBlock Text="Expired pending counts are a current unresolved backlog as of today; automated cleanup can move those notes to Abandoned. Abandoned service dates remain visible separately. These counts do not reconstruct when completed notes were late. Service-day totals count distinct calendar dates across the selected consumers; adding client rows can exceed the overall count."
+                           FontFamily="Inter" FontSize="11"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,14" />
+
+                <TextBlock Text="FORM AND VISIT ACTIVITY" FontFamily="Inter" FontSize="11"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}"
+                           Margin="0,0,0,4" />
+                <TextBlock Text="One note may include both form and visit activity, so these slices can overlap and should not be added together. Payer-transmitted units are frozen on original claim lines; form and visit grouping follows each linked note's current activity flags."
+                           FontFamily="Inter" FontSize="12"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,10" />
+                <UniformGrid Columns="4" Margin="0,0,0,14">
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.FormDocumentedUnits, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Documented form work units" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.VisitDocumentedUnits, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Documented visit work units" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.SubmittedFormUnits, StringFormat={}{0:N2}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Payer-transmitted units on notes marked Form" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.SubmittedVisitUnits, StringFormat={}{0:N2}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Payer-transmitted units on notes marked Visit" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <UniformGrid Columns="4" Margin="0,0,0,16">
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.DocumentedNoteCount, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Documented notes" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.FormNoteCount, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Documented notes marked Form" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.VisitNoteCount, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Documented notes marked Visit" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatisticsMetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BreakdownTotals.SubmittedClaimCount, StringFormat={}{0:N0}}"
+                                       Style="{StaticResource StatisticsMetricValue}" />
+                            <TextBlock Text="Original payer-transmitted claim lines" Style="{StaticResource StatisticsMetricCaption}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <TextBlock Text="DOCUMENTED UNITS BY SELECTED PERIOD" FontFamily="Inter" FontSize="11"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}"
+                           Margin="0,0,0,8" />
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource HoverBrush}" BorderThickness="1"
+                        CornerRadius="6" Padding="12" Margin="0,0,0,6">
+                    <oxy:PlotView Name="UnitsChart"
+                                  Model="{Binding UnitsChartModel}"
+                                  AutomationProperties.Name="Documented units chart for the selected period and consumer"
+                                  Height="320" Background="Transparent" />
+                </Border>
+                <TextBlock Text="The chart shows up to the latest 18 periods; the tables below include the full selected window."
+                           FontFamily="Inter" FontSize="11"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                <WrapPanel Margin="0,0,0,8">
+                    <TextBlock Text="FOCUS METRIC" FontFamily="Inter" FontSize="11"
+                               FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox ItemsSource="{Binding MetricChoices}"
+                              SelectedItem="{Binding SelectedMetricChoice, Mode=TwoWay}"
+                              DisplayMemberPath="Label"
+                              AutomationProperties.Name="Choose focused statistics metric"
+                              Width="265" Height="34" />
+                </WrapPanel>
+                <TextBlock Text="{Binding FocusedMetricLabel, StringFormat=Selected metric: {0}}"
+                           FontFamily="Inter" FontSize="12" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                <DataGrid AutomationProperties.Name="Selected metric by period"
+                          ItemsSource="{Binding FocusRows}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="Column" SelectionMode="Single"
+                          Margin="0,0,0,20" MaxHeight="300"
+                          AlternatingRowBackground="{DynamicResource SurfaceRaisedBrush}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Period" Binding="{Binding Period}" Width="2*" />
+                        <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock Text="PERIOD WORK DETAIL" FontFamily="Inter" FontSize="11"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}"
+                           Margin="0,0,0,8" />
+                <DataGrid AutomationProperties.Name="Work metrics by selected period"
+                          ItemsSource="{Binding BreakdownPeriods}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="Column" SelectionMode="Single"
+                          Margin="0,0,0,20" MaxHeight="350"
+                          AlternatingRowBackground="{DynamicResource SurfaceRaisedBrush}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Period" Binding="{Binding Period}" Width="180" />
+                        <DataGridTextColumn Header="Documented units" Binding="{Binding Metrics.DocumentedUnits}" Width="120" />
+                        <DataGridTextColumn Header="Billable-marked units" Binding="{Binding Metrics.BillableMarkedUnits}" Width="150" />
+                        <DataGridTextColumn Header="Intentionally unbilled units" Binding="{Binding Metrics.NonBillableUnits}" Width="175" />
+                        <DataGridTextColumn Header="Pending units" Binding="{Binding Metrics.PendingUnits}" Width="110" />
+                        <DataGridTextColumn Header="Blocked units" Binding="{Binding Metrics.ComplianceBlockedUnits}" Width="110" />
+                        <DataGridTextColumn Header="Form work units" Binding="{Binding Metrics.FormDocumentedUnits}" Width="115" />
+                        <DataGridTextColumn Header="Visit work units" Binding="{Binding Metrics.VisitDocumentedUnits}" Width="115" />
+                        <DataGridTextColumn Header="Visit notes" Binding="{Binding Metrics.VisitNoteCount}" Width="95" />
+                        <DataGridTextColumn Header="Form notes" Binding="{Binding Metrics.FormNoteCount}" Width="95" />
+                        <DataGridTextColumn Header="Documented days" Binding="{Binding Metrics.DocumentedServiceDays}" Width="120" />
+                        <DataGridTextColumn Header="Billable-marked service dates" Binding="{Binding Metrics.BillableMarkedServiceDays}" Width="180" />
+                        <DataGridTextColumn Header="Intentionally unbilled service dates" Binding="{Binding Metrics.NonBillableServiceDays}" Width="200" />
+                        <DataGridTextColumn Header="Expired pending service dates" Binding="{Binding Metrics.ExpiredPendingServiceDays}" Width="180" />
+                        <DataGridTextColumn Header="Abandoned service dates" Binding="{Binding Metrics.AbandonedServiceDays}" Width="165" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock Text="CLAIM PIPELINE BY PERIOD" FontFamily="Inter" FontSize="11"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}"
+                           Margin="0,0,0,4" />
+                <TextBlock Text="Payer-transmitted columns require real transmission evidence; locked columns describe internal billing progress. Form and Visit slices use current note activity and can overlap. Corrections and payment outcomes are not included."
+                           FontFamily="Inter" FontSize="11"
+                           Foreground="{DynamicResource TextMutedBrush}"
+                           TextWrapping="Wrap" Margin="0,0,0,8" />
+                <DataGrid AutomationProperties.Name="Claim pipeline metrics by selected period"
+                          ItemsSource="{Binding BreakdownPeriods}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="Column" SelectionMode="Single"
+                          Margin="0,0,0,20" MaxHeight="350"
+                          AlternatingRowBackground="{DynamicResource SurfaceRaisedBrush}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Period" Binding="{Binding Period}" Width="180" />
+                        <DataGridTextColumn Header="Payer-transmitted units" Binding="{Binding Metrics.SubmittedClaimUnits, StringFormat={}{0:N2}}" Width="150" />
+                        <DataGridTextColumn Header="Locked units" Binding="{Binding Metrics.LockedClaimUnits, StringFormat={}{0:N2}}" Width="110" />
+                        <DataGridTextColumn Header="Units on Form notes" Binding="{Binding Metrics.SubmittedFormUnits, StringFormat={}{0:N2}}" Width="145" />
+                        <DataGridTextColumn Header="Units on Visit notes" Binding="{Binding Metrics.SubmittedVisitUnits, StringFormat={}{0:N2}}" Width="145" />
+                        <DataGridTextColumn Header="Transmitted lines" Binding="{Binding Metrics.SubmittedClaimCount}" Width="125" />
+                        <DataGridTextColumn Header="Locked lines" Binding="{Binding Metrics.LockedClaimCount}" Width="100" />
+                        <DataGridTextColumn Header="Lines without units" Binding="{Binding Metrics.SubmittedClaimsWithoutUnits}" Width="135" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock Text="CLIENT DETAIL" FontFamily="Inter" FontSize="11"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextMutedBrush}"
+                           Margin="0,0,0,8" />
+                <DataGrid AutomationProperties.Name="Work and claim pipeline metrics by consumer"
+                          ItemsSource="{Binding BreakdownClients}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="Column" SelectionMode="Single"
+                          Margin="0,0,0,8" MaxHeight="380"
+                          AlternatingRowBackground="{DynamicResource SurfaceRaisedBrush}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Consumer" Binding="{Binding ConsumerName}" Width="180" />
+                        <DataGridTextColumn Header="Documented units" Binding="{Binding Metrics.DocumentedUnits}" Width="120" />
+                        <DataGridTextColumn Header="Billable-marked units" Binding="{Binding Metrics.BillableMarkedUnits}" Width="150" />
+                        <DataGridTextColumn Header="Intentionally unbilled units" Binding="{Binding Metrics.NonBillableUnits}" Width="175" />
+                        <DataGridTextColumn Header="Pending units" Binding="{Binding Metrics.PendingUnits}" Width="105" />
+                        <DataGridTextColumn Header="Blocked units" Binding="{Binding Metrics.ComplianceBlockedUnits}" Width="105" />
+                        <DataGridTextColumn Header="Form work units" Binding="{Binding Metrics.FormDocumentedUnits}" Width="115" />
+                        <DataGridTextColumn Header="Visit work units" Binding="{Binding Metrics.VisitDocumentedUnits}" Width="115" />
+                        <DataGridTextColumn Header="Visit notes" Binding="{Binding Metrics.VisitNoteCount}" Width="95" />
+                        <DataGridTextColumn Header="Form notes" Binding="{Binding Metrics.FormNoteCount}" Width="95" />
+                        <DataGridTextColumn Header="Payer-transmitted units" Binding="{Binding Metrics.SubmittedClaimUnits, StringFormat={}{0:N2}}" Width="150" />
+                        <DataGridTextColumn Header="Locked units" Binding="{Binding Metrics.LockedClaimUnits, StringFormat={}{0:N2}}" Width="110" />
+                        <DataGridTextColumn Header="Documented days" Binding="{Binding Metrics.DocumentedServiceDays}" Width="120" />
+                        <DataGridTextColumn Header="Billable-marked service dates" Binding="{Binding Metrics.BillableMarkedServiceDays}" Width="180" />
+                        <DataGridTextColumn Header="Intentionally unbilled service dates" Binding="{Binding Metrics.NonBillableServiceDays}" Width="200" />
+                        <DataGridTextColumn Header="Expired pending service dates" Binding="{Binding Metrics.ExpiredPendingServiceDays}" Width="180" />
+                        <DataGridTextColumn Header="Abandoned service dates" Binding="{Binding Metrics.AbandonedServiceDays}" Width="165" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+
+            <StackPanel Visibility="{Binding HasLoadedSuccessfully, Converter={StaticResource BoolToVisibilityConverter}}">
+            <!-- ── Caseload-wide productivity history ── -->
+            <TextBlock Text="CASELOAD-WIDE PRODUCTIVITY AND COMPLIANCE"
+                       FontFamily="Inter" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,4" />
+            <TextBlock Text="This history covers all currently assigned consumers regardless of the detailed consumer filter above. Incentives are worker-level monthly snapshots."
+                       FontFamily="Inter" FontSize="11"
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       TextWrapping="Wrap" Margin="0,0,0,12" />
             <!-- ── Summary cards ── -->
             <UniformGrid Columns="2"
                          Margin="0,0,0,24">
@@ -131,7 +529,7 @@
                                    FontSize="36"
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Units logged + approved (selected window)"
+                        <TextBlock Text="Logged + Approved units (all consumers)"
                                    FontFamily="Inter"
                                    FontSize="11"
                                    Foreground="{DynamicResource TextMutedBrush}"
@@ -160,18 +558,22 @@
             </UniformGrid>
 
             <!-- ── Empty state ── -->
-            <TextBlock Text="DOCUMENTATION BILLABILITY"
+            <TextBlock Text="DOCUMENTATION ELIGIBILITY"
                        FontFamily="Inter"
                        FontSize="11"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextMutedBrush}"
                        Margin="0,0,0,4" />
-            <TextBlock Text="Calendar days and performed work units in the selected window. Non-billable days are days inside an overdue PCP, assessment, reclassification, or 90-day review gap; overlapping gaps count once."
+            <TextBlock Text="Eligible and blocked client-days are calendar dates, including weekends, from each consumer's effective date. A blocked date falls inside an overdue PCP, assessment, reclassification, or 90-day review gap; overlapping gaps count once. Units here include recorded work in several statuses and do not establish submitted billing."
                        FontFamily="Inter"
                        FontSize="12"
                        Foreground="{DynamicResource TextMutedBrush}"
                        TextWrapping="Wrap"
-                       Margin="0,0,0,12" />
+                       Margin="0,0,0,4" />
+            <TextBlock Text="{Binding ComplianceWindowMessage}"
+                       FontFamily="Inter" FontSize="11"
+                       Foreground="{DynamicResource TextMutedBrush}"
+                       TextWrapping="Wrap" Margin="0,0,0,12" />
 
             <UniformGrid Columns="3" Margin="0,0,0,14">
                 <Border Margin="0,0,6,0" Background="{DynamicResource SurfaceBrush}"
@@ -181,7 +583,7 @@
                         <TextBlock Text="{Binding TotalBillableWorkUnits}" FontFamily="Inter"
                                    FontSize="28" FontWeight="Bold"
                                    Foreground="{DynamicResource CompliantBrush}" />
-                        <TextBlock Text="Units on billable days" FontFamily="Inter" FontSize="11"
+                        <TextBlock Text="Recorded work units on eligible days" FontFamily="Inter" FontSize="11"
                                    Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
                     </StackPanel>
                 </Border>
@@ -192,7 +594,7 @@
                         <TextBlock Text="{Binding TotalNonBillableWorkUnits}" FontFamily="Inter"
                                    FontSize="28" FontWeight="Bold"
                                    Foreground="{DynamicResource OverdueBrush}" />
-                        <TextBlock Text="Units lost to overdue documentation" FontFamily="Inter"
+                        <TextBlock Text="Recorded work units on blocked days" FontFamily="Inter"
                                    FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
                                    TextWrapping="Wrap" Margin="0,2,0,0" />
                     </StackPanel>
@@ -204,7 +606,7 @@
                         <TextBlock Text="{Binding TotalLostWorkPercentageLabel}" FontFamily="Inter"
                                    FontSize="28" FontWeight="Bold"
                                    Foreground="{DynamicResource OverdueBrush}" />
-                        <TextBlock Text="Work lost" FontFamily="Inter" FontSize="11"
+                        <TextBlock Text="Share of recorded work on blocked days" FontFamily="Inter" FontSize="11"
                                    Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
                     </StackPanel>
                 </Border>
@@ -216,9 +618,9 @@
                     CornerRadius="6"
                     Padding="20"
                     Margin="0,0,0,24"
-                    Visibility="{Binding HasConsumerBillingRows,
-                        Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                <TextBlock Text="No consumers are available for this reporting window."
+                    Visibility="{Binding ShowConsumerBillingEmpty,
+                        Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="{Binding ConsumerBillingEmptyMessage}"
                            FontFamily="Inter" FontSize="13"
                            Foreground="{DynamicResource TextMutedBrush}"
                            TextWrapping="Wrap" HorizontalAlignment="Center" />
@@ -258,7 +660,6 @@
                         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                         <Setter Property="FontFamily" Value="Inter" />
                         <Setter Property="Background" Value="Transparent" />
-                        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                         <Style.Triggers>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
@@ -269,11 +670,11 @@
                 </DataGrid.CellStyle>
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Consumer" Binding="{Binding ConsumerName}" Width="2*" />
-                    <DataGridTextColumn Header="Billable days" Binding="{Binding BillableDays}" Width="110" />
-                    <DataGridTextColumn Header="Non-billable days" Binding="{Binding NonBillableDays}" Width="135" />
-                    <DataGridTextColumn Header="Billable units" Binding="{Binding BillableUnits}" Width="110" />
-                    <DataGridTextColumn Header="Lost units" Binding="{Binding NonBillableUnits}" Width="95" />
-                    <DataGridTextColumn Header="Work lost"
+                    <DataGridTextColumn Header="Eligible calendar client-days" Binding="{Binding BillableDays}" Width="190" />
+                    <DataGridTextColumn Header="Blocked calendar client-days" Binding="{Binding NonBillableDays}" Width="190" />
+                    <DataGridTextColumn Header="Units on eligible days" Binding="{Binding BillableUnits}" Width="145" />
+                    <DataGridTextColumn Header="Units on blocked days" Binding="{Binding NonBillableUnits}" Width="145" />
+                    <DataGridTextColumn Header="Share on blocked days"
                                         Binding="{Binding LostWorkPercentage, StringFormat={}{0:0.0}%, TargetNullValue=—}"
                                         Width="95" />
                 </DataGrid.Columns>
@@ -284,8 +685,8 @@
                     BorderThickness="1"
                     CornerRadius="6"
                     Padding="24"
-                    Visibility="{Binding HasData,
-                        Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    Visibility="{Binding ShowProductivityEmpty,
+                        Converter={StaticResource BoolToVisibilityConverter}}">
                 <TextBlock Text="No productivity history yet. Logged and approved units appear here as months complete."
                            FontFamily="Inter"
                            FontSize="13"
@@ -298,25 +699,7 @@
             <StackPanel Visibility="{Binding HasData,
                             Converter={StaticResource BoolToVisibilityConverter}}">
 
-                <TextBlock Text="UNITS BY PERIOD"
-                           FontFamily="Inter"
-                           FontSize="11"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextMutedBrush}"
-                           Margin="0,0,0,8" />
-                <Border Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource HoverBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="12"
-                        Margin="0,0,0,28">
-                    <oxy:PlotView Name="UnitsChart"
-                                  Model="{Binding UnitsChartModel}"
-                                  Height="320"
-                                  Background="Transparent" />
-                </Border>
-
-                <TextBlock Text="PERIOD DETAIL"
+                <TextBlock Text="MONTHLY INCENTIVE HISTORY"
                            FontFamily="Inter"
                            FontSize="11"
                            FontWeight="SemiBold"
@@ -372,8 +755,6 @@
                                     Value="Inter" />
                             <Setter Property="Background"
                                     Value="Transparent" />
-                            <Setter Property="FocusVisualStyle"
-                                    Value="{x:Null}" />
                             <Style.Triggers>
                                 <Trigger Property="IsSelected"
                                          Value="True">
@@ -418,7 +799,7 @@
                 </DataGrid>
 
             </StackPanel>
-
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

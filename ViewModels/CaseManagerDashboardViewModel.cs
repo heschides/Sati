@@ -156,13 +156,34 @@ CalendarViewModel calendarViewModel,
             // A passage checked in the journal can become a Reminder or Scheduled note
             // without the note panel. It is a note like any other from here on.
             newClientViewModel.JournalNoteCreated += async (s, e) => await OnNoteSavedAsync();
+            newClientViewModel.ClientNoteSaved += async (s, e) =>
+            {
+                var account = _sessionService.CurrentUser;
+                try
+                {
+                    await OnNoteSavedAsync();
+                }
+                catch (Exception exception)
+                {
+                    var reference = AppErrorLog.Record(
+                        exception, "client-note.dashboard-refresh");
+                    if (ReferenceEquals(_sessionService.CurrentUser, account))
+                    {
+                        newClientViewModel.ClientNoteLoadError =
+                            "The note was saved, but related views could not be fully refreshed. " +
+                            "Reopen Sati to reload them; do not save the note again. " +
+                            $"Support reference: {reference}.";
+                    }
+                }
+            };
 
-            // Journal reminders. Either note-entry instance can write one — this
-            // VM's own module, or the one inside the notes log — and both write the
-            // same column the client page's journal box is bound to. Wiring lives
-            // here because this VM is the only place that owns all three.
+            // Journal reminders from the dashboard, notes log, and consumer record
+            // all write the same journal column. Wire each editor to the client
+            // page's flush/adopt handoff before it can prepend a reminder.
             WireJournalReminders(noteEntryViewModel, newClientViewModel);
             WireJournalReminders(notesWindowViewModel.NoteEntry, newClientViewModel);
+            if (newClientViewModel.ClientNoteEntry is not null)
+                WireJournalReminders(newClientViewModel.ClientNoteEntry, newClientViewModel);
 
             newClientViewModel.FormComplianceChangedAsync = async () =>
             {
@@ -1354,10 +1375,12 @@ CalendarViewModel calendarViewModel,
                 return;
             }
 
-            SelectedPerson = person;
-            NoteEntry.SelectedPerson = person;
             Clients.SelectedPerson = Clients.People.FirstOrDefault(candidate =>
                 candidate.Id == person.Id) ?? person;
+            if (Clients.SelectedPerson?.Id != person.Id)
+                return;
+            SelectedPerson = person;
+            NoteEntry.SelectedPerson = person;
             CurrentSubViewModel = Clients;
             await Clients.OpenReleaseObligationAsync(
                 obligationId,
@@ -1460,6 +1483,7 @@ CalendarViewModel calendarViewModel,
         private async Task OnNoteSavedAsync()
         {
             await LoadPeopleAsync();
+            await Clients.RefreshSelectedNotesIfSelectedAsync();
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
             await NotesLog.ReloadIfLoadedAsync();

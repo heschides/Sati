@@ -6,11 +6,37 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Schedules and clearer daily work";
-    public const string ReleaseDate = "October 2, 2026";
+    public const string ReleaseName = "Clearer notes, calendar, and statistics";
+    public const string ReleaseDate = "October 3, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Write notes from a consumer's page",
+            [
+                "The Clients page has a Notes tab for adding or editing that consumer's notes and reviewing their note history in one place.",
+                "If you have unsaved note changes, Sati asks before switching to another note or consumer. Saving refreshes the consumer's note list and dashboard."
+            ]),
+        new(
+            "Read calendar unit counts more clearly",
+            [
+                "A day's main unit count includes Pending, Logged, and Approved units. Compliance blocked and Cancelled units remain visible in the breakdown without enlarging that main count.",
+                "Past Scheduled work appears as Rescheduled in the daily breakdown, while the note keeps its Scheduled status. This label means planned work remains on a past day; it does not by itself mean someone moved the note.",
+                "When a scheduled note is moved to another date, the calendar keeps a count on its earlier date while that note remains. Moves made before this update cannot be reconstructed."
+            ]),
+        new(
+            "Explore service statistics",
+            [
+                "Statistics can group your caseload by week, month, quarter, or year and show all consumers or one consumer. It separates documented, Pending, compliance-blocked, and billable-marked versus intentionally unbilled work, with service-day and current overdue-Pending backlog counts.",
+                "Claim units locked for billing are shown separately from original claim units with a recorded non-synthetic transmission. A transmitted claim is not evidence of payer receipt or payment; synthetic Demo transmissions are excluded.",
+                "Form and Visit slices can overlap when one note has both activities, and their labels reflect the note's current activities. The overdue-Pending count describes unresolved work today, not when completed notes were once late."
+            ]),
+        new(
+            "Scan note lists without losing detail",
+            [
+                "The Notes Log date filters have more room, and long note text now appears as a compact one-line preview in Notes Log and the Clients note lists.",
+                "The full note remains available in the editor and through the preview's tooltip and screen-reader help."
+            ]),
         new(
             "Record a consumer's schedule",
             [

@@ -78,7 +78,7 @@ public sealed class LocalServiceTimeSqlServerTests
 
         private string Connection(string catalog) => new SqlConnectionStringBuilder
         {
-            DataSource = @"(localdb)\MSSQLLocalDB", InitialCatalog = catalog,
+            DataSource = SqlTestLocalDb.DataSource, InitialCatalog = catalog,
             IntegratedSecurity = true, Encrypt = false, ConnectTimeout = 15,
             ApplicationName = "Sati synthetic local schedule tests"
         }.ConnectionString;
@@ -189,9 +189,30 @@ public sealed class LocalSqlTheoryAttribute : TheoryAttribute
     public LocalSqlTheoryAttribute()
     {
         if (!OperatingSystem.IsWindows() || Environment.GetEnvironmentVariable("SATI_RUN_SQLSERVER_TESTS") != "1")
-            Skip = "Set SATI_RUN_SQLSERVER_TESTS=1 on Windows to run against disposable synthetic LocalDB databases.";
+            Skip = "Use the isolated LocalDB test wrapper on Windows.";
     }
 }
 
 [CollectionDefinition("Local synthetic SQL schedule", DisableParallelization = true)]
 public sealed class LocalSyntheticSqlScheduleCollection;
+
+internal static class SqlTestLocalDb
+{
+    public static string DataSource
+    {
+        get
+        {
+            if (!OperatingSystem.IsWindows() ||
+                Environment.GetEnvironmentVariable("SATI_RUN_SQLSERVER_TESTS") != "1")
+                throw new InvalidOperationException("SQL Server tests require explicit Windows opt-in.");
+
+            var instance = Environment.GetEnvironmentVariable("SATI_SQL_TEST_LOCALDB_INSTANCE");
+            if (instance is null || !Regex.IsMatch(instance,
+                    @"\ASatiSqlTests_[0-9a-f]{32}\z", RegexOptions.CultureInvariant))
+                throw new InvalidOperationException(
+                    "SQL Server tests require an isolated SATI_SQL_TEST_LOCALDB_INSTANCE named SatiSqlTests_<32 lowercase hex>.");
+
+            return $@"(localdb)\{instance}";
+        }
+    }
+}

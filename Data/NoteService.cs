@@ -134,6 +134,24 @@ public class NoteService(
         await EnsureExactFormLinkAsync(context, note);
         var annualPcp = await PrepareAnnualPcpAsync(context, actor, note, today);
         await EnsureServiceTimeAvailableAsync(context, actor.Id, note, stored.Id);
+        if (NoteScheduleMoveRules.ShouldRecord(
+                stored.Status?.ToString(), stored.EventDate, note.EventDate,
+                stored.NoteType?.ToString()))
+        {
+            context.ScheduledNoteMoves.Add(new ScheduledNoteMove
+            {
+                NoteId = stored.Id,
+                PersonId = stored.PersonId,
+                AgencyId = actor.AgencyId,
+                UserId = actor.Id,
+                FromDate = stored.EventDate!.Value.Date,
+                ToDate = note.EventDate!.Value.Date,
+                ScheduledMinutes = stored.Minutes,
+                ScheduledUnits = NoteScheduleMoveRules.FrozenUnits(stored.Minutes),
+                NoteRevision = stored.Revision + 1,
+                MovedAtUtc = (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime
+            });
+        }
         CopyCaseManagerValues(note, stored);
         stored.PersonId = note.PersonId;
         stored.Person = targetPerson;
@@ -243,6 +261,7 @@ public class NoteService(
         var end = firstDay.AddYears(1);
         return await context.Notes.Include(n => n.Person).Where(n => n.Person.UserId == userId &&
             n.Person.AgencyId == actor.AgencyId && n.AgencyId == actor.AgencyId &&
+            n.Person.Status != PersonStatus.Ghost &&
             n.EventDate.HasValue && n.EventDate.Value >= firstDay && n.EventDate.Value < end).ToListAsync();
     }
 

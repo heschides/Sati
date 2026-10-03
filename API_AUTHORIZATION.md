@@ -5,7 +5,7 @@
 | Billing | `POST /billing/remittance-deposits/{depositId}/eft` | Deposit `AgencyId` | Billing permission and a re-validated current actor. Appends one bank-deposit entry; nothing is edited. The caller must name the entry it saw (`PreviousRecordId`), so a concurrent entry or correction returns 409 rather than stacking silently; a filtered unique index enforces the same race server-side. Amount, date, and correction-note rules are `EftDepositRules`. Reconciliation is derived from the latest entry, never stored. |
 # API authorization and tenant ownership
 
-*Route manifest updated 2026-09-30: 229 protected routes. The table is maintained with
+*Route manifest updated 2026-10-02: 241 protected routes. The table is maintained with
 `ApiSurface.Routes` after excluding health and anonymous login, and `ApiSurfaceTests` checks that
 manifest against live endpoint registration. Every route added, removed, or rescoped must be
 reflected here in the same change.*
@@ -215,6 +215,7 @@ incentives are separate own-user information, not an extension of consumer casel
 | Notes | `GET /people/{personId}/notes` | Note person's assigned user and agency | Own caseload only. |
 | Notes | `GET /notes/monthly` | Target user's `AgencyId` | Accessible case manager only. |
 | Notes | `GET /notes/day` | Target user's `AgencyId` | Accessible case manager only; returns one date across that user's whole caseload for the service-time overlap rule. |
+| Notes | `GET /notes/schedule-moves/year/{year}` | Frozen move agency/user, current note agency, and both historical and current note consumer assignments and agencies | Current CaseManagement and own caseload only. Returns prior scheduled date, destination date, frozen minutes/units, and consumer name without note narrative. A move back to its prior date is suppressed while that note currently occupies that date; repeated moves from one date are shown once using the latest revision. |
 | Notes | `GET /notes/year/{year}` | Own user, person and note agency | Current CaseManagement and own caseload only. |
 | Notes | `POST /notes/abandon-overdue` | Own user, person and note agency | Current CaseManagement and own caseload only; denied before settings creation. Only eligible matching-agency notes are transitioned, with each revision incremented. |
 | Settings | `GET /settings` | Settings `AgencyId` | Actor's agency only. The returned billing mask is the policy resolved for the agency's current date, not permission to reinterpret historical service. |
@@ -242,6 +243,7 @@ incentives are separate own-user information, not an extension of consumer casel
 | Reports | `GET /reports/consumer-billing-loss` | Each person's assigned user and agency | Own caseload only. |
 | Reports | `GET /reports/productivity-units` | Validated actor's user and agency | Own caseload only; both Person and Note agency markers must match, the request accepts no user id, and the response contains narrative-free monthly aggregates. |
 | Reports | `GET /reports/productivity-days/{year}/{month}` | Validated actor's user and agency | Own caseload only; both Person and Note agency markers must match, the request accepts no user id, and the response contains narrative-free daily secured-unit totals and note counts. |
+| Reports | `GET /reports/statistics-breakdown` | Validated actor's user and agency; optionally one currently owned Person | Own case-management caseload only. A selected person outside that caseload is forbidden. Both Person and Note agency markers and the claim period's owner must match the actor. Returns narrative-free productivity, current pending/compliance-blocked backlog, and distinct Abandoned service dates. Locked claim units count original claim lines on internally submitted/non-Draft periods; payer-submitted units require an exact non-synthetic Transmitted event linked to an original, non-test EDI generation for the same period and agency. Form and Visit activity measures may overlap. Draft claim lines and correction submissions are excluded; transmission does not imply payment. |
 | Billing | `POST /billing/periods/{year}/{month}` | Billing period user's `AgencyId` | Billing permission; target user must be in actor agency. |
 | Billing | `GET /billing/periods` | Billing period user's `AgencyId` | Billing permission; response joined to actor agency. Each returned line includes only its frozen client display name and shared 837P-readiness errors; raw note narrative is not returned. |
 | Billing | `GET /billing/overview-periods/{year}/{month}` | Billing period owner's `AgencyId` | Billing permission. Returns only the actor agency's all-time draft charge total and exactly six grouped monthly charge totals ending in the requested month. It never returns period, claim-line, note, or consumer rows, so Overview payload size is independent of billing-history length. |

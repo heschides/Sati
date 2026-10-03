@@ -20,6 +20,7 @@ public partial class CalendarViewModel : ObservableObject
 
     private readonly IExemptDateService _exemptDateService;
     private readonly INoteService _noteService;
+    private readonly IScheduledNoteMoveService? _scheduledNoteMoveService;
     private readonly ISessionService _sessionService;
     private readonly IServiceDayInclusionService? _serviceDayInclusionService;
     private readonly ISettingsService? _settingsService;
@@ -30,6 +31,7 @@ public partial class CalendarViewModel : ObservableObject
 
     private List<ExemptDate> _exemptDates = [];
     private List<Note> _yearNotes = [];
+    private List<ScheduledNoteMoveDto> _yearMoves = [];
     private List<ImportedOutlookEvent> _yearOutlookEvents = [];
     private List<ServiceDayInclusion> _serviceDayInclusions = [];
     private int _documentationWindowDays = ProductivityForecast.DefaultDocumentationWindowDays;
@@ -77,6 +79,9 @@ public partial class CalendarViewModel : ObservableObject
     public IReadOnlyList<CalendarNoteItem> SelectedDayNotes =>
         SelectedDay?.Notes ?? [];
 
+    public IReadOnlyList<ScheduledNoteMoveDto> SelectedDayRescheduledMoves =>
+        SelectedDay?.RescheduledMoves ?? [];
+
     public IReadOnlyList<ImportedOutlookEvent> SelectedDayOutlookEvents =>
         SelectedDay?.OutlookEvents ?? [];
 
@@ -85,10 +90,11 @@ public partial class CalendarViewModel : ObservableObject
     public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
 
     public int SelectedDayTotalMinutes =>
-        SelectedDayNotes.Sum(note => note.Minutes ?? 0);
+        SelectedDayNotes.Where(note => note.CountsTowardDayTotal)
+            .Sum(note => note.Minutes ?? 0);
 
     public int SelectedDayTotalUnits =>
-        SelectedDayNotes.Sum(note => note.Units ?? 0);
+        SelectedDay?.TotalUnits ?? 0;
 
     public string SelectedDaySummary
     {
@@ -129,13 +135,15 @@ public partial class CalendarViewModel : ObservableObject
         IOutlookCalendarFilePicker? outlookCalendarFilePicker = null,
         Func<DateTime>? today = null,
         IServiceDayInclusionService? serviceDayInclusionService = null,
-        ISettingsService? settingsService = null)
+        ISettingsService? settingsService = null,
+        IScheduledNoteMoveService? scheduledNoteMoveService = null)
     {
         _today = today ?? (() => DateTime.Today);
         _serviceDayInclusionService = serviceDayInclusionService;
         _settingsService = settingsService;
         _exemptDateService = exemptDateService;
         _noteService = noteService;
+        _scheduledNoteMoveService = scheduledNoteMoveService;
         _sessionService = sessionService;
         _outlookCalendarService = outlookCalendarService;
         _outlookCalendarFilePicker = outlookCalendarFilePicker;
@@ -148,6 +156,7 @@ public partial class CalendarViewModel : ObservableObject
         _yearLoadRequests.Invalidate();
         _exemptDates = [];
         _yearNotes = [];
+        _yearMoves = [];
         _yearOutlookEvents = [];
         _serviceDayInclusions = [];
         _settings = null;
@@ -420,10 +429,13 @@ public partial class CalendarViewModel : ObservableObject
 
             var exemptDatesTask = _exemptDateService.GetByYearAsync(user.Id, year);
             var notesTask = _noteService.GetByYearAsync(user.Id, year);
+            var movesTask = _scheduledNoteMoveService?.GetByYearAsync(year) ??
+                Task.FromResult<IReadOnlyList<ScheduledNoteMoveDto>>([]);
             var outlookTask = LoadOutlookEventsAsync(user.Id, year);
             var inclusionsTask = LoadServiceDayInclusionsAsync(user.Id, year);
             var settingsTask = LoadCalendarSettingsAsync();
-            await Task.WhenAll(exemptDatesTask, notesTask, outlookTask, inclusionsTask, settingsTask);
+            await Task.WhenAll(exemptDatesTask, notesTask, movesTask, outlookTask,
+                inclusionsTask, settingsTask);
 
             if (!_yearLoadRequests.IsCurrent(request) || CurrentYear != year ||
                 !ReferenceEquals(_sessionService.CurrentUser, user))
@@ -435,6 +447,7 @@ public partial class CalendarViewModel : ObservableObject
                 _settings?.AbandonedAfterDays);
             _exemptDates = await exemptDatesTask;
             _yearNotes = await notesTask;
+            _yearMoves = (await movesTask).ToList();
             var outlookResult = await outlookTask;
             _yearOutlookEvents = outlookResult.Events;
             BuildMonths();
@@ -464,8 +477,8 @@ public partial class CalendarViewModel : ObservableObject
         var today = _today();
         var notesByDate = _yearNotes
             .Where(note => note.EventDate.HasValue && note.EventDate.Value.Year == CurrentYear &&
-                           !IsLapsedScheduled(note, today))
-            .Select(note => new CalendarNoteItem(note))
+                           ShouldShowOnCalendar(note, today))
+            .Select(note => new CalendarNoteItem(note, today))
             .GroupBy(note => note.EventDate.Date)
             .ToDictionary(
                 group => group.Key,
@@ -474,6 +487,13 @@ public partial class CalendarViewModel : ObservableObject
                     .ThenBy(note => note.ClientName, StringComparer.CurrentCultureIgnoreCase)
                     .ThenBy(note => note.Id)
                     .ToList());
+        var movesByDate = _yearMoves
+            .Where(move => move.FromDate.Year == CurrentYear)
+            .GroupBy(move => move.FromDate.Date)
+            .ToDictionary(group => group.Key,
+                group => group.OrderBy(move => move.ConsumerName,
+                        StringComparer.CurrentCultureIgnoreCase)
+                    .ThenBy(move => move.NoteId).ToList());
         var outlookByDate = _yearOutlookEvents
             .SelectMany(entry => CalendarDates(entry)
                 .Select(date => (Date: date, Event: entry)))
@@ -497,7 +517,7 @@ public partial class CalendarViewModel : ObservableObject
         for (var month = 1; month <= 12; month++)
         {
             result.Add(BuildMonth(
-                CurrentYear, month, notesByDate, exemptByDate, outlookByDate,
+                CurrentYear, month, notesByDate, movesByDate, exemptByDate, outlookByDate,
                 today, _documentationWindowDays, choices, _settings));
         }
 
@@ -524,27 +544,33 @@ public partial class CalendarViewModel : ObservableObject
         DateTime today,
         int documentationWindowDays = ProductivityForecast.DefaultDocumentationWindowDays,
         IEnumerable<ServiceDayInclusion>? serviceDayInclusions = null,
-        Settings? settings = null)
+        Settings? settings = null,
+        IEnumerable<ScheduledNoteMoveDto>? rescheduledMoves = null)
     {
         var notesByDate = notes
             .Where(note => note.EventDate is DateTime date && date.Year == year && date.Month == month &&
-                           !IsLapsedScheduled(note, today))
-            .Select(note => new CalendarNoteItem(note))
+                           ShouldShowOnCalendar(note, today))
+            .Select(note => new CalendarNoteItem(note, today))
             .GroupBy(note => note.EventDate.Date)
             .ToDictionary(group => group.Key, group => group.ToList());
         var exemptByDate = exemptDates
             .Where(entry => entry.Date.Year == year && entry.Date.Month == month)
             .GroupBy(entry => entry.Date.Date)
             .ToDictionary(group => group.Key, group => group.First());
-        return BuildMonth(year, month, notesByDate, exemptByDate,
+        var movesByDate = (rescheduledMoves ?? [])
+            .Where(move => move.FromDate.Year == year && move.FromDate.Month == month)
+            .GroupBy(move => move.FromDate.Date)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        return BuildMonth(year, month, notesByDate, movesByDate, exemptByDate,
             new Dictionary<DateTime, List<ImportedOutlookEvent>>(), today,
             documentationWindowDays, ChoicesByDate(serviceDayInclusions), settings);
     }
 
-    // Scheduled work whose day has passed is not shown and does not reach the day's
-    // productivity facts. NoteSchedulingPolicy owns what "lapsed" means.
-    private static bool IsLapsedScheduled(Note note, DateTime today) =>
-        NoteSchedulingPolicy.IsLapsedScheduled(note.Status?.ToString(), note.EventDate, today);
+    // Past Scheduled service work still belongs in the day's status breakdown, but an
+    // old calendar reminder has no units to account for and remains outside the view.
+    private static bool ShouldShowOnCalendar(Note note, DateTime today) =>
+        note.NoteType != NoteType.Reminder ||
+        !NoteSchedulingPolicy.IsLapsedScheduled(note.Status?.ToString(), note.EventDate, today);
 
     /// <summary>The stored decisions as the shared rule reads them.</summary>
     internal static IReadOnlyDictionary<DateTime, bool> ChoicesByDate(
@@ -559,6 +585,7 @@ public partial class CalendarViewModel : ObservableObject
         int year,
         int month,
         IReadOnlyDictionary<DateTime, List<CalendarNoteItem>> notesByDate,
+        IReadOnlyDictionary<DateTime, List<ScheduledNoteMoveDto>> movesByDate,
         IReadOnlyDictionary<DateTime, ExemptDate> exemptByDate,
         IReadOnlyDictionary<DateTime, List<ImportedOutlookEvent>> outlookByDate,
         DateTime today,
@@ -578,9 +605,13 @@ public partial class CalendarViewModel : ObservableObject
             var date = new DateTime(year, month, dayNumber);
             exemptByDate.TryGetValue(date, out var exemptEntry);
             notesByDate.TryGetValue(date, out var notes);
+            movesByDate.TryGetValue(date, out var moves);
             outlookByDate.TryGetValue(date, out var outlookEvents);
             notes ??= [];
-            var facts = notes.Select(note => note.ProductivityFact).ToList();
+            // The rescheduled display must not turn a lapsed plan into evidence of
+            // completed service or hold the old day open in the daily average.
+            var facts = notes.Where(note => !note.IsLapsedScheduled)
+                .Select(note => note.ProductivityFact).ToList();
             var choice = choices.TryGetValue(date, out var stored) ? stored : (bool?)null;
             cells.Add(new CalendarDay
             {
@@ -589,6 +620,7 @@ public partial class CalendarViewModel : ObservableObject
                 ExemptDateId = exemptEntry?.Id,
                 IsWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday,
                 Notes = notes,
+                RescheduledMoves = moves ?? [],
                 OutlookEvents = outlookEvents ?? [],
                 ProductivityKind = ProductivityForecast.ClassifyDay(
                     date, facts, today, documentationWindowDays, choice),
@@ -634,6 +666,7 @@ public partial class CalendarViewModel : ObservableObject
     {
         _exemptDates = [];
         _yearNotes = [];
+        _yearMoves = [];
         _yearOutlookEvents = [];
         Months = [];
         SelectedDay = null;
@@ -744,6 +777,7 @@ public partial class CalendarViewModel : ObservableObject
     private void NotifyCalendarComputedProperties()
     {
         OnPropertyChanged(nameof(SelectedDayNotes));
+        OnPropertyChanged(nameof(SelectedDayRescheduledMoves));
         OnPropertyChanged(nameof(SelectedDayOutlookEvents));
         OnPropertyChanged(nameof(SelectedDayTotalMinutes));
         OnPropertyChanged(nameof(SelectedDayTotalUnits));
