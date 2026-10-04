@@ -1,85 +1,111 @@
 # Sati — Refactor Agenda
 
-## Release 1.3.35 — October 4, 2026 (blocked: verification reset poisoned)
+## Release 1.3.35 — October 4, 2026 (publication verified; closing audit)
 
-Scope: linked approved-note amendments, provider-panel organization, completed
-background-worker and Claim.MD preparation source, incident outbox improvements,
-and the date rollover refresh. Operational worker/alert/Function/sandbox activation
-is not implied by packaging this source. Existing configuration gates remain in force.
-Josh separately approved the controlled Demo amendment migration and replacement
-baseline capture on October 4. Josh added `datt-workstation-20261004` for
-`72.95.106.10`; read-only Azure verification confirmed both bounds. Josh removes it
-after migration, capture and verification reset. No assistant changes a firewall rule.
+"Approved-note amendments and provider organization." Scope: linked approved-note
+amendments with explicit financial review for financial changes, provider-panel
+organization, completed background-worker and Claim.MD preparation source,
+incident outbox improvements, and the date rollover refresh. Worker, alert,
+Function and sandbox activation remain separate; their configuration gates remain
+in force. No Function publication or Claim.MD call occurred in this release.
 
-- [x] Complete full Release build and all five test projects with private SQL opt-ins:
-      **4,012 passed, zero failed, one opt-in local AI evaluation skip**. Desktop
-      2,848; API 1,033; signatures 119; portal 8; Carika 4. Final TRX evidence:
+- [x] Full Release solution build: zero errors, 11 warnings under the signed-in
+      Windows profile. `TestResults/datt-1.3.35-build-final.log`.
+- [x] All five test projects with private SQL opt-ins: **4,012 passed, zero failed,
+      one opt-in local AI evaluation skip**. Desktop 2,848; API 1,033; signatures
+      119; portal 8; Carika 4. Final TRXs:
       `TestResults/BackgroundWorkersFullSql/Joshu_LONGCHENPA_2026-10-04_10_12_*`.
-      The owned private LocalDB instance was stopped and deleted after verification.
-- [x] Commit and push verified source to `master`: `2991edd60876a049f149f61c2abbad9d9db4ea72`.
-- [x] Guarded migration rollback rehearsal, apply and idempotent rerun (124 to 125).
-- [x] Publish matching Demo API; health/version/contract checks passed.
-- [ ] Replace reset baseline and verify one full `demo.reset.completed` outcome.
-- [ ] Accept and publish new Demo/Local installers and checksums; record sizes/hashes.
-- [ ] Verify user removal of the named firewall rule and push final release evidence.
+      Owned private LocalDB instances were stopped and deleted. Guarded migration
+      tests passed 3/3 at
+      `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-04_10_10_14_net10.0.trx`.
+- [x] Reviewed source commit `2991edd60876a049f149f61c2abbad9d9db4ea72` pushed to
+      resolved default branch `master` and verified before packaging. Partial
+      release evidence `19591ab632c62a5a46719e00eaf62efba475b550` was pushed when
+      the first reset blocked publication. No unrelated Carika source/version change.
+- [x] Josh separately approved the controlled Demo amendment migration and
+      replacement reset baseline on October 4. Guarded rollback-only rehearsal
+      persisted 124 history rows; `20261004120026_AddNoteAmendments` applied once
+      to 125, then rerun reported `IDEMPOTENCY_VERIFIED`. Reviewed guarded SQL
+      SHA-256 `642F27BBA3EBC9888BDE56FF9A2CEEF8B25868F62DAFCB7E51A47EF4BBF24769`.
+      No Local Production database was queried or migrated.
+- [x] Demo API ZIP `artifacts/SatiApi-1.3.35-fx-x86.zip`: 11,568,730 bytes,
+      SHA-256 `CE564381EC514FDF8DE179E8FEEC4A06E81376A148E70D2DF8ADF02D173CE4B1`.
+      Assembly 1.3.35.0, 69 safe entries, no private settings or detected credential
+      patterns. OneDeploy `64af33c2ccac42179ce82ed540e20443` succeeded at
+      14:25:39.8809648Z. Live/ready returned HTTP 200, version 1.3.35 and contract
+      `896134D84722` before capture and after recovery. Protected route count 250.
+      Authenticated readiness was skipped because Demo credentials were unavailable.
+      Worker/synthetic-dispatch/Claim.MD activation settings remain absent.
+- [x] Read-only pre-capture compliance check: 177 synthetic clients, zero changes,
+      11 expected teaching exceptions, two without effective dates and no unexpected
+      billing holds. `DEMO_FULL_RESET_BASELINE_CAPTURED` captured the baseline at
+      14:27:44Z with anchor 2026-10-04. First verification request
+      `d90c91e8-7018-4e85-9dbb-7cb9f740882c`, accepted at 14:29:27.9581832Z,
+      reached poison at 14:39:39Z without an outcome audit. Read-only diagnosis
+      confirmed unchanged baseline state, enabled foreign keys and no reset lock.
+      A new JobHost started at 14:39:38Z before queue exhaustion; interruption
+      before restore commit is consistent with the evidence, but its cause remains
+      unconfirmed. No replay or hosting/configuration change was made.
+- [x] Josh separately approved one fresh Demo-only recovery after diagnosis.
+      Request `7e73ec33-19aa-48c9-9c6d-1c2a597343d4`, accepted at
+      14:51:03.1611882Z, recorded `demo.reset.completed` at 14:54:48.8837886Z,
+      stage Completed, duration 220 seconds. Correlated operation
+      `a7a3a0ff4ccdf5dc616fcf0efb05417b` emitted
+      `DEMO_COMPLIANCE_HISTORY_COMPLETE` at 14:54:48.858273Z. Main queue is empty;
+      all four poison messages remain preserved. Audit, markers and post-reset
+      health evidence: `TestResults/datt-1.3.35-reset-recovery-audit.json`,
+      `TestResults/datt-1.3.35-reset-recovery-markers.json`, and
+      `TestResults/datt-1.3.35-api-health-after-reset.json`.
+- [x] Josh added `datt-workstation-20261004` for exact IP `72.95.106.10`, then
+      confirmed removal after recovery. Read-only Azure listings verified both
+      bounds initially and the named rule's absence afterward. No assistant
+      changed a firewall rule. The playbook now requires user-run PowerShell
+      add/remove commands with the same explicit release-specific rule name;
+      `Set-DemoWorkstationFirewallRule.ps1` fails on CLI errors, refuses repointing,
+      and verifies exact bounds/absence.
+- [x] Demo installer `artifacts/SatiDemoInstaller/SatiDemoSetup-1.3.35.exe`,
+      104,259,584 bytes, SHA-256
+      `BF207337D17A7851812D981A4E31B0F16E6E01189ECF272446CA53148DDAB38C`.
+      Five responsive launches, normal closes, exact version and isolated cleanup
+      passed. `TestResults/datt-1.3.35-demo-installer-acceptance.json`.
+- [x] Local installer `artifacts/SatiLocalInstaller/SatiLocalSetup-1.3.35.exe`,
+      206,618,665 bytes, SHA-256
+      `FE0C1A49183961C80450764972587230E991CE399E121E7F447C8B75365899E7`.
+      Exact version, Windows integrated security and isolated cleanup passed.
+      Direct resource inspection verified the embedded MSI's valid Microsoft
+      signature and SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`,
+      identical to the reviewed prerequisite. The installers themselves are not
+      claimed code-signed. `TestResults/datt-1.3.35-local-installer-acceptance.json`.
+- [x] Published only the two accepted installers and their `.sha256` files, using
+      verified temporary sibling copies and no overwrite. Local distribution:
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop\SatiLocalSetup-1.3.35.exe`.
+      Demo distribution:
+      `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files\SatiDemoSetup-1.3.35.exe`.
+      Published installer hashes match above; checksum file hashes are
+      `A3AC0BBF356C44FBA263A5E237FC72B6A9DC55580A303B3BA04C299F9E4C7656` (Local)
+      and `416DC4A52AD4FC07F8CA4FAEA535DB615F9BF90FC68EBAAFA856DAF2563B88C4` (Demo).
+      `TestResults/datt-1.3.35-distribution.json` records all four verified copies.
+- [ ] Push final release evidence and verify clean local/remote default-branch equality.
 
-Preflight evidence: local/default/remote tips were
-`89c2c1e0e2d29650498a6938056fc9d73353ad29`; default branch is `master`.
-The current `codex/background-workers` checkout has the same tip and its reviewed
-uncommitted release scope is retained in full. Remote Claude feature/CI tips are
-already ancestors of `master` with no unique commits; retained because independent
-retention intent is unconfirmed. The detached 1.3.31 worktree is retained.
-No unrelated Carika/product source or version change is included.
+Preflight tips were `89c2c1e0e2d29650498a6938056fc9d73353ad29` on default and
+`codex/background-workers`; the reviewed dirty source moved intact to `master`.
+No branches were merged or deleted. The background-workers branch, remote Claude
+feature/CI ancestors with zero unique commits but uncertain retention intent, and
+the detached 1.3.31 worktree are retained.
 
-Release build `TestResults/datt-1.3.35-build-final.log` passed with zero errors and
-11 warnings under the signed-in Windows profile. The initial sandbox build could
-not write Avalonia's profile-local build log. First full tests found release-count,
-version, read-only Run binding, note-panel placement and existing Unbilled-route
-response regressions; these were repaired before repeating the gates.
-Private guarded migration tests passed 3/3 at
-`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-04_10_10_14_net10.0.trx`.
-The Demo rollback-only rehearsal passed and persisted 124 history rows.
-Reviewed guarded SQL SHA-256:
-`642F27BBA3EBC9888BDE56FF9A2CEEF8B25868F62DAFCB7E51A47EF4BBF24769`.
-Protected route count is 250; expected contract revision is `896134D84722`.
+Local machines: Joshu workstation at **1.3.33** per Josh's October 4 report;
+1.3.35 is unapplied until installation and launch. Schema was not independently
+inspected. SatiLogica colleague installation is retired per October 3 evidence;
+no additional active machines are reported. No personal working database access.
 
-Local machines: Joshu workstation at 1.3.33 per Josh's October 4 report; database
-schema not independently inspected, and 1.3.35 remains unapplied until installation
-and launch. SatiLogica colleague installation is retired per October 3 evidence.
-No additional active machines have been reported.
-No Local Production database is inspected or migrated by this release workflow.
+Deferred: diagnose the recurring first-request host interruption without replaying
+preserved messages; review all four poison entries before watchdog activation.
+Alert routing, Function publication, worker/sandbox activation and restore rehearsal
+remain separately authorized operations. The initial sandbox build could not write
+Avalonia's profile-local log; normal-profile build passed. Initial release assertion,
+Run binding, note-panel placement and Unbilled response failures were fixed before
+repeating the affected build/test gates. No failed gate was knowingly published.
 
-Operational evidence: Demo migration `20261004120026_AddNoteAmendments` applied;
-rerun reported `IDEMPOTENCY_VERIFIED` with 125 migration history rows.
-API ZIP `artifacts/SatiApi-1.3.35-fx-x86.zip`: 11,568,730 bytes, SHA-256
-`CE564381EC514FDF8DE179E8FEEC4A06E81376A148E70D2DF8ADF02D173CE4B1`.
-OneDeploy `64af33c2ccac42179ce82ed540e20443` succeeded at
-2026-10-04T14:25:39.8809648Z. Live/ready returned HTTP 200 Healthy;
-version 1.3.35, contract `896134D84722`. Authenticated readiness was skipped
-because Demo credentials were unavailable. Worker/sandbox activation settings
-remain absent; no Function publication or Claim.MD call was performed.
-
-Baseline captured with `DEMO_FULL_RESET_BASELINE_CAPTURED`, anchor 2026-10-04.
-Read-only compliance check: 177 clients, zero changes, 11 expected teaching
-exceptions, two without effective dates. One reset request
-`d90c91e8-7018-4e85-9dbb-7cb9f740882c` queued at 14:29:27.9581832Z.
-At 10:39:39 Eastern it entered `demo-reset-requests-poison`; read-only peek
-confirmed this exact request. No matching completed/failed audit was found,
-and the compliance history completion marker was not verified. Release blocked;
-no replay, dequeue, Function change or installer distribution performed.
-Temporary user-managed firewall rule remains pending removal/recovery decision.
-
-Both built installers passed isolated acceptance and cleanup:
-- Demo `artifacts/SatiDemoInstaller/SatiDemoSetup-1.3.35.exe`, 104,259,584 bytes,
-  SHA-256 `BF207337D17A7851812D981A4E31B0F16E6E01189ECF272446CA53148DDAB38C`;
-  five responsive launches, graceful closes, exact installed version.
-- Local `artifacts/SatiLocalInstaller/SatiLocalSetup-1.3.35.exe`, 206,618,665 bytes,
-  SHA-256 `FE0C1A49183961C80450764972587230E991CE399E121E7F447C8B75365899E7`;
-  exact version, embedded Microsoft prerequisite signature, integrated security.
-Acceptance evidence: `TestResults/datt-1.3.35-demo-installer-acceptance.json`
-and `TestResults/datt-1.3.35-local-installer-acceptance.json`.
-These artifacts and their checksums remain unpublished pending reset recovery.
-No branches were merged or deleted; uncertain retained branches remain intact.
 ## Claim.MD preparation — October 3, 2026 (source only)
 
 - [x] Audited exact-Demo Admin onboarding creates account, independent reviewed
