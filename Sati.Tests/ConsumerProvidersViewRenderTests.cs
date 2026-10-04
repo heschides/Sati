@@ -24,6 +24,65 @@ namespace Sati.Tests;
 [Collection(WpfViewCollection.Name)]
 public sealed class ConsumerProvidersViewRenderTests
 {
+    [Theory]
+    [InlineData(700)]
+    [InlineData(1100)]
+    public async Task OrderingPanelRendersAtProfileWidths(int width)
+    {
+        var rows = new List<PersonProvider> { Link(1, 40, 4), Link(2, 40, 3), Link(3, 40, 7) };
+        rows[0].IsPrimaryCare = true;
+        var panel = new ConsumerProvidersViewModel(new StubLinkService(rows), new StubProviderService(Directory()));
+        panel.SetPerson(Consumer(40, null));
+        await panel.RefreshAsync();
+        WpfUiHarness.Run(() =>
+        {
+            var view = new ConsumerProvidersView { DataContext = panel };
+            WpfUiHarness.Realize(view, width, 800);
+            var list = WpfUiHarness.FindByAutomationName<ItemsControl>(view, "Current provider assignments");
+            Assert.Equal(3, list.Items.Count);
+            var move = WpfUiHarness.Descendants(list).OfType<Button>().First(button => Equals(button.Content, "Move Down") && button.IsEnabled);
+            Assert.True(move.Focusable);
+            Assert.True(System.Windows.Input.KeyboardNavigation.GetIsTabStop(move));
+            var row = (ConsumerProviderRowViewModel)move.CommandParameter;
+            var container = list.ItemContainerGenerator.ContainerFromItem(row);
+            panel.MoveDownCommand.Execute(row);
+            WpfUiHarness.Realize(view, width, 800);
+            Assert.Same(container, list.ItemContainerGenerator.ContainerFromItem(row));
+            Assert.True(WpfUiHarness.FindByAutomationName<Button>(view, "Save current provider order").IsEnabled);
+            var image = new System.Windows.Media.Imaging.RenderTargetBitmap(width, 800, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            image.Render(view);
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+            using var stream = System.IO.File.Create(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"sati-provider-order-{width}.png"));
+            encoder.Save(stream);
+        });
+    }
+
+    [Fact]
+    public async Task OrderingControlsAreNamedKeyboardReachableAndRespectBoundaries()
+    {
+        var panel = await LoadedPanelAsync();
+        RenderProfile(panel, view =>
+        {
+            var list = WpfUiHarness.FindByAutomationName<ItemsControl>(view, "Current provider assignments");
+            var buttons = WpfUiHarness.Descendants(list).OfType<Button>().ToList();
+            var up = buttons.Single(button => Equals(button.Content, "Move Up"));
+            var down = buttons.Single(button => Equals(button.Content, "Move Down"));
+            Assert.Same(panel.MoveUpCommand, up.Command);
+            Assert.Same(panel.MoveDownCommand, down.Command);
+            Assert.Same(Assert.Single(panel.Current), up.CommandParameter);
+            Assert.False(up.IsEnabled);
+            Assert.False(down.IsEnabled);
+            Assert.True(up.Focusable);
+            Assert.True(down.Focusable);
+            Assert.Contains("Dr. Reed", AutomationProperties.GetName(up));
+            var save = WpfUiHarness.FindByAutomationName<Button>(view, "Save current provider order");
+            Assert.Same(panel.SaveOrderCommand, save.Command);
+            Assert.False(save.IsEnabled);
+            Assert.True(WpfUiHarness.FindByAutomationName<Button>(view,
+                "Reload provider assignments and discard intended order").Focusable);
+        });
+    }
     [Fact]
     public async Task EachProviderRowsEndAndRemoveButtonsReachTheViewModelCommands()
     {
@@ -322,6 +381,8 @@ public sealed class ConsumerProvidersViewRenderTests
 
     private sealed class StubLinkService(List<PersonProvider> links) : IConsumerProviderService
     {
+        public Task<List<Sati.Models.PersonProvider>> ReorderAsync(int personId, Sati.Contracts.V1.ReorderConsumerProvidersRequest request) => throw new NotSupportedException();
+
         private readonly TaskCompletionSource _loaded =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 

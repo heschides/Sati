@@ -1,5 +1,146 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.35 — October 4, 2026 (audit in progress)
+
+Scope: linked approved-note amendments, provider-panel organization, completed
+background-worker and Claim.MD preparation source, incident outbox improvements,
+and the date rollover refresh. Operational worker/alert/Function/sandbox activation
+is not implied by packaging this source. Existing configuration gates remain in force.
+Josh separately approved the controlled Demo amendment migration and replacement
+baseline capture on October 4. Josh added `datt-workstation-20261004` for
+`72.95.106.10`; read-only Azure verification confirmed both bounds. Josh removes it
+after migration, capture and verification reset. No assistant changes a firewall rule.
+
+- [x] Complete full Release build and all five test projects with private SQL opt-ins:
+      **4,012 passed, zero failed, one opt-in local AI evaluation skip**. Desktop
+      2,848; API 1,033; signatures 119; portal 8; Carika 4. Final TRX evidence:
+      `TestResults/BackgroundWorkersFullSql/Joshu_LONGCHENPA_2026-10-04_10_12_*`.
+      The owned private LocalDB instance was stopped and deleted after verification.
+- [ ] Commit and push verified source to resolved default branch `master`.
+- [ ] Guarded migration rollback rehearsal, apply and idempotent rerun (124 to 125).
+- [ ] Publish matching Demo API; record ZIP hash, deployment, health and contract revision.
+- [ ] Replace reset baseline and verify one full `demo.reset.completed` outcome.
+- [ ] Accept and publish new Demo/Local installers and checksums; record sizes/hashes.
+- [ ] Verify user removal of the named firewall rule and push final release evidence.
+
+Preflight evidence: local/default/remote tips were
+`89c2c1e0e2d29650498a6938056fc9d73353ad29`; default branch is `master`.
+The current `codex/background-workers` checkout has the same tip and its reviewed
+uncommitted release scope is retained in full. Remote Claude feature/CI tips are
+already ancestors of `master` with no unique commits; retained because independent
+retention intent is unconfirmed. The detached 1.3.31 worktree is retained.
+No unrelated Carika/product source or version change is included.
+
+Release build `TestResults/datt-1.3.35-build-final.log` passed with zero errors and
+11 warnings under the signed-in Windows profile. The initial sandbox build could
+not write Avalonia's profile-local build log. First full tests found release-count,
+version, read-only Run binding, note-panel placement and existing Unbilled-route
+response regressions; these were repaired before repeating the gates.
+Private guarded migration tests passed 3/3 at
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-04_10_10_14_net10.0.trx`.
+The Demo rollback-only rehearsal passed and persisted 124 history rows.
+Reviewed guarded SQL SHA-256:
+`642F27BBA3EBC9888BDE56FF9A2CEEF8B25868F62DAFCB7E51A47EF4BBF24769`.
+Protected route count is 250; expected contract revision is `896134D84722`.
+
+Local machines: Joshu workstation at 1.3.33 per Josh's October 4 report; database
+schema not independently inspected, and 1.3.35 remains unapplied until installation
+and launch. SatiLogica colleague installation is retired per October 3 evidence.
+No additional active machines have been reported.
+No Local Production database is inspected or migrated by this release workflow.
+
+## Claim.MD preparation — October 3, 2026 (source only)
+
+- [x] Audited exact-Demo Admin onboarding creates account, independent reviewed
+      Status/ERA cursors and permanent evidence marker atomically. A global SQL
+      transaction lease serializes routing reservations across hosts; exact replay
+      requires unchanged initial revisions/cursors and original request fingerprint.
+- [x] Manual Admin reconciliation checks retained account/generation/file/hash,
+      revision, timely proof and PCN/D9 identities. Original evidence is immutable;
+      support-attested non-receipt has a distinct terminal state. No automatic send.
+- [x] Hosted uploads/polling hold shared reset leases through vendor calls and
+      evidence commits; per-dispatch exclusion prevents conflicting active-upload
+      findings. Reset capture/assertion/restore share one external-history guard.
+- [x] Owner-executed reset assertion preserves the existing denial of direct
+      baseline access. Missing guard/schema fails closed before restore/seed.
+- [x] Watchdog handles Josh's intended paused reset timer without a false missing
+      nightly finding; failed audits/poison and enabled billing scans remain active.
+- [x] `CLAIMMD_SANDBOX_RUNBOOK.md` records activation, account/feed setup, manual
+      findings and the pause/test/preserve/return-to-canonical/resume sequence.
+- [x] Release verification: **3,975 passed, zero failed, one opt-in local AI skip**.
+      Desktop 2,831; API 1,013; signatures 119; portal 8; Carika 4. Full solution
+      SQL-enabled evidence is `TestResults/BackgroundWorkersFullSql/2026-10-03_18_39_*`.
+      The API suite was rerun after the foreign-busy-dispatch fix: 1,013/1,013,
+      `TestResults/ClaimMdPreparationFinalApi/2026-10-03_18_47_04*`. Both runs used
+      fresh private synthetic LocalDB instances and deleted their owned instances.
+      Restricted reset identity execution, live/baseline history preservation,
+      onboarding host serialization, active-upload exclusion, and manifest parity
+      passed. Targeted weakened guards failed before restoration: worker/poller
+      reset bypass (2), SQL upload/onboarding/history guards (3), Admin/tenant/revision
+      checks, foreign busy-resource privacy, and paused-timer watchdog scenarios.
+      Valid root mutation evidence is the `18_30_29` worker/poller TRX and
+      `18_37_54` SQL TRX; preceding SQL runs caught fixture/identifier errors and
+      are not claimed as history-regression proof. `git diff --check` is clean.
+- [ ] Separately approve/install guarded SQL procedures, publish API/Function,
+      verify contract parity and pause the reset timer before account onboarding.
+      No runtime/cloud configuration, migration, account call or reset ran here;
+      this source slice requires no new EF migration.
+- [ ] Obtain dedicated vendor test credentials and approved synthetic patient AND
+      provider fixtures; verify remote_claimid-only duplicate setting, independent
+      feed history/cursors, response variants, encrypted evidence readback and
+      account lifecycle with Claim.MD. No test enrollments on live linked services.
+- [ ] Implement/rehearse an approved sandbox evidence archive and clean-Demo
+      cutover adapter before testing ends. Reconcile uncertainty and prove recovery
+      before resuming automatic resets. Timer re-enable alone must remain blocked
+      against linked history; deleting audit/account rows is not a resume procedure.
+- [ ] Before live MaineCare claims: add immutable/configured service-facility ID
+      to block 32/2310C (Claim.MD documents xxxx-xxx), review MEMCD routing, provider
+      identifiers/taxonomy, service codes/authorization and real enrollment with
+      current official requirements. The formatter currently lacks that loop and
+      uses a fixed taxonomy. This is separately scoped payer-readiness work.
+- [ ] Future cloud Production integration still needs its own credentials,
+      retention/recovery, authorization, vendor-contract and regulatory acceptance.
+
+## Background workers handoff — October 3, 2026 (source only)
+
+Implementation follows `BACKGROUND_WORKERS_HANDOFF.md` and D1–D4. Claude's PRs #3
+and #4 were merged before work began. No cloud configuration, deployment,
+migration, personal LocalDB query, poison-message replay or vendor retry is part
+of this source change.
+
+- [x] Final Release solution verification passed with the SQL opt-ins enabled:
+      **3,948 passed, zero failed, one explicitly gated local AI evaluation skip**.
+      Desktop 2,823; API 994; signatures 119; portal 8; Carika 4.
+      `scripts/Test-IsolatedLocalDb.ps1 -FullSolution` used only synthetic fixtures
+      in a new private LocalDB instance, then stopped and deleted it. TRX evidence
+      is in `TestResults/BackgroundWorkersFullSql`, `2026-10-03_17_26_*`.
+      An earlier run was interrupted by workstation connected standby and failed
+      during WPF theme resource evaluation; the focused theme suite passed
+      153/153 before the clean full rerun. Fail-first checks and remaining
+      activation boundaries are recorded in `BACKGROUND_WORKERS_HANDOFF.md`.
+
+- [x] W1/W4 source: daily read-only Function watchdog and operator alert script.
+- [x] W2 source: shared eligibility, audited revision checks, default-off API worker.
+- [x] W3 source: account-bound durable envelopes and bounded in-session retry.
+- [x] W5 source: coalesced midnight/activation refresh with draft deferral.
+- [x] W6 source: restore-verification script and isolated cloud restore runbook; Demo
+      rehearsal requires separate approval and has not run.
+- [ ] Publish the reviewed Function package through a separately authorized
+      release, with updated seed source and `DemoWatchdogSchedule=0 0 4 * * *`.
+- [ ] Josh reviews/runs `Set-DemoWatchdogAlerts.ps1`, confirms regional costs,
+      supplies his email, and proves one notification. No receiver is configured
+      by this implementation.
+- [ ] Review the three preserved poison entries before watchdog activation.
+      Count greater than zero intentionally creates a daily finding; no baseline
+      suppression or queue cleanup is automatic.
+- [ ] Enable the API sweep and its Function expectation flag together after
+      deployment acceptance. Default-off configuration is preserved.
+- [ ] W7 optional personal backup hygiene remains deferred: it creates/operates
+      on real PHI copies and is not needed for this cloud implementation.
+- [ ] Assessment submit-after-save failure remains a separately scoped defect,
+      as the handoff specifies; deadline digests, cycle preparation, statistics
+      aggregation and automated retention remain excluded with their recorded reasons.
+
 ## Release 1.3.34 — October 3, 2026 (published)
 
 "Clearer notes, calendar, and statistics." Scope: a consumer-scoped Notes
@@ -2891,13 +3032,14 @@ Sati-owned output.
 - [x] Phase 2 source foundation: agency-scoped account metadata, durable one-generation
       dispatch outbox, immutable completed attempts, separate feed checkpoints, automated
       receipt provenance, tenant/comcurrency constraints, and a reviewed additive migration.
-      No migration has been applied and no connector, worker, or Production path is active.
-- [ ] Apply `20260926183942_AddClearinghouseDispatchFoundation` only through the reviewed
-      migration, backup, and restore procedure; this source change authorizes no database write.
+      This describes the original source phase; the later release 1.3.30 record
+      confirms Demo migration 118 was applied. No real vendor transport is activated.
+- [x] `20260926183942_AddClearinghouseDispatchFoundation` was separately applied to
+      Demo before release 1.3.30; verify current schema before any new activation.
 - [x] Phase 3 source workflow: API-owned connector seam, no-network fake connector, durable
       worker, authorized test-account generation and exact-generation queue, and a generic
-      WPF queue/status view. The server flag defaults off and the Phase 2 migration remains
-      unapplied. Queued/sending/unknown uploads block another file for the period and are never
+      WPF queue/status view. The server flag defaults off; the later Demo migration
+      record supersedes this phase's unapplied state. Queued/sending/unknown uploads block another file for the period and are never
       retried automatically; operational reconciliation is still a Phase 4 gate.
 - [x] Phase 4 source path: default-off, Demo-only Claim.MD HTTP upload, fixed host and
       server-side account-key lookup, encrypted upload evidence, distinct status/ERA reads,
@@ -7667,19 +7809,17 @@ be added retroactively. Everything below waits for Karuna.
 
 ## Note pipeline — outstanding after the 2026-08-17 review
 
-- [ ] **Give an approved note an amendment path.** Approved is terminal for every actor, so a
-      supervisor who approves in error has no remedy even before a claim line exists. The right
-      shape is an immutable approved version plus a linked amending note, not an un-approve that
-      rewrites the record. Touches the claim-line linkage and the 837P path, which is why it was
-      not folded into the workflow-table work. See `DECISIONS.md`.
-- [ ] **Audit the abandonment sweep.** Neither `NoteService.UpdateAbandonedNotesAsync` nor
-      `POST /notes/abandon-overdue` records an audit event, so a status change the system makes on
-      its own is the one transition with no trail. Bulk writes need a summary event rather than
-      one per note.
-- [ ] **Make the overdue sweep respect the concurrency token.** The API route uses
-      `ExecuteUpdateAsync`, which bypasses `Revision`, so a note being edited at that moment can be
-      abandoned underneath its author. Bounded today by the `Pending`-only filter, but it is the
-      one write in the pipeline that ignores optimistic concurrency.
+- [x] **Give an approved note an amendment path (October 4 source; activation pending).**
+      Linked immutable draft/submitted versions and review history preserve the original.
+      Author and current owner cannot self-review. Approved financial changes require
+      explicit billing review; existing submitted claims retain correction lineage and
+      frozen snapshots. Controlled activation and remaining draft/cross-period adapters
+      are recorded in `NOTE_AMENDMENTS_RUNBOOK.md` and the October 4 follow-up below.
+- [x] **Audit the abandonment sweep.** October 3 source now records one system summary
+      per changed agency in the same transaction as its updates, in local and API paths.
+- [x] **Make the overdue sweep respect the concurrency token.** October 3 source updates
+      only the observed revision/status/date/current ownership. A concurrent edit is skipped;
+      API regression tests failed against the previous unconditional bulk update.
 - [ ] **Close the create-time gap on overlapping service time.** `AddNoteAsync` checks for an
       overlapping block and then saves in a separate step, with no transaction spanning the two.
       Two concurrent saves can both pass the check. The unique index that protects claim lines has
@@ -8114,8 +8254,26 @@ that link is slice 2 here, and is deliberately not medical-only.
       button, the derived affiliation being text rather than an input, the collapsed disclosure,
       and the assertive live region. What stays unverified is that `ClientsView` hands it the
       right DataContext — the smoke test loads `ClientsView` without one.
-- [ ] **`SortOrder` has no interface.** The column, the rule, and the ordering all exist and are
-      tested; nothing yet lets a case manager reorder the list, so every row is added at the end.
+- [x] **`SortOrder` interface — October 3, source only (feature prompt 14).**
+      Move Up/Move Down stage the current list, keeping primary care pinned first;
+      Save order persists the whole permutation with local/API parity. Serializable
+      collection snapshot checks reject stale membership/order; changed order and
+      its metadata-only audit commit together. Failure preserves the intended order
+      with explicit Reload/Retry. Navigation during save cannot publish into another
+      consumer. Existing storage requires no migration. Ended history and frozen
+      document snapshots stay unchanged.
+      Verification: 100 focused desktop/domain tests and 19 API/compatibility tests
+      pass (`Sati.Tests/TestResults/provider-order-desktop-final.trx` and
+      `Sati.Api.Tests/TestResults/provider-order-api-final.trx`). Three local
+      ownership/stale-snapshot tests failed with their guards removed, then passed
+      after restoration (`provider-order-removed-guards.trx`). Synthetic WPF
+      previews at 700/1100 pixels were inspected; automation names, command
+      bindings, boundary states, tab stops and row-container preservation passed.
+      SQLite verifies transactions/rollback; multi-host SQL contention and actual
+      assistive-technology operation have not been rehearsed in this task.
+- [ ] Release the compatible provider-order API/desktop source through the normal
+      release procedure; perform hands-on keyboard/screen-reader acceptance there.
+      Synthetic WPF rendering and automation assertions are narrower evidence.
 
 ### Slice 3 — Reconcile the superseded fields ✅ (2026-08-28)
 
@@ -8599,3 +8757,19 @@ See `TEAM_CHAT_DESIGN.md`, `TEAM_CHAT_REVIEW.md`, `TEAM_CHAT_GUIDE.md` and
       verified it absent; the existing Demo API and refresh outbound rules remain.
       Local Production has not been
       migrated; its pending migrations run when the new Local client is installed and launched.
+
+## Approved-note amendments — October 4 source follow-up
+
+Linked version/history, own-caseload authorship, independent supervisory review,
+financial holds and explicit review, reviewed unclaimed billing projections, and
+submitted-claim correction lineage are implemented in source. See
+`NOTE_AMENDMENTS_RUNBOOK.md` for controlled activation and evidence.
+
+- [ ] Controlled migration/deployment and agency/legal amendment policy acceptance.
+- [ ] Append-only adjustment for an existing draft claim; cross-period correction allocation.
+- [ ] Effective amendment projections in general calendars, clinical exports and productivity;
+      preserve original provenance rather than flattening records.
+- [ ] Release of conservative original time reservations after financial resolution.
+- [ ] Explicit reassignment/withdrawal policy for an unfinished amendment after caseload transfer.
+- [ ] Local claimed-note correction adapter remains unavailable with the existing local billing path.
+- [ ] Coordinate amendment history with retention/holds, deletion, and Demo baseline/reset policy.

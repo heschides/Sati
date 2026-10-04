@@ -6,7 +6,8 @@ using Sati.Data;
 
 namespace Sati.ViewModels.Admin;
 
-public partial class PlatformHealthViewModel(IPlatformHealthService service) : ObservableObject
+public partial class PlatformHealthViewModel(
+    IPlatformHealthService service, IIncidentReporter incidentReporter) : ObservableObject
 {
     public ObservableCollection<PlatformAgencyHealthDto> Agencies { get; } = [];
     public ObservableCollection<IncidentGroupDto> Incidents { get; } = [];
@@ -15,6 +16,7 @@ public partial class PlatformHealthViewModel(IPlatformHealthService service) : O
     [ObservableProperty] private DateTime? lastRefreshedAt;
     [ObservableProperty] private bool isBusy;
     [ObservableProperty] private string statusMessage = string.Empty;
+    [ObservableProperty] private string localIncidentOutboxStatus = string.Empty;
 
     public string LastRefreshedLabel => LastRefreshedAt is null
         ? "Not loaded"
@@ -28,6 +30,7 @@ public partial class PlatformHealthViewModel(IPlatformHealthService service) : O
             return;
         IsBusy = true;
         StatusMessage = string.Empty;
+        LocalIncidentOutboxStatus = DescribeLocalOutbox(incidentReporter.GetOutboxStatus());
         try
         {
             var dashboard = await service.GetDashboardAsync();
@@ -48,6 +51,18 @@ public partial class PlatformHealthViewModel(IPlatformHealthService service) : O
 
     partial void OnLastRefreshedAtChanged(DateTime? value) => OnPropertyChanged(nameof(LastRefreshedLabel));
     partial void OnStatusMessageChanged(string value) => OnPropertyChanged(nameof(HasError));
+
+    private static string DescribeLocalOutbox(IncidentOutboxSupportStatus? status)
+    {
+        if (status is null)
+            return "Local incident delivery status is unavailable.";
+        var oldest = status.OldestPendingAge is TimeSpan age
+            ? $"; oldest waiting {Math.Max(0, (int)age.TotalMinutes)} minutes"
+            : string.Empty;
+        return $"Local incident delivery: {status.PendingForCurrentAccount} pending for this account" +
+               oldest + $"; {status.HeldForOtherAccounts} held for other accounts on this " +
+               $"Windows profile; {status.Quarantined} quarantined for support review.";
+    }
 
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values)
     {

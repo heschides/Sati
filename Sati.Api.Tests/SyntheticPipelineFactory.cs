@@ -129,6 +129,7 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
     public TestKeyWrapper Vault { get; }
     public bool EnableSyntheticDispatch { get; set; }
     public bool DisableDispatchWorker { get; set; }
+    public IDemoWorkerResetCoordination? ResetCoordinationOverride { get; set; }
 
     public SyntheticPipelineFactory(SyntheticPipelineDatabase database, TestKeyWrapper? vault = null,
         params IInterceptor[] interceptors)
@@ -186,6 +187,11 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
             services.AddScoped(provider => provider.GetRequiredService<IDbContextFactory<ApiDbContext>>().CreateDbContext());
             services.RemoveAll<IKeyWrapper>();
             services.AddSingleton<IKeyWrapper>(Vault);
+            if (ResetCoordinationOverride is not null)
+            {
+                services.RemoveAll<IDemoWorkerResetCoordination>();
+                services.AddSingleton(ResetCoordinationOverride);
+            }
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
         });
     }

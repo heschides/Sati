@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,6 +36,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
     private bool _seeded;
 
     internal TimeProvider? ClockOverride { get; init; }
+    internal DbCommandInterceptor? DatabaseCommandInterceptor { get; init; }
 
     /// <summary>
     /// The in-memory stand-in for this environment's Key Vault key. Exposed so a test
@@ -100,8 +102,12 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IDbContextOptionsConfiguration<ApiDbContext>>();
             services.RemoveAll<IDatabaseProvider>();
             services.AddDbContextFactory<ApiDbContext>(options =>
+            {
                 options.UseSqlite(_testDatabaseConnection)
-                    .ReplaceService<IExecutionStrategyFactory, TestRetryingExecutionStrategyFactory>());
+                    .ReplaceService<IExecutionStrategyFactory, TestRetryingExecutionStrategyFactory>();
+                if (DatabaseCommandInterceptor is not null)
+                    options.AddInterceptors(DatabaseCommandInterceptor);
+            });
             services.AddScoped(provider =>
                 provider.GetRequiredService<IDbContextFactory<ApiDbContext>>().CreateDbContext());
             services.AddDataProtection().UseEphemeralDataProtectionProvider();

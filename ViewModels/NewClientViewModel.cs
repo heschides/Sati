@@ -2263,6 +2263,9 @@ namespace Sati.ViewModels
         // Immediate flush for shutdown/user-switch. Public so ShellViewModel can call
         // it in the same teardown path that saves the Scratchpad. Stops the timer
         // first so a pending tick can't double-write.
+        public bool HasUnsavedJournalChanges =>
+            _journalPersonId is int id && _journalDraftTracker.IsDirty(id, Journal);
+
         public async Task<bool> FlushJournalAsync()
         {
             _journalSaveTimer?.Stop();

@@ -7,6 +7,9 @@ namespace Sati.Data
     {
         public SatiContext CreateDbContext(string[] args)
         {
+            if (args.Contains("--synthetic-design", StringComparer.Ordinal))
+                return new SatiContext(new DbContextOptionsBuilder<SatiContext>().UseSqlServer(
+                    "Server=(localdb)\\MSSQLLocalDB;Database=SatiSyntheticDesignOnly;Trusted_Connection=True;Encrypt=False;").Options);
             var workingDirectory = Directory.GetCurrentDirectory();
             var repositoryDirectory = Directory.GetParent(workingDirectory)?.FullName;
             var configurationDirectory = File.Exists(Path.Combine(workingDirectory, "appsettings.json"))

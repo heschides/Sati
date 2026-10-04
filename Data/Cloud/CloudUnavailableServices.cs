@@ -427,6 +427,11 @@ public sealed class CloudCheckRequestService(CloudApiClient api) : ICheckRequest
 
 public sealed class CloudConsumerProviderService(CloudApiClient api) : IConsumerProviderService
 {
+    public async Task<List<PersonProvider>> ReorderAsync(int personId, ReorderConsumerProvidersRequest request) =>
+        (await api.PutAsync<ReorderConsumerProvidersRequest, List<ConsumerProviderDto>>(
+            $"/api/v1/people/{personId}/providers/order", request))
+        .Select(CloudContractMapper.ToConsumerProvider).ToList();
+
     public async Task<List<PersonProvider>> GetByPersonAsync(int personId) =>
         (await api.GetAsync<List<ConsumerProviderDto>>($"/api/v1/people/{personId}/providers"))
         .Select(CloudContractMapper.ToConsumerProvider)

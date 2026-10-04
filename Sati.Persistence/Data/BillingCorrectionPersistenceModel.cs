@@ -49,6 +49,9 @@ public static class BillingCorrectionPersistenceModel
         model.Entity<ClaimCorrection>(entity =>
         {
             entity.ToTable("ClaimCorrections");
+            entity.Property(x => x.CorrectedUnits).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.CorrectedChargeAmount).HasColumnType("decimal(18,2)");
+            entity.HasOne<Sati.Models.NoteAmendmentVersion>().WithMany().HasForeignKey(x => x.AmendedNoteVersionId).OnDelete(DeleteBehavior.Restrict);
             entity.HasKey(x => x.Id);
             entity.Property(x => x.PayerClaimControlNumber).HasMaxLength(ClaimCorrectionRules.PayerClaimControlNumberMaxLength);
             entity.Property(x => x.ClaimSnapshotJson).IsRequired();

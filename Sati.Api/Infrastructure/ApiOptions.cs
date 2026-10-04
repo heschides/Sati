@@ -45,4 +45,6 @@ internal sealed class SatiApiOptions
     public bool EnableSyntheticClearinghouseDispatch { get; init; }
     // Independent, default-off Demo-only gate. Never route Office Ally through this transport.
     public bool EnableClaimMdSandboxTransport { get; init; }
+    // Default-off, server-owned Pending-note catch-up on API wake.
+    public bool EnableNoteAbandonmentWorker { get; init; }
 }

@@ -30,6 +30,7 @@ namespace Sati.Views
         private readonly CheckRequestPromptLauncher _checkRequestPromptLauncher;
         private readonly UndocumentedDayPromptLauncher _undocumentedDayPromptLauncher;
         private readonly LeftoverScheduledWorkPromptLauncher _leftoverScheduledWorkPromptLauncher;
+        private readonly DateRolloverRefreshCoordinator _dateRefresh;
         private readonly ScratchpadView _workAgendaView;
         private ContentControl? _overviewAgendaHost;
         private ContentControl? _workAgendaParent;
@@ -64,8 +65,11 @@ namespace Sati.Views
             CheckRequestPromptLauncher checkRequestPromptLauncher,
             UndocumentedDayPromptLauncher undocumentedDayPromptLauncher,
             LeftoverScheduledWorkPromptLauncher leftoverScheduledWorkPromptLauncher,
+            DateRolloverRefreshCoordinator dateRefresh,
             SessionKeepAlive? sessionKeepAlive = null)
         {
+            _dateRefresh = dateRefresh;
+            _dateRefresh.BindAccount(sessionService.CurrentUser?.Id);
             _leftoverScheduledWorkPromptLauncher = leftoverScheduledWorkPromptLauncher;
             _undocumentedDayPromptLauncher = undocumentedDayPromptLauncher;
             InitializeComponent();
@@ -124,7 +128,10 @@ namespace Sati.Views
             // advances the two dated agenda views immediately; the autosave timer
             // provides the same check while the window stays active.
             Activated += async (s, e) =>
+            {
                 await _shellViewModel.Scratchpad.RollForwardIfNeededAsync();
+                await TryRefreshForDateChangeAsync();
+            };
 
             // The view model owns whether the panel is open; collapsing the actual grid
             // column and restoring its width is view layout, so it lives here. React to
@@ -269,6 +276,7 @@ namespace Sati.Views
             _idleTimer.Start();
             _dateRolloverTimer.Tick += async (_, _) =>
             {
+                await TryRefreshForDateChangeAsync();
                 var today = DateOnly.FromDateTime(DateTime.Today);
                 if (today == _observedLocalDate) return;
                 _observedLocalDate = today;
@@ -293,6 +301,27 @@ namespace Sati.Views
                 CloseDatabasePatienceWindow();
                 Application.Current.Shutdown();
             };
+        }
+
+        private async Task TryRefreshForDateChangeAsync()
+        {
+            try
+            {
+                await _dateRefresh.CheckAsync(_sessionService.CurrentUser?.Id,
+                    () => !_shellViewModel.IsCaseManagementAvailable ||
+                        _shellViewModel.IsAccountTransitionActive ||
+                        _shellViewModel.IsSessionReauthenticationRequired ||
+                        _shellViewModel.Idle.IsOverlayVisible || OwnedWindows.Count != 0 ||
+                        _shellViewModel.NotesViewModel.IsClientsSubActive ||
+                        _shellViewModel.NotesViewModel.HasUnsavedDateRefreshWork,
+                    _shellViewModel.NotesViewModel.RefreshForDateChangeAsync);
+            }
+            catch (Exception ex)
+            {
+                // Keep the rollover due for the next timer/activation. Do not
+                // interrupt editing with a modal dialog or log exception text.
+                System.Diagnostics.Debug.WriteLine($"Date refresh failed: {ex.GetType().Name}");
+            }
         }
 
         private void OnPreProcessInput(object? sender, PreProcessInputEventArgs e)
@@ -437,6 +466,7 @@ namespace Sati.Views
                 {
                     sameAccountReauthenticated = true;
                     await _shellViewModel.ResumeReauthenticatedSessionAsync(user);
+                    await _incidentReporter.FlushAsync();
                     return;
                 }
 

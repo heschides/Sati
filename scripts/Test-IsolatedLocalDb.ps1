@@ -10,16 +10,31 @@
     pwsh -File scripts/Test-IsolatedLocalDb.ps1
 .EXAMPLE
     pwsh -File scripts/Test-IsolatedLocalDb.ps1 -ApiOnly
+.EXAMPLE
+    pwsh -File scripts/Test-IsolatedLocalDb.ps1 -NoteAbandonmentOnly
+.EXAMPLE
+    pwsh -File scripts/Test-IsolatedLocalDb.ps1 -FullSolution
+.EXAMPLE
+    pwsh -File scripts/Test-IsolatedLocalDb.ps1 -ClaimMdPreparationOnly
+.EXAMPLE
+    pwsh -File scripts/Test-IsolatedLocalDb.ps1 -FullApi
 #>
 [CmdletBinding()]
 param(
     [switch]$ApiOnly,
-    [switch]$DesktopOnly
+    [switch]$DesktopOnly,
+    [switch]$NoteAbandonmentOnly,
+    [switch]$ClaimMdPreparationOnly,
+    [switch]$NoteAmendmentsOnly,
+    [switch]$FullApi,
+    [switch]$FullSolution
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-if ($ApiOnly -and $DesktopOnly) { throw 'Choose at most one test-project filter.' }
+if (@(@($ApiOnly, $DesktopOnly, $NoteAbandonmentOnly, $ClaimMdPreparationOnly, $NoteAmendmentsOnly, $FullApi, $FullSolution) | Where-Object { $_ }).Count -gt 1) {
+    throw 'Choose at most one test-project filter.'
+}
 if ($env:OS -cne 'Windows_NT') { throw 'Isolated LocalDB tests require Windows.' }
 
 $localDb = Get-Command SqlLocalDB -CommandType Application -ErrorAction Stop
@@ -50,6 +65,11 @@ $cleanupFailures = [System.Collections.Generic.List[string]]::new()
 try {
     & $localDb.Source create $instance | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "Could not create isolated LocalDB instance $instance." }
+    $afterCreate = @(& $localDb.Source info)
+    if ($LASTEXITCODE -ne 0 -or
+        -not @($afterCreate | Where-Object { $_.ToString().Trim() -ceq $instance }).Count) {
+        throw "LocalDB did not list the newly created isolated instance $instance."
+    }
     $created = $true
 
     & $localDb.Source start $instance | Out-Host
@@ -59,16 +79,37 @@ try {
     [Environment]::SetEnvironmentVariable('SATI_RUN_SQLSERVER_TESTS', '1', 'Process')
     [Environment]::SetEnvironmentVariable('SATI_SQL_TEST_LOCALDB_INSTANCE', $instance, 'Process')
 
-    if (-not $DesktopOnly) {
-        $apiFilter = 'FullyQualifiedName~JoinedBillingPipeline|FullyQualifiedName~ServiceTimeSqlServerConcurrencyTests|FullyQualifiedName~BillingSubmissionSqlServerConcurrencyTests|FullyQualifiedName~ClaimMdSandboxCoordinationTests|FullyQualifiedName~SyntheticPipelineSafetyTests'
-        $apiArgs = @('test', $apiProject, '--configuration', 'Release', '--filter', $apiFilter,
-            '--logger', 'trx', '--results-directory', (Join-Path $repository 'TestResults/IsolatedSqlServer/Api'),
+    if ($FullSolution) {
+        $solutionArgs = @('test', (Join-Path $repository 'SatiLogica.slnx'),
+            '--configuration', 'Release', '--no-restore', '--logger', 'trx',
+            '--results-directory', (Join-Path $repository 'TestResults/BackgroundWorkersFullSql'),
             '-v', 'minimal')
+        & dotnet @solutionArgs
+        if ($LASTEXITCODE -ne 0) { throw "Full solution test run failed (exit $LASTEXITCODE)." }
+    }
+
+    if (-not $DesktopOnly -and -not $FullSolution) {
+        $apiFilter = if ($NoteAmendmentsOnly) {
+            'FullyQualifiedName~NoteAmendmentMigrationSqlTests'
+        }
+        elseif ($ClaimMdPreparationOnly) {
+            'FullyQualifiedName~DemoWorkerResetCoordinationTests|FullyQualifiedName~DemoExternalClearinghouseGuardSqlTests|FullyQualifiedName~ClaimMdOnboardingTests.SqlGlobalLeaseSerializesTwoHostsAndExactReplayAfterRelease'
+        }
+        elseif ($NoteAbandonmentOnly) {
+            'FullyQualifiedName~NoteAbandonmentWorkerTests.DemoResetExclusiveLeasePreventsWorkerSweep|FullyQualifiedName~NoteAbandonmentWorkerTests.SeparateApiHostsCannotSweepAtTheSameTime'
+        }
+        else {
+            'FullyQualifiedName~NoteAmendmentMigrationSqlTests|FullyQualifiedName~JoinedBillingPipeline|FullyQualifiedName~ServiceTimeSqlServerConcurrencyTests|FullyQualifiedName~BillingSubmissionSqlServerConcurrencyTests|FullyQualifiedName~ClaimMdSandboxCoordinationTests|FullyQualifiedName~SyntheticPipelineSafetyTests|FullyQualifiedName~DemoWatchdogSchemaTests.WatchdogSelectsCompileAgainstIsolatedSqlServerSchema|FullyQualifiedName~NoteAbandonmentWorkerTests.DemoResetExclusiveLeasePreventsWorkerSweep|FullyQualifiedName~NoteAbandonmentWorkerTests.SeparateApiHostsCannotSweepAtTheSameTime|FullyQualifiedName~DemoWorkerResetCoordinationTests'
+        }
+        $apiArgs = @('test', $apiProject, '--configuration', 'Release')
+        if (-not $FullApi) { $apiArgs += @('--filter', $apiFilter) }
+        $apiResults = if ($FullApi) { 'TestResults/ClaimMdPreparationFinalApi' } else { 'TestResults/IsolatedSqlServer/Api' }
+        $apiArgs += @('--logger', 'trx', '--results-directory', (Join-Path $repository $apiResults), '-v', 'minimal')
         & dotnet @apiArgs
         if ($LASTEXITCODE -ne 0) { throw "API SQL test project failed (exit $LASTEXITCODE)." }
     }
 
-    if (-not $ApiOnly) {
+    if (-not $ApiOnly -and -not $NoteAbandonmentOnly -and -not $ClaimMdPreparationOnly -and -not $NoteAmendmentsOnly -and -not $FullApi -and -not $FullSolution) {
         $desktopFilter = 'FullyQualifiedName~LocalServiceTimeSqlServerTests|FullyQualifiedName~MigrationEffectAnalyzerAgainstLiveSchemaTests|FullyQualifiedName~WorkAgendaMigrationTests.SystemDataSqlClientSessionTempTableSurvivesParameterizedCommands|FullyQualifiedName~WorkAgendaMigrationTests.DuplicateRepairKeepsLowestExactRowCancelsSafeFanOutAndSkipsUnsafeGroups'
         $desktopArgs = @('test', $desktopProject, '--configuration', 'Release', '--filter', $desktopFilter,
             '--logger', 'trx', '--results-directory', (Join-Path $repository 'TestResults/IsolatedSqlServer/Desktop'),

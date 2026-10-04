@@ -27,6 +27,8 @@ public sealed class CloudApiClient
     private int _sessionEnded;
     private long _sessionGeneration;
     private bool _accessSuspended;
+    private int? _tokenUserId;
+    private int? _tokenAgencyId;
     internal long SessionGeneration { get { lock (_tokenLock) return _sessionGeneration; } }
     internal bool IsAccessSuspended { get { lock (_tokenLock) return _accessSuspended; } }
 
@@ -75,6 +77,21 @@ public sealed class CloudApiClient
         SetAccessToken(accessToken, null);
 
     public void SetAccessToken(string accessToken, DateTimeOffset? expiresAtUtc)
+        => SetAccessTokenCore(accessToken, expiresAtUtc, null, null);
+
+    // Login binds the bearer token to the identity returned by the same authenticated
+    // response. This is local guard metadata, never an account id supplied to the API.
+    internal void SetAuthenticatedAccessToken(string accessToken,
+        DateTimeOffset? expiresAtUtc, int userId, int agencyId)
+    {
+        if (userId <= 0 || agencyId < 0)
+            throw new ArgumentOutOfRangeException(nameof(userId),
+                "The authenticated token requires a valid user and agency.");
+        SetAccessTokenCore(accessToken, expiresAtUtc, userId, agencyId);
+    }
+
+    private void SetAccessTokenCore(string accessToken, DateTimeOffset? expiresAtUtc,
+        int? userId, int? agencyId)
     {
         if (string.IsNullOrWhiteSpace(accessToken))
             throw new ArgumentException("An access token is required.", nameof(accessToken));
@@ -85,6 +102,8 @@ public sealed class CloudApiClient
         {
             _accessToken = accessToken;
             _accessTokenExpiresAtUtc = expiresAtUtc;
+            _tokenUserId = userId;
+            _tokenAgencyId = agencyId;
             _sessionGeneration++;
             Volatile.Write(ref _sessionEnded, 0);
         }
@@ -92,6 +111,25 @@ public sealed class CloudApiClient
         // A fresh credential revives the client. Without this an ended session would
         // stay latched shut after the user signed back in.
         AccessTokenChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    internal long? CapturedAccountGeneration(int userId, int agencyId)
+    {
+        lock (_tokenLock)
+            return !_accessSuspended && Volatile.Read(ref _sessionEnded) == 0 &&
+                   _tokenUserId == userId && _tokenAgencyId == agencyId &&
+                   !string.IsNullOrWhiteSpace(_accessToken)
+                ? _sessionGeneration
+                : null;
+    }
+
+    internal bool IsCapturedAccountSession(int userId, int agencyId, long generation)
+    {
+        lock (_tokenLock)
+            return !_accessSuspended && Volatile.Read(ref _sessionEnded) == 0 &&
+                   _tokenUserId == userId && _tokenAgencyId == agencyId &&
+                   _sessionGeneration == generation &&
+                   !string.IsNullOrWhiteSpace(_accessToken);
     }
 
     /// <summary>
@@ -167,6 +205,16 @@ public sealed class CloudApiClient
         string path, TRequest body, CancellationToken cancellationToken = default)
     {
         var generation = SessionGeneration;
+        return await PostWithCapturedSessionAsync<TRequest, TResponse>(
+            path, body, generation, cancellationToken);
+    }
+
+    internal async Task<TResponse> PostWithCapturedSessionAsync<TRequest, TResponse>(
+        string path, TRequest body, long expectedGeneration,
+        CancellationToken cancellationToken = default)
+    {
+        var generation = expectedGeneration;
+        EnsureCurrentSession(generation);
         using var request = CreateRequest(HttpMethod.Post, path, body, expectedGeneration: generation);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         ValidateResponseSession(response, generation);

@@ -88,13 +88,19 @@ builder.Services.AddSingleton<SignaturePackageBuilder>();
 builder.Services.AddSingleton<SignatureComplianceProjectionService>();
 builder.Services.AddSingleton<SignatureCompletionWorker>();
 builder.Services.AddSingleton<SignatureMailWorker>();
+// Hosted services start in registration order. Validate the database identity
+// before any background worker can read from or mutate its configured target.
+builder.Services.AddSingleton<DatabaseIdentityValidator>();
+builder.Services.AddHostedService<DatabaseIdentityHostedService>();
 builder.Services.AddHostedService<SignatureProcessingService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<ApiClock>();
+builder.Services.AddSingleton<NoteAbandonmentSweep>();
+builder.Services.AddSingleton<INoteAbandonmentCoordination, SqlNoteAbandonmentCoordination>();
+builder.Services.AddHostedService<NoteAbandonmentWorker>();
 builder.Services.AddSingleton<PasswordVerifier>();
 builder.Services.AddSingleton<TokenIssuer>();
 builder.Services.AddSingleton<LoginAttemptGuard>();
-builder.Services.AddSingleton<DatabaseIdentityValidator>();
 builder.Services.AddScoped<ValidatedActorFilter>();
 builder.Services.AddScoped<AuditTrail>();
 builder.Services.AddScoped<PersonLifecycle>();
@@ -137,6 +143,7 @@ builder.Services.AddSingleton<ClearinghouseDispatchGate>();
 builder.Services.AddSingleton<SyntheticClearinghouseConnector>();
 builder.Services.AddSingleton<IClaimMdSandboxKeySource, EnvironmentClaimMdSandboxKeySource>();
 builder.Services.AddSingleton<IClaimMdSandboxCoordination, SqlClaimMdSandboxCoordination>();
+builder.Services.AddSingleton<IDemoWorkerResetCoordination, SqlDemoWorkerResetCoordination>();
 builder.Services.AddHttpClient<ClaimMdSandboxConnector>(client => client.Timeout = TimeSpan.FromSeconds(45))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
 builder.Services.AddSingleton<IClearinghouseConnector, SandboxConnectorRouter>();
@@ -144,7 +151,6 @@ builder.Services.AddHostedService<ClearinghouseDispatchWorker>();
 builder.Services.AddHostedService<ClaimMdSandboxPoller>();
 builder.Services.AddSingleton<IncidentAggregator>();
 builder.Services.AddSingleton<ApiIncidentRecorder>();
-builder.Services.AddHostedService<DatabaseIdentityHostedService>();
 builder.Services.AddDbContextFactory<ApiDbContext>(options =>
     options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
 builder.Services.AddScoped(sp =>

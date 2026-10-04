@@ -2,8 +2,52 @@
 
 **For:** Codex, or any implementer starting without prior context.
 **Written:** 2026-10-03, against release 1.3.34 (`master` @ `9d2d06a`).
-**Status:** scoped and verified against the code; operating decisions D1–D4 made (§4). Nothing
-here is implemented yet.
+**Status:** W1–W6 source, tests, documentation, and operator scripts implemented on
+`codex/background-workers`, based on merged `master` @ `89c2c1e`. Final verification completed
+2026-10-03: **3,948 passed, zero failed, one local AI evaluation skipped**. W7 remains deferred.
+No cloud publication, configuration change, migration, or restore rehearsal was performed.
+
+### Implementation record — October 3, 2026
+
+- **W1/W4:** `Sati.DemoRefresh/DemoWatchdog` runs a daily read-only check after the reset;
+  `Shared/DemoWatchdog.ps1` owns detection and content-free result traces.
+  `scripts/Set-DemoWatchdogAlerts.ps1` prepares Josh's action group and two alert rules with
+  `-WhatIf` and a current regional pricing review gate. The schedule, receiver, and alert rules
+  are not live. Existing poison entries are preserved and intentionally produce findings.
+- **W2:** `NoteAbandonmentRules` and `SystemActor` in Contracts are the shared owners. The
+  default-off API worker catches up on wake, coordinates with the Demo reset lease, and writes
+  revision-checked changes and summary audits together. The desktop-local path uses its existing
+  triggers, the same rule, and a bounded batch. Admin activity displays actor 0 as automation.
+- **W3:** incident envelopes retain their originating account. Sending requires that account
+  and its captured credential session; bounded retries stop on sign-out or account switch.
+  Legacy, malformed, and expired envelopes are held for manual review. Platform Health exposes
+  pending age and held-envelope counts.
+- **W5:** the existing desktop timer and activation event coalesce day-change refreshes through
+  `DateRolloverRefreshCoordinator`. Dirty editors defer refresh; stale account/navigation results
+  are discarded, and failed calendar refreshes remain due for retry.
+- **W6:** `scripts/Invoke-DemoRestoreVerification.ps1` and the `OPERATIONS.md` runbook validate
+  an approved historical manifest against an isolated Demo scratch restore. Fake-operation
+  tests cover ownership, cleanup, evidence failures, manifest validation, and replay prevention.
+  An actual Azure rehearsal still requires separate approval.
+
+Acceptance used `scripts/Test-IsolatedLocalDb.ps1 -FullSolution` with synthetic fixtures in a
+new private LocalDB instance. The final five-project Release run passed: desktop 2,823, API 994,
+signatures 119, portal 8, and Carika 4. The only skip is the explicitly gated on-device AI model
+evaluation. The private instance was stopped and deleted. TRX evidence is under
+`TestResults/BackgroundWorkersFullSql`, with filenames dated `2026-10-03_17_26_*`.
+
+An earlier full run was interrupted by workstation connected standby and subsequently failed
+inside WPF theme resource evaluation. Windows power-event timestamps matched the pause. The
+focused theme suite then passed 153/153, and the final full rerun passed with a temporary,
+process-scoped wake request. No theme assertions or persistent power settings were changed.
+
+Security/concurrency regressions were demonstrated failing when the relevant attribution,
+revision, audit, reset-lease, stale-result, and draft guards were removed, then passed after
+restoration. The local batch-limit and malformed restore-manifest checks were also verified
+against unfixed variants. Operator activation and deferred work are tracked at the top of
+`AGENDA.md`; response procedures and restore evidence requirements are in `OPERATIONS.md`.
+
+The sections below preserve the original scope and acceptance criteria for future review.
 
 Read `AGENTS.md` (or `CLAUDE.md`) first, then `ARCHITECTURE.md`, `DECISIONS.md`, and the
 release 1.3.34 section at the top of `AGENDA.md`. This brief is a map with file references, not a

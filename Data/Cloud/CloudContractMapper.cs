@@ -367,6 +367,7 @@ internal static class CloudContractMapper
     public static ClaimLine ToClaimLine(ClaimLineDto dto) => new()
     {
         Id = dto.Id,
+        AmendedNoteVersionId = dto.AmendedNoteVersionId,
         NoteId = dto.NoteId,
         BillingPeriodId = dto.BillingPeriodId,
         DateOfService = dto.DateOfService,

@@ -17,6 +17,42 @@ public sealed class ConsumerProviderApiTests(SatiApiFactory factory)
     private const int OtherAgencyPersonId = 201;
 
     [Fact]
+    public async Task ReorderSavesCanonicalOrderAndRejectsStaleForeignAndMalformedRequests()
+    {
+        using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var p1 = await CreateProviderAsync("Order First");
+        var p2 = await CreateProviderAsync("Order Second");
+        var first = await AddAsync(client, OwnedPersonId, Link(p1.Id));
+        var second = await AddAsync(client, OwnedPersonId, Link(p2.Id));
+        try
+        {
+            var before = await ListAsync(client, OwnedPersonId);
+            var version = ConsumerProviderOrder.Version(before);
+            var url = $"/api/v1/people/{OwnedPersonId}/providers/order";
+            var bad = await client.PutAsJsonAsync(url, new ReorderConsumerProvidersRequest(version, [first.Id, first.Id]));
+            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+            var foreign = await client.PutAsJsonAsync($"/api/v1/people/{OtherAgencyPersonId}/providers/order",
+                new ReorderConsumerProvidersRequest(version, [second.Id, first.Id]));
+            Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+            var saved = await client.PutAsJsonAsync(url, new ReorderConsumerProvidersRequest(version, [second.Id, first.Id]));
+            Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+            var canonical = (await saved.Content.ReadFromJsonAsync<List<ConsumerProviderDto>>())!;
+            Assert.Equal(new[] { second.Id, first.Id }, canonical.Select(link => link.Id));
+            Assert.Equal(canonical, await ListAsync(client, OwnedPersonId));
+            var stale = await client.PutAsJsonAsync(url, new ReorderConsumerProvidersRequest(version, [first.Id, second.Id]));
+            Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+            Assert.Equal(ConsumerProviderOrder.ConflictCode, (await stale.Content.ReadFromJsonAsync<ApiErrorDto>())?.Code);
+        }
+        finally
+        {
+            await RemoveAsync(client, OwnedPersonId, first.Id);
+            await RemoveAsync(client, OwnedPersonId, second.Id);
+            await DeleteProviderAsync(p1.Id);
+            await DeleteProviderAsync(p2.Id);
+        }
+    }
+
+    [Fact]
     public async Task ACaseManagerCannotReadAnotherAgencysConsumerProviderList()
     {
         using var client = await factory.CreateAuthenticatedClientAsync("case-manager-one");

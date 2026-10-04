@@ -15,6 +15,77 @@ namespace Sati.Tests;
 public sealed class ConsumerProviderServiceTests
 {
     [Fact]
+    public async Task ReorderRequiresOwnedConsumerEvenWithAValidForeignSnapshot()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var service = new ConsumerProviderService(fixture.Factory, fixture.Session);
+        await fixture.SeedLinkAsync(fixture.OtherPersonId, fixture.ClinicianId);
+        await using var db = fixture.Factory.CreateDbContext();
+        var foreign = await db.PersonProviders.Where(link => link.PersonId == fixture.OtherPersonId).ToListAsync();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ReorderAsync(fixture.OtherPersonId,
+            new(ConsumerProviderOrder.Version(foreign.Select(ConsumerProviderOrderSnapshot.Fact)), foreign.Select(link => link.Id).ToArray())));
+    }
+
+    [Fact]
+    public async Task AuditFailureRollsBackTheEntireReorder()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var service = new ConsumerProviderService(fixture.Factory, fixture.Session);
+        var secondProvider = await fixture.SeedProviderAsync(1, "Second", MedicalProviderKind.Individual);
+        var first = await service.SaveAsync(Link(fixture.PersonId, fixture.ClinicianId));
+        var second = await service.SaveAsync(Link(fixture.PersonId, secondProvider));
+        var before = await service.GetByPersonAsync(fixture.PersonId);
+        await using var db = fixture.Factory.CreateDbContext();
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER FailOrderAudit BEFORE INSERT ON AuditEvents BEGIN SELECT RAISE(ABORT, 'synthetic audit failure'); END;");
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => service.ReorderAsync(fixture.PersonId,
+            new(ConsumerProviderOrder.Version(before.Select(ConsumerProviderOrderSnapshot.Fact)), [second.Id, first.Id])));
+        Assert.IsType<DbUpdateException>(failure.InnerException);
+        Assert.Equal(before.Select(ConsumerProviderOrderSnapshot.Fact),
+            (await service.GetByPersonAsync(fixture.PersonId)).Select(ConsumerProviderOrderSnapshot.Fact));
+        Assert.Empty(await db.AuditEvents.Where(a => a.Action == "consumer.providers.reordered").ToListAsync());
+    }
+
+    [Fact]
+    public async Task ReorderPersistsOnlyOrderAndRejectsStaleSnapshotsAndForeignConsumers()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var service = new ConsumerProviderService(fixture.Factory, fixture.Session);
+        var secondProvider = await fixture.SeedProviderAsync(1, "Second", MedicalProviderKind.Individual);
+        var first = await service.SaveAsync(Link(fixture.PersonId, fixture.ClinicianId));
+        var second = await service.SaveAsync(Link(fixture.PersonId, secondProvider));
+        var before = await service.GetByPersonAsync(fixture.PersonId);
+        var request = new ReorderConsumerProvidersRequest(
+            ConsumerProviderOrder.Version(before.Select(ConsumerProviderOrderSnapshot.Fact)), [second.Id, first.Id]);
+        var saved = await service.ReorderAsync(fixture.PersonId, request);
+        Assert.Equal(new[] { second.Id, first.Id }, saved.Select(link => link.Id));
+        Assert.Equal(new[] { second.Id, first.Id }, (await service.GetByPersonAsync(fixture.PersonId)).Select(link => link.Id));
+        foreach (var prior in before)
+            Assert.Equal(ConsumerProviderOrderSnapshot.Fact(prior) with { SortOrder = saved.Single(l => l.Id == prior.Id).SortOrder },
+                ConsumerProviderOrderSnapshot.Fact(saved.Single(l => l.Id == prior.Id)));
+        await Assert.ThrowsAsync<ConsumerProviderOrderConflictException>(() => service.ReorderAsync(fixture.PersonId, request));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ReorderAsync(fixture.OtherPersonId, request));
+        await using var db = fixture.Factory.CreateDbContext();
+        Assert.Single(await db.AuditEvents.Where(a => a.Action == "consumer.providers.reordered").ToListAsync());
+    }
+
+    [Fact]
+    public async Task ReorderRejectsChangedMembershipAndMismatchedIdsWithoutPartialWrites()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var service = new ConsumerProviderService(fixture.Factory, fixture.Session);
+        var first = await service.SaveAsync(Link(fixture.PersonId, fixture.ClinicianId));
+        var before = await service.GetByPersonAsync(fixture.PersonId);
+        var version = ConsumerProviderOrder.Version(before.Select(ConsumerProviderOrderSnapshot.Fact));
+        foreach (var ids in new[] { Array.Empty<int>(), new[] { first.Id, first.Id }, new[] { int.MaxValue } })
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.ReorderAsync(fixture.PersonId, new(version, ids)));
+        await service.EndAsync(fixture.PersonId, first.Id, new DateTime(2026, 8, 28));
+        await Assert.ThrowsAsync<ConsumerProviderOrderConflictException>(() => service.ReorderAsync(fixture.PersonId, new(version, [first.Id])));
+        await using var db = fixture.Factory.CreateDbContext();
+        Assert.Empty(await db.AuditEvents.Where(a => a.Action == "consumer.providers.reordered").ToListAsync());
+        Assert.Equal(0, (await db.PersonProviders.SingleAsync()).SortOrder);
+    }
+
+    [Fact]
     public async Task ACaseManagerCannotReadAnotherCaseloadsProviderList()
     {
         await using var fixture = await Fixture.CreateAsync();

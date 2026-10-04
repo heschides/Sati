@@ -602,6 +602,8 @@ namespace Sati.ViewModels.Children
         private static string FormatAgendaDate(DateTime date) =>
             $"Next workday · {date:ddd, MMM d}";
 
+        public bool HasUnsavedChanges => IsTodayDirty || IsTomorrowDirty;
+
         private bool IsTodayDirty =>
             _scratchpad is not null && ScratchpadContent != _lastSavedScratchpadContent;
 

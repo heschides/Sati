@@ -259,7 +259,7 @@ public sealed record BillingClaimStatusDto(
     string? PayerClaimControlNumber,
     int SubmissionCount);
 
-public sealed record CreateClaimCorrectionRequest(int ClaimLineId, ClaimCorrectionAction Action, string Reason);
+public sealed record CreateClaimCorrectionRequest(int ClaimLineId, ClaimCorrectionAction Action, string Reason, long? ApprovedAmendmentVersionId = null, decimal? CorrectedChargeAmount = null);
 
 public sealed record ClaimCorrectionDto(
     long Id,

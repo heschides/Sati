@@ -31,11 +31,11 @@
 
 .EXAMPLE
     # 1. Open it, for this release only
-    .\scripts\Set-DemoWorkstationFirewallRule.ps1 -Ip 66.211.131.66
+    .\scripts\Set-DemoWorkstationFirewallRule.ps1 -Ip 72.95.106.10 -RuleName datt-workstation-20261004
 
 .EXAMPLE
     # 2. Close it, the moment the migration finishes
-    .\scripts\Set-DemoWorkstationFirewallRule.ps1 -Remove
+    .\scripts\Set-DemoWorkstationFirewallRule.ps1 -Remove -RuleName datt-workstation-20261004
 #>
 [CmdletBinding()]
 param(
@@ -48,15 +48,29 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ($Server -ne 'sati-demo-satilogica-central' -or $ResourceGroup -ne 'rg-sati-demo') {
+    throw 'This helper is restricted to the existing Demo SQL server in rg-sati-demo.'
+}
+if ([string]::IsNullOrWhiteSpace($RuleName)) { throw '-RuleName must not be empty.' }
+
+function Invoke-DemoAzureCli {
+    param([string[]]$Arguments)
+    $result = & az @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Azure CLI failed with exit code $LASTEXITCODE. No successful rule change or verification is claimed."
+    }
+    return $result
+}
+
 function Show-AllowList {
     Write-Host ''
     Write-Host 'Current allow-list:' -ForegroundColor Cyan
-    az sql server firewall-rule list `
-        --server $Server --resource-group $ResourceGroup --output table
+    Invoke-DemoAzureCli -Arguments @('sql', 'server', 'firewall-rule', 'list',
+        '--server', $Server, '--resource-group', $ResourceGroup, '--output', 'table')
 }
 
 # Fail closed on identity before touching anything.
-$account = az account show --output json 2>$null
+$account = Invoke-DemoAzureCli -Arguments @('account', 'show', '--output', 'json')
 if (-not $account) {
     throw "Not signed in to Azure. Run 'az login' first."
 }
@@ -66,13 +80,13 @@ Write-Host "Server:       $Server (resource group $ResourceGroup)" -ForegroundCo
 
 if ($Remove) {
     Write-Host "Removing firewall rule '$RuleName'..." -ForegroundColor Yellow
-    az sql server firewall-rule delete `
-        --name $RuleName --server $Server --resource-group $ResourceGroup
+    Invoke-DemoAzureCli -Arguments @('sql', 'server', 'firewall-rule', 'delete',
+        '--name', $RuleName, '--server', $Server, '--resource-group', $ResourceGroup)
 
     # The verification is the point of the -Remove path. A rule you believe you
     # deleted is worth nothing; a listing that no longer contains it is evidence.
-    $remaining = az sql server firewall-rule list `
-        --server $Server --resource-group $ResourceGroup --output json | ConvertFrom-Json
+    $remaining = Invoke-DemoAzureCli -Arguments @('sql', 'server', 'firewall-rule', 'list',
+        '--server', $Server, '--resource-group', $ResourceGroup, '--output', 'json') | ConvertFrom-Json
 
     if ($remaining | Where-Object { $_.name -eq $RuleName }) {
         Show-AllowList
@@ -111,8 +125,8 @@ if (-not [System.Net.IPAddress]::TryParse($Ip, [ref]$parsedIp) -or
 # Never silently repoint an existing security rule. If this run's exact rule is
 # already open, report that fact; if the name points anywhere else, require the
 # operator to inspect and remove it deliberately before continuing.
-$existingRules = az sql server firewall-rule list `
-    --server $Server --resource-group $ResourceGroup --output json | ConvertFrom-Json
+$existingRules = Invoke-DemoAzureCli -Arguments @('sql', 'server', 'firewall-rule', 'list',
+    '--server', $Server, '--resource-group', $ResourceGroup, '--output', 'json') | ConvertFrom-Json
 $existingRule = $existingRules | Where-Object { $_.name -eq $RuleName } | Select-Object -First 1
 if ($existingRule) {
     if ($existingRule.startIpAddress -eq $Ip -and $existingRule.endIpAddress -eq $Ip) {
@@ -126,17 +140,17 @@ if ($existingRule) {
 
 # A single address, not a range. Start and end are deliberately identical.
 Write-Host "Adding firewall rule '$RuleName' for $Ip only..." -ForegroundColor Yellow
-az sql server firewall-rule create `
-    --name $RuleName --server $Server --resource-group $ResourceGroup `
-    --start-ip-address $Ip --end-ip-address $Ip
+Invoke-DemoAzureCli -Arguments @('sql', 'server', 'firewall-rule', 'create',
+    '--name', $RuleName, '--server', $Server, '--resource-group', $ResourceGroup,
+    '--start-ip-address', $Ip, '--end-ip-address', $Ip)
 
-$created = az sql server firewall-rule show `
-    --name $RuleName --server $Server --resource-group $ResourceGroup `
-    --output json | ConvertFrom-Json
+$created = Invoke-DemoAzureCli -Arguments @('sql', 'server', 'firewall-rule', 'show',
+    '--name', $RuleName, '--server', $Server, '--resource-group', $ResourceGroup,
+    '--output', 'json') | ConvertFrom-Json
 if ($created.startIpAddress -ne $Ip -or $created.endIpAddress -ne $Ip) {
     throw "Rule '$RuleName' was created with unexpected bounds. Remove it immediately with -Remove."
 }
 
 Show-AllowList
 Write-Host ''
-Write-Host 'REMINDER: run this with -Remove as soon as the migration finishes.' -ForegroundColor Yellow
+Write-Host "REMINDER: run this with -Remove -RuleName '$RuleName' after migration, baseline capture and reset verification." -ForegroundColor Yellow

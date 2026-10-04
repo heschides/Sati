@@ -1154,6 +1154,8 @@
             <DataTemplate DataType="{x:Type supervisorVms:SupervisorDashboardViewModel}">
                 <views:SupervisorDashboardWindow />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type billingVms:NoteAmendmentFinancialReviewsViewModel}"><billingViews:NoteAmendmentFinancialReviewsView /></DataTemplate>
+            <DataTemplate DataType="{x:Type viewmodels:NoteAmendmentsViewModel}"><views:NoteAmendmentsView /></DataTemplate>
             <DataTemplate DataType="{x:Type viewmodels:NotesWindowViewModel}">
                 <views:NotesLogView />
             </DataTemplate>

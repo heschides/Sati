@@ -293,6 +293,8 @@ public sealed class ReleaseComplianceRefreshTests
 
     private sealed class StubProviderLinkService(Action onSave) : IConsumerProviderService
     {
+        public Task<List<Sati.Models.PersonProvider>> ReorderAsync(int personId, Sati.Contracts.V1.ReorderConsumerProvidersRequest request) => throw new NotSupportedException();
+
         private readonly List<PersonProvider> _links = [];
 
         public Task<List<PersonProvider>> GetByPersonAsync(int personId) =>

@@ -38,6 +38,7 @@ internal static class AuditActions
     public const string NoteApproved = "note.approved";
     public const string NoteApprovalOverridden = "note.approval-overridden";
     public const string NoteReturned = "note.returned";
+    public const string NoteAbandonedBySystem = "note.abandoned-by-system";
     public const string NoteFormDateCorrected = "note.form-date-corrected";
     public const string NoteReassigned = "note.reassigned";
     public const string NoteOlderCycleJustified = "note.older-form-cycle-justified";

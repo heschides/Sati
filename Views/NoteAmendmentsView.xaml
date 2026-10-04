@@ -1,0 +1,36 @@
+<UserControl x:Class="Sati.Views.NoteAmendmentsView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="12">
+            <TextBlock Text="Approved note amendments" FontSize="18" FontWeight="SemiBold" />
+            <TextBlock Text="The approved original remains immutable. Submit a saved proposal for independent review. Financial changes require separate billing review." TextWrapping="Wrap" Margin="0,8" />
+            <WrapPanel><Button Content="Load queue" Command="{Binding LoadCommand}" /><Button Content="More notes" Command="{Binding MoreCommand}" Margin="8,0" /></WrapPanel>
+            <ListBox ItemsSource="{Binding Queue}" SelectedItem="{Binding Selected}" MaxHeight="180" AutomationProperties.Name="Approved notes and amendment status">
+                <ListBox.ItemTemplate><DataTemplate><TextBlock><Run Text="{Binding ClientName, Mode=OneWay}" /><Run Text=" — " /><Run Text="{Binding ServiceDate, StringFormat=d, Mode=OneWay}" /><Run Text=" — " /><Run Text="{Binding State, Mode=OneWay}" /><Run Text="; financial review: " /><Run Text="{Binding RequiresFinancialReview, Mode=OneWay}" /></TextBlock></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,8" AutomationProperties.LiveSetting="Polite" />
+            <Expander Header="Immutable original" IsExpanded="True"><TextBox Text="{Binding Original, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="240" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Immutable approved original" /></Expander>
+            <Expander Header="Current approved amendment" IsExpanded="True"><TextBox Text="{Binding Effective, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="240" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Effective approved content" /></Expander>
+            <TextBlock Text="Proposed narrative" Margin="0,10,0,2" />
+            <TextBox Text="{Binding Narrative, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding CanEdit, Converter={StaticResource InverseBoolConverter}}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" MaxHeight="300" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Proposed amended narrative" />
+            <StackPanel IsEnabled="{Binding CanEdit}">
+                <TextBlock Text="Service date" /><DatePicker SelectedDate="{Binding ServiceDate}" AutomationProperties.Name="Amended service date" />
+                <TextBlock Text="Service minutes" /><TextBox Text="{Binding Minutes, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}" AutomationProperties.Name="Amended service minutes" />
+                <TextBlock Text="Service start time (optional)" /><ComboBox ItemsSource="{Binding StartTimeOptions}" SelectedItem="{Binding SelectedStartTime}" DisplayMemberPath="Display" AutomationProperties.Name="Amended service start time" />
+                <Button Content="Clear optional start time" Command="{Binding ClearStartTimeCommand}" />
+                <CheckBox Content="Unbilled" IsChecked="{Binding IsUnbilled}" />
+                <TextBlock Text="Reason for amendment" /><TextBox Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" MaxLength="1000" TextWrapping="Wrap" AutomationProperties.Name="Reason for amendment" />
+            </StackPanel>
+            <WrapPanel Margin="0,8"><Button Content="Save proposal" Command="{Binding SaveCommand}" /><Button Content="Submit saved version" Command="{Binding SubmitCommand}" Margin="8,0" /></WrapPanel>
+            <TextBlock Text="Review explanation (required to return or reject)" /><TextBox Text="{Binding ReviewReason, UpdateSourceTrigger=PropertyChanged}" MaxLength="1000" TextWrapping="Wrap" AutomationProperties.Name="Independent review explanation" />
+            <WrapPanel Margin="0,8"><Button Content="Approve submitted version" Command="{Binding ApproveCommand}" /><Button Content="Return for revision" Command="{Binding ReturnCommand}" Margin="8,0" /><Button Content="Reject" Command="{Binding RejectCommand}" /></WrapPanel>
+            <Expander Header="Every saved and submitted version">
+                <StackPanel><ListBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}" MaxHeight="160" DisplayMemberPath="Number" AutomationProperties.Name="Immutable amendment versions" />
+                    <TextBlock Text="{Binding SelectedVersion.Reason}" TextWrapping="Wrap" /><TextBox Text="{Binding SelectedVersion.Content.Narrative, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="220" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Selected historical version narrative" />
+                    <TextBlock Text="{Binding SelectedVersion.Content}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Expander>
+            <Expander Header="Decision history"><ItemsControl ItemsSource="{Binding Decisions}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></Expander>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+

@@ -87,6 +87,27 @@ A DATT release is complete only when all applicable conditions are true:
    Discovering either of these at the API publication step wastes a full release pass. Raise both
    in the preflight report, alongside the other findings, before any version bump or commit.
 
+   Whenever a migration needs workstation access, provide the user with copy-and-paste
+   PowerShell commands for both adding and removing the exact-IP rule; reporting an IP alone
+   is insufficient. Use `scripts/Set-DemoWorkstationFirewallRule.ps1`, the freshly reported
+   public IPv4 address, and one explicit release-specific rule name in both commands. For example,
+   from the repository directory (replace the example address/date for the current release):
+
+   ```powershell
+   # Josh runs this before the controlled migration.
+   .\scripts\Set-DemoWorkstationFirewallRule.ps1 -Ip 72.95.106.10 -RuleName datt-workstation-20261004
+
+   # Josh runs this after migration, baseline capture and reset verification.
+   .\scripts\Set-DemoWorkstationFirewallRule.ps1 -Remove -RuleName datt-workstation-20261004
+   ```
+
+   Check the helper before handing it over: restrict it to the exact Demo server/resource group,
+   reject nonzero Azure CLI exits, refuse to repoint an existing rule, verify exact start/end IP
+   after creation, and verify absence of the same named rule after removal. A failed listing is
+   not proof of removal. The user executes both commands; assistants never execute the helper
+   against Azure. Keep the rule open through the separately approved baseline capture and
+   verification reset, then obtain confirmation of removal.
+
    A release containing the full Demo reset has an additional controlled database operation even
    though it adds no EF migration: the first reviewed baseline capture (or an intentional baseline
    replacement after schema/data changes). DATT does not authorize that data transformation. Stop

@@ -45,7 +45,8 @@ internal static partial class ApiEndpoints
         var api = app.MapGroup("/api/v1")
             .RequireAuthorization()
             .AddEndpointFilter<ValidatedActorFilter>()
-            .AddEndpointFilter<SingleAttemptWriteFilter>();
+            .AddEndpointFilter<SingleAttemptWriteFilter>()
+            .AddEndpointFilter<NoteAmendmentDomainFilter>();
         MapProfile(api);
         MapAudit(api);
         MapAdmin(api);
@@ -73,6 +74,7 @@ internal static partial class ApiEndpoints
         MapCheckRequests(api);
         MapAiContext(api);
         MapNotes(api);
+        MapNoteAmendments(api);
         MapAdminFormNoteCorrections(api);
         MapAdminReleaseNoteCorrections(api);
         MapSettings(api);
@@ -1189,7 +1191,10 @@ internal static partial class ApiEndpoints
                 select new AdminActivityDto(
                     auditEvent.Id,
                     auditEvent.ActorUserId,
-                    user == null ? $"User {auditEvent.ActorUserId}" : user.DisplayName,
+                    user == null
+                        ? auditEvent.ActorUserId == SystemActor.UserId
+                            ? SystemActor.DisplayName : $"User {auditEvent.ActorUserId}"
+                        : user.DisplayName,
                     auditEvent.Action,
                     auditEvent.ResourceType,
                     auditEvent.ResourceId,
@@ -1236,7 +1241,10 @@ internal static partial class ApiEndpoints
                     auditEvent.EventId,
                     auditEvent.OccurredAtUtc,
                     auditEvent.ActorUserId,
-                    user == null ? $"User {auditEvent.ActorUserId}" : user.DisplayName,
+                    user == null
+                        ? auditEvent.ActorUserId == SystemActor.UserId
+                            ? SystemActor.DisplayName : $"User {auditEvent.ActorUserId}"
+                        : user.DisplayName,
                     auditEvent.Action,
                     auditEvent.ResourceType,
                     auditEvent.ResourceId,
@@ -3194,6 +3202,39 @@ internal static partial class ApiEndpoints
     // from, and correcting a directory entry corrects every profile at once.
     private static void MapConsumerProviders(RouteGroupBuilder api)
     {
+        api.MapPut("/people/{personId:int}/providers/order", async Task<IResult> (
+            int personId, ReorderConsumerProvidersRequest request, ClaimsPrincipal principal,
+            ApiDbContext db, AuditTrail audit, CancellationToken cancellationToken) =>
+        {
+            var actor = Actor.From(principal);
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
+                return Results.NotFound();
+            var links = await db.PersonProviders.Where(link => link.PersonId == personId).ToListAsync(cancellationToken);
+            var facts = links.Select(ContractMapper.ToConsumerProvider).ToList();
+            if (ConsumerProviderOrder.Version(facts) != request.ExpectedVersion)
+                return Results.Conflict(new ApiErrorDto(ConsumerProviderOrder.ConflictCode, ConsumerProviderOrder.ConflictMessage, string.Empty));
+            if (ConsumerProviderOrder.Validate(request, facts) is { } error)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["orderedLinkIds"] = [error] });
+            var providerIds = links.Select(link => link.ProviderId).Distinct().ToArray();
+            if (await db.Providers.CountAsync(p => providerIds.Contains(p.Id) && p.AgencyId == actor.AgencyId, cancellationToken) != providerIds.Length)
+                return Results.NotFound();
+            var changed = false;
+            for (var index = 0; index < request.OrderedLinkIds.Length; index++)
+            {
+                var link = links.Single(link => link.Id == request.OrderedLinkIds[index]);
+                changed |= link.SortOrder != index;
+                link.SortOrder = index;
+            }
+            if (changed)
+                audit.Record(actor, "consumer.providers.reordered", "Person", personId,
+                    JsonSerializer.Serialize(new { linkIds = request.OrderedLinkIds }));
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Results.Ok(links.OrderByDescending(link => link.IsPrimaryCare).ThenBy(link => link.SortOrder)
+                .ThenBy(link => link.Id).Select(ContractMapper.ToConsumerProvider).ToList());
+        }).AddEndpointFilter<ConsumerProviderOrderConflictFilter>();
+
         api.MapGet("/people/{personId:int}/providers", async Task<IResult> (
             int personId, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>
         {
@@ -5229,23 +5270,16 @@ internal static partial class ApiEndpoints
         api.MapPost("/notes/abandon-overdue", async (
             ClaimsPrincipal principal,
             ApiDbContext db,
-            ApiClock clock,
+            NoteAbandonmentSweep sweep,
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            // Permission is checked before even lazily creating agency settings.
+            // Keep this route scoped to the authenticated case manager's caseload.
             if (!await TenantAccess.CanAccessUserAsync(db, actor, actor.UserId, cancellationToken))
                 return Results.Forbid();
-            var abandonedAfterDays = ProductivityForecast.NormalizeDocumentationWindowDays(
-                (await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken)).AbandonedAfterDays);
-            var threshold = clock.Today.AddDays(-abandonedAfterDays);
-            var personIds = TenantAccess.OwnedPeople(db, actor).Select(x => x.Id);
-            var count = await db.Notes
-                .Where(x => x.AgencyId == actor.AgencyId && personIds.Contains(x.PersonId) && x.Status == 1 && x.EventDate < threshold)
-                .ExecuteUpdateAsync(x => x
-                    .SetProperty(n => n.Status, 8)
-                    .SetProperty(n => n.Revision, n => n.Revision + 1), cancellationToken);
-            return TypedResults.Ok(new CountDto(count));
+            var result = await sweep.RunAsync(actor.AgencyId, actor.UserId,
+                NoteAbandonmentRules.DesktopBatchSize, "desktop", cancellationToken);
+            return TypedResults.Ok(new CountDto(result.ChangedCount));
         });
     }
 
@@ -6533,6 +6567,8 @@ internal static partial class ApiEndpoints
         MapClaimResponseIntake(api);
         MapBillingCorrections(api);
         MapClearinghouseDispatch(api);
+        MapClaimMdOnboarding(api);
+        MapClaimMdReconciliation(api);
 
         // Drive the mock clearinghouse. Scaffolding: it fabricates responses and then hands
         // them to the same ingestion path above, rather than writing rows directly, so the
@@ -6783,6 +6819,8 @@ internal static partial class ApiEndpoints
                     .ToListAsync(cancellationToken))
                 .Select(ToReviewableNote)
                 .ToList();
+            foreach (var candidate in rows) await ApplyFinancialAmendmentAsync(db, actor.AgencyId, candidate.Note, cancellationToken);
+            rows.RemoveAll(r => r.Note.IsUnbilled);
             if (rows.Count == 0)
                 return Results.Ok(Array.Empty<BillingCandidateDto>());
 
@@ -6835,7 +6873,7 @@ internal static partial class ApiEndpoints
             var row = await (from note in db.Notes
                              join person in db.People on note.PersonId equals person.Id
                              join owner in db.Users on person.UserId equals owner.Id
-                             where note.Id == request.NoteId && note.Status == 6 && !note.IsUnbilled &&
+                             where note.Id == request.NoteId && note.Status == 6 &&
                                    owner.AgencyId == actor.AgencyId &&
                                    person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId
                              select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
@@ -6848,7 +6886,11 @@ internal static partial class ApiEndpoints
                     ["note"] = ["No service date."]
                 });
             }
-            var serviceDate = sourceDate.Date;
+            db.Entry(row.Note).State = EntityState.Detached;
+            var firstAmendment = await ApplyFinancialAmendmentAsync(db, actor.AgencyId, row.Note, cancellationToken);
+            if (row.Note.IsUnbilled)
+                return Results.NotFound();
+            var serviceDate = row.Note.EventDate!.Value.Date;
             var ownerId = row.Person.UserId;
             // Lock the period before reading the form completion used to approve
             // this financial write. A concurrent revocation must either commit
@@ -6860,11 +6902,13 @@ internal static partial class ApiEndpoints
             row = await (from note in db.Notes
                          join person in db.People on note.PersonId equals person.Id
                          join owner in db.Users on person.UserId equals owner.Id
-                         where note.Id == request.NoteId && note.Status == 6 && !note.IsUnbilled &&
+                         where note.Id == request.NoteId && note.Status == 6 &&
                                owner.AgencyId == actor.AgencyId &&
                                person.AgencyId == actor.AgencyId && note.AgencyId == actor.AgencyId
                          select new ReviewableNote(note, person)).SingleOrDefaultAsync(cancellationToken);
-            if (row is null || row.Note.EventDate?.Date != serviceDate ||
+            long? financialAmendment = null;
+            if (row is not null) { db.Entry(row.Note).State = EntityState.Detached; financialAmendment = await ApplyFinancialAmendmentAsync(db, actor.AgencyId, row.Note, cancellationToken); }
+            if (row is null || financialAmendment != firstAmendment || row.Note.EventDate?.Date != serviceDate ||
                 row.Person.UserId != ownerId)
             {
                 return Results.Conflict(new ApiErrorDto("billing_source_changed",
@@ -6873,6 +6917,8 @@ internal static partial class ApiEndpoints
             }
             if (await db.ClaimLines.AnyAsync(line => line.NoteId == request.NoteId, cancellationToken))
                 return DuplicateClaimLineConflict();
+            if (row.Note.IsUnbilled)
+                return Results.NotFound();
             var agency = await db.Agencies.AsNoTracking()
                 .SingleOrDefaultAsync(candidate => candidate.Id == actor.AgencyId, cancellationToken);
             var forms = await db.Forms.AsNoTracking()
@@ -6927,6 +6973,7 @@ internal static partial class ApiEndpoints
             var line = new ServerClaimLine
             {
                 NoteId = row.Note.Id,
+                AmendedNoteVersionId = financialAmendment,
                 BillingPeriodId = period.Id,
                 DateOfService = serviceDate,
                 ProcedureCode = agency!.BillingProcedureCode!,
@@ -7181,6 +7228,7 @@ internal static partial class ApiEndpoints
             if (previous is not null)
                 return ReplayEdiOrConflict(previous, periodId, request.IsTest, profile);
 
+            foreach (var line in period.Lines) await NoteAmendmentBilling.ValidateLineVersionAsync(db, actor.AgencyId, line.NoteId, line.AmendedNoteVersionId, cancellationToken);
             var generatedAt = clock.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
             if (await db.EdiGenerations.AnyAsync(item => item.AgencyId == actor.AgencyId &&
@@ -9731,6 +9779,8 @@ internal static partial class ApiEndpoints
         {
             if (!rowsByNoteId.TryGetValue(line.NoteId, out var row))
                 continue;
+            await NoteAmendmentBilling.ValidateLineVersionAsync(db, agencyId, line.NoteId, line.AmendedNoteVersionId, cancellationToken);
+            await ApplyFinancialAmendmentAsync(db, agencyId, row.Note, cancellationToken);
             if (row.Note.EventDate?.Date != line.DateOfService.Date)
             {
                 errors.Add($"Draft claim line {line.Id} no longer matches its source note's service date.");
@@ -10364,7 +10414,8 @@ internal static partial class ApiEndpoints
         join person in db.People.AsNoTracking() on note.PersonId equals person.Id
         join owner in db.Users.AsNoTracking() on person.UserId equals owner.Id
         where note.Status == 6 &&
-              !note.IsUnbilled &&
+              (!note.IsUnbilled || db.NoteAmendments.Any(a => a.NoteId == note.Id && a.Status == NoteAmendmentStatus.Approved && a.ChangesFinancialFacts)) &&
+              !NoteAmendmentBilling.HeldNoteIds(db).Contains(note.Id) &&
               owner.AgencyId == agencyId &&
               person.AgencyId == agencyId &&
               note.AgencyId == agencyId &&
@@ -10854,7 +10905,9 @@ internal static partial class ApiEndpoints
             .OfType<ServiceBlock>();
 
         var conflicts = ServiceTimeline.FindConflicts(candidate, blocks);
-        if (conflicts.Count == 0)
+        if (conflicts.Count == 0 && !await NoteAmendmentSchedule.ConflictsAsync(db,
+            from n in db.Notes join p in db.People on n.PersonId equals p.Id where n.AgencyId == agencyId && p.AgencyId == agencyId && p.UserId == caseManagerId select n.Id,
+            agencyId, eventDate, candidate, cancellationToken))
             return null;
 
         return Results.Conflict(new ApiErrorDto(

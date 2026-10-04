@@ -1,9 +1,28 @@
 using Sati.Models;
+using Sati.Contracts.V1;
 
 namespace Sati.Data;
 
 internal static class LocalAuditTrail
 {
+    public static void RecordSystem(
+        SatiContext context,
+        int agencyId,
+        string action,
+        string resourceType,
+        string metadataJson)
+    {
+        context.AuditEvents.Add(new AuditEvent
+        {
+            AgencyId = agencyId,
+            ActorUserId = SystemActor.UserId,
+            Action = action,
+            ResourceType = resourceType,
+            CorrelationId = $"desktop-system-{Guid.NewGuid():N}",
+            MetadataJson = metadataJson
+        });
+    }
+
     public static void Record(
         SatiContext context,
         User actor,
@@ -56,6 +75,7 @@ internal static class LocalAuditActions
     public const string AssessmentSubmitted = "assessment.submitted";
     public const string NoteCreated = "note.created";
     public const string NoteUpdated = "note.updated";
+    public const string NoteAbandonedBySystem = "note.abandoned-by-system";
     public const string NoteReassigned = "note.reassigned";
     public const string NoteOlderCycleJustified = "note.older-form-cycle-justified";
     public const string NoteApproved = "note.approved";

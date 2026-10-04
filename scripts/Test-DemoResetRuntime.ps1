@@ -91,7 +91,12 @@ Invoke-TestSeed
             return 0
         }
         $command | Add-Member ScriptMethod ExecuteNonQuery {
-            if ($this.CommandText -like '*SatiResetToCanonicalBaseline*') {
+            if ($this.CommandText -eq 'EXEC dbo.SatiAssertCanonicalResetAllowed;') {
+                [void]$global:SatiDemoResetRuntimeState.Events.Add('operation:AssertCanonicalResetAllowed')
+                Assert-Test ($this.CommandTimeout -gt 0 -and $this.CommandTimeout -le 90) `
+                    'The read-only guard must have a bounded SQL timeout.'
+            }
+            elseif ($this.CommandText -like '*SatiResetToCanonicalBaseline*') {
                 [void]$global:SatiDemoResetRuntimeState.Events.Add('operation:RestoreCanonicalBaseline')
                 Assert-Test ($this.CommandTimeout -gt 0 -and $this.CommandTimeout -le 300) `
                     'Restore must time out with room left for cleanup before the 600-second host limit.'
@@ -190,6 +195,7 @@ Invoke-TestSeed
         }
 
         $expectedStages = @('AcquireManagedIdentityToken', 'OpenDemoDatabase', 'AcquireExclusiveResetLock',
+            'AssertCanonicalResetAllowed',
             'RestoreCanonicalBaseline', 'RollShowcaseDates', 'CompleteComplianceHistory')
         foreach ($stageName in $expectedStages) {
             $operationIndex = $global:SatiDemoResetRuntimeState.Events.IndexOf("operation:$stageName")

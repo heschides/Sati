@@ -247,7 +247,7 @@ internal static class ContractMapper
         line.IsComplianceException,
         line.ComplianceExceptionReason,
         readiness.ClientName,
-        readiness.Errors);
+        readiness.Errors, line.AmendedNoteVersionId);
 
     internal static ProfessionalClaimLineFacts ToReadinessFacts(ServerClaimLine line) => new(
         line.Id,

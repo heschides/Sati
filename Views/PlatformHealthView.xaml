@@ -18,6 +18,9 @@
                            Foreground="{DynamicResource TextPrimaryBrush}" />
                 <TextBlock Text="Cross-agency operational incidents; every view is audited"
                            FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                <TextBlock Text="{Binding LocalIncidentOutboxStatus}" FontSize="11"
+                           AutomationProperties.Name="Local incident delivery status"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <TextBlock Text="{Binding LastRefreshedLabel}" VerticalAlignment="Center" Margin="0,0,12,0"

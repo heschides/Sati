@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Contracts.V1;
 using Sati.Data;
@@ -53,6 +53,7 @@ namespace Sati.ViewModels
 
         // PROPERTIES
         public NoteEntryViewModel NoteEntry { get; }
+        public NoteAmendmentsViewModel? Amendments { get; }
         public ICollectionView NotesView { get; }
 
         [ObservableProperty] private Person? _selectedFilterPerson = AllPersonsSentinel;
@@ -141,12 +142,13 @@ namespace Sati.ViewModels
             IPersonService personService,
             ISessionService sessionService,
             INoteService noteService,
-            NoteEntryViewModel noteEntryViewModel)
+            NoteEntryViewModel noteEntryViewModel, NoteAmendmentsViewModel? amendments = null)
         {
             _personService = personService;
             _sessionService = sessionService;
             _noteService = noteService;
             NoteEntry = noteEntryViewModel;
+            Amendments = amendments;
             NotesView = CollectionViewSource.GetDefaultView(_allNotes);
             NotesView.Filter = FilterNotes;
 
@@ -523,6 +525,7 @@ namespace Sati.ViewModels
         public void ClearForAccountSwitch()
         {
             _accountLoads.Invalidate();
+            Amendments?.ClearForAccountSwitch();
             _peopleSnapshot = [];
             _hasPeopleSnapshot = false;
             _hasLoadedNotes = false;

@@ -29,6 +29,9 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<SignatureDatabaseEnvironment> SignatureDatabaseEnvironment => Set<SignatureDatabaseEnvironment>();
     public DbSet<ServerDocumentTemplate> DocumentTemplates => Set<ServerDocumentTemplate>();
     public DbSet<ServerNote> Notes => Set<ServerNote>();
+    public DbSet<NoteAmendment> NoteAmendments => Set<NoteAmendment>();
+    public DbSet<NoteAmendmentVersion> NoteAmendmentVersions => Set<NoteAmendmentVersion>();
+    public DbSet<NoteAmendmentEvent> NoteAmendmentEvents => Set<NoteAmendmentEvent>();
     public DbSet<ScheduledNoteMove> ScheduledNoteMoves => Set<ScheduledNoteMove>();
     public DbSet<ServerSettings> Settings => Set<ServerSettings>();
     public DbSet<BillingCompliancePolicyVersion> BillingCompliancePolicyVersions => Set<BillingCompliancePolicyVersion>();
@@ -335,6 +338,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
                 .OnDelete(DeleteBehavior.Restrict);
         });
         ScheduledNoteMovePersistenceModel.Configure<ServerNote>(modelBuilder);
+        NoteAmendmentPersistenceModel.Configure<ServerNote>(modelBuilder);
+        NoteAmendmentPersistenceModel.ConfigureClaimLine<ServerClaimLine>(modelBuilder);
 
         modelBuilder.Entity<ServerSettings>(entity =>
         {
@@ -822,6 +827,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
 
     private void EnsureAuditEventsAreAppendOnly()
     {
+        NoteAmendmentPersistenceModel.ProtectWrites(ChangeTracker);
+        NoteAmendmentPersistenceModel.ProtectOriginalNotes<ServerNote>(this);
         ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
         BillingCorrectionPersistenceModel.ProtectWrites(ChangeTracker);
         ReleaseObligationPersistenceModel.ProtectWrites(ChangeTracker);
@@ -1309,6 +1316,7 @@ internal sealed class ServerClaimLine
 {
     public int Id { get; set; }
     public int NoteId { get; set; }
+    public long? AmendedNoteVersionId { get; set; }
     public int BillingPeriodId { get; set; }
     public DateTime DateOfService { get; set; }
     public string ProcedureCode { get; set; } = string.Empty;

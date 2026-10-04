@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('PackageOnly', 'ReviewedDeploy', 'WrongTarget', 'WrongRuntime', 'ChangedPackage', 'DirtySource', 'PrivateConfig')]
+    [ValidateSet('PackageOnly', 'ReviewedDeploy', 'WrongTarget', 'WrongRuntime', 'MissingWatchdogSchedule', 'ChangedPackage', 'DirtySource', 'PrivateConfig')]
     [string]$Case,
     [string]$PublisherPath = (Join-Path $PSScriptRoot 'Publish-DemoRefresh.ps1')
 )
@@ -45,7 +45,11 @@ function az {
         @{ powerShellVersion = '7.6'; use32BitWorkerProcess = ($Case -eq 'WrongRuntime') } | ConvertTo-Json
     }
     elseif ($command.StartsWith('functionapp config appsettings list ')) {
-        @(@{ name = 'FUNCTIONS_WORKER_RUNTIME'; value = 'powershell' }) | ConvertTo-Json -AsArray
+        $items = @(@{ name = 'FUNCTIONS_WORKER_RUNTIME'; value = 'powershell' })
+        if ($Case -ne 'MissingWatchdogSchedule') {
+            $items += @{ name = 'DemoWatchdogSchedule'; value = '0 0 4 * * *' }
+        }
+        $items | ConvertTo-Json -AsArray
     }
     elseif ($command.StartsWith('storage account show ')) {
         @{ id = "$resourcePrefix/Microsoft.Storage/storageAccounts/satidemorefreshst" } | ConvertTo-Json
@@ -102,8 +106,8 @@ try {
                 Assert-Test $failed 'Changed package bytes or dirty source must fail.'
                 Assert-Test ($global:SatiDemoRefreshPublishTestCalls.Count -eq 0) 'Unreviewed packages must fail before Azure is called.'
             }
-            elseif ($Case -eq 'WrongRuntime') {
-                Assert-Test $failed 'A 32-bit runtime must fail.'
+            elseif ($Case -in @('WrongRuntime', 'MissingWatchdogSchedule')) {
+                Assert-Test $failed 'An unreviewed runtime or missing watchdog schedule must fail.'
                 Assert-Test (-not @($global:SatiDemoRefreshPublishTestCalls | Where-Object { $_.Contains('config-zip') }).Count) 'Runtime mismatch must prevent deployment.'
             }
             else {

@@ -50,6 +50,9 @@ namespace Sati.Edi
             if (previous is not null)
                 return await SaveFileAsync(previous.FileName, previous.Content);
 
+            foreach (var line in period.Lines)
+                await NoteAmendmentBilling.ValidateLineVersionAsync(context, actor.AgencyId, line.NoteId, line.AmendedNoteVersionId);
+
             var generatedAt = DateTime.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
             var ediContent = EdiGenerator.Generate(
@@ -159,6 +162,8 @@ namespace Sati.Edi
             foreach (var line in period.Lines)
             {
                 var note = notes.Single(candidate => candidate.Id == line.NoteId);
+                if (await NoteAmendmentBilling.LineContentAsync(context, line.AmendedNoteVersionId) is { } service)
+                { note.EventDate = service.EventDate; note.Minutes = service.Minutes; note.StartTime = service.StartTime; note.IsUnbilled = service.IsUnbilled; }
                 await NoteService.EnsureServiceTimeAvailableAsync(context, note.Person.UserId, note, note.Id);
                 var facts = new BillingExportSource(note.PersonId, (int?)note.Status, note.EventDate,
                     note.ComplianceOverride, note.OverrideReason, note.ApprovedById, note.ApprovedAt,

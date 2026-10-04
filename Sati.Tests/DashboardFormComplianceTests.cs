@@ -356,6 +356,94 @@ public sealed class DashboardFormComplianceTests
     }
 
     [Fact]
+    public async Task DateRefreshPreservesAnEditorThatBecomesDirtyWhileReadsArePending()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        var dashboard = harness.Dashboard;
+        var (person, _) = harness.AddOverdueQuarterlyReview(FormType.Q3R);
+        dashboard.NoteEntry.SelectedPerson = person;
+        var matrixRow = Assert.Single(dashboard.Matrix!.Rows);
+        harness.Notes.DelayNextMonthlyLoad = true;
+
+        var refresh = dashboard.RefreshForDateChangeAsync(
+            DateOnly.FromDateTime(DateTime.Today.AddDays(1)), () => true);
+        await harness.Notes.MonthlyLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        dashboard.NoteEntry.Narrative = "Unsaved note draft";
+        Assert.True(dashboard.HasUnsavedDateRefreshWork);
+
+        harness.Notes.ReleaseMonthlyLoad.TrySetResult();
+        Assert.False(await refresh);
+        Assert.Equal("Unsaved note draft", dashboard.NoteEntry.Narrative);
+        Assert.Same(person, dashboard.NoteEntry.SelectedPerson);
+        Assert.Same(matrixRow, Assert.Single(dashboard.Matrix.Rows));
+    }
+
+    [Fact]
+    public async Task DateRefreshFromAnOldAccountCannotPublishAfterAccountSwitch()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        var dashboard = harness.Dashboard;
+        harness.Notes.DelayNextMonthlyLoad = true;
+
+        var refresh = dashboard.RefreshForDateChangeAsync(
+            DateOnly.FromDateTime(DateTime.Today.AddDays(1)), () => true);
+        await harness.Notes.MonthlyLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        dashboard.Reset();
+        var nextUser = User.Create(92, "second", "Second Account", string.Empty,
+            string.Empty, UserRole.CaseManager, null, fixture.CaseManagerOne.AgencyId);
+        harness.Session.SetUser(nextUser);
+        dashboard.LoggedInUser = nextUser;
+        var nextPerson = Person.Rehydrate(902, nextUser.Id);
+        nextPerson.FirstName = "New";
+        nextPerson.LastName = "Account";
+        dashboard.People.Add(nextPerson);
+        dashboard.Matrix!.Rebuild([], DateTime.Today);
+
+        harness.Notes.ReleaseMonthlyLoad.TrySetResult();
+        Assert.False(await refresh);
+        Assert.Same(nextPerson, Assert.Single(dashboard.People));
+        Assert.Empty(dashboard.Matrix.Rows);
+        Assert.Empty(dashboard.UpcomingEvents);
+    }
+
+    [Fact]
+    public async Task DateRefreshReloadsTheCalendarOnlyAfterItWasOpened()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        var date = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+
+        Assert.True(await harness.Dashboard.RefreshForDateChangeAsync(date, () => true));
+        Assert.Equal(0, harness.Notes.YearLoads);
+
+        await harness.Dashboard.NavigateToCalendarCommand.ExecuteAsync(null);
+        Assert.Equal(1, harness.Notes.YearLoads);
+        Assert.True(await harness.Dashboard.RefreshForDateChangeAsync(date, () => true));
+        Assert.Equal(2, harness.Notes.YearLoads);
+    }
+
+    [Fact]
+    public async Task FailedLoadedCalendarRefreshRemainsDueForASecondAttempt()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var harness = await DashboardHarness.CreateAsync(fixture);
+        await harness.Dashboard.NavigateToCalendarCommand.ExecuteAsync(null);
+        Assert.Equal(1, harness.Notes.YearLoads);
+        harness.Notes.NextYearLoadException = new IOException("transient read failure");
+        var date = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+
+        Assert.False(await harness.Dashboard.RefreshForDateChangeAsync(date, () => true));
+        Assert.Equal(2, harness.Notes.YearLoads);
+        Assert.NotEmpty(harness.Dashboard.Calendar.StatusMessage);
+
+        Assert.True(await harness.Dashboard.RefreshForDateChangeAsync(date, () => true));
+        Assert.Equal(3, harness.Notes.YearLoads);
+        Assert.Empty(harness.Dashboard.Calendar.StatusMessage);
+    }
+
+    [Fact]
     public async Task PcpAndAssessmentRequireAnExplicitEvergreenAttestation()
     {
         var service = new RecordingFormService();
@@ -564,17 +652,20 @@ public sealed class DashboardFormComplianceTests
             Settings settings,
             UpcomingEventService upcomingEvents,
             MutablePersonService people,
+            SessionService session,
             CountingNoteService notes)
         {
             Dashboard = dashboard;
             this.settings = settings;
             this.upcomingEvents = upcomingEvents;
             this.people = people;
+            Session = session;
             Notes = notes;
         }
 
         public CaseManagerDashboardViewModel Dashboard { get; }
         public CountingNoteService Notes { get; }
+        public SessionService Session { get; }
 
         public void ReplacePerson(Person person)
         {
@@ -646,7 +737,8 @@ public sealed class DashboardFormComplianceTests
                 productivityReportService: reportService);
 
             await dashboard.InitializeAsync();
-            return new DashboardHarness(dashboard, settings, upcomingEvents, people, notes);
+            return new DashboardHarness(dashboard, settings, upcomingEvents, people, session,
+                notes);
         }
 
         public (Person Person, Form Form) AddOverdueQuarterlyReview(FormType type)
@@ -784,6 +876,12 @@ public sealed class DashboardFormComplianceTests
     private sealed class CountingNoteService(INoteService inner) : INoteService
     {
         public int YearLoads { get; private set; }
+        public Exception? NextYearLoadException { get; set; }
+        public bool DelayNextMonthlyLoad { get; set; }
+        public TaskCompletionSource MonthlyLoadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseMonthlyLoad { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<Note> AddNoteAsync(Note note) => inner.AddNoteAsync(note);
         public Task DeleteNoteAsync(Note note) => inner.DeleteNoteAsync(note);
         public Task UpdateNoteAsync(Note note) => inner.UpdateNoteAsync(note);
@@ -791,11 +889,24 @@ public sealed class DashboardFormComplianceTests
             inner.GetAllByPersonAsync(personId);
         public Task UpdateAbandonedNotesAsync(int abandonedAfterDays) =>
             inner.UpdateAbandonedNotesAsync(abandonedAfterDays);
-        public Task<List<Note>> GetMonthlyNotesAsync(int userId) =>
-            inner.GetMonthlyNotesAsync(userId);
+        public async Task<List<Note>> GetMonthlyNotesAsync(int userId)
+        {
+            if (DelayNextMonthlyLoad)
+            {
+                DelayNextMonthlyLoad = false;
+                MonthlyLoadStarted.TrySetResult();
+                await ReleaseMonthlyLoad.Task;
+            }
+            return await inner.GetMonthlyNotesAsync(userId);
+        }
         public Task<List<Note>> GetByYearAsync(int userId, int year)
         {
             YearLoads++;
+            if (NextYearLoadException is { } failure)
+            {
+                NextYearLoadException = null;
+                return Task.FromException<List<Note>>(failure);
+            }
             return inner.GetByYearAsync(userId, year);
         }
 

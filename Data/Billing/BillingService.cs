@@ -183,7 +183,8 @@ namespace Sati.Services.Billing
                 ?? throw new InvalidOperationException($"Note {noteId} was not found in your agency.");
             if (sourceKey.EventDate is not DateTime sourceDate)
                 throw new InvalidOperationException("The service note has no service date.");
-            var serviceDate = sourceDate.Date;
+            var firstAmendment = await NoteAmendmentBilling.AuthorizedContentAsync(context, actor.AgencyId, noteId);
+            var serviceDate = firstAmendment?.Content.EventDate?.Date ?? sourceDate.Date;
             await using var periodWrite = await BillingPeriodWriteScope.BeginAsync(
                 context, actor.AgencyId, sourceKey.OwnerUserId,
                 serviceDate.Year, serviceDate.Month);
@@ -202,7 +203,9 @@ namespace Sati.Services.Billing
 
             if (note.Person is null)
                 throw new InvalidOperationException($"Note {noteId} has no associated person.");
-            if (note.EventDate?.Date != serviceDate || note.Person.UserId != sourceKey.OwnerUserId)
+            context.Entry(note).State = EntityState.Detached;
+            var financialAmendment = await ApplyFinancialAmendmentAsync(context, actor.AgencyId, note);
+            if (financialAmendment != firstAmendment?.VersionId || note.EventDate?.Date != serviceDate || note.Person.UserId != sourceKey.OwnerUserId)
                 throw new InvalidOperationException(
                     "The note's service date or owner changed while billing was being prepared. Refresh and try again.");
             await BillingComplianceProjectionLoader.PopulateAsync(
@@ -213,6 +216,7 @@ namespace Sati.Services.Billing
             if (note.IsUnbilled)
                 throw new InvalidOperationException(
                     "This note was marked Unbilled and cannot become a claim line.");
+            await NoteService.EnsureServiceTimeAvailableAsync(context, note.Person.UserId, note, note.Id);
 
             var complianceContext = await BillingCompliancePolicyContextLoader.LoadAsync(
                 context, actor.AgencyId);
@@ -252,6 +256,7 @@ namespace Sati.Services.Billing
             var claimLine = new ClaimLine
             {
                 NoteId = noteId,
+                AmendedNoteVersionId = financialAmendment,
                 DateOfService = serviceDate,
                 ProcedureCode = procedureCode,
                 ProcedureModifier = note.Person.Agency.BillingModifier,
@@ -407,6 +412,9 @@ namespace Sati.Services.Billing
             foreach (var line in period.Lines)
             {
                 var note = notesById[line.NoteId];
+                await NoteAmendmentBilling.ValidateLineVersionAsync(context, agencyId, note.Id, line.AmendedNoteVersionId);
+                context.Entry(note).State = EntityState.Detached;
+                await ApplyFinancialAmendmentAsync(context, agencyId, note);
                 if (note.EventDate?.Date != line.DateOfService.Date)
                     throw new InvalidOperationException(
                         $"Draft claim line {line.Id} no longer matches its source note's service date.");
@@ -440,7 +448,8 @@ namespace Sati.Services.Billing
                               join owner in context.Users.AsNoTracking()
                                   on person.UserId equals owner.Id
                               where note.Status == NoteStatus.Approved &&
-                                    !note.IsUnbilled &&
+                                    (!note.IsUnbilled || context.NoteAmendments.Any(a => a.NoteId == note.Id && a.Status == NoteAmendmentStatus.Approved && a.ChangesFinancialFacts)) &&
+                                    !NoteAmendmentBilling.HeldNoteIds(context).Contains(note.Id) &&
                                     note.AgencyId == actor.AgencyId &&
                                     person.AgencyId == actor.AgencyId &&
                                     owner.AgencyId == actor.AgencyId &&
@@ -517,6 +526,8 @@ namespace Sati.Services.Billing
                 .Select(row => ToBillingCandidateNote(row, peopleById[row.PersonId]))
                 .ToList();
 
+            foreach (var candidate in notes) await ApplyFinancialAmendmentAsync(context, actor.AgencyId, candidate);
+            notes.RemoveAll(n => n.IsUnbilled);
             var noteIds = notes.Select(note => note.Id).ToArray();
             var decisions = await context.BillingComplianceRecoveryDecisions.AsNoTracking()
                 .Include(item => item.Obligations)
@@ -533,6 +544,13 @@ namespace Sati.Services.Billing
             return notes;
         }
 
+        private static async Task<long?> ApplyFinancialAmendmentAsync(SatiContext context, int agencyId, Note note)
+        {
+            var approved = await NoteAmendmentBilling.AuthorizedContentAsync(context, agencyId, note.Id);
+            if (approved is not { } a) return null;
+            note.EventDate = a.Content.EventDate; note.Minutes = a.Content.Minutes; note.StartTime = a.Content.StartTime; note.IsUnbilled = a.Content.IsUnbilled;
+            return a.VersionId;
+        }
         private static Person ToBillingCandidatePerson(
             LocalBillingCandidateRow row,
             Agency agency,

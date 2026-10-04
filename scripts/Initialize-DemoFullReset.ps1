@@ -18,6 +18,12 @@ if (-not $ReplaceBaseline) {
     throw 'Capturing a full Demo baseline is deliberate and destructive to any older baseline. Pass -ReplaceBaseline after approving the current curated Demo data.'
 }
 
+# The same packaged guard protects baseline capture, the stored procedure, and
+# the Function's runtime preflight when an older procedure is still deployed.
+. (Join-Path $PSScriptRoot '..\Sati.DemoRefresh\Shared\ExternalClearinghouseResetGuard.ps1')
+$captureExternalGuardSql = Get-DemoExternalClearinghouseResetGuardSql
+$restoreExternalGuardSql = Get-DemoExternalClearinghouseResetGuardSql -RequireBaseline
+
 $token = az account get-access-token --resource 'https://database.windows.net/' --query accessToken -o tsv
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
     throw 'Could not obtain an Azure SQL access token.'
@@ -44,6 +50,9 @@ DECLARE @captureLockResult int;
 EXEC @captureLockResult=sys.sp_getapplock @Resource=N'SatiDemo.FullReset',
     @LockMode=N'Exclusive', @LockOwner=N'Transaction', @LockTimeout=60000;
 IF @captureLockResult < 0 THROW 51001, 'The Demo is busy; baseline capture did not begin.', 1;
+
+-- Refuse to snapshot or erase vendor-linked state, including an older snapshot.
+$captureExternalGuardSql
 
 -- The deployed reset Function carries a packaged copy of the seed. Until that
 -- Function is republished, its older seed cannot clear frozen move rows before
@@ -102,6 +111,27 @@ COMMIT;
     $command.Parameters.Clear()
 
 $command.CommandText = @"
+CREATE OR ALTER PROCEDURE dbo.SatiAssertCanonicalResetAllowed
+WITH EXECUTE AS OWNER
+AS
+BEGIN
+    SET NOCOUNT ON; SET XACT_ABORT ON;
+    IF DB_NAME() <> N'SatiDemo' OR NOT EXISTS
+       (SELECT 1 FROM dbo.SatiDatabaseIdentity WHERE Id=1 AND EnvironmentName=N'Demo')
+        THROW 51000, 'Refusing to check reset safety outside the validated Demo database.', 1;
+    BEGIN TRANSACTION;
+    DECLARE @guardLockResult int;
+    EXEC @guardLockResult=sys.sp_getapplock @Resource=N'SatiDemo.FullReset',
+        @LockMode=N'Exclusive', @LockOwner=N'Transaction', @LockTimeout=60000;
+    IF @guardLockResult < 0 THROW 51001, 'The Demo is busy; reset safety check did not begin.', 1;
+
+    $restoreExternalGuardSql
+    COMMIT;
+END
+"@
+    [void]$command.ExecuteNonQuery()
+
+$command.CommandText = @"
 CREATE OR ALTER PROCEDURE dbo.SatiResetToCanonicalBaseline
     @RequestId uniqueidentifier,
     @ActorUserId int
@@ -112,6 +142,15 @@ BEGIN
     IF DB_NAME() <> N'SatiDemo' OR NOT EXISTS
        (SELECT 1 FROM dbo.SatiDatabaseIdentity WHERE Id=1 AND EnvironmentName=N'Demo')
         THROW 51000, 'Refusing to reset outside the validated Demo database.', 1;
+    BEGIN TRANSACTION;
+    DECLARE @lockResult int;
+    EXEC @lockResult=sys.sp_getapplock @Resource=N'SatiDemo.FullReset',
+        @LockMode=N'Exclusive', @LockOwner=N'Transaction', @LockTimeout=60000;
+    IF @lockResult < 0 THROW 51001, 'The Demo is busy; reset did not begin.', 1;
+
+    -- Guard both live data and the snapshot before any constraint or row changes.
+    $restoreExternalGuardSql
+
     IF EXISTS (
         SELECT t.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
         WHERE s.name=N'dbo' AND t.name NOT LIKE N'SatiDemoReset%'
@@ -126,11 +165,6 @@ BEGIN
         WHERE s.name=N'dbo' AND t.name NOT LIKE N'SatiDemoReset%'
     )
         THROW 51002, 'The Demo schema changed after baseline capture. Capture a reviewed replacement baseline before resetting.', 1;
-    BEGIN TRANSACTION;
-    DECLARE @lockResult int;
-    EXEC @lockResult=sys.sp_getapplock @Resource=N'SatiDemo.FullReset',
-        @LockMode=N'Exclusive', @LockOwner=N'Transaction', @LockTimeout=60000;
-    IF @lockResult < 0 THROW 51001, 'The Demo is busy; reset did not begin.', 1;
 
     DECLARE @sql nvarchar(max)=N'';
     SELECT @sql += N'ALTER TABLE dbo.' + QUOTENAME(t.name) + N' NOCHECK CONSTRAINT ALL;'
@@ -181,6 +215,7 @@ END
     [void]$command.ExecuteNonQuery()
 
 $command.CommandText = @"
+GRANT EXECUTE ON dbo.SatiAssertCanonicalResetAllowed TO [$ResetIdentityName];
 GRANT EXECUTE ON dbo.SatiResetToCanonicalBaseline TO [$ResetIdentityName];
 DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::demo_baseline TO [$ResetIdentityName];
 IF USER_ID(N'$ApiIdentityName') IS NOT NULL

@@ -17,6 +17,71 @@ public sealed class ConsumerProvidersViewModelTests
     private static readonly DateTime Today = new(2026, 8, 28);
 
     [Fact]
+    public async Task OrderCommandsRespectPrimaryAndEdgesAndSaveSurvivesReload()
+    {
+        var links = new StubLinkService([Link(1, 40, 4, isPrimaryCare: true), Link(2, 40, 3), Link(3, 40, 1)]);
+        var vm = Build(links, Directory());
+        vm.SetPerson(Consumer(40));
+        await vm.RefreshAsync();
+        Assert.False(vm.MoveDownCommand.CanExecute(vm.Current[0]));
+        Assert.False(vm.MoveUpCommand.CanExecute(vm.Current[1]));
+        Assert.False(vm.MoveDownCommand.CanExecute(vm.Current[^1]));
+        var last = vm.Current[^1];
+        vm.MoveUpCommand.Execute(last);
+        Assert.Same(last, vm.Current[1]);
+        Assert.True(vm.HasOrderChanges);
+        Assert.False(vm.EndProviderCommand.CanExecute(last));
+        await vm.RefreshAsync(); // Automatic refresh must preserve the intended order.
+        Assert.Same(last, vm.Current[1]);
+        await vm.SaveOrderCommand.ExecuteAsync(null);
+        Assert.False(vm.HasOrderChanges);
+        Assert.Equal("Provider order saved.", vm.OrderMessage);
+        await vm.RefreshAsync();
+        Assert.Equal(new[] { 1, 3, 2 }, vm.Current.Select(row => row.Id));
+    }
+
+    [Fact]
+    public async Task FailedOrderSaveKeepsIntentionAndExplicitRetryUsesFreshVersion()
+    {
+        var links = new StubLinkService([Link(1, 40, 3), Link(2, 40, 4)]) { RefuseOrder = true };
+        var vm = Build(links, Directory());
+        vm.SetPerson(Consumer(40));
+        await vm.RefreshAsync();
+        vm.MoveDownCommand.Execute(vm.Current[0]);
+        var intended = vm.Current.Select(row => row.Id).ToArray();
+        await vm.SaveOrderCommand.ExecuteAsync(null);
+        Assert.True(vm.HasOrderChanges);
+        Assert.Equal(intended, vm.Current.Select(row => row.Id));
+        Assert.Contains("intended order is still shown", vm.OrderMessage);
+        links.RefuseOrder = false;
+        await vm.RetryOrderCommand.ExecuteAsync(null);
+        Assert.False(vm.HasOrderChanges);
+        Assert.Equal(intended, vm.Current.Select(row => row.Id));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OrderSaveForPreviousConsumerCannotPublishSuccessOrFailure(bool refuse)
+    {
+        var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var links = new StubLinkService([Link(1, 40, 3), Link(2, 40, 4), Link(3, 41, 1)])
+            { HoldOrder = hold, RefuseOrder = refuse };
+        var vm = Build(links, Directory());
+        vm.SetPerson(Consumer(40));
+        await vm.RefreshAsync();
+        vm.MoveDownCommand.Execute(vm.Current[0]);
+        var save = vm.SaveOrderCommand.ExecuteAsync(null);
+        vm.SetPerson(Consumer(41));
+        await links.SecondLoadPublished;
+        hold.SetResult();
+        await save;
+        Assert.Equal(3, Assert.Single(vm.Current).Id);
+        Assert.Equal(string.Empty, vm.OrderMessage);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
     public async Task ThePracticeAndNetworkAreResolvedFromTheDirectory()
     {
         var links = new StubLinkService([Link(1, 40, providerId: 4)]);
@@ -478,6 +543,18 @@ public sealed class ConsumerProvidersViewModelTests
 
     private sealed class StubLinkService(List<PersonProvider> links) : IConsumerProviderService
     {
+        public bool RefuseOrder { get; set; }
+        public TaskCompletionSource? HoldOrder { get; init; }
+        public async Task<List<PersonProvider>> ReorderAsync(int personId, ReorderConsumerProvidersRequest request)
+        {
+            if (HoldOrder is not null) await HoldOrder.Task;
+            if (RefuseOrder) throw new ConsumerProviderOrderConflictException();
+            var rows = links.Where(link => link.PersonId == personId).ToList();
+            for (var index = 0; index < request.OrderedLinkIds.Length; index++)
+                rows.Single(link => link.Id == request.OrderedLinkIds[index]).SortOrder = index;
+            return rows;
+        }
+
         private readonly TaskCompletionSource _loaded = Signal();
         private readonly TaskCompletionSource _secondPublished = Signal();
         private readonly TaskCompletionSource _firstReturned = Signal();

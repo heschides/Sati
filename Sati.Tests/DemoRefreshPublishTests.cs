@@ -10,6 +10,7 @@ public sealed class DemoRefreshPublishTests
     [InlineData("ReviewedDeploy")]
     [InlineData("WrongTarget")]
     [InlineData("WrongRuntime")]
+    [InlineData("MissingWatchdogSchedule")]
     [InlineData("ChangedPackage")]
     [InlineData("DirtySource")]
     [InlineData("PrivateConfig")]

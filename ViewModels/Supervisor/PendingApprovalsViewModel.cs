@@ -24,12 +24,13 @@ namespace Sati.ViewModels.Supervisor
             ISupervisorService supervisorService,
             ISessionService sessionService,
             IFormAttestationChangeReviewService? formChangeReviews = null,
-            IAdminFormNoteCorrectionService? adminFormCorrections = null)
+            IAdminFormNoteCorrectionService? adminFormCorrections = null, NoteAmendmentsViewModel? amendments = null)
         {
             _supervisorService = supervisorService;
             _sessionService = sessionService;
             _formChangeReviews = formChangeReviews;
             _adminFormCorrections = adminFormCorrections;
+            Amendments = amendments; Amendments?.SetReviewMode();
         }
 
         // -------------------------------------------------------------------------
@@ -37,6 +38,7 @@ namespace Sati.ViewModels.Supervisor
         // -------------------------------------------------------------------------
 
         // Notes whose consumers pass the compliance gate — ready for content review.
+        public NoteAmendmentsViewModel? Amendments { get; }
         public ObservableCollection<PendingNoteViewModel> PendingNotes { get; } = [];
 
         // Notes whose consumers fail the compliance gate — waiting for compliance
@@ -137,6 +139,7 @@ namespace Sati.ViewModels.Supervisor
         public void ClearForAccountSwitch()
         {
             Deactivate();
+            Amendments?.ClearForAccountSwitch();
             SelectedNote = null;
             OverrideNote = null;
             IsReturnDialogVisible = false;

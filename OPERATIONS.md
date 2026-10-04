@@ -1,6 +1,6 @@
 # Operations and records governance
 
-*Current as of 2026-08-15. Retention enforcement remains `PolicyOnly`; nothing in this document
+*Current as of 2026-10-03. Retention enforcement remains `PolicyOnly`; nothing in this document
 describes an automated deletion process that exists today.*
 
 This runbook describes the operational controls represented in the Admin dashboard and the
@@ -145,6 +145,80 @@ Before a production pilot, wire these signals into the chosen monitoring platfor
 Alerts must route to a named owner with severity, acknowledgement, escalation, and after-hours
 expectations. A dashboard without notification routing is visibility, not an alerting system.
 
+### Demo watchdog — implemented source, activation pending
+
+Josh owns the Demo notification route. `DemoWatchdog` is prepared for a daily 04:00 Eastern
+Function run, after the existing 03:15 reset. It checks outcomes once per day; it does not keep
+App Service F1 or serverless SQL awake. This implementation has not published the Function,
+configured an email receiver, enabled API maintenance, or created Azure alert rules.
+
+The watchdog emits one narrative-free `SATI_WATCHDOG_OK` or `SATI_WATCHDOG_FINDING` trace.
+The finding rule emails Josh; a separate rule detects no result for 26 hours. The Function's
+existing SQL identity and storage connection are used without new role assignments.
+
+| Finding | Operator response |
+|---|---|
+| `ResetOutcomeMissing` / `ResetOutcomeFailed` | Review reset audit, Function invocation and safe failure logs. A missing outcome can mean the host stopped. Do not automatically queue a replacement reset. |
+| `PoisonQueueMessages` | Review the failed request and its original outcome before deciding recovery. The three preserved messages from release 1.3.34 intentionally produce findings until reviewed; nothing drains, replays or suppresses them. |
+| `OverduePendingNotes` | Confirm `Sati:EnableNoteAbandonmentWorker` and the matching watchdog flag, the current documentation window, API wake and sweep audit. Detection includes a two-day grace beyond the configured window. |
+| `BillingDispatchStale` / `BillingOutcomeUnknown` | Reconcile dispatch state with the clearinghouse before any resend. Detection does not retry a claim. |
+| `SignaturePackageUnprepared` / `SignatureNotificationFailed` | Review the enabled signature workflow and delivery state. Detection does not resend an invitation or receipt. |
+| `WatchdogCheckFailed` | Inspect safe exception-type logs and validate database identity, schema, credentials and queue metadata access. Existing findings are retained. |
+| No result in 26 hours | Check the Function timer, app setting and Application Insights ingestion, then the alert route itself. |
+
+Before activation:
+
+1. Review the preserved poison messages and record their disposition; no reset or replay is
+   authorized by this checklist.
+2. In a separately authorized Function publication, include the updated seed source and
+   `DemoWatchdog`, with `DemoWatchdogSchedule=0 0 4 * * *`. An existing app must receive that
+   setting explicitly before `Publish-DemoRefresh.ps1 -ExistingAppOnly` can proceed.
+3. Leave `SATI_WATCHDOG_EXPECT_NOTE_ABANDONMENT`, `SATI_WATCHDOG_EXPECT_CLEARINGHOUSE`, and
+   `SATI_WATCHDOG_EXPECT_SIGNATURE` false until each corresponding feature is accepted and
+   enabled. Enable the note worker and its expectation together. Hosted identity validation
+   precedes all workers, and the note worker joins the reset lock before its own sweep lock.
+4. Review regional Azure Monitor costs, including two hourly log-search rules and email volume.
+   Microsoft's public price page did not expose the exact regional dollar figure to verification;
+   the script requires a positive reviewed USD monthly estimate, an evidence reference, and a
+   review date within seven days before apply. These values record review, not a spending cap.
+5. Josh previews and runs the script below with his actual email and reviewed pricing values.
+   It manages only the dedicated action group and two rules on existing Application Insights.
+6. Josh sends an Azure Monitor action-group test notification and confirms receipt, then
+   verifies a normal scheduled result and the absence rule. Record evidence before relying on
+   the route. No SMS or paging service is introduced.
+
+```powershell
+.\scripts\Set-DemoWatchdogAlerts.ps1 -EmailAddress 'your-address@example.com' -WhatIf
+# Replace the values below with the reviewed estimate, evidence reference and date.
+.\scripts\Set-DemoWatchdogAlerts.ps1 -EmailAddress 'your-address@example.com' `
+  -ReviewedMonthlyEstimateUsd $reviewedEstimate `
+  -PricingEvidence $quoteReference -PricingReviewedOn $quoteDate
+```
+
+`-WhatIf` performs no Azure calls. The finding alert is stateless with action muting, so a
+persistent poison entry cannot keep it permanently open and hide a later daily finding.
+Future cloud Production needs its own identities, alert resources, escalation expectations
+and an Always On hosting review; this Demo script cannot target it.
+
+### Desktop incident outbox support
+
+Platform Health shows pending count and oldest age for the current account, count held for
+other accounts, and quarantine count. Local origin user/agency identifiers choose which
+authenticated account may deliver an envelope; the API derives the actual actor from its token.
+Credential generation is checked as well as the account, including during a switch-user login.
+
+Transient delivery retries at most eight times while that account remains authenticated:
+five-second exponential base, five-minute cap before 20% jitter, and server `Retry-After` up to
+30 minutes. Sign-out, session end, or credential change cancels the loop. A later matching
+sign-in or explicit flush can resume retained work. HTTP 401/403 stops delivery; permanent
+4xx other than 401/403/429 quarantines that envelope and permits later valid entries to proceed.
+
+Legacy unscoped or malformed entries, entries older than 30 days, and entries dated more than
+five minutes in the future move to `Rejected` without guessed ownership. Quarantine is retained
+for manual support review; there is no automatic deletion or replay. Review only through an
+approved support process, and never attach unrestricted crash payloads or clinical material to
+support tickets. Account identifiers in an envelope do not grant permission.
+
 ## Demo operator check
 
 1. Sign in as an Admin and open **Admin**.
@@ -153,6 +227,98 @@ expectations. A dashboard without notification routing is visibility, not an ale
 3. Enter an appropriate export reason and download the last-30-day CSV.
 4. Confirm the recent activity list adds **Exported audit activity**.
 5. Do not present policy-only retention as automated deletion or legal-hold enforcement.
+
+## Cloud restore verification — design and Demo script only
+
+`scripts/Invoke-DemoRestoreVerification.ps1` implements the Demo rehearsal adapter.
+It has not run against Azure. A real rehearsal requires Josh's separate approval
+and execution with `-RunRehearsal`. It cannot target personal `SatiProduction` or
+future cloud Production, and it is not scheduled. Recovery for a future Production
+deployment requires a separately reviewed adapter, environment identity, access
+policy, evidence location, recovery objectives and approval process.
+
+The adapter pins subscription `253e5008-51c0-434b-80b9-ae3ac94bd66b`, resource group
+`rg-sati-demo`, SQL server `sati-demo-satilogica-central` and source `SatiDemo`.
+It restores a chosen point in time into `SatiRestoreCheck_<new-guid>`, never over an
+existing database. Restored Azure SQL databases incur ordinary charges until deleted;
+Josh reviews the tier and expected rehearsal duration before execution. See
+[Microsoft's recovery guidance](https://learn.microsoft.com/en-us/azure/azure-sql/database/recovery-using-backups?view=azuresql).
+
+### Prepare the approved historical inventory
+
+Use an inventory recorded for the chosen historical restore point. Comparing a
+historical restore with today's mutable source would produce misleading evidence.
+The script does not query source records or create a manifest from live data.
+An approved manifest has this shape; replace every sample value with historical
+evidence before a rehearsal:
+
+```json
+{
+  "schemaVersion": 1,
+  "sourceEnvironment": "Demo",
+  "sourceDatabase": "SatiDemo",
+  "sourceServer": "sati-demo-satilogica-central",
+  "sourceSubscriptionId": "253e5008-51c0-434b-80b9-ae3ac94bd66b",
+  "restorePointUtc": "2026-10-03T12:00:00Z",
+  "expectedInstanceId": "<historical SatiDatabaseIdentity InstanceId>",
+  "migrationIds": ["<complete historical EF migration ID inventory>"],
+  "tableCounts": {"dbo.Agencies": 0, "dbo.People": 0, "dbo.Notes": 0}
+}
+```
+
+Include counts for critical source, audit, version, billing and enabled-signature
+tables, appropriate to the point being restored. Table identifiers are restricted
+to simple `dbo.Table` names. Count agreement alone does not prove record integrity;
+it supplements identity, complete migration history and the application's separate
+integrity tests. Evidence is limited to identity match, counts, safe status, manifest
+hash, resource/run identifiers and timestamps, without narratives or row exports.
+
+### Preview, execute and review
+
+1. Review the historical manifest, chosen restore point, operator SQL access and
+   Azure costs. Use already authorized connectivity and identities. The script
+   never grants roles or changes a firewall; inability to connect is a rehearsal
+   failure requiring operator action through the existing controlled process.
+2. Generate a fresh RunId and preview. `-WhatIf` validates local inputs but makes
+   zero Azure/SQL calls and writes no files.
+3. After Josh's separate approval, run the same plan with `-RunRehearsal`. Normal
+   PowerShell confirmation shows the uniquely named scratch target.
+4. Review the local JSON evidence under ignored `output/demo-restore-verification`
+   (or an approved `-EvidenceDirectory`). Success requires a zero exit status,
+   `state: Completed`, `cleanup: DeletedOwnedScratch` and `evidenceWriteFailed: false`.
+5. Retain the approved evidence and manifest in the operational evidence store.
+   Record actual elapsed recovery time and compare it with agreed objectives.
+
+```powershell
+$restoreRun = [guid]::NewGuid()
+.\scripts\Invoke-DemoRestoreVerification.ps1 -RunId $restoreRun `
+  -ExpectedManifestPath '.\approved-demo-inventory.json' -WhatIf
+# Only after separate approval:
+.\scripts\Invoke-DemoRestoreVerification.ps1 -RunId $restoreRun `
+  -ExpectedManifestPath '.\approved-demo-inventory.json' -RunRehearsal
+```
+
+### Failure and cleanup
+
+The restore applies run-ID and purpose tags on creation. SQL probing and cleanup
+require the exact scratch resource identity and matching ownership tags; ownership
+is rechecked immediately before deletion. Verification failure still cleans a
+confirmed owned scratch. A local ledger under `output/demo-restore-verification/runs`
+prevents reuse of a RunId in this checkout even when the evidence destination changes.
+A preexisting target is never reused. Preserve the ledger and approved evidence
+store; replay prevention is local, not a global cloud registry. Use a fresh run
+only after reviewing the previous outcome.
+
+A timeout while creation is uncertain, unexpected ownership, or failed cleanup
+leaves the exact target for manual investigation and reports failure. Do not retry
+the restore or delete by name alone. Confirm resource identity, ownership and state
+before separately approved recovery, and check for continuing charges. Local evidence
+write failures must not prevent cleanup of a confirmed owned scratch.
+
+SQL recovery is one part of recovery. Rehearse protected object storage, signed
+packages, attachment references, required encryption/signing keys, configuration
+and identity recovery as separate approved procedures. This adapter proves none
+of those and performs no export or restore of personal PHI.
 
 ## Demo schema changes without a firewall rule
 
@@ -340,6 +506,30 @@ Development and real case management should not share a Windows profile, because
 share a cloud account, a risk profile, or an audience. A separate profile gives each its own
 OneDrive, its own Desktop and Documents, and its own default save paths — which removes the
 class of mistake above rather than relying on remembering the rule each time.
+
+## Claim.MD sandbox reset pause and uncertainty review
+
+Follow `CLAIMMD_SANDBOX_RUNBOOK.md` for the separately approved testing window.
+Pause `RefreshCaseload` with `AzureWebJobs.RefreshCaseload.Disabled=true` before
+onboarding. Verify that queued/in-flight reset requests are accounted for; never
+automatically replay poison messages. The watchdog recognizes this actual pause
+while continuing to detect failed resets, poison entries and enabled billing checks.
+
+`DemoResetBlockedByExternalClearinghouseState` means reset preserved linked sandbox
+history. Do not clear accounts/checkpoints/audit to make it pass. The Function's
+owner-executed assertion procedure must be installed before the guarded package is
+activated; direct baseline read permission remains denied. Missing procedure or
+schema must stop reset before restore/seed.
+
+Sending/OutcomeUnknown dispatches require an agency Admin's audited reconciliation,
+using retained source identity and authoritative account/support evidence. The
+dispatch lease excludes active uploads. No automatic resend or direct row repair
+is permitted. Preserve encrypted proof outside general logs and retain recovery keys.
+
+At testing completion, stop transport, reconcile uncertainty, prove complete evidence
+preservation, and separately approve a return to clean canonical Demo. Only then
+resume the timer and approve a verification reset. The archive/cutover adapter is
+not supplied by this source work; enabling the timer on linked data yields refusals.
 
 ## Remaining production work
 

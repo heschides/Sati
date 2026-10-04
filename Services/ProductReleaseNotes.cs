@@ -6,11 +6,31 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Clearer notes, calendar, and statistics";
-    public const string ReleaseDate = "October 3, 2026";
+    public const string ReleaseName = "Approved-note amendments and provider organization";
+    public const string ReleaseDate = "October 4, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Amend approved notes with a retained history",
+            [
+                "Notes Log includes approved-note amendments with original and proposed content together, a reason, retained versions, and an independent supervisor review.",
+                "Returned proposals can be revised and resubmitted. Approval keeps the original note unchanged and identifies the exact reviewed amendment.",
+                "Changes to service date, duration, time, or Unbilled status hold billing until a separate financial review. Narrative-only amendments leave billing unchanged.",
+                "Existing submitted claims require an explicit linked correction; Sati does not automatically resend them. Draft-claim adjustments and cross-month corrections remain unavailable."
+            ]),
+        new(
+            "Organize a consumer's providers",
+            [
+                "Filter provider assignments, reorder them with keyboard controls or drag and drop, and copy contact details.",
+                "Ordering is saved for the consumer and conflicts ask you to refresh before replacing someone else's changes."
+            ]),
+        new(
+            "Keep work current across the day",
+            [
+                "An open desktop refreshes date-dependent work when the day changes and can retain safe operational incident reports while the API is unavailable.",
+                "Server maintenance and Claim.MD sandbox preparation have additional coordination safeguards. Their operational activation remains a separate controlled step."
+            ]),
         new(
             "Write notes from a consumer's page",
             [

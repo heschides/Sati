@@ -59,6 +59,10 @@ function Assert-ExistingDemoTarget {
         if ($workerRuntime.Count -ne 1 -or $workerRuntime[0].value -cne 'powershell') {
             throw 'The existing Demo Function worker runtime must already be PowerShell.'
         }
+        $watchdogSchedule = @($settings | Where-Object name -eq 'DemoWatchdogSchedule')
+        if ($watchdogSchedule.Count -ne 1 -or $watchdogSchedule[0].value -cne '0 0 4 * * *') {
+            throw 'Set DemoWatchdogSchedule=0 0 4 * * * on the existing Demo Function before publishing this package.'
+        }
     }
     finally { $settings = $null }
     $storage = Invoke-AzureCli @('storage','account','show','-g',$ResourceGroup,'-n',$StorageAccount,'-o','json') |
@@ -193,6 +197,7 @@ try {
     Invoke-AzureCli @('functionapp','config','appsettings','set','-g',$ResourceGroup,'-n',$FunctionApp,'--settings',
         'FUNCTIONS_WORKER_RUNTIME=powershell','FUNCTIONS_EXTENSION_VERSION=~4',
         'WEBSITE_TIME_ZONE=Eastern Standard Time','DemoRefreshSchedule=0 15 3 * * *',
+        'DemoWatchdogSchedule=0 0 4 * * *',
         'SATI_DEMO_SQL_SERVER=sati-demo-satilogica-central.database.windows.net') | Out-Null
     }
     if ($null -ne $manifest) { $manifest.DeploymentResult = [pscustomobject]@{ Status = 'Started' } }

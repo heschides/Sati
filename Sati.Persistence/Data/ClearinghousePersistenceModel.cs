@@ -175,7 +175,7 @@ public static class ClearinghousePersistenceModel
                 throw new InvalidOperationException("A clearinghouse dispatch cannot change its source or account and updates require a new revision.");
             var before = entry.OriginalValues.GetValue<ClearinghouseDispatchState>(nameof(ClearinghouseDispatch.State));
             var after = entry.Entity.State;
-            if (before != after && !CanAdvanceDispatch(before, after))
+            if (before != after && !ClaimMdReconciliationRules.CanAdvanceDispatch((int)before, (int)after))
                 throw new InvalidOperationException("Clearinghouse dispatch cannot return to sending or skip a required state.");
         }
         foreach (var entry in tracker.Entries<ClearinghouseFeedCheckpoint>().Where(x => x.State == EntityState.Modified))
@@ -194,14 +194,4 @@ public static class ClearinghousePersistenceModel
             throw new InvalidOperationException("A retained clearinghouse receipt cannot acquire new matches.");
     }
 
-    private static bool CanAdvanceDispatch(ClearinghouseDispatchState before, ClearinghouseDispatchState after) =>
-        before switch
-        {
-            ClearinghouseDispatchState.Queued => after is ClearinghouseDispatchState.Sending or ClearinghouseDispatchState.CancelledBeforeSend,
-            ClearinghouseDispatchState.Sending => after is ClearinghouseDispatchState.AcceptedByClearinghouse or
-                ClearinghouseDispatchState.RejectedByClearinghouse or ClearinghouseDispatchState.OutcomeUnknown,
-            ClearinghouseDispatchState.OutcomeUnknown => after is ClearinghouseDispatchState.AcceptedByClearinghouse or
-                ClearinghouseDispatchState.RejectedByClearinghouse,
-            _ => false
-        };
 }

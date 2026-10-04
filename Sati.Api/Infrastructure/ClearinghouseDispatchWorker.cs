@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Sati.Api.Data;
 using Sati.Contracts.V1;
 using Sati.Models.Billing;
+using Sati.Data;
 
 namespace Sati.Api.Infrastructure;
 
@@ -38,17 +40,35 @@ internal sealed class SyntheticClearinghouseConnector : IClearinghouseConnector
 internal sealed class ClearinghouseDispatchWorker(
     IDbContextFactory<ApiDbContext> contexts, IClearinghouseConnector connector,
     ClearinghouseDispatchGate gate, EnvelopeProtector protector, IClaimMdSandboxKeySource keys,
+    IDemoWorkerResetCoordination resetCoordination,
     ILogger<ClearinghouseDispatchWorker> logger) : BackgroundService
 {
     internal async Task<bool> ProcessOneAsync(CancellationToken token)
     {
         if (!gate.IsEnabled) return false;
+        return await resetCoordination.RunAsync(ProcessUnderResetLeaseAsync, false, token);
+    }
+
+    private async Task<bool> ProcessUnderResetLeaseAsync(CancellationToken token)
+    {
         await using var db = await contexts.CreateDbContextAsync(token);
         var dispatch = await db.ClearinghouseDispatches
             .Where(row => row.State == ClearinghouseDispatchState.Queued)
             .OrderBy(row => row.RequestedAtUtc).ThenBy(row => row.Id)
             .FirstOrDefaultAsync(token);
         if (dispatch is null) return false;
+
+        return await resetCoordination.RunDispatchAsync(dispatch.Id,
+            innerToken => new DispatchSingleAttempt(db).ExecuteAsync(
+                () => UploadUnderDispatchLeaseAsync(db, dispatch, innerToken)), false, token);
+    }
+
+    private async Task<bool> UploadUnderDispatchLeaseAsync(ApiDbContext db,
+        ClearinghouseDispatch dispatch, CancellationToken token)
+    {
+        // Another host may have sent this row while we were acquiring its lease.
+        await db.Entry(dispatch).ReloadAsync(token);
+        if (dispatch.State != ClearinghouseDispatchState.Queued) return false;
 
         var account = await db.ClearinghouseAccounts.AsNoTracking()
             .SingleOrDefaultAsync(row => row.Id == dispatch.AccountId && row.AgencyId == dispatch.AgencyId, token);
@@ -67,19 +87,34 @@ internal sealed class ClearinghouseDispatchWorker(
             return true;
         }
 
-        if (gate.IsRealSandboxEnabled)
+        var ownerId = await db.BillingPeriods.AsNoTracking().Where(p => p.Id == generation.BillingPeriodId).Select(p => p.UserId).SingleAsync(token);
+        await using (var schedule = await ServiceTimeWriteScope.BeginAsync(db, generation.AgencyId, ownerId, token))
         {
-            // Neither a missing AccountKey nor an unavailable receipt-wrapping key should
-            // convert an unsent file into an uncertain upload. Preflight before Sending.
-            _ = keys.Resolve(account.SecretReference);
-            _ = await protector.ProtectAsync("claimmd-receipt-preflight",
-                new FieldBinding(dispatch.AgencyId, 0, $"ClaimMdPreflight:{dispatch.Id:N}"), token);
-        }
+            try { await NoteAmendmentDispatchGuard.ValidateAsync(db, generation, token); }
+            catch (NoteAmendmentWorkflowException)
+            {
+                dispatch.State = ClearinghouseDispatchState.CancelledBeforeSend;
+                dispatch.SafeErrorCode = "note_amendment_financial_hold"; dispatch.Revision++;
+                try { await db.SaveChangesAsync(token); await schedule.CommitAsync(token); } catch (DbUpdateConcurrencyException) { }
+                return true;
+            }
 
-        dispatch.State = ClearinghouseDispatchState.Sending;
-        dispatch.Revision++;
-        try { await db.SaveChangesAsync(token); }
-        catch (DbUpdateConcurrencyException) { return true; }
+            if (gate.IsRealSandboxEnabled)
+            {
+                // Neither a missing AccountKey nor an unavailable receipt-wrapping key should
+                // convert an unsent file into an uncertain upload. Preflight before Sending.
+                _ = keys.Resolve(account.SecretReference);
+                _ = await protector.ProtectAsync("claimmd-receipt-preflight",
+                    new FieldBinding(dispatch.AgencyId, 0, $"ClaimMdPreflight:{dispatch.Id:N}"), token);
+            }
+
+            dispatch.State = ClearinghouseDispatchState.Sending;
+            dispatch.Revision++;
+            try { await db.SaveChangesAsync(token); }
+            catch (DbUpdateConcurrencyException) { return true; }
+            await schedule.CommitAsync(token);
+
+        }
 
         var startedAt = DateTime.UtcNow;
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(generation.Content)));
@@ -182,4 +217,11 @@ internal sealed class ClearinghouseDispatchWorker(
 
     internal static FieldBinding ResponseBinding(int agencyId, ClearinghouseDispatchAttempt attempt) =>
         new(agencyId, 0, $"ClearinghouseAttempt:{attempt.Id:N}:Response:{attempt.ResponseSha256}");
+
+    // SQL providers with retry enabled require an execution scope for our owned
+    // transaction. Never replay a scope that may already have uploaded a file.
+    private sealed class DispatchSingleAttempt(ApiDbContext context) : ExecutionStrategy(context, 0, TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => false;
+    }
 }

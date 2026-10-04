@@ -46,11 +46,10 @@
              Second host of the shared entry module. Its own instance — drafts
              here are independent of the dashboard's copy. It is also the detail
              view: the grid selection loads the note into it, locked. -->
-        <ContentControl x:Name="NoteEntryPanel"
-                        Grid.Row="0"
-                        Grid.RowSpan="3"
-                        Grid.Column="0"
-                        Content="{Binding NoteEntry}" />
+        <TabControl x:Name="NoteEntryPanel" Grid.Row="0" Grid.RowSpan="3" Grid.Column="0">
+            <TabItem Header="Note"><ContentControl Content="{Binding NoteEntry}" /></TabItem>
+            <TabItem Header="Approved amendments"><ContentControl Content="{Binding Amendments}" /></TabItem>
+        </TabControl>
 
         <!-- ═══ FILTERS ═══
              A horizontal band directly above the grid it scopes. The groups sit

@@ -6276,3 +6276,159 @@ on input surface (lowest: IndustrialMatte, 5.04:1).
 
 **Rejected:** re-creating `States.xaml` after each swap, which depends on the same lazy resolution;
 and leaving the fallback in place for future themes, which would silently reintroduce the defect.
+
+## 2026-10-03 — Maintenance follows shared rules and the reset boundary
+
+`NoteAbandonmentRules` combines the existing workflow and documentation-window
+owners; API and local sweeps now use it. `SystemActor.UserId` is the named zero
+constant, with `SystemActor.DisplayName` (`Sati automation`) in activity views and
+exports. Automatic work does not require or impersonate a user row. Each agency's
+changed-note summary and revision-checked writes commit together.
+
+The new worker defaults off and catches up after API wake. SQL application locks
+coordinate multiple hosts and exclude a concurrent Demo reset. Identity validation
+precedes hosted workers. Successful daily work is remembered in process; a host
+restart may repeat the check safely, while a full batch remains due for the next
+bounded pass. The desktop route preserves caller scope and processes at most
+1,000 candidates; the local trigger uses the same Contracts batch cap. No scheduler
+is added to the personal LocalDB path.
+
+The watchdog uses its own `DemoWatchdogSchedule` app setting, prepared for the next
+separately approved Function publication. The expected-overdue, clearinghouse and
+signature scans remain off until their corresponding features are activated.
+Existing poison messages are never automatically removed or ignored. The finding
+alert is stateless with action muting so a persistent poison finding cannot hold
+the alert permanently open and conceal later daily findings.
+
+## 2026-10-03 — Date rollover refresh preserves editors
+
+The shell's existing minute timer and foreground event feed one
+`DateRolloverRefreshCoordinator` with `TimeProvider`. A completed day is consumed
+once; a failed, superseded or blocked refresh remains due. Notes, journal and
+scratchpad dirty state defer refresh. The consumer editor and owned windows are
+also conservatively deferred, including editors without a uniform dirty flag.
+Leaving those surfaces permits the next tick to catch up.
+
+Only dated projections are refreshed; consumer editors are not reinitialized.
+Each asynchronous snapshot must retain its request identity and account before
+publication. Settings, note-save, compliance and caseload refresh cascades
+invalidate an older date snapshot. Viewing the current productivity month follows
+the next month; choosing a historical month preserves that choice.
+
+## 2026-10-03 — Incident delivery binds account and credential generation
+
+The durable local envelope wraps the unchanged incident request with its originating
+user, agency and enqueue time. Only the matching authenticated account and captured
+credential generation can submit it. Login can install a new token before the shell
+has replaced its session user; checking only the visible user would misattribute an
+old queued incident. The API continues to derive its actor and agency independently.
+
+Delivery is FIFO within an account. Legacy unscoped or malformed envelopes, entries
+older than 30 days and timestamps more than five minutes ahead are quarantined in
+`Rejected`, retained for review without automatic deletion or replay. Permanent 4xx
+except 401/403/429 is also quarantined; 401/403 stops delivery and keeps pending work.
+
+Transient failures have at most eight retries per authenticated session, using a
+five-second exponential base, five-minute cap before 20% jitter, and `Retry-After`
+up to 30 minutes. Credential change or session end cancels retries immediately.
+Later matching sign-in or explicit flush may resume. Support sees account-scoped
+count/oldest age and held/quarantined counts, without automatically opening payloads.
+
+## 2026-10-03 — Restore evidence compares a historical inventory
+
+W6 ships a Demo-only operator adapter and runbook, without executing or scheduling
+a cloud restore. A manifest records the selected historical restore point, expected
+database InstanceId, complete migration IDs and selected critical table counts.
+Comparing PITR with the mutable current source is rejected because legitimate later
+writes would make that comparison misleading.
+
+Each rehearsal uses a new GUID in its scratch name and ownership tags. Local
+evidence and a fixed checkout-local run marker are created exclusively; changing
+the evidence directory does not permit reuse. This guard is local, not a global
+cloud registry; a new checkout must reconcile earlier run evidence manually.
+Deletion requires matching resource identity and tags immediately before cleanup.
+Confirmed owned scratch is cleaned even when verification fails; uncertain creation,
+ownership or cleanup is reported for manual recovery. No role or firewall change is
+included. Future Production needs a separately reviewed adapter and recovery policy.
+
+## 2026-10-03 — Claim.MD setup and manual uncertainty findings
+
+Onboarding is an exact Demo Admin operation even when transport is off. Permanent
+account identity, globally reserved routing metadata, independent reviewed Status
+and ERA cursors, and an audit fingerprint commit serializably together under a
+global transaction-owned SQL onboarding lease. Busy reservations return 409;
+there is no automatic write replay. Secret
+references stay server-side and are neither resolved nor returned by onboarding.
+
+Manual reconciliation is deliberately a structured human finding: the API can
+check source identity, revision, timing, claim/count parity and contradictory
+history, but cannot authenticate a vendor proof hash or claim original-byte
+retention from a regenerated claimdata file. Preserve the attempt and append
+the finding/audit. ConfirmedNotReceived is a distinct terminal enum value 7 in
+the existing integer column, requiring no EF migration. Neither finding resends.
+Business validation and state transitions have one Contracts owner.
+
+The per-dispatch exclusive lease spans upload through evidence commit and serializes
+manual findings across hosts. It follows the shared reset lease and precedes
+period/request locks. Revision alone is insufficient while a remote upload is
+still in flight. Polling also holds the shared reset lease through cursor/effects.
+
+## 2026-10-03 — Sandbox testing pauses canonical Demo resets
+
+Josh requested automatic reset pause while Demo uses its dedicated Claim.MD test
+account, followed by restoration after testing. The timer-disable setting controls
+that window; the watchdog suppresses missing nightly outcomes only during the
+intentional pause. Existing failed/poison evidence remains actionable.
+
+Reset safety also has a durable guard: capture and restore refuse linked accounts,
+attempts, receipts, checkpoints and onboarding audit history in live/baseline data.
+Pure synthetic accounts without linkage/activity remain resettable. An
+owner-executed assertion procedure gives the Function EXECUTE-only preflight under
+the reset lock; missing procedure/schema fails closed without expanding baseline
+read permissions. A published Function alone cannot supply the SQL capability.
+
+Resuming the timer requires preserving/reconciling sandbox evidence and returning
+to a clean canonical Demo. Disabling or deleting an account cannot make its history
+disposable. A separately approved archive/cutover adapter remains deferred, rather
+than supplying an unsafe history-erasing resume switch. No runtime configuration,
+procedure installation or deployment was performed here.
+
+## Consumer provider order — October 3, 2026 (source only)
+
+Use the existing SortOrder rather than introduce another persisted ordering model.
+Primary care remains pinned first; ended assignments retain chronological history.
+Move commands stage an explicit arrangement, and one save validates every current
+association and updates only SortOrder. No affiliation, role or primary mark changes.
+
+A SHA-256 fingerprint over the complete retained relationship DTO collection provides
+an expected snapshot without a schema migration. It is compared under serializable
+isolation before writes in both service paths. Changes to membership, order or other
+relationship facts require explicit review/retry; directory changes are excluded.
+Identical final facts have the same token, so this does not claim to detect ABA history.
+A stale retry returns a typed conflict; the user may explicitly apply the intended
+permutation to a fresh snapshot if its membership and primary placement still agree.
+
+Rejected: saving individual rows from the UI, which can leave half an order saved and
+silently overwrite a simultaneous edit. Rejected: letting display order change primary
+care status, medical affiliation, ended history or frozen document/financial snapshots.
+Reorder adds an atomic metadata-only audit. Existing unrelated provider-change audit
+coverage remains separately deferred.
+
+## 2026-10-04 — Approved notes use linked versions and independent review
+
+An approved clinical note is preserved as the original, including exact evidence and
+approval metadata. Amendments form a linked aggregate based on its original revision
+and preceding approved version. Every save and submission is immutable history;
+return retains the proposal, and approval accepts the aggregate's exact submitted
+version under its revision token. Authorship belongs to the current owning case
+manager; review requires current supervisory reach and excludes the author/owner.
+
+Josh selected explicit financial review for date, start time, duration, or Unbilled
+changes. A separate billing-capable reviewer authorizes an exact financial version.
+Narrative-only changes do not disturb billing. New unclaimed services use reviewed
+facts; existing submitted claims use explicit correction/replacement/void lineage and
+an explicitly confirmed corrected charge. Neither action sends a file. A void repeats
+the standing claim, while originals and all prior submissions remain immutable.
+Draft-claim and cross-period adapters are gated rather than silently rewriting their
+financial records. See `NOTE_AMENDMENTS_RUNBOOK.md` for current projection boundaries,
+local correction limitations, and activation/rollback constraints.

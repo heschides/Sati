@@ -33,6 +33,9 @@ namespace Sati.Data
         public DbSet<SignatureDatabaseEnvironment> SignatureDatabaseEnvironment => Set<SignatureDatabaseEnvironment>();
         public DbSet<DocumentTemplate> DocumentTemplates { get; set; }
         public DbSet<Note> Notes { get; set; }
+        public DbSet<NoteAmendment> NoteAmendments => Set<NoteAmendment>();
+        public DbSet<NoteAmendmentVersion> NoteAmendmentVersions => Set<NoteAmendmentVersion>();
+        public DbSet<NoteAmendmentEvent> NoteAmendmentEvents => Set<NoteAmendmentEvent>();
         public DbSet<ScheduledNoteMove> ScheduledNoteMoves => Set<ScheduledNoteMove>();
         public DbSet<Settings> Settings { get; set; }
         public DbSet<BillingCompliancePolicyVersion> BillingCompliancePolicyVersions { get; set; }
@@ -112,6 +115,8 @@ namespace Sati.Data
 
         private void EnsureAuditEventsAreAppendOnly()
         {
+            NoteAmendmentPersistenceModel.ProtectWrites(ChangeTracker);
+            NoteAmendmentPersistenceModel.ProtectOriginalNotes<Note>(this);
             ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
             BillingCorrectionPersistenceModel.ProtectWrites(ChangeTracker);
             ReleaseObligationPersistenceModel.ProtectWrites(ChangeTracker);
@@ -554,6 +559,8 @@ namespace Sati.Data
                       .OnDelete(DeleteBehavior.Restrict);
             });
             ScheduledNoteMovePersistenceModel.Configure<Note>(modelBuilder);
+            NoteAmendmentPersistenceModel.Configure<Note>(modelBuilder);
+            NoteAmendmentPersistenceModel.ConfigureClaimLine<Sati.Models.Billing.ClaimLine>(modelBuilder);
 
             modelBuilder.Entity<Form>(entity =>
             {

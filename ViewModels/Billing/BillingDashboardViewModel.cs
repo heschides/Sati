@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace Sati.ViewModels.Billing
@@ -17,17 +17,20 @@ namespace Sati.ViewModels.Billing
             BillingQueueViewModel queueViewModel,
             BillingSubmissionsViewModel submissionsViewModel,
             BillingRemittancesViewModel remittancesViewModel,
-            BillingAlertsViewModel alertsViewModel)
+            BillingAlertsViewModel alertsViewModel, NoteAmendmentFinancialReviewsViewModel? amendmentReviews = null)
         {
             _overviewViewModel = overviewViewModel;
             _queueViewModel = queueViewModel;
             _submissionsViewModel = submissionsViewModel;
             _remittancesViewModel = remittancesViewModel;
             _alertsViewModel = alertsViewModel;
+            AmendmentReviews = amendmentReviews;
 
             CurrentSubView = _overviewViewModel;
         }
 
+        public NoteAmendmentFinancialReviewsViewModel? AmendmentReviews { get; }
+        [RelayCommand] private void NavigateToAmendmentReviews() => CurrentSubView = AmendmentReviews;
         [ObservableProperty] private object? currentSubView;
 
         public bool IsOverviewActive => CurrentSubView is BillingOverviewViewModel;
@@ -101,6 +104,7 @@ namespace Sati.ViewModels.Billing
         public void ClearForAccountSwitch()
         {
             CurrentSubView = null;
+            AmendmentReviews?.ClearForAccountSwitch();
             _overviewViewModel.ClearForAccountSwitch();
             _queueViewModel.ClearForAccountSwitch();
             _submissionsViewModel.ClearForAccountSwitch();

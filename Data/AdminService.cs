@@ -562,7 +562,10 @@ public sealed class AdminService(
                 auditEvent.EventId,
                 auditEvent.OccurredAtUtc,
                 auditEvent.ActorUserId,
-                user == null ? $"User {auditEvent.ActorUserId}" : user.DisplayName,
+                user == null
+                    ? auditEvent.ActorUserId == SystemActor.UserId
+                        ? SystemActor.DisplayName : $"User {auditEvent.ActorUserId}"
+                    : user.DisplayName,
                 auditEvent.Action,
                 auditEvent.ResourceType,
                 auditEvent.ResourceId,
@@ -810,7 +813,10 @@ public sealed class AdminService(
             select new AdminActivityDto(
                 auditEvent.Id,
                 auditEvent.ActorUserId,
-                user == null ? $"User {auditEvent.ActorUserId}" : user.DisplayName,
+                user == null
+                    ? auditEvent.ActorUserId == SystemActor.UserId
+                        ? SystemActor.DisplayName : $"User {auditEvent.ActorUserId}"
+                    : user.DisplayName,
                 auditEvent.Action,
                 auditEvent.ResourceType,
                 auditEvent.ResourceId,

@@ -96,6 +96,7 @@ internal static partial class ApiEndpoints
                                           row.IsTest && period.Status == 1 && owner.AgencyId == actor.AgencyId
                                     select row).SingleOrDefaultAsync(token);
             if (generation is null) return Results.NotFound();
+            await NoteAmendmentDispatchGuard.ValidateAsync(db, generation, token);
             var account = await db.ClearinghouseAccounts.AsNoTracking().SingleOrDefaultAsync(row =>
                 row.Id == request.AccountId && row.AgencyId == actor.AgencyId && row.IsEnabled && row.IsTest, token);
             if (account is null || !gate.CanUseAccount(account)) return Results.NotFound();

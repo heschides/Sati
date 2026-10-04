@@ -1,6 +1,17 @@
 # Audit events
 
-*Current as of 2026-09-24.*
+*Current as of 2026-10-03.*
+
+`billing-clearinghouse.claimmd-test-account-onboarded` identifies the human Admin,
+account GUID, request fingerprint and opaque test/D9/status/ERA review references.
+It commits with account/checkpoints and permanently marks protected sandbox linkage.
+It contains no API key, secret reference, raw claim or vendor proof body.
+`billing-clearinghouse.dispatch-reconciled` commits with the dispatch finding and
+synthetic submission event, retaining account/dispatch/generation pointers, source
+hash, claim-identity digest/count, prior/new state and prior revision, evidence
+kind/reference/hash/time, and receipt file ID/counts when applicable. These bounded
+operational identifiers are reviewed metadata, not claim content. The API records
+the human finding without certifying vendor proof or original-byte identity.
 
 Clearinghouse intake adds `billing-response.imported` in the same transaction as its encrypted
 immutable receipt, generation/claim matches and financial observations. Metadata contains receipt
@@ -19,7 +30,7 @@ copy of the clinical or financial record.
 |---|---|
 | `EventId` | Globally unique event identifier. |
 | `AgencyId` | Tenant boundary and primary audit-query scope. |
-| `ActorUserId` | Authenticated user who completed the action. |
+| `ActorUserId` | Authenticated user, or `SystemActor.UserId` (0) for automatic work. |
 | `Action` | Stable machine-readable action name. |
 | `ResourceType` / `ResourceId` | Minimal pointer to the affected record. The numeric ID may be absent on a create performed in the same database save. |
 | `OccurredAtUtc` | Server timestamp. |
@@ -32,10 +43,17 @@ for content; the audit event is only its activity index.
 
 ## Recorded actions
 
+`consumer.providers.reordered` records the authenticated actor, agency and Person
+pointer with ordered current assignment IDs only. Local and API paths commit it
+with SortOrder changes in one transaction. No names, roles, relationship dates,
+narratives or directory snapshots are copied to telemetry. An unchanged order
+produces no additional event; a stale request fails rather than silently replaying.
+
 - `authentication.succeeded`
 - `user.created`, `user.updated`, `user.password-reset`, `user.password-changed`
 - `note.reassigned`, `note.approved`, `note.approval-overridden`, `note.returned`,
-  `note.scheduled-duplicate-cancelled`, `note.older-form-cycle-justified`
+  `note.scheduled-duplicate-cancelled`, `note.older-form-cycle-justified`,
+  `note.abandoned-by-system`
 - `assessment.created`, `assessment.updated`, `assessment.submitted`
 - `person.created`, `person.updated`, `person.journal-updated`, `person.journal-reminder-added`
 - `person-history.viewed`, `person-history-pdf.generated`
@@ -47,6 +65,8 @@ for content; the audit event is only its activity index.
 - `billing-compliance-recovery.recorded`
 - `scratchpad.updated`
 - `billing-claim-line.created`, `billing-period.submitted`, `billing-edi.generated`
+- `billing-clearinghouse.claimmd-test-account-onboarded`,
+  `billing-clearinghouse.dispatch-reconciled`
 - `billing-eft-deposit.recorded`, `billing-claim-correction.created`,
   `billing-correction-edi.generated`
 - `at-request.published`, `at-request.reopened`
@@ -180,6 +200,14 @@ broaden assignment or agency scope.
   administrator powerless.
 
 ## Concurrency and duplicate protection introduced with this slice
+
+`note.abandoned-by-system` records one summary for each agency whose sweep changed
+notes, in the same transaction as those revision-checked updates. The system actor
+is `SystemActor.UserId` (0), rendered as `Sati automation`; there is no user row for
+this identity. Metadata has `actorKind: system`, `jobName: NoteAbandonmentSweep`,
+`trigger: worker|desktop`, local date, changed count, up to 100 note ids, and
+`idsTruncated`. No note narrative, consumer name or rejected candidate is copied.
+The API route, scheduled worker and existing local triggers share this action.
 
 Comprehensive Assessments carry a `Revision` concurrency token. Save and submit requests include
 the revision the user opened. A stale revision returns HTTP 409 and does not overwrite the newer
@@ -411,3 +439,15 @@ Stopping external receipt access after a relevant signer change records its own 
 time and reason and advances the request's authentication version. It does not revoke a medical
 authorization or change the signed outcome. The certificate includes a bounded selection for the
 completed signing session; the full ledger, including later actions, remains in the database.
+
+## Note amendments — October 4 (source only)
+
+Local and API amendment writers atomically record `note.amendment.create`, `.save`,
+`.submit`, `.return`, `.approve`, and `.reject` against `Note` with only amendment and
+version identities in general audit metadata. `note.amendment.financial-reviewed`
+records only the reviewed version identity. Explained proposals/review reasons live
+in the protected version/event/financial-review aggregate, not general telemetry.
+Retry replay does not create another audit or version. Claim-correction history also
+retains `AmendedNoteVersionId` and frozen corrected financial facts. A failed audit
+write rolls back intermediate aggregate and version writes. History is append-only;
+activation and controlled rollback are in `NOTE_AMENDMENTS_RUNBOOK.md`.

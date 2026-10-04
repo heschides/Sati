@@ -4,6 +4,7 @@
     {
         public int Id { get; set; }
         public int NoteId { get; set; }
+        public long? AmendedNoteVersionId { get; set; }
         public int BillingPeriodId { get; set; }
 
         public DateTime DateOfService { get; set; }

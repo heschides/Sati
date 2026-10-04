@@ -35,6 +35,9 @@ public static class ApiSurface
     /// </summary>
     public static IReadOnlyList<string> ContractShapes { get; } =
     [
+        "NoteAmendment/v1:operationId,action,amendmentId,expectedRevision,expectedNoteRevision,expectedEffectiveVersionId,content,reason,reviewReason;immutable-version-history",
+        "NoteAmendmentFinancialReview/v1:operationId,approvedVersionId,expectedNoteRevision,reason;no-narrative",
+        "ClaimCorrection/v2:claimLineId,action,reason,approvedAmendmentVersionId,correctedChargeAmount",
         "person-representative-payee-v1",
         "consumer-schedule-and-modivcare-tracking-v1",
         "future-note-reminder-v1",
@@ -125,7 +128,9 @@ public static class ApiSurface
         // with the actor's own rows, which would show a supervisor their own days under a case
         // manager's name.
         "service-day-inclusion-review-v1",
-        "synthetic-clearinghouse-dispatch-v1"
+        "synthetic-clearinghouse-dispatch-v1",
+        "claimmd-test-account-onboarding-v1",
+        "claimmd-manual-reconciliation-v1"
     ];
 
     /// <summary>
@@ -148,6 +153,7 @@ public static class ApiSurface
         "DELETE /api/v1/service-day-inclusions/{date}",
         "DELETE /api/v1/users/{userId:int}/sessions",
         "GET /api/v1/admin/activity",
+        "GET /api/v1/admin/clearinghouse/dispatches/{dispatchId:guid}/reconciliation",
         "GET /api/v1/admin/incidents",
         "GET /api/v1/admin/legal-holds",
         "GET /api/v1/admin/notes/{noteId:int}/form-date-correction-target",
@@ -217,6 +223,10 @@ public static class ApiSurface
         "GET /api/v1/people/{personId:int}/photo",
         "GET /api/v1/people/{personId:int}/schedule",
         "GET /api/v1/people/{personId:int}/providers",
+        "GET /api/v1/note-amendments",
+        "GET /api/v1/billing/note-amendments",
+        "POST /api/v1/billing/notes/{noteId:int}/amendment-review",
+        "GET /api/v1/notes/{noteId:int}/amendments",
         "GET /api/v1/people/{personId:int}/release-obligations",
         "GET /api/v1/people/{personId:int}/reviews",
         "GET /api/v1/people/{personId:int}/safety-plans/latest",
@@ -253,6 +263,8 @@ public static class ApiSurface
         "GET /health/live",
         "GET /health/version",
         "POST /api/v1/admin/audit-export.csv",
+        "POST /api/v1/admin/clearinghouse/claimmd-test-accounts",
+        "POST /api/v1/admin/clearinghouse/dispatches/{dispatchId:guid}/reconciliation",
         "POST /api/v1/admin/consumers/{personId:int}/delete-in-window",
         "POST /api/v1/admin/demo/reset",
         "POST /api/v1/admin/demo/seed-ssns",
@@ -321,6 +333,7 @@ public static class ApiSurface
         "POST /api/v1/people/{personId:int}/housing-support-funds.pdf",
         "POST /api/v1/people/{personId:int}/journal/entries",
         "POST /api/v1/people/{personId:int}/providers",
+        "POST /api/v1/notes/{noteId:int}/amendments",
         "POST /api/v1/people/{personId:int}/schedule",
         "POST /api/v1/people/{personId:int}/release-obligations/reconcile",
         "POST /api/v1/people/{personId:int}/release-obligations/{obligationId:guid}/attest",
@@ -364,6 +377,7 @@ public static class ApiSurface
         "PUT /api/v1/people/{personId:int}/owner",
         "PUT /api/v1/people/{personId:int}/photo",
         "PUT /api/v1/people/{personId:int}/providers/{linkId:int}",
+        "PUT /api/v1/people/{personId:int}/providers/order",
         "PUT /api/v1/people/{personId:int}/schedule/{entryId:int}",
         "PUT /api/v1/people/{personId:int}/ssn",
         "PUT /api/v1/people/{personId:int}/status",

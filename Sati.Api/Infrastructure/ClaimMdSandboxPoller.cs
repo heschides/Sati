@@ -10,12 +10,14 @@ internal sealed class ClaimMdSandboxPoller(
     IDbContextFactory<ApiDbContext> contexts, ClaimMdSandboxConnector connector,
     IServiceScopeFactory scopes,
     ClearinghouseDispatchGate gate, Sati.Contracts.V1.EnvelopeProtector protector,
-    IClaimMdSandboxCoordination coordination, ILogger<ClaimMdSandboxPoller> logger) : BackgroundService
+    IClaimMdSandboxCoordination coordination, IDemoWorkerResetCoordination resetCoordination,
+    ILogger<ClaimMdSandboxPoller> logger) : BackgroundService
 {
     internal async Task<int> PollOnceAsync(CancellationToken token)
     {
         if (!gate.IsRealSandboxEnabled) return 0;
-        return await coordination.PollOnceAsync(PollAccountsAsync, token);
+        return await resetCoordination.RunAsync(
+            innerToken => coordination.PollOnceAsync(PollAccountsAsync, innerToken), 0, token);
     }
 
     private async Task<int> PollAccountsAsync(CancellationToken token)

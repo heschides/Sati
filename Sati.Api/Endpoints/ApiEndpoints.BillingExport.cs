@@ -3,6 +3,7 @@ using Sati.Api.Data;
 using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
+using Sati.Data;
 
 namespace Sati.Api.Endpoints;
 
@@ -66,6 +67,8 @@ internal static partial class ApiEndpoints
         {
             var source = sources.Single(row => row.Note.Id == line.NoteId);
             var note = source.Note;
+            if (await NoteAmendmentBilling.LineContentAsync(db, line.AmendedNoteVersionId, cancellationToken) is { } service)
+            { note.EventDate = service.EventDate; note.Minutes = service.Minutes; note.StartTime = service.StartTime; note.IsUnbilled = service.IsUnbilled; }
             var block = ServiceTimeline.TryCreateBlock(note.Id, note.StartTime, note.Minutes,
                 ContractMapper.NoteStatusName(note.Status));
             if (block is not null && note.EventDate is DateTime eventDate)

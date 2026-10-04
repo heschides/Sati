@@ -16,7 +16,8 @@ public sealed class CloudAuthService(CloudApiClient api) : IAuthService
             var response = await api.PostAnonymousAsync<LoginRequest, LoginResponse>(
                 "/api/v1/auth/login",
                 new LoginRequest(username, plainText));
-            api.SetAccessToken(response.AccessToken, response.ExpiresAtUtc);
+            api.SetAuthenticatedAccessToken(response.AccessToken, response.ExpiresAtUtc,
+                response.User.Id, response.User.AgencyId);
             return CloudContractMapper.ToUser(response.User);
         }
         catch (CloudApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)

@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sati.Data;
 using Sati.Data.Billing;
@@ -40,6 +40,8 @@ namespace Sati.ViewModels.Billing
             _responseFilePicker = responseFilePicker;
         }
 
+        [ObservableProperty] private long? approvedAmendmentVersionId;
+        [ObservableProperty] private decimal? correctedChargeAmount;
         public ObservableCollection<BillingPeriod> BillingPeriods { get; } = [];
         public ObservableCollection<BillingPeriod> DraftBillingPeriods { get; } = [];
         public ObservableCollection<ClaimLine> SelectedPeriodLines { get; } = [];
@@ -240,7 +242,7 @@ namespace Sati.ViewModels.Billing
         partial void OnSelectedClaimChanged(BillingClaimStatusDto? value)
         {
             CorrectionProblem = null;
-            CorrectionReason = null;
+            CorrectionReason = null; ApprovedAmendmentVersionId = null; CorrectedChargeAmount = null;
             AvailableCorrections.Clear();
             foreach (var action in value?.AllowedActions ?? [])
             {
@@ -289,10 +291,10 @@ namespace Sati.ViewModels.Billing
             try
             {
                 await _billingService.CreateClaimCorrectionAsync(CurrentActor(), period.Id,
-                    new CreateClaimCorrectionRequest(claim.ClaimLineId, action, CorrectionReason!.Trim()));
+                    new CreateClaimCorrectionRequest(claim.ClaimLineId, action, CorrectionReason!.Trim(), ApprovedAmendmentVersionId, CorrectedChargeAmount));
                 StatusMessage = $"{ClaimCorrectionRules.Describe(action)} recorded for {claim.ClientName}. " +
                     "Generate the correction file to send it.";
-                CorrectionReason = null;
+                CorrectionReason = null; ApprovedAmendmentVersionId = null; CorrectedChargeAmount = null;
                 await LoadPeriodClaimsAsync(period.Id);
                 SelectedClaim = PeriodClaims.FirstOrDefault(row => row.ClaimLineId == claim.ClaimLineId);
             }

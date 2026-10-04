@@ -1,6 +1,102 @@
 # Sati — Architecture Reference
 
-*Living document. Updated during structured review sessions. Last updated: 2026-10-02.*
+*Living document. Updated during structured review sessions. Last updated: 2026-10-03.*
+
+## Claim.MD setup, manual findings and reset preservation — October 3 (source only)
+
+The API owns audited test-account onboarding, with agency derived from the validated
+Admin actor. A serializable transaction creates the account, two independently
+reviewed feed checkpoints and one audit, under a global transaction-owned
+onboarding lease that serializes reservations across hosts. Only the secret reference is
+stored; onboarding does not resolve credentials or make a vendor request. Contracts
+owns cursor/review validation and manual reconciliation/dispatch transition rules.
+
+Reconciliation exposes a bounded retained-file manifest and accepts an Admin's
+structured finding for Sending/OutcomeUnknown. Account, generation, source hash,
+filename, revision and every claim identity are checked under the period transaction.
+Receipt is not payer acceptance; support-attested non-receipt has its own terminal
+state. Attempts/receipts remain immutable. Neither finding resends a claim or proves
+that Claim.MD retained original bytes. See `CLAIMMD_SANDBOX_RUNBOOK.md`.
+
+Hosted uploads and polling share `SatiDemo.FullReset` across reads, vendor calls and
+evidence commits. Uploads and reconciliation also hold a per-dispatch exclusive
+lease; order is reset, dispatch/poll, period/request. HTTP mutations retain their
+outer reset middleware lease. Exact Demo requires SQL and fails closed on
+coordination failure; synthetic fixtures use explicit test seams.
+
+One shared SQL helper guards baseline capture, owner-executed reset assertion, and
+restore. `dbo.SatiAssertCanonicalResetAllowed` supplies EXECUTE-only preflight for
+the Function without direct baseline access. Missing guard/schema refuses reset.
+Linked accounts (including disabled), attempted uploads, receipts, checkpoints and
+onboarding history block restore/capture in live and baseline data. Pure fake
+accounts without linkage or external activity remain resettable.
+Automatic resets are paused during sandbox testing. The watchdog recognizes the
+timer-disable setting while retaining failed/poison findings. Resuming requires
+preserved sandbox evidence and clean canonical Demo; an archive/cutover adapter
+and activation remain deferred. No new EF migration or deployment ran for this slice.
+
+## Background maintenance and operational watchdogs — October 3 (source only)
+
+`BACKGROUND_WORKERS_HANDOFF.md` governs this slice. The cloud API owns maintenance;
+the personal LocalDB path keeps its existing dashboard and timer triggers. No new
+schema, Azure deployment, resource change, or query of personal working data is part
+of implementation. The Demo Function and API configuration below are not claimed live.
+
+`NoteAbandonmentRules` in Contracts combines `NoteWorkflow.CanSystemAbandon` with
+`ProductivityForecast.IsDocumentationWindowClosed`. The local note service and API's
+`NoteAbandonmentSweep` apply that same decision. Candidates are bounded and each update
+checks its observed revision, status, service date and current tenant/caseload ownership.
+The successful transitions and one summary audit share a transaction. Both existing
+desktop triggers remain own-caseload only, with the shared 1,000-candidate limit
+per pass (`NoteAbandonmentRules.DesktopBatchSize`).
+`SystemActor.UserId` is zero, matching the existing reset precedent; the Admin feed
+and export display these entries as `Sati automation`, without a fabricated user.
+
+`NoteAbandonmentWorker` is off by default (`Sati:EnableNoteAbandonmentWorker`). When
+enabled, it catches up after API wake and processes agency-local days in bounded
+100-note batches, under SQL application-lock coordination. Startup identity validation
+precedes hosted workers. The sweep holds the Demo reset's shared lease before its
+own exclusive job lease, excluding a concurrent full reset. Its hourly in-memory
+date check does not query SQL again after that day's agencies are complete. A stopped
+or sleeping F1 host supplies no exact-time guarantee; no wake ping is introduced.
+
+The separate `DemoWatchdog` Function runs daily at 04:00 Eastern through
+`DemoWatchdogSchedule`. It reads the validated Demo database and poison queue metadata
+without receiving messages or changing records. It emits one `SATI_WATCHDOG_OK` or
+`SATI_WATCHDOG_FINDING` trace. Missing/failed reset outcomes and nonempty poison queues
+are checked every run. Overdue Pending notes and billing/signature backlogs have
+separate, default-off expectation flags, enabled only alongside the corresponding
+features. It is an operational diagnosis, not a second note or financial rule owner.
+`Set-DemoWatchdogAlerts.ps1` prepares one email action group and two log-search rules
+on existing Application Insights; Josh executes changes after review. Normal Function
+publication, including the updated seed and watchdog schedule, remains separate.
+
+Cloud incident envelopes now carry local originating account and agency identifiers.
+These identifiers select the authenticated sender, never authorize an API request.
+Each POST must retain both account identity and captured credential generation;
+token changes cancel old retries even before the shell replaces its session user.
+The outbox keeps FIFO order per account, isolates other accounts, and holds rejected
+envelopes for review. A bounded retry loop drains transient failures during a signed-in
+session; the Admin health view displays counts and oldest pending age. The API still
+derives the actual actor and agency from authenticated credentials.
+
+`DateRolloverRefreshCoordinator` coalesces the existing shell timer and activation
+events. It refreshes dated matrix, deadlines, productivity and an already-loaded
+calendar once per day, retaining a deferred refresh while drafts are dirty, a child
+window is open, the consumer editor is active, or the account is shielded. Snapshot
+reads use a `LatestRequestTracker` and account check before publication; consumer
+editors are not reinitialized. Current-month productivity follows a month rollover,
+while an explicitly selected historical month remains selected.
+A failed loaded-calendar read also leaves the rollover due for retry.
+
+Cloud restore verification is an operator procedure, not a hosted worker.
+`Invoke-DemoRestoreVerification.ps1` is a pinned Demo adapter with a local-only
+`-WhatIf` preview. It compares an isolated PITR scratch database with an approved
+historical identity, migration and count inventory, retains count-only evidence,
+and deletes only a scratch whose exact resource identity and run tags match.
+Uncertain creation or ownership requires manual review. No rehearsal has run;
+future cloud Production and protected object/key recovery require separate adapters.
+
 
 ## Configurable Statistics breakdowns — October 2 (unreleased)
 
@@ -1949,6 +2045,27 @@ Form→target: `Form.TargetEffectiveDate`.**
 
 ### Consumer Provider List
 
+October 3 source follow-up (feature prompt 14): the panel stages Move Up/Move Down
+using its existing current list, then saves the entire permutation through
+`IConsumerProviderService.ReorderAsync`. `ConsumerProviderOrder` in Contracts owns
+the collection fingerprint and permutation/primary-first validation. The fingerprint
+includes every retained relationship field and ended membership, sorted by link ID;
+directory names and affiliation are excluded because reorder never writes them.
+Local and API services recheck own-caseload and every provider's agency under a
+serializable transaction, compare the loaded snapshot, and commit only SortOrder
+plus `consumer.providers.reordered`. Existing storage needs no migration.
+This is content-based concurrency: intervening changes that return to identical
+facts do not invalidate the snapshot. It is not an immutable revision ledger.
+
+Navigation and reorder results use `LatestRequestTracker`. Background refresh does
+not discard staged order; assignment mutations are disabled until Save or Reload.
+Failure retains the intended arrangement. Explicit Retry reads a fresh snapshot and
+refuses changed membership/primary placement before applying only the intended order.
+Collection Move preserves row containers; keyboard controls have provider-specific
+automation names. Past rows keep their date-descending history order. Frozen
+assessment/plan/financial snapshots are never rewritten. API and desktop must be
+released together through the compatibility manifest; this source work does not deploy.
+
 **Single source of truth: `ConsumerProviderRules` (`Sati.Contracts.V1`), over `PersonProvider`.**
 
 - A row stores the provider and the relationship's own fields — role, primary-care mark,
@@ -3195,3 +3312,22 @@ validation remain authoritative.
 Migration
 `20260912053013_AddPersonPhotos` creates the storage; it was generated
 and tested here but was not applied to a real database or deployment.
+
+## Approved-note amendments — October 4 (source only)
+
+`Sati.Contracts.V1.NoteAmendmentRules` owns permission interpretation, transitions,
+content validation, and financial-change classification. `NoteAmendmentWorkflow` in
+Persistence is the shared transactional aggregate writer; local/cloud services keep
+ViewModels behind `INoteAmendmentService`. API scopes join Note, Person, and owner
+agency and apply current actor validation. The service-day lock protects revisions,
+submission/approval overlap checks, and the dispatch transition to Sending.
+
+Persistence adds immutable original snapshots, append-only draft/submitted versions,
+append-only events with exact retry identities, and separate append-only financial
+reviews. Financial service facts have a bounded narrative-free version projection.
+`NoteAmendmentBilling` selects only reviewed approved financial versions; new claims
+and append-only corrections retain their version lineage. Original Notes, claim
+lines, and submitted EDI files remain intact. Notes Log, supervisor review, and Billing
+host independent amendment screens with guarded asynchronous publication and account
+clearing. Migration/activation and explicit remaining adapters are described in
+`NOTE_AMENDMENTS_RUNBOOK.md`; no runtime environment was changed.

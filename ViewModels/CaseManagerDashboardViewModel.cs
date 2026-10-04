@@ -56,6 +56,7 @@ namespace Sati.ViewModels
         private readonly LatestRequestTracker _upcomingEventLoadRequests = new();
         private readonly LatestRequestTracker _peopleLoadRequests = new();
         private readonly LatestRequestTracker _annualReminderRequests = new();
+        private readonly LatestRequestTracker _dateRefreshRequests = new();
         private Task? _calendarInitialization;
         private User? _calendarInitializationAccount;
         private User? _calendarLoadedAccount;
@@ -1399,6 +1400,7 @@ CalendarViewModel calendarViewModel,
 
         private async Task AfterFormComplianceChangedAsync()
         {
+            _dateRefreshRequests.Invalidate();
             RefreshComplianceFlags();
             RefreshPendingAttestations();
             Matrix?.Rebuild(People, DateTime.Today, MatrixSchedule);
@@ -1423,6 +1425,7 @@ CalendarViewModel calendarViewModel,
         /// </summary>
         public async Task RefreshAfterSettingsChangedAsync()
         {
+            _dateRefreshRequests.Invalidate();
             if (LoggedInUser is null)
                 return;
 
@@ -1439,12 +1442,80 @@ CalendarViewModel calendarViewModel,
             await RefreshAnnualReminderAsync();
         }
 
+        public bool HasUnsavedDateRefreshWork =>
+            NoteEntry.HasUnsavedChanges || NotesLog.NoteEntry.HasUnsavedChanges ||
+            Clients.ClientNoteEntry?.HasUnsavedChanges == true ||
+            Clients.HasUnsavedJournalChanges || Clients.IsContactEditorOpen ||
+            Scratchpad?.HasUnsavedChanges == true;
+
+        // Refresh only dated projections, without reinitializing any consumer or
+        // editor. Every awaited read is held locally until the request still owns
+        // the account and no draft has become dirty in the meantime.
+        public async Task<bool> RefreshForDateChangeAsync(DateOnly date, Func<bool> isCurrent)
+        {
+            var account = LoggedInUser;
+            if (account is null || HasUnsavedDateRefreshWork || !isCurrent()) return false;
+            var request = _dateRefreshRequests.Begin();
+            bool OwnsRequest() => _dateRefreshRequests.IsCurrent(request) && isCurrent() &&
+                ReferenceEquals(LoggedInUser, account) && !HasUnsavedDateRefreshWork;
+            var today = date.ToDateTime(TimeOnly.MinValue);
+            var monthEnd = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+            var settingsTask = _settingsService.LoadAsync();
+            var notesTask = _noteService.GetMonthlyNotesAsync(account.Id);
+            var incentiveTask = _incentiveService.GetOrCreateAsync(account.Id, today.Month, today.Year);
+            var exemptTask = _exemptDateService.GetByYearAsync(account.Id, today.Year);
+            var inclusionTask = _serviceDayInclusionService?.GetByYearAsync(account.Id, today.Year)
+                ?? Task.FromResult(new List<ServiceDayInclusion>());
+            var eligibleTask = _incentiveService.GetEligibleDaysAsync(today, monthEnd);
+            var afterTodayTask = today < monthEnd
+                ? _incentiveService.GetEligibleDaysAsync(today.AddDays(1), monthEnd)
+                : Task.FromResult(0);
+            await Task.WhenAll(settingsTask, notesTask, incentiveTask, exemptTask,
+                inclusionTask, eligibleTask, afterTodayTask);
+            if (!OwnsRequest()) return false;
+
+            _upcomingEventLoadRequests.Invalidate();
+
+            if (_incentive is not null && _selectedProductivityMonth == new DateTime(_incentive.Year, _incentive.Month, 1))
+                _selectedProductivityMonth = new DateTime(today.Year, today.Month, 1);
+            _settings = settingsTask.Result;
+            _monthlyNotes = notesTask.Result;
+            _incentive = incentiveTask.Result.incentive;
+            _exemptDatesForMonth = exemptTask.Result.Where(e => e.Date.Month == today.Month).ToList();
+            _serviceDayInclusionsForMonth = inclusionTask.Result.Where(e => e.Date.Month == today.Month).ToList();
+            _remainingEligibleDays = Math.Max(0, eligibleTask.Result - CountEligibleExemptions(today, monthEnd));
+            _eligibleDaysAfterToday = Math.Max(0, afterTodayTask.Result - CountEligibleExemptions(today.AddDays(1), monthEnd));
+            Matrix?.Rebuild(People, today, MatrixSchedule);
+            UpcomingEvents.Clear();
+            foreach (var item in _upcomingEventService.GenerateEvents(People, _settings, today))
+                UpcomingEvents.Add(item);
+            _hasLoadedDeadlineData = true;
+            _deadlineLoadFailure = null;
+            RefreshComplianceFlags();
+            RefreshPendingAttestations();
+            OnPropertyChanged(nameof(AllEvents));
+            OnPropertyChanged(nameof(OverdueCount));
+            OnPropertyChanged(nameof(HasOverdueEvents));
+            OnPropertyChanged(nameof(BoardItems));
+            OnPropertyChanged(nameof(BoardGroups));
+            OnPropertyChanged(nameof(TabHasOverdue));
+            OnPropertyChanged(nameof(EffectiveDateGroups));
+            RefreshBoardState();
+            NotifyProductivityChanged();
+            NotifyProductivityPeriodChanged();
+            if (!OwnsRequest()) return false;
+            if (ReferenceEquals(_calendarLoadedAccount, account) &&
+                !await Calendar.RefreshForDateChangeAsync()) return false;
+            return OwnsRequest();
+        }
+
         // -------------------------------------------------------------------------
         // Private methods
         // -------------------------------------------------------------------------
 
         private async Task LoadAsync()
         {
+            _dateRefreshRequests.Invalidate();
             try
             {
                 if (LoggedInUser is null)
@@ -1482,6 +1553,7 @@ CalendarViewModel calendarViewModel,
         // RefreshComplianceFlags — grid and checkboxes track without explicit calls.
         private async Task OnNoteSavedAsync()
         {
+            _dateRefreshRequests.Invalidate();
             await LoadPeopleAsync();
             await Clients.RefreshSelectedNotesIfSelectedAsync();
             await LoadMonthlyNotesAsync();
@@ -1497,6 +1569,7 @@ CalendarViewModel calendarViewModel,
         // note pickers, and Notes Log; the matrix and deadline board use that same list.
         public async Task RefreshAfterPersonStatusChangedAsync()
         {
+            _dateRefreshRequests.Invalidate();
             var account = LoggedInUser;
             await LoadPeopleAsync(reportFailure: true);
             if (account is null || !ReferenceEquals(LoggedInUser, account))
@@ -2026,6 +2099,7 @@ CalendarViewModel calendarViewModel,
 
         public void Reset()
         {
+            _dateRefreshRequests.Invalidate();
             _productivityMonthRequests.Invalidate();
             _selectedProductivityMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             _historicalProductivityDays = [];

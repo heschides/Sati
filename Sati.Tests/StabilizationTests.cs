@@ -650,10 +650,10 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.34", version);
+        Assert.Equal("1.3.35", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Clearer notes, calendar, and statistics", ProductReleaseNotes.ReleaseName);
-        Assert.Equal("October 3, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Equal("Approved-note amendments and provider organization", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("October 4, 2026", ProductReleaseNotes.ReleaseDate);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Prepare the OADS Safety Device request" &&
             section.Items.Any(item => item.Contains("signatures outside Sati", StringComparison.Ordinal)));
@@ -2249,6 +2249,8 @@ public sealed class StabilizationTests
 
     internal sealed class SmokeConsumerProviderService : IConsumerProviderService
     {
+        public Task<List<Sati.Models.PersonProvider>> ReorderAsync(int personId, Sati.Contracts.V1.ReorderConsumerProvidersRequest request) => throw new NotSupportedException();
+
         public Task<List<Models.PersonProvider>> GetByPersonAsync(int personId) =>
             Task.FromResult(new List<Models.PersonProvider>());
         public Task<Models.PersonProvider> SaveAsync(Models.PersonProvider link) =>

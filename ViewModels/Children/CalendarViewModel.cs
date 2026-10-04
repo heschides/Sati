@@ -151,6 +151,10 @@ public partial class CalendarViewModel : ObservableObject
 
     public Task InitializeAsync() => LoadYearAsync();
 
+    // The normal Refresh command handles its own error message. Date rollover
+    // also needs the outcome so the shell can keep a failed refresh due.
+    internal Task<bool> RefreshForDateChangeAsync() => LoadYearAsync();
+
     public void ClearForAccountSwitch()
     {
         _yearLoadRequests.Invalidate();
@@ -412,7 +416,7 @@ public partial class CalendarViewModel : ObservableObject
         await LoadYearAsync();
     }
 
-    private async Task LoadYearAsync()
+    private async Task<bool> LoadYearAsync()
     {
         var request = _yearLoadRequests.Begin();
         var year = CurrentYear;
@@ -439,7 +443,7 @@ public partial class CalendarViewModel : ObservableObject
 
             if (!_yearLoadRequests.IsCurrent(request) || CurrentYear != year ||
                 !ReferenceEquals(_sessionService.CurrentUser, user))
-                return;
+                return false;
 
             _serviceDayInclusions = await inclusionsTask;
             _settings = await settingsTask;
@@ -452,6 +456,7 @@ public partial class CalendarViewModel : ObservableObject
             _yearOutlookEvents = outlookResult.Events;
             BuildMonths();
             StatusMessage = outlookResult.Warning;
+            return true;
         }
         catch (Exception ex)
         {
@@ -463,6 +468,7 @@ public partial class CalendarViewModel : ObservableObject
                     ? "Your calendar is unavailable because the session ended. Sign in again."
                     : "The calendar could not be loaded. Check the connection and choose Refresh.";
             }
+            return false;
         }
         finally
         {

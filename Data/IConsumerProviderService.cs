@@ -10,6 +10,9 @@ namespace Sati.Data
     /// </summary>
     public interface IConsumerProviderService
     {
+        Task<List<PersonProvider>> ReorderAsync(int personId,
+            Sati.Contracts.V1.ReorderConsumerProvidersRequest request);
+
         Task<List<PersonProvider>> GetByPersonAsync(int personId);
 
         /// <summary>Adds a new link, or updates an existing one.</summary>

@@ -2,6 +2,13 @@ using Sati.Contracts.V1;
 
 namespace Sati.Data;
 
+/// <summary>Local delivery state only; no incident content or account identifiers.</summary>
+public sealed record IncidentOutboxSupportStatus(
+    int PendingForCurrentAccount,
+    TimeSpan? OldestPendingAge,
+    int HeldForOtherAccounts,
+    int Quarantined);
+
 public interface IIncidentReporter
 {
     Task ReportAsync(
@@ -12,6 +19,8 @@ public interface IIncidentReporter
         CancellationToken cancellationToken = default);
 
     Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    IncidentOutboxSupportStatus? GetOutboxStatus() => null;
 
     Task ReportCrashAsync(
         Exception exception,

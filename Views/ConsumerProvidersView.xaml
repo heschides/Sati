@@ -204,7 +204,7 @@
                        Visibility="{Binding HasCurrent,
                            Converter={StaticResource InverseBoolToVisibilityConverter}}" />
 
-            <ScrollViewer MaxHeight="170"
+            <ScrollViewer MaxHeight="260"
                           Margin="0,8,0,0"
                           VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Current}"
@@ -219,6 +219,10 @@
                                     CornerRadius="5"
                                     AutomationProperties.Name="{Binding AutomationName}">
                                 <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="2*" />
                                         <ColumnDefinition Width="3*" />
@@ -250,9 +254,7 @@
                                                    FontSize="11"
                                                    Foreground="{DynamicResource TextSecondaryBrush}" />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="2"
-                                                Orientation="Horizontal"
-                                                VerticalAlignment="Center">
+                                    <WrapPanel Grid.Row="1" Grid.ColumnSpan="3" Margin="0,6,0,0">
                                         <Button Content="End"
                                                 Style="{StaticResource SmallButton}"
                                                 Padding="12,4"
@@ -262,6 +264,16 @@
                                                     RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding}"
                                                 AutomationProperties.Name="{Binding EndAutomationName}" />
+                                        <Button Content="Move Up"
+                                                Click="OrderMoveClicked"
+                                                Style="{StaticResource SmallButton}" Padding="12,4" Margin="0,0,6,0"
+                                                Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}" AutomationProperties.Name="{Binding MoveUpAutomationName}" />
+                                        <Button Content="Move Down"
+                                                Click="OrderMoveClicked"
+                                                Style="{StaticResource SmallButton}" Padding="12,4" Margin="0,0,6,0"
+                                                Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}" AutomationProperties.Name="{Binding MoveDownAutomationName}" />
                                         <Button Content="Remove"
                                                 Style="{StaticResource SmallButton}"
                                                 Padding="12,4"
@@ -270,13 +282,25 @@
                                                     RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding}"
                                                 AutomationProperties.Name="{Binding RemoveAutomationName}" />
-                                    </StackPanel>
+                                    </WrapPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+
+            <TextBlock Text="{Binding OrderMessage}" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       AutomationProperties.Name="Provider order status" AutomationProperties.LiveSetting="Polite" />
+            <WrapPanel Margin="0,6,0,0">
+                <Button Content="Save order" Command="{Binding SaveOrderCommand}" Style="{StaticResource SmallButton}"
+                        Margin="0,0,6,0" AutomationProperties.Name="Save current provider order" />
+                <Button Content="Reload order" Command="{Binding ReloadOrderCommand}" Style="{StaticResource SmallButton}"
+                        Margin="0,0,6,0" AutomationProperties.Name="Reload provider assignments and discard intended order" />
+                <Button Content="Retry intended order" Command="{Binding RetryOrderCommand}" Style="{StaticResource SmallButton}"
+                        AutomationProperties.Name="Retry intended provider order against fresh assignments" />
+            </WrapPanel>
 
             <!-- Past providers are kept and collapsed, never deleted:
                  who was treating someone in a given year is a question

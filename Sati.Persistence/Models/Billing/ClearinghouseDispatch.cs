@@ -7,7 +7,9 @@ public enum ClearinghouseDispatchState
     AcceptedByClearinghouse = 3,
     RejectedByClearinghouse = 4,
     OutcomeUnknown = 5,
-    CancelledBeforeSend = 6
+    CancelledBeforeSend = 6,
+    /// <summary>Manual, audited finding of authoritative vendor non-receipt; not a rejection.</summary>
+    ConfirmedNotReceived = 7
 }
 
 /// <summary>Durable outbox identity for one exact, immutable EDI generation.</summary>

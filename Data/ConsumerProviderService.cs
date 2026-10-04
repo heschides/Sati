@@ -49,6 +49,48 @@ namespace Sati.Data
             return saved;
         }
 
+        public async Task<List<PersonProvider>> ReorderAsync(int personId, ReorderConsumerProvidersRequest request)
+        {
+            try { return await ReorderWithinTransactionAsync(personId, request); }
+            catch (Microsoft.Data.SqlClient.SqlException error) when (error.Number == 1205)
+            { throw new ConsumerProviderOrderConflictException(); }
+            catch (DbUpdateException error) when (error is DbUpdateConcurrencyException ||
+                error.InnerException is Microsoft.Data.SqlClient.SqlException sql && sql.Number == 1205)
+            { throw new ConsumerProviderOrderConflictException(); }
+            catch (DbUpdateException error)
+            { throw new InvalidOperationException("Provider order could not be saved. Reload to check its current state before retrying.", error); }
+        }
+
+        private async Task<List<PersonProvider>> ReorderWithinTransactionAsync(int personId, ReorderConsumerProvidersRequest request)
+        {
+            await using var context = _contextFactory.CreateDbContext();
+            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            var actor = await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await EnsureOwnedPersonAsync(context, personId, actor);
+            var links = await context.PersonProviders.Where(link => link.PersonId == personId).ToListAsync();
+            var facts = links.Select(ConsumerProviderOrderSnapshot.Fact).ToList();
+            if (ConsumerProviderOrder.Version(facts) != request.ExpectedVersion)
+                throw new ConsumerProviderOrderConflictException();
+            if (ConsumerProviderOrder.Validate(request, facts) is { } error)
+                throw new InvalidOperationException(error);
+            var providerIds = links.Select(link => link.ProviderId).Distinct().ToArray();
+            if (await context.Providers.CountAsync(p => providerIds.Contains(p.Id) && p.AgencyId == actor.AgencyId) != providerIds.Length)
+                throw new UnauthorizedAccessException(ConsumerProviderRules.ProviderOutsideAgencyMessage());
+            var changed = false;
+            for (var index = 0; index < request.OrderedLinkIds.Length; index++)
+            {
+                var link = links.Single(link => link.Id == request.OrderedLinkIds[index]);
+                changed |= link.SortOrder != index;
+                link.SortOrder = index;
+            }
+            if (changed)
+                LocalAuditTrail.Record(context, actor, "consumer.providers.reordered", "Person", personId,
+                    System.Text.Json.JsonSerializer.Serialize(new { linkIds = request.OrderedLinkIds }));
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return links.OrderByDescending(link => link.IsPrimaryCare).ThenBy(link => link.SortOrder).ThenBy(link => link.Id).ToList();
+        }
+
         internal async Task<PersonProvider> SaveWithinTransactionAsync(
             SatiContext context,
             PersonProvider link,
@@ -181,9 +223,9 @@ namespace Sati.Data
 
         // Caseload ownership plus agency, matching the API's OwnsPersonAsync. A link id
         // arriving from anywhere resolves to a person before it resolves to a row.
-        private async Task EnsureOwnedPersonAsync(SatiContext context, int personId)
+        private async Task EnsureOwnedPersonAsync(SatiContext context, int personId, User? actor = null)
         {
-            var user = _sessionService.CurrentUser
+            var user = actor ?? _sessionService.CurrentUser
                 ?? throw new InvalidOperationException(
                     "A signed-in user is required to read a consumer's providers.");
 

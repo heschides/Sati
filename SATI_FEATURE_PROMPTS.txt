@@ -1,0 +1,524 @@
+Sati implementation prompts
+Prepared October 3, 2026
+
+This pack contains fourteen feature prompts from the overall Sati gap review and five related operations/integration prompts. Each numbered section is self-contained: copy the instructions under its heading into the coding task you want to start. Writing this pack does not start implementation or authorize any operational change.
+
+Priority labels describe impact on official-record integrity and intended organizational/cloud or live-billing use. They are not a claim that every future capability is necessary for today's personal Windows workflow. Current-state statements must be rechecked when a prompt is executed.
+
+Suggested sequencing
+- Assessment review (4) supplies the approved version foundation for PCP (5).
+- Payer configuration (2), utilization (6) and multi-line/remittance work (7) share billing boundaries; coordinate their schema and contracts.
+- Retention/holds (3) must precede destructive automated retention.
+- Identity (8) and explicit relationship authority (11) underpin broader organizational use.
+- Mobile (10) is staged; EVV requires approved applicable policy and interface requirements.
+- Workers (15), alerts (16) and restore verification (17) have separate acceptance evidence.
+- Sandbox activation (18) requires a reset pause and guard; preservation/cutover (19) is required before resets resume.
+- Coordinate shared files, migrations and release documentation when using separate agents or branches. Preserve ongoing work.
+
+Index
+01. Critical: Approved-note amendments
+02. Critical: Live payer billing requirements
+03. Critical: Complete retention and legal holds
+04. Significant: Comprehensive Assessment supervisor review
+05. Significant: Full Person-Centered Plan workflow
+06. Significant: Service authorization and utilization
+07. Significant: Complete remittance detail and multi-line claims
+08. Significant: Identity, organizational onboarding and recovery
+09. Significant: Consumer reportable incidents
+10. Significant: Mobile field work, offline synchronization and EVV
+11. Significant: Organization linking and cross-agency coordination
+12. Significant: Notifications outside an active Sati session
+13. Significant: Clearinghouse operator screens
+14. Trivial: Provider-panel conveniences
+15. Significant now; Critical before a cloud pilot: Activate implemented background workers
+16. Significant now; Critical before a cloud pilot: Route operational alerts to the owner
+17. Critical before a cloud pilot: Rehearse cloud backup restoration
+18. Significant: Activate and verify Claim.MD sandbox transport
+19. Significant; prerequisite for resuming resets: Preserve sandbox evidence and return to clean Demo
+
+========================================================================
+PROMPT 01  Approved-note amendments
+Importance: Critical
+Dependency: Coordinate with existing note review and claim corrections.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Implement a linked amendment workflow for finalized clinical notes. Inspect Sati.Contracts/V1/NoteWorkflow.cs, note services/review endpoints, claim-line linkage, immutable financial snapshots and existing correction tests.
+
+Approved notes are generally immutable. A limited supervisor correction route already exists for exact form/release-linked notes before claiming; preserve it. Add an amendment aggregate identifying the original note and exact version, author, reason, proposed corrections, submission/review history and approved effective version. Preserve original content and every submitted financial snapshot.
+
+Implement shared permissions and transitions, additive persistence, transactional API/local services, author and reviewer queues, and accessible original/amendment comparison. Separate authorship from review authority using the existing permission model and documented policy. Retain returned drafts and every submitted revision; approval must identify the exact reviewed version.
+
+Distinguish narrative corrections from service-time, units and financial corrections. Pending or rejected amendments have no billing effect. An approved amendment must never duplicate billable units, silently rewrite a claim, reopen an immutable financial record or automatically resend anything. Financial changes must use the existing correction/replacement/void workflow with explicit lineage and policy.
+
+Acceptance criteria: authorized staff can draft, submit, return and approve; foreign/caseload-denied records cannot be discovered; stale or simultaneous actions return typed conflicts; duplicate requests are idempotent; original records remain byte-for-byte unchanged; failed transactions leave no partial amendment, audit or billing state. Test both claimed and unclaimed notes, overlap validation for time changes, and billing projections before/after correction. General audit telemetry must contain metadata rather than unrestricted narratives.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 02  Live payer billing requirements
+Importance: Critical
+Dependency: Coordinate with prompt 6 authorization tracking and prompt 7 claim structure.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Implement missing payer-specific professional-claim configuration. Inspect Professional837Formatter, ProfessionalClaimSnapshot, ProfessionalClaimReadiness, BillingConfiguration and both local/API generation paths. Shared formatting and frozen snapshots already exist; the current formatter has a fixed billing taxonomy and lacks the required service-facility representation.
+
+At execution time, verify requirements against current primary Claim.MD and MaineCare documentation. Produce a traceable requirements matrix identifying payer, document/version, effective dates, required fields, format and unresolved agency decisions. Do not infer provider enrollment or billing authority from a populated identifier.
+
+Build versioned, effective-dated agency/provider/payer configuration for facility identifiers, provider identifiers/taxonomy, payer routing, procedure/modifiers and applicable authorization references. Provide permission-controlled, accessible configuration and claim-readiness previews. Missing or incompatible required values must fail closed with field-specific errors.
+
+Freeze the applicable inputs into each new claim snapshot. Define snapshot-version compatibility and correction provenance explicitly: existing submitted files remain reproducible, and later configuration changes cannot rewrite prior snapshots or correction history. Preserve supported legacy formatter behavior.
+
+Acceptance criteria: synthetic golden files verify loop placement, escaping, control/segment counts, effective-date boundaries and correction identities; local/API generation agrees; readiness rejects incomplete configuration; unauthorized or cross-agency updates and stale revisions fail; original generated files and receipts remain immutable. Include private SQL migration rehearsal and rollback compatibility where schema changes are needed.
+
+Deliver the source feature and a separate payer-certification checklist. Provider enrollment, actual credentials, real claim submission and payer acceptance remain operational gates requiring verified direction and authorization.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 03  Complete retention and legal holds
+Importance: Critical
+Dependency: Required before automated destructive retention; coordinate with prompt 17 recovery.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Complete the records-governance foundation described in OPERATIONS.md and HANDOFF_CLIENT_DELETION_POLICY.md. Inspect Sati.Contracts/V1/LegalHold.cs, the LegalHold model, API/local registries and deletion routes. The current registry protects individual consumer deletion and permits single-admin release; preserve its fail-closed behavior.
+
+Implement versioned policy definitions, agency/record-class/record-scope holds, audited placement/change history, release requests and independent second-approver decisions. Prevent self-approval and enforce tenant permissions and revision checks. Preserve the meaning and effect of existing person holds during migration.
+
+Build dependency-aware hold evaluation across clinical, billing, audit, chat, documents and evidence. Unsupported or unavailable stores must block destructive execution. Produce retention previews showing candidate counts/date ranges, exclusions, dependencies and policy version. A preview is not permission to delete.
+
+Implement an explicitly gated execution path with bounded batches, durable checkpoints, idempotent recovery and a transaction/locking strategy that rechecks holds and policy before deletion. A newly placed hold must defeat a previously prepared plan. Keep runtime enforcement PolicyOnly until the approved policies, storage/backup adapters and activation gates are satisfied. Test destructive behavior only in private synthetic fixtures.
+
+Model backup and encrypted-object reconciliation explicitly, including evidence of preservation, protected recovery references and failure handling. Do not invent legal retention periods or treat a database purge as proof all copies were reconciled.
+
+Acceptance criteria: all covered dependencies are held; release cannot be self-approved or replayed; failed hold lookup blocks deletion; concurrent hold/purge and policy changes are safe; partial failures recover without deleting extra records; decisions are reconstructable without narrative PHI in operational logs.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 04  Comprehensive Assessment supervisor review
+Importance: Significant
+Dependency: Provides the approved assessment/version foundation for prompt 5.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Complete Comprehensive Assessment review. Inspect the assessment model/service, ViewModels/ClientDocuments/ComprehensiveAssessmentViewModel.cs, assessment routes in Sati.Api/Endpoints/ApiEndpoints.cs, provider snapshots and existing document/signature infrastructure.
+
+Draft creation, autosave and submission exist. Add a scoped supervisor queue, section/question comments and flags, resolution history, documented returns, resubmission and wholesale approval. Reviewers must not rewrite the author's answers. Separate author and reviewer permissions, including supervisors who carry caseloads.
+
+Create one versioned shared owner for assessment completeness. Validate answer dispositions, support combinations, contributors, identified needs, provider references and dissent server-side. Fix save/submit so a failed or conflicted save cannot submit an older document. Submission must validate the exact persisted revision.
+
+Preserve an identifiable snapshot for each submission/review cycle. Approval requires resolved blocking flags, freezes the exact reviewed version and links completion to the correct annual Form through its existing attestation/compliance invariant in one audited transaction. Use current canonical annual identity/deadline calculations, including configured agency rules; do not restore superseded dates from old documentation.
+
+Provide focusable validation summaries, accessible reviewer controls and a version-identified PDF. Reuse document storage/signing owners. Clarify approval versus publication versus signature completion rather than treating one as the others.
+
+Acceptance criteria: unauthorized reviewers cannot discover submissions; completeness cannot be bypassed through the API; failed save prevents submission; stale approvals fail; returned/resubmitted versions retain history; approved content remains unchanged; PDF, audit and Form completion identify the same version. Verify the exact Form-completion policy; where signatures/attestation are required, approval alone must not falsely complete it. Real signing and agency acceptance remain separate activation gates.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 05  Full Person-Centered Plan workflow
+Importance: Significant
+Dependency: Build on prompt 4; coordinate authorization references with prompt 6.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Extend the current read-only assessment-derived PCP workspace into complete plan authoring and review. Inspect ViewModels/ClientDocuments/PersonCenteredPlanViewModel.cs, IPersonCenteredPlanSourceService, assessment versions, annual-cycle rules and existing document/signature capabilities. Preserve the useful source display and its provenance.
+
+Deliver in stages: draft persistence/authoring; outcomes, measures, actions and responsibilities; meeting/participant records; supervisor review/publication; linked amendments; then a narrowly scoped internal OADS review boundary with external integration gated separately.
+
+Record the source assessment version and relevant frozen profile/provider facts, target/effective dates, supports, follow-up and authorization references. Capture participants, roles, invitations, attendance method and acknowledgment state. Default the assigned case manager as organizer, with permission-controlled audited overrides. Distinguish invitations prepared in Sati from invitations actually delivered.
+
+Use shared validation and permissions. Separate assessment approval, plan approval, signature completion, OADS decisions and service authorization. Document reviewer/recusal/coverage requirements; do not invent state authority, required signers or payer approval. Published/signed content must remain immutable. Later profile/provider changes create reviewable change candidates, never silent plan edits.
+
+Acceptance criteria: source provenance is visible; incomplete plans cannot publish; every review, decision and artifact names an exact version; unauthorized author/reviewer access fails; concurrent edits conflict; amendments preserve prior evidence; annual obligations link to the correct plan year; profile changes cannot rewrite published history.
+
+Provide accessible authoring, review, progress and amendment views plus frozen PDF output through existing infrastructure. Implement OADS-facing permissions and decisions with synthetic policy fixtures; do not send external submissions or activate live sharing/signing before approved authority and operating requirements are available.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 06  Service authorization and utilization
+Importance: Significant
+Dependency: Integrates with prompts 2 and 5; distinguish payer authorization from user permissions.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Implement payer/program service authorization and utilization tracking. This concerns approved services and quantities, not login authorization or releases of information.
+
+Create an agency-owned authorization aggregate for consumer, payer/program, service, provider where relevant, effective dates, authorization reference, approved quantity/unit basis, period/frequency limits and protected evidence references. Retain immutable active/superseded history and audited amendments; model draft, expiration and revocation without rewriting historical coverage.
+
+Define one shared rule owner and a durable utilization ledger. Document which events reserve, consume, release or reverse units. Keep documented, approved, submitted, adjudicated and paid quantities distinct. Resolve policy-dependent billability decisions explicitly; do not assume documented work equals units actually submitted.
+
+Provide API-mediated administration, a consumer panel and billing-readiness integration. Show approved/used/reserved/remaining quantities, missing coverage, nearing expiration/exhaustion and a clearly labeled forecast. Resolve overlapping authorizations deterministically and handle service/provider changes, partial periods, decimal quantities, cancellations, amendments, replacement/void claims and reversals.
+
+Acceptance criteria: parallel operations cannot consume the same remaining allowance twice; retries are idempotent; effective-date/time boundaries select the proper version; late corrections preserve their original coverage context; insufficient or ambiguous coverage fails according to documented policy; foreign IDs do not disclose data; unauthorized/stale edits fail; reports reconcile to the ledger.
+
+Use synthetic SQL-backed contention and failure tests. Existing compliance gates retain their own responsibilities, and submitted financial snapshots remain immutable. Provide configurable warnings separately from hard billing gates so an unapproved policy cannot silently alter billability.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 07  Complete remittance detail and multi-line claims
+Importance: Significant
+Dependency: Coordinate frozen claim structure with prompt 2; retain all legacy generations.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Extend the existing remittance pipeline rather than creating a parallel billing engine. Inspect ClaimResponseReader, ParsedClaimResponse, ClaimResponseIngestion, RemittanceClaimOutcome, MockClearinghouse, Professional837Formatter, clearinghouse dispatch validation and correction screens.
+
+Acknowledgment/835 ingestion, encrypted receipts, claim-level payment/denial handling, deposit reconciliation and correction workflows already exist. Preserve every CAS adjustment group/reason/amount/quantity and each RARC from LQ, with exact claim or SVC-line scope. Retain unknown codes. If descriptions are supplied, use verified maintained primary code sources with appropriate access/licensing; do not fabricate meanings.
+
+Define a frozen multi-line claim model and deterministic grouping rules before changing generation. Preserve single-line snapshots, stable service-line references, claim/D9 identity semantics, original generation bytes and correction lineage. Extend transport validation that currently assumes one service-line reference per claim.
+
+Model immutable service-line outcomes, mixed paid/denied lines, multiple adjustments, patient responsibility, reversals and later advice. Provide drill-through views showing every line, code, amount and evidence reference, with reconciliation to deposits and claim totals.
+
+Acceptance criteria: synthetic multi-line 837/835 fixtures verify correlation, segment counts, financial balancing, duplicate import idempotency, unmatched/ambiguous line quarantine, out-of-order/reversal behavior and legacy compatibility. Preserve and test authenticated account/feed ownership, agency and test/production mode, sender/receiver envelope matching, and payee NPI matching the exact retained submission. Payment/deposit identity deduplication must hold across repeated and different receipts, reversals and later advice. Malformed or ambiguous evidence must neither change financial state nor advance feed checkpoints. Concurrent ingestion cannot double-apply payments. Local/API projections agree and tenant/permission/audit/conflict checks pass.
+
+Define financial sign/balance rules explicitly from supported standards/vendor documentation. Unsupported variants remain visible and quarantined rather than approximated. Do not rewrite old receipts, generate duplicate financial effects or resend uncertain uploads.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 08  Identity, organizational onboarding and recovery
+Importance: Significant
+Dependency: Foundation for broader agency deployment and prompt 11.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Complete identity capabilities for organizational deployment while preserving current JWT authentication, validated actors, account disabling/revocation and existing administrator reset paths. Inspect LoginAttemptGuard, TokenIssuer, authorization filters, password-reset flows, API_SECURITY_AUDIT.md and current account lifecycle tests.
+
+Implement durable/shared sign-in throttling across hosts, audited agency/user invitations and a documented final-administrator recovery path. Invitations must expire, support revocation, prevent replay and bind agency/role assignment to the validated inviter; recipients cannot choose their tenant or elevate privilege. Prevent administrative actions from accidentally removing the agency's last recovery route.
+
+Define a provider-neutral external-identity contract and implement a configured standards-based adapter after reviewing current primary documentation. Validate issuer, audience, subject, tenant mapping, callback/state/nonce and identity linking. Do not identify a user solely by mutable email. Prevent account-linking and recovery from bypassing MFA.
+
+Implement an explicit MFA/step-up policy boundary using verifiable provider assurance or an approved factor implementation. A client checkbox or unvalidated token claim is not MFA. Keep external registration and runtime MFA activation disabled until the selected identity provider, tenant ownership, factors and recovery policy are approved. Complete synthetic source/integration tests independently of provider provisioning.
+
+Acceptance criteria: simultaneous hosts enforce one throttle; limits cannot be trivially evaded through request variations; invitation replay/expiration and foreign-tenant actions fail; response behavior avoids account enumeration; stale sessions and disabled users lose authority; lockout recovery is auditable and cannot escalate privilege; identity linking rejects conflicting subjects.
+
+Deliver additive migrations, default-off configuration templates, accessible workflows and recovery/rollback instructions. Do not provision identity services or change live authentication/security settings.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 09  Consumer reportable incidents
+Importance: Significant
+Dependency: Coordinate holds with prompt 3 and delivery with prompt 12.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Build a distinct consumer incident-management capability. Existing incidents capture application failures and operational telemetry; retain that separation. Clinical allegations, involved-party details and narratives must not enter app-error logs or cross-tenant platform-support dashboards.
+
+Deliver internal reporting/immediate-action capture, triage/assignment, investigation/findings, follow-up/resolution and preparation for configurable external reporting. Record occurrence, discovery and report timestamps; consumer/party relationships; reporter/source; category; protective actions; reviewer; deadlines; evidence; and resolution. Treat allegations, findings and substantiation as different facts. Freeze submitted reports and use versions/addenda for corrections.
+
+Implement permission boundaries for restricted cases, conflicted staff, delegated coverage and independent reviewers according to approved policy. Ordinary caseload access need not imply unrestricted incident access. Version agency-approved classification/deadline policies and retain the policy used for each decision. Do not invent reportability rules, mandatory time limits, state forms or legal conclusions.
+
+Provide accessible queues, overdue/escalation states and decision history. Integrate notification delivery through its owner; a failed notice remains visible. Recording an external submission must distinguish preparation, attempted delivery, acknowledged receipt and authoritative acceptance.
+
+Acceptance criteria: authorized staff submit and assigned reviewers act; restricted or foreign incidents cannot be discovered by unauthorized users; submitted originals are immutable; stale/conflicting actions fail; retries cannot duplicate reports; deadline calculations retain policy provenance; exports and attachments, if included, are authorized, protected and audited.
+
+Use synthetic internal policy fixtures while real agency/state direction is pending. Document actual emergency/reporting procedures as operational prerequisites; the application must not imply emergency response or external reporting occurred merely because a form was saved. Keep external submissions disabled until recipients, authority and approved interfaces are established.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 10  Mobile field work, offline synchronization and EVV
+Importance: Significant
+Dependency: Stage online client, offline sync, then policy-approved EVV; keep full WPF support.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Develop mobile field work from the existing Carika/Avalonia and API foundations. Inspect Carika's current Windows target, encrypted local drafts and API note saving. Windows DPAPI drafts are not portable offline synchronization.
+
+Implement in reviewable stages: secure Android/iOS client foundations; today's work and minimal consumer essentials; visit/contact capture; interruption-safe encrypted drafts; durable synchronization/conflict recovery; then EVV under verified applicable requirements. Share portable contracts and authoritative rules with WPF. Complete independent client/sync work while EVV policy or platform tooling is pending.
+
+Bind cached data and queued operations to environment, agency, authenticated user and consumer. Use platform secure key storage and approved policies for logout, disabled accounts, device loss, expired sessions and draft retention. Minimize protected offline data. Synchronize with durable operation IDs, server validation and revision-aware conflicts; preserve local edits when a conflict needs review. Offline records remain provisional and cannot approve themselves or establish billability.
+
+EVV must have a documented applicability/interface specification: covered services, required time/location/identity evidence, permission/privacy requirements, exceptions, corrections and authoritative acceptance. Treat client clock/location as evidence requiring validation. Build synthetic adapters and correction history; keep live collection/transmission default-off until the policy is approved. Do not claim ordinary visit timestamps satisfy EVV.
+
+Acceptance criteria: process death during save, duplicate delivery, network interruption, reassignment, account/environment switching, expiration and concurrent server edits cause neither data loss nor duplicate billable notes. Show accessible pending/failed/conflict/synced states. Verify Android and iOS target builds and physical-device behavior where tooling is available; record unexecuted platform gates accurately.
+
+Deliver staged source, synthetic tests, device/install instructions and explicit SDK/signing prerequisites. No app-store publication, real-PHI pilot, live location transmission or device distribution is authorized.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 11  Organization linking and cross-agency coordination
+Importance: Significant
+Dependency: Coordinate identity with prompt 8 and record protection with prompt 3.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Implement the organization/relationship foundation for cross-agency coordination. Read PLATFORM_DOMAIN.md and the current organization-authority decisions. Existing provider directories contain each agency's knowledge; preserve those records, links and historical snapshots.
+
+Create a canonical Organization registry with reviewed identity facts and nullable provider links, plus explicit AgencyRelationship records. Use exact authoritative identifiers where available, followed by human-reviewed candidates for ambiguous matches. Link reviewed directory entries to the canonical organization. Never merge/delete directory entries, repoint existing foreign keys or replace historical snapshots. Preserve provenance and local overrides. Canonical-organization deduplication requires a separately reviewed design.
+
+Provide reviewed relationship establishment, invitation/approval, suspension and revocation with permission checks, revision conflicts and append-only audit. Tenant membership and organization authority are distinct. An organization link must not grant clinical access.
+
+Implement explicitly published organization contact payloads maintained by an authorized tenant, local override resolution, change notices and review flags for affected drafts. Submitted documents retain their original contact/provider facts.
+
+Define and implement a narrow relationship-scoped sharing policy engine with synthetic fixtures: allowed record types/purposes, parties, grants, expiration/revocation and necessary consent/authority evidence under approved policy. Enforce grants server-side for search, reads, attachments, exports and notifications. Do not broaden ordinary agency queries or duplicate PHI into operational directories. Keep live clinical sharing disabled until governance and recipient authority are reviewed.
+
+Acceptance criteria: unauthorized discovery, identifier collisions, concurrent links, revoked/expired relationships and stale grants fail safely; linking preserves existing provider associations; published contacts cannot overwrite local overrides silently; submitted snapshots remain unchanged; clinical access requires an explicit valid grant and is audited.
+
+Deliver accessible administration/review screens, migrations, DTOs, tests and a policy/activation checklist. Do not provision real organizations, send relationship invitations or activate external sharing.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 12  Notifications outside an active Sati session
+Importance: Significant
+Dependency: Reuse Daily Agenda/rule owners; coordinate restricted recipients with prompts 9 and 11.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Implement proactive deadline/overdue notifications as an API-owned feature. Read BACKGROUND_WORKERS_HANDOFF.md and inspect DailyAgendaCoordinator, DailyAgendaBuilder, upcoming-event services and deadline rules. Daily Agenda already appears at sign-in; extend delivery rather than duplicating the definition of due/late.
+
+Start with a durable in-app notification center and optional generic email digests behind default-off settings. Provide user cadence/categories/timezone/quiet-hours preferences and separately authorized agency escalation policy. Store notification identity, content-policy version, scheduling window, delivery state and safe evidence references.
+
+Schedule bounded catch-up batches with database coordination across hosts, durable deduplication, retry/backoff and an explicit policy for unknown delivery acceptance. Recompute recipient authorization, consumer assignment and current deadline state before delivery so disabled users or reassigned cases cannot receive stale content. Define cancellation/suppression when an obligation is completed or preferences change.
+
+Email must use approved generic content and an authenticated destination, without consumer names, narratives or clinical details. Use an approved delivery adapter; durable retry behavior must reflect whether the provider offers idempotent requests/receipt lookup. Unknown acceptance must not silently become a repeated email or a false successful delivery.
+
+Acceptance criteria: daylight-saving changes, missed runs, concurrent hosts, duplicate scheduling, preference changes, completion/reassignment, disabled accounts and adapter failures preserve one coherent history. Restricted incidents/sharing grants remain enforced. UI status and preference controls are keyboard/screen-reader accessible and do not rely on color.
+
+Deliver meaningful time/SQL/adapter tests, default-off settings and an operator runbook with owner, metrics, failure handling and synthetic delivery plan. Do not provision a delivery provider, send live messages or enable cloud schedules.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 13  Clearinghouse operator screens
+Importance: Significant
+Dependency: Uses existing onboarding/reconciliation APIs; coordinate activation with prompt 18.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Build accessible WPF screens for existing Claim.MD account/feed onboarding and uncertain-upload reconciliation. Read CLAIMMD_SANDBOX_RUNBOOK.md and inspect ClaimMdOnboardingContracts, ClaimMdReconciliation, their endpoints and BillingSubmissionsViewModel.
+
+Add an exact-Demo agency-Admin setup workflow for dedicated test-account confirmation, permanent routing namespace, independent reviewed Status/ERA cursors and opaque evidence references. Zero means verified empty, not a convenient default. The actual AccountKey and vendor endpoints remain outside the desktop. Follow the server contract's approved secret-reference input without persisting secrets or references in client settings/logs.
+
+Add a reconciliation workspace for Sending/OutcomeUnknown dispatches. Display the retained account, generation, filename, content hash, exact claim identities, relevant attempt time and revision. Collect decision-appropriate evidence, claim statuses/counts, observation time and the exact attestation supplied by the API. Protect vendor evidence; metadata/audit logs must not expose its contents.
+
+Use shared contract rules for validation, constructor-injected narrow HTTP services and request identity checks. A stale/busy 409 requires refresh and renewed review. Distinguish clearinghouse receipt from payer acceptance and support-attested non-receipt from rejection.
+
+Do not add automatic resend or automatically create/queue another generation after a finding. Filename matching and regenerated claimdata are not proof of original uploaded bytes.
+
+Acceptance criteria: valid setup/findings work; denied Admin/tenant access, changed manifests, stale revisions, busy uploads, incorrect timing/claims and navigation races fail safely; canceled forms do not mutate state; failures preserve operator input appropriately; secrets never appear in settings, logs or returned DTOs. Use integration and focused ViewModel tests plus keyboard/screen-reader verification.
+
+No migration is expected without concrete evidence. Keep transport disabled; no credential configuration, vendor call or deployment is authorized.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 14  Provider-panel conveniences
+Importance: Trivial
+Dependency: Use existing PersonProvider.SortOrder and provider service/rule owners.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, relevant current AGENDA.md sections, API_AUTHORIZATION.md, and REGULATORY_CONCERNS.md where applicable. Check the current source before relying on historical checkboxes. Preserve unrelated changes and coordinate any overlapping work.
+
+Implement source, documentation and meaningful tests using private synthetic fixtures. This prompt does not authorize deployment, cloud migrations, security changes, external transmissions or access to real SatiProduction data. Prepare controlled migration and activation instructions where needed.
+
+Keep the API authoritative for tenant access, permissions, validation, transactions and audit. Use narrow DTOs and shared Sati.Contracts.V1 business rules; retain local service parity where applicable. Use constructor injection, revision conflicts, accessible controls and LatestRequestTracker for selection/navigation loads.
+
+Complete linked-provider ordering in the consumer panel. Inspect ConsumerProviderRules, PersonProvider.SortOrder, provider services, ConsumerProvidersViewModel and the host's bindings. Current ordering storage/rules exist; provide a usable editing flow without creating a second ordering model.
+
+Implement keyboard-accessible Move Up/Move Down commands with meaningful automation names, predictable focus and visible saving/failure state. Optional drag-and-drop supplements the keyboard commands. Follow existing grouping, inactive/historical-provider and role semantics; moving a row must not change affiliation or primary-care status.
+
+Persist an entire reorder through one validated API/local service operation. Verify consumer access and every association. Reject foreign, duplicate, missing or unexpected associations according to the documented collection/version contract. Detect concurrent membership/order changes and return the canonical saved order. Do not overwrite another user's concurrent edit.
+
+Protect selection loads and mutation results with request identities so a save/load started for one consumer cannot reorder another consumer's display. On failure/conflict preserve a reviewable intended arrangement and offer reload/retry against fresh state.
+
+Use stored ordering wherever the existing panel displays these associations. Frozen assessment, plan and financial snapshots remain unchanged. Do not expand this task into organization merging or legacy-link reconciliation.
+
+Acceptance criteria: order survives reload in local/cloud modes; first/last/group-boundary controls behave correctly; keyboard focus remains sensible; mismatched associations and stale versions fail; navigation during save leaves the selected consumer correct. Add focused rule/service/ViewModel tests for those risks and perform an accessible visual check. A migration is unnecessary unless inspection identifies a concrete schema gap.
+
+Verify successful and denied paths, atomic failures, immutable history and concurrency where relevant. For security or concurrency defects, demonstrate the regression test fails before the repair. Update affected architecture, decisions, authorization/audit inventories and agenda. Finish with implemented scope, test evidence, remaining policy/integration gates and activation steps. Complete all independent authorized work while any missing policy decision is pending; do not invent external requirements.
+
+========================================================================
+PROMPT 15  Activate implemented background workers
+Importance: Significant now; Critical before a cloud pilot
+Dependency: Coordinate prompts 16, 17 and 18; preserve any active reset pause.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, the newest relevant AGENDA.md sections, OPERATIONS.md and RELEASE_PLAYBOOK.md. Preserve existing work. Verify current source and deployed state rather than treating historical status as current.
+
+The initial scope is source preparation, private synthetic tests and read-only operational preflight. This prompt is not a DATT invocation and does not reuse permissions from an earlier release. Prepare concrete artifacts, commands, acceptance evidence, abort conditions and rollback before requesting any necessary approval. Perform cloud mutations or external calls only after the applicable explicit authorization for that reviewed action. Never change firewall/security settings or access personal SatiProduction data. Clearly separate prepared, tested, deployed and operationally verified results.
+
+Prepare a Demo-only activation package for implemented W1-W5. Read BACKGROUND_WORKERS_HANDOFF.md and CLAIMMD_SANDBOX_RUNBOOK.md. Inventory branch/worktree changes, reviewed artifacts, deployed API/Function versions, schema compatibility, flags and package contents. Include the latest external-history reset guard and pause-aware watchdog; this is activation of existing source, not a new worker rewrite.
+
+Produce an ordered plan for API/Function publication, daily watchdog schedule, synthetic acceptance, coordinated enabling of the note-abandonment worker and its watchdog expectation, desktop release acceptance and rollback. Respect Free F1 idle/catch-up behavior; do not add continuous SQL polling or a wake service.
+
+Verify shared abandonment eligibility, revision-safe audited batches, account-bound durable incident retry and draft-safe day rollover using relevant tests. Prepare deployed synthetic checks for overdue notes, concurrent edits, account switching, restart/catch-up and intentionally paused resets. Exact setting names and values must come from current source/runbooks.
+
+Keep billing/signature expectations conditional on those features actually being enabled. Review preserved poison entries read-only; do not replay, delete or silently baseline them. The Claim.MD reset pause and permanent evidence guard remain effective throughout.
+
+Acceptance after separately approved execution: intended artifacts are deployed; defaults/expectations agree; synthetic notes follow audited rules exactly once; failures and catch-up are observable; desktop drafts are preserved; reset pause is honored; rollback leaves records and evidence intact. Record artifact versions, configuration differences and observed evidence.
+
+Complete source/package/preflight work before presenting the exact cloud mutation plan for required approval. Baseline replacement, migrations and any reset are separate actions, not implied by worker publication.
+
+Update the affected runbooks, current agenda and design records with verified status, retained evidence and unresolved gates. Do not report source or previews as successful activation.
+
+========================================================================
+PROMPT 16  Route operational alerts to the owner
+Importance: Significant now; Critical before a cloud pilot
+Dependency: Depends on the deployed watchdog from prompt 15.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, the newest relevant AGENDA.md sections, OPERATIONS.md and RELEASE_PLAYBOOK.md. Preserve existing work. Verify current source and deployed state rather than treating historical status as current.
+
+The initial scope is source preparation, private synthetic tests and read-only operational preflight. This prompt is not a DATT invocation and does not reuse permissions from an earlier release. Prepare concrete artifacts, commands, acceptance evidence, abort conditions and rollback before requesting any necessary approval. Perform cloud mutations or external calls only after the applicable explicit authorization for that reviewed action. Never change firewall/security settings or access personal SatiProduction data. Clearly separate prepared, tested, deployed and operationally verified results.
+
+Prepare and validate the existing Demo watchdog alert configuration. Read BACKGROUND_WORKERS_HANDOFF.md, its D1-D4 decisions, OPERATIONS.md and scripts/Set-DemoWatchdogAlerts.ps1. Follow the existing Application Insights plus email-to-Josh action-group design; do not introduce another monitoring service or continuous SQL poll.
+
+Review the finding and missing-watchdog-result alert conditions against current content-free result markers and the documented 26-hour expectation. Verify intentional-reset-pause behavior: only the expected nightly-reset absence is suppressed; failed outcomes, poison entries and enabled feature failures remain reportable.
+
+At execution time, verify current official regional pricing and resource prerequisites. Prepare the exact subscription/resource scope, owner email prerequisite, schedule, ownership checks, idempotent application and WhatIf output. Conflicting or unknown resources must stop mutation safely. Follow the recorded decision that Josh executes Azure-changing alert commands.
+
+Validate fake-operation tests for repeated application, incomplete prerequisites, drift, missing results, paused reset and invalid ownership. Provide a diagnosis/ownership runbook for every alert, with sensible recovery steps. Unknown clearinghouse uploads and poison messages must not be automatically replayed.
+
+Acceptance after authorized owner execution: the receiver and rules match the reviewed plan; one approved synthetic finding reaches the named owner; the missing-result condition is verified without unnecessarily disabling useful monitoring; recovery/acknowledgment behavior is documented; notifications contain no protected content. A script success or created action group alone is not proof delivery works.
+
+Deliver the reviewable script/configuration package, cost assumptions, commands, test evidence, abort/rollback instructions and the exact operator acceptance checklist. Do not create resources or send email during preparation.
+
+Update the affected runbooks, current agenda and design records with verified status, retained evidence and unresolved gates. Do not report source or previews as successful activation.
+
+========================================================================
+PROMPT 17  Rehearse cloud backup restoration
+Importance: Critical before a cloud pilot
+Dependency: Uses the existing Demo restore adapter; coordinate key/evidence recovery separately.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, the newest relevant AGENDA.md sections, OPERATIONS.md and RELEASE_PLAYBOOK.md. Preserve existing work. Verify current source and deployed state rather than treating historical status as current.
+
+The initial scope is source preparation, private synthetic tests and read-only operational preflight. This prompt is not a DATT invocation and does not reuse permissions from an earlier release. Prepare concrete artifacts, commands, acceptance evidence, abort conditions and rollback before requesting any necessary approval. Perform cloud mutations or external calls only after the applicable explicit authorization for that reviewed action. Never change firewall/security settings or access personal SatiProduction data. Clearly separate prepared, tested, deployed and operationally verified results.
+
+Prepare a bounded Demo restore rehearsal using scripts/Invoke-DemoRestoreVerification.ps1 and the OPERATIONS.md restore procedure. Restore an approved historical point only into a fresh owned SatiRestoreCheck_<guid> database on the pinned Demo server. Never replace a database or target personal SatiProduction/future cloud Production.
+
+Obtain the approved historical manifest for that exact point: environment identity, complete migrations and critical source/audit/version/billing/enabled-signature counts. Do not manufacture historical expectations from today's mutable data. Clarify owner-approved recovery objectives and include protected evidence location, costs, duration limits, access prerequisites and cleanup.
+
+Validate inputs and produce a fresh-RunId WhatIf preview. Exercise fake-operation tests for uncertain creation, ownership conflict, verification/evidence-write failure, cleanup failure and replay prevention. The execution path must never delete a resource merely because its name resembles the expected scratch name.
+
+Actual RunRehearsal execution requires separate approval and the recorded operator procedure. Do not grant roles or change firewall/security settings to make the rehearsal succeed. Complete the preparation and identify the exact existing access requirement first.
+
+Acceptance after authorized execution: the restored identity/schema/counts match the historical manifest; evidence is durable; actual recovery time is compared with the objective; only the owned scratch database is cleaned up; failures and uncertain resource IDs remain visible without automatic destructive retry.
+
+State the proven scope accurately. SQL verification does not establish recovery of attachments, encrypted evidence, signed packages, keys, application settings or service identities. Prepare separately scoped recovery verification for those dependencies and identify remaining gaps. Update the operating evidence and repeatable runbook rather than claiming whole-platform recovery from one successful SQL restore.
+
+Update the affected runbooks, current agenda and design records with verified status, retained evidence and unresolved gates. Do not report source or previews as successful activation.
+
+========================================================================
+PROMPT 18  Activate and verify Claim.MD sandbox transport
+Importance: Significant
+Dependency: Coordinate prompts 2, 7, 13 and 19; confirm archive/cutover readiness before ending testing.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, the newest relevant AGENDA.md sections, OPERATIONS.md and RELEASE_PLAYBOOK.md. Preserve existing work. Verify current source and deployed state rather than treating historical status as current.
+
+The initial scope is source preparation, private synthetic tests and read-only operational preflight. This prompt is not a DATT invocation and does not reuse permissions from an earlier release. Prepare concrete artifacts, commands, acceptance evidence, abort conditions and rollback before requesting any necessary approval. Perform cloud mutations or external calls only after the applicable explicit authorization for that reviewed action. Never change firewall/security settings or access personal SatiProduction data. Clearly separate prepared, tested, deployed and operationally verified results.
+
+Prepare a bounded activation/acceptance plan for the implemented Claim.MD sandbox connector, poller, onboarding and reconciliation. Read CLAIMMD_SANDBOX_RUNBOOK.md and current integration decisions. Verify deployed schema read-only; older notes saying the clearinghouse foundation migration is unapplied must not cause a blind repeat.
+
+Complete source preflight and synthetic rehearsal first. Verify exact-Demo transport gates, evidence encryption/readback/recovery, independent Status/ERA cursor transactions, multi-host SQL coordination, routing and uncertain-upload quarantine. Review current primary Claim.MD documentation at execution time for test-account restrictions, duplicate settings, response formats, rates and supplied synthetic patient/provider fixtures.
+
+Prepare exact guarded-SQL/API/Function publication steps, contract parity checks, approved secret-storage configuration, dedicated account confirmation, remote_claimid-only duplicate setting and independent reviewed feed history. Pause automatic resets BEFORE account onboarding and verify the permanent guard remains active. Inspect queued/in-flight reset requests without replaying them.
+
+Define a vendor acceptance matrix for receipt/rejection/denial, malformed or ambiguous responses, interrupted upload, independent polling, 835 ingestion, supported corrections/voids, deposits and restart/multi-host behavior. HTTP success or clearinghouse acceptance must not be labeled payer approval. Unknown uploads remain quarantined; no automatic resend.
+
+Plan the complete testing window: named owner, bounds, retained evidence, abort criteria, rollback, and archive/clean-Demo cutover before reset restoration. Keep AccountKey outside desktop/source/logs. Use approved synthetic fixtures only; do not enroll through potentially live linked services.
+
+Actual publication, procedure installation, configuration/secrets, vendor calls and verification resets require the corresponding reviewed authorization. After execution report actual observations, unsupported variants and remaining payer certification; never equate test-account success with readiness for real claims.
+
+Update the affected runbooks, current agenda and design records with verified status, retained evidence and unresolved gates. Do not report source or previews as successful activation.
+
+========================================================================
+PROMPT 19  Preserve sandbox evidence and return to clean Demo
+Importance: Significant; prerequisite for resuming resets
+Dependency: Complete and rehearse before prompt 18's test window closes.
+========================================================================
+
+Work in C:\Users\Joshu\source\repos\heschides\Sati. Read AGENTS.md, ARCHITECTURE.md, DECISIONS.md, the newest relevant AGENDA.md sections, OPERATIONS.md and RELEASE_PLAYBOOK.md. Preserve existing work. Verify current source and deployed state rather than treating historical status as current.
+
+The initial scope is source preparation, private synthetic tests and read-only operational preflight. This prompt is not a DATT invocation and does not reuse permissions from an earlier release. Prepare concrete artifacts, commands, acceptance evidence, abort conditions and rollback before requesting any necessary approval. Perform cloud mutations or external calls only after the applicable explicit authorization for that reviewed action. Never change firewall/security settings or access personal SatiProduction data. Clearly separate prepared, tested, deployed and operationally verified results.
+
+Implement a controlled archive/clean-Demo cutover adapter. Read DATABASE_ENVIRONMENTS.md, CLAIMMD_SANDBOX_RUNBOOK.md, OPERATIONS.md, reset scripts and ExternalClearinghouseResetGuard. The current reset guard intentionally refuses external account linkage, reviewed checkpoints, attempts, receipts or onboarding history in live data or baseline. Disabling/deleting an account or erasing audit rows must not bypass it.
+
+Design an operator-controlled sequence to stop new uploads, drain in-flight work, resolve unknown outcomes and capture final independent feed checkpoints. Preserve the COMPLETE linked sandbox database, encrypted evidence, recovery keys through approved secret handling, account/claim correlations, immutable financial history and audits. Protect archives under owner-approved access/retention; do not invent durations or write key material to manifests/logs.
+
+Create a verifiable manifest with hashes, environment/account/namespace identity, ownership, protected recovery references and instructions. Prove readback and restore in a private synthetic rehearsal. Refuse cutover if evidence is incomplete, recovery cannot be proved, uploads remain active or uncertainty is unresolved.
+
+Return to a verified clean canonical Demo through an explicit cutover rather than destructive cleanup of linked history. Retire the old association and reserve its namespace. Verify API/Function mapping, database identity/baseline, transport-off state, guarded procedures and queued reset state. Keep the old environment recoverable until acceptance.
+
+Make interrupted/partial execution resumable with ownership checks and safe rollback. Test incomplete archives, missing keys, wrong identities, linked baselines, unresolved dispatches and failures at each boundary. Prepare cloud scripts/runbook but do not execute cloud writes/deletions during implementation.
+
+Re-enabling the timer and one verification reset are final separately approved operations after preservation/cutover acceptance. Confirm the successful reset audit and resumed watchdog expectation. Never capture linked data as the ordinary reset baseline or weaken the guard to make resume work.
+
+Update the affected runbooks, current agenda and design records with verified status, retained evidence and unresolved gates. Do not report source or previews as successful activation.
+

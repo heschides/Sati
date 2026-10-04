@@ -145,6 +145,16 @@ SELECT @result;
 '@
             if ([int]$lock.ExecuteScalar() -lt 0) { throw 'The Demo is busy; reset did not begin.' }
 
+            $stage = 'AssertCanonicalResetAllowed'
+            Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
+            $preflight = $connection.CreateCommand()
+            $preflight.CommandTimeout = 75
+            # Owner-executed SQL can inspect demo_baseline without widening the
+            # Function identity's explicit DENY on that schema. A missing proc
+            # fails before the older restore proc can run.
+            $preflight.CommandText = 'EXEC dbo.SatiAssertCanonicalResetAllowed;'
+            [void]$preflight.ExecuteNonQuery()
+
             $stage = 'RestoreCanonicalBaseline'
             Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
             $command = $connection.CreateCommand()
@@ -206,6 +216,12 @@ SELECT @result;
     }
     catch {
         $detail = Get-SafeFailureDetail $_
+        if ($detail.SqlErrorNumbers -contains 51012) {
+            # This fixed SQL error means the reset transaction refused to touch
+            # vendor-linked clearinghouse state. No row values enter telemetry.
+            $stage = 'DemoResetBlockedByExternalClearinghouseState'
+            Write-DemoResetStage $RequestId $Trigger $stage $clock.Elapsed.TotalSeconds
+        }
         Write-DemoResetStage $RequestId $Trigger 'RecordFailureOutcome' $clock.Elapsed.TotalSeconds
         Write-DemoResetOutcome -Server $server -Token $token -RequestId $RequestId -ActorUserId $ActorUserId `
             -Trigger $Trigger -Succeeded $false -Stage $stage -Seconds $clock.Elapsed.TotalSeconds -Detail $detail

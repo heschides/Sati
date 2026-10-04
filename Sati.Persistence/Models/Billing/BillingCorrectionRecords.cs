@@ -54,6 +54,10 @@ public sealed class ClaimCorrection
     public int BillingPeriodId { get; set; }
     public int ClaimLineId { get; set; }
     public int NoteId { get; set; }
+    public long? AmendedNoteVersionId { get; set; }
+    public DateTime? CorrectedDateOfService { get; set; }
+    public decimal? CorrectedUnits { get; set; }
+    public decimal? CorrectedChargeAmount { get; set; }
     public ClaimCorrectionAction Action { get; set; }
     public string? PayerClaimControlNumber { get; set; }
     public string ClaimSnapshotJson { get; set; } = string.Empty;

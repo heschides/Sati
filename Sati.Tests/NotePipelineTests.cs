@@ -1,5 +1,8 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Sati.Api.Data;
+using Sati.Api.Infrastructure;
 using Sati.Contracts.V1;
 using SatiLogica.Contracts;
 using Sati.Data;
@@ -567,6 +570,7 @@ public sealed class NotePipelineTests
         var stale = DateTime.Today.AddDays(-30);
 
         var ownDraft = await fixture.SeedNoteAsync(fixture.PersonOneId, NoteStatus.Pending, stale);
+        var originalRevision = await fixture.RevisionOfAsync(ownDraft);
         var ownScheduled = await fixture.SeedNoteAsync(fixture.PersonOneId, NoteStatus.Scheduled, stale);
         var ownRecent = await fixture.SeedNoteAsync(
             fixture.PersonOneId, NoteStatus.Pending, DateTime.Today);
@@ -580,6 +584,137 @@ public sealed class NotePipelineTests
         Assert.Equal(NoteStatus.Pending, await fixture.StatusOfAsync(ownRecent));
         Assert.Equal(NoteStatus.Pending, await fixture.StatusOfAsync(peerDraft));
         Assert.Equal(NoteStatus.Pending, await fixture.StatusOfAsync(foreignDraft));
+        Assert.Equal(originalRevision + 1, await fixture.RevisionOfAsync(ownDraft));
+        await using var auditDb = fixture.Factory.CreateDbContext();
+        var audit = await auditDb.AuditEvents.SingleAsync(item =>
+            item.Action == "note.abandoned-by-system");
+        Assert.Equal(fixture.CaseManagerOne.AgencyId, audit.AgencyId);
+        Assert.Equal(0, audit.ActorUserId);
+        Assert.Contains("\"actorKind\":\"system\"", audit.MetadataJson);
+        using var metadata = System.Text.Json.JsonDocument.Parse(audit.MetadataJson);
+        var auditedIds = metadata.RootElement.GetProperty("noteIds").EnumerateArray().Select(item => item.GetInt32()).ToArray();
+        Assert.Contains(ownDraft, auditedIds);
+        Assert.DoesNotContain(peerDraft, auditedIds);
+    }
+
+    [Fact]
+    public async Task LocalAndApiAbandonmentSweepsAgreeAtTheSameWindowBoundary()
+    {
+        var time = new FrozenTimeProvider(new DateTimeOffset(2026, 10, 3, 12, 0, 0,
+            TimeSpan.Zero));
+        var today = TenantClock.MaineDate(time.GetUtcNow());
+        const int windowDays = 8;
+        var cases = new (NoteStatus Status, int AgeDays)[]
+        {
+            (NoteStatus.Pending, 9),  // The window closed yesterday.
+            (NoteStatus.Pending, 8),  // The window closes after today.
+            (NoteStatus.Pending, 7),
+            (NoteStatus.Scheduled, 9),
+            (NoteStatus.Logged, 9),
+            (NoteStatus.Abandoned, 9)
+        };
+        await using var local = await PipelineFixture.CreateAsync();
+        await using var apiConnection = new SqliteConnection("Data Source=:memory:");
+        await apiConnection.OpenAsync();
+        var apiOptions = new DbContextOptionsBuilder<ApiDbContext>()
+            .UseSqlite(apiConnection).Options;
+        await using (var api = new ApiDbContext(apiOptions))
+        {
+            await api.Database.EnsureCreatedAsync();
+            api.Agencies.Add(new ServerAgency { Id = local.CaseManagerOne.AgencyId,
+                Name = "Parity agency" });
+            api.Users.Add(new ServerUser { Id = local.CaseManagerOne.Id,
+                AgencyId = local.CaseManagerOne.AgencyId, Username = "parity-case-manager",
+                DisplayName = "Parity case manager", PasswordHash = "test", Salt = "test",
+                Role = "CaseManager" });
+            api.People.Add(new ServerPerson { Id = 10_001, UserId = local.CaseManagerOne.Id,
+                AgencyId = local.CaseManagerOne.AgencyId, FirstName = "Parity", LastName = "Person",
+                BirthDate = new DateTime(1990, 1, 1) });
+            api.Settings.Add(new ServerSettings { Id = 10_001,
+                AgencyId = local.CaseManagerOne.AgencyId, AbandonedAfterDays = windowDays });
+            await api.SaveChangesAsync();
+        }
+
+        var localIds = new List<int>();
+        var apiNotes = new List<ServerNote>();
+        foreach (var item in cases)
+        {
+            var eventDate = today.AddDays(-item.AgeDays);
+            localIds.Add(await local.SeedNoteAsync(local.PersonOneId, item.Status, eventDate));
+            apiNotes.Add(new ServerNote { PersonId = 10_001,
+                AgencyId = local.CaseManagerOne.AgencyId, Status = (int)item.Status,
+                EventDate = eventDate, Narrative = "Parity fixture", Revision = 1 });
+        }
+        await using (var api = new ApiDbContext(apiOptions))
+        {
+            api.Notes.AddRange(apiNotes);
+            await api.SaveChangesAsync();
+        }
+
+        await local.NotesAs(local.CaseManagerOne, time).UpdateAbandonedNotesAsync(windowDays);
+        var apiSweep = new NoteAbandonmentSweep(new ApiPipelineContextFactory(apiOptions),
+            new ApiClock(Options.Create(new SatiApiOptions()), time));
+        var result = await apiSweep.RunAsync(local.CaseManagerOne.AgencyId,
+            local.CaseManagerOne.Id, NoteAbandonmentRules.DesktopBatchSize,
+            "desktop", CancellationToken.None);
+        Assert.Equal(1, result.ChangedCount);
+
+        await using var actualApi = new ApiDbContext(apiOptions);
+        for (var index = 0; index < cases.Length; index++)
+        {
+            var localNote = await local.NoteAsync(localIds[index]);
+            var apiNote = await actualApi.Notes.AsNoTracking()
+                .SingleAsync(note => note.Id == apiNotes[index].Id);
+            var expected = NoteAbandonmentRules.IsEligible((int)cases[index].Status,
+                today.AddDays(-cases[index].AgeDays), today, windowDays)
+                ? NoteStatus.Abandoned : cases[index].Status;
+            Assert.Equal(expected, localNote.Status);
+            Assert.Equal((int)expected, apiNote.Status);
+            Assert.Equal(localNote.Revision, apiNote.Revision);
+            Assert.Equal(expected == NoteStatus.Abandoned &&
+                cases[index].Status == NoteStatus.Pending ? 2 : 1, apiNote.Revision);
+        }
+        await using var localDb = local.Factory.CreateDbContext();
+        var localAudit = await localDb.AuditEvents.SingleAsync(item =>
+            item.Action == "note.abandoned-by-system");
+        var apiAudit = await actualApi.AuditEvents.SingleAsync(item =>
+            item.Action == "note.abandoned-by-system");
+        foreach (var audit in new[] { localAudit.MetadataJson, apiAudit.MetadataJson })
+        {
+            using var metadata = System.Text.Json.JsonDocument.Parse(audit);
+            Assert.Equal("system", metadata.RootElement.GetProperty("actorKind").GetString());
+            Assert.Equal(1, metadata.RootElement.GetProperty("noteCount").GetInt32());
+        }
+        Assert.Equal(SystemActor.UserId, localAudit.ActorUserId);
+        Assert.Equal(SystemActor.UserId, apiAudit.ActorUserId);
+    }
+
+    [Fact]
+    public async Task LocalAbandonmentSweepProcessesAtMostOneSharedDesktopBatch()
+    {
+        var time = new FrozenTimeProvider(new DateTimeOffset(2026, 10, 3, 12, 0, 0,
+            TimeSpan.Zero));
+        var overdue = TenantClock.MaineDate(time.GetUtcNow()).AddDays(-30);
+        await using var fixture = await PipelineFixture.CreateAsync();
+        var ids = await fixture.SeedNotesBatchAsync(fixture.PersonOneId,
+            NoteAbandonmentRules.DesktopBatchSize + 1, overdue);
+        var service = fixture.NotesAs(fixture.CaseManagerOne, time);
+
+        await service.UpdateAbandonedNotesAsync(8);
+        Assert.Equal(NoteStatus.Abandoned, await fixture.StatusOfAsync(ids[^2]));
+        Assert.Equal(NoteStatus.Pending, await fixture.StatusOfAsync(ids[^1]));
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var audit = await db.AuditEvents.SingleAsync(item =>
+                item.Action == "note.abandoned-by-system");
+            using var metadata = System.Text.Json.JsonDocument.Parse(audit.MetadataJson);
+            Assert.Equal(NoteAbandonmentRules.DesktopBatchSize,
+                metadata.RootElement.GetProperty("noteCount").GetInt32());
+            Assert.True(metadata.RootElement.GetProperty("idsTruncated").GetBoolean());
+        }
+
+        await service.UpdateAbandonedNotesAsync(8);
+        Assert.Equal(NoteStatus.Abandoned, await fixture.StatusOfAsync(ids[^1]));
     }
 
     // ---------------------------------------------------------------------
@@ -1271,7 +1406,7 @@ public sealed class NotePipelineTests
         await db.SaveChangesAsync();
     }
 
-    private sealed class PipelineFixture : IAsyncDisposable
+    internal sealed class PipelineFixture : IAsyncDisposable
     {
         private const int AgencyOne = 101;
         private const int AgencyTwo = 102;
@@ -1315,7 +1450,8 @@ public sealed class NotePipelineTests
             return fixture;
         }
 
-        public INoteService NotesAs(User user) => new NoteService(Factory, SessionFor(user));
+        public INoteService NotesAs(User user, TimeProvider? timeProvider = null) =>
+            new NoteService(Factory, SessionFor(user), timeProvider);
 
         public ISupervisorService SupervisionAs(User user) =>
             new SupervisorService(Factory, SessionFor(user));
@@ -1371,6 +1507,21 @@ public sealed class NotePipelineTests
             db.Notes.Add(note);
             await db.SaveChangesAsync();
             return note.Id;
+        }
+
+        public async Task<int[]> SeedNotesBatchAsync(int personId, int count, DateTime eventDate)
+        {
+            await using var db = Factory.CreateDbContext();
+            var person = await db.People.SingleAsync(candidate => candidate.Id == personId);
+            var notes = Enumerable.Range(0, count).Select(_ =>
+            {
+                var note = Note.Create("Batch note", eventDate, NoteStatus.Pending, 60, personId);
+                note.AgencyId = person.AgencyId;
+                return note;
+            }).ToArray();
+            db.Notes.AddRange(notes);
+            await db.SaveChangesAsync();
+            return notes.Select(note => note.Id).ToArray();
         }
 
         public async Task<Note> NoteAsync(int noteId)
@@ -1512,5 +1663,20 @@ public sealed class NotePipelineTests
 
         public Task<SatiContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(CreateDbContext());
+    }
+
+    private sealed class ApiPipelineContextFactory(DbContextOptions<ApiDbContext> options)
+        : IDbContextFactory<ApiDbContext>
+    {
+        public ApiDbContext CreateDbContext() => new(options);
+
+        public ValueTask<ApiDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(CreateDbContext());
+    }
+
+    private sealed class FrozenTimeProvider(DateTimeOffset instant) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => instant;
     }
 }

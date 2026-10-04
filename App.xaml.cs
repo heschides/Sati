@@ -104,6 +104,8 @@ namespace Sati
                             context.Configuration,
                             selectedEnvironment);
                         services.AddSingleton(dataEnvironment);
+                        services.AddSingleton(TimeProvider.System);
+                        services.AddSingleton<DateRolloverRefreshCoordinator>();
 
                         services.Configure<LocalAiOptions>(
                             context.Configuration.GetSection(LocalAiOptions.SectionName));
@@ -236,6 +238,8 @@ namespace Sati
                         // (CaseManagerDashboardViewModel, NotesWindowViewModel),
                         // each capturing its own long-lived, isolated instance.
                         services.AddTransient<NoteEntryViewModel>();
+                        services.AddTransient<NoteAmendmentsViewModel>();
+                        services.AddTransient<NoteAmendmentFinancialReviewsViewModel>();
                         services.AddSingleton<BillingDashboardViewModel>();
                         services.AddSingleton<BillingOverviewViewModel>();
                         services.AddSingleton<BillingQueueViewModel>();
@@ -558,6 +562,7 @@ namespace Sati
             services.AddTransient<IConsumerScheduleService, ConsumerScheduleService>();
             services.AddTransient<IReleaseObligationService, ReleaseObligationService>();
             services.AddTransient<INoteService, NoteService>();
+            services.AddTransient<INoteAmendmentService, NoteAmendmentService>();
             services.AddTransient<IScheduledNoteMoveService, ScheduledNoteMoveService>();
             services.AddTransient<IAuthService, AuthService>();
             services.AddTransient<IUserService, UserService>();
@@ -630,11 +635,13 @@ namespace Sati
             services.AddSingleton<IncidentOutbox>();
             services.AddTransient<IAuthService, CloudAuthService>();
             services.AddTransient<IAdminService, CloudAdminService>();
-            services.AddTransient<IIncidentReporter, CloudIncidentReporter>();
+            // One reporter owns the per-session retry loop and its cancellation.
+            services.AddSingleton<IIncidentReporter, CloudIncidentReporter>();
             services.AddTransient<IPlatformHealthService, CloudPlatformHealthService>();
             services.AddTransient<IPersonService, CloudPersonService>();
             services.AddTransient<IPersonPhotoService, CloudPersonPhotoService>();
             services.AddTransient<INoteService, CloudNoteService>();
+            services.AddTransient<INoteAmendmentService, CloudNoteAmendmentService>();
             services.AddTransient<IScheduledNoteMoveService, CloudScheduledNoteMoveService>();
             services.AddTransient<ISettingsService, CloudSettingsService>();
             services.AddTransient<IScratchpadService, CloudScratchpadService>();

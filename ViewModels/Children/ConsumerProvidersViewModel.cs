@@ -37,6 +37,12 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     private List<Provider> _directory = [];
     private List<ProviderAffiliationNode> _nodes = [];
     private int? _personId;
+    private string _orderVersion = string.Empty;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveOrderCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RetryOrderCommand))]
+    private bool hasOrderChanges;
+    [ObservableProperty] private string orderMessage = string.Empty;
 
     // The free-text fields that predate the directory. Held so the panel can offer to link
     // them; never written to, and never cleared — the typed value is the only record of what
@@ -98,7 +104,7 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     public bool HasCurrent => Current.Count > 0;
     public bool HasPast => Past.Count > 0;
     public bool CanAdd =>
-        HasLoadedPerson && NewProviderId is > 0 && NewStartDate is not null && !IsBusy;
+        HasLoadedPerson && NewProviderId is > 0 && NewStartDate is not null && !IsBusy && !HasOrderChanges;
     public bool HasSelectedProvider => SelectedProvider is not null;
     public bool SelectedProviderIsMedical => SelectedProvider?.Type == ProviderType.Healthcare;
     public bool SelectedProviderIsService => SelectedProvider?.Type == ProviderType.Waiver;
@@ -155,6 +161,7 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(CanAdd));
         OnPropertyChanged(nameof(CanLinkLegacyPrimaryCare));
+        UpdateOrderCommands();
     }
     partial void OnHasLoadedPersonChanged(bool value) => OnPropertyChanged(nameof(CanAdd));
 
@@ -170,6 +177,11 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     public void SetPerson(Person? person)
     {
         var request = _loads.Begin();
+
+        IsBusy = false;
+        HasOrderChanges = false;
+        OrderMessage = string.Empty;
+        _orderVersion = string.Empty;
 
         Current.Clear();
         Past.Clear();
@@ -190,12 +202,14 @@ public partial class ConsumerProvidersViewModel : ObservableObject
 
     public async Task RefreshAsync()
     {
+        if (HasOrderChanges || IsBusy) return;
         if (_personId is { } id)
             await LoadAsync(id, _loads.Begin());
     }
 
     private async Task LoadAsync(int personId, int request)
     {
+        IsBusy = true;
         try
         {
             var directory = await _providerService.GetAllAsync();
@@ -238,14 +252,21 @@ public partial class ConsumerProvidersViewModel : ObservableObject
             if (_loads.IsCurrent(request) && _personId == personId)
                 StatusMessage = exception.Message;
         }
+        finally
+        {
+            if (_loads.IsCurrent(request) && _personId == personId) IsBusy = false;
+        }
     }
 
     private void Populate(IEnumerable<PersonProvider> links)
     {
+        var snapshot = links.ToList();
+        _orderVersion = ConsumerProviderOrder.Version(snapshot.Select(ConsumerProviderOrderSnapshot.Fact));
+        HasOrderChanges = false;
         Current.Clear();
         Past.Clear();
 
-        var rows = links.Select(BuildRow).ToList();
+        var rows = snapshot.Select(BuildRow).ToList();
         foreach (var row in ConsumerProviderRules.OrderForDisplay(
                      rows.Where(row => row.IsCurrent),
                      row => row.IsPrimaryCare,
@@ -265,7 +286,98 @@ public partial class ConsumerProvidersViewModel : ObservableObject
         }
 
         RaiseListChanged();
+        UpdateOrderCommands();
     }
+
+    private bool CanMoveUp(ConsumerProviderRowViewModel? row) => !IsBusy && row is not null &&
+        Current.IndexOf(row) > 0 && !row.IsPrimaryCare && !Current[Current.IndexOf(row) - 1].IsPrimaryCare;
+    private bool CanMoveDown(ConsumerProviderRowViewModel? row) => !IsBusy && row is not null &&
+        Current.Contains(row) && Current.IndexOf(row) < Current.Count - 1 && !row.IsPrimaryCare;
+
+    [RelayCommand(CanExecute = nameof(CanMoveUp))]
+    private void MoveUp(ConsumerProviderRowViewModel? row) => Move(row!, -1);
+    [RelayCommand(CanExecute = nameof(CanMoveDown))]
+    private void MoveDown(ConsumerProviderRowViewModel? row) => Move(row!, 1);
+    private void Move(ConsumerProviderRowViewModel row, int direction)
+    {
+        if (direction < 0 ? !CanMoveUp(row) : !CanMoveDown(row)) return;
+        var index = Current.IndexOf(row);
+        Current.Move(index, index + direction);
+        HasOrderChanges = true;
+        OrderMessage = "Order changed. Save order to keep this arrangement. Primary care stays first; past assignments keep their history order.";
+        UpdateOrderCommands();
+    }
+
+    private bool CanSaveOrder() => HasOrderChanges && !IsBusy && _personId is not null;
+    [RelayCommand(CanExecute = nameof(CanSaveOrder))]
+    private Task SaveOrder() => PersistOrderAsync(false);
+    [RelayCommand(CanExecute = nameof(CanSaveOrder))]
+    private Task RetryOrder() => PersistOrderAsync(true);
+
+    private bool CanReloadOrder() => !IsBusy && _personId is not null;
+    [RelayCommand(CanExecute = nameof(CanReloadOrder))]
+    private async Task ReloadOrder()
+    {
+        if (IsBusy) return;
+        HasOrderChanges = false;
+        OrderMessage = string.Empty;
+        await RefreshAsync();
+    }
+
+    private async Task PersistOrderAsync(bool refreshVersion)
+    {
+        if (!CanSaveOrder() || _personId is not int personId) return;
+        var requestId = _loads.Begin();
+        var ids = Current.Select(row => row.Id).ToArray();
+        var version = _orderVersion;
+        IsBusy = true;
+        OrderMessage = "Saving provider order…";
+        try
+        {
+            if (refreshVersion)
+            {
+                var fresh = await _linkService.GetByPersonAsync(personId);
+                if (!_loads.IsCurrent(requestId) || _personId != personId) return;
+                var facts = fresh.Select(ConsumerProviderOrderSnapshot.Fact).ToList();
+                version = ConsumerProviderOrder.Version(facts);
+                if (ConsumerProviderOrder.Validate(new(version, ids), facts) is { } error)
+                    throw new InvalidOperationException(error + " Reload to review the changed assignments.");
+            }
+            var saved = await _linkService.ReorderAsync(personId, new(version, ids));
+            if (!_loads.IsCurrent(requestId) || _personId != personId) return;
+            // Keep existing row containers/focus. Reordering cannot change relationship fields.
+            _orderVersion = ConsumerProviderOrder.Version(saved.Select(ConsumerProviderOrderSnapshot.Fact));
+            if (refreshVersion) Populate(saved);
+            HasOrderChanges = false;
+            OrderMessage = "Provider order saved.";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or UnauthorizedAccessException
+            or CloudApiException or CloudConnectivityException or SessionExpiredException)
+        {
+            if (_loads.IsCurrent(requestId) && _personId == personId)
+                OrderMessage = exception.Message + " Your intended order is still shown. Reload discards it; retry applies it to fresh assignments.";
+        }
+        finally
+        {
+            if (_loads.IsCurrent(requestId) && _personId == personId) IsBusy = false;
+        }
+    }
+
+    private void UpdateOrderCommands()
+    {
+        MoveUpCommand.NotifyCanExecuteChanged();
+        MoveDownCommand.NotifyCanExecuteChanged();
+        SaveOrderCommand.NotifyCanExecuteChanged();
+        RetryOrderCommand.NotifyCanExecuteChanged();
+        ReloadOrderCommand.NotifyCanExecuteChanged();
+        EndProviderCommand.NotifyCanExecuteChanged();
+        RemoveProviderCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanAdd));
+        OnPropertyChanged(nameof(CanLinkLegacyPrimaryCare));
+    }
+
+    private bool CanChangeAssignment(ConsumerProviderRowViewModel? row) =>
+        !IsBusy && !HasOrderChanges && row is not null && Current.Contains(row);
 
     private ConsumerProviderRowViewModel BuildRow(PersonProvider link)
     {
@@ -293,6 +405,7 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     [RelayCommand]
     private async Task AddProvider()
     {
+        if (IsBusy || HasOrderChanges) return;
         if (_personId is not { } personId || NewProviderId is not { } providerId)
             return;
         if (NewStartDate is not DateTime startDate)
@@ -318,9 +431,10 @@ public partial class ConsumerProvidersViewModel : ObservableObject
             ClearEditor();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanChangeAssignment))]
     private async Task EndProvider(ConsumerProviderRowViewModel? row)
     {
+        if (!CanChangeAssignment(row)) return;
         if (row is null || _personId is not { } personId)
             return;
 
@@ -329,9 +443,10 @@ public partial class ConsumerProvidersViewModel : ObservableObject
         await RunAsync(() => _linkService.EndAsync(personId, row.Id, _today()));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanChangeAssignment))]
     private async Task RemoveProvider(ConsumerProviderRowViewModel? row)
     {
+        if (!CanChangeAssignment(row)) return;
         if (row is null || _personId is not { } personId)
             return;
 
@@ -342,6 +457,8 @@ public partial class ConsumerProvidersViewModel : ObservableObject
 
     private async Task<bool> RunAsync(Func<Task> operation)
     {
+        if (_personId is not int personId || IsBusy || HasOrderChanges) return false;
+        var request = _loads.Begin();
         StatusMessage = string.Empty;
         IsBusy = true;
         try
@@ -356,18 +473,23 @@ public partial class ConsumerProvidersViewModel : ObservableObject
         {
             // The rules reject an edit rather than correcting it, so the entered values stay
             // on screen with the reason beside them.
-            StatusMessage = exception.Message;
+            if (_loads.IsCurrent(request) && _personId == personId)
+                StatusMessage = exception.Message;
             return false;
         }
         finally
         {
-            IsBusy = false;
+            if (_loads.IsCurrent(request) && _personId == personId)
+                IsBusy = false;
         }
 
-        await RefreshAsync();
+        if (!_loads.IsCurrent(request) || _personId != personId) return false;
+        var refresh = _loads.Begin();
+        await LoadAsync(personId, refresh);
+        if (!_loads.IsCurrent(refresh) || _personId != personId) return false;
         if (ProviderAssignmentsChangedAsync is not null)
             await ProviderAssignmentsChangedAsync();
-        return true;
+        return _loads.IsCurrent(refresh) && _personId == personId;
     }
 
     private void ClearEditor()
@@ -402,7 +524,7 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     public string PrimaryCareLinkGuidance => LegacyProviderLinking.PrimaryCareGuidance(_legacyMatch);
 
     /// <summary>Only an unambiguous single match can be linked in one click.</summary>
-    public bool CanLinkLegacyPrimaryCare => NeedsPrimaryCareLinking && _legacyMatch.CanLink && !IsBusy;
+    public bool CanLinkLegacyPrimaryCare => NeedsPrimaryCareLinking && _legacyMatch.CanLink && !IsBusy && !HasOrderChanges;
 
     public string LinkLegacyPrimaryCareLabel => $"Link {_legacyMatch.ProviderName}";
 
@@ -421,6 +543,7 @@ public partial class ConsumerProvidersViewModel : ObservableObject
     [RelayCommand]
     private async Task LinkLegacyPrimaryCare()
     {
+        if (!CanLinkLegacyPrimaryCare) return;
         if (_personId is not { } personId || !_legacyMatch.CanLink)
             return;
 
@@ -544,6 +667,8 @@ public sealed class ConsumerProviderRowViewModel
         $"{ProviderName}, {ProviderKindLabel}, {RoleLabel}, {DateRangeLabel}, {StatusLabel}" +
         (HasAffiliation ? $", {Affiliation}" : string.Empty);
     public string EndAutomationName => $"End the provider assignment for {ProviderName}";
+    public string MoveUpAutomationName => $"Move {ProviderName} up in the current provider order";
+    public string MoveDownAutomationName => $"Move {ProviderName} down in the current provider order";
     public string RemoveAutomationName =>
         $"Remove the incorrectly entered provider assignment for {ProviderName}";
 }

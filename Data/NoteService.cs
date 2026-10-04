@@ -208,23 +208,59 @@ public class NoteService(
                 "The abandonment threshold must be a positive number of days.");
 
         var actor = CurrentActor();
-        await using var context = contextFactory.CreateDbContext();
-        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
-        await EnsureUserInScopeAsync(context, actor, actor.Id);
-        var threshold = DateTime.Today.AddDays(-abandonedAfterDays);
-        var notes = await context.Notes.Where(n => n.Person.UserId == actor.Id &&
-            n.Person.AgencyId == actor.AgencyId &&
-            n.AgencyId == actor.AgencyId &&
-            n.Status == NoteStatus.Pending &&
-            n.EventDate.HasValue && n.EventDate.Value < threshold).ToListAsync();
-        foreach (var note in notes)
+        var today = TenantClock.MaineDate((timeProvider ?? TimeProvider.System).GetUtcNow());
+        await using var strategyContext = contextFactory.CreateDbContext();
+        var strategy = strategyContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            if (!NoteWorkflow.CanSystemAbandon((int?)note.Status))
-                continue;
-            note.Status = NoteStatus.Abandoned;
-            note.Revision++;
-        }
-        await context.SaveChangesAsync();
+            await using var context = contextFactory.CreateDbContext();
+            await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+            await EnsureUserInScopeAsync(context, actor, actor.Id);
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            var threshold = today.AddDays(-abandonedAfterDays);
+            var candidates = await context.Notes.AsNoTracking()
+                .Where(n => n.Person.UserId == actor.Id &&
+                    n.Person.AgencyId == actor.AgencyId && n.AgencyId == actor.AgencyId &&
+                    n.Status == NoteStatus.Pending && n.EventDate.HasValue &&
+                    n.EventDate.Value < threshold)
+                .OrderBy(n => n.EventDate).ThenBy(n => n.Id)
+                .Select(n => new { n.Id, n.Revision, n.Status, n.EventDate })
+                .Take(NoteAbandonmentRules.DesktopBatchSize)
+                .ToListAsync();
+            var changedIds = new List<int>();
+            foreach (var candidate in candidates)
+            {
+                if (!NoteAbandonmentRules.IsEligible((int?)candidate.Status,
+                        candidate.EventDate, today, abandonedAfterDays))
+                    continue;
+                var changed = await context.Notes.Where(n =>
+                        n.Id == candidate.Id && n.Revision == candidate.Revision &&
+                        n.Status == candidate.Status && n.EventDate == candidate.EventDate &&
+                        n.Person.UserId == actor.Id && n.Person.AgencyId == actor.AgencyId &&
+                        n.AgencyId == actor.AgencyId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(n => n.Status, NoteStatus.Abandoned)
+                        .SetProperty(n => n.Revision, n => n.Revision + 1));
+                if (changed == 1) changedIds.Add(candidate.Id);
+            }
+            if (changedIds.Count > 0)
+            {
+                LocalAuditTrail.RecordSystem(context, actor.AgencyId,
+                    LocalAuditActions.NoteAbandonedBySystem, "Note",
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        actorKind = "system",
+                        jobName = "NoteAbandonmentSweep",
+                        trigger = "desktop",
+                        localDate = today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                        noteCount = changedIds.Count,
+                        noteIds = changedIds.Take(100).ToArray(),
+                        idsTruncated = changedIds.Count > 100
+                    }));
+                await context.SaveChangesAsync();
+            }
+            await transaction.CommitAsync();
+        });
     }
 
     public async Task<List<Note>> GetMonthlyNotesAsync(int userId)
@@ -759,7 +795,8 @@ public class NoteService(
                 existing.Minutes, existing.Status?.ToString(), $"a note for {existing.Person.FullName}"))
             .OfType<ServiceBlock>();
         var conflicts = ServiceTimeline.FindConflicts(candidate, blocks);
-        if (conflicts.Count > 0)
+        if (conflicts.Count > 0 || await NoteAmendmentSchedule.ConflictsAsync(context,
+            context.Notes.Where(n => n.AgencyId == agencyId && n.Person.AgencyId == agencyId && n.Person.UserId == userId).Select(n => n.Id), agencyId, eventDate, candidate))
             throw new InvalidOperationException("This service time overlaps time already recorded on this date. " +
                 string.Join(" ", conflicts.Select(conflict => conflict.Reason)));
     }

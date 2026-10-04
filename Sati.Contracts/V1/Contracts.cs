@@ -725,7 +725,8 @@ public sealed record ClaimLineDto(
     bool IsComplianceException,
     string? ComplianceExceptionReason,
     string ClientName,
-    IReadOnlyList<string> ReadinessErrors);
+    IReadOnlyList<string> ReadinessErrors,
+    long? AmendedNoteVersionId = null);
 
 public sealed record BillingConfigurationDto(
     string ProcedureCode,

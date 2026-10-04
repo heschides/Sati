@@ -172,12 +172,21 @@ internal static partial class ApiEndpoints
                     $"{ClaimCorrectionRules.Describe(request.Action)} is not available for this claim. {options.Explanation}",
                     string.Empty));
 
+            var approvedAmendment = await NoteAmendmentBilling.AuthorizedContentAsync(db, actor.AgencyId, line.NoteId, cancellationToken);
+            if (approvedAmendment?.VersionId != request.ApprovedAmendmentVersionId)
+                return Results.Conflict(new ApiErrorDto("note_amendment_changed", "Identify the exact financially reviewed amendment version when correcting this claim.", string.Empty));
+            if (approvedAmendment is { } financial && request.Action != ClaimCorrectionAction.Void &&
+                (financial.Content.IsUnbilled || request.CorrectedChargeAmount is not > 0))
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["amendment"] = ["An Unbilled service requires voiding the standing claim. For a replacement or resubmission, explicitly confirm the corrected positive charge."] });
+            if (approvedAmendment is null && request.CorrectedChargeAmount is not null)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["correctedChargeAmount"] = ["A financial charge change requires a reviewed amendment."] });
             var correction = new ClaimCorrection
             {
                 AgencyId = actor.AgencyId,
                 BillingPeriodId = period.Id,
                 ClaimLineId = line.Id,
                 NoteId = line.NoteId,
+                AmendedNoteVersionId = approvedAmendment?.VersionId,
                 Action = request.Action,
                 PayerClaimControlNumber = request.Action == ClaimCorrectionAction.Resubmit
                     ? null : options.PayerClaimControlNumber,
@@ -199,6 +208,8 @@ internal static partial class ApiEndpoints
                 correction.RenderingProviderNpi = source?.RenderingProviderNpi ?? line.RenderingProviderNpi;
                 correction.DiagnosisCode = source?.DiagnosisCode ?? line.DiagnosisCode;
                 correction.PlaceOfService = source?.PlaceOfService ?? line.PlaceOfService;
+                correction.CorrectedDateOfService = source?.CorrectedDateOfService;
+                correction.CorrectedUnits = source?.CorrectedUnits; correction.CorrectedChargeAmount = source?.CorrectedChargeAmount;
             }
             else
             {
@@ -215,6 +226,8 @@ internal static partial class ApiEndpoints
                 if (row is null)
                     return Results.Conflict(new ApiErrorDto("invalid_billing_source",
                         "The claim's service note is no longer an approved note in this agency.", string.Empty));
+                db.Entry(row.Note).State = EntityState.Detached;
+                await ApplyFinancialAmendmentAsync(db, actor.AgencyId, row.Note, cancellationToken);
                 var agency = await db.Agencies.AsNoTracking()
                     .SingleOrDefaultAsync(candidate => candidate.Id == actor.AgencyId, cancellationToken);
                 var forms = await db.Forms.AsNoTracking().Include(form => form.Attestations)
@@ -239,6 +252,12 @@ internal static partial class ApiEndpoints
                 correction.PlaceOfService = row.Person.PlaceOfService!.Value;
             }
 
+            if (approvedAmendment is { } approved && request.Action != ClaimCorrectionAction.Void)
+            {
+                correction.CorrectedDateOfService = approved.Content.EventDate!.Value.Date;
+                correction.CorrectedUnits = BillingRules.CalculateSection13Units(approved.Content.Minutes);
+                correction.CorrectedChargeAmount = request.CorrectedChargeAmount!.Value;
+            }
             var readiness = ProfessionalClaimReadiness.EvaluatePeriod(
                 period.Year, period.Month, [ContractMapper.ToReadinessFacts(CorrectedLine(line, correction))]);
             if (!readiness.IsReady)
@@ -310,6 +329,7 @@ internal static partial class ApiEndpoints
                 return Results.Conflict(new ApiErrorDto("no_corrections_waiting",
                     "There are no corrections waiting to be sent for this billing period.", string.Empty));
 
+            foreach (var correction in waiting) await NoteAmendmentBilling.ValidateLineVersionAsync(db, actor.AgencyId, correction.NoteId, correction.AmendedNoteVersionId, cancellationToken);
             var generatedAt = clock.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
             if (await db.EdiGenerations.AnyAsync(item => item.AgencyId == actor.AgencyId &&
@@ -465,11 +485,12 @@ internal static partial class ApiEndpoints
         Id = line.Id,
         NoteId = line.NoteId,
         BillingPeriodId = line.BillingPeriodId,
-        DateOfService = line.DateOfService,
+        DateOfService = correction.CorrectedDateOfService ?? line.DateOfService,
+        AmendedNoteVersionId = correction.AmendedNoteVersionId,
         ProcedureCode = line.ProcedureCode,
         ProcedureModifier = line.ProcedureModifier,
-        Units = line.Units,
-        ChargeAmount = line.ChargeAmount,
+        Units = correction.CorrectedUnits ?? line.Units,
+        ChargeAmount = correction.CorrectedChargeAmount ?? line.ChargeAmount,
         ClientMaineCareId = correction.ClientMaineCareId,
         RenderingProviderNpi = correction.RenderingProviderNpi,
         DiagnosisCode = correction.DiagnosisCode,

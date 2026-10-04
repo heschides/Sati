@@ -6,6 +6,11 @@ using Sati.Contracts.V1;
 
 namespace Sati.Api.Infrastructure;
 
+internal static class DemoResetLease
+{
+    internal const string Resource = "SatiDemo.FullReset";
+}
+
 internal sealed class DemoMutationLeaseMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(
@@ -30,10 +35,11 @@ internal sealed class DemoMutationLeaseMiddleware(RequestDelegate next)
         await using var command = connection.CreateCommand();
         command.CommandText = """
             DECLARE @result int;
-            EXEC @result=sys.sp_getapplock @Resource=N'SatiDemo.FullReset',
+            EXEC @result=sys.sp_getapplock @Resource=@resource,
                 @LockMode=N'Shared', @LockOwner=N'Session', @LockTimeout=0;
             SELECT @result;
             """;
+        command.Parameters.AddWithValue("@resource", DemoResetLease.Resource);
         var result = Convert.ToInt32(await command.ExecuteScalarAsync(context.RequestAborted));
         if (result < 0)
         {
@@ -49,7 +55,8 @@ internal sealed class DemoMutationLeaseMiddleware(RequestDelegate next)
         finally
         {
             await using var release = connection.CreateCommand();
-            release.CommandText = "EXEC sys.sp_releaseapplock @Resource=N'SatiDemo.FullReset', @LockOwner=N'Session';";
+            release.CommandText = "EXEC sys.sp_releaseapplock @Resource=@resource, @LockOwner=N'Session';";
+            release.Parameters.AddWithValue("@resource", DemoResetLease.Resource);
             await release.ExecuteNonQueryAsync(CancellationToken.None);
         }
     }
