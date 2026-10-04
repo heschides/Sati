@@ -1,6 +1,6 @@
 # Sati — Refactor Agenda
 
-## Release 1.3.35 — October 4, 2026 (publication verified; closing audit)
+## Release 1.3.35 — October 4, 2026 (published)
 
 "Approved-note amendments and provider organization." Scope: linked approved-note
 amendments with explicit financial review for financial changes, provider-panel
@@ -85,7 +85,9 @@ in force. No Function publication or Claim.MD call occurred in this release.
       `A3AC0BBF356C44FBA263A5E237FC72B6A9DC55580A303B3BA04C299F9E4C7656` (Local)
       and `416DC4A52AD4FC07F8CA4FAEA535DB615F9BF90FC68EBAAFA856DAF2563B88C4` (Demo).
       `TestResults/datt-1.3.35-distribution.json` records all four verified copies.
-- [ ] Push final release evidence and verify clean local/remote default-branch equality.
+- [x] Final operational evidence commit `a382fc98f0b54cb1ceebed57c8866a265620af5c`
+      pushed to `origin/master`; local/remote equality and a clean working tree
+      verified. This closing ledger update records that evidence commit.
 
 Preflight tips were `89c2c1e0e2d29650498a6938056fc9d73353ad29` on default and
 `codex/background-workers`; the reviewed dirty source moved intact to `master`.
