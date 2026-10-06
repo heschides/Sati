@@ -1,15 +1,62 @@
 # Sati — Refactor Agenda
 
-## Release 1.3.36 — October 6, 2026 (in progress)
+## Release 1.3.36 — October 6, 2026 (completed)
 
 - Scope: explicit PCP/assessment progress, quarterly completion notes, corrected follow-up
   suggestions, Telehealth, note layout, History sizing, month shortcuts, reviewed payer
   configuration and DATT tooling improvements.
-- Source/build/tests/API/installer/publication evidence: pending.
+- Source commit `e3164910c42bf0721991e0cffda2ad9fa10ffe39` pushed to master.
+- Final full Release build passed: 0 errors, 18 warnings. Full solution tests ran
+  with SQL tests in a new synthetic LocalDB instance, which was stopped/deleted.
+  Initial UI contrast/binding and API manifest failures were repaired; all 40
+  failed results have passing replay evidence (154 UI and 5 API surface cases).
+  Project coverage: desktop 2,908 passing plus one absent external-model skip;
+  API 1,053, Carika 4, Portal 8, Signatures 119 passing. Unaffected passing gates reused.
+  Evidence: `TestResults/datt-1.3.36-test-coverage.json` and final build log.
+- Demo API ZIP: 11,688,622 bytes, SHA-256
+  `4D3E65090E0770F8B63CC94704A62920851541E32ACF4089C6231F8CD386E887`.
+  Assembly 1.3.36.0, 70 safe entries. Demo deployment
+  `82c452f4e2cb4d22a2e96dbe4260135c` succeeded at 21:23:40.1333478Z.
+  Live/ready healthy, version 1.3.36, contract `1BC53A01599D`.
+  Authenticated readiness skipped: designated Demo credentials unavailable.
+  Prior 1.3.35 package/deployment retained; no external billing activation.
+- Demo installer built: 104,341,504 bytes, SHA-256
+  `52A95429053B93F23BE18D79E90C19362B208E2C84C08D54DC17BE03663FCD80`.
+  Local installer built: 206,674,985 bytes, SHA-256
+  `EB65310035121BCBAD45BC5641E26CA7C52F23C0DBC52CADB83A5D7AE97185C8`.
+  Demo acceptance: five responsive 15-second launches, graceful close, exact version and
+  cleanup passed. Local acceptance: exact version, embedded Microsoft MSI signature,
+  Windows integrated security and cleanup passed. Isolated acceptance on LONGCHENPA;
+  external-machine attestation remains unverified.
+  Both installers and checksum files published without overwrite, with matching final hashes:
+  `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop\SatiLocalSetup-1.3.36.exe`
+  and `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files\SatiDemoSetup-1.3.36.exe`.
+  Evidence: `TestResults/datt-1.3.36-{demo,local}-installer-acceptance.json`
+  and `TestResults/datt-1.3.36-distribution.json` (all four final file hashes).
+  Read-only pre-capture check: 177 synthetic clients, zero proposed changes and zero unexpected
+  billing holds. Replacement capture reported `DEMO_FULL_RESET_BASELINE_CAPTURED`, anchor
+  2026-10-06. One verification reset accepted (202) at 21:58:11Z, request
+  `f38b24dd-4840-4425-8664-ee501df4cb1e`; `demo.reset.completed` at 22:01:59Z,
+  stage Completed, duration 226 seconds. Correlated worker operation
+  `328433a6a3517a09df3e4b287ba3cff7` recorded `DEMO_COMPLIANCE_HISTORY_COMPLETE`.
+  Post-reset API live/ready remained healthy, version 1.3.36 and contract 1BC53A01599D.
+  Evidence: reset-request/outcome/markers and api-health-after-reset JSON under
+  `TestResults/datt-1.3.36-*`.
+  All operational release gates completed; this closing ledger is the final evidence commit.
 - Demo migration, replacement baseline and one verification reset explicitly authorized
   by Josh in this release conversation. Exact-IP rule added by Josh and verified.
-- Rollback-only migration rehearsal passed; Demo remains at 125 migrations.
-- Local machine inventory: LONGCHENPA (current development workstation), installed
+- Guarded Demo migration rehearsal passed and rolled back at 125 migrations.
+  Application reached 126; rerun reported `IDEMPOTENCY_VERIFIED`.
+  Reviewed SQL SHA-256 `C8BC119D26C647DACA32FCB1EC7A49E56B6504EBEB3BDF50EFE6623D24176E27`.
+  No Local Production database was queried or migrated.
+- Connectivity changed after API publication: SQL reported workstation IP
+  `72.95.106.10`; the user-added rule still allowed `66.211.131.66`. Read-only
+  pre-capture check was blocked before reading data. Josh removed the old rule and added
+  exact-IP `datt-workstation-20261006` for `72.95.106.10`; read-only Azure inspection verified it.
+  Josh removed the temporary rule; successful read-only Azure listing verified its absence
+  at 22:50:09Z. Evidence: `TestResults/datt-1.3.36-firewall-removal.json`.
+- Local machine inventory: LONGCHENPA (current development workstation), debugger executable
+  1.3.35.0 (file metadata only; closed for installer acceptance), installed
   version/schema unverified; other Local machines and installed versions unknown.
   Debugger use is not evidence that every Local machine has caught up.
 - Branch audit: master matches origin/master. Existing feature/CI/background-worker
@@ -8951,8 +8998,8 @@ is preserved. The first documented profile is MaineCare Section 13 through Claim
 See PAYER_BILLING_REQUIREMENTS.md for primary-source dates/requirements and
 PAYER_BILLING_CERTIFICATION.md for the separate certification/migration checklist.
 
-- [ ] Controlled migration 20261004204633_AddPayerBillingConfigurationVersions (125 -> 126),
-      matching client/API release and reviewed replacement Demo baseline; no deployment performed.
+- [x] Controlled Demo migration 20261004204633_AddPayerBillingConfigurationVersions (125 -> 126)
+      and matching 1.3.36 API/installers; replacement baseline captured. See current release evidence.
 - [ ] Josh names the agency enrollment/billing reviewer; obtain post-transition companion guide,
       exact facility qualifier, population applicability, fee schedule/rounding and payer acceptance.
 - [ ] Authorized vendor sandbox certification and any later real credentials/submission authority.
