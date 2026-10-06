@@ -25,6 +25,8 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $processGuardScript = Join-Path $repoRoot 'installer\InstallerProcessGuard.ps1'
 . $processGuardScript
+. (Join-Path $repoRoot 'installer\InstallerAcceptanceEvidence.ps1')
+$resolvedEvidence = Assert-SatiInstallerEvidencePath $EvidencePath
 $installer = [System.IO.Path]::GetFullPath($InstallerPath)
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
     throw "Installer not found: $installer"
@@ -44,6 +46,8 @@ $runRoot = Join-Path $acceptanceRoot ('run-' + [Guid]::NewGuid().ToString('N'))
 $priorTestMode = [Environment]::GetEnvironmentVariable('SATI_DEMO_INSTALLER_TEST')
 $priorInstallRoot = [Environment]::GetEnvironmentVariable('SATI_DEMO_INSTALL_ROOT')
 $app = $null
+$evidence = $null
+$cleanupPassed = $false
 
 try {
     if (@(Get-SatiInstallerRunningProcesses -ProcessNames @('Sati', 'Sati.Demo')).Count -ne 0) {
@@ -152,23 +156,12 @@ try {
     Write-Output "INSTALLER_ACCEPTANCE_PASSED installer=$installerName sha256=$hash"
     Write-Output "INSTALLED_APP_ACCEPTANCE_PASSED version=$actualVersion responding=True launchSeconds=$LaunchSeconds iterations=$LaunchIterations gracefulClose=True"
 
-    if (-not [string]::IsNullOrWhiteSpace($EvidencePath)) {
-        $resolvedEvidence = [System.IO.Path]::GetFullPath($EvidencePath)
-        $evidenceParent = [System.IO.Path]::GetDirectoryName($resolvedEvidence)
-        if ([string]::IsNullOrWhiteSpace($evidenceParent)) {
-            throw 'EvidencePath must include a parent directory.'
-        }
-        [System.IO.Directory]::CreateDirectory($evidenceParent) | Out-Null
-        if (Test-Path -LiteralPath $resolvedEvidence) {
-            throw "Refusing to overwrite installer evidence: $resolvedEvidence"
-        }
-
+    if ($resolvedEvidence) {
         $sourceTreeDetected = Test-Path -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) '.git')
-        [ordered]@{
+        $evidence = [ordered]@{
             SchemaVersion = 1
             Gate = 'CleanMachineLaunch'
             Passed = $true
-            CapturedUtc = [DateTime]::UtcNow.ToString('O')
             InstallerFileName = $installerName
             InstallerSha256 = $hash
             InstalledVersion = $actualVersion
@@ -180,10 +173,6 @@ try {
             OsVersion = [Environment]::OSVersion.VersionString
             ExternalMachineConfirmed = [bool]$ExternalMachine
             SourceTreeDetected = [bool]$sourceTreeDetected
-        } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $resolvedEvidence -Encoding UTF8
-        Write-Output "INSTALLER_EVIDENCE_WRITTEN path=$resolvedEvidence"
-        if (-not $ExternalMachine) {
-            Write-Warning 'Evidence records a successful launch, but it is not a clean external-machine attestation.'
         }
     }
 }
@@ -220,5 +209,17 @@ finally {
         }
         Remove-Item -LiteralPath $resolvedRunRoot -Recurse -Force
         Write-Output 'INSTALLER_ACCEPTANCE_CLEANUP_PASSED'
+    }
+    $cleanupPassed = -not $KeepInstalledFiles -and -not (Test-Path -LiteralPath $runRoot)
+}
+
+# Reached only when acceptance and finally both succeed. Failed cleanup leaves no passing file.
+if ($evidence) {
+    $evidence.CapturedUtc = [DateTime]::UtcNow.ToString('O')
+    $evidence.CleanupPassed = $cleanupPassed
+    $evidence.InstalledFilesRetained = [bool]$KeepInstalledFiles
+    Write-SatiInstallerAcceptanceEvidence $resolvedEvidence $evidence
+    if (-not $ExternalMachine) {
+        Write-Warning 'Evidence records a successful launch, but it is not a clean external-machine attestation.'
     }
 }

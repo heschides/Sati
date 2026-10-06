@@ -33,7 +33,8 @@ Validate the LocalDB install payload without touching the normal installation:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
     .\scripts\Test-LocalInstaller.ps1 `
-    -InstallerPath .\artifacts\SatiLocalInstaller\SatiLocalSetup-1.3.35.exe
+    -InstallerPath .\artifacts\SatiLocalInstaller\SatiLocalSetup-1.3.36.exe `
+    -EvidencePath .\TestResults\datt-1.3.36-local-installer-acceptance.json
 ```
 
 On a clean workstation, the combined installer requests elevation only when LocalDB is absent. Sati
@@ -68,11 +69,18 @@ Run the isolated installation and launch acceptance test from the repository roo
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
     .\scripts\Test-DemoInstaller.ps1 `
-    -InstallerPath .\artifacts\SatiDemoInstaller\SatiDemoSetup-1.3.35.exe `
-    -LaunchIterations 5
+    -InstallerPath .\artifacts\SatiDemoInstaller\SatiDemoSetup-1.3.36.exe `
+    -LaunchIterations 5 `
+    -EvidencePath .\TestResults\datt-1.3.36-demo-installer-acceptance.json
 ```
 
 The acceptance test requires each packaged launch to remain responsive, accept a normal window-close
 request, exit with code zero, and leave no isolated installation behind.
+
+Both scripts write a new JSON evidence file only after acceptance and cleanup succeed. Local
+acceptance also validates the Microsoft signature of the MSI embedded in the exact installer;
+it does not install the prerequisite or access a working database. Evidence files are never
+overwritten. Demo's diagnostic `-KeepInstalledFiles` records `CleanupPassed=false` and does not
+satisfy a release's cleanup requirement.
 
 The generated installer is not code-signed. Windows may display an Unknown publisher or SmartScreen warning until the executable is signed with a trusted code-signing certificate.

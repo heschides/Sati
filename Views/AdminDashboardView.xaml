@@ -679,6 +679,10 @@
                 DataContext="{Binding ComplianceRecovery}"
                 Margin="18,14,18,18" />
         </TabItem>
+        <TabItem Header="Payer configuration"
+                 AutomationProperties.Name="Administrator payer configuration">
+            <billingViews:PayerBillingView DataContext="{Binding PayerBilling}" />
+        </TabItem>
         <TabItem Header="Signatures"
                  AutomationProperties.Name="Agency signature settings">
             <ScrollViewer VerticalScrollBarVisibility="Auto">

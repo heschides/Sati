@@ -7,6 +7,14 @@ namespace Sati.Data.Billing
     public interface IBillingService
     {
         bool SupportsMockClearinghouse => false;
+        Task<IReadOnlyList<PayerBillingVersionDto>> GetPayerConfigurationsAsync(AgencyActor actor) =>
+            Task.FromResult<IReadOnlyList<PayerBillingVersionDto>>([]);
+        Task<PayerBillingVersionDto> PublishPayerConfigurationAsync(AgencyActor actor, PublishPayerBillingRequest request) =>
+            Task.FromException<PayerBillingVersionDto>(new NotSupportedException("Payer configuration is unavailable."));
+        Task<PayerClaimPreviewDto> PreviewPayerClaimAsync(AgencyActor actor, int noteId, PayerClaimPreparation preparation) =>
+            Task.FromException<PayerClaimPreviewDto>(new NotSupportedException("Payer preparation is unavailable."));
+        Task<ClaimLine> CreatePreparedClaimLineAsync(AgencyActor actor, int noteId, PayerClaimPreparation preparation) =>
+            Task.FromException<ClaimLine>(new NotSupportedException("Payer preparation is unavailable."));
         bool SupportsResponseImport => false;
         bool SupportsClearinghouseDispatch => false;
         Task<ClearinghouseWorkspaceDto> GetClearinghouseWorkspaceAsync(

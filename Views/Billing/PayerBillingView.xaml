@@ -1,0 +1,58 @@
+<UserControl x:Class="Sati.Views.Billing.PayerBillingView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+ TextElement.FontFamily="{DynamicResource AppFont}">
+ <Grid Margin="16">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel Grid.Row="0">
+   <TextBlock Text="Payer configuration and claim preparation" FontSize="20" Margin="0,0,0,12" />
+   <TextBlock Text="Publishing a profile requires agency review of enrollment, routing, facility qualifier, taxonomy, service population and rate evidence. This workspace does not certify payer acceptance." TextWrapping="Wrap" Margin="0,0,0,12" />
+   <Button Content="Refresh profiles and notes" Command="{Binding LoadCommand}" IsEnabled="{Binding CanLoad}" HorizontalAlignment="Left" />
+  </StackPanel>
+  <TabControl Grid.Row="1" Margin="0,12">
+   <TabItem Header="Configuration" AutomationProperties.Name="Payer configuration tab">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="8">
+   <TextBlock Text="Retained configuration versions" Margin="0,12,0,4" />
+   <ComboBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}" IsEnabled="{Binding CanLoad}" AutomationProperties.Name="Retained payer configuration version">
+    <ComboBox.ItemTemplate><DataTemplate><TextBlock><Run Text="{Binding Configuration.ProfileKey, Mode=OneWay}"/><Run Text=" — revision "/><Run Text="{Binding Revision, Mode=OneWay}"/><Run Text=" — effective "/><Run Text="{Binding Configuration.EffectiveOn, Mode=OneWay, StringFormat=yyyy-MM-dd}"/></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+   </ComboBox>
+   <Button Content="New profile" Command="{Binding NewProfileCommand}" IsEnabled="{Binding CanEdit}" HorizontalAlignment="Left" Margin="0,8" />
+   <StackPanel>
+    <TextBlock Text="Profile kind"/><ComboBox ItemsSource="{Binding Kinds}" SelectedValue="{Binding Kind}" SelectedValuePath="Kind" DisplayMemberPath="Display" IsEnabled="{Binding CanEdit}" AutomationProperties.Name="Payer profile kind"/>
+    <ItemsControl ItemsSource="{Binding Fields}">
+     <ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,6"><Label Foreground="{DynamicResource TextPrimaryBrush}" Content="{Binding Label}" Target="{Binding ElementName=FieldValue}"/><TextBox x:Name="FieldValue" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding DataContext.IsConfigurationReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}" AutomationProperties.Name="{Binding Label}"/></StackPanel></DataTemplate></ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Effective date (yyyy-MM-dd)" Target="{Binding ElementName=Effective}"/><TextBox x:Name="Effective" IsReadOnly="{Binding IsConfigurationReadOnly}" Text="{Binding EffectiveOn, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Configuration effective date"/>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Expiration date (optional, yyyy-MM-dd)" Target="{Binding ElementName=Expiration}"/><TextBox x:Name="Expiration" IsReadOnly="{Binding IsConfigurationReadOnly}" Text="{Binding ExpiresOn, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Configuration expiration date"/>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Modifiers in order (comma separated, maximum four)" Target="{Binding ElementName=Modifiers}"/><TextBox x:Name="Modifiers" IsReadOnly="{Binding IsConfigurationReadOnly}" Text="{Binding Modifiers, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Ordered procedure modifiers"/>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Unit rate (for example 25.00)" Target="{Binding ElementName=Rate}"/><TextBox x:Name="Rate" IsReadOnly="{Binding IsConfigurationReadOnly}" Text="{Binding UnitRate, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Evidenced unit rate"/>
+    <CheckBox Content="Prior authorization required" IsChecked="{Binding RequiresAuthorization}" IsEnabled="{Binding CanEdit}"/>
+    <CheckBox Content="Agency requirements reviewed against the referenced evidence" IsChecked="{Binding RequirementsReviewed}" IsEnabled="{Binding CanEdit}" Margin="0,8"/>
+    <Button Content="Publish new immutable version" Command="{Binding PublishCommand}" IsEnabled="{Binding CanEdit}" HorizontalAlignment="Left"/>
+   </StackPanel>
+   </StackPanel></ScrollViewer></TabItem>
+   <TabItem Header="Claim readiness" AutomationProperties.Name="Payer claim readiness tab">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="8">
+   <TextBlock Text="Prepare an approved note" FontSize="16" Margin="0,24,0,8"/>
+   <StackPanel IsEnabled="{Binding CanPrepare}">
+    <TextBlock Text="Payer profile (the service date selects its applicable version)" Margin="0,0,0,4"/>
+    <ComboBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}" DisplayMemberPath="Configuration.ProfileKey" AutomationProperties.Name="Claim payer profile" Margin="0,0,0,12"/>
+    <ComboBox ItemsSource="{Binding Notes}" SelectedItem="{Binding SelectedNote}" DisplayMemberPath="Display" AutomationProperties.Name="Approved unclaimed note"/>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Prior authorization reference" Target="{Binding ElementName=Auth}"/><TextBox x:Name="Auth" Text="{Binding AuthorizationReference, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Prior authorization reference"/>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Authorization decision date (yyyy-MM-dd)" Target="{Binding ElementName=AuthDecision}"/><TextBox x:Name="AuthDecision" Text="{Binding AuthorizationDecisionDate, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Authorization decision date"/>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Authorization effective date (yyyy-MM-dd)" Target="{Binding ElementName=AuthStart}"/><TextBox x:Name="AuthStart" Text="{Binding AuthorizationEffectiveOn, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Authorization effective date"/>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Authorization expiration date (yyyy-MM-dd)" Target="{Binding ElementName=AuthEnd}"/><TextBox x:Name="AuthEnd" Text="{Binding AuthorizationExpiresOn, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Authorization expiration date"/>
+    <Label Foreground="{DynamicResource TextPrimaryBrush}" Content="Protected authorization evidence reference" Target="{Binding ElementName=Evidence}"/><TextBox x:Name="Evidence" Text="{Binding AuthorizationEvidenceReference, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Protected authorization evidence reference"/>
+    <CheckBox Content="Coverage reviewed for this consumer, service, provider and date; a reference alone is insufficient" IsChecked="{Binding AuthorizationCoverageReviewed}" Margin="0,8"/>
+    <Button Content="Preview claim readiness" Command="{Binding PreviewCommand}" HorizontalAlignment="Left"/>
+    <Button Content="Create claim from this preview" Command="{Binding CreateClaimCommand}" IsEnabled="{Binding PreviewReady}" HorizontalAlignment="Left" Margin="0,8"/>
+   </StackPanel>
+    </StackPanel></ScrollViewer></TabItem>
+  </TabControl>
+  <StackPanel Grid.Row="2">
+   <ListBox ItemsSource="{Binding Errors}" AutomationProperties.Name="Payer field validation errors" Margin="0,12" MaxHeight="250"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+   <TextBox Text="{Binding StatusMessage, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" AutomationProperties.Name="Payer configuration status and readiness"/>
+  </StackPanel>
+ </Grid>
+</UserControl>

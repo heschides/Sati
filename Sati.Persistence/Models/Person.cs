@@ -661,14 +661,16 @@ namespace Sati
             Contracts.V1.ComplianceScheduleSettings? schedule = null,
             Note? contactCandidate = null,
             int? projectedCompletedFormId = null,
-            DateTime? projectedCompletedOn = null) =>
+            DateTime? projectedCompletedOn = null,
+            int? projectedOpenedFormId = null,
+            DateTime? projectedOpenedOn = null) =>
             EvaluateBillingWindowDetailed(
                 noteDate,
                 requirements,
                 schedule,
                 contactCandidate,
                 projectedCompletedFormId,
-                projectedCompletedOn).Reasons;
+                projectedCompletedOn, projectedOpenedFormId, projectedOpenedOn).Reasons;
 
         /// <param name="contactCandidate">
         /// A note being saved. Its in-flight type and status replace the stored copy in
@@ -688,14 +690,16 @@ namespace Sati
             Contracts.V1.ComplianceScheduleSettings? schedule = null,
             Note? contactCandidate = null,
             int? projectedCompletedFormId = null,
-            DateTime? projectedCompletedOn = null) =>
+            DateTime? projectedCompletedOn = null,
+            int? projectedOpenedFormId = null,
+            DateTime? projectedOpenedOn = null) =>
             Contracts.V1.BillingComplianceGate.EvaluateBillingWindowDetailed(
                 BillingComplianceSnapshots(
                     noteDate,
                     schedule ?? new Contracts.V1.ComplianceScheduleSettings(),
                     contactCandidate,
                     projectedCompletedFormId,
-                    projectedCompletedOn),
+                    projectedCompletedOn, projectedOpenedFormId, projectedOpenedOn),
                 noteDate,
                 requirements);
 
@@ -704,7 +708,9 @@ namespace Sati
             Contracts.V1.ComplianceScheduleSettings schedule,
             Note? contactCandidate = null,
             int? projectedCompletedFormId = null,
-            DateTime? projectedCompletedOn = null)
+            DateTime? projectedCompletedOn = null,
+            int? projectedOpenedFormId = null,
+            DateTime? projectedOpenedOn = null)
         {
             var releaseFacts = Contracts.V1.ExpectedBillingComplianceObligations
                 .IncludeMissingReleases(
@@ -734,7 +740,8 @@ namespace Sati
                     form.Id == exactFormId
                         ? completionDate.Date
                         : form.CompletedDate,
-                    form.OpenedDate,
+                    projectedOpenedFormId == form.Id && projectedOpenedOn is DateTime openingDate
+                        ? openingDate.Date : form.OpenedDate,
                     form.Id > 0 ? $"form:{form.Id}" : null,
                     TargetEffectiveDate: form.TargetEffectiveDate == default
                         ? null

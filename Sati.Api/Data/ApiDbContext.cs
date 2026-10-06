@@ -9,6 +9,7 @@ namespace Sati.Api.Data;
 internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(options)
 {
     public DbSet<ServerDatabaseIdentity> DatabaseIdentities => Set<ServerDatabaseIdentity>();
+    public DbSet<PayerBillingConfigurationVersion> PayerBillingConfigurationVersions => Set<PayerBillingConfigurationVersion>();
     public DbSet<ServerUser> Users => Set<ServerUser>();
     public DbSet<ServerPerson> People => Set<ServerPerson>();
     public DbSet<ServerPersonPhoto> PersonPhotos => Set<ServerPersonPhoto>();
@@ -109,6 +110,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             ServerChatReadMarker, ServerAgency, ServerUser, ServerPerson>(modelBuilder);
         ReleaseObligationPersistenceModel.Configure<ServerAgency, ServerUser, ServerPerson, ServerProvider, ServerDocumentArtifact>(modelBuilder);
         BillingComplianceRecoveryPersistenceModel.Configure<ServerAgency, ServerUser, ServerPerson, ServerNote>(modelBuilder);
+        PayerBillingPersistenceModel.Configure<ServerAgency, ServerUser>(modelBuilder);
         BillingCompliancePolicyReviewPersistenceModel.Configure<ServerAgency, ServerPerson, ServerNote, ServerClaimLine>(modelBuilder);
         FormAttestationChangeReviewPersistenceModel.Configure<ServerAgency, ServerPerson, ServerNote, ServerForm, ServerClaimLine>(modelBuilder);
         modelBuilder.Entity<ServerUser>(entity =>
@@ -828,6 +830,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     private void EnsureAuditEventsAreAppendOnly()
     {
         NoteAmendmentPersistenceModel.ProtectWrites(ChangeTracker);
+        PayerBillingPersistenceModel.ProtectWrites(ChangeTracker);
         NoteAmendmentPersistenceModel.ProtectOriginalNotes<ServerNote>(this);
         ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
         BillingCorrectionPersistenceModel.ProtectWrites(ChangeTracker);

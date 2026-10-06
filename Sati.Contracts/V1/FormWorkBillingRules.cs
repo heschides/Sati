@@ -30,6 +30,9 @@ public sealed record FormWorkBillingResult(
 /// </summary>
 public static class FormWorkBillingRules
 {
+    public static bool CompletedAfterDeadline(DateTime completedOn, DateTime dueOn) =>
+        completedOn.Date > dueOn.Date;
+
     public static FormWorkBillingResult Evaluate(
         FormWorkNoteFact note,
         FormWorkObligationFact? linkedForm)
@@ -65,7 +68,7 @@ public static class FormWorkBillingRules
                 reasons.Add("The form-work note's activity date does not match the attested completion date.");
             }
 
-            if (completedOn.Date > linkedForm.DueDate.Date)
+            if (CompletedAfterDeadline(completedOn, linkedForm.DueDate))
             {
                 reasons.Add($"The linked form was completed after its {linkedForm.DueDate:MMM d, yyyy} due date.");
             }

@@ -200,7 +200,11 @@ an existing version number.
 
 ## 4. Release validation
 
-1. Review the complete diff and run `git diff --check`.
+1. Review the complete diff and run `git diff --check`. After updating the coordinated release
+   owners, run `scripts/Test-DattPreflight.ps1` before starting the full build/test gates. This
+   source-only check catches stale project versions, builder/readiness defaults, release-note
+   assertions, migration-count/latest-migration assertions, and installer examples without
+   compiling or connecting to a database. Fix every mismatch first; it supplements the full gates.
 2. Build the complete `SatiLogica.slnx` solution in Release configuration.
 3. Run every test project in `SatiLogica.slnx`, including Sati desktop/domain tests, API integration
    tests, and Carika tests when present. Run profile-dependent DPAPI, WPF, or Avalonia checks under
@@ -212,6 +216,11 @@ an existing version number.
 
 Any real build or test failure stops the release. Fix it and repeat the affected gates before
 continuing. Do not publish or package a knowingly failing source state.
+
+Reuse passing evidence only while that gate's verified source, configuration, tools, dependencies
+and artifact bytes remain unchanged. Repeat a gate when its inputs changed, it failed, or a specific
+unresolved concern requires it.
+Evidence-only ledger edits do not require another build, test run, package, or acceptance run.
 
 ## 5. Source commit and push
 
@@ -301,6 +310,22 @@ Build installers only after the matching API and source commit pass their releas
 - Run the Local isolated acceptance test for exact version, embedded LocalDB signature, integrated
   security, and cleanup.
 
+Pass a new `-EvidencePath` to both acceptance scripts. For example:
+
+```powershell
+$releaseVersion = (& .\scripts\Test-DattPreflight.ps1).ReleaseVersion
+.\scripts\Test-DemoInstaller.ps1 -InstallerPath ".\artifacts\SatiDemoInstaller\SatiDemoSetup-$releaseVersion.exe" `
+    -LaunchIterations 5 -EvidencePath ".\TestResults\datt-$releaseVersion-demo-installer-acceptance.json"
+.\scripts\Test-LocalInstaller.ps1 -InstallerPath ".\artifacts\SatiLocalInstaller\SatiLocalSetup-$releaseVersion.exe" `
+    -EvidencePath ".\TestResults\datt-$releaseVersion-local-installer-acceptance.json"
+```
+
+Both JSON records are written only after acceptance and cleanup succeed, with `CleanupPassed=true`.
+Local acceptance reads the exact installer's embedded MSI and validates its Microsoft signature;
+no separate inspection or repeated acceptance run is needed. `-KeepInstalledFiles` is a diagnostic
+Demo option: its evidence explicitly records retained files and `CleanupPassed=false`, and cannot
+satisfy the release cleanup gate. Never overwrite evidence from a prior run.
+
 Record each final artifact's absolute path, byte size, and SHA-256 hash. Generated installers are not
 assumed to be code-signed merely because the embedded Microsoft LocalDB prerequisite is signed.
 
@@ -332,7 +357,7 @@ configuration, or any additional files to these folders.
 
 Update the current `AGENDA.md` release section with:
 
-- source and evidence commit identifiers;
+- the pushed source commit identifier (report the resulting evidence commit identifier after push);
 - test totals and any legitimate skips;
 - API ZIP hash, deployment identifier, health status, release version, and contract revision;
 - for a Demo migration: the baseline capture marker and anchor date, plus the verification reset's
@@ -340,8 +365,12 @@ Update the current `AGENDA.md` release section with:
 - Demo and Local installer names, byte sizes, hashes, acceptance results, cleanup results, and
   verified distribution paths.
 
-Commit and push that evidence to the resolved default branch. Finish by confirming a clean working
-tree and equality with the remote branch.
+Complete the operational checklist, then make **one final evidence commit** and push it to the
+resolved default branch. Confirm a clean working tree and equality with the remote branch, and
+report the resulting evidence commit identifier in the final response. Do not create a second
+closing-ledger commit merely to insert a commit's own hash into `AGENDA.md`. A blocked-release
+checkpoint is appropriate when needed to preserve an interrupted rollout's state; it does not
+replace the final evidence commit after recovery.
 
 The final user report must lead with whether the release completed. Include the version, commits,
 API verification, installer links and hashes, tests, branches merged or deleted, branches retained

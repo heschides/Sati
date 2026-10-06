@@ -25,6 +25,9 @@ namespace Sati.Models
         public bool IsUnbilled { get; set; }
         [NotMapped]
         public AnnualPcpProgressAction AnnualPcpAction { get; set; }
+
+        [NotMapped]
+        public FormProgressRequest? FormProgress { get; set; }
         // Transport-only intent marker. Daily-agenda creation uses this so the
         // authoritative write boundary can atomically reuse an existing active
         // note for the same exact form. It is deliberately not clinical data.

@@ -82,6 +82,30 @@ namespace Sati.ViewModels
         public ConsumerProvidersViewModel ConsumerProviders { get; }
         public ConsumerScheduleViewModel? ConsumerSchedule { get; }
         public NoteEntryViewModel? ClientNoteEntry { get; }
+        private readonly Func<NoteEntryViewModel>? _reviewNoteEntryFactory;
+        private readonly LatestRequestTracker _reviewEditorLoads = new();
+        public Func<Person, Form, Task>? ReviewCompletionRequestedAsync { get; set; }
+        public Func<Task>? ReviewNoteSavedAsync { get; set; }
+
+        public async Task<NoteEntryViewModel> CreateReviewCompletionEditorAsync(
+            Person person, Form form, DateTime completedOn)
+        {
+            var request = _reviewEditorLoads.Begin();
+            var account = _sessionService.CurrentUser;
+            var editor = _reviewNoteEntryFactory?.Invoke()
+                ?? throw new InvalidOperationException("The review note editor is unavailable.");
+            await editor.InitializeAsync();
+            if (!_reviewEditorLoads.IsCurrent(request) || !ReferenceEquals(account, _sessionService.CurrentUser))
+                throw new OperationCanceledException("The review editor request is no longer current.");
+            editor.PrepareReviewCompletion(person, form, completedOn);
+            editor.RefreshAfterNoteSavedAsync = async () =>
+            {
+                if (ReviewNoteSavedAsync is not null) await ReviewNoteSavedAsync();
+                else if (FormComplianceChangedAsync is not null) await FormComplianceChangedAsync();
+                await RefreshSelectedNotesIfSelectedAsync();
+            };
+            return editor;
+        }
         public event EventHandler? ClientNoteSaved;
         private readonly LatestRequestTracker _selectedNotesLoads = new();
         private User? _clientNoteSettingsLoadedAccount;
@@ -801,7 +825,8 @@ namespace Sati.ViewModels
                            SafetyDeviceViewModel? safetyDevice = null,
                            BenefitsApplicationViewModel? benefitsApplication = null,
                            ConsumerScheduleViewModel? consumerSchedule = null,
-                           NoteEntryViewModel? clientNoteEntry = null)
+                           NoteEntryViewModel? clientNoteEntry = null,
+                           Func<NoteEntryViewModel>? reviewNoteEntryFactory = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -827,6 +852,7 @@ namespace Sati.ViewModels
             ConsumerProviders = consumerProviders;
             ConsumerSchedule = consumerSchedule;
             ClientNoteEntry = clientNoteEntry;
+            _reviewNoteEntryFactory = reviewNoteEntryFactory;
             if (ClientNoteEntry is not null)
             {
                 ClientNoteEntry.EditorCleared += (_, _) => SelectedClientNote = null;
@@ -1105,6 +1131,15 @@ namespace Sati.ViewModels
             switch (item.Workspace)
             {
                 case Sati.Contracts.V1.PlanYearWorkspace.ClientOverview:
+                    if (SelectedPerson is { } reviewPerson && item.Key.StartsWith("form:", StringComparison.Ordinal) &&
+                        int.TryParse(item.Key[5..], out var reviewId) &&
+                        reviewPerson.Forms.SingleOrDefault(form => form.Id == reviewId) is { } review &&
+                        ReviewCompletionNoteRules.IsReview(review.Type.ToString()) && review.CompletedDate is null)
+                    {
+                        if (ReviewCompletionRequestedAsync is not null)
+                            await ReviewCompletionRequestedAsync(reviewPerson, review);
+                        return;
+                    }
                     ClientWorkspaceTabIndex = 0;
                     break;
                 case Sati.Contracts.V1.PlanYearWorkspace.Releases when item.ReleaseObligationId is Guid obligationId:
@@ -1683,6 +1718,13 @@ namespace Sati.ViewModels
             var form = person.GetCurrentCycleForm(type);
             if (form is null) return;
 
+            if (form.CompletedDate is null && ReviewCompletionNoteRules.IsReview(type.ToString()))
+            {
+                if (ReviewCompletionRequestedAsync is not null)
+                    await ReviewCompletionRequestedAsync(person, form);
+                return;
+            }
+
             if (person.EffectiveDate is not DateTime effectiveDate)
                 return;
             Attestation.Begin(
@@ -1800,6 +1842,14 @@ namespace Sati.ViewModels
             var selectedId = selected?.Id;
             var currentPersonId = (PeopleView.CurrentItem as Person)?.Id;
             var preserveDraft = selected is not null && IsClientEditorOpen;
+
+            // Compliance evidence is authoritative even while demographic edits
+            // keep their original Person instance and unsaved field values.
+            if (preserveDraft && incoming.FirstOrDefault(person => person.Id == selectedId) is Person refreshed)
+            {
+                selected!.Forms = refreshed.Forms;
+                RefreshComplianceFlags();
+            }
 
             People.Clear();
             foreach (var person in incoming)

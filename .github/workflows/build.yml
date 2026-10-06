@@ -13,6 +13,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check release source consistency
+        run: ./scripts/Test-DattPreflight.ps1
+
+      - name: Test release tooling
+        run: |
+          ./scripts/Test-DattPreflightChecks.ps1
+          foreach ($case in @('DemoCleanupFailure','DemoSuccess','DemoKeepFiles','DemoExistingEvidence','LocalSuccess','LocalCleanupFailure','LocalSignatureFailure','LocalExistingEvidence')) {
+            ./scripts/Test-InstallerAcceptanceEvidence.ps1 -Case $case
+          }
+          foreach ($case in @('ValidMicrosoft','InvalidSignature','OtherSigner','MissingSigner','MissingBundle','UnsupportedFormat','InvalidBounds')) {
+            pwsh -NoProfile -File ./scripts/Test-LocalInstallerPrerequisiteChecks.ps1 -Case $case
+            if ($LASTEXITCODE -ne 0) { throw "Prerequisite check failed: $case" }
+          }
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x

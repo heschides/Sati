@@ -27,6 +27,7 @@ namespace Sati.Views
             // opens as many save dialogs as the view has been re-bound.
             if (_viewModel is not null)
             {
+                _viewModel.ReviewCompletionRequestedAsync = null;
                 _viewModel.AtRequestPdfReady -= SaveAtRequestPdf;
                 _viewModel.AtRequestProblem -= ShowAtRequestProblem;
                 _viewModel.ClientSaveProblemOccurred -= ShowClientSaveProblem;
@@ -38,6 +39,8 @@ namespace Sati.Views
             if (e.NewValue is NewClientViewModel vm)
             {
                 _viewModel = vm;
+                vm.ReviewCompletionRequestedAsync = (person, form) =>
+                    ReviewCompletionDialogs.ShowAsync(Window.GetWindow(this) ?? Application.Current.MainWindow, vm, person, form);
                 vm.AtRequestPdfReady += SaveAtRequestPdf;
                 vm.AtRequestProblem += ShowAtRequestProblem;
                 vm.ClientSaveProblemOccurred += ShowClientSaveProblem;

@@ -1,5 +1,115 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.36 — October 6, 2026 (in progress)
+
+- Scope: explicit PCP/assessment progress, quarterly completion notes, corrected follow-up
+  suggestions, Telehealth, note layout, History sizing, month shortcuts, reviewed payer
+  configuration and DATT tooling improvements.
+- Source/build/tests/API/installer/publication evidence: pending.
+- Demo migration, replacement baseline and one verification reset explicitly authorized
+  by Josh in this release conversation. Exact-IP rule added by Josh and verified.
+- Rollback-only migration rehearsal passed; Demo remains at 125 migrations.
+- Local machine inventory: LONGCHENPA (current development workstation), installed
+  version/schema unverified; other Local machines and installed versions unknown.
+  Debugger use is not evidence that every Local machine has caught up.
+- Branch audit: master matches origin/master. Existing feature/CI/background-worker
+  branches contain no unique commits; retained because retention intent is unconfirmed.
+
+
+## October 6 — Note follow-up suggestion correction (source only)
+
+The note editor excludes the current scheduled note and, for an exact Q1–Q4 Form
+note with Pending/Logged status and an occurred activity date, excludes that review
+and its linked scheduled work from a read-only follow-up projection. Other quarters
+and obligations remain available. This changes suggestions only; persisted completion
+and scheduling remain unchanged until ordinary submission. Dates on scheduled activity
+suggestions and accepted follow-up text say "scheduled"; actual form deadlines say
+"due". Scheduled activities do not supply the form-deadline status cue. Synthetic
+regressions reproduce the Q2 deadline/completion/scheduled-date mismatch; no PHI query,
+migration, deployment or application restart was performed.
+
+
+## October 6 — Quarterly completion note workflow (source only)
+
+- Record completion for Q1–Q4 now asks for the actual completion date and offers an
+  editable note in a modal. On-time work starts billable; overdue work starts Unbilled.
+- Completion remains unchanged until a Logged note saves with its exact form attestation.
+  Cancelling does not save a note or update the review. Existing validation and refresh apply.
+- Further multifaceted 90-day review preparation and tracking remains deferred.
+- No migration, installer publication, deployment or working-data changes.
+
+
+## October 6 - Note activities and layout (source only)
+
+- Added distinct Telehealth activity, remote-contact evidence and round-trip checks.
+- Moved Reminder and Unbilled above Activities and fixed the clipped heading with
+  full-width wrapping. No claim-coding automation, migration or deployment.
+
+
+## October 6 - Explicit PCP and Comprehensive Assessment progress (source only)
+
+- Added the note-save modal with exact annual state and Leave unchanged, Open and
+  Complete choices. Completing an unopened document captures both actual dates
+  atomically; shared validation and stale-state rejection apply locally and in
+  the API. Clients profile refresh is awaited after saving.
+- The separately requested quarterly completion-note workflow is now implemented;
+  broader multifaceted review preparation remains deferred.
+- No installer publication, deployment, migration or working-data changes.
+
+
+## Unreleased — DATT rollout efficiency (October 4, 2026)
+
+Josh requested an audit of increasing DATT rollout time and approved the first
+process improvements. These are release-tooling changes for the next invocation.
+
+- [x] Add a source-only consistency check before the long release gates and before
+      CI restore/build. It checks coordinated versions, release notes/assertions,
+      builder/readiness defaults, migration count/latest-ID assertions and installer
+      examples. Its fixtures derive the current version and title, so the tests
+      introduce no additional release literals to maintain.
+- [x] Write Demo and Local acceptance JSON after successful cleanup, preserving the
+      existing Demo evidence schema. Refuse existing evidence before installation
+      and use exclusive creation when writing. Diagnostic retained-file evidence
+      explicitly records failed cleanup. Local acceptance verifies the Microsoft
+      signature of the MSI embedded in the exact installer, removing the separate
+      inspection and repeat acceptance needed during 1.3.35.
+- [x] Require one final operational-evidence commit. Report its resulting hash after
+      push instead of creating another ledger commit to record that hash. Reuse
+      passing gate evidence while its inputs remain unchanged; rerun affected gates
+      for changed inputs, failures or specific unresolved concerns.
+- [x] Validation: 9 preflight fixture checks, 8 synthetic acceptance/evidence cases,
+      7 prerequisite signature/format cases, and 4 existing installer contract
+      tests passed. Cleanup and signature regressions failed with the relevant
+      protections removed and passed after restoration. The real 1.3.35 embedded
+      MSI was inspected under PowerShell 7 and Windows PowerShell 5.1; signature
+      Valid, SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+      Existing-test TRX: `TestResults/DattEfficiency/datt-efficiency-installer-contracts.trx`.
+      The quick tooling checks are included in CI. Full application tests and real
+      installer acceptance remain release gates; no new release was performed here.
+
+Measured from the 1.3.35 evidence: the final Release build took 16.44 seconds;
+desktop tests took 484.4 seconds and API tests 191.4 seconds, running in parallel.
+The initial full run spent about eight minutes before reporting six failures,
+including stale metadata assertions that the new preflight can catch earlier.
+153 ThemeLegibility cases account for 360.5 seconds of summed test durations.
+The reset/recovery window lasted about 25 minutes; the successful reset itself
+took 220 seconds. Host interruption is consistent with the failed request's logs,
+but its cause is unconfirmed. These measurements do not establish a future rollout
+duration. GitHub workflow triggers were inspected; live CI run timings were unavailable.
+
+- [ ] Investigate recurring reset interruption outside a release: correlate request
+      IDs, worker stages, host lifecycle and cold/warm behavior from existing
+      telemetry first. Preserve poison messages and approvals for any fresh reset,
+      Function publication, hosting change or database operation. The largest
+      observed delay needs this diagnosis; routine retries are not an optimization.
+- [ ] Profile ThemeLegibility view construction and repeated immutable inputs.
+      Retain all palette/rendered-view coverage; introduce measured caching only
+      where fixture isolation and UI state remain correct.
+- [ ] Review CI classification for evidence-only pushes after inspecting required
+      branch checks. A workflow path filter alone can leave required checks pending.
+      Also assess `--no-build` in the full-SQL runner after its matching Release
+      build; this smaller saving is not implemented by this change.
+
 ## Release 1.3.35 — October 4, 2026 (published)
 
 "Approved-note amendments and provider organization." Scope: linked approved-note
@@ -8832,3 +8942,27 @@ submitted-claim correction lineage are implemented in source. See
 - [ ] Explicit reassignment/withdrawal policy for an unfinished amendment after caseload transfer.
 - [ ] Local claimed-note correction adapter remains unavailable with the existing local billing path.
 - [ ] Coordinate amendment history with retention/holds, deletion, and Demo baseline/reset policy.
+
+## Prompt 2 - payer billing inputs (October 4, 2026, source only)
+
+Versioned agency payer configuration, permission-controlled WPF editing/readiness, shared
+validation, v2 frozen claims and correction provenance are implemented. Existing v1 generation
+is preserved. The first documented profile is MaineCare Section 13 through Claim.MD.
+See PAYER_BILLING_REQUIREMENTS.md for primary-source dates/requirements and
+PAYER_BILLING_CERTIFICATION.md for the separate certification/migration checklist.
+
+- [ ] Controlled migration 20261004204633_AddPayerBillingConfigurationVersions (125 -> 126),
+      matching client/API release and reviewed replacement Demo baseline; no deployment performed.
+- [ ] Josh names the agency enrollment/billing reviewer; obtain post-transition companion guide,
+      exact facility qualifier, population applicability, fee schedule/rounding and payer acceptance.
+- [ ] Authorized vendor sandbox certification and any later real credentials/submission authority.
+- [ ] Prompt 6: authoritative authorization aggregate and utilization ledger replacing manual references.
+- [ ] Prompt 7: explicit frozen multi-line structure; current profile uses the Section 13 unit basis.
+- [ ] Explicit reviewed configuration rebase for an already submitted claim and cross-period corrections.
+      Out-of-scope dates are blocked; the standing configuration is preserved.
+- [ ] Local claimed-note correction adapter remains unavailable; shared correction freezing/generation
+      behavior is implemented without adding an alternative correction workflow.
+- [ ] Local file export continues to select Office Ally; configured MaineCare export uses the API's
+      server-owned Claim.MD account. Keep local account/credential operation outside this feature.
+- [ ] Retention/hold and Demo seed/baseline handling for payer versions and frozen authorization evidence.
+      Baseline activation should start with the new configuration table empty.

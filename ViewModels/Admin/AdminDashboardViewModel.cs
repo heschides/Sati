@@ -16,7 +16,8 @@ public partial class AdminDashboardViewModel(
     DataEnvironmentInfo? environmentInfo = null,
     BillingComplianceRecoveryViewModel? complianceRecovery = null,
     ISettingsService? settingsService = null,
-    ISignatureService? signatureService = null) : ObservableObject
+    ISignatureService? signatureService = null,
+    PayerBillingViewModel? payerBilling = null) : ObservableObject
 {
     private CancellationTokenSource? _historyCancellation;
     private readonly LatestRequestTracker _accountLoads = new();
@@ -27,6 +28,7 @@ public partial class AdminDashboardViewModel(
     public ObservableCollection<IncidentGroupDto> Incidents { get; } = [];
     public ObservableCollection<IncidentGroupDto> FilteredIncidents { get; } = [];
     public BillingComplianceRecoveryViewModel? ComplianceRecovery { get; } = complianceRecovery;
+    public PayerBillingViewModel? PayerBilling { get; } = payerBilling;
     public IReadOnlyList<string> IncidentStatusFilters { get; } = ["All statuses", "Open", "Reopened", "Investigating", "Resolved"];
     public IReadOnlyList<string> IncidentSeverityFilters { get; } = ["All severities", "Critical", "Error", "Warning"];
     public IReadOnlyList<string> IncidentStatuses { get; } = ["Open", "Investigating", "Resolved"];
@@ -172,6 +174,7 @@ public partial class AdminDashboardViewModel(
         if (sessionService.CurrentUser?.HasAdminPermissions != true)
         {
             ComplianceRecovery?.ClearForAccountSwitch();
+            PayerBilling?.ClearForAccountSwitch();
             StatusMessage = "Only an Admin can open this dashboard.";
             return;
         }
@@ -304,6 +307,7 @@ public partial class AdminDashboardViewModel(
     {
         _accountLoads.Invalidate();
         ComplianceRecovery?.ClearForAccountSwitch();
+        PayerBilling?.ClearForAccountSwitch();
         _historyCancellation?.Cancel();
         _historyCancellation?.Dispose();
         _historyCancellation = null;

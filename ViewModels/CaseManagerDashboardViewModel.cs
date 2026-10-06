@@ -149,10 +149,12 @@ CalendarViewModel calendarViewModel,
             // scopes this whole page, and ReturnToNewNote leaves the client alone.
             noteEntryViewModel.EditorCleared += (s, e) => SelectedNote = null;
 
-            // Saving any note refreshes the dashboard. Form-tagged notes have no
-            // compliance side effect; the notes reload recomputes the derived
-            // pending-attestation suggestions from persisted evidence.
-            noteEntryViewModel.NoteSaved += async (s, e) => await OnNoteSavedAsync();
+            // The editor awaits the authoritative caseload/profile refresh after
+            // persistence and reports refresh failure as a successful save.
+            noteEntryViewModel.RefreshAfterNoteSavedAsync = OnNoteSavedAsync;
+            newClientViewModel.ReviewNoteSavedAsync = OnNoteSavedAsync;
+            if (newClientViewModel.ClientNoteEntry is not null)
+                newClientViewModel.ClientNoteEntry.RefreshAfterNoteSavedAsync = OnNoteSavedAsync;
 
             // A passage checked in the journal can become a Reminder or Scheduled note
             // without the note panel. It is a note like any other from here on.
@@ -162,7 +164,8 @@ CalendarViewModel calendarViewModel,
                 var account = _sessionService.CurrentUser;
                 try
                 {
-                    await OnNoteSavedAsync();
+                    if (newClientViewModel.ClientNoteEntry?.RefreshAfterNoteSavedAsync is null)
+                        await OnNoteSavedAsync();
                 }
                 catch (Exception exception)
                 {
@@ -244,6 +247,7 @@ CalendarViewModel calendarViewModel,
         public NoteEntryViewModel NoteEntry { get; }
         public NotesWindowViewModel NotesLog { get; }
         public NewClientViewModel Clients { get; }
+        public Func<Person, Form, Task>? ReviewCompletionRequestedAsync { get; set; }
         public CaseloadMatrixViewModel? Matrix { get; private set; }
 
         /// <summary>
@@ -1316,8 +1320,7 @@ CalendarViewModel calendarViewModel,
             if (form is null)
                 return;
 
-            BeginAttestation(form, SelectedPerson);
-            await Task.CompletedTask;
+            await BeginCompletionAsync(form, SelectedPerson);
         }
 
         [RelayCommand]
@@ -1355,8 +1358,7 @@ CalendarViewModel calendarViewModel,
             if (row is null)
                 return;
 
-            BeginAttestation(row.Form, PersonFor(row.Form));
-            await Task.CompletedTask;
+            await BeginCompletionAsync(row.Form, PersonFor(row.Form));
         }
 
         [RelayCommand]
@@ -1554,7 +1556,8 @@ CalendarViewModel calendarViewModel,
         private async Task OnNoteSavedAsync()
         {
             _dateRefreshRequests.Invalidate();
-            await LoadPeopleAsync();
+            await LoadPeopleAsync(reportFailure: true);
+            Matrix?.Rebuild(People, DateTime.Today, MatrixSchedule);
             await Clients.RefreshSelectedNotesIfSelectedAsync();
             await LoadMonthlyNotesAsync();
             await LoadUpcomingEventsAsync();
@@ -1961,6 +1964,18 @@ CalendarViewModel calendarViewModel,
             if (form is not null)
                 BeginAttestation(form, SelectedPerson,
                     pending.IsLegacyUnlinked ? null : pending.EvidenceNoteId);
+        }
+
+        private async Task BeginCompletionAsync(Form form, Person? person)
+        {
+            if (person is not null && form.CompletedDate is null &&
+                ReviewCompletionNoteRules.IsReview(form.Type.ToString()))
+            {
+                if (ReviewCompletionRequestedAsync is not null)
+                    await ReviewCompletionRequestedAsync(person, form);
+                return;
+            }
+            BeginAttestation(form, person);
         }
 
         private void BeginAttestation(Form form, Person? person, int? evidenceNoteId = null)

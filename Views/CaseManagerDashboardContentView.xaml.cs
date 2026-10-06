@@ -52,6 +52,12 @@ namespace Sati.Views
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            if (e.OldValue is CaseManagerDashboardViewModel oldVm)
+                oldVm.ReviewCompletionRequestedAsync = null;
+            if (e.NewValue is CaseManagerDashboardViewModel vm)
+                vm.ReviewCompletionRequestedAsync = (person, form) =>
+                    ReviewCompletionDialogs.ShowAsync(Window.GetWindow(this) ?? Application.Current.MainWindow,
+                        vm.Clients, person, form);
             if (!IsLoaded)
                 return;
 

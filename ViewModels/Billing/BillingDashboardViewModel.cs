@@ -17,7 +17,8 @@ namespace Sati.ViewModels.Billing
             BillingQueueViewModel queueViewModel,
             BillingSubmissionsViewModel submissionsViewModel,
             BillingRemittancesViewModel remittancesViewModel,
-            BillingAlertsViewModel alertsViewModel, NoteAmendmentFinancialReviewsViewModel? amendmentReviews = null)
+            BillingAlertsViewModel alertsViewModel, NoteAmendmentFinancialReviewsViewModel? amendmentReviews = null,
+            PayerBillingViewModel? payerBilling = null)
         {
             _overviewViewModel = overviewViewModel;
             _queueViewModel = queueViewModel;
@@ -25,11 +26,18 @@ namespace Sati.ViewModels.Billing
             _remittancesViewModel = remittancesViewModel;
             _alertsViewModel = alertsViewModel;
             AmendmentReviews = amendmentReviews;
+            PayerBilling = payerBilling;
 
             CurrentSubView = _overviewViewModel;
         }
 
         public NoteAmendmentFinancialReviewsViewModel? AmendmentReviews { get; }
+        public PayerBillingViewModel? PayerBilling { get; }
+        [RelayCommand] private async Task NavigateToPayerBilling()
+        {
+            CurrentSubView = PayerBilling;
+            if (PayerBilling is not null) await PayerBilling.LoadAsync();
+        }
         [RelayCommand] private void NavigateToAmendmentReviews() => CurrentSubView = AmendmentReviews;
         [ObservableProperty] private object? currentSubView;
 
@@ -105,6 +113,7 @@ namespace Sati.ViewModels.Billing
         {
             CurrentSubView = null;
             AmendmentReviews?.ClearForAccountSwitch();
+            PayerBilling?.ClearForAccountSwitch();
             _overviewViewModel.ClearForAccountSwitch();
             _queueViewModel.ClearForAccountSwitch();
             _submissionsViewModel.ClearForAccountSwitch();

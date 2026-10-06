@@ -10,7 +10,7 @@ using System.Data;
 
 namespace Sati.Services.Billing
 {
-    public class BillingService : IBillingService
+    public partial class BillingService : IBillingService
     {
         public bool SupportsMockClearinghouse => false;
         private readonly IDbContextFactory<SatiContext> _contextFactory;
@@ -163,7 +163,13 @@ namespace Sati.Services.Billing
             return new BillingPeriodOverviewDto(draftRevenue, months);
         }
 
-        public async Task<ClaimLine> CreateClaimLineAsync(AgencyActor suppliedActor, int noteId, bool isComplianceException = false, string? complianceExceptionReason = null)
+        public Task<ClaimLine> CreateClaimLineAsync(AgencyActor suppliedActor, int noteId, bool isComplianceException = false, string? complianceExceptionReason = null) =>
+            CreateClaimLineCoreAsync(suppliedActor, noteId, null);
+
+        public Task<ClaimLine> CreatePreparedClaimLineAsync(AgencyActor actor, int noteId, PayerClaimPreparation preparation) =>
+            CreateClaimLineCoreAsync(actor, noteId, preparation);
+
+        private async Task<ClaimLine> CreateClaimLineCoreAsync(AgencyActor suppliedActor, int noteId, PayerClaimPreparation? preparation)
         {
             await using var context = _contextFactory.CreateDbContext();
             var actor = await ValidateBillingActorAsync(context, suppliedActor);
@@ -173,7 +179,8 @@ namespace Sati.Services.Billing
             var sourceKey = await context.Notes.AsNoTracking()
                 .Where(candidate => candidate.Id == noteId &&
                     candidate.AgencyId == actor.AgencyId &&
-                    candidate.Person.AgencyId == actor.AgencyId)
+                    candidate.Person.AgencyId == actor.AgencyId &&
+                    context.Users.Any(owner => owner.Id == candidate.Person.UserId && owner.AgencyId == actor.AgencyId))
                 .Select(candidate => new
                 {
                     candidate.EventDate,
@@ -188,6 +195,9 @@ namespace Sati.Services.Billing
             await using var periodWrite = await BillingPeriodWriteScope.BeginAsync(
                 context, actor.AgencyId, sourceKey.OwnerUserId,
                 serviceDate.Year, serviceDate.Month);
+            context.Entry(actor).State = EntityState.Detached;
+            actor = await ValidateBillingActorAsync(context, suppliedActor);
+            var payerVersion = await PayerBillingStore.SelectAsync(context, actor.AgencyId, serviceDate, preparation);
 
             var note = await context.Notes
                 .Include(n => n.Person)
@@ -198,7 +208,8 @@ namespace Sati.Services.Billing
                 .Include(n => n.Person)
                     .ThenInclude(p => p.ReleaseObligations)
                         .ThenInclude(obligation => obligation.Attestations)
-                .FirstOrDefaultAsync(n => n.Id == noteId && n.Person.AgencyId == actor.AgencyId)
+                .FirstOrDefaultAsync(n => n.Id == noteId && n.AgencyId == actor.AgencyId && n.Person.AgencyId == actor.AgencyId &&
+                    context.Users.Any(owner => owner.Id == n.Person.UserId && owner.AgencyId == actor.AgencyId))
                 ?? throw new InvalidOperationException($"Note {noteId} was not found in your agency.");
 
             if (note.Person is null)
@@ -222,7 +233,9 @@ namespace Sati.Services.Billing
                 context, actor.AgencyId);
             var recoveryDecisions = await LoadRecoveryDecisionsForNoteAsync(
                 context, actor.AgencyId, note.PersonId, note.Id);
-            var validation = ValidateNoteForBilling(note, complianceContext, recoveryDecisions);
+            var validation = ValidateNoteForBilling(note, complianceContext, recoveryDecisions, payerVersion is null);
+            if (payerVersion is not null && PayerBillingRules.ValidateServiceQuantity(payerVersion.Configuration, note.Minutes) is { Count: > 0 } quantityErrors)
+                throw new InvalidOperationException(string.Join("; ", quantityErrors.Select(e => $"{e.Field}: {e.Message}")));
             if (!validation.IsValid)
                 throw new InvalidOperationException(
                     $"Note {noteId} is not ready for billing: {string.Join("; ", validation.Errors)}");
@@ -250,8 +263,11 @@ namespace Sati.Services.Billing
                 throw new InvalidOperationException("This billing period is no longer a draft.");
 
             var units = BillingRules.CalculateSection13Units(note.Minutes);
-            var procedureCode = note.Person.Agency!.BillingProcedureCode!;
-            var unitRate = note.Person.Agency.BillingUnitRate!.Value;
+            var procedureCode = payerVersion?.Configuration.ProcedureCode ?? note.Person.Agency!.BillingProcedureCode!;
+            var unitRate = payerVersion?.Configuration.UnitRate ?? note.Person.Agency!.BillingUnitRate!.Value;
+            var snapshot = CreateClaimSnapshot(note.Person, note.Person.Agency!);
+            if (payerVersion is not null)
+                snapshot = PayerBillingRules.Freeze(snapshot, payerVersion, preparation!, actor.Id, DateTime.UtcNow, serviceDate);
 
             var claimLine = new ClaimLine
             {
@@ -259,15 +275,14 @@ namespace Sati.Services.Billing
                 AmendedNoteVersionId = financialAmendment,
                 DateOfService = serviceDate,
                 ProcedureCode = procedureCode,
-                ProcedureModifier = note.Person.Agency.BillingModifier,
+                ProcedureModifier = payerVersion is null ? note.Person.Agency!.BillingModifier : payerVersion.Configuration.Modifiers.FirstOrDefault(),
                 Units = units,
                 ChargeAmount = BillingRules.CalculateCharge(units, unitRate),
                 ClientMaineCareId = note.Person.MaineCareId ?? string.Empty,
-                RenderingProviderNpi = note.Person.Agency?.Npi ?? string.Empty,
+                RenderingProviderNpi = payerVersion?.Configuration.RenderingProviderNpi ?? note.Person.Agency?.Npi ?? string.Empty,
                 DiagnosisCode = note.Person.DiagnosisCode ?? string.Empty,
                 PlaceOfService = (int?)note.Person.PlaceOfService ?? (int)PlaceOfService.Other,
-                ClaimSnapshotJson = ProfessionalClaimSnapshotCodec.Serialize(
-                    CreateClaimSnapshot(note.Person, note.Person.Agency!)),
+                ClaimSnapshotJson = ProfessionalClaimSnapshotCodec.Serialize(snapshot),
                 // A claim's exception marker is an official financial-record fact.
                 // It must reflect the documented supervisor decision on the note,
                 // never a value supplied by the billing caller.
@@ -421,7 +436,8 @@ namespace Sati.Services.Billing
                 var validation = ValidateNoteForBilling(
                     note,
                     policy,
-                    decisionsByNote[note.Id].ToArray());
+                    decisionsByNote[note.Id].ToArray(),
+                    ProfessionalClaimSnapshotCodec.Deserialize(line.ClaimSnapshotJson).PayerInputs is null);
                 if (!validation.IsValid)
                 {
                     throw new InvalidOperationException(
@@ -640,9 +656,10 @@ namespace Sati.Services.Billing
         internal static BillingValidationResult ValidateNoteForBilling(
             Note note,
             BillingCompliancePolicyContext complianceContext,
-            IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null)
+            IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null,
+            bool validateLegacyConfiguration = true)
         {
-            var errors = ValidateNonComplianceBillingRequirements(note).ToList();
+            var errors = ValidateNonComplianceBillingRequirements(note, validateLegacyConfiguration).ToList();
             // The note documenting a form is subject to the form's own deadline.
             // Keep this outside the ordinary compliance-release path: a supervisor
             // exception or administrative recovery cannot make late form work billable.
@@ -824,7 +841,7 @@ namespace Sati.Services.Billing
             return result.Decision;
         }
 
-        private static IReadOnlyList<string> ValidateNonComplianceBillingRequirements(Note note)
+        private static IReadOnlyList<string> ValidateNonComplianceBillingRequirements(Note note, bool validateLegacyConfiguration = true)
         {
             var errors = new List<string>();
             if (note.Status != NoteStatus.Approved)
@@ -843,9 +860,9 @@ namespace Sati.Services.Billing
                 errors.Add("Consumer has no place of service.");
             if (!HasValidSubscriberClaimIdentity(note.Person))
                 errors.Add("Consumer claim name, birth date, or structured claim address is incomplete or invalid.");
-            if (!BillingRules.IsValidNpi(note.Person?.Agency?.Npi))
+            if (validateLegacyConfiguration && !BillingRules.IsValidNpi(note.Person?.Agency?.Npi))
                 errors.Add("Agency NPI is missing or invalid.");
-            if (note.Person?.Agency is Agency agency)
+            if (validateLegacyConfiguration && note.Person?.Agency is Agency agency)
                 errors.AddRange(ValidateBillingConfiguration(agency));
             return errors;
         }

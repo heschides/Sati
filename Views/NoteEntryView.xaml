@@ -533,9 +533,6 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <!-- Reminder remains a distinct non-service choice. With
-                             no date it is a journal entry; with a future date it
-                             is a calendar reminder. -->
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -550,51 +547,73 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
+                    <CheckBox Grid.Row="0"
+                                 Grid.ColumnSpan="4"
+                                 Content="Reminder"
+                                 AutomationProperties.Name="Reminder note"
+                                 Margin="0,0,0,8"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 ToolTip="Without a date, adds a journal reminder. Choosing a future date saves it on that calendar day. Never billable."
+                                 IsChecked="{Binding IsReminderSelected, Mode=TwoWay}" />
+                    <CheckBox Grid.Row="1" Grid.ColumnSpan="4"
+                              Margin="0,0,0,0"
+                              Content="Unbilled"
+                              IsChecked="{Binding IsUnbilled, Mode=TwoWay}"
+                              IsEnabled="{Binding IsUnbilledEnabled}"
+                              AutomationProperties.Name="Unbilled note"
+                              AutomationProperties.HelpText="The note still goes to the supervisor, but approval does not send it to billing." />
+                    <TextBlock Grid.Row="2" Grid.ColumnSpan="4"
+                               Margin="20,3,0,0"
+                               Text="{Binding UnbilledGuidance}"
+                               TextWrapping="Wrap"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               AutomationProperties.Name="Unbilled workflow explanation"
+                               AutomationProperties.LiveSetting="Polite" />
                     <TextBlock Text="ACTIVITIES (SELECT ALL THAT APPLY)"
                                Style="{StaticResource LabelStyle}"
-                               Grid.Row="0"
+                               Grid.Row="3"
                                Grid.Column="0"
-                               Grid.ColumnSpan="2" />
-                    <CheckBox Grid.Row="1"
+                               Grid.ColumnSpan="4"
+                               Margin="0,12,0,0"
+                               TextWrapping="Wrap"
+                               AutomationProperties.Name="Activities section" />
+                    <CheckBox Grid.Row="4"
                                  Grid.Column="1"
                                  Content="Visit"
                                  Margin="0,0,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  IsChecked="{Binding IsVisitSelected, Mode=TwoWay}" />
-                    <CheckBox Grid.Row="1"
+                    <CheckBox Grid.Row="4"
                                  Grid.Column="3"
                                  Content="Phone"
                                  Margin="0,0,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  IsChecked="{Binding IsPhoneSelected, Mode=TwoWay}" />
-                    <CheckBox Grid.Row="2"
+                    <CheckBox Grid.Row="5"
                                  Grid.Column="1"
                                  Content="Email"
                                  Margin="0,0,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  IsChecked="{Binding IsEmailSelected, Mode=TwoWay}" />
-                    <CheckBox Grid.Row="2"
+                    <CheckBox Grid.Row="5"
                                  Grid.Column="3"
                                  Content="Form"
                                  Margin="0,0,8,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  IsChecked="{Binding IsFormSelected, Mode=TwoWay}" />
-                    <CheckBox Grid.Row="3"
+                    <CheckBox Grid.Row="6"
                                  Grid.Column="1"
                                  Content="Other"
                                  Margin="0,0,12,4"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  IsChecked="{Binding IsOtherSelected, Mode=TwoWay}" />
-                    <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,8,0,4"
-                               Text="OR" Foreground="{DynamicResource TextSecondaryBrush}" />
-                    <CheckBox Grid.Row="4"
-                                 Grid.Column="3"
-                                 Content="Reminder (separate)"
-                                 Margin="0,8,12,4"
-                                 Foreground="{DynamicResource TextPrimaryBrush}"
-                                 ToolTip="Without a date, adds a journal reminder. Choosing a future date saves it on that calendar day. Never billable."
-                                 IsChecked="{Binding IsReminderSelected, Mode=TwoWay}" />
-                    <ComboBox AutomationProperties.Name="Form Type" Grid.Row="5"
+                    <CheckBox Grid.Row="6" Grid.Column="3"
+                              Content="Telehealth" Margin="0,0,8,4"
+                              Foreground="{DynamicResource TextPrimaryBrush}"
+                              AutomationProperties.Name="Telehealth activity"
+                              IsChecked="{Binding IsTelehealthSelected, Mode=TwoWay}" />
+                    <ComboBox AutomationProperties.Name="Form Type" Grid.Row="7"
                               Grid.ColumnSpan="4"
                               ItemsSource="{Binding FormTypes}"
                               SelectedItem="{Binding SelectedFormType, Mode=TwoWay}"
@@ -606,15 +625,15 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <CheckBox Grid.Row="6" Grid.ColumnSpan="4"
+                    <CheckBox Grid.Row="8" Grid.ColumnSpan="4"
                               Margin="0,8,0,0"
                               Content="Annual"
                               IsChecked="{Binding IsAnnualPlan, Mode=TwoWay}"
                               AutomationProperties.Name="Annual Person-Centered Plan"
-                              AutomationProperties.HelpText="Links this note to an annual plan year and records opening or completion when a draft or submitted note is saved."
+                              AutomationProperties.HelpText="Links this note to an annual plan year. Saving asks whether to leave its state unchanged, open it, or complete it."
                               Visibility="{Binding IsAnnualPcpOptionVisible,
                                   Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <TextBlock Grid.Row="7" Grid.ColumnSpan="4"
+                    <TextBlock Grid.Row="9" Grid.ColumnSpan="4"
                                Margin="20,4,0,0"
                                Text="{Binding AnnualPcpYearText}"
                                FontWeight="SemiBold"
@@ -623,7 +642,7 @@
                                AutomationProperties.LiveSetting="Polite"
                                Visibility="{Binding HasAnnualPcpYear,
                                    Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <StackPanel Grid.Row="8" Grid.ColumnSpan="4" Margin="0,8,0,0"
+                    <StackPanel Grid.Row="10" Grid.ColumnSpan="4" Margin="0,8,0,0"
                                 Visibility="{Binding IsFormObligationVisible,
                                     Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="FORM TO DOCUMENT"
@@ -642,32 +661,17 @@
                                    Margin="0,4,0,0" FontSize="11" TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextSecondaryBrush}" />
                     </StackPanel>
-                    <TextBlock Grid.Row="9" Grid.ColumnSpan="4" Margin="0,6,0,0"
+                    <TextBlock Grid.Row="11" Grid.ColumnSpan="4" Margin="0,6,0,0"
                                Text="Reason for changing a prior attested date (if applicable)"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Visibility="{Binding IsFormNote,
                                    Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <TextBox Grid.Row="10" Grid.ColumnSpan="4"
+                    <TextBox Grid.Row="12" Grid.ColumnSpan="4"
                              AutomationProperties.Name="Reason for form completion date correction"
                              MaxLength="1000"
                              Text="{Binding FormDateCorrectionReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Visibility="{Binding IsFormNote,
                                  Converter={StaticResource BoolToVisibilityConverter}}" />
-                    <CheckBox Grid.Row="11" Grid.ColumnSpan="4"
-                              Margin="0,12,0,0"
-                              Content="Unbilled"
-                              IsChecked="{Binding IsUnbilled, Mode=TwoWay}"
-                              IsEnabled="{Binding IsUnbilledEnabled}"
-                              AutomationProperties.Name="Unbilled note"
-                              AutomationProperties.HelpText="The note still goes to the supervisor, but approval does not send it to billing." />
-                    <TextBlock Grid.Row="12" Grid.ColumnSpan="4"
-                               Margin="20,3,0,0"
-                               Text="{Binding UnbilledGuidance}"
-                               TextWrapping="Wrap"
-                               FontSize="11"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               AutomationProperties.Name="Unbilled workflow explanation"
-                               AutomationProperties.LiveSetting="Polite" />
                 </Grid>
 
                         <Grid x:Name="NoteBodyGrid"

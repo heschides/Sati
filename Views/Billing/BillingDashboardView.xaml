@@ -23,6 +23,7 @@
                         VerticalAlignment="Center">
 
                 <Button Content="Amendment review" Command="{Binding NavigateToAmendmentReviewsCommand}" AutomationProperties.Name="Review approved note financial amendments" Margin="0,0,8,0" />
+                <Button Content="Payer configuration" Command="{Binding NavigateToPayerBillingCommand}" AutomationProperties.Name="Payer configuration and claim readiness" Margin="0,0,8,0" />
                 <!-- Overview -->
                 <Border Cursor="Hand"
                         CornerRadius="4"

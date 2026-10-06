@@ -12,13 +12,14 @@ public enum NoteActivity
     Phone = 1 << 1,
     Email = 1 << 2,
     Form = 1 << 3,
-    Other = 1 << 4
+    Other = 1 << 4,
+    Telehealth = 1 << 5
 }
 
 public static class NoteActivityRules
 {
     public const NoteActivity All = NoteActivity.Visit | NoteActivity.Phone |
-        NoteActivity.Email | NoteActivity.Form | NoteActivity.Other;
+        NoteActivity.Email | NoteActivity.Form | NoteActivity.Other | NoteActivity.Telehealth;
 
     public static NoteActivity Effective(int? activities, string? legacyNoteType) =>
         activities is int value ? (NoteActivity)value : FromLegacy(legacyNoteType);
@@ -45,6 +46,9 @@ public static class NoteActivityRules
     {
         if ((activities & NoteActivity.Form) != 0) return "Form";
         if ((activities & NoteActivity.Visit) != 0) return "Visit";
+        // Keep the old remote-contact ordinal for clients/readers that do not
+        // inspect flags. The activity label preserves Telehealth distinctly.
+        if ((activities & NoteActivity.Telehealth) != 0) return "Phone";
         if ((activities & NoteActivity.Phone) != 0) return "Phone";
         if ((activities & NoteActivity.Email) != 0) return "Email";
         if ((activities & NoteActivity.Other) != 0) return "Other";
@@ -58,9 +62,10 @@ public static class NoteActivityRules
         var selected = (NoteActivity)activities.Value;
         if (selected == NoteActivity.None)
             return legacyNoteType ?? "Unclassified note";
-        var labels = new List<string>(5);
+        var labels = new List<string>(6);
         if ((selected & NoteActivity.Visit) != 0) labels.Add("Visit");
         if ((selected & NoteActivity.Phone) != 0) labels.Add("Phone");
+        if ((selected & NoteActivity.Telehealth) != 0) labels.Add("Telehealth");
         if ((selected & NoteActivity.Email) != 0) labels.Add("Email");
         if ((selected & NoteActivity.Form) != 0) labels.Add("Form");
         if ((selected & NoteActivity.Other) != 0) labels.Add("Other");

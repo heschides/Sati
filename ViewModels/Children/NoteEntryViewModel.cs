@@ -161,6 +161,7 @@ namespace Sati.ViewModels.Children
         // Args: the form type, and whether this was an edit (hosts may route new
         // vs. edited form notes differently).
         public event EventHandler? NoteSaved;
+        public Func<Task>? RefreshAfterNoteSavedAsync { get; set; }
 
         // The view owns the confirmation window. The ViewModel supplies the exact
         // old/new client names and treats an absent handler as a refusal, so a
@@ -211,6 +212,7 @@ namespace Sati.ViewModels.Children
         private bool _synchronizingActivitySelection;
         public bool IsVisitSelected { get => HasActivity(NoteActivity.Visit); set => SetActivity(NoteActivity.Visit, value); }
         public bool IsPhoneSelected { get => HasActivity(NoteActivity.Phone); set => SetActivity(NoteActivity.Phone, value); }
+        public bool IsTelehealthSelected { get => HasActivity(NoteActivity.Telehealth); set => SetActivity(NoteActivity.Telehealth, value); }
         public bool IsEmailSelected { get => HasActivity(NoteActivity.Email); set => SetActivity(NoteActivity.Email, value); }
         public bool IsFormSelected { get => HasActivity(NoteActivity.Form); set => SetActivity(NoteActivity.Form, value); }
         public bool IsOtherSelected { get => HasActivity(NoteActivity.Other); set => SetActivity(NoteActivity.Other, value); }
@@ -248,17 +250,39 @@ namespace Sati.ViewModels.Children
         {
             OnPropertyChanged(nameof(IsVisitSelected));
             OnPropertyChanged(nameof(IsPhoneSelected));
+            OnPropertyChanged(nameof(IsTelehealthSelected));
             OnPropertyChanged(nameof(IsEmailSelected));
             OnPropertyChanged(nameof(IsFormSelected));
             OnPropertyChanged(nameof(IsOtherSelected));
             OnPropertyChanged(nameof(IsReminderSelected));
             ApplyActivitySelectionEffects(SelectedNoteType);
+            RefreshSuggestedFollowUp(SelectedPerson, resetAcceptance: false);
         }
         [ObservableProperty] private FormType? selectedFormType;
         [ObservableProperty] private bool isAnnualPlan;
         [ObservableProperty] private bool isUnbilled;
         private AnnualPcpProgressAction _annualPcpAction;
+        private FormProgressRequest? _formProgress;
+        public event EventHandler<FormProgressConfirmationEventArgs>? FormProgressConfirmationRequested;
         private int? _selectedFormId;
+        private Form? _reviewCompletionForm;
+
+        public void PrepareReviewCompletion(Person person, Form form, DateTime completedOn)
+        {
+            if (!ReviewCompletionNoteRules.IsReview(form.Type.ToString()) ||
+                form.PersonId != person.Id || form.CompletedDate is not null)
+                throw new InvalidOperationException("Select an incomplete review belonging to this client.");
+            SetPeople([person]);
+            SelectedPerson = person;
+            SelectedNoteType = NoteType.Form;
+            SelectedFormType = form.Type;
+            SelectedFormObligation = FormObligations.Single(option => option.FormId == form.Id);
+            EventDate = completedOn.Date;
+            Status = NoteStatus.Logged;
+            _reviewCompletionForm = form;
+            IsUnbilled = ReviewCompletionNoteRules.IsOverdue(completedOn, form.DueDate);
+            OnPropertyChanged(nameof(IsStatusEnabled));
+        }
         public ObservableCollection<FormObligationOption> FormObligations { get; } = [];
         [ObservableProperty] private FormObligationOption? selectedFormObligation;
         [ObservableProperty] private string formDateCorrectionReason = string.Empty;
@@ -306,7 +330,7 @@ namespace Sati.ViewModels.Children
 
         public string SuggestedFollowUpText => _suggestedFollowUp is null
             ? string.Empty
-            : $"{_suggestedFollowUp.Title}, due {_suggestedFollowUp.Date:M/d/yy}";
+            : $"{_suggestedFollowUp.Title}, {FollowUpDateLabel(_suggestedFollowUp)} {_suggestedFollowUp.Date:M/d/yy}";
 
         // Compact note panels already contain the client picker, so repeating the
         // person's name in the pinned header spends scarce space without adding
@@ -524,7 +548,7 @@ namespace Sati.ViewModels.Children
         // Future work keeps its estimated minutes, but it has not occurred yet.
         // The shared scheduling policy owns its Scheduled status and deliberately
         // leaves its actual start time empty until the case manager starts it.
-        public bool IsStatusEnabled => AreNoteFieldsEnabled && !IsFutureScheduledWork;
+        public bool IsStatusEnabled => AreNoteFieldsEnabled && !IsFutureScheduledWork && _reviewCompletionForm is null;
         public bool IsServiceTimeEnabled => AreNoteFieldsEnabled && !IsFutureScheduledWork;
         public bool IsGoalProgressEnabled => AreNoteFieldsEnabled && !IsFutureScheduledWork;
         public bool IsDateEnabled => !IsLocked;
@@ -536,6 +560,7 @@ namespace Sati.ViewModels.Children
             OnPropertyChanged(nameof(StatusGuidance));
             MarkDirty();
 
+            RefreshSuggestedFollowUp(SelectedPerson, resetAcceptance: false);
             // Cancelled and Delayed release the time the draft was holding.
             RedrawServiceDay();
         }
@@ -599,7 +624,9 @@ namespace Sati.ViewModels.Children
 
         partial void OnEventDateChanged(DateTime? value)
         {
-            if (!_applyingSchedulingPolicy &&
+            if (_reviewCompletionForm is { } review && value is DateTime completedOn)
+                IsUnbilled = ReviewCompletionNoteRules.IsOverdue(completedOn, review.DueDate);
+            if (_reviewCompletionForm is null && !_applyingSchedulingPolicy &&
                 NoteSchedulingPolicy.IsFutureDate(value, DateTime.Today))
             {
                 ApplyFutureSchedulingPolicy();
@@ -612,6 +639,7 @@ namespace Sati.ViewModels.Children
             OnPropertyChanged(nameof(IsGoalProgressEnabled));
             NotifyReminderModeChanged();
             NotifyAnnualPcpPresentationChanged();
+            RefreshSuggestedFollowUp(SelectedPerson, resetAcceptance: false);
             MarkDirty();
             _ = RefreshServiceDayAsync();
         }
@@ -734,6 +762,7 @@ namespace Sati.ViewModels.Children
             IsAnnualPlan = false;
             IsUnbilled = false;
             _annualPcpAction = AnnualPcpProgressAction.None;
+            _formProgress = null;
             _selectedFormId = null;
             RefreshFormObligations();
             Minutes = null;
@@ -958,6 +987,7 @@ namespace Sati.ViewModels.Children
         partial void OnSelectedFormObligationChanged(FormObligationOption? value)
         {
             _selectedFormId = value?.FormId;
+            RefreshSuggestedFollowUp(SelectedPerson, resetAcceptance: false);
             NotifyAnnualPcpPresentationChanged();
             MarkDirty();
         }
@@ -972,12 +1002,19 @@ namespace Sati.ViewModels.Children
                 RefreshFormObligations();
             }
             _annualPcpAction = AnnualPcpProgressAction.None;
+            _formProgress = null;
             NotifyAnnualPcpPresentationChanged();
             MarkDirty();
         }
 
         partial void OnIsUnbilledChanged(bool value)
         {
+            if (!value && _reviewCompletionForm is { } review && EventDate is DateTime completedOn &&
+                ReviewCompletionNoteRules.IsOverdue(completedOn, review.DueDate))
+            {
+                IsUnbilled = true;
+                return;
+            }
             OnPropertyChanged(nameof(UnbilledGuidance));
             MarkDirty();
         }
@@ -1094,10 +1131,19 @@ namespace Sati.ViewModels.Children
             {
                 try
                 {
-                    var generated = _upcomingEventService.GenerateEvents([person], _settings);
-                    var nextDueForm = _upcomingEventService.NextFormSuggestion(person, _settings);
+                    // This is a read-only presentation projection. It neither attests
+                    // the review nor changes the scheduled record before submission.
+                    var documentingReview = IsFormNote &&
+                        SelectedFormRecord is { } selected &&
+                        ReviewCompletionNoteRules.IsReview(selected.Type.ToString()) &&
+                        Status is NoteStatus.Pending or NoteStatus.Logged &&
+                        EventDate is DateTime occurredOn && occurredOn.Date <= DateTime.Today
+                            ? SelectedFormRecord : null;
+                    var source = new FollowUpEventSource(person, _editingNote, documentingReview);
+                    var generated = _upcomingEventService.GenerateEvents([source], _settings);
+                    var nextDueForm = _upcomingEventService.NextFormSuggestion(source, _settings);
                     nextFormWork = generated
-                        .Where(item => item.FormType.HasValue)
+                        .Where(item => item.FormType.HasValue && !IsScheduledFollowUp(item))
                         .Concat(nextDueForm is null ? [] : [nextDueForm])
                         .OrderBy(FormWorkPriority)
                         .ThenBy(item => item.Date)
@@ -1126,6 +1172,33 @@ namespace Sati.ViewModels.Children
             if (resetAcceptance)
                 _suggestedFollowUpAccepted = false;
             NotifySuggestedFollowUpChanged();
+        }
+
+        private static bool IsScheduledFollowUp(UpcomingEvent item) => item.Kind is
+            UpcomingEventKind.ScheduledVisit or UpcomingEventKind.ScheduledContact or
+            UpcomingEventKind.ScheduledForm or UpcomingEventKind.ScheduledReminder or
+            UpcomingEventKind.ScheduledPhone or UpcomingEventKind.ScheduledEmail or
+            UpcomingEventKind.ScheduledOther;
+
+        private static string FollowUpDateLabel(UpcomingEvent item) =>
+            IsScheduledFollowUp(item) ? "scheduled" : "due";
+
+        private sealed class FollowUpEventSource(Person person, Note? editingNote, Form? documentingReview) : IEventSource
+        {
+            public int Id => person.Id;
+            public DateTime? EffectiveDate => person.EffectiveDate;
+            public string FullName => person.FullName;
+            public List<Form> Forms { get; } = person.Forms
+                .Where(form => form.Id != documentingReview?.Id).ToList();
+            public IReadOnlyCollection<ReleaseComplianceFact> ReleaseComplianceFacts =>
+                ((IEventSource)person).ReleaseComplianceFacts;
+            public IEnumerable<INoteInfo> Notes => person.Notes.Where(note =>
+                !ReferenceEquals(note, editingNote) &&
+                !(editingNote is { Id: > 0 } && note.Id == editingNote.Id) &&
+                !(documentingReview is not null && note.FormId == documentingReview.Id &&
+                  note.FormType == documentingReview.Type));
+            public Form? GetCurrentCycleForm(FormType type, DateTime? asOf = null) =>
+                Person.FindCurrentCycleForm(Forms, EffectiveDate, type, asOf);
         }
 
         private static int FormWorkPriority(UpcomingEvent item) => item switch
@@ -1161,7 +1234,7 @@ namespace Sati.ViewModels.Children
                 return;
 
             var item = _suggestedFollowUp.Title.Trim().TrimEnd('.');
-            var line = $"Follow-up: {item} due {_suggestedFollowUp.Date:M/d/yy}.";
+            var line = $"Follow-up: {item} {FollowUpDateLabel(_suggestedFollowUp)} {_suggestedFollowUp.Date:M/d/yy}.";
             Narrative = string.IsNullOrWhiteSpace(Narrative)
                 ? line
                 : $"{Narrative.TrimEnd()}{Environment.NewLine}{line}";
@@ -2150,6 +2223,11 @@ namespace Sati.ViewModels.Children
         [RelayCommand(CanExecute = nameof(CanSubmitNote))]
         private async Task SubmitNote()
         {
+            if (_reviewCompletionForm is not null && IsReminderNote)
+            {
+                SubmissionFailureMessage = "Review completion requires a submitted Form note.";
+                return;
+            }
             // An undated Reminder keeps the established journal-entry path. A
             // future-dated Reminder is deliberately a scheduled Notes row so the
             // calendar can retrieve it; it continues through the normal save path.
@@ -2160,6 +2238,23 @@ namespace Sati.ViewModels.Children
             }
 
             var errors = new List<string>();
+
+            if (_reviewCompletionForm is { } review)
+            {
+                if (SelectedPerson?.Id != review.PersonId || _selectedFormId != review.Id ||
+                    SelectedFormType != review.Type || !IsFormSelected || Status != NoteStatus.Logged)
+                    errors.Add("• This completion must submit a Form note for the selected review and client.");
+                if (EventDate is DateTime completedOn && SelectedPerson?.EffectiveDate is DateTime effectiveDate)
+                {
+                    var cycle = FormAttestationRules.ResolveCycleForForm(effectiveDate,
+                        review.Type.ToString(), review.DueDate,
+                        review.TargetEffectiveDate == default ? null : review.TargetEffectiveDate);
+                    var dateError = cycle is null ? "The review has no valid compliance cycle." :
+                        FormAttestationRules.ValidateCompletionDate(completedOn, cycle.Value.CycleStart, DateTime.Today);
+                    if (dateError is not null) errors.Add("• " + dateError);
+                    if (ReviewCompletionNoteRules.IsOverdue(completedOn, review.DueDate)) IsUnbilled = true;
+                }
+            }
 
             if (SelectedPerson is null) errors.Add("• Please select a client.");
             if (Status is null) errors.Add("• Please select a status.");
@@ -2190,7 +2285,7 @@ namespace Sati.ViewModels.Children
 
             try
             {
-                if (!PrepareAnnualPcpSave())
+                if (!PrepareFormProgressSave())
                     return;
 
                 if (Status == NoteStatus.Logged && !IsUnbilled)
@@ -2225,13 +2320,15 @@ namespace Sati.ViewModels.Children
                             form.Type == SelectedFormType)
                         : null;
                     var completesExactForm = exactForm is not null &&
-                        FormNoteAttestationRules.AttestsExactFormOnLog(
+                        (_formProgress is not null
+                            ? _formProgress.Action == AnnualPcpProgressAction.Complete
+                            : FormNoteAttestationRules.AttestsExactFormOnLog(
                             Status?.ToString(),
                             (int)_selectedActivities,
                             SelectedNoteType?.ToString(),
                             SelectedFormType?.ToString(),
                             _selectedFormId,
-                            IsAnnualPlan);
+                            IsAnnualPlan));
                     var windowReasons = selectedPerson.EvaluateBillingWindow(
                         serviceDate,
                         requirements,
@@ -2240,8 +2337,11 @@ namespace Sati.ViewModels.Children
                             ? exactForm!.Id
                             : null,
                         projectedCompletedOn: completesExactForm
-                            ? serviceDate
-                            : null).ToList();
+                            ? _formProgress?.CompletedOn ?? serviceDate
+                            : null,
+                        projectedOpenedFormId: _formProgress is { Action: not AnnualPcpProgressAction.None }
+                            ? exactForm?.Id : null,
+                        projectedOpenedOn: _formProgress?.OpenedOn).ToList();
                     if (completesExactForm)
                     {
                         var ambiguity = EvaluateFormNoteCycleAmbiguity(
@@ -2300,59 +2400,44 @@ namespace Sati.ViewModels.Children
             }
         }
 
-        private bool PrepareAnnualPcpSave()
+        private bool PrepareFormProgressSave()
         {
             _annualPcpAction = AnnualPcpProgressAction.None;
-            if (!IsAnnualPlan || SelectedFormType != FormType.PCP ||
-                Status is not (NoteStatus.Pending or NoteStatus.Logged))
-            {
+            _formProgress = null;
+            if (!FormProgressRules.Supports(SelectedFormType?.ToString()) ||
+                Status is not (NoteStatus.Pending or NoteStatus.Logged) ||
+                !NoteActivityRules.Has((int)_selectedActivities, SelectedNoteType?.ToString(), NoteActivity.Form))
                 return true;
+            if (SelectedFormRecord is not Form form)
+            {
+                if (SelectedFormType == FormType.PCP && !IsAnnualPlan) return true;
+                ShowSubmissionRefusal("Choose the specific annual document in FORM TO DOCUMENT before saving.");
+                return false;
             }
-
-            if (SelectedFormRecord is not Form form || EventDate is not DateTime serviceDate)
-                return true; // Normal validation supplies the field-specific error.
-
+            if (EventDate is not DateTime serviceDate) return true;
             var availableOn = FormDueDateCalculator.ComputeAvailableDateForDueDate(
                 form.Type, form.DueDate, _settings ?? new Settings());
-            var decision = AnnualPcpNoteRules.Evaluate(
-                true, form.Type.ToString(), form.Id, Status?.ToString(), serviceDate,
-                availableOn, form.DueDate, form.OpenedDate, form.CompletedDate);
-
-            if (decision.IsBeforeAvailableWindow)
+            if (form.Type == FormType.PCP && serviceDate.Date < availableOn.Date)
             {
-                var revision = new AnnualPcpConfirmationEventArgs(
-                    AnnualPcpConfirmationKind.CreateRevision,
-                    decision.Message + " Do you want to save it as PCP revision work instead?");
+                var revision = new AnnualPcpConfirmationEventArgs(AnnualPcpConfirmationKind.CreateRevision,
+                    $"This Annual PCP is available from {availableOn:d}. Save as non-annual PCP revision work instead?");
                 AnnualPcpConfirmationRequested?.Invoke(this, revision);
-                if (!revision.Confirmed)
-                    return false;
-
+                if (!revision.Confirmed) return false;
                 IsAnnualPlan = false;
                 _selectedFormId = null;
                 RefreshFormObligations();
                 NotifyAnnualPcpPresentationChanged();
                 return true;
             }
-
-            if (decision.RequiredAction != AnnualPcpProgressAction.None)
-            {
-                var kind = decision.RequiredAction == AnnualPcpProgressAction.Open
-                    ? AnnualPcpConfirmationKind.Open
-                    : AnnualPcpConfirmationKind.Complete;
-                var confirmation = new AnnualPcpConfirmationEventArgs(kind, decision.Message);
-                AnnualPcpConfirmationRequested?.Invoke(this, confirmation);
-                if (!confirmation.Confirmed)
-                    return false;
-                _annualPcpAction = decision.RequiredAction;
-            }
-            else if (decision.MustBeUnbilled)
-            {
-                var notice = new AnnualPcpConfirmationEventArgs(
-                    AnnualPcpConfirmationKind.LateNotice, decision.Message);
-                AnnualPcpConfirmationRequested?.Invoke(this, notice);
-            }
-
-            if (decision.MustBeUnbilled)
+            var confirmation = new FormProgressConfirmationEventArgs(form.Type.ToString(),
+                Status!.Value.ToString(), serviceDate.Date, availableOn, DateTime.Today,
+                form.DueDate, form.TargetEffectiveDate, form.OpenedDate, form.CompletedDate);
+            FormProgressConfirmationRequested?.Invoke(this, confirmation);
+            if (confirmation.Progress is null) return false;
+            _formProgress = confirmation.Progress;
+            // The existing rule forces late annual PCP activity Unbilled regardless
+            // of when its opening/completion evidence was recorded.
+            if (form.Type == FormType.PCP && serviceDate.Date > form.DueDate.Date)
                 IsUnbilled = true;
             return true;
         }
@@ -2407,6 +2492,12 @@ namespace Sati.ViewModels.Children
         [RelayCommand]
         private async Task HoldForCompliance()
         {
+            if (_reviewCompletionForm is not null)
+            {
+                CancelComplianceDialog();
+                SubmissionFailureMessage = "The review remains incomplete. Resolve the billing requirements, select Unbilled, or submit with a written justification.";
+                return;
+            }
             Status = _dialogIsWindowBlock
                 ? NoteStatus.ComplianceBlocked
                 : NoteStatus.HeldForCompliance;
@@ -2448,6 +2539,13 @@ namespace Sati.ViewModels.Children
         // branch on _editingNote.
         private async Task SaveAsync(string? caseManagerJustification = null)
         {
+            if (_reviewCompletionForm is { } review &&
+                (Status != NoteStatus.Logged || SelectedPerson?.Id != review.PersonId ||
+                 SelectedFormType != review.Type || _selectedFormId != review.Id || !IsFormSelected))
+            {
+                SubmissionFailureMessage = "Review completion requires a submitted Form note for the selected review and client.";
+                return;
+            }
             SubmissionFailureMessage = null;
             // Last check before the record exists. The API repeats this as the
             // authoritative gate; this covers the desktop's direct database path
@@ -2480,6 +2578,7 @@ namespace Sati.ViewModels.Children
                 note.IsAnnualPlan = IsAnnualPlan;
                 note.IsUnbilled = IsUnbilled;
                 note.AnnualPcpAction = _annualPcpAction;
+                note.FormProgress = _formProgress;
                 note.FormDateCorrectionReason = string.IsNullOrWhiteSpace(FormDateCorrectionReason)
                     ? null : FormDateCorrectionReason.Trim();
                 note.GoalProgress = GoalProgress;
@@ -2515,6 +2614,7 @@ namespace Sati.ViewModels.Children
                 note.IsAnnualPlan = IsAnnualPlan;
                 note.IsUnbilled = IsUnbilled;
                 note.AnnualPcpAction = _annualPcpAction;
+                note.FormProgress = _formProgress;
                 note.FormDateCorrectionReason = string.IsNullOrWhiteSpace(FormDateCorrectionReason)
                     ? null : FormDateCorrectionReason.Trim();
                 note.VisitDocumentation = BuildVisitDocumentation();
@@ -2528,6 +2628,14 @@ namespace Sati.ViewModels.Children
             // so the next note for this person needs no re-selection.
             ReturnToNewNote();
 
+            if (RefreshAfterNoteSavedAsync is not null)
+            {
+                try { await RefreshAfterNoteSavedAsync(); }
+                catch (Exception)
+                {
+                    SubmissionFailureMessage = "The note was saved, but related views could not be refreshed. Reopen the client profile to retry.";
+                }
+            }
             NoteSaved?.Invoke(this, EventArgs.Empty);
         }
 
@@ -2675,6 +2783,7 @@ namespace Sati.ViewModels.Children
             IsAnnualPlan = false;
             IsUnbilled = false;
             _annualPcpAction = AnnualPcpProgressAction.None;
+            _formProgress = null;
             _selectedFormId = null;
             RefreshFormObligations();
             FormDateCorrectionReason = string.Empty;
@@ -2797,6 +2906,23 @@ namespace Sati.ViewModels.Children
         public string Message { get; } =
             $"Are you sure you want to reassign this note from {previousClientName} to {newClientName}?";
         public bool Confirmed { get; set; }
+    }
+
+    public sealed class FormProgressConfirmationEventArgs(
+        string formType, string status, DateTime activityOn, DateTime availableOn,
+        DateTime today, DateTime dueOn, DateTime targetEffectiveDate,
+        DateTime? openedOn, DateTime? completedOn) : EventArgs
+    {
+        public string FormType { get; } = formType;
+        public string Status { get; } = status;
+        public DateTime ActivityOn { get; } = activityOn;
+        public DateTime AvailableOn { get; } = availableOn;
+        public DateTime Today { get; } = today;
+        public DateTime DueOn { get; } = dueOn;
+        public DateTime TargetEffectiveDate { get; } = targetEffectiveDate;
+        public DateTime? OpenedOn { get; } = openedOn;
+        public DateTime? CompletedOn { get; } = completedOn;
+        public FormProgressRequest? Progress { get; set; }
     }
 
     public enum AnnualPcpConfirmationKind

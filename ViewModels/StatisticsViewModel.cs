@@ -150,6 +150,15 @@ namespace Sati.ViewModels
         }
 
         [RelayCommand]
+        private async Task ShowLastMonthAsync()
+        {
+            var thisMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            SelectedStartDate = thisMonth.AddMonths(-1);
+            SelectedEndDate = thisMonth.AddDays(-1);
+            await LoadAsync(preserveConsumerSelection: true);
+        }
+
+        [RelayCommand]
         private async Task ShowLast30DaysAsync()
         {
             SelectedStartDate = DateTime.Today.AddDays(-29);

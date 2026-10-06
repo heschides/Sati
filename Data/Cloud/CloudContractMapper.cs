@@ -317,7 +317,8 @@ internal static class CloudContractMapper
         note.IsAgendaGenerated,
         note.IsAnnualPlan,
         note.IsUnbilled,
-        note.AnnualPcpAction);
+        note.AnnualPcpAction,
+        note.FormProgress);
 
     public static SavePersonRequest ToSavePersonRequest(Person person) =>
         PersonContractMapper.ToSaveRequest(person);

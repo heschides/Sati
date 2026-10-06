@@ -198,6 +198,12 @@ public sealed class DashboardFormComplianceTests
         var currentPerson = clients.PeopleView.CurrentItem;
         clients.SelectedPerson = person;
         var revisionBeforeAttestation = clients.CompliancePresentationRevision;
+        Form? requestedReview = null;
+        clients.ReviewCompletionRequestedAsync = (_, selectedReview) =>
+        {
+            requestedReview = selectedReview;
+            return Task.CompletedTask;
+        };
 
         Assert.False(clients.IsFormsEditingUnlocked);
         Assert.False(clients.ToggleFormCommand.CanExecute(FormType.Q3R));
@@ -211,6 +217,12 @@ public sealed class DashboardFormComplianceTests
         Assert.True(clients.ToggleFormCommand.CanExecute(FormType.Q3R));
 
         await clients.ToggleFormCommand.ExecuteAsync(FormType.Q3R);
+        Assert.Same(form, requestedReview);
+        Assert.False(clients.Attestation.IsVisible);
+        Assert.Null(form.CompletedDate);
+        // The note writer uses the existing attestation aggregate. Exercise its
+        // established refresh/revocation cascade separately from opening the editor.
+        clients.Attestation.Begin(form, person.EffectiveDate!.Value, "Submitted review note");
         Assert.True(clients.Attestation.IsVisible);
         Assert.Null(clients.Attestation.CompletionDate);
         Assert.False(clients.Attestation.CompleteAttestationCommand.CanExecute(null));
@@ -604,6 +616,15 @@ public sealed class DashboardFormComplianceTests
         Assert.Contains(harness.Dashboard.UpcomingEvents,
             item => item.Kind == UpcomingEventKind.LateReview && item.Title.StartsWith("Q3 Review"));
 
+        Form? requestedReview = null;
+        Task RequestReview(Person _, Form selected)
+        {
+            requestedReview = selected;
+            return Task.CompletedTask;
+        }
+        harness.Dashboard.ReviewCompletionRequestedAsync = RequestReview;
+        harness.Dashboard.Clients.ReviewCompletionRequestedAsync = RequestReview;
+
         switch (path)
         {
             case CompletionPath.DashboardToggle:
@@ -630,6 +651,11 @@ public sealed class DashboardFormComplianceTests
             : harness.Dashboard.Attestation;
         var explicitCompletion = DateTime.Today.AddDays(-2);
         Assert.Null(form.CompletedDate);
+        Assert.Same(form, requestedReview);
+        Assert.False(attestation.IsVisible);
+        // Model the existing shared attestation/refresh cascade after submission;
+        // opening any completion action alone must leave it untouched.
+        attestation.Begin(form, person.EffectiveDate!.Value, "Submitted review note");
         Assert.True(attestation.IsVisible);
         Assert.Null(attestation.CompletionDate);
         attestation.CompletionDate = explicitCompletion;

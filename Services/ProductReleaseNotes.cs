@@ -6,11 +6,31 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Approved-note amendments and provider organization";
-    public const string ReleaseDate = "October 4, 2026";
+    public const string ReleaseName = "Form completion and clearer note follow-up";
+    public const string ReleaseDate = "October 6, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Choose document progress when saving form work",
+            [
+                "PCP and Comprehensive Assessment saves show the document's current state and let you leave it unchanged, open it, or complete it. Completing an unopened document requires its actual opening date.",
+                "Recording quarterly review completion offers an editable case note. The review remains incomplete until submission saves the note and its completion evidence together, then refreshes the client profile.",
+                "Actual work dates determine whether form work is late; overdue review work starts Unbilled and other billing requirements still apply."
+            ]),
+        new(
+            "Follow up on the next work",
+            [
+                "The note editor excludes the quarterly review being documented and its linked scheduled note from follow-up suggestions. Scheduled activities say scheduled; document deadlines say due.",
+                "Telehealth is available as an activity. Reminder and Unbilled appear above Activities, and the activity heading displays fully.",
+                "Agenda History narrative text follows the text sizing buttons. Statistics and Notes Log include Last Month shortcuts; Notes Log also includes This Month."
+            ]),
+        new(
+            "Prepare reviewed payer billing inputs",
+            [
+                "Administration can publish effective-dated agency payer configuration with retained history. Billing can preview field readiness and freeze reviewed configuration and authorization references on prepared claims.",
+                "Existing legacy claims retain their original format. Enrollment, payer certification, full authorization tracking, and real transmission activation require separate review."
+            ]),
         new(
             "Amend approved notes with a retained history",
             [

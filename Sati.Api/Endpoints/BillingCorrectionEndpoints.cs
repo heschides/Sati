@@ -240,14 +240,25 @@ internal static partial class ApiEndpoints
                 var recoveryByNote = await LoadRecoveryDecisionsByNoteAsync(
                     db, actor.AgencyId, [row.Note.Id], cancellationToken);
                 await PopulateContactHistoryAsync(db, actor.AgencyId, [row.Person], cancellationToken);
+                var standing = history.StandingSubmission(line.NoteId);
+                var priorCorrection = standing?.CorrectionId is long priorId ? history.Corrections.Single(c => c.Id == priorId) : null;
+                var previousSnapshotJson = priorCorrection?.ClaimSnapshotJson ?? line.ClaimSnapshotJson ?? string.Empty;
+                var previousSnapshot = ProfessionalClaimSnapshotCodec.Deserialize(previousSnapshotJson);
                 var errors = ValidateBillingCandidate(row.Note, row.Person, agency, forms, releaseRows,
-                    compliancePolicy, recoveryByNote.GetValueOrDefault(row.Note.Id) ?? [], providerLinks);
+                    compliancePolicy, recoveryByNote.GetValueOrDefault(row.Note.Id) ?? [], providerLinks, previousSnapshot.PayerInputs is null);
+                if (previousSnapshot.PayerInputs is { } payerInputs)
+                    errors = errors.Concat(PayerBillingRules.ValidateServiceQuantity(payerInputs.ConfigurationVersion.Configuration, row.Note.Minutes)
+                        .Select(e => $"{e.Field}: {e.Message}")).ToList();
                 if (errors.Count > 0)
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = errors.ToArray() });
 
-                correction.ClaimSnapshotJson = ProfessionalClaimSnapshotCodec.Serialize(CreateClaimSnapshot(row.Person, agency!));
+                ProfessionalClaimSnapshot correctedSnapshot;
+                try { correctedSnapshot = PayerBillingRules.PreserveCorrection(CreateClaimSnapshot(row.Person, agency!), previousSnapshotJson,
+                    approvedAmendment?.Content.EventDate?.Date ?? priorCorrection?.CorrectedDateOfService ?? line.DateOfService); }
+                catch (InvalidOperationException e) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["payerConfiguration"] = [e.Message] }); }
+                correction.ClaimSnapshotJson = ProfessionalClaimSnapshotCodec.Serialize(correctedSnapshot);
                 correction.ClientMaineCareId = row.Person.MaineCareId!;
-                correction.RenderingProviderNpi = agency!.Npi!;
+                correction.RenderingProviderNpi = correctedSnapshot.PayerInputs?.ConfigurationVersion.Configuration.RenderingProviderNpi ?? agency!.Npi!;
                 correction.DiagnosisCode = row.Person.DiagnosisCode!;
                 correction.PlaceOfService = row.Person.PlaceOfService!.Value;
             }

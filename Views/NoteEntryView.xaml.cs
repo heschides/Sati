@@ -65,6 +65,7 @@ namespace Sati.Views
             {
                 _subscribedViewModel.NoteReassignmentConfirmationRequested -= ConfirmReassignment;
                 _subscribedViewModel.AnnualPcpConfirmationRequested -= ConfirmAnnualPcp;
+                _subscribedViewModel.FormProgressConfirmationRequested -= ConfirmFormProgress;
                 _subscribedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
             }
 
@@ -73,6 +74,7 @@ namespace Sati.Views
             {
                 _subscribedViewModel.NoteReassignmentConfirmationRequested += ConfirmReassignment;
                 _subscribedViewModel.AnnualPcpConfirmationRequested += ConfirmAnnualPcp;
+                _subscribedViewModel.FormProgressConfirmationRequested += ConfirmFormProgress;
                 _subscribedViewModel.PropertyChanged += OnViewModelPropertyChanged;
             }
         }
@@ -188,6 +190,16 @@ namespace Sati.Views
                     MessageBoxImage.Warning,
                     MessageBoxResult.No);
             e.Confirmed = answer == MessageBoxResult.Yes;
+        }
+
+        private readonly Func<FormProgressConfirmationEventArgs, Window> _formProgressWindowFactory =
+            request => new FormProgressWindow(request);
+
+        private void ConfirmFormProgress(object? sender, FormProgressConfirmationEventArgs e)
+        {
+            var dialog = _formProgressWindowFactory(e);
+            dialog.Owner = Window.GetWindow(this);
+            dialog.ShowDialog();
         }
 
         private void ConfirmAnnualPcp(

@@ -13,6 +13,97 @@ namespace Sati.Tests;
 public sealed class SuggestedFollowUpRealServiceTests
 {
     [Fact]
+    public async Task CompletingQ2DoesNotSuggestItsScheduledNoteAsAnotherDeadline()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var today = DateTime.Today;
+        var person = await fixture.PersonOneAsync();
+        person.EffectiveDate = today.AddDays(-200);
+        var q2 = new Form(FormType.Q2R, today.AddDays(-20), targetEffectiveDate: person.EffectiveDate)
+        { Id = 501, PersonId = person.Id };
+        var q3 = new Form(FormType.Q3R, today.AddDays(70), targetEffectiveDate: person.EffectiveDate)
+        { Id = 502, PersonId = person.Id };
+        person.Forms.AddRange([q2, q3]);
+        var scheduled = Note.Rehydrate(601);
+        scheduled.PersonId = person.Id;
+        scheduled.Status = NoteStatus.Scheduled;
+        scheduled.EventDate = today;
+        scheduled.NoteType = NoteType.Form;
+        scheduled.FormType = FormType.Q2R;
+        scheduled.FormId = q2.Id;
+        person.Notes.Add(scheduled);
+        var panel = fixture.NoteEntry();
+        await panel.InitializeAsync();
+        panel.SelectedPerson = person;
+        Assert.Contains($"Q2 Review — {person.FullName}", panel.SuggestedFollowUpText);
+        panel.PrepareReviewCompletion(person, q2, q2.DueDate.AddDays(2));
+        Assert.Contains("Q3 Review", panel.SuggestedFollowUpText);
+        Assert.DoesNotContain("Q2 Review", panel.SuggestedFollowUpText);
+        Assert.Null(q2.CompletedDate);
+        Assert.Equal(NoteStatus.Scheduled, scheduled.Status);
+        Assert.Equal(today, scheduled.EventDate);
+    }
+
+    [Fact]
+    public async Task ScheduledActivityIsLabelledScheduledInSuggestionAndAcceptedNarrative()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var person = await fixture.PersonOneAsync();
+        person.EffectiveDate = DateTime.Today.AddDays(180);
+        person.Notes.Add(Note.Create("Call.", DateTime.Today, NoteStatus.Scheduled, 15,
+            person.Id, null, NoteType.Phone));
+        var panel = fixture.NoteEntry();
+        await panel.InitializeAsync();
+        panel.SelectedPerson = person;
+        Assert.Contains(", scheduled ", panel.SuggestedFollowUpText);
+        Assert.DoesNotContain(", due ", panel.SuggestedFollowUpText);
+        panel.AcceptSuggestedFollowUpCommand.Execute(null);
+        Assert.Contains(" scheduled ", panel.Narrative);
+        Assert.DoesNotContain(" due ", panel.Narrative);
+    }
+
+    [Fact]
+    public async Task StartingAgendaReviewExcludesItsStoredScheduledCopyBeforeSubmission()
+    {
+        await using var fixture = await NoteEntryFixture.CreateAsync();
+        var today = DateTime.Today;
+        int formId;
+        await using (var db = fixture.Factory.CreateDbContext())
+        {
+            var stored = await db.People.SingleAsync(p => p.Id == fixture.PersonOneId);
+            stored.EffectiveDate = today.AddDays(-200);
+            var q2 = new Form(FormType.Q2R, today.AddDays(-20), targetEffectiveDate: stored.EffectiveDate)
+            { PersonId = stored.Id };
+            stored.Forms.Add(q2);
+            stored.Forms.Add(new Form(FormType.Q3R, today.AddDays(70), targetEffectiveDate: stored.EffectiveDate)
+            { PersonId = stored.Id });
+            await db.SaveChangesAsync();
+            formId = q2.Id;
+        }
+        var notes = fixture.NotesFromAnotherSession();
+        var scheduled = Note.Create("Complete Q2 review.", today, NoteStatus.Scheduled, 15,
+            fixture.PersonOneId, FormType.Q2R, NoteType.Form, formId);
+        await notes.AddNoteAsync(scheduled);
+        Person person;
+        await using (var db = fixture.Factory.CreateDbContext())
+            person = await db.People.AsNoTracking().Include(p => p.Forms).Include(p => p.Notes)
+                .SingleAsync(p => p.Id == fixture.PersonOneId);
+        var panel = fixture.NoteEntry(notes: notes);
+        await panel.InitializeAsync();
+        panel.SetPeople([person]);
+        Assert.True(await panel.PrepareScheduledWorkAsync(scheduled));
+        panel.EventDate = today.AddDays(-18); // Completed two days after the deadline.
+        Assert.Equal(NoteStatus.Pending, panel.Status);
+        Assert.Contains("Q3 Review", panel.SuggestedFollowUpText);
+        Assert.DoesNotContain("Q2 Review", panel.SuggestedFollowUpText);
+        await using var verify = fixture.Factory.CreateDbContext();
+        Assert.Null((await verify.Forms.SingleAsync(f => f.Id == formId)).CompletedDate);
+        var unchanged = await verify.Notes.SingleAsync(n => n.Id == scheduled.Id);
+        Assert.Equal(NoteStatus.Scheduled, unchanged.Status);
+        Assert.Equal(today, unchanged.EventDate);
+    }
+
+    [Fact]
     public async Task NextFormSuggestionFillsTheWindowGapThatLeftTheRowBlank()
     {
         await using var fixture = await NoteEntryFixture.CreateAsync();

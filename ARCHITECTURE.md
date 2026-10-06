@@ -1,5 +1,75 @@
 # Sati — Architecture Reference
 
+## October 6 — Note follow-up suggestion correction (source only)
+
+The note editor excludes the current scheduled note and, for an exact Q1–Q4 Form
+note with Pending/Logged status and an occurred activity date, excludes that review
+and its linked scheduled work from a read-only follow-up projection. Other quarters
+and obligations remain available. This changes suggestions only; persisted completion
+and scheduling remain unchanged until ordinary submission. Dates on scheduled activity
+suggestions and accepted follow-up text say "scheduled"; actual form deadlines say
+"due". Scheduled activities do not supply the form-deadline status cue. Synthetic
+regressions reproduce the Q2 deadline/completion/scheduled-date mismatch; no PHI query,
+migration, deployment or application restart was performed.
+
+
+## Quarterly review completion notes — October 6 (source only)
+
+Q1–Q4 Record completion actions on Annual Forms, client Overview and the dashboard
+open an actual-date prompt followed by an independent modal NoteEntryView editor.
+The selected form ID is retained across plan years; no existing note draft is replaced.
+The editor requires a Logged Form note for that exact client and quarter, and leaves
+service time, minutes and goal progress for human entry. Cancel and opening the editor
+make no persistence changes. Late work uses the existing FormWorkBillingRules deadline
+predicate and starts Unbilled; ordinary compliance and submission rules still apply.
+
+Submission reuses the existing local/API atomic linked-form note attestation, recording
+the activity date and evidence note together. It awaits the dashboard note-save refresh
+cascade before closing, updating the client profile, board, matrix and notes. Failed saves
+retain the editor; post-save refresh failures are reported separately. Completed reviews
+retain their existing history/revocation workflow. No schema, API route or deployment change.
+
+
+## Telehealth activity and note-entry layout - October 6 (source only)
+
+Telehealth is a distinct `NoteActivity` flag on the existing integer column, with
+Phone as its legacy primary type for remote-contact readers. Activity-aware history
+shows Telehealth; it counts as occurred contact through `MonthlyContactRules` and
+does not require in-person Visit documentation unless Visit is also selected.
+It does not automatically choose claim modifiers or place of service. The capability
+`telehealth-note-activity-v1` prevents older API interpretation. Reminder and Unbilled
+precede Activities in visual and keyboard order; the heading uses the full grid
+width and wraps. No schema change.
+
+
+## Explicit PCP and Comprehensive Assessment note progress - October 6 (source only)
+
+`FormProgressRules` in Contracts owns the explicit choice for exact PCP and
+Comprehensive Assessment note saves. The modal shows annual target, due date and
+current dates, defaults to Leave unchanged, and offers Open or Complete where
+applicable. Completing an unopened document requires its actual opening date.
+Completion defaults to the activity date but may differ. Previously completed
+records use the existing attestation correction workflow. This supersedes the
+September 28 implicit next-step desktop interaction; legacy payloads retain their
+existing behavior.
+
+`SaveNoteRequest.FormProgress` and Note's nonmapped equivalent carry the choice,
+entered dates and observed dates/deadline/target. Both writers validate that state
+inside the existing serializable note transaction and append opening audits and
+completion attestations atomically with the note. API stale-state refusals are
+409 `stale_form_progress`. The explicit path bypasses automatic Logged form
+attestation, including Leave unchanged. Billing uses actual recorded dates and
+all independent requirements; desktop preflight projects only the exact chosen
+opening/completion. Late PCP activity retains its existing Unbilled rule.
+
+The capability `explicit-pcp-assessment-progress-v1` blocks new desktop sessions
+against older APIs that would ignore the choice. Editors await the dashboard's
+caseload/profile, matrix, deadline and calendar refresh after saving. Preserved
+demographic edits receive fresh Forms without losing their draft. Refresh failures
+are reported as saved notes with stale views. No migration or deployment is implied.
+Quarterly review completion now has its separate note workflow described above.
+
+
 *Living document. Updated during structured review sessions. Last updated: 2026-10-03.*
 
 ## Claim.MD setup, manual findings and reset preservation — October 3 (source only)
@@ -3331,3 +3401,22 @@ lines, and submitted EDI files remain intact. Notes Log, supervisor review, and 
 host independent amendment screens with guarded asynchronous publication and account
 clearing. Migration/activation and explicit remaining adapters are described in
 `NOTE_AMENDMENTS_RUNBOOK.md`; no runtime environment was changed.
+
+## Versioned professional payer inputs (October 4, 2026, unreleased)
+
+`PayerBillingRules` in Contracts owns payer field validation, permissions, date selection,
+authorization-reference coverage and freezing. The shared append-only
+`PayerBillingConfigurationVersion` and `PayerBillingStore` serve local and API models.
+Publication serializes per agency under a database application lock and rechecks the current
+actor; unique revision/start indexes provide another conflict boundary. Claim creation selects
+inside its existing serializable period transaction, checks the preview version, and freezes v2.
+The local actor is detached before its transaction-time recheck to defeat EF identity-map reuse.
+
+Billing and Administration host accessible configuration/readiness workspaces with LatestRequestTracker and
+separate busy-operation ownership; edited inputs invalidate older previews. Version 1 formatting
+remains reproducible; version 2 carries explicit provider/facility/routing/coding and reviewed
+prior-authorization evidence. Corrections retain standing payer inputs plus prior snapshot hash.
+Administration without Billing can configure through its own tab, without loading consumer notes.
+No credentials are client configuration. A profile is not enrollment or payer certification.
+See PAYER_BILLING_REQUIREMENTS.md and PAYER_BILLING_CERTIFICATION.md for source evidence,
+controlled migration 126, compatibility, correction limits and unactivated operational gates.

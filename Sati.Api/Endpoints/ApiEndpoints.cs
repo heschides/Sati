@@ -83,6 +83,7 @@ internal static partial class ApiEndpoints
         MapIncentives(api);
         MapReports(api);
         MapBilling(api);
+        MapPayerBilling(api);
         MapForms(api);
         MapFormAttestationChangeReviewFlags(api);
         MapDocuments(api);
@@ -4923,7 +4924,7 @@ internal static partial class ApiEndpoints
                 db, actor, note, annualPcp.Plan, clock, auditTrail);
             if (annualPcp.Plan is not null)
                 await db.SaveChangesAsync(cancellationToken);
-            var formAttestationProblem = await AttestFormFromLoggedNoteAsync(
+            var formAttestationProblem = request.FormProgress is not null ? null : await AttestFormFromLoggedNoteAsync(
                 db, note, actor, clock, auditTrail, cancellationToken);
             if (formAttestationProblem is not null)
                 return formAttestationProblem;
@@ -5075,7 +5076,7 @@ internal static partial class ApiEndpoints
                     db, actor, row.Note, annualPcp.Plan, clock, auditTrail);
                 if (annualPcp.Plan is not null)
                     await db.SaveChangesAsync(cancellationToken);
-                var formAttestationProblem = await AttestFormFromLoggedNoteAsync(
+                var formAttestationProblem = request.FormProgress is not null ? null : await AttestFormFromLoggedNoteAsync(
                     db, row.Note, actor, clock, auditTrail, cancellationToken);
                 if (formAttestationProblem is not null)
                     return formAttestationProblem;
@@ -6899,6 +6900,10 @@ internal static partial class ApiEndpoints
                 db, actor.AgencyId, ownerId, serviceDate.Year, serviceDate.Month,
                 cancellationToken);
             db.ChangeTracker.Clear();
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Forbid();
+            PayerBillingVersionDto? payerVersion;
+            try { payerVersion = await PayerBillingStore.SelectAsync(db, actor.AgencyId, serviceDate, request.PayerPreparation, cancellationToken); }
+            catch (PayerBillingConflictException e) { return Results.Conflict(new ApiErrorDto(PayerBillingRules.RevisionCode, e.Message, string.Empty)); }
             row = await (from note in db.Notes
                          join person in db.People on note.PersonId equals person.Id
                          join owner in db.Users on person.UserId equals owner.Id
@@ -6939,7 +6944,7 @@ internal static partial class ApiEndpoints
                 db, actor.AgencyId, [row.Person], cancellationToken);
             var errors = ValidateBillingCandidate(
                 row.Note, row.Person, agency, forms, releaseRows, compliancePolicy,
-                recoveryByNote.GetValueOrDefault(row.Note.Id) ?? [], providerLinks);
+                recoveryByNote.GetValueOrDefault(row.Note.Id) ?? [], providerLinks, payerVersion is null);
             if (errors.Count > 0)
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["note"] = errors.ToArray() });
 
@@ -6970,24 +6975,32 @@ internal static partial class ApiEndpoints
             if (period.Status != 0)
                 return Results.Conflict(new ApiErrorDto("period_submitted", "This billing period is no longer a draft.", string.Empty));
 
+            var claimSnapshot = CreateClaimSnapshot(row.Person, agency!);
+            if (payerVersion is not null)
+            {
+                var preparationErrors = PayerBillingRules.ValidatePreparation(payerVersion, request.PayerPreparation, actor.AgencyId, row.Person.Id, serviceDate)
+                    .Concat(PayerBillingRules.ValidateServiceQuantity(payerVersion.Configuration, row.Note.Minutes)).ToList();
+                if (preparationErrors.Count > 0) return PayerValidationProblem(preparationErrors);
+                claimSnapshot = PayerBillingRules.Freeze(claimSnapshot, payerVersion, request.PayerPreparation!, actor.UserId, DateTime.UtcNow, serviceDate);
+            }
+
             var line = new ServerClaimLine
             {
                 NoteId = row.Note.Id,
                 AmendedNoteVersionId = financialAmendment,
                 BillingPeriodId = period.Id,
                 DateOfService = serviceDate,
-                ProcedureCode = agency!.BillingProcedureCode!,
-                ProcedureModifier = agency.BillingModifier,
+                ProcedureCode = payerVersion?.Configuration.ProcedureCode ?? agency!.BillingProcedureCode!,
+                ProcedureModifier = payerVersion is null ? agency!.BillingModifier : payerVersion.Configuration.Modifiers.FirstOrDefault(),
                 Units = BillingRules.CalculateSection13Units(row.Note.Minutes),
                 ChargeAmount = BillingRules.CalculateCharge(
                     BillingRules.CalculateSection13Units(row.Note.Minutes),
-                    agency.BillingUnitRate!.Value),
+                    payerVersion?.Configuration.UnitRate ?? agency!.BillingUnitRate!.Value),
                 ClientMaineCareId = row.Person.MaineCareId!,
-                RenderingProviderNpi = agency!.Npi!,
+                RenderingProviderNpi = payerVersion?.Configuration.RenderingProviderNpi ?? agency!.Npi!,
                 DiagnosisCode = row.Person.DiagnosisCode!,
                 PlaceOfService = row.Person.PlaceOfService!.Value,
-                ClaimSnapshotJson = ProfessionalClaimSnapshotCodec.Serialize(
-                    CreateClaimSnapshot(row.Person, agency)),
+                ClaimSnapshotJson = ProfessionalClaimSnapshotCodec.Serialize(claimSnapshot),
                 // The approved note is the sole authority for a compliance
                 // exception. A billing request must not be able to add, remove,
                 // or rewrite this regulated financial-record fact.
@@ -9605,9 +9618,10 @@ internal static partial class ApiEndpoints
         IReadOnlyList<ReleaseObligation> releaseObligations,
         ServerBillingCompliancePolicyContext policy,
         IReadOnlyList<Sati.Contracts.V1.BillingComplianceRecoveryDecision>? recoveryDecisions = null,
-        IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null)
+        IReadOnlyList<ReleaseProviderLinkFact>? providerLinks = null,
+        bool validateLegacyConfiguration = true)
     {
-        var errors = ValidateNonComplianceBillingCandidate(note, person, agency).ToList();
+        var errors = ValidateNonComplianceBillingCandidate(note, person, agency, validateLegacyConfiguration).ToList();
         // The note documenting a form must satisfy its own due date. This check
         // is outside ordinary compliance recovery and cannot be waived by it.
         errors.AddRange(EvaluateFormWorkBilling(note, forms));
@@ -9795,7 +9809,8 @@ internal static partial class ApiEndpoints
                 releasesByPerson.GetValueOrDefault(row.Person.Id) ?? [],
                 policy,
                 recoveryByNote.GetValueOrDefault(row.Note.Id) ?? [],
-                providerLinksByPerson.GetValueOrDefault(row.Person.Id) ?? []);
+                providerLinksByPerson.GetValueOrDefault(row.Person.Id) ?? [],
+                ProfessionalClaimSnapshotCodec.Deserialize(line.ClaimSnapshotJson).PayerInputs is null);
             errors.AddRange(validation.Select(error =>
                 $"Draft claim line {line.Id} is no longer eligible for submission: {error}"));
         }
@@ -9806,7 +9821,8 @@ internal static partial class ApiEndpoints
     private static IReadOnlyList<string> ValidateNonComplianceBillingCandidate(
         ServerNote note,
         ServerPerson person,
-        ServerAgency? agency)
+        ServerAgency? agency,
+        bool validateLegacyConfiguration = true)
     {
         var errors = new List<string>();
         if (note.Status != 6)
@@ -9825,9 +9841,9 @@ internal static partial class ApiEndpoints
             errors.Add("Consumer has no place of service.");
         if (!HasValidSubscriberClaimIdentity(person))
             errors.Add("Consumer claim name, birth date, or structured claim address is incomplete or invalid.");
-        if (!BillingRules.IsValidNpi(agency?.Npi))
+        if (validateLegacyConfiguration && !BillingRules.IsValidNpi(agency?.Npi))
             errors.Add("Agency NPI is missing or invalid.");
-        if (agency is not null)
+        if (validateLegacyConfiguration && agency is not null)
             errors.AddRange(ValidateBillingConfiguration(agency));
         return errors;
     }

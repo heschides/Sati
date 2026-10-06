@@ -640,3 +640,23 @@ routes retain their existing Administration and agency gates; no new caller-cont
 or cross-tenant query was introduced. Disabling same-reference enrichment leaves the row Pending
 and fails the integration test. This was a limited review of the changed incident route and
 does not recertify the broader API.
+
+## October 4, 2026: Professional payer configuration boundary (limited review)
+
+New routes expose actor-agency configuration history (Billing or Administration), append-only
+publication (Administration), and own-agency note readiness previews (Billing). ValidatedActorFilter
+refreshes identity/permission state. Publication repeats the current actor check in its transaction;
+claim creation does so under the serializable period lock. Foreign notes return 404 and foreign
+change-identity replay returns a generic conflict with no configuration disclosure. Local services
+validate enabled/security-version/permission/agency and detach the preliminary claim actor before
+rechecking under the transaction. Local preview and claim source reads require matching note,
+consumer and owner agency markers; the preview denial has a failing-before-repair regression.
+No caller-selected agency or credential is a new DTO field.
+
+Audit actions `billing-payer-configuration.published` (version UUID, key, revision, effective date)
+and `billing-payer-claim.previewed` (note ID) contain metadata only. Full authorization references,
+configuration evidence and consumer facts remain in protected configuration/financial storage.
+Publication and audit save atomically. New configuration versions are append-only, with unique
+start/revision indexes and a database-owned publication lock. Existing retained generation,
+correction and receipt protection owners are preserved. This review concerns this change only;
+it is not payer certification or a renewed platform security/compliance certification.

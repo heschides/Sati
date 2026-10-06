@@ -1,8 +1,37 @@
 # Sati - Decisions
 
+## 2026-10-06 - Telehealth is a distinct remote-contact activity
+
+Use an additional activity bit, preserving all existing ordinals, instead of
+relabeling historical Phone or Visit notes. Telehealth keeps the legacy Phone
+primary type, displays distinctly, and participates in occurred contact evidence.
+It does not imply in-person Visit facts or automatically change claim coding.
+The API capability marker protects new desktop sessions against older servers.
+Reminder and Unbilled remain independent workflow choices above Activities.
+
+
+## 2026-10-06 - Explicit annual document progress during note saves
+
+PCP and Comprehensive Assessment notes let the author choose the actual document
+transition, rather than interpret a save as the next available step. The modal
+defaults to leaving state unchanged and can complete an unopened document in one
+confirmed save when its actual opening date is supplied. This supersedes the
+September 28 rejection of completing an unopened PCP in one save. Opening and
+completion may differ from the activity date, must be ordered and remain subject
+to existing availability/future-date rules. Existing evidence corrections use the
+attestation correction workflow.
+
+Contracts owns validation; both writers recheck observed state and atomically
+save the note, opening audit and completion ledger in the existing serializable
+transaction. Explicit choices bypass automatic form-note attestation; legacy
+payloads retain their behavior. The API capability marker prevents an older
+server from silently ignoring the choice. Profile refresh is awaited after saving
+and preserves unsaved demographic edits. No billing policy or schema changes.
+
+
 *Living document. The "why" behind choices that no diagram preserves. ARCHITECTURE.md
 says what owns what; this says why it was built that way and what was rejected. Newest
-sections at the bottom. Last updated: 2026-10-03.*
+sections at the bottom. Last updated: 2026-10-04.*
 
 ---
 
@@ -6432,3 +6461,73 @@ the standing claim, while originals and all prior submissions remain immutable.
 Draft-claim and cross-period adapters are gated rather than silently rewriting their
 financial records. See `NOTE_AMENDMENTS_RUNBOOK.md` for current projection boundaries,
 local correction limitations, and activation/rollback constraints.
+
+## 2026-10-04 — Release evidence follows the completed gate
+
+DATT uses a cheap source consistency check to catch stale release metadata before
+the full build and tests. It supplements the release gates. Passing evidence can
+be reused only while the relevant source, configuration, tools, dependencies and
+artifact bytes remain unchanged; a failed gate or unresolved concern still requires
+verification.
+
+Installer acceptance owns the complete result, including cleanup. Demo keeps its
+existing evidence schema and adds explicit cleanup/retention fields; Local records
+integrated security and the Microsoft signature/hash of the exact bundle's embedded
+MSI. Evidence is created exclusively after the gate succeeds. Retaining diagnostic
+files cannot satisfy cleanup. Reading a bundle's managed resource never executes
+the bootstrap entry point or MSI and requires no SDK installation.
+
+One final evidence commit closes a successful rollout; its hash is reported after
+push. Another commit solely to put that hash into the ledger adds no verification
+and triggers another CI run. A checkpoint for an interrupted rollout remains useful.
+Reset interruption diagnosis and rendered-theme test profiling remain separate
+measured work, preserving reset recovery approvals and existing test coverage.
+
+## 2026-10-04: Payer configuration and financial snapshot compatibility
+
+Josh selected MaineCare Section 13 through Claim.MD as the first documented profile. Agency
+configuration is append-only and effective-dated, with strict forward starts per profile and
+inclusive expiration. Expired newer versions never fall back. Administration publishes reviewed
+evidence; Billing prepares claims. An administrator without Billing can configure but cannot
+preview consumers. Publication retries retain an exact change identity and expected revision.
+
+Agencies without profiles retain legacy compatibility; the first published profile makes explicit
+version and authorization preparation mandatory for all new claims. No profile is automatically
+seeded by migration. Frozen v1 JSON and renderer behavior remain supported. V2 must carry the
+complete configuration/authorization provenance and requires the proper trading-partner route.
+Different envelope facts cannot share a generation; subscriber groups preserve distinct frozen
+identities. Resend/replacement refreshes consumer identity/diagnosis but preserves standing payer
+inputs and adds prior snapshot SHA-256; void repeats the standing snapshot. Neither a configuration
+edit nor correction changes original financial files or receipts. Rebinding a submitted claim to
+a different configuration needs a future explicit review action, not an implicit refresh.
+
+MaineCare evidence was researched October 4; the portal transition prevented retrieval of the
+current companion guide. Facility qualifier, enrollment, applicable population, rates/rounding,
+licensed guide validation and real payer acceptance remain checklist gates. Manually reviewed
+references do not implement prompt 6 authorization/utilization tracking. Migration Down refuses
+written history or retained v2 financial snapshots, including imported snapshots when the configuration
+table is empty; after v2 use, recovery must preserve the matching application and evidence.
+
+
+## 2026-10-06: Quarterly completion waits for note submission (source only)
+
+Q1–Q4 Record completion generates an independent editable note rather than saving a
+manual completion first. The actual activity date determines the overdue wording and
+Unbilled preset through the existing form-work deadline owner. The note retains the exact
+form ID selected on the Annual Forms overview. It must submit as Logged Form work for
+that client and quarter; Cancel leaves both note and review unsaved. Time and goal progress
+are human inputs. Existing transactional linked-form attestation remains authoritative
+locally and in the API, followed by the dashboard's awaited refresh cascade. Existing
+completed-review history/revocation remains available. Broader review preparation remains
+separate; no deployment or migration accompanies this source change.
+
+
+## 2026-10-06: Follow-up suggestions distinguish scheduling from deadlines
+
+The note editor may project its exact current quarterly completion work out of the
+follow-up candidates without marking the saved obligation complete. It also excludes
+its current scheduled record by note identity. Exact form identity is required; matching
+only a quarter label could suppress another cycle. Other scheduled activities remain
+suggestions, labelled scheduled rather than due in both the UI and accepted narrative.
+The form-status cue reads genuine form deadlines. Persistence, billing, and audit rules
+remain unchanged. Verification uses synthetic records only.

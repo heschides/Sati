@@ -1,6 +1,7 @@
 namespace Sati.Contracts.V1;
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 /// <summary>
 /// Exact billing inputs frozen when a service note becomes a claim line. Generators must use
@@ -31,11 +32,17 @@ public sealed record ProfessionalClaimSnapshot(
     string SubmitterContactName,
     string SubmitterContactPhone,
     string PayerName,
-    string PayerId);
+    string PayerId)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PayerClaimInputs? PayerInputs { get; init; }
+}
 
 public static class ProfessionalClaimSnapshotCodec
 {
     public const int CurrentVersion = 1;
+    // CurrentVersion retains the legacy constructor contract and exact v1 JSON bytes.
+    public const int PayerConfiguredVersion = 2;
 
     public static string Serialize(ProfessionalClaimSnapshot snapshot) =>
         JsonSerializer.Serialize(snapshot);
@@ -49,8 +56,12 @@ public static class ProfessionalClaimSnapshotCodec
         {
             var snapshot = JsonSerializer.Deserialize<ProfessionalClaimSnapshot>(json)
                 ?? throw new InvalidOperationException("The claim snapshot is empty.");
-            if (snapshot.Version != CurrentVersion)
+            if (snapshot.Version is not (CurrentVersion or PayerConfiguredVersion))
                 throw new InvalidOperationException($"Claim snapshot version {snapshot.Version} is not supported.");
+            if ((snapshot.Version == PayerConfiguredVersion) != (snapshot.PayerInputs is not null))
+                throw new InvalidOperationException("Claim snapshot version and payer inputs are incompatible.");
+            if (snapshot.PayerInputs is { } inputs && (inputs.ConfigurationVersion is null || inputs.ConfigurationVersion.Configuration is null))
+                throw new InvalidOperationException("Claim snapshot has incomplete payer configuration provenance.");
             return snapshot;
         }
         catch (JsonException exception)

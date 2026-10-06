@@ -87,18 +87,22 @@ public sealed class NoteSubmissionFeedbackTests
         panel.Status = NoteStatus.Pending;
         panel.Narrative = "Opened the annual PCP.";
         panel.Minutes = 15;
-        AnnualPcpConfirmationKind? prompt = null;
-        panel.AnnualPcpConfirmationRequested += (_, args) =>
+        FormProgressConfirmationEventArgs? prompt = null;
+        panel.FormProgressConfirmationRequested += (_, args) =>
         {
-            prompt = args.Kind;
-            args.Confirmed = true;
+            prompt = args;
+            Assert.Null(args.OpenedOn);
+            Assert.Null(args.CompletedOn);
+            args.Progress = new(AnnualPcpProgressAction.Open, serviceDate, null,
+                args.OpenedOn, args.CompletedOn, args.DueOn, args.TargetEffectiveDate);
         };
 
         Assert.True(panel.HasAnnualPcpYear);
         Assert.Contains(serviceDate.AddDays(30).Year.ToString(), panel.AnnualPcpYearText);
         await panel.SubmitNoteCommand.ExecuteAsync(null);
 
-        Assert.Equal(AnnualPcpConfirmationKind.Open, prompt);
+        Assert.NotNull(prompt);
+        Assert.Equal("PCP", prompt.FormType);
         await using var verification = fixture.Factory.CreateDbContext();
         Assert.Equal(serviceDate, (await verification.Forms.SingleAsync()).OpenedDate);
         var saved = await verification.Notes.SingleAsync();
@@ -174,7 +178,7 @@ public sealed class NoteSubmissionFeedbackTests
         Assert.Single(panel.FormObligations);
         await panel.SubmitNoteCommand.ExecuteAsync(null);
 
-        Assert.Contains("Annual PCP plan year", panel.SubmissionFailureMessage);
+        Assert.Contains("specific annual document", panel.SubmissionFailureMessage);
         Assert.Equal("The PCP work was completed.", panel.Narrative);
         await using var verification = fixture.Factory.CreateDbContext();
         Assert.Empty(await verification.Notes.ToListAsync());

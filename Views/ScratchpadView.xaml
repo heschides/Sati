@@ -480,6 +480,8 @@
                              RelativeSource={RelativeSource AncestorType=views:ScratchpadView},
                              Converter={StaticResource BoolToVisibilityConverter}}">
                     <views:ScratchpadHistoryView x:Name="HistoryView"
+                                                 FontSize="{Binding DataContext.ScratchpadFontSize,
+                                                     RelativeSource={RelativeSource AncestorType=views:ScratchpadView}}"
                                                  DataContext="{Binding History}" />
                 </TabItem>
             </TabControl>

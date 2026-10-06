@@ -54,7 +54,7 @@ public static class MonthlyContactRules
         eventDate is DateTime occurred &&
         (activities is null ? IsContactType(noteType) :
             (NoteActivityRules.Effective(activities, noteType) &
-             (NoteActivity.Visit | NoteActivity.Phone | NoteActivity.Email)) != 0) &&
+             (NoteActivity.Visit | NoteActivity.Phone | NoteActivity.Email | NoteActivity.Telehealth)) != 0) &&
         HasOccurred(status)
             ? new ContactFact(occurred.Date, EvidenceIdFor(noteId))
             : null;

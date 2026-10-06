@@ -124,8 +124,9 @@ public static class ProfessionalClaimReadiness
             if (!HasValidSubscriberSnapshot(snapshot))
                 errors.Add("Frozen client identity or billing address is incomplete or invalid.");
             if (!string.Equals(line.ClientMaineCareId, snapshot.SubscriberMemberId, StringComparison.Ordinal) ||
-                !string.Equals(line.RenderingProviderNpi, snapshot.BillingProviderNpi, StringComparison.Ordinal))
+                !string.Equals(line.RenderingProviderNpi, snapshot.PayerInputs?.ConfigurationVersion.Configuration.RenderingProviderNpi ?? snapshot.BillingProviderNpi, StringComparison.Ordinal))
                 errors.Add("Claim identifiers do not match the frozen billing snapshot.");
+            errors.AddRange(PayerBillingRules.ValidateFrozen(snapshot, line).Select(e => $"{e.Field}: {e.Message}"));
         }
 
         return new(line.LineId, clientName, errors.Distinct(StringComparer.Ordinal).ToList());
@@ -171,6 +172,12 @@ public static class ProfessionalClaimReadiness
         snapshot.SubscriberGenderCode is "M" or "F" or "U";
 
     private static string ProviderPayerIdentity(ProfessionalClaimSnapshot snapshot) =>
-        string.Join('\u001f', snapshot.AgencyId, snapshot.BillingProviderNpi,
-            snapshot.SubmitterId, snapshot.PayerId);
+        snapshot.PayerInputs is null
+            ? string.Join('\u001f', snapshot.AgencyId, snapshot.BillingProviderNpi, snapshot.SubmitterId, snapshot.PayerId)
+            : string.Join('\u001f', snapshot.Version, snapshot.AgencyId, snapshot.BillingProviderName,
+                snapshot.BillingProviderNpi, snapshot.BillingProviderTaxId, snapshot.BillingProviderStreet,
+                snapshot.BillingProviderCity, snapshot.BillingProviderState, snapshot.BillingProviderZip,
+                snapshot.SubmitterId, snapshot.SubmitterContactName, snapshot.SubmitterContactPhone,
+                snapshot.PayerName, snapshot.PayerId, snapshot.PayerInputs.ConfigurationVersion.Configuration.BillingTaxonomy,
+                snapshot.PayerInputs.ConfigurationVersion.Configuration.ClaimFilingIndicator);
 }

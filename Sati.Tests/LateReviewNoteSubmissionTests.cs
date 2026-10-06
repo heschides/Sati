@@ -463,6 +463,9 @@ public sealed class LateReviewNoteSubmissionTests
         panel.Minutes = 30;
         panel.GoalProgress = GoalProgressLevel.Moderate;
         panel.Narrative = "Completed the Comprehensive Assessment.";
+        panel.FormProgressConfirmationRequested += (_, args) =>
+            args.Progress = new(AnnualPcpProgressAction.Complete, args.OpenedOn ?? eventDate,
+                eventDate, args.OpenedOn, args.CompletedOn, args.DueOn, args.TargetEffectiveDate);
     }
 
     private sealed class AssessmentOnlySettingsService : ISettingsService

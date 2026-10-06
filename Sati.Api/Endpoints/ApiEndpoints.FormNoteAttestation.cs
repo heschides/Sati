@@ -12,7 +12,7 @@ internal static partial class ApiEndpoints
 {
     private sealed record AnnualPcpServerPlan(
         ServerForm Form,
-        AnnualPcpNoteDecision Decision);
+        AnnualPcpNoteDecision Decision, FormProgressRequest? Progress = null);
 
     private sealed record AnnualPcpPreparation(
         SaveNoteRequest Request,
@@ -26,7 +26,7 @@ internal static partial class ApiEndpoints
         ApiClock clock,
         CancellationToken cancellationToken)
     {
-        var isAnnual = AnnualPcpNoteRules.IsAnnualSelection(
+        var isAnnual = request.FormProgress is not null || AnnualPcpNoteRules.IsAnnualSelection(
             request.IsAnnualPlan, request.FormType, request.FormId);
         if (!isAnnual)
         {
@@ -44,11 +44,11 @@ internal static partial class ApiEndpoints
             .SingleOrDefaultAsync(candidate =>
                 candidate.Id == formId &&
                 candidate.PersonId == request.PersonId &&
-                candidate.Type == AnnualPcpNoteRules.FormTypeName,
+                candidate.Type == request.FormType,
                 cancellationToken);
         if (form is null)
             return new(request, null, FormNoteProblem(
-                "The selected Annual PCP no longer matches this note. Refresh the note."));
+                "The selected annual document no longer matches this note. Refresh the note."));
 
         var settings = await db.Settings.AsNoTracking()
             .SingleOrDefaultAsync(candidate => candidate.AgencyId == actor.AgencyId,
@@ -56,7 +56,15 @@ internal static partial class ApiEndpoints
             ?? new ServerSettings { AgencyId = actor.AgencyId };
         var availableOn = form.DueDate.Date.AddDays(
             -OpenDaysBefore(form.Type, settings));
-        var decision = AnnualPcpNoteRules.Evaluate(
+        var explicitError = request.FormProgress is null ? null : !FormNoteAttestationRules.IsExactNonReleaseFormActivity(request.Activities, request.NoteType, request.FormType, request.FormId)
+            ? "Document progress requires an exact Form activity." : FormProgressRules.Validate(request.FormProgress, form.Type, request.Status, availableOn, clock.Today, form.DueDate, form.TargetEffectiveDate, form.OpenedDate, form.CompletedDate);
+        if (explicitError is not null) return new(request, null,
+            explicitError == FormProgressRules.StaleStateMessage
+                ? Results.Conflict(new ApiErrorDto("stale_form_progress", explicitError, string.Empty))
+                : FormNoteProblem(explicitError));
+        var decision = request.FormProgress is { } progress
+            ? new AnnualPcpNoteDecision(true, false, request.EventDate!.Value.Date > form.DueDate.Date, progress.Action, string.Empty)
+            : AnnualPcpNoteRules.Evaluate(
             true,
             form.Type,
             form.Id,
@@ -67,14 +75,14 @@ internal static partial class ApiEndpoints
             form.OpenedDate,
             form.CompletedDate);
         var confirmationError = AnnualPcpNoteRules.ValidateConfirmation(
-            decision, request.AnnualPcpAction);
+            decision, request.FormProgress?.Action ?? request.AnnualPcpAction);
         if (confirmationError is not null)
             return new(request, null, FormNoteProblem(confirmationError));
 
         if (decision.RequiredAction == AnnualPcpProgressAction.Open)
         {
             var dateError = FormOpeningRules.Validate(
-                request.EventDate!.Value, availableOn, clock.Today);
+                request.FormProgress?.OpenedOn ?? request.EventDate!.Value, availableOn, clock.Today);
             if (dateError is not null)
                 return new(request, null, FormNoteProblem(dateError));
         }
@@ -87,15 +95,15 @@ internal static partial class ApiEndpoints
                 .SingleOrDefaultAsync(cancellationToken);
             if (effectiveDate is null)
                 return new(request, null, FormNoteProblem(
-                    "The client's effective date is required for Annual PCP completion."));
+                    "The client's effective date is required for annual document completion."));
             var cycle = FormAttestationRules.ResolveCycleForForm(
                 effectiveDate.Value, form.Type, form.DueDate,
                 form.TargetEffectiveDate == default ? null : form.TargetEffectiveDate);
             if (cycle is null)
                 return new(request, null, FormNoteProblem(
-                    "The selected Annual PCP is not attached to a valid plan cycle."));
+                    "The selected annual document is not attached to a valid plan cycle."));
             var dateDecision = FormAttestationRules.Evaluate(
-                form.Type, request.EventDate!.Value, cycle.Value.CycleStart,
+                form.Type, request.FormProgress?.CompletedOn ?? request.EventDate!.Value, cycle.Value.CycleStart,
                 clock.Today, AttestationActorKind.CaseManager, [],
                 [new FormFact(form.Id, form.PersonId, form.Type, form.DueDate,
                     form.CompletedDate, form.TargetEffectiveDate)],
@@ -111,10 +119,10 @@ internal static partial class ApiEndpoints
 
         request = request with
         {
-            IsAnnualPlan = true,
-            IsUnbilled = request.IsUnbilled || decision.MustBeUnbilled
+            IsAnnualPlan = form.Type == "PCP",
+            IsUnbilled = request.IsUnbilled || (form.Type == "PCP" && decision.MustBeUnbilled)
         };
-        return new(request, new AnnualPcpServerPlan(form, decision), null);
+        return new(request, new AnnualPcpServerPlan(form, decision, request.FormProgress), null);
     }
 
     private static void ApplyAnnualPcpProgress(
@@ -127,14 +135,22 @@ internal static partial class ApiEndpoints
     {
         if (plan is null || note.EventDate is not DateTime activityDate)
             return;
-        var occurredOn = activityDate.Date;
+        var occurredOn = (plan.Progress?.CompletedOn ?? activityDate).Date;
+        if (plan.Form.OpenedDate is null && plan.Progress?.OpenedOn is DateTime opening &&
+            plan.Decision.RequiredAction == AnnualPcpProgressAction.Complete)
+        {
+            plan.Form.OpenedDate = opening.Date;
+            auditTrail.Record(actor, AuditActions.FormOpened, "Form", plan.Form.Id,
+                JsonSerializer.Serialize(new { formType = plan.Form.Type, openedOn = opening.Date.ToString("yyyy-MM-dd"), evidenceNoteId = note.Id }));
+        }
         if (plan.Decision.RequiredAction == AnnualPcpProgressAction.Open)
         {
+            occurredOn = (plan.Progress?.OpenedOn ?? activityDate).Date;
             plan.Form.OpenedDate = occurredOn;
             auditTrail.Record(actor, AuditActions.FormOpened, "Form", plan.Form.Id,
                 JsonSerializer.Serialize(new
                 {
-                    formType = AnnualPcpNoteRules.FormTypeName,
+                    formType = plan.Form.Type,
                     targetEffectiveDate = plan.Form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
                     openedOn = occurredOn.ToString("yyyy-MM-dd"),
                     evidenceNoteId = note.Id
@@ -155,21 +171,22 @@ internal static partial class ApiEndpoints
             RecordedAtUtc = clock.UtcNow.UtcDateTime,
             EvidenceNoteId = note.Id,
             PrerequisiteStateJson = FormAttestationRules.NoPrerequisitesStateJson,
-            Reason = "Annual PCP note confirmation."
+            Reason = plan.Progress is null ? "Annual PCP note confirmation." : "Explicit document progress confirmation."
         });
         auditTrail.Record(actor, AuditActions.FormAttested, "Form", plan.Form.Id,
             JsonSerializer.Serialize(new
             {
-                formType = AnnualPcpNoteRules.FormTypeName,
+                formType = plan.Form.Type,
                 targetEffectiveDate = plan.Form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
                 completedOn = occurredOn.ToString("yyyy-MM-dd"),
                 evidenceNoteId = note.Id,
-                annualPcpNote = true
+                annualPcpNote = plan.Form.Type == "PCP",
+                explicitFormProgress = plan.Progress is not null
             }));
     }
 
     private static bool IsNonReleaseLoggedFormNote(SaveNoteRequest request) =>
-        FormNoteAttestationRules.AttestsExactFormOnLog(
+        request.FormProgress is not null || FormNoteAttestationRules.AttestsExactFormOnLog(
             request.Status,
             request.Activities,
             request.NoteType,

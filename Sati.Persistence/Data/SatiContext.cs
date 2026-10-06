@@ -13,6 +13,7 @@ namespace Sati.Data
         public const int FormTypeMaxLength = 40;
 
         public DbSet<Agency> Agencies { get; set; }
+        public DbSet<PayerBillingConfigurationVersion> PayerBillingConfigurationVersions { get; set; }
         public DbSet<Person> People { get; set; }
         public DbSet<PersonPhoto> PersonPhotos { get; set; }
         public DbSet<User> Users { get; set; }
@@ -116,6 +117,7 @@ namespace Sati.Data
         private void EnsureAuditEventsAreAppendOnly()
         {
             NoteAmendmentPersistenceModel.ProtectWrites(ChangeTracker);
+            PayerBillingPersistenceModel.ProtectWrites(ChangeTracker);
             NoteAmendmentPersistenceModel.ProtectOriginalNotes<Note>(this);
             ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
             BillingCorrectionPersistenceModel.ProtectWrites(ChangeTracker);
@@ -184,6 +186,7 @@ namespace Sati.Data
                 Agency, User, Person>(modelBuilder);
             ReleaseObligationPersistenceModel.Configure<Agency, User, Person, Provider, DocumentArtifact>(modelBuilder);
             BillingComplianceRecoveryPersistenceModel.Configure<Agency, User, Person, Note>(modelBuilder);
+            PayerBillingPersistenceModel.Configure<Agency, User>(modelBuilder);
             BillingCompliancePolicyReviewPersistenceModel.Configure<Agency, Person, Note, ClaimLine>(modelBuilder);
             FormAttestationChangeReviewPersistenceModel.Configure<Agency, Person, Note, Form, ClaimLine>(modelBuilder);
             modelBuilder.Entity<Person>()

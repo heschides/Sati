@@ -23,4 +23,8 @@
     <ProjectReference Include="..\Sati.Api\Sati.Api.csproj" />
     <ProjectReference Include="..\platform\SatiLogica.Contracts\SatiLogica.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Sati.Api.Tests\PayerBillingSynthetic.cs" Link="PayerBillingSynthetic.cs" />
+    <None Update="Fixtures\PayerBilling-MaineCare.837" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

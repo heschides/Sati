@@ -37,6 +37,8 @@ public static class Professional837Formatter
         if (profile.Version != TradingPartnerProfile.CurrentVersion)
             throw new InvalidOperationException("Unsupported trading-partner profile version.");
         var rows = ReadAndValidateRows(year, month, claims);
+        if (profile.Kind != TradingPartnerKind.ClaimMd && rows.Any(r => r.Snapshot.PayerInputs?.ConfigurationVersion.Configuration.Kind == PayerBillingProfileKind.MaineCareSection13ClaimMd))
+            throw new InvalidOperationException("The MaineCare Claim.MD profile requires a Claim.MD trading-partner account.");
         var envelope = rows[0].Snapshot;
         var submitterId = profile.SenderId(envelope);
         var receiverId = profile.ReceiverId;
@@ -54,18 +56,18 @@ public static class Professional837Formatter
         builder.AppendLine(Segment("PER", "IC", envelope.SubmitterContactName, "TE", envelope.SubmitterContactPhone));
         builder.AppendLine(Segment("NM1", "40", "2", profile.ReceiverName, "", "", "", "", "46", receiverId));
         builder.AppendLine(Segment("HL", "1", "", "20", "1"));
-        builder.AppendLine(Segment("PRV", "BI", "PXC", "251B00000X"));
+        builder.AppendLine(Segment("PRV", "BI", "PXC", envelope.PayerInputs?.ConfigurationVersion.Configuration.BillingTaxonomy ?? "251B00000X"));
         builder.AppendLine(Segment("NM1", "85", "2", envelope.BillingProviderName, "", "", "", "", "XX", envelope.BillingProviderNpi));
         builder.AppendLine(Segment("N3", envelope.BillingProviderStreet));
         builder.AppendLine(Segment("N4", envelope.BillingProviderCity, envelope.BillingProviderState, envelope.BillingProviderZip));
         builder.AppendLine(Segment("REF", "EI", envelope.BillingProviderTaxId));
 
         var hierarchicalId = 2;
-        foreach (var group in rows.GroupBy(row => row.Snapshot.PersonId))
+        foreach (var group in rows.GroupBy(row => SubscriberGroup(row.Snapshot)))
         {
             var subscriber = group.First().Snapshot;
             builder.AppendLine(Segment("HL", hierarchicalId++.ToString(CultureInfo.InvariantCulture), "1", "22", "0"));
-            builder.AppendLine(Segment("SBR", "P", "18", "", "", "", "", "", "", "MC"));
+            builder.AppendLine(Segment("SBR", "P", "18", "", "", "", "", "", "", subscriber.PayerInputs?.ConfigurationVersion.Configuration.ClaimFilingIndicator ?? "MC"));
             builder.AppendLine(Segment("NM1", "IL", "1", subscriber.SubscriberLastName,
                 subscriber.SubscriberFirstName, "", "", "", "MI", subscriber.SubscriberMemberId));
             builder.AppendLine(Segment("N3", subscriber.SubscriberStreet));
@@ -81,10 +83,13 @@ public static class Professional837Formatter
                 var line = row.Claim.Line;
                 var units = BillingRules.FormatDecimal(line.Units ?? 0m);
                 var charge = BillingRules.FormatDecimal(line.ChargeAmount);
+                var payerInputs = row.Snapshot.PayerInputs;
+                var modifiers = payerInputs?.ConfigurationVersion.Configuration.Modifiers ??
+                    (string.IsNullOrWhiteSpace(line.ProcedureModifier) ? [] : new[] { line.ProcedureModifier });
                 var procedure = $"HC{SubSep}{line.ProcedureCode}" +
-                    (string.IsNullOrWhiteSpace(line.ProcedureModifier) ? string.Empty : $"{SubSep}{line.ProcedureModifier}");
+                    (modifiers.Count == 0 ? string.Empty : SubSep + string.Join(SubSep, modifiers));
                 builder.AppendLine(Segment("CLM", ClaimSubmissionIdentity.ClaimReference(controlNumber, periodId, row.Claim.NoteId), charge, "", "",
-                    $"{line.PlaceOfService:D2}{SubSep}{SubSep}{row.Claim.FrequencyCode}", "Y", "A", "Y", "I"));
+                    $"{line.PlaceOfService:D2}{SubSep}{(payerInputs is null ? "" : "B")}{SubSep}{row.Claim.FrequencyCode}", "Y", "A", "Y", "I"));
                 builder.AppendLine(Segment("DTP", "472", "D8", line.DateOfService.ToString("yyyyMMdd", CultureInfo.InvariantCulture)));
                 if (profile.Kind == TradingPartnerKind.ClaimMd)
                     builder.AppendLine(Segment("REF", "D9", ClaimSubmissionIdentity.RemoteClaimId(
@@ -92,10 +97,26 @@ public static class Professional837Formatter
                 // Both D9 and F8 are Loop 2300 references and precede the diagnosis segment.
                 if (row.Claim.PayerClaimControlNumber is { Length: > 0 } payerClaimNumber)
                     builder.AppendLine(Segment("REF", "F8", payerClaimNumber));
+                if (payerInputs?.Authorization is { } authorization)
+                    builder.AppendLine(Segment("REF", "G1", authorization.Reference));
                 builder.AppendLine(Segment("HI", $"ABK{SubSep}{line.DiagnosisCode}"));
-                builder.AppendLine(Segment("LX", lineNumber++.ToString(CultureInfo.InvariantCulture)));
+                if (payerInputs is not null)
+                {
+                    var c = payerInputs.ConfigurationVersion.Configuration;
+                    // Claim-level rendering provider 2310B, then service facility 2310C.
+                    builder.AppendLine(Segment("NM1", "82", c.RenderingProviderEntityType, c.RenderingProviderName,
+                        c.RenderingProviderFirstName, "", "", "", "XX", c.RenderingProviderNpi));
+                    builder.AppendLine(Segment("PRV", "PE", "PXC", c.RenderingTaxonomy));
+                    builder.AppendLine(string.IsNullOrEmpty(c.FacilityNpi)
+                        ? Segment("NM1", "77", "2", c.FacilityName)
+                        : Segment("NM1", "77", "2", c.FacilityName, "", "", "", "", "XX", c.FacilityNpi));
+                    builder.AppendLine(Segment("N3", c.FacilityStreet));
+                    builder.AppendLine(Segment("N4", c.FacilityCity, c.FacilityState, c.FacilityZip));
+                    builder.AppendLine(Segment("REF", c.FacilityIdQualifier, c.FacilityId));
+                }
+                builder.AppendLine(Segment("LX", payerInputs is null ? lineNumber++.ToString(CultureInfo.InvariantCulture) : "1"));
                 builder.AppendLine(Segment("SV1", procedure, charge, "UN", units,
-                    line.PlaceOfService.ToString("D2", CultureInfo.InvariantCulture), "", ""));
+                    line.PlaceOfService.ToString("D2", CultureInfo.InvariantCulture), "", payerInputs is null ? "" : "1"));
                 builder.AppendLine(Segment("DTP", "472", "D8", line.DateOfService.ToString("yyyyMMdd", CultureInfo.InvariantCulture)));
                 builder.AppendLine(Segment("REF", "6R", row.Claim.NoteId.ToString(CultureInfo.InvariantCulture)));
             }
@@ -128,6 +149,13 @@ public static class Professional837Formatter
 
     private static string Segment(string id, params string[] elements) =>
         id + "*" + string.Join("*", elements) + "~";
+
+    private static string SubscriberGroup(ProfessionalClaimSnapshot snapshot) => snapshot.PayerInputs is null
+        ? snapshot.PersonId.ToString(CultureInfo.InvariantCulture)
+        : string.Join('\u001f', snapshot.Version, snapshot.PersonId, snapshot.SubscriberFirstName,
+            snapshot.SubscriberLastName, snapshot.SubscriberBirthDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            snapshot.SubscriberGenderCode, snapshot.SubscriberMemberId, snapshot.SubscriberStreet,
+            snapshot.SubscriberCity, snapshot.SubscriberState, snapshot.SubscriberZip);
 
     private sealed record ClaimRow(Professional837Claim Claim, ProfessionalClaimSnapshot Snapshot);
 }

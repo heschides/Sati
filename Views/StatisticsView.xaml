@@ -80,6 +80,11 @@
                                 Padding="12,6"
                                 Height="36"
                                 Margin="0,18,8,0" />
+                        <Button Content="‹ Last Month"
+                                Command="{Binding ShowLastMonthCommand}"
+                                AutomationProperties.Name="Show last month"
+                                ToolTip="Show the full previous calendar month"
+                                Padding="12,6" Height="36" Margin="0,18,8,0" />
                         <Button Content="Last 30 Days"
                                 Command="{Binding ShowLast30DaysCommand}"
                                 AutomationProperties.Name="Show the last 30 days"

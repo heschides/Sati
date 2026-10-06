@@ -591,6 +591,15 @@ public sealed class CloudConsumerBillingLossReportService(CloudApiClient api) : 
 
 public sealed class CloudBillingService(CloudApiClient api) : IBillingService
 {
+    public async Task<IReadOnlyList<PayerBillingVersionDto>> GetPayerConfigurationsAsync(AgencyActor actor) =>
+        await api.GetAsync<List<PayerBillingVersionDto>>("/api/v1/billing/payer-configurations");
+    public Task<PayerBillingVersionDto> PublishPayerConfigurationAsync(AgencyActor actor, PublishPayerBillingRequest request) =>
+        api.PostAsync<PublishPayerBillingRequest, PayerBillingVersionDto>("/api/v1/billing/payer-configurations", request);
+    public Task<PayerClaimPreviewDto> PreviewPayerClaimAsync(AgencyActor actor, int noteId, PayerClaimPreparation preparation) =>
+        api.PostAsync<PayerClaimPreparation, PayerClaimPreviewDto>($"/api/v1/billing/payer-claims/{noteId}/preview", preparation);
+    public async Task<ClaimLine> CreatePreparedClaimLineAsync(AgencyActor actor, int noteId, PayerClaimPreparation preparation) =>
+        CloudContractMapper.ToClaimLine(await api.PostAsync<CreateClaimLineRequest, ClaimLineDto>("/api/v1/billing/claim-lines",
+            new CreateClaimLineRequest(noteId, false, null) { PayerPreparation = preparation }));
     public bool SupportsMockClearinghouse => true;
     public bool SupportsResponseImport => true;
     public bool SupportsClearinghouseDispatch => true;

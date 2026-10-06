@@ -238,8 +238,10 @@ namespace Sati
                         // (CaseManagerDashboardViewModel, NotesWindowViewModel),
                         // each capturing its own long-lived, isolated instance.
                         services.AddTransient<NoteEntryViewModel>();
+                        services.AddTransient<Func<NoteEntryViewModel>>(sp => () => sp.GetRequiredService<NoteEntryViewModel>());
                         services.AddTransient<NoteAmendmentsViewModel>();
                         services.AddTransient<NoteAmendmentFinancialReviewsViewModel>();
+                        services.AddTransient<PayerBillingViewModel>();
                         services.AddSingleton<BillingDashboardViewModel>();
                         services.AddSingleton<BillingOverviewViewModel>();
                         services.AddSingleton<BillingQueueViewModel>();

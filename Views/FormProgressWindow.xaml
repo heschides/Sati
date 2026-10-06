@@ -1,0 +1,33 @@
+<Window x:Class="Sati.Views.FormProgressWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Document progress" Width="520" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+    <StackPanel Margin="24">
+        <TextBlock x:Name="DocumentLabel" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock x:Name="StateLabel" Margin="0,12,0,16" TextWrapping="Wrap"/>
+        <TextBlock Text="When this note is saved:"/>
+        <ComboBox x:Name="ActionChoice" Margin="0,6,0,12" SelectionChanged="ActionChanged"
+                  AutomationProperties.Name="Document action"/>
+        <StackPanel x:Name="OpeningPanel">
+            <TextBlock x:Name="OpeningLabel" Text="Actual opening date"/>
+            <DatePicker x:Name="OpeningDate" Margin="0,6,0,12"
+                        AutomationProperties.Name="Actual document opening date"/>
+        </StackPanel>
+        <StackPanel x:Name="CompletionPanel">
+            <TextBlock Text="Actual completion date"/>
+            <DatePicker x:Name="CompletionDate" Margin="0,6,0,12"
+                        AutomationProperties.Name="Actual document completion date"/>
+        </StackPanel>
+        <TextBlock Text="The dates describe when the work occurred. Existing completion dates require the attestation correction workflow to change."
+                   TextWrapping="Wrap" Margin="0,4,0,12"/>
+        <TextBlock x:Name="ValidationMessage" TextWrapping="Wrap" Foreground="{DynamicResource DangerDarkBrush}"
+                   AutomationProperties.LiveSetting="Assertive" Margin="0,0,0,12"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Cancel save" IsCancel="True" MinWidth="100" Margin="0,0,8,0"/>
+            <Button Content="Continue save" IsDefault="True" MinWidth="110" Click="ContinueSave"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

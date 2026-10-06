@@ -90,7 +90,9 @@ public static class ApiSurface
         // Notes can explicitly represent Annual PCP progression and can opt out
         // of billing without leaving the ordinary supervisor-review workflow.
         "annual-pcp-and-unbilled-note-v1",
+        "explicit-pcp-assessment-progress-v1",
         "multi-activity-note-v1",
+        "telehealth-note-activity-v1",
         "scheduled-note-move-history-v1",
         "manual-attestation-note-link-v1",
         "form-work-billing-v1",
@@ -169,6 +171,7 @@ public static class ApiSurface
         "GET /api/v1/audit-events",
         "GET /api/v1/billing/candidates",
         "GET /api/v1/billing/claim-lines/draft",
+        "GET /api/v1/billing/payer-configurations",
         "GET /api/v1/billing/clearinghouse",
         "GET /api/v1/billing/compliance-policy-review-flags",
         "GET /api/v1/billing/compliance-recovery/{personId:int}",
@@ -281,6 +284,8 @@ public static class ApiSurface
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/renew",
         "POST /api/v1/billing/claim-lines",
+        "POST /api/v1/billing/payer-configurations",
+        "POST /api/v1/billing/payer-claims/{noteId:int}/preview",
         "POST /api/v1/billing/clearinghouse/dispatches",
         "POST /api/v1/billing/compliance-recovery/{personId:int}",
         "POST /api/v1/billing/periods/{periodId:int}/corrections",

@@ -54,7 +54,7 @@ public class NoteService(
         await context.SaveChangesAsync();
         if (annualPcp is not null)
             ApplyAnnualPcpProgress(context, actor, note, annualPcp);
-        if (await AttestLinkedFormAsync(context, actor, note, today))
+        if (note.FormProgress is null && await AttestLinkedFormAsync(context, actor, note, today))
             await context.SaveChangesAsync();
         else if (annualPcp is not null)
             await context.SaveChangesAsync();
@@ -158,7 +158,9 @@ public class NoteService(
         stored.Revision++;
         if (annualPcp is not null)
             ApplyAnnualPcpProgress(context, actor, stored, annualPcp);
-        await AttestLinkedFormAsync(context, actor, stored, today);
+        stored.FormProgress = note.FormProgress;
+        if (note.FormProgress is null)
+            await AttestLinkedFormAsync(context, actor, stored, today);
         LocalAuditTrail.Record(context, actor, LocalAuditActions.NoteUpdated, "Note", stored.Id);
         if (previousPersonId != stored.PersonId)
         {
@@ -558,7 +560,7 @@ public class NoteService(
 
     private sealed record AnnualPcpWritePlan(
         Form Form,
-        AnnualPcpNoteDecision Decision);
+        AnnualPcpNoteDecision Decision, FormProgressRequest? Progress = null);
 
     private static async Task<AnnualPcpWritePlan?> PrepareAnnualPcpAsync(
         SatiContext context,
@@ -567,7 +569,7 @@ public class NoteService(
         DateTime today)
     {
         var formType = note.FormType?.ToString();
-        var isAnnual = AnnualPcpNoteRules.IsAnnualSelection(
+        var isAnnual = note.FormProgress is not null || AnnualPcpNoteRules.IsAnnualSelection(
             note.IsAnnualPlan, formType, note.FormId);
         if (!isAnnual)
         {
@@ -586,12 +588,12 @@ public class NoteService(
             .SingleOrDefaultAsync(candidate =>
                 candidate.Id == formId &&
                 candidate.PersonId == note.PersonId &&
-                candidate.Type == FormType.PCP);
+                candidate.Type == note.FormType);
         if (form is null || form.Person.AgencyId != actor.AgencyId ||
             form.Person.UserId != actor.Id)
         {
             throw new UnauthorizedAccessException(
-                "The selected Annual PCP is not available in your caseload.");
+                "The selected annual document is not available in your caseload.");
         }
 
         var settings = await context.Settings.AsNoTracking()
@@ -599,7 +601,12 @@ public class NoteService(
             ?? new Settings { AgencyId = actor.AgencyId };
         var availableOn = FormDueDateCalculator.ComputeAvailableDateForDueDate(
             form.Type, form.DueDate, settings);
-        var decision = AnnualPcpNoteRules.Evaluate(
+        var explicitError = note.FormProgress is null ? null : !FormNoteAttestationRules.IsExactNonReleaseFormActivity((int?)note.Activities, note.NoteType?.ToString(), formType, note.FormId)
+            ? "Document progress requires an exact Form activity." : FormProgressRules.Validate(note.FormProgress, form.Type.ToString(), note.Status?.ToString(), availableOn, today, form.DueDate, form.TargetEffectiveDate, form.OpenedDate, form.CompletedDate);
+        if (explicitError is not null) throw new InvalidOperationException(explicitError);
+        var decision = note.FormProgress is { } progress
+            ? new AnnualPcpNoteDecision(true, false, note.EventDate!.Value.Date > form.DueDate.Date, progress.Action, string.Empty)
+            : AnnualPcpNoteRules.Evaluate(
             true,
             form.Type.ToString(),
             form.Id,
@@ -610,14 +617,14 @@ public class NoteService(
             form.OpenedDate,
             form.CompletedDate);
         var confirmationError = AnnualPcpNoteRules.ValidateConfirmation(
-            decision, note.AnnualPcpAction);
+            decision, note.FormProgress?.Action ?? note.AnnualPcpAction);
         if (confirmationError is not null)
             throw new InvalidOperationException(confirmationError);
 
         if (decision.RequiredAction == AnnualPcpProgressAction.Open)
         {
             var dateError = FormOpeningRules.Validate(
-                note.EventDate!.Value, availableOn, today);
+                note.FormProgress?.OpenedOn ?? note.EventDate!.Value, availableOn, today);
             if (dateError is not null)
                 throw new InvalidOperationException(dateError);
         }
@@ -625,14 +632,14 @@ public class NoteService(
         {
             var effectiveDate = form.Person.EffectiveDate
                 ?? throw new InvalidOperationException(
-                    "The client's effective date is required for Annual PCP completion.");
+                    "The client's effective date is required for annual document completion.");
             var cycle = FormAttestationRules.ResolveCycleForForm(
                 effectiveDate, form.Type.ToString(), form.DueDate,
                 form.TargetEffectiveDate == default ? null : form.TargetEffectiveDate)
                 ?? throw new InvalidOperationException(
-                    "The selected Annual PCP is not attached to a valid plan cycle.");
+                    "The selected annual document is not attached to a valid plan cycle.");
             var decisionForDate = FormAttestationRules.Evaluate(
-                form.Type.ToString(), note.EventDate!.Value, cycle.CycleStart, today,
+                form.Type.ToString(), note.FormProgress?.CompletedOn ?? note.EventDate!.Value, cycle.CycleStart, today,
                 AttestationActorKind.CaseManager, [],
                 [new FormFact(form.Id, form.PersonId, form.Type.ToString(),
                     form.DueDate, form.CompletedDate, form.TargetEffectiveDate)],
@@ -644,10 +651,10 @@ public class NoteService(
                         decisionForDate.UnmetPrerequisites.Select(item => item.Message)));
         }
 
-        note.IsAnnualPlan = true;
-        if (decision.MustBeUnbilled)
+        note.IsAnnualPlan = form.Type == FormType.PCP;
+        if (form.Type == FormType.PCP && decision.MustBeUnbilled)
             note.IsUnbilled = true;
-        return new AnnualPcpWritePlan(form, decision);
+        return new AnnualPcpWritePlan(form, decision, note.FormProgress);
     }
 
     private static void ApplyAnnualPcpProgress(
@@ -656,15 +663,23 @@ public class NoteService(
         Note note,
         AnnualPcpWritePlan plan)
     {
-        var occurredOn = note.EventDate!.Value.Date;
+        var occurredOn = (plan.Progress?.CompletedOn ?? note.EventDate!.Value).Date;
+        if (plan.Form.OpenedDate is null && plan.Progress?.OpenedOn is DateTime opening &&
+            plan.Decision.RequiredAction == AnnualPcpProgressAction.Complete)
+        {
+            plan.Form.OpenedDate = opening.Date;
+            LocalAuditTrail.Record(context, actor, LocalAuditActions.FormOpened, "Form", plan.Form.Id,
+                System.Text.Json.JsonSerializer.Serialize(new { formType = plan.Form.Type.ToString(), openedOn = opening.Date.ToString("yyyy-MM-dd"), evidenceNoteId = note.Id }));
+        }
         if (plan.Decision.RequiredAction == AnnualPcpProgressAction.Open)
         {
+            occurredOn = (plan.Progress?.OpenedOn ?? note.EventDate!.Value).Date;
             plan.Form.OpenedDate = occurredOn;
             LocalAuditTrail.Record(
                 context, actor, LocalAuditActions.FormOpened, "Form", plan.Form.Id,
                 System.Text.Json.JsonSerializer.Serialize(new
                 {
-                    formType = FormType.PCP.ToString(),
+                    formType = plan.Form.Type.ToString(),
                     targetEffectiveDate = plan.Form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
                     openedOn = occurredOn.ToString("yyyy-MM-dd"),
                     evidenceNoteId = note.Id
@@ -682,16 +697,17 @@ public class NoteService(
             recordedAtUtc,
             evidenceNoteId: note.Id,
             prerequisiteStateJson: FormAttestationRules.NoPrerequisitesStateJson,
-            reason: "Annual PCP note confirmation."));
+            reason: plan.Progress is null ? "Annual PCP note confirmation." : "Explicit document progress confirmation."));
         LocalAuditTrail.Record(
             context, actor, LocalAuditActions.FormAttested, "Form", plan.Form.Id,
             System.Text.Json.JsonSerializer.Serialize(new
             {
-                formType = FormType.PCP.ToString(),
+                formType = plan.Form.Type.ToString(),
                 targetEffectiveDate = plan.Form.TargetEffectiveDate.ToString("yyyy-MM-dd"),
                 completedOn = occurredOn.ToString("yyyy-MM-dd"),
                 evidenceNoteId = note.Id,
-                annualPcpNote = true
+                annualPcpNote = plan.Form.Type == FormType.PCP,
+                explicitFormProgress = plan.Progress is not null
             }));
     }
 

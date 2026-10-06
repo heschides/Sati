@@ -77,6 +77,22 @@ namespace Sati.ViewModels
         public event EventHandler? NoteStatusChanged;
 
         // CALLBACKS
+        [RelayCommand]
+        private void ShowThisMonth()
+        {
+            var today = DateTime.Today;
+            RangeStart = new DateTime(today.Year, today.Month, 1);
+            RangeEnd = today;
+        }
+
+        [RelayCommand]
+        private void ShowLastMonth()
+        {
+            var thisMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            RangeStart = thisMonth.AddMonths(-1);
+            RangeEnd = thisMonth.AddDays(-1);
+        }
+
         partial void OnSelectedFilterPersonChanged(Person? value) => RefreshView();
         partial void OnSelectedStatusOptionChanged(StatusOption value) => NotesView.Refresh();
         partial void OnSearchTextChanged(string? value) => RefreshView();

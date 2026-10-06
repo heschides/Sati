@@ -1174,6 +1174,49 @@ namespace Sati.Migrations
                     b.ToTable("EftDepositRecords", (string)null);
                 });
 
+            modelBuilder.Entity("Sati.Models.Billing.PayerBillingConfigurationVersion", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AgencyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ConfigurationJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EffectiveOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ProfileKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("VersionId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("AgencyId", "ProfileKey", "EffectiveOn")
+                        .IsUnique();
+
+                    b.HasIndex("AgencyId", "ProfileKey", "Revision")
+                        .IsUnique();
+
+                    b.ToTable("PayerBillingConfigurationVersions", (string)null);
+                });
+
             modelBuilder.Entity("Sati.Models.Billing.RemittanceClaimOutcome", b =>
                 {
                     b.Property<long>("Id")
@@ -5549,6 +5592,21 @@ namespace Sati.Migrations
                         .WithMany()
                         .HasForeignKey("SupersedesRecordId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Sati.Models.Billing.PayerBillingConfigurationVersion", b =>
+                {
+                    b.HasOne("Sati.Models.Agency", null)
+                        .WithMany()
+                        .HasForeignKey("AgencyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Sati.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sati.Models.Billing.RemittanceClaimOutcome", b =>

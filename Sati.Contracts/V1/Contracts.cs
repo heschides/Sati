@@ -352,7 +352,8 @@ public sealed record SaveNoteRequest(
     bool IsAgendaGenerated = false,
     bool IsAnnualPlan = false,
     bool IsUnbilled = false,
-    AnnualPcpProgressAction AnnualPcpAction = AnnualPcpProgressAction.None);
+    AnnualPcpProgressAction AnnualPcpAction = AnnualPcpProgressAction.None,
+    FormProgressRequest? FormProgress = null);
 
 public sealed record PersonReferenceDto(int Id, int UserId, string? FirstName, string? LastName);
 
@@ -759,7 +760,10 @@ public sealed record BillingCandidateDto(
     int PersonOwnerUserId,
     bool ComplianceOverride,
     IReadOnlyList<string> Errors);
-public sealed record CreateClaimLineRequest(int NoteId, bool IsComplianceException, string? ComplianceExceptionReason);
+public sealed record CreateClaimLineRequest(int NoteId, bool IsComplianceException, string? ComplianceExceptionReason)
+{
+    public PayerClaimPreparation? PayerPreparation { get; init; }
+}
 public sealed record GenerateEdiRequest(bool IsTest, string IdempotencyKey)
 {
     public Guid? ClearinghouseAccountId { get; init; }

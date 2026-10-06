@@ -3,7 +3,9 @@ param(
     [Parameter(Mandatory)]
     [string]$InstallerPath,
 
-    [string]$WorkingRoot
+    [string]$WorkingRoot,
+
+    [string]$EvidencePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +14,9 @@ $configurationTestScript = Join-Path $repoRoot 'installer\Test-SatiLocalConfigur
 $processGuardScript = Join-Path $repoRoot 'installer\InstallerProcessGuard.ps1'
 . $configurationTestScript
 . $processGuardScript
+. (Join-Path $repoRoot 'installer\InstallerAcceptanceEvidence.ps1')
+. (Join-Path $repoRoot 'installer\Read-LocalInstallerPrerequisite.ps1')
+$resolvedEvidence = Assert-SatiInstallerEvidencePath $EvidencePath
 if ([string]::IsNullOrWhiteSpace($WorkingRoot)) {
     $WorkingRoot = Join-Path $repoRoot 'artifacts\SatiLocalInstallerAcceptance'
 }
@@ -33,6 +38,7 @@ if ($acceptanceRoot -eq [System.IO.Path]::GetPathRoot($acceptanceRoot)) {
 $runRoot = Join-Path $acceptanceRoot ('run-' + [Guid]::NewGuid().ToString('N'))
 $priorTestMode = [Environment]::GetEnvironmentVariable('SATI_LOCAL_INSTALLER_TEST')
 $priorInstallRoot = [Environment]::GetEnvironmentVariable('SATI_LOCAL_INSTALL_ROOT')
+$evidence = $null
 
 try {
     if (@(Get-SatiInstallerRunningProcesses -ProcessNames @('Sati', 'Sati.Demo')).Count -ne 0) {
@@ -40,6 +46,8 @@ try {
     }
 
     [System.IO.Directory]::CreateDirectory($runRoot) | Out-Null
+    # Inspect the exact accepted bundle before executing it; never install the prerequisite here.
+    $prerequisite = Test-SatiEmbeddedLocalDbPrerequisite -InstallerPath $installer -WorkingRoot $runRoot
     $env:SATI_LOCAL_INSTALLER_TEST = '1'
     $env:SATI_LOCAL_INSTALL_ROOT = $runRoot
     $install = Start-Process `
@@ -94,7 +102,14 @@ try {
 
     $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
     Write-Output "LOCAL_INSTALLER_ACCEPTANCE_PASSED installer=$installerName sha256=$hash version=$actualVersion database=$($configuration.DatabaseName) integratedSecurity=$($configuration.IntegratedSecurity)"
+    $evidence = [ordered]@{
+        SchemaVersion=1; Gate='LocalInstallerAcceptance'; Passed=$true
+        InstallerFileName=$installerName; InstallerSha256=$hash; InstalledVersion=$actualVersion
+        Database=$configuration.DatabaseName; IntegratedSecurity=$configuration.IntegratedSecurity
+        EmbeddedPrerequisite=$prerequisite; MachineName=[Environment]::MachineName
+    }
 }
+
 finally {
     if ($null -eq $priorTestMode) {
         Remove-Item Env:SATI_LOCAL_INSTALLER_TEST -ErrorAction SilentlyContinue
@@ -124,4 +139,11 @@ finally {
         Remove-Item -LiteralPath $resolvedRunRoot -Recurse -Force
         Write-Output 'LOCAL_INSTALLER_ACCEPTANCE_CLEANUP_PASSED'
     }
+}
+
+# An exception from either acceptance or cleanup skips this write.
+if ($evidence) {
+    $evidence.CapturedUtc = [DateTime]::UtcNow.ToString('O')
+    $evidence.CleanupPassed = -not (Test-Path -LiteralPath $runRoot)
+    Write-SatiInstallerAcceptanceEvidence $resolvedEvidence $evidence
 }
