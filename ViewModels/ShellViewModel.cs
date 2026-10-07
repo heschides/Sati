@@ -35,6 +35,7 @@ namespace Sati.ViewModels
         private readonly NewLayoutPreferenceService _newLayoutPreferences;
         private readonly IdleLockPreferenceService _idlePreferences;
         private bool _isTogglingEasyEyes;
+        private readonly ApplicationRunState? _runState;
 
 
         // -------------------------------------------------------------------------
@@ -57,11 +58,15 @@ namespace Sati.ViewModels
             NewLayoutPreferenceService newLayoutPreferences,
             IdleLockPreferenceService idlePreferences,
             ChatViewModel chatViewModel,
-            ISessionLifetime sessionLifetime)
+            ISessionLifetime sessionLifetime,
+            ApplicationRunState? runState = null)
         {
+            _runState = runState;
             _apiCompatibility = apiCompatibility;
             _caseManagementViewModel = caseManagementViewModel;
             _supervisorDashboardViewModel = supervisorViewModel;
+            _supervisorDashboardViewModel.AssessmentChangedAsync = async () =>
+            { if (IsCaseManagementAvailable) await NotesViewModel.RefreshAfterAssessmentChangedAsync(); };
             _sessionService = sessionService;
             _sessionLifetime = sessionLifetime;
             Scratchpad = scratchpadViewModel;
@@ -237,6 +242,22 @@ namespace Sati.ViewModels
         // Property change callbacks
         // -------------------------------------------------------------------------
 
+        partial void OnCurrentViewModelChanging(object? value) =>
+            _runState?.RecordBreadcrumb(NavigationOperation(value));
+
+        private static DiagnosticOperation NavigationOperation(object? value) => value switch
+        {
+            CaseManagementViewModel => DiagnosticOperation.CaseManagementNavigation,
+            SupervisorDashboardViewModel => DiagnosticOperation.SupervisorNavigation,
+            UserManagementViewModel => DiagnosticOperation.UserManagementNavigation,
+            BillingDashboardViewModel => DiagnosticOperation.BillingNavigation,
+            RepresentativePayeeDashboardViewModel => DiagnosticOperation.RepresentativePayeeNavigation,
+            AdminDashboardViewModel => DiagnosticOperation.AdminNavigation,
+            PlatformHealthViewModel => DiagnosticOperation.PlatformHealthNavigation,
+            ChatViewModel => DiagnosticOperation.ChatNavigation,
+            _ => DiagnosticOperation.OtherNavigation
+        };
+
         partial void OnCurrentViewModelChanged(object? value)
         {
             OnPropertyChanged(nameof(IsCaseManagementActive));
@@ -252,7 +273,12 @@ namespace Sati.ViewModels
             // Scratchpad, since the notes panel it was hosting belongs to the Overview.
             NotifyOverviewActivityChanged();
             if (value is not SupervisorDashboardViewModel)
+            {
+                _runState?.RecordBreadcrumb(DiagnosticOperation.SupervisorChartCleanup);
                 _supervisorDashboardViewModel?.ClearCharts();
+                _runState?.RecordBreadcrumb(DiagnosticOperation.SupervisorChartCleanup, DiagnosticPhase.Completed);
+            }
+            _runState?.RecordBreadcrumb(NavigationOperation(value), DiagnosticPhase.Completed);
         }
 
         // -------------------------------------------------------------------------

@@ -41,6 +41,9 @@ namespace Sati.ViewModels.Supervisor
         private readonly CheckRequestApprovalsViewModel _checkRequestApprovalsViewModel;
         private readonly CaseloadDistributionViewModel _caseloadDistributionViewModel;
         private readonly CaseloadImportViewModel _caseloadImportViewModel;
+        private readonly NoteAmendmentsViewModel? _noteCorrections;
+        private readonly AssessmentReviewsViewModel? _assessmentReviews;
+        public Func<Task>? AssessmentChangedAsync { get; set; }
 
         // -------------------------------------------------------------------------
         // Constructor
@@ -60,8 +63,15 @@ namespace Sati.ViewModels.Supervisor
             CheckRequestApprovalsViewModel checkRequestApprovalsViewModel,
             CaseloadDistributionViewModel caseloadDistributionViewModel,
             CaseloadImportViewModel caseloadImportViewModel,
-            IServiceDayInclusionService? serviceDayInclusions = null)
+            IServiceDayInclusionService? serviceDayInclusions = null,
+            NoteAmendmentsViewModel? noteCorrections = null,
+            AssessmentReviewsViewModel? assessmentReviews = null)
         {
+            _noteCorrections = noteCorrections;
+            _noteCorrections?.SetReviewMode();
+            _assessmentReviews = assessmentReviews;
+            if (_assessmentReviews is not null) _assessmentReviews.RecordChanged += async () =>
+            { await RefreshIfLoadedAsync(); if (AssessmentChangedAsync is not null) await AssessmentChangedAsync(); };
             _serviceDayInclusions = serviceDayInclusions;
             _sessionService = sessionService;
             _personService = personService;
@@ -142,6 +152,8 @@ namespace Sati.ViewModels.Supervisor
             _loadedAccount == (current.Id, current.AgencyId);
         public bool IsPendingApprovalsActive => CurrentSubView is PendingApprovalsViewModel;
         public bool IsCheckRequestApprovalsActive => CurrentSubView is CheckRequestApprovalsViewModel;
+        public bool IsNoteCorrectionsActive => ReferenceEquals(CurrentSubView, _noteCorrections) && _noteCorrections is not null;
+        public bool IsAssessmentReviewsActive => ReferenceEquals(CurrentSubView, _assessmentReviews) && _assessmentReviews is not null;
 
         public string AvgComplianceLabel
         {
@@ -174,6 +186,8 @@ namespace Sati.ViewModels.Supervisor
             OnPropertyChanged(nameof(IsUserManagementActive));
             OnPropertyChanged(nameof(IsPendingApprovalsActive));
             OnPropertyChanged(nameof(IsCheckRequestApprovalsActive));
+            OnPropertyChanged(nameof(IsNoteCorrectionsActive));
+            OnPropertyChanged(nameof(IsAssessmentReviewsActive));
             OnPropertyChanged(nameof(IsCaseloadDistributionActive));
             OnPropertyChanged(nameof(IsCaseloadImportActive));
         }
@@ -271,6 +285,22 @@ namespace Sati.ViewModels.Supervisor
         {
             CurrentSubView = _checkRequestApprovalsViewModel;
             await _checkRequestApprovalsViewModel.LoadAsync();
+        }
+
+        [RelayCommand]
+        private async Task NavigateToNoteCorrections()
+        {
+            if (_sessionService.CurrentUser?.HasSupervisorPermissions != true || _noteCorrections is null) return;
+            CurrentSubView = _noteCorrections;
+            await _noteCorrections.LoadCommand.ExecuteAsync(null);
+        }
+
+        [RelayCommand]
+        private async Task NavigateToAssessmentReviews()
+        {
+            if (_sessionService.CurrentUser?.HasSupervisorPermissions != true || _assessmentReviews is null) return;
+            CurrentSubView = _assessmentReviews;
+            await _assessmentReviews.LoadCommand.ExecuteAsync(null);
         }
    
         // -------------------------------------------------------------------------
@@ -431,6 +461,8 @@ namespace Sati.ViewModels.Supervisor
             CaseManagers.Clear();
             _pendingApprovalsViewModel.ClearForAccountSwitch();
             _checkRequestApprovalsViewModel.ClearForAccountSwitch();
+            _noteCorrections?.ClearForAccountSwitch();
+            _assessmentReviews?.ClearForAccountSwitch();
             CurrentSubView = _teamOverviewViewModel;
             _teamOverviewViewModel.Refresh(CaseManagers);
             _overdueItemsViewModel.Refresh(CaseManagers);

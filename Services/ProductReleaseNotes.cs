@@ -6,11 +6,37 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Form completion and clearer note follow-up";
-    public const string ReleaseDate = "October 6, 2026";
+    public const string ReleaseName = "Scratchpad formatting and assessment review";
+    public const string ReleaseDate = "October 7, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Format your scratchpad and track numbered tasks",
+            [
+                "Select text and right-click to apply bold, italic, underline, strikethrough, or one of four highlight colors. Today and Tomorrow preserve that formatting; History displays it as locked content.",
+                "Insert clickable inline checkboxes with an optional editable number. The corner total sums checked numbers over all assigned numbers and stays hidden when there are no numbered checkboxes.",
+                "Edits made while an autosave is running remain available for the next save."
+            ]),
+        new(
+            "Review Comprehensive Assessments independently",
+            [
+                "Authors submit a validated document version. Supervisors can review frozen answers, comment, flag concerns, return work for revision, and approve the exact reviewed version.",
+                "Approval creates a versioned PDF. Optional actual-date Form completion is a separate explicit attestation; approval alone does not sign or complete a document.",
+                "Assessment signing and agency acceptance remain separate activation steps."
+            ]),
+        new(
+            "Find corrections where you work",
+            [
+                "Notes Log shows correction history for the selected approved note. The Supervisor page has a separate Note corrections queue for submitted proposals.",
+                "Local crash diagnostics retain a small trail of navigation and operation steps to help investigate an unexpected termination. The intermittent stack overflow remains under investigation."
+            ]),
+        new(
+            "Manage preservation holds with independent approval",
+            [
+                "Administration includes Records governance for scoped holds, retained history, release requests, and independent release decisions.",
+                "Retention policies are versioned proposals. Missing inventory remains unknown; runtime deletion is unavailable and no legal retention period is automatically approved."
+            ]),
         new(
             "Choose document progress when saving form work",
             [

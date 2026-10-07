@@ -65,7 +65,7 @@ public sealed class LegalHoldTests
     }
 
     [Fact]
-    public async Task AnAdminCanReleaseAHoldTheyPlaced()
+    public async Task AnAdminCanRequestButCannotUnilaterallyReleaseAHold()
     {
         await using var fixture = await Fixture.CreateAsync();
         var placed = await fixture.AdminService.PlaceLegalHoldAsync(new PlaceLegalHoldRequest(
@@ -73,14 +73,12 @@ public sealed class LegalHoldTests
 
         var released = await fixture.AdminService.ReleaseLegalHoldAsync(placed.Id, "Review concluded.");
 
-        Assert.True(released.IsReleased);
-        Assert.Equal("Review concluded.", released.ReleaseNote);
-        Assert.NotNull(released.ReleasedAtUtc);
+        Assert.False(released.IsReleased);
+        Assert.Null(released.ReleasedAtUtc);
+        Assert.Equal(LegalHoldStatus.Active, await new LocalLegalHoldRegistry(fixture.Factory).GetStatusAsync(fixture.AgencyId, fixture.PersonId));
     }
 
-    // Release is single-admin for v1 — deliberately not testing that a DIFFERENT admin is
-    // required, since that dual-control requirement is a documented, tracked shortfall rather
-    // than a built guarantee. See DECISIONS.md and AGENDA.md.
+    // The compatibility action requests release; replay cannot bypass independent approval.
     [Fact]
     public async Task AnAlreadyReleasedHoldCannotBeReleasedAgain()
     {
@@ -100,6 +98,7 @@ public sealed class LegalHoldTests
         var first = await fixture.AdminService.PlaceLegalHoldAsync(new PlaceLegalHoldRequest(
             fixture.PersonId, "First hold", null, null, DateTime.UtcNow));
         await fixture.AdminService.ReleaseLegalHoldAsync(first.Id, null);
+        await fixture.ApprovePendingRelease();
         var second = await fixture.AdminService.PlaceLegalHoldAsync(new PlaceLegalHoldRequest(
             fixture.PersonId, "Second hold", null, null, DateTime.UtcNow));
 
@@ -144,6 +143,7 @@ public sealed class LegalHoldTests
         var placed = await fixture.AdminService.PlaceLegalHoldAsync(new PlaceLegalHoldRequest(
             fixture.PersonId, "Under review", null, null, DateTime.UtcNow));
         await fixture.AdminService.ReleaseLegalHoldAsync(placed.Id, null);
+        await fixture.ApprovePendingRelease();
         var registry = new LocalLegalHoldRegistry(fixture.Factory);
 
         var status = await registry.GetStatusAsync(fixture.AgencyId, fixture.PersonId);
@@ -183,6 +183,14 @@ public sealed class LegalHoldTests
         public int ForeignPersonId { get; private set; }
         public AdminService AdminService { get; private set; } = null!;
         public AdminService CaseManagerService { get; private set; } = null!;
+        private User reviewer = null!;
+        public async Task ApprovePendingRelease()
+        {
+            var session = new SessionService(); session.SetUser(reviewer);
+            var service = new RecordsGovernanceService(Factory, session);
+            var hold = (await service.GetHoldsAsync()).Single(x => x.ReleaseRequestedById is not null);
+            await service.ChangeHoldAsync(new(Guid.NewGuid(), GovernanceHoldAction.ApproveRelease, hold.Id, hold.Revision, hold.Scope, hold.RecordClass, hold.PersonId, hold.RecordId, "Independent synthetic approval"));
+        }
 
         public static async Task<Fixture> CreateAsync()
         {
@@ -207,7 +215,8 @@ public sealed class LegalHoldTests
             var foreignCaseManager = User.Create(
                 1402, "foreign-legal-hold", "Foreign Case Manager", "hash", "salt", UserRole.CaseManager, null, foreignAgency.Id);
             db.Agencies.AddRange(agency, foreignAgency);
-            db.Users.AddRange(admin, caseManager, foreignCaseManager);
+            reviewer = User.Create(1303, "reviewer-legal-hold", "Reviewer", "hash", "salt", UserRole.Admin, null, agency.Id);
+            db.Users.AddRange(admin, reviewer, caseManager, foreignCaseManager);
 
             var person = Person.CreatePerson(
                 caseManager.Id, "Held", "Consumer", "Synthetic record.",

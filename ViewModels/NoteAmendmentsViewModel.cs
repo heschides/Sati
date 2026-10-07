@@ -36,10 +36,16 @@ public partial class NoteAmendmentsViewModel(INoteAmendmentService service) : Ob
     [ObservableProperty] private string statusMessage = "Load approved notes to view or propose a linked amendment.";
     [ObservableProperty] private bool isBusy;
     [ObservableProperty] private bool isDirty;
-    public bool CanEdit => !IsBusy && workspace?.CanAuthor == true && (current is null || current.Status is NoteAmendmentStatus.Draft or NoteAmendmentStatus.Returned);
+    public bool IsReviewMode => review;
+    public bool IsAuthorMode => !review;
+    public string Instructions => review
+        ? "Select a submitted correction to compare with the approved original and record an independent review. Financial changes require separate billing review."
+        : "The approved original is preserved. View this note's correction history or submit a saved proposal for independent review. Financial changes require separate billing review.";
+    public bool CanChangeSelectedNote => !IsDirty && !(IsBusy && retry is not null);
+    public bool CanEdit => !review && !IsBusy && workspace?.CanAuthor == true && (current is null || current.Status is NoteAmendmentStatus.Draft or NoteAmendmentStatus.Returned);
     public bool CanSave => CanEdit && IsDirty;
     public bool CanSubmit => CanEdit && current is not null && !IsDirty;
-    public bool CanReview => !IsBusy && workspace?.CanReview == true && current?.Status == NoteAmendmentStatus.Submitted;
+    public bool CanReview => review && !IsBusy && workspace?.CanReview == true && current?.Status == NoteAmendmentStatus.Submitted;
     partial void OnIsBusyChanged(bool value) => NotifyActions();
     partial void OnIsDirtyChanged(bool value) => NotifyActions();
     partial void OnNarrativeChanged(string value) => Dirty();
@@ -60,7 +66,19 @@ public partial class NoteAmendmentsViewModel(INoteAmendmentService service) : Ob
     {
         if (value is not null) StatusMessage = $"Version {value.Number} ({value.Kind}), recorded by user {value.RecordedById} at {value.RecordedAtUtc:u}. Reason: {value.Reason}";
     }
-    public void SetReviewMode() => review = true;
+    public void SetReviewMode()
+    {
+        review = true;
+        OnPropertyChanged(nameof(IsReviewMode)); OnPropertyChanged(nameof(IsAuthorMode)); OnPropertyChanged(nameof(Instructions)); NotifyActions();
+    }
+    public async Task ShowNoteAsync(int? noteId)
+    {
+        if (review) return;
+        if (!CanChangeSelectedNote) { StatusMessage = "Save your correction proposal and wait for the operation to finish before selecting another note."; return; }
+        ClearForAccountSwitch();
+        StatusMessage = noteId is null ? "Select an approved note to view its correction history." : "Loading selected note corrections.";
+        if (noteId is int id) await OpenAsync(id);
+    }
     public void ClearForAccountSwitch()
     {
         requests.Invalidate(); publishing = true; workspace = null; current = null; retry = null;
@@ -72,6 +90,7 @@ public partial class NoteAmendmentsViewModel(INoteAmendmentService service) : Ob
     [RelayCommand] private async Task MoreAsync() => await LoadQueueAsync(true);
     private async Task LoadQueueAsync(bool more)
     {
+        if (!review) { StatusMessage = "Select an approved note in Notes Log."; return; }
         if (IsBusy || IsDirty) { StatusMessage = "Save your proposal before refreshing."; return; }
         if (more && next is null) return;
         var request = requests.Begin(); IsBusy = true;

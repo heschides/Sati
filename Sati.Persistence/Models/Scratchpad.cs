@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using Sati.Contracts.V1;
 
 namespace Sati.Models
 {
@@ -16,9 +17,12 @@ namespace Sati.Models
         public ObservableCollection<ScratchpadComment> Comments { get; set; } = [];
 
         [NotMapped]
-        public string DisplayContent => string.IsNullOrWhiteSpace(Content)
+        public string PlainContent => JournalDocument.Parse(Content).ToPlainText();
+
+        [NotMapped]
+        public string DisplayContent => string.IsNullOrWhiteSpace(PlainContent)
             ? "No text was entered on this day."
-            : Content;
+            : PlainContent;
 
         [NotMapped]
         public bool HasComments => Comments.Count > 0;
@@ -28,7 +32,7 @@ namespace Sati.Models
         {
             get
             {
-                var firstLine = Content.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                var firstLine = PlainContent.Split('\n', StringSplitOptions.RemoveEmptyEntries)
                                        .FirstOrDefault() ?? string.Empty;
                 return firstLine.Length > 80 ? firstLine[..80] + "…" : firstLine;
             }

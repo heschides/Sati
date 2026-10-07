@@ -10,6 +10,27 @@ namespace Sati.Tests;
 public sealed class LocalAuthorizationTests
 {
     [Fact]
+    public async Task FormattedScratchpadWithNumberedCheckboxesRoundTripsThroughLocalStorage()
+    {
+        await using var fixture = await LocalFixture.CreateAsync();
+        var session = new SessionService();
+        session.SetUser(fixture.CaseManagerOne);
+        var service = new ScratchpadService(fixture.Factory, session);
+        var draft = await service.LoadTodayAsync(fixture.CaseManagerOne.Id);
+        var content = new Sati.Contracts.V1.JournalDocument([
+            new Sati.Contracts.V1.JournalPage("Scratchpad", [new Sati.Contracts.V1.JournalParagraph([
+                Sati.Contracts.V1.JournalInline.Checkbox(true, 2.5m),
+                Sati.Contracts.V1.JournalInline.Checkbox(false, 5),
+                Sati.Contracts.V1.JournalInline.Run("Synthetic task", bold: true, italic: true,
+                    underline: true, strikethrough: true, highlight: Sati.Contracts.V1.TextHighlight.Blue)])])]);
+        draft.Content = content.Serialize();
+        await service.SaveAsync(draft);
+        var reloaded = await service.LoadTodayAsync(fixture.CaseManagerOne.Id);
+        Assert.Equal(draft.Content, reloaded.Content);
+        Assert.Equal(2, reloaded.Revision);
+        Assert.Equal(content.Pages[0], Sati.Contracts.V1.JournalDocument.Parse(reloaded.Content).Pages[0]);
+    }
+    [Fact]
     public async Task AssessmentWritesRequireTheSignedInAssignedCaseManager()
     {
         await using var fixture = await LocalFixture.CreateAsync();
@@ -29,8 +50,20 @@ public sealed class LocalAuthorizationTests
             assessment,
             new AssessmentDocument
             {
-                Contributors = [new AssessmentContributor { Name = "Reviewer", Relationship = "Team" }]
+                Contributors = [new AssessmentContributor { Name = "Reviewer", Relationship = "Team" }],
+                NoIdentifiedNeedsReason = "This synthetic fixture identified no additional needs.",
+                Answers = Sati.Contracts.V1.AssessmentCatalog.Questions.ToDictionary(q => q.Key,
+                    q => new AssessmentAnswer { Status = AssessmentAnswerStatus.NotApplicable, ExceptionReason = "Synthetic disposition." })
             });
+        await using (var setup = fixture.Factory.CreateDbContext())
+        {
+            var target = DateTime.Today.AddDays(90);
+            var person = await setup.People.SingleAsync(p => p.Id == fixture.PersonOneId);
+            person.EffectiveDate = target.AddYears(-1);
+            var form = new Form(FormType.ComprehensiveAssessment, DateTime.Today, targetEffectiveDate: target) { PersonId = person.Id };
+            setup.Forms.Add(form); await setup.SaveChangesAsync();
+            assessment.SubmissionRequest = new(assessment.Revision, Sati.Contracts.V1.AssessmentReviewRules.Hash(assessment.DocumentJson), form.Id, target, form.DueDate);
+        }
         await service.SubmitForReviewAsync(assessment);
 
         await using var db = fixture.Factory.CreateDbContext();

@@ -77,7 +77,8 @@ internal static class AppErrorLog
     public static void RecordCrashDiagnostic(
         string reference,
         CrashDiagnosticDto diagnostic,
-        string? directoryOverride = null)
+        string? directoryOverride = null,
+        IReadOnlyList<DiagnosticBreadcrumb>? breadcrumbs = null)
     {
         try
         {
@@ -90,7 +91,12 @@ internal static class AppErrorLog
                 reference,
                 area = "application.previous-session-unclean.windows-readback",
                 applicationVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(),
-                crashDiagnostic = diagnostic
+                crashDiagnostic = diagnostic,
+                breadcrumbs = DiagnosticBreadcrumbs.Sanitize(breadcrumbs).Select(entry => new
+                {
+                    entry.Sequence, entry.TimestampUtc,
+                    operation = entry.Operation.ToString(), phase = entry.Phase.ToString()
+                })
             };
             lock (Sync)
             {

@@ -1,5 +1,10 @@
 # Handoff — Client deletion and archival protocol
 
+**October 7 source update (Prompt 04):** both ordinary and test-consumer deletion
+refuse consumers with immutable assessment submission/review history. Archive instead.
+This protects retained clinical review evidence even inside the ordinary deletion
+window; it does not relax any existing financial or legal-hold safeguard.
+
 **Status:** built 2026-09-03. All four rules are implemented — see the "What already exists"
 table below, now fully checked off. Two decisions from the original review changed during
 implementation, both by Josh's direction: the window is 20 days, not 14 (A2's formula and the
@@ -467,3 +472,16 @@ Audit:
 Landing 2 before 3 matters: until archive exists, an Admin facing a bad record past the
 window has no correct action available, and pressure to loosen the deletion path is
 exactly the failure mode this protocol is meant to prevent.
+
+
+## October 6, 2026 source update — preservation and dual control
+
+Prompt 03 now supplies scoped governance holds and independent release decisions. The historical
+single-Admin release limitation above is superseded in unreleased source. Old release routes request
+review and remain active until a different Admin approves the exact revision. Migration 127 imports
+active person holds without changing their original evidence; registries still check legacy rows.
+Both ordinary and test-data consumer deletion use the same agency preservation lock as hold placement,
+policy change and retention batches. Broad holds block deletion; unresolved record/person dependency
+scope is unavailable and conservatively blocks it. Registry failure never means clear. Runtime
+retention remains PolicyOnly with explicit unavailable adapters. See RECORDS_GOVERNANCE_RUNBOOK.md
+for private synthetic tests, controlled migration and the remaining agency/storage/recovery gates.

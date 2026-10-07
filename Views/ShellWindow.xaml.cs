@@ -624,9 +624,11 @@ namespace Sati.Views
 
         internal void RegisterOverviewAgendaHost(ContentControl host)
         {
+            _applicationRunState.RecordBreadcrumb(DiagnosticOperation.OverviewAgendaRegistration);
             _overviewAgendaHost = host;
             MoveWorkAgendaToPreferredHost();
             ApplyScratchpadVisibility();
+            _applicationRunState.RecordBreadcrumb(DiagnosticOperation.OverviewAgendaRegistration, DiagnosticPhase.Completed);
         }
 
         internal void UnregisterOverviewAgendaHost(ContentControl host)
@@ -634,9 +636,11 @@ namespace Sati.Views
             if (!ReferenceEquals(_overviewAgendaHost, host))
                 return;
 
+            _applicationRunState.RecordBreadcrumb(DiagnosticOperation.OverviewAgendaRemoval);
             _overviewAgendaHost = null;
             MoveWorkAgendaToPreferredHost();
             ApplyScratchpadVisibility();
+            _applicationRunState.RecordBreadcrumb(DiagnosticOperation.OverviewAgendaRemoval, DiagnosticPhase.Completed);
         }
 
         private void MoveWorkAgendaToPreferredHost()
@@ -647,11 +651,15 @@ namespace Sati.Views
             if (ReferenceEquals(_workAgendaParent, target))
                 return;
 
+            var operation = ReferenceEquals(target, _overviewAgendaHost)
+                ? DiagnosticOperation.AgendaMoveToOverview : DiagnosticOperation.AgendaMoveToSidebar;
+            _applicationRunState.RecordBreadcrumb(operation);
             if (_workAgendaParent?.Content == _workAgendaView)
                 _workAgendaParent.Content = null;
             _workAgendaView.IsHistoryAvailable = ReferenceEquals(target, _overviewAgendaHost);
             target.Content = _workAgendaView;
             _workAgendaParent = target;
+            _applicationRunState.RecordBreadcrumb(operation, DiagnosticPhase.Completed);
         }
 
         private Task OnTimeOffScheduledAsync(DateTime date) =>

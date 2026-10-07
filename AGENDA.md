@@ -1,5 +1,102 @@
 # Sati — Refactor Agenda
 
+## Release 1.3.37 — October 7, 2026 (in progress)
+
+- Scope: formatted scratchpads and weighted numbered checkboxes, selected-note correction
+  history and Supervisor correction queue, durable crash breadcrumbs, records governance
+  (Prompt 03), and Comprehensive Assessment review (Prompt 04).
+- Josh authorized migrations 127 and 128, current synthetic Demo baseline replacement,
+  and one verification reset after the DATT preflight question. Josh added exact-IP rule
+  `datt-workstation-20261007`; read-only inspection verified `66.211.131.66` and Demo
+  identity/connectivity at migration 126. Rule removal remains user-run and pending.
+- Master equals fetched origin/master at `c1fcbb0966fa8490ae444f77192926ffafa5106c`.
+  No branch has unique commits requiring reconciliation; retained existing feature/CI/
+  background-worker branches because retention intent is unconfirmed. Detached historical
+  1.3.31 release worktree remains untouched.
+- Local machine inventory: LONGCHENPA, current development workstation; the SatiLogica
+  Windows profile's installed Local executable is 1.3.2.0 (file metadata only, behind).
+  Its database schema is unverified. Other Local machines/installed releases remain unknown.
+  Each Local database receives pending migrations at its next desktop launch; no Local
+  Production database query, migration, or backup is part of this release procedure.
+- [x] Source consistency and full Release build passed: zero errors, 18 existing warnings.
+  All five projects passed with SQL tests enabled in private instance
+  `SatiSqlTests_3669d943277f4283bcb32acba89f4051`, then stopped/deleted: desktop 2,955,
+  API 1,119, Signatures 119, Portal 8 and Carika 4 (4,205 passing). One documented
+  on-device AI model opt-in skip; no SQL skips. Evidence: `TestResults/datt-1.3.37/`
+  build/test logs and coverage index; unique TRX files in BackgroundWorkersFullSql.
+- [ ] Source commit/push and matching API package/deployment/health/contract evidence.
+- [ ] Controlled Demo migration rollback rehearsals, application and idempotent reruns.
+- [ ] Read-only pre-capture check, replacement baseline, completed reset and worker marker.
+- [ ] User firewall-rule removal and successful absence verification.
+- [ ] Demo/Local installers, acceptance and cleanup, exact distribution hash verification.
+- [ ] One final evidence commit/push and clean master matching the remote.
+
+Comprehensive Assessment signing/agency acceptance and runtime destructive retention
+remain gated as documented in their runbooks. Breadcrumbs support diagnosis; they do
+not establish or repair the intermittent stack-overflow cause.
+
+## October 7 — Prompt 04 Comprehensive Assessment review (source implemented)
+
+- [x] Scoped independent supervisor queue; read-only answers; section/question comments,
+  blocking/nonblocking flags, reasoned resolutions/returns, author responses and resubmission.
+- [x] Shared versioned completeness/catalog; exact persisted revision/hash submission;
+  failed/conflicted save stops submission. New provider references validated server-side,
+  historical snapshots preserved; structured contributors/needs/dissent checked.
+- [x] Immutable submission cycles and review events, wholesale approval with carried
+  blocking flags resolved, frozen version PDF through existing DocumentArtifact owner.
+- [x] Approval separate from signatures/external publication/Form completion. Optional
+  explicit actual-date staff attestation cites that same snapshot/hash/artifact and
+  applies the exact canonical annual Form/current agency deadline invariant atomically.
+  Saved decisions refresh live client/caseload/matrix/note context.
+- [x] Constructor-injected author workspace, focusable local/cloud validation,
+  accessible reviewer controls, selection/account request guards and detachable view events.
+- [x] Explicit author-only recovery for legacy submissions without snapshots; no fabricated
+  historical snapshot or Form identity. Retained review history blocks consumer deletion.
+- [x] Additive migration 128, guarded identity/predecessor/schema-checked runner and
+  activation/downgrade instructions prepared. Isolated SQL rehearsal passed 2 tests;
+  no Demo or SatiProduction migration/data access.
+- [x] Full API checkpoint: 1,089 passed, 25 opt-in SQL tests skipped. Final focused workflow
+  recheck: 39 passed, including deletion refusal and rendered PDF version metadata.
+  Revision/self-review guard removal each caused the intended failure,
+  then restored; original completeness/save regressions reproduced before repair.
+- [x] Broad desktop checkpoint: 2,918 passed, 6 opt-in SQL tests skipped; one display-only
+  Run binding rule failed, was repaired, and passed in the final 83-test affected-feature
+  recheck with actual WPF author/reviewer bindings. New views rendered/inspected using
+  synthetic data; no unrestricted application log or crash dump capture.
+- [x] Final integration checks: 119 signature and 8 portal tests passed. The last shared
+  recovery-rule/local/UI recheck passed 9 tests. Migration-chain replay: 128 migrations,
+  zero problems. Guarded SQL SHA-256:
+  `F544FE2360FFA9EB0726C0F14815935408352F3495A64D2121195E982B5D8B02`.
+- [ ] Controlled deployment/schema activation, synthetic Demo baseline recapture and
+  verification reset remain separately authorized release actions.
+- [ ] Comprehensive Assessment signing, required-signers/meaning, agency/OADS acceptance,
+  accessible-PDF acceptance and broader keyboard/JAWS/high-contrast/200% layout checks
+  remain activation gates. Queue pagination and richer coverage/recusal policy are deferred.
+
+Runbook: ASSESSMENT_REVIEW_RUNBOOK.md. TRX evidence: TestResults/assessment-review
+and TestResults/IsolatedSqlServer/Api. Source work does not begin Prompt 05.
+
+## Unreleased — selected-note corrections and crash investigation (October 6)
+
+- [x] Notes Log correction history follows only the selected approved note; preserve
+      unsaved proposals and suppress stale selection responses.
+- [x] Separate submitted-correction queue on the Supervisor page, using an independent
+      review workspace and existing server authorization. Billing review stays in Billing.
+- [x] Release build and 15 focused synthetic desktop/WPF tests passed. Removing the
+      selection request guard made the stale-response regression fail; restored checks pass.
+- [x] Persist the last 32 fixed navigation/operation breadcrumbs before tracked UI work,
+      then attach them to local crash readback under the existing error reference. No record
+      identifiers, narratives, free-text payloads, uploads or automatic memory dumps.
+      A debugger may still be needed to identify the recursive call chain.
+- [x] Breadcrumb durability/recovery, privacy guards and affected lifecycle checks: 40
+      synthetic tests passed in Release. Removing the enum allow-list made the readback
+      regression fail; restored checks pass (`TestResults/breadcrumbs`). No migration required.
+- [ ] Diagnose intermittent Supervisor-to-Case Management termination. Local curated
+      crash readback confirms 1.3.36 at 19:56 Eastern, Windows event 1000, exception
+      0xC00000FD (stack overflow), reference CRASHD83B6A7E0FCD. No managed stack or
+      matching .NET runtime event was captured. Navigation source review alone does not
+      establish a root cause; no crash fix is claimed. No PHI/database query or dump copied.
+
 ## Release 1.3.36 — October 6, 2026 (completed)
 
 - Scope: explicit PCP/assessment progress, quarterly completion notes, corrected follow-up
@@ -353,7 +450,7 @@ of this source change.
       deployment acceptance. Default-off configuration is preserved.
 - [ ] W7 optional personal backup hygiene remains deferred: it creates/operates
       on real PHI copies and is not needed for this cloud implementation.
-- [ ] Assessment submit-after-save failure remains a separately scoped defect,
+- [x] Assessment submit-after-save failure fixed and verified in Prompt 04 (October 7);
       as the handoff specifies; deadline digests, cycle preparation, statistics
       aggregation and automated retention remain excluded with their recorded reasons.
 
@@ -3297,6 +3394,23 @@ Sati-owned output.
 - [ ] Complete actual clearinghouse sandbox acceptance, supported variant/companion-guide checks,
       authorized raw receipt readback, rejected/corrected/void claim workflows, bank reconciliation,
       and approved API-mediated Production activation. Production import remains disabled.
+
+## Unreleased — formatted scratchpad and weighted checklist (October 7, source only)
+
+- [x] Add right-click bold, italic, underline, strike-through and four named highlight
+      colors, plus clear highlight, to both agenda editors.
+- [x] Insert clickable inline checkboxes with optional positive numbers; allow number
+      edits/removal by right-click and keyboard insertion/toggling with Ctrl+Shift+C.
+- [x] Show a separate corner with checked assigned values / all assigned values,
+      update immediately, and hide it when only plain checkboxes or no boxes exist.
+- [x] Persist through the existing portable journal format and revision/save boundary;
+      preserve legacy plain text, locked history, text sizing, snippets and timestamps.
+- [x] Reproduce and fix the lost-dirty-state race when edits occur during a save.
+- [x] Verify 117 focused desktop tests and 20 API tests; inspect synthetic narrow/wide
+      renders. Undo/redo preserves numbered checkbox metadata and click handlers.
+      Tests use synthetic fixtures only; no PHI database was accessed.
+- [ ] Include this source slice in the next authorized DATT release; no publication
+      or database migration is part of this feature implementation.
 
 ## Unreleased — Overview scratchpad history and Umber Facets
 
@@ -7471,29 +7585,31 @@ Before any shared or production release:
   an explicitly documented supervisor exception where policy allows.
 - [ ] Add autosave retry/recovery, unsaved-change shutdown flush, concurrency handling,
   and protection against two sessions editing the same draft.
-- [ ] Remove the service-locator construction in
+- [x] Remove the service-locator construction in
   `ComprehensiveAssessmentWorkspace.xaml.cs`; inject/factory-create the workspace and
   ViewModel consistently with Sati's DI rule.
 - [ ] Perform keyboard-only, JAWS, high-contrast, 200% scaling, and 1280x768 layout QA.
-- [ ] Add unit tests for completion rules, support-selection exclusions, ownership,
+- [x] Add unit tests for completion rules, support-selection exclusions, ownership,
   version immutability, serialization compatibility, and submission transitions.
 
 ### Supervisor assessment workflow
 
-- [ ] Add a supervisor review queue for Comprehensive Assessments.
-- [ ] Allow supervisors to flag individual sections/questions, comment, and return a
+- [x] Add a supervisor review queue for Comprehensive Assessments (Prompt 04, source only).
+- [x] Allow supervisors to flag individual sections/questions, comment, and return a
   submission without rewriting the author's answers.
-- [ ] Make supervisor approval wholesale, with all unresolved flags blocking approval.
-- [ ] Permit supervisors who carry a caseload to author only their own assigned clients'
+- [x] Make supervisor approval wholesale, with unresolved **blocking** flags stopping approval;
+  nonblocking observations remain visible without inventing an additional completion gate.
+- [x] Permit supervisors who carry a caseload to author only their own assigned clients'
   assessments; keep the author and reviewer capabilities separate.
-- [ ] Record submission, return, resubmission, approval, actor, timestamps, reason, and
+- [x] Record submission, return, resubmission, approval, actor, timestamps, reason, and
   exact version in append-only audit history.
-- [ ] On approval, lock the version and mark the matching legacy `Form` complete through
-  the existing `Form` invariant rather than writing compliance fields directly.
+- [x] On approval, lock the version; complete the matching annual `Form` only with explicit
+  dated staff attestation through its existing invariant. Approval alone does not complete it.
 
 ### Documents, signatures, and versions
 
-- [ ] Publish a version-identified Comprehensive Assessment PDF.
+- [x] Generate/export a version-identified Comprehensive Assessment PDF (Prompt 04 source).
+  External publication and program acceptance remain separately gated.
 - [ ] Retain both the generated unsigned PDF and uploaded physically signed scan.
 - [ ] Record signer, role, signature method, upload actor, and timestamps against the
   exact frozen version.
@@ -7861,7 +7977,8 @@ for a rewrite.
 
 ### P2 — MVVM boundaries and maintainability
 
-- [ ] **Remove the Comprehensive Assessment service locator.**
+- [x] **Remove the Comprehensive Assessment service locator.** Prompt 04 injects the
+      ViewModel through NewClientViewModel and a dependency-property binding.
       `ComprehensiveAssessmentWorkspace` constructs its own ViewModel through
       `Application.Current.Services`. Create the workspace/ViewModel through the
       composition root or a typed injected factory so dependencies are explicit and the
@@ -7888,7 +8005,8 @@ for a rewrite.
       healthcare reference data, and journal autosave. Extract focused client-profile,
       journal, appointment, and compliance/document components while preserving the
       current single Overview experience.
-- [ ] **Extract a versioned Comprehensive Assessment definition catalog.**
+- [x] **Extract a versioned Comprehensive Assessment definition catalog.** Prompt 04
+      moves the definitions/guidance and shared validation into Contracts.V1, version 1.
       `ComprehensiveAssessmentViewModel.BuildSections` currently owns question text,
       guidance, support applicability, validation, navigation, mapping, persistence, and
       autosave. Move the content/schema into a dedicated, versioned definition provider
@@ -9013,3 +9131,32 @@ PAYER_BILLING_CERTIFICATION.md for the separate certification/migration checklis
       server-owned Claim.MD account. Keep local account/credential operation outside this feature.
 - [ ] Retention/hold and Demo seed/baseline handling for payer versions and frozen authorization evidence.
       Baseline activation should start with the new configuration table empty.
+
+
+## Unreleased — feature prompt 03: records governance (October 6, 2026)
+
+- [x] Add versioned proposed policies and agency/person/record holds with immutable scope,
+      append-only evidence, exact revisions, operation retries and independent release decisions.
+- [x] Preserve active legacy person holds during additive migration 127; retain original and
+      already released history. Old release action requests review and keeps preservation active.
+- [x] Share Contracts rules and portable transactional writers across API/local services; add
+      an accessible Admin workspace with guarded loads and account clearing.
+- [x] Preserve connected dependencies in all six classes and reverse references. Missing stores
+      and unresolved record/person scope refuse destructive operations. Both consumer deletion
+      paths share the agency preservation lock with hold/policy/batch work.
+- [x] Persist bounded previews and fixture-only 50-record batches, atomic checkpoints, exact retries,
+      new-hold/policy invalidation, fingerprint/edge rechecks and plan/epoch-bound recovery receipts.
+      Runtime remains PolicyOnly with unavailable adapters and unknown inventory counts.
+- [x] Prepare a controlled, identity/hash/history/schema-checked migration runner and a runbook;
+      privately rehearse import, rollback/rerun/schema refusal and hold/purge SQL lock contention.
+      Security regression probes fail without independent-approval/epoch guards and restore source.
+- [ ] Apply migration 127 and publish matching API/client through a separately authorized release;
+      refresh and verify Demo baseline/reset compatibility. No runtime database was changed here.
+- [ ] Obtain agency/legal-approved policy periods and complete reviewed clinical/billing/audit/chat/
+      document/evidence inventories, protected recovery-reference resolver and backup/encrypted-object
+      reconciliation/outbox adapters; unknown coverage must remain a blocker. Coordinate restore
+      verification with prompt 17. No legal period or external store coverage was invented.
+- [ ] Review a runtime execution/worker activation gate, preservation of operational exports/backups,
+      named owner/failure alerts and evidence-preserving downgrade/recovery before any real purge.
+
+See RECORDS_GOVERNANCE_RUNBOOK.md. The handoff index marks prompt 04 as next unstarted feature.

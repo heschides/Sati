@@ -117,6 +117,8 @@ namespace Sati.Data
         private void EnsureAuditEventsAreAppendOnly()
         {
             NoteAmendmentPersistenceModel.ProtectWrites(ChangeTracker);
+            RecordsGovernanceModel.Validate(ChangeTracker);
+            AssessmentReviewPersistenceModel.ProtectWrites<ComprehensiveAssessment>(ChangeTracker);
             PayerBillingPersistenceModel.ProtectWrites(ChangeTracker);
             NoteAmendmentPersistenceModel.ProtectOriginalNotes<Note>(this);
             ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);
@@ -176,6 +178,7 @@ namespace Sati.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             FormWizardProgressPersistenceModel.Configure<Person>(modelBuilder);
+            AssessmentReviewPersistenceModel.Configure<ComprehensiveAssessment, Person, Form, Agency, User, DocumentArtifact>(modelBuilder);
             ConsumerSchedulePersistenceModel.Configure<Person>(modelBuilder);
             base.OnModelCreating(modelBuilder);
             ClearinghousePersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration>(modelBuilder);
@@ -563,6 +566,7 @@ namespace Sati.Data
             });
             ScheduledNoteMovePersistenceModel.Configure<Note>(modelBuilder);
             NoteAmendmentPersistenceModel.Configure<Note>(modelBuilder);
+            RecordsGovernanceModel.Configure<Agency, User>(modelBuilder);
             NoteAmendmentPersistenceModel.ConfigureClaimLine<Sati.Models.Billing.ClaimLine>(modelBuilder);
 
             modelBuilder.Entity<Form>(entity =>

@@ -192,6 +192,52 @@ public sealed class CrashObservabilityTests : IDisposable
     }
 
     [Fact]
+    public async Task BreadcrumbsAreDurableBoundedAndRecoveredWithTheCrashReference()
+    {
+        var now = new DateTime(2026, 10, 6, 23, 56, 0, DateTimeKind.Utc);
+        var user = User.Create(91, "synthetic-account", "Synthetic Person Name", "", "",
+            UserRole.CaseManager, null, 7);
+        var directory = Path.Combine(_root, "breadcrumb-state");
+        var state = State(directory, new SequenceEventReader([]), now);
+        await state.StartSessionAsync(user, new CapturingReporter());
+        for (var i = 0; i < 40; i++)
+            state.RecordBreadcrumb(DiagnosticOperation.CaseManagementNavigation,
+                i % 2 == 0 ? DiagnosticPhase.Started : DiagnosticPhase.Completed);
+        state.RecordBreadcrumb((DiagnosticOperation)999);
+        var path = Path.Combine(directory, "agency-7-agency.json");
+        var persisted = File.ReadAllText(path); // No heartbeat, exit, or flush callback required.
+        var marker = JsonSerializer.Deserialize<ApplicationRunMarker>(persisted, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.Equal(32, marker.Breadcrumbs!.Count);
+        Assert.Equal(9, marker.Breadcrumbs[0].Sequence);
+        Assert.Equal(40, marker.Breadcrumbs[^1].Sequence);
+        Assert.DoesNotContain("Synthetic Person Name", persisted);
+        state.MarkGracefulExit();
+        File.WriteAllText(path, persisted); // Simulate the marker surviving process termination.
+        var recovery = State(directory, new SequenceEventReader([]), now.AddMinutes(1));
+        await recovery.StartSessionAsync(user, new CapturingReporter());
+        var logs = string.Join("\n", Directory.GetFiles(Path.Combine(_root, "logs"), "*.jsonl").Select(File.ReadAllText));
+        Assert.Contains(marker.SessionReference, logs);
+        Assert.Contains("CaseManagementNavigation", logs);
+        Assert.Contains("Completed", logs);
+        recovery.MarkGracefulExit();
+    }
+
+    [Fact]
+    public void BreadcrumbReadbackRejectsUnknownOperationsAndInvalidPhases()
+    {
+        var now = DateTime.UtcNow;
+        var entries = new[]
+        {
+            new DiagnosticBreadcrumb(1, now, DiagnosticOperation.SupervisorNavigation, DiagnosticPhase.Started),
+            new DiagnosticBreadcrumb(2, now, (DiagnosticOperation)999, DiagnosticPhase.Started),
+            new DiagnosticBreadcrumb(3, now, DiagnosticOperation.SupervisorNavigation, (DiagnosticPhase)999)
+        };
+        var safe = DiagnosticBreadcrumbs.Sanitize(entries);
+        Assert.Single(safe);
+        Assert.Equal(1, safe[0].Sequence);
+    }
+
+    [Fact]
     public async Task MissingWerRecordRemainsPendingAndLaterMatchUpgradesWithoutNewReference()
     {
         var now = new DateTime(2026, 9, 10, 4, 15, 0, DateTimeKind.Utc);

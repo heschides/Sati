@@ -550,6 +550,12 @@ public sealed class CloudApiClient
             if (!string.IsNullOrWhiteSpace(body))
             {
                 using var document = JsonDocument.Parse(body);
+                if (response.StatusCode == HttpStatusCode.UnprocessableEntity &&
+                    document.RootElement.TryGetProperty("code", out var assessmentCode) &&
+                    assessmentCode.GetString() == "assessment_incomplete" &&
+                    document.RootElement.TryGetProperty("issues", out var assessmentIssues))
+                    throw new AssessmentValidationException(
+                        JsonSerializer.Deserialize<List<AssessmentValidationIssue>>(assessmentIssues.GetRawText(), JsonOptions) ?? []);
                 if (document.RootElement.TryGetProperty("errors", out var errors) &&
                     errors.ValueKind == JsonValueKind.Object)
                 {

@@ -6,6 +6,7 @@
              xmlns:viewmodels="clr-namespace:Sati.ViewModels"
              xmlns:supervisor="clr-namespace:Sati.ViewModels.Supervisor"
              xmlns:supervisorVms="clr-namespace:Sati.ViewModels.Supervisor"
+             xmlns:supervisorViews="clr-namespace:Sati.Views.Supervisor"
              xmlns:billingVms="clr-namespace:Sati.ViewModels.Billing"
              xmlns:financeVms="clr-namespace:Sati.ViewModels.Finance"
              xmlns:clientDocumentVms="clr-namespace:Sati.ViewModels.ClientDocuments"
@@ -1223,6 +1224,9 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type supervisorVms:PendingApprovalsViewModel}">
                 <views:PendingApprovalsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type supervisorVms:AssessmentReviewsViewModel}">
+                <supervisorViews:AssessmentReviewsView />
             </DataTemplate>
             <DataTemplate DataType="{x:Type supervisorVms:CheckRequestApprovalsViewModel}">
                 <views:CheckRequestApprovalsView />

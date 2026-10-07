@@ -5,7 +5,8 @@ namespace Sati.Contracts.V1;
 
 /// <summary>
 /// Sole owner of the stored shape of a consumer journal: named pages of paragraphs, each a
-/// sequence of text runs (bold, italic, underline) and checkboxes. Shared by <c>Sati.Api</c>
+/// sequence of text runs (emphasis, strike-through, highlight) and checkboxes. Also used by
+/// the single-page personal scratchpad. Shared by <c>Sati.Api</c>
 /// and the desktop so the writer that prepends a reminder and the editor that saves the page
 /// read and write one format.
 ///
@@ -67,13 +68,16 @@ public sealed class JournalDocument
                 Name = page.Name,
                 Paragraphs = page.Paragraphs.Select(paragraph => paragraph.Inlines
                     .Select(inline => inline.IsCheckbox
-                        ? new StoredInline { Checkbox = inline.IsChecked ? 2 : 1 }
+                        ? new StoredInline { Checkbox = inline.IsChecked ? 2 : 1,
+                            Number = NormalizeCheckboxNumber(inline.Number) }
                         : new StoredInline
                         {
                             Text = inline.Text,
                             Bold = inline.Bold,
                             Italic = inline.Italic,
-                            Underline = inline.Underline
+                            Underline = inline.Underline,
+                            Strikethrough = inline.Strikethrough,
+                            Highlight = NormalizeHighlight(inline.Highlight)
                         })
                     .ToList()).ToList()
             }).ToList()
@@ -143,9 +147,10 @@ public sealed class JournalDocument
                     .Select(paragraph => new JournalParagraph((paragraph ?? [])
                         .Where(inline => inline is not null)
                         .Select(inline => inline.Checkbox is 1 or 2
-                            ? JournalInline.Checkbox(inline.Checkbox == 2)
+                            ? JournalInline.Checkbox(inline.Checkbox == 2, NormalizeCheckboxNumber(inline.Number))
                             : JournalInline.Run(inline.Text ?? string.Empty,
-                                inline.Bold, inline.Italic, inline.Underline))
+                                inline.Bold, inline.Italic, inline.Underline,
+                                inline.Strikethrough, NormalizeHighlight(inline.Highlight)))
                         .Where(inline => inline.IsCheckbox || inline.Text.Length > 0)
                         .ToList()))
                     .ToList())));
@@ -160,6 +165,27 @@ public sealed class JournalDocument
             .Split('\n')
             .Select(JournalParagraph.FromText)
             .ToList();
+    }
+
+    private static TextHighlight NormalizeHighlight(TextHighlight value) =>
+        Enum.IsDefined(value) ? value : TextHighlight.None;
+
+    public const decimal MaximumCheckboxNumber = 1_000_000;
+
+    /// <summary>Optional positive value, up to two decimal places; invalid stored values are unnumbered.</summary>
+    public static decimal? NormalizeCheckboxNumber(decimal? value) =>
+        value is > 0 and <= MaximumCheckboxNumber && decimal.Round(value.Value, 2) == value.Value
+            ? value : null;
+
+    /// <summary>Personal checklist display only; never clinical completion or billable units.</summary>
+    public JournalChecklistTotals ChecklistTotals()
+    {
+        var checkboxes = Pages.SelectMany(page => page.Paragraphs).SelectMany(p => p.Inlines)
+            .Where(inline => inline.IsCheckbox).ToArray();
+        var numbered = checkboxes.Where(inline => NormalizeCheckboxNumber(inline.Number) is not null).ToArray();
+        return new JournalChecklistTotals(checkboxes.Length, checkboxes.Count(inline => inline.IsChecked),
+            numbered.Length, numbered.Sum(inline => inline.IsChecked ? inline.Number!.Value : 0),
+            numbered.Sum(inline => inline.Number!.Value));
     }
 
     // Short member names keep a long journal's stored size close to its text. The shape is
@@ -183,8 +209,11 @@ public sealed class JournalDocument
         [JsonPropertyName("b")] public bool Bold { get; set; }
         [JsonPropertyName("i")] public bool Italic { get; set; }
         [JsonPropertyName("u")] public bool Underline { get; set; }
+        [JsonPropertyName("s")] public bool Strikethrough { get; set; }
+        [JsonPropertyName("h")] public TextHighlight Highlight { get; set; }
         // 1 = unchecked, 2 = checked; absent for text.
         [JsonPropertyName("c")] public int Checkbox { get; set; }
+        [JsonPropertyName("n")] public decimal? Number { get; set; }
     }
 }
 
@@ -223,11 +252,20 @@ public sealed record JournalParagraph(IReadOnlyList<JournalInline> Inlines)
 
 /// <summary>A run of text with its marks, or a checkbox. A checkbox carries no text.</summary>
 public sealed record JournalInline(
-    string Text, bool Bold, bool Italic, bool Underline, bool IsCheckbox, bool IsChecked)
+    string Text, bool Bold, bool Italic, bool Underline, bool IsCheckbox, bool IsChecked,
+    bool Strikethrough = false, TextHighlight Highlight = TextHighlight.None, decimal? Number = null)
 {
-    public static JournalInline Run(string text, bool bold = false, bool italic = false, bool underline = false) =>
-        new(text, bold, italic, underline, IsCheckbox: false, IsChecked: false);
+    public static JournalInline Run(string text, bool bold = false, bool italic = false,
+        bool underline = false, bool strikethrough = false, TextHighlight highlight = TextHighlight.None) =>
+        new(text, bold, italic, underline, IsCheckbox: false, IsChecked: false, strikethrough, highlight);
 
-    public static JournalInline Checkbox(bool isChecked) =>
-        new(string.Empty, false, false, false, IsCheckbox: true, IsChecked: isChecked);
+    public static JournalInline Checkbox(bool isChecked, decimal? number = null) =>
+        new(string.Empty, false, false, false, IsCheckbox: true, IsChecked: isChecked,
+            Number: JournalDocument.NormalizeCheckboxNumber(number));
 }
+
+/// <summary>Closed palette: no arbitrary brushes, markup or executable objects are stored.</summary>
+public enum TextHighlight { None = 0, Yellow = 1, Green = 2, Blue = 3, Pink = 4 }
+
+public sealed record JournalChecklistTotals(int CheckboxCount, int CheckedCount,
+    int NumberedCount, decimal CheckedNumberTotal, decimal NumberTotal);

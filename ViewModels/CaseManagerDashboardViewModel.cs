@@ -1726,6 +1726,8 @@ CalendarViewModel calendarViewModel,
             return sortByLastName;
         }
 
+        public Task RefreshAfterAssessmentChangedAsync() => ReloadAfterExternalFormComplianceChangedAsync();
+
         private async Task ReloadAfterExternalFormComplianceChangedAsync()
         {
             var selectedPersonId = SelectedPerson?.Id;

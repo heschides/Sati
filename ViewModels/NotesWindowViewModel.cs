@@ -107,6 +107,13 @@ namespace Sati.ViewModels
             if (_restoringSelection)
                 return;
 
+            if (Amendments?.CanChangeSelectedNote == false)
+            {
+                Amendments.StatusMessage = "Save your correction proposal and wait for the operation to finish before selecting another note.";
+                RestoreSelection(oldValue);
+                return;
+            }
+
             if (newValue is null)
             {
                 // The row was dropped. Only a locked view follows it back to a
@@ -114,6 +121,7 @@ namespace Sati.ViewModels
                 // the client stays selected either way.
                 if (NoteEntry.IsLocked)
                     NoteEntry.ReturnToNewNote();
+                if (Amendments is not null) _ = Amendments.ShowNoteAsync(null);
                 return;
             }
 
@@ -124,6 +132,8 @@ namespace Sati.ViewModels
             }
 
             NoteEntry.EnterViewMode(newValue);
+            if (Amendments is not null)
+                _ = Amendments.ShowNoteAsync(newValue.Status == NoteStatus.Approved ? newValue.Id : null);
         }
 
         private void RestoreSelection(Note? previous)

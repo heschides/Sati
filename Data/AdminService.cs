@@ -169,7 +169,10 @@ public sealed class AdminService(
             throw new ArgumentException("A reason is required to place a legal hold.", nameof(request));
 
         await using var context = contextFactory.CreateDbContext();
-        await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        actor = await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        RecordsGovernanceRules.RequireAdmin(actor.ToAgencyActor());
+        var governanceState = await RecordsGovernanceWorkflow.LockAsync(context, actor.AgencyId, cancellationToken);
         var personExists = await context.People.AsNoTracking().AnyAsync(candidate =>
             candidate.Id == request.PersonId && candidate.AgencyId == actor.AgencyId,
             cancellationToken);
@@ -186,11 +189,14 @@ public sealed class AdminService(
             EffectiveAtUtc = request.EffectiveAtUtc
         };
         hold.PlacedByUserId = actor.Id;
+        governanceState.Revision++;
         context.LegalHolds.Add(hold);
         LocalAuditTrail.Record(
             context, actor, LocalAuditActions.LegalHoldPlaced, "LegalHold",
             metadataJson: JsonSerializer.Serialize(new { personId = request.PersonId }));
         await context.SaveChangesAsync(cancellationToken);
+        await LegacyRecordsHoldBridge.ImportActiveAsync<LegalHold>(context, actor.ToAgencyActor(), hold.Id, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return ToLegalHoldDto(hold);
     }
 
@@ -207,14 +213,12 @@ public sealed class AdminService(
         if (hold.IsReleased)
             throw new InvalidOperationException("This legal hold has already been released.");
 
-        hold.IsReleased = true;
-        hold.ReleasedByUserId = actor.Id;
-        hold.ReleasedAtUtc = DateTime.UtcNow;
-        hold.ReleaseNote = string.IsNullOrWhiteSpace(releaseNote) ? null : releaseNote.Trim();
-        LocalAuditTrail.Record(
-            context, actor, LocalAuditActions.LegalHoldReleased, "LegalHold",
-            metadataJson: JsonSerializer.Serialize(new { legalHoldId, personId = hold.PersonId }));
-        await context.SaveChangesAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        actor = await LocalTenantAccess.EnsureSessionAsync(context, sessionService);
+        RecordsGovernanceRules.RequireAdmin(actor.ToAgencyActor());
+        await LegacyRecordsHoldBridge.RequestReleaseAsync<LegalHold>(context, actor.ToAgencyActor(), legalHoldId, releaseNote,
+            (action, id, revision) => LocalAuditTrail.Record(context, actor, action, "RecordsHold", metadataJson: JsonSerializer.Serialize(new { holdId = id, revision })), DateTime.UtcNow, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return ToLegalHoldDto(hold);
     }
 
@@ -286,17 +290,23 @@ public sealed class AdminService(
         if (!actorIsCurrentAdmin)
             throw new UnauthorizedAccessException("Only a current Admin can delete a consumer.");
 
+        await RecordsGovernanceWorkflow.LockAsync(context, actor.AgencyId, cancellationToken);
         var person = await context.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
             candidate.Id == personId && candidate.AgencyId == actor.AgencyId &&
             context.Users.Any(user => user.Id == candidate.UserId && user.AgencyId == actor.AgencyId),
             cancellationToken);
         if (person is null)
             throw new InvalidOperationException("This consumer was not found in your agency.");
+        var legacyActive = await context.LegalHolds.AnyAsync(h => h.AgencyId == actor.AgencyId && h.PersonId == personId && !h.IsReleased, cancellationToken);
+        var preservation = await LegacyRecordsHoldBridge.PersonStatusAsync(context, actor.AgencyId, personId, legacyActive, cancellationToken);
+        if (preservation != LegalHoldStatus.Clear) throw new InvalidOperationException(ConsumerDeletionRules.LegalHoldActiveMessage);
         if (person.Revision != expectedRevision)
             throw new InvalidOperationException(
                 "This consumer changed after you selected them. Refresh and review the current record before trying again.");
         if (await context.ChatRooms.AsNoTracking().AnyAsync(room => room.PersonId == personId, cancellationToken))
             throw new InvalidOperationException(ConsumerDeletionRules.HasChatHistoryMessage);
+        if (await context.Set<Sati.Models.Assessments.AssessmentSubmission>().AnyAsync(x => x.PersonId == personId, cancellationToken))
+            throw new InvalidOperationException(ConsumerDeletionRules.HasAssessmentReviewHistoryMessage);
         if (await context.FrozenSignatureDocuments.AsNoTracking().AnyAsync(document => document.PersonId == personId, cancellationToken))
             throw new InvalidOperationException(SignatureRules.RetainedHistoryMessage);
         if (!ConsumerDeletionRules.IsWithinDeletionWindow(person.CreatedAtUtc, DateTime.UtcNow))
@@ -652,12 +662,16 @@ public sealed class AdminService(
         if (!actorIsCurrentAdmin)
             throw new UnauthorizedAccessException("Only a current Admin can delete test consumer data.");
 
+        await RecordsGovernanceWorkflow.LockAsync(context, actor.AgencyId, cancellationToken);
         var person = await context.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
             candidate.Id == personId && candidate.AgencyId == actor.AgencyId &&
             context.Users.Any(user => user.Id == candidate.UserId && user.AgencyId == actor.AgencyId),
             cancellationToken);
         if (person is null)
             throw new InvalidOperationException("This consumer was not found in your agency.");
+        var legacyActive = await context.LegalHolds.AnyAsync(h => h.AgencyId == actor.AgencyId && h.PersonId == personId && !h.IsReleased, cancellationToken);
+        var preservation = await LegacyRecordsHoldBridge.PersonStatusAsync(context, actor.AgencyId, personId, legacyActive, cancellationToken);
+        if (preservation != LegalHoldStatus.Clear) throw new InvalidOperationException(ConsumerDeletionRules.LegalHoldActiveMessage);
         if (!person.IsTestData)
             throw new InvalidOperationException(
                 "This consumer was not marked as Test when created and cannot be deleted with the test-data tool.");
@@ -667,6 +681,8 @@ public sealed class AdminService(
 
         if (await context.ChatRooms.AsNoTracking().AnyAsync(room => room.PersonId == personId, cancellationToken))
             throw new InvalidOperationException(ConsumerDeletionRules.HasChatHistoryMessage);
+        if (await context.Set<Sati.Models.Assessments.AssessmentSubmission>().AnyAsync(x => x.PersonId == personId, cancellationToken))
+            throw new InvalidOperationException(ConsumerDeletionRules.HasAssessmentReviewHistoryMessage);
         if (await context.FrozenSignatureDocuments.AsNoTracking().AnyAsync(document => document.PersonId == personId, cancellationToken))
             throw new InvalidOperationException(SignatureRules.RetainedHistoryMessage);
 

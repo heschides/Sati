@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
+using Sati.Models.Assessments;
 using Sati.Models.Billing;
 
 namespace Sati.Api.Data;
@@ -95,6 +96,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         FormWizardProgressPersistenceModel.Configure<ServerPerson>(modelBuilder);
+        AssessmentReviewPersistenceModel.Configure<ServerComprehensiveAssessment, ServerPerson, ServerForm, ServerAgency, ServerUser, ServerDocumentArtifact>(modelBuilder);
         ConsumerSchedulePersistenceModel.Configure<ServerPerson>(modelBuilder);
         ClearinghousePersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration>(modelBuilder);
         BillingCorrectionPersistenceModel.Configure<ServerAgency, ServerUser, ServerBillingPeriod, ServerEdiGeneration, ServerClaimLine, ServerRemittanceDeposit>(modelBuilder);
@@ -341,7 +343,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
         });
         ScheduledNoteMovePersistenceModel.Configure<ServerNote>(modelBuilder);
         NoteAmendmentPersistenceModel.Configure<ServerNote>(modelBuilder);
-        NoteAmendmentPersistenceModel.ConfigureClaimLine<ServerClaimLine>(modelBuilder);
+        RecordsGovernanceModel.Configure<ServerAgency, ServerUser>(modelBuilder);
+            NoteAmendmentPersistenceModel.ConfigureClaimLine<ServerClaimLine>(modelBuilder);
 
         modelBuilder.Entity<ServerSettings>(entity =>
         {
@@ -830,6 +833,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     private void EnsureAuditEventsAreAppendOnly()
     {
         NoteAmendmentPersistenceModel.ProtectWrites(ChangeTracker);
+            RecordsGovernanceModel.Validate(ChangeTracker);
+        AssessmentReviewPersistenceModel.ProtectWrites<ServerComprehensiveAssessment>(ChangeTracker);
         PayerBillingPersistenceModel.ProtectWrites(ChangeTracker);
         NoteAmendmentPersistenceModel.ProtectOriginalNotes<ServerNote>(this);
         ClearinghousePersistenceModel.ProtectWrites(ChangeTracker);

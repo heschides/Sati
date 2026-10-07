@@ -21,8 +21,11 @@ compiler/analyzer warnings remain outside this feature's scope.
 
 ## Workflow and authority
 
-In Notes Log, open **Approved amendments**, load the approved-note queue, and select
-the original. The current case manager proposes corrected narrative, service date,
+In Notes Log, select an approved note and open **Note corrections**. Its correction
+history follows that selection; no separate authoring queue is loaded. An unsaved
+proposal prevents switching the selected note. On the Supervisor page, **Note
+corrections** loads the independently reviewable submitted-proposal queue, using
+a separate workspace. The current case manager proposes corrected narrative, service date,
 duration, start time, and Unbilled status with a reason. Save preserves a draft
 version; Submit preserves a separate submitted version. A current supervisor with
 direct or agency-wide reach can return, reject, or approve the submitted aggregate

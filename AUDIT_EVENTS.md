@@ -1,5 +1,17 @@
 # Audit events
 
+## October 7 — Assessment review (source only)
+
+`assessment.submitted`, `assessment.comment`, `assessment.flag`, `assessment.resolve`,
+`assessment.respond`, `assessment.return`, `assessment.approve` and
+`assessment.pdf-generated` commit with their corresponding clinical snapshot/decision/
+artifact. Metadata cites submission ID, assessment version, cycle, rules version,
+Form ID, content SHA-256 and artifact ID where applicable. Existing `form.attested`
+also cites this version when explicit dated attestation accompanies approval.
+`assessment.legacy-reopened` cites version and new revision only. Clinical answers,
+review comment/reason text and consumer names remain in access-controlled clinical
+records, not general audit metadata. Failed/conflicted actions append nothing.
+
 *Current as of 2026-10-03.*
 
 `billing-clearinghouse.claimmd-test-account-onboarded` identifies the human Admin,
@@ -451,3 +463,22 @@ Retry replay does not create another audit or version. Claim-correction history 
 retains `AmendedNoteVersionId` and frozen corrected financial facts. A failed audit
 write rolls back intermediate aggregate and version writes. History is append-only;
 activation and controlled rollback are in `NOTE_AMENDMENTS_RUNBOOK.md`.
+
+
+## Records governance — October 6, 2026, unreleased
+
+The legacy `legal-hold.released` single-Admin action above is superseded for new decisions. Old
+release routes now emit `records.hold.requestrelease` and keep their row active until approval.
+Shared writers emit `records.hold.place`, `.amend`, `.requestrelease`, `.approverelease` and
+`.rejectrelease`, with hold UUID/revision only; policy writes emit `records.policy.created` with
+policy ID/version; persisted previews emit `records.retention.previewed` with plan/policy/version.
+Reasons, case references and issuing authority stay in agency-scoped hold events/policy rows,
+never unrestricted operational metadata. Decisions and audit commit in the same transaction.
+
+Migration preserves legacy placement evidence in a linked revision-1 hold event; original rows
+and historical release evidence stay unchanged. Retention batches append actor, operation, plan,
+checkpoint/count/result and the plan/epoch-bound preservation receipt. Receipts contain digest,
+UTC evidence time, adapter and opaque recovery UUID, never an access URI/token/path or narrative.
+The checkpoint and deletion commit together. Policy/hold-event/batch history is append-only,
+and governance aggregate/checkpoint deletion is refused. Runtime execution is PolicyOnly;
+synthetic batch evidence is not a real purge or backup/restore attestation.

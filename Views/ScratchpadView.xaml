@@ -88,11 +88,10 @@
             </Setter>
         </Style>
 
-        <Style x:Key="AgendaTextBoxStyle" TargetType="TextBox">
+        <Style x:Key="AgendaTextBoxStyle" TargetType="views:ScratchpadEditor">
             <Setter Property="FontFamily" Value="{StaticResource NarrativeFont}" />
             <Setter Property="FontSize" Value="{Binding ScratchpadFontSize}" />
             <Setter Property="AcceptsReturn" Value="True" />
-            <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="SpellCheck.IsEnabled" Value="True" />
             <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
             <Setter Property="VerticalAlignment" Value="Stretch" />
@@ -396,13 +395,31 @@
                                 BorderBrush="{DynamicResource BorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="5">
-                            <TextBox x:Name="TodaysWorkBox"
-                                     services:TextShortcutTarget.IsEnabled="True"
-                                     AutomationProperties.Name="Today's Work freeform scratchpad"
-                                     AutomationProperties.HelpText="Unstructured notes for today. Scheduled client work is listed above."
-                                     Style="{StaticResource AgendaTextBoxStyle}"
-                                     Text="{Binding ScratchpadContent, UpdateSourceTrigger=PropertyChanged}"
-                                     KeyDown="AgendaBox_KeyDown" />
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <views:ScratchpadEditor x:Name="TodaysWorkBox"
+                                                       services:TextShortcutTarget.IsEnabled="True"
+                                                       AutomationProperties.Name="Today's Work freeform scratchpad"
+                                                       AutomationProperties.HelpText="Unstructured notes for today. Scheduled client work is listed above."
+                                                       Style="{StaticResource AgendaTextBoxStyle}"
+                                                       StoredContent="{Binding ScratchpadContent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Border Grid.Row="1" HorizontalAlignment="Right" Margin="0,5,0,0" Padding="8,4"
+                                        Background="{DynamicResource SurfaceRaisedBrush}"
+                                        BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4"
+                                        Visibility="{Binding HasNumberedCheckboxes, ElementName=TodaysWorkBox,
+                                            Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTip="Sum of checked numbered boxes / sum of all numbered boxes. Plain checkboxes are excluded.">
+                                    <TextBlock Text="{Binding ChecklistProgress, ElementName=TodaysWorkBox}"
+                                               TextWrapping="Wrap"
+                                               FontSize="{Binding ScratchpadFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               AutomationProperties.Name="Today's Work numbered checklist progress"
+                                               AutomationProperties.LiveSetting="Polite" />
+                                </Border>
+                            </Grid>
                         </Border>
                     </Grid>
                 </TabItem>
@@ -463,13 +480,30 @@
                                 </StackPanel>
                             </Border>
                         </StackPanel>
-                        <TextBox x:Name="TomorrowAgendaBox"
-                                 services:TextShortcutTarget.IsEnabled="True"
-                                 Grid.Row="2"
-                                 AutomationProperties.Name="Tomorrow's Agenda for the next workday"
-                                 Style="{StaticResource AgendaTextBoxStyle}"
-                                 Text="{Binding TomorrowAgendaContent, UpdateSourceTrigger=PropertyChanged}"
-                                 KeyDown="AgendaBox_KeyDown" />
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <views:ScratchpadEditor x:Name="TomorrowAgendaBox"
+                                                   services:TextShortcutTarget.IsEnabled="True"
+                                                   AutomationProperties.Name="Tomorrow's Agenda for the next workday"
+                                                   Style="{StaticResource AgendaTextBoxStyle}"
+                                                   StoredContent="{Binding TomorrowAgendaContent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <Border Grid.Row="1" HorizontalAlignment="Right" Margin="0,5,0,0" Padding="8,4"
+                                    Background="{DynamicResource SurfaceRaisedBrush}"
+                                    BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4"
+                                    Visibility="{Binding HasNumberedCheckboxes, ElementName=TomorrowAgendaBox,
+                                        Converter={StaticResource BoolToVisibilityConverter}}"
+                                    ToolTip="Sum of checked numbered boxes / sum of all numbered boxes. Plain checkboxes are excluded.">
+                                <TextBlock Text="{Binding ChecklistProgress, ElementName=TomorrowAgendaBox}"
+                                           TextWrapping="Wrap"
+                                           FontSize="{Binding ScratchpadFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           AutomationProperties.Name="Tomorrow's Agenda numbered checklist progress"
+                                           AutomationProperties.LiveSetting="Polite" />
+                            </Border>
+                        </Grid>
                     </Grid>
                 </TabItem>
 

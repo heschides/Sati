@@ -243,7 +243,7 @@ public sealed class TenantAuthorizationTests
 
         Assert.NotNull(release);
         Assert.Equal("Sati.Api", release["product"]);
-        Assert.Equal("1.3.36", release["releaseVersion"]);
+        Assert.Equal("1.3.37", release["releaseVersion"]);
     }
 
     [Fact]
@@ -1967,6 +1967,28 @@ public sealed class TenantAuthorizationTests
         Assert.Equal(1, savedEvent.AgencyId);
         Assert.Equal(12, savedEvent.ActorUserId);
         Assert.Equal("Scratchpad", savedEvent.ResourceType);
+    }
+
+    [Theory]
+    [InlineData("today")]
+    [InlineData("tomorrow")]
+    public async Task FormattedNumberedScratchpadRoundTripsThroughApi(string day)
+    {
+        using var owner = await _factory.CreateAuthenticatedClientAsync("case-manager-one");
+        var original = await owner.GetFromJsonAsync<ScratchpadDto>($"/api/v1/scratchpad/{day}");
+        var document = new JournalDocument([new JournalPage("Scratchpad", [new JournalParagraph([
+            JournalInline.Checkbox(true, 2), JournalInline.Checkbox(false, 3), JournalInline.Checkbox(false, 5),
+            JournalInline.Run("Synthetic task", bold: true, italic: true, underline: true,
+                strikethrough: true, highlight: TextHighlight.Pink)])])]);
+        var stored = document.Serialize();
+        var save = await owner.PutAsJsonAsync("/api/v1/scratchpad", new SaveScratchpadRequest(original!.Id, stored, original.Revision));
+        Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        var reloaded = await owner.GetFromJsonAsync<ScratchpadDto>($"/api/v1/scratchpad/{day}");
+        Assert.Equal(stored, reloaded!.Content);
+        var read = JournalDocument.Parse(reloaded.Content);
+        Assert.Equal(document.Pages[0], read.Pages[0]);
+        Assert.Equal(2, read.ChecklistTotals().CheckedNumberTotal);
+        Assert.Equal(10, read.ChecklistTotals().NumberTotal);
     }
 
     [Fact]

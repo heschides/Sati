@@ -206,7 +206,7 @@ public sealed class ScratchpadThemeTests
 
                 void AssertEditor(string name)
                 {
-                    var editor = WpfUiHarness.FindByAutomationName<TextBox>(view, name);
+                    var editor = WpfUiHarness.FindByAutomationName<ScratchpadEditor>(view, name);
                     Assert.Equal(expected.Color, Assert.IsType<SolidColorBrush>(editor.Foreground).Color);
                     Assert.Equal(expected.Color, Assert.IsType<SolidColorBrush>(editor.CaretBrush).Color);
                 }

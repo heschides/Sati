@@ -1,6 +1,7 @@
 <UserControl x:Class="Sati.Views.ScratchpadHistoryView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Sati.Views"
              FontSize="14" SizeChanged="HistoryView_SizeChanged">
     <UserControl.Resources>
         <Style x:Key="HistoryTextBoxStyle"
@@ -194,14 +195,14 @@
                                                                TextWrapping="Wrap"
                                                                Foreground="{DynamicResource TextMutedBrush}" />
                                                 </StackPanel>
-                                                <TextBox Text="{Binding DisplayContent, Mode=OneWay}"
+                                                <views:ScratchpadEditor StoredContent="{Binding Content, Mode=OneWay}"
                                                          Margin="0,8,0,0"
                                                          IsReadOnly="True"
                                                          AcceptsReturn="True"
-                                                         TextWrapping="Wrap"
                                                          BorderThickness="0"
                                                          Padding="0"
                                                          Background="Transparent"
+                                                         AutomationProperties.Name="Original scratchpad entry (locked)"
                                                          FontFamily="{StaticResource NarrativeFont}"
                                                          FontSize="{Binding FontSize,
                                                              RelativeSource={RelativeSource AncestorType=UserControl}}"

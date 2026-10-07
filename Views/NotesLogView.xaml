@@ -48,7 +48,7 @@
              view: the grid selection loads the note into it, locked. -->
         <TabControl x:Name="NoteEntryPanel" Grid.Row="0" Grid.RowSpan="3" Grid.Column="0">
             <TabItem Header="Note"><ContentControl Content="{Binding NoteEntry}" /></TabItem>
-            <TabItem Header="Approved amendments"><ContentControl Content="{Binding Amendments}" /></TabItem>
+            <TabItem Header="Note corrections"><ContentControl Content="{Binding Amendments}" /></TabItem>
         </TabControl>
 
         <!-- ═══ FILTERS ═══

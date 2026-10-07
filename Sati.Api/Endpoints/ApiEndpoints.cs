@@ -46,10 +46,12 @@ internal static partial class ApiEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<ValidatedActorFilter>()
             .AddEndpointFilter<SingleAttemptWriteFilter>()
-            .AddEndpointFilter<NoteAmendmentDomainFilter>();
+            .AddEndpointFilter<NoteAmendmentDomainFilter>()
+            .AddEndpointFilter<AssessmentReviewDomainFilter>();
         MapProfile(api);
         MapAudit(api);
         MapAdmin(api);
+        MapRecordsGovernance(api);
         MapUsers(api);
         MapAccountLifecycle(api);
         MapSupervisor(api);
@@ -533,12 +535,16 @@ internal static partial class ApiEndpoints
                 IsolationLevel.Serializable,
                 cancellationToken);
 
+            await RecordsGovernanceWorkflow.LockAsync(db, actor.AgencyId, cancellationToken);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId &&
                 db.Users.Any(user => user.Id == candidate.UserId && user.AgencyId == actor.AgencyId),
                 cancellationToken);
             if (person is null)
                 return Results.NotFound();
+            var legacyActive = await db.LegalHolds.AnyAsync(h => h.AgencyId == actor.AgencyId && h.PersonId == personId && !h.IsReleased, cancellationToken);
+            var preservation = await LegacyRecordsHoldBridge.PersonStatusAsync(db, actor.AgencyId, personId, legacyActive, cancellationToken);
+            if (preservation != LegalHoldStatus.Clear) return Results.Conflict(new ApiErrorDto("consumer_legal_hold", ConsumerDeletionRules.LegalHoldActiveMessage, ""));
             if (!person.IsTestData)
             {
                 return Results.Conflict(new ApiErrorDto(
@@ -551,6 +557,8 @@ internal static partial class ApiEndpoints
             if (await db.FrozenSignatureDocuments.AsNoTracking().AnyAsync(document => document.PersonId == personId &&
                 document.AgencyId == actor.AgencyId, cancellationToken))
                 return Results.Conflict(new ApiErrorDto("consumer_has_signature_history", SignatureRules.RetainedHistoryMessage, string.Empty));
+            if (await db.Set<Sati.Models.Assessments.AssessmentSubmission>().AnyAsync(x => x.PersonId == personId, cancellationToken))
+                return Results.Conflict(new ApiErrorDto("consumer_has_assessment_review_history", ConsumerDeletionRules.HasAssessmentReviewHistoryMessage, string.Empty));
             if (await db.ChatRooms.AsNoTracking().AnyAsync(room => room.PersonId == personId &&
                 room.AgencyId == actor.AgencyId, cancellationToken))
                 return ChatRetainedConsumerConflict();
@@ -703,8 +711,7 @@ internal static partial class ApiEndpoints
 
         // Legal holds — the fail-closed gate rule-3 deletion checks before removing a record.
         // Deliberately narrower than OPERATIONS.md's full record-class/scope hold model; this
-        // exists only to gate consumer deletion. Release is single-admin for v1, a documented
-        // shortfall against OPERATIONS.md's dual-control requirement.
+        // preserves existing person holds. Release now requests independent governance review.
         api.MapPost("/admin/legal-holds", async Task<IResult> (
             PlaceLegalHoldRequest request,
             ClaimsPrincipal principal,
@@ -723,6 +730,8 @@ internal static partial class ApiEndpoints
                 });
             }
 
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            var governanceState = await RecordsGovernanceWorkflow.LockAsync(db, actor.AgencyId, cancellationToken);
             var personExists = await db.People.AsNoTracking().AnyAsync(candidate =>
                 candidate.Id == request.PersonId && candidate.AgencyId == actor.AgencyId,
                 cancellationToken);
@@ -739,6 +748,7 @@ internal static partial class ApiEndpoints
                 EffectiveAtUtc = request.EffectiveAtUtc,
                 PlacedByUserId = actor.UserId
             };
+            governanceState.Revision++;
             db.LegalHolds.Add(hold);
             auditTrail.Record(
                 actor,
@@ -746,6 +756,8 @@ internal static partial class ApiEndpoints
                 "LegalHold",
                 metadataJson: JsonSerializer.Serialize(new { personId = request.PersonId }));
             await db.SaveChangesAsync(cancellationToken);
+            await LegacyRecordsHoldBridge.ImportActiveAsync<ServerLegalHold>(db, actor.ToAgencyActor(), hold.Id, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return Results.Ok(ToLegalHoldDto(hold));
         });
 
@@ -774,16 +786,14 @@ internal static partial class ApiEndpoints
                     string.Empty));
             }
 
-            hold.IsReleased = true;
-            hold.ReleasedByUserId = actor.UserId;
-            hold.ReleasedAtUtc = DateTime.UtcNow;
-            hold.ReleaseNote = string.IsNullOrWhiteSpace(request.ReleaseNote) ? null : request.ReleaseNote.Trim();
-            auditTrail.Record(
-                actor,
-                AuditActions.LegalHoldReleased,
-                "LegalHold",
-                metadataJson: JsonSerializer.Serialize(new { legalHoldId, personId = hold.PersonId }));
-            await db.SaveChangesAsync(cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            try {
+                await LegacyRecordsHoldBridge.RequestReleaseAsync<ServerLegalHold>(db, actor.ToAgencyActor(), legalHoldId, request.ReleaseNote,
+                    (action, id, revision) => auditTrail.Record(actor, action, "RecordsHold", metadataJson: JsonSerializer.Serialize(new { holdId = id, revision })), DateTime.UtcNow, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            } catch (InvalidOperationException) {
+                return Results.Conflict(new ApiErrorDto(RecordsGovernanceRules.ConflictCode, "The hold remains active. Independent release approval is required in Records governance.", ""));
+            }
             return Results.Ok(ToLegalHoldDto(hold));
         });
 
@@ -850,11 +860,15 @@ internal static partial class ApiEndpoints
             await using var transaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable, cancellationToken);
 
+            await RecordsGovernanceWorkflow.LockAsync(db, actor.AgencyId, cancellationToken);
             var person = await db.People.AsNoTracking().SingleOrDefaultAsync(candidate =>
                 candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
                 cancellationToken);
             if (person is null)
                 return Results.NotFound();
+            var legacyActive = await db.LegalHolds.AnyAsync(h => h.AgencyId == actor.AgencyId && h.PersonId == personId && !h.IsReleased, cancellationToken);
+            var preservation = await LegacyRecordsHoldBridge.PersonStatusAsync(db, actor.AgencyId, personId, legacyActive, cancellationToken);
+            if (preservation != LegalHoldStatus.Clear) return Results.Conflict(new ApiErrorDto("consumer_legal_hold", ConsumerDeletionRules.LegalHoldActiveMessage, ""));
             if (request.ExpectedRevision != person.Revision)
                 return StalePersonConflict();
             if (await db.FrozenSignatureDocuments.AsNoTracking().AnyAsync(document => document.PersonId == personId &&
@@ -863,6 +877,8 @@ internal static partial class ApiEndpoints
             if (await db.ChatRooms.AsNoTracking().AnyAsync(room => room.PersonId == personId &&
                 room.AgencyId == actor.AgencyId, cancellationToken))
                 return ChatRetainedConsumerConflict();
+            if (await db.Set<Sati.Models.Assessments.AssessmentSubmission>().AnyAsync(x => x.PersonId == personId, cancellationToken))
+                return Results.Conflict(new ApiErrorDto("consumer_has_assessment_review_history", ConsumerDeletionRules.HasAssessmentReviewHistoryMessage, string.Empty));
             if (!ConsumerDeletionRules.IsWithinDeletionWindow(person.CreatedAtUtc, DateTime.UtcNow))
             {
                 return Results.Conflict(new ApiErrorDto(
@@ -3663,9 +3679,15 @@ internal static partial class ApiEndpoints
             if (assessment is null ||
                 !await TenantAccess.CanAuthorAssessmentAsync(db, actor, assessment, cancellationToken))
                 return Results.NotFound();
-            if (assessment.Status is "Approved" or "Superseded") return Results.Conflict(new ApiErrorDto("assessment_locked", "Approved assessment versions cannot be changed.", string.Empty));
+            if (!AssessmentReviewRules.CanEdit(assessment.Status)) return Results.Conflict(new ApiErrorDto("assessment_locked", "Approved assessment versions cannot be changed.", string.Empty));
             if (request.ExpectedRevision != assessment.Revision)
                 return StaleAssessmentConflict();
+            try
+            {
+                var document = AssessmentReviewRules.Parse(request.DocumentJson);
+                await ValidateAssessmentProvidersAsync(db, actor.AgencyId, assessment.PersonId, document, AssessmentReviewRules.Parse(assessment.DocumentJson), cancellationToken);
+            }
+            catch (AssessmentValidationException ex) { return AssessmentValidationResult(ex); }
             assessment.DocumentJson = request.DocumentJson;
             assessment.UpdatedAt = DateTime.UtcNow;
             assessment.Revision++;
@@ -3681,38 +3703,7 @@ internal static partial class ApiEndpoints
             return Results.Ok(ContractMapper.ToAssessment(assessment));
         });
 
-        api.MapPost("/assessments/{assessmentId:int}/submit", async Task<IResult> (
-            int assessmentId, int authorUserId, int expectedRevision,
-            ClaimsPrincipal principal, ApiDbContext db,
-            AuditTrail auditTrail, CancellationToken cancellationToken) =>
-        {
-            var actor = Actor.From(principal);
-            if (!await IsComprehensiveAssessmentAuthoringEnabledAsync(
-                    db, actor.AgencyId, cancellationToken))
-                return Results.NotFound();
-            var assessment = await db.ComprehensiveAssessments.SingleOrDefaultAsync(x => x.Id == assessmentId, cancellationToken);
-            if (assessment is null || authorUserId != actor.UserId ||
-                !await TenantAccess.CanAuthorAssessmentAsync(db, actor, assessment, cancellationToken))
-                return Results.NotFound();
-            if (assessment.Status is not ("Draft" or "Returned"))
-                return Results.Conflict(new ApiErrorDto("assessment_locked", "This assessment is not editable.", string.Empty));
-            if (expectedRevision != assessment.Revision)
-                return StaleAssessmentConflict();
-            assessment.Status = "ReadyForReview";
-            assessment.SubmittedAt = DateTime.UtcNow;
-            assessment.UpdatedAt = assessment.SubmittedAt.Value;
-            assessment.Revision++;
-            auditTrail.Record(actor, AuditActions.AssessmentSubmitted, "Assessment", assessmentId);
-            try
-            {
-                await db.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                return StaleAssessmentConflict();
-            }
-            return Results.Ok(ContractMapper.ToAssessment(assessment));
-        });
+        MapAssessmentReview(api);
 
         api.MapGet("/people/{personId:int}/pcp-source", async Task<IResult> (
             int personId, int preferredAuthorUserId, ClaimsPrincipal principal, ApiDbContext db, CancellationToken cancellationToken) =>

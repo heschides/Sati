@@ -208,7 +208,10 @@ namespace Sati.ViewModels.Children
 
                 var tomorrowSaved = !tomorrowDirty ||
                     (!HasTomorrowAgendaConflict && await SaveTomorrowCoreAsync());
-                return todaySaved && tomorrowSaved;
+                // A successful request confirms its captured document, not edits
+                // made while that request was in flight. Do not close or roll over
+                // while the visible document still needs another save.
+                return todaySaved && tomorrowSaved && !HasUnsavedChanges;
             }
             finally
             {
@@ -524,11 +527,12 @@ namespace Sati.ViewModels.Children
             if (!IsTodayDirty)
                 return true;
 
-            _scratchpad.Content = ScratchpadContent;
+            var savedContent = ScratchpadContent;
+            _scratchpad.Content = savedContent;
             try
             {
                 await _scratchpadService.SaveAsync(_scratchpad);
-                _lastSavedScratchpadContent = ScratchpadContent;
+                _lastSavedScratchpadContent = savedContent;
                 HasScratchpadConflict = false;
                 ScratchpadConflictMessage = string.Empty;
                 return true;
@@ -565,11 +569,12 @@ namespace Sati.ViewModels.Children
             if (!IsTomorrowDirty)
                 return true;
 
-            _tomorrowAgenda.Content = TomorrowAgendaContent;
+            var savedContent = TomorrowAgendaContent;
+            _tomorrowAgenda.Content = savedContent;
             try
             {
                 await _scratchpadService.SaveAsync(_tomorrowAgenda);
-                _lastSavedTomorrowAgendaContent = TomorrowAgendaContent;
+                _lastSavedTomorrowAgendaContent = savedContent;
                 HasTomorrowAgendaConflict = false;
                 TomorrowAgendaConflictMessage = string.Empty;
                 return true;

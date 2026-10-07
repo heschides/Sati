@@ -1,0 +1,34 @@
+<UserControl x:Class="Sati.Views.RecordsGovernanceView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="16">
+        <TextBlock Text="Records governance" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="Retention is disabled (PolicyOnly). A preview does not authorize deletion. Holds remain active while release is awaiting independent approval." TextWrapping="Wrap" Margin="0,8" />
+        <Button Content="Load governance records" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
+        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" Margin="0,8" />
+        <TextBlock Text="Holds" FontWeight="SemiBold" />
+        <ListBox ItemsSource="{Binding Holds}" SelectedItem="{Binding SelectedHold}" MaxHeight="180" IsEnabled="{Binding CanWork}" AutomationProperties.Name="Agency preservation holds">
+            <ListBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="Wrap"><Run Text="{Binding Scope, Mode=OneWay}" /><Run Text="; class: " /><Run Text="{Binding RecordClass, Mode=OneWay, TargetNullValue=All}" /><Run Text="; person ID: " /><Run Text="{Binding PersonId, Mode=OneWay, TargetNullValue=None}" /><Run Text="; record ID: " /><Run Text="{Binding RecordId, Mode=OneWay, TargetNullValue=None}" /><Run Text="; revision " /><Run Text="{Binding Revision, Mode=OneWay}" /><Run Text="; released: " /><Run Text="{Binding IsReleased, Mode=OneWay}" /><Run Text="; release requester: " /><Run Text="{Binding ReleaseRequestedById, Mode=OneWay, TargetNullValue=None}" /></TextBlock></DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+        <StackPanel IsEnabled="{Binding CanWork}">
+            <TextBlock Text="Preservation scope" /><ComboBox ItemsSource="{Binding Scopes}" SelectedItem="{Binding Scope}" AutomationProperties.Name="Preservation scope" />
+            <CheckBox Content="All record classes" IsChecked="{Binding AllRecordClasses}" />
+            <TextBlock Text="Record class" /><ComboBox ItemsSource="{Binding RecordClasses}" SelectedItem="{Binding RecordClass}" AutomationProperties.Name="Retention record class" />
+            <TextBlock Text="Person record ID (person or linked-record scope)" /><TextBox Text="{Binding PersonIdText, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Preservation person record ID" />
+            <TextBlock Text="Exact record ID (record scope)" /><TextBox Text="{Binding RecordId, UpdateSourceTrigger=PropertyChanged}" MaxLength="80" AutomationProperties.Name="Exact preservation record ID" />
+            <TextBlock Text="Reason for this action" /><TextBox Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" MaxLength="500" TextWrapping="Wrap" AutomationProperties.Name="Preservation action reason" />
+            <TextBlock Text="Case reference" /><TextBox Text="{Binding CaseReference, UpdateSourceTrigger=PropertyChanged}" MaxLength="100" AutomationProperties.Name="Preservation case reference" />
+            <TextBlock Text="Issuing authority" /><TextBox Text="{Binding IssuedBy, UpdateSourceTrigger=PropertyChanged}" MaxLength="150" AutomationProperties.Name="Preservation issuing authority" />
+        </StackPanel>
+        <WrapPanel Margin="0,8"><Button Content="Place additional hold" Command="{Binding PlaceCommand}" /><Button Content="Record hold change" Command="{Binding AmendCommand}" /><Button Content="Request release" Command="{Binding RequestReleaseCommand}" /><Button Content="Approve release" Command="{Binding ApproveReleaseCommand}" /><Button Content="Reject release" Command="{Binding RejectReleaseCommand}" /></WrapPanel>
+        <TextBlock Text="{Binding SelectedHold.Id, StringFormat=Selected hold: {0}}" TextWrapping="Wrap" />
+        <Expander Header="Placement and decision history"><ItemsControl ItemsSource="{Binding SelectedHold.History}"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,4"><TextBlock TextWrapping="Wrap"><Run Text="{Binding RecordedAtUtc, Mode=OneWay, StringFormat={}{0:u}}" /><Run Text="; " /><Run Text="{Binding Action, Mode=OneWay}" /><Run Text="; Admin ID " /><Run Text="{Binding ActorId, Mode=OneWay}" /><Run Text="; revision " /><Run Text="{Binding Revision, Mode=OneWay}" /></TextBlock><TextBlock Text="{Binding Reason}" TextWrapping="Wrap" /></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></Expander>
+        <TextBlock Text="Proposed retention policy versions" FontWeight="SemiBold" Margin="0,16,0,4" />
+        <ListBox ItemsSource="{Binding Policies}" SelectedItem="{Binding SelectedPolicy}" MaxHeight="160" IsEnabled="{Binding CanWork}" AutomationProperties.Name="Retention policy versions">
+            <ListBox.ItemTemplate><DataTemplate><TextBlock><Run Text="{Binding RecordClass, Mode=OneWay}" /><Run Text="; version " /><Run Text="{Binding Version, Mode=OneWay}" /><Run Text="; days: " /><Run Text="{Binding RetentionDays, Mode=OneWay}" /><Run Text="; PolicyOnly" /></TextBlock></DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Text="Policy record class" /><ComboBox ItemsSource="{Binding RecordClasses}" SelectedItem="{Binding PolicyClass}" IsEnabled="{Binding CanWork}" AutomationProperties.Name="Policy record class" />
+        <TextBlock Text="Retention days (blank preserves indefinitely; subject to agency approval)" /><TextBox Text="{Binding RetentionDaysText, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanWork}" AutomationProperties.Name="Proposed retention days" />
+        <TextBlock Text="Policy version reason" /><TextBox Text="{Binding PolicyReason, UpdateSourceTrigger=PropertyChanged}" MaxLength="500" AutomationProperties.Name="Retention policy reason" />
+        <WrapPanel Margin="0,8"><Button Content="Save new proposed policy version" Command="{Binding SavePolicyCommand}" /><Button Content="Prepare selected policy preview" Command="{Binding PreviewCommand}" /></WrapPanel>
+        <TextBlock Text="{Binding PreviewSummary}" TextWrapping="Wrap" AutomationProperties.Name="Retention preview and activation blockers" />
+    </StackPanel></ScrollViewer>
+</UserControl>

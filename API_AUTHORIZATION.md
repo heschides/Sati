@@ -5,7 +5,7 @@
 | Billing | `POST /billing/remittance-deposits/{depositId}/eft` | Deposit `AgencyId` | Billing permission and a re-validated current actor. Appends one bank-deposit entry; nothing is edited. The caller must name the entry it saw (`PreviousRecordId`), so a concurrent entry or correction returns 409 rather than stacking silently; a filtered unique index enforces the same race server-side. Amount, date, and correction-note rules are `EftDepositRules`. Reconciliation is derived from the latest entry, never stored. |
 # API authorization and tenant ownership
 
-*Route manifest updated 2026-10-04: 250 protected routes. The table is maintained with
+*Route manifest updated 2026-10-07: 264 protected routes. The table is maintained with
 `ApiSurface.Routes` after excluding health and anonymous login, and `ApiSurfaceTests` checks that
 manifest against live endpoint registration. Every route added, removed, or rescoped must be
 reflected here in the same change.*
@@ -166,8 +166,13 @@ incentives are separate own-user information, not an extension of consumer casel
 | Consumer schedule | `GET`, `POST /people/{personId}/schedule`; `PUT`, `DELETE /people/{personId}/schedule/{entryId}` | Person's assigned user and agency; entry's `PersonId` | Current owning case manager on every operation. Row IDs are resolved only within the route's person. Shared validation bounds dates, times, weekdays, and ModivCare state. PUT and DELETE require the current revision; stale requests return 409. Reads and writes are audited without clinical text or ride details in metadata. GET and write responses are non-cacheable. |
 | Assessments | `POST /people/{personId}/assessments/draft` | Person's assigned user and agency | Assigned case manager alone may author; `authorUserId` must equal actor. |
 | Assessments | `GET /people/{personId}/assessments/latest` | Person's assigned user and agency | Read-only agenda progress source; assigned case manager alone, no draft creation. |
-| Assessments | `PUT /assessments/{assessmentId}/document` | Assessment author plus owned person | Author alone may edit; approved/superseded versions are locked. |
-| Assessments | `POST /assessments/{assessmentId}/submit` | Assessment author plus owned person | Author alone may submit their editable draft. |
+| Assessments | `PUT /assessments/{assessmentId}/document` | Assessment author plus owned person | Draft/Returned only; revision checked. New provider associations require current linked canonical snapshots. |
+| Assessments | `POST /assessments/{assessmentId}/submit` | Assessment author plus owned person | Exact stored revision/hash, shared completeness, exact canonical annual Form/current configured deadline; immutable cycle snapshot and audit atomically. |
+| Assessments | `POST /assessments/{assessmentId}/reopen-legacy` | Assessment author plus owned person | Explicit current revision; ReadyForReview only when no snapshot exists. Preserve answers, audit reopening, require validated resubmission. |
+| Assessments | `GET /assessments/review-queue` | Current assigned author/person and actor agency | Supervision required; direct or existing agency-wide reach; exclude self-review. Oldest 200 submissions with reviewable snapshots. |
+| Assessments | `GET /assessments/{assessmentId}/review` | Actor agency plus current owned author/person | Author or independent scoped reviewer; tenant/user reach rechecked. Inaccessible record is 404. |
+| Assessments | `POST /assessments/{assessmentId}/review` | Same scoped aggregate | Independent supervisor may comment/flag/resolve/return/approve latest submitted snapshot at exact revision/hash. Author may respond while Returned. Blocking flags stop approval; optional explicit dated Form attestation uses existing invariant in the audited approval/PDF transaction. |
+| Assessments | `POST /assessments/{assessmentId}/submissions/{submissionId}/pdf` | Scoped assessment and snapshot agency/assessment identity | Author or independent reviewer; frozen specific version only; existing DocumentArtifact owner, metadata-only audit. No signature/delivery authority conferred. |
 | Assessments | `GET /people/{personId}/pcp-source` | Person's assigned user and agency | Accessible case manager; read-only supervisory access is allowed. |
 | Consumer providers | `GET /people/{personId}/providers` | Person's assigned user and agency | Accessible case manager only. Returns ended links as well as current ones; the caller decides what to show. |
 | Consumer provider order | `PUT /people/{personId}/providers/order` | Person's assigned user and agency, every association's provider agency | Own-caseload capability required before collection reads. Serializable snapshot comparison; exact permutation of all current links, primary care first. Ended, foreign, duplicate, missing and unexpected links rejected. Changes only SortOrder, returns the canonical collection, audits atomically; stale snapshot returns `consumer_provider_order_changed` (409). |
@@ -384,3 +389,27 @@ billing validation. Void retains standing financial facts. No route rewrites the
 original note or submitted snapshot. See `NOTE_AMENDMENTS_RUNBOOK.md` for adapters
 that remain blocked. Existing linked-note corrections remain available before an
 amendment aggregate exists; tracked writes/deletes with linked history return conflict.
+
+
+## Records governance routes — October 6, 2026, unreleased
+
+All routes below inherit authentication and ValidatedActorFilter. Administration permission is
+required; tenant scope comes exclusively from the current actor's agency. There is no caller-
+selected agency/user scope. Foreign policy/plan/hold/person IDs return 404. Exact operation replay
+is actor/request bound; stale or changed governance writes return `records_governance_changed` 409.
+
+| Route under `/api/v1` | Scope and permission |
+|---|---|
+| `GET /admin/records-governance/holds` | Own agency hold aggregates and protected decision history; Administration. |
+| `POST /admin/records-governance/holds` | Own agency; person ownership verified where supplied; exact-record references preserve conservatively while their store is unresolved. Scope immutable, expected revision, independent approver, atomic metadata audit. |
+| `GET /admin/records-governance/policies` | Own agency proposed policy-version history; Administration. |
+| `POST /admin/records-governance/policies` | Own agency append-only proposal, expected class version, operation identity and metadata audit; always PolicyOnly. |
+| `POST /admin/records-governance/policies/{policyId:long}/preview` | Own agency version and locked preservation epoch; persisted preview, unknown inventory counts, metadata audit; no delete authority. |
+| `POST /admin/records-governance/plans/{planId:guid}/execute` | Own agency plan must exist; always returns PolicyOnly blocker and zero deletion. No request can enable fixture mode. |
+
+Legacy `POST /admin/legal-holds/{legalHoldId}/release` now requests independent review; it returns
+an active legacy hold until approved through the new workflow. Placement also registers the
+legacy hold in the new workspace. Both ordinary and test-consumer deletion acquire the same
+serializable agency preservation lock before checking legacy/broader preservation. Active or
+unavailable preservation refuses deletion. Local services repeat current session/agency/Admin
+checks and use the same portable writers; ViewModel command availability is presentation only.

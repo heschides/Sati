@@ -479,6 +479,15 @@ seconds, under whichever account is signed in — which may be a personal one wi
 
 ### Exports and recordings are records too
 
+Fatal-crash navigation breadcrumbs are local diagnostic metadata: the last 32 fixed
+operation/phase labels, sequence numbers and UTC timestamps. They accept no record IDs,
+names, narratives or free text. ApplicationRunState stores them in the existing
+`%LOCALAPPDATA%\SatiLogica\Sati\RunState` marker; graceful exit removes the active trail.
+On unclean-session recovery they are attached to the local diagnostic log under the
+crash reference, with existing 30-day retention/rotation. They are not uploaded in
+incident payloads and do not enable memory dumps. A trail narrows the last operations;
+it does not substitute for a call stack or prove the cause of a fatal crash.
+
 A screen recording of Sati showing real clients is PHI. So is a CSV export, a generated AT
 request PDF, a backfill log that enumerates people, and a crash dump taken with a caseload
 loaded. These are easy to overlook because none of them feels like a database:
@@ -570,3 +579,21 @@ changes stop old external access without altering the signature or pretending to
 authorization. Incident review must cover misdirected mail and copied files already released.
 Browser/screen-reader/document acceptance, deployed sender authentication and delivery-event
 monitoring remain uncompleted launch evidence, as listed in `SIGNATURE_PORTAL_VALIDATION.md`.
+
+
+## Records governance implementation status — October 6, 2026
+
+The unreleased source implements scoped/versioned holds, independent second-Admin release,
+versioned proposed policies, connected dependency evaluation and bounded/checkpointed execution
+in owned private fixtures. The legacy single-Admin release limitation described in historical
+sections above is superseded in this source: the compatibility route requests release and keeps
+preservation active until independent approval. Migration 127 imports active person holds intact;
+original legal-hold rows remain retained. No runtime migration or purge was performed for this task.
+
+Enforcement remains **PolicyOnly**. No approved period, complete runtime storage inventory,
+backup/object reconciler or protected recovery-reference resolver has been invented. Runtime
+previews report unknown counts when coverage is unavailable; they do not advertise zero records
+or authorize deletion. Apply only a separately authorized controlled migration/release. Before
+runtime purge, obtain agency/legal policy approvals, implement/review complete adapters and
+recovery references, rehearse restore (prompt 17), appoint owners/alerts and review a runtime gate.
+RECORDS_GOVERNANCE_RUNBOOK.md supplies implementation, synthetic evidence and activation steps.

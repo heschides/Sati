@@ -1,5 +1,39 @@
 # Sati - Decisions
 
+## 2026-10-07 — Assessment approval reviews an exact immutable submission
+
+Use one Contracts.V1 completeness catalog/rule version and one Persistence review-staging
+owner for API and local parity. Hash the exact saved JSON, not reserialized client values.
+Save failure/conflict stops submission. Each return/resubmission retains its own snapshot;
+blocking flags survive cycles until independent reasoned resolution. Supervisors with
+caseloads can author but cannot approve their own records. Reviewers never rewrite answers.
+
+Approval creates the frozen PDF through DocumentArtifact infrastructure. Existing staff
+attestation policy allows optional actual-date completion in the approval transaction,
+citing the same snapshot/artifact; approval without that explicit attestation leaves the
+Form incomplete. Recheck current configured canonical deadlines instead of resurrecting
+historical 60/120-day defaults. Signature and external acceptance remain separate gates;
+the new artifact kind has no activated signature policy. Do not fabricate snapshots for
+legacy submissions: their author must explicitly reopen, validate and resubmit. Preserve
+review evidence on consumer deletion and refuse lossy schema downgrades.
+
+## 2026-10-06 — Persist fatal-crash context before the crash
+
+Use a bounded, explicitly numbered operation/phase enum in ApplicationRunState's
+existing marker, rather than an in-memory trail or unrestricted logging strings.
+Durable writes happen before tracked UI work. Recovery adds the sanitized trail to
+local crash diagnostics without uploading it or collecting process memory. Breadcrumbs
+identify the last operations; they do not establish a recursive call stack or recover
+from a stack overflow. Keep existing account lifecycle and retention controls.
+
+## 2026-10-06 — Corrections follow the selected note; supervisory review has its own queue
+
+Notes Log correction history and authoring are scoped to the selected approved note.
+The Supervisor page owns a separate submitted-correction review workspace. Unsaved
+authoring or an in-flight write prevents note switching, and request identities
+suppress responses for an earlier selection. Existing server-side independent-review
+and tenancy rules remain authoritative; presentation mode does not grant permission.
+
 ## 2026-10-06 - Telehealth is a distinct remote-contact activity
 
 Use an additional activity bit, preserving all existing ordinals, instead of
@@ -3967,6 +4001,26 @@ LocalDumps. Dumps can contain process memory and PHI and would require a separat
 for enablement, access, retention, and destruction. Also unchanged: a hard fault before sign-in has
 no tenant-safe marker and therefore cannot be assigned to an agency Admin record.
 
+## 2026-10-07 — Scratchpad formatting reuses the portable journal format
+
+Personal scratchpads use the existing `JournalDocument` run/paragraph format in their
+Content column, with a single Scratchpad page. Optional marks add strike-through,
+four closed highlight colors, and a positive number on a checkbox. Existing plain
+entries and older document fields remain readable. There is one shared shape and
+one WPF rendering adapter, rather than persisted WPF objects or another rich format.
+History renders the saved marks with disabled checkboxes and preserves append-only
+retrospective comments. External rich clipboard content arrives as plain text.
+
+Josh clarified the checklist calculation: the numerator is the sum of the numbers
+on checked boxes, and the denominator is the sum on every numbered box. Plain boxes
+are excluded. The separate corner appears only with numbered boxes, avoiding 0/0.
+Optional values can be supplied when inserting a checkbox or edited/removed by
+right-clicking an existing checkbox. Canceling leaves the document unchanged.
+This indicator is personal progress only and never affects documentation or billing.
+Font sizing changes presentation rather than persisted run sizes. Save completion
+confirms its captured document; edits made while saving remain dirty and prevent a
+close or rollover from discarding them. No migration or route is needed.
+
 ## 2026-09-10 — Scratchpad history is an Overview workspace, not another window
 
 The shell still owns exactly one live `ScratchpadView`. While that view is in Overview's center host,
@@ -6531,3 +6585,27 @@ only a quarter label could suppress another cycle. Other scheduled activities re
 suggestions, labelled scheduled rather than due in both the UI and accepted narrative.
 The form-status cue reads genuine form deadlines. Persistence, billing, and audit rules
 remain unchanged. Verification uses synthetic records only.
+
+
+## October 6, 2026 — records governance with preservation before destruction
+
+- Hold scope is immutable. Amendments version its evidence and cancel pending release requests;
+  broaden preservation with another hold. The placing Admin and requesting Admin cannot decide
+  a release. Decisions identify the exact pending revision; unchanged operation retries are
+  idempotent and changed replay is refused. Legacy release commands now request, rather than
+  complete, release. Legacy originals and released history remain retained.
+- Store the hold/policy reasons in protected append-only evidence; operational audit events contain
+  IDs/revisions only. Policies are proposals with no invented or seeded period. Null duration means
+  indefinite preservation. No policy is implicitly approved by saving or previewing it.
+- Preserve the whole connected dependency component, including reverse edges, across the six
+  record classes. A missing dependency/store is unavailable. A record hold with an unresolved
+  person conservatively refuses consumer deletion until a reviewed mapper establishes scope.
+- Use one serializable agency lock and preservation epoch for holds, policies, consumer deletion
+  and retention batches. A preview grants no permission. Recheck policy/epoch/graph/fingerprints
+  under the lock; commit at most 50 deletions with the checkpoint and receipt. Failed transactions
+  are disposed and retried from a fresh context, never continued.
+- Keep runtime PolicyOnly and use an unavailable inventory/deletion adapter. Unknown counts remain
+  unknown. The executable engine accepts only owned private fixtures with plan/epoch-bound backup,
+  encrypted-object and recovery evidence. An opaque UUID is a protected-reference contract, not
+  proof that an external vault or backup adapter has been implemented. Remote deletion needs a
+  reviewed durable outbox adapter before activation. See RECORDS_GOVERNANCE_RUNBOOK.md.

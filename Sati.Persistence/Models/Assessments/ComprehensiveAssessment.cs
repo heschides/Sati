@@ -1,49 +1,11 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Sati.Contracts.V1;
 
 namespace Sati.Models.Assessments;
 
 public enum AssessmentStatus { Draft, ReadyForReview, Returned, Approved, Superseded }
-
-public enum AssessmentAnswerStatus
-{
-    [Description("Answered")] Answered = 0,
-    [Description("Not Applicable")] NotApplicable = 1,
-    [Description("Declined")] Declined = 2,
-    [Description("Unable to Assess")] UnableToAssess = 3,
-    [Description("Follow-Up Required")] FollowUpRequired = 4,
-    [Description("Not Yet Answered")] NotYetAnswered = 5
-}
-
-public enum AssessmentQuestionKind { Narrative, YesNo, HealthConcern, Therapy, ActivitySupport }
-
-public enum ActivitySupportLevel
-{
-    Independent = 0,
-    Prompting = 1,
-    // Retained only to read drafts saved before skills training became a
-    // separate checkbox. New responses never write this value.
-    SkillsTraining = 2,
-    Monitoring = 3,
-    PhysicalAssistance = 4,
-    TotalCare = 5
-}
-
-public enum TherapySessionFormat { NotSelected, InPerson, Telehealth }
-
-public enum TherapyFrequencyDirection { NotSelected, Increase, Decrease }
-
-[Flags]
-public enum SupportMethod
-{
-    None = 0,
-    SetupOrEnvironmental = 1,
-    PromptingOrCoaching = 2,
-    HandsOnAssistance = 4,
-    AnotherPersonCompletes = 8,
-    Varies = 16,
-    NoSupportCurrentlyNeeded = 32
-}
 
 public class ComprehensiveAssessment
 {
@@ -61,89 +23,5 @@ public class ComprehensiveAssessment
     public DateTime? ApprovedAt { get; set; }
     public int? ApprovedByUserId { get; set; }
     public string DocumentJson { get; set; } = "{}";
-}
-
-public sealed class AssessmentDocument
-{
-    public List<AssessmentContributor> Contributors { get; set; } = [];
-    public Dictionary<string, AssessmentAnswer> Answers { get; set; } = [];
-    public List<AssessmentNeed> Needs { get; set; } = [];
-}
-
-public sealed class AssessmentContributor
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Name { get; set; } = string.Empty;
-    public string Relationship { get; set; } = string.Empty;
-}
-
-public sealed class AssessmentAnswer
-{
-    public AssessmentAnswerStatus Status { get; set; } = AssessmentAnswerStatus.NotYetAnswered;
-    public string Narrative { get; set; } = string.Empty;
-    public SupportMethod Supports { get; set; }
-    public string SupportDetails { get; set; } = string.Empty;
-    public string ExceptionReason { get; set; } = string.Empty;
-    public string DissentingOpinion { get; set; } = string.Empty;
-    public bool? YesNoResponse { get; set; }
-    public bool? FollowUpYesNoResponse { get; set; }
-    public string Details { get; set; } = string.Empty;
-    public TherapySessionFormat TherapySessionFormat { get; set; }
-    public bool? WantsOtherSessionFormat { get; set; }
-    public bool? WantsFrequencyChange { get; set; }
-    public TherapyFrequencyDirection TherapyFrequencyDirection { get; set; }
-    public Dictionary<string, ActivitySupportLevel> ActivitySupportLevels { get; set; } = [];
-    public Dictionary<string, bool> ActivitySkillsTraining { get; set; } = [];
-}
-
-public enum AssessmentNeedType
-{
-    [Description("Material")] Material,
-    [Description("Support")] Support,
-    [Description("Skill Development")] SkillDevelopment,
-    [Description("Access or Accommodation")] AccessOrAccommodation,
-    [Description("Health or Safety")] HealthOrSafety,
-    [Description("Relationship or Community")] RelationshipOrCommunity,
-    [Description("Choice, Autonomy, or Rights")] ChoiceAutonomyOrRights,
-    [Description("Information, Planning, or Decision Support")] InformationPlanningOrDecisionSupport
-}
-
-public sealed class AssessmentNeed
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public AssessmentNeedType Type { get; set; }
-    public string Description { get; set; } = string.Empty;
-    public string DesiredResult { get; set; } = string.Empty;
-    public bool AssociateProvider { get; set; }
-
-    // The provider this need is associated with, frozen at the moment it was chosen.
-    //
-    // A document is the one place the practice and network are COPIED rather than derived.
-    // Everywhere else in Sati a directory correction reaches every reader, which is exactly
-    // what an assessment must not do: one approved in March has to keep saying what it said
-    // in March, even after the physician moves practices. ProviderId stays alongside so the
-    // entry can still be traced back, but nothing recomputes these three strings.
-    //
-    // Both new fields default to empty, so documents written before 2026-08-28 deserialize
-    // unchanged — the document is stored as JSON, so this needs no migration.
-    public int? ProviderId { get; set; }
-    public string ProviderNameSnapshot { get; set; } = string.Empty;
-    public string ProviderPracticeSnapshot { get; set; } = string.Empty;
-    public string ProviderNetworkSnapshot { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The frozen provider as one line, for a document or a plan. Falls back to the bare name,
-    /// which is all an entry typed before the directory existed ever had.
-    /// </summary>
-    public string DescribeProvider()
-    {
-        var affiliation = string.Join(" · ", new[]
-        {
-            ProviderPracticeSnapshot, ProviderNetworkSnapshot
-        }.Where(part => !string.IsNullOrWhiteSpace(part)));
-
-        return affiliation.Length == 0
-            ? ProviderNameSnapshot
-            : $"{ProviderNameSnapshot} — {affiliation}";
-    }
+    [NotMapped] public SubmitAssessmentRequest? SubmissionRequest { get; set; }
 }

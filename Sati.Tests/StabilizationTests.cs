@@ -650,10 +650,10 @@ public sealed class StabilizationTests
         var apiVersion = typeof(Sati.Api.Infrastructure.SatiApiOptions).Assembly
             .GetName().Version?.ToString(3);
 
-        Assert.Equal("1.3.36", version);
+        Assert.Equal("1.3.37", version);
         Assert.Equal(version, apiVersion);
-        Assert.Equal("Form completion and clearer note follow-up", ProductReleaseNotes.ReleaseName);
-        Assert.Equal("October 6, 2026", ProductReleaseNotes.ReleaseDate);
+        Assert.Equal("Scratchpad formatting and assessment review", ProductReleaseNotes.ReleaseName);
+        Assert.Equal("October 7, 2026", ProductReleaseNotes.ReleaseDate);
         Assert.Contains(ProductReleaseNotes.Sections, section =>
             section.Title == "Prepare the OADS Safety Device request" &&
             section.Items.Any(item => item.Contains("signatures outside Sati", StringComparison.Ordinal)));

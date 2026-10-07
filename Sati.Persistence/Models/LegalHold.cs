@@ -5,9 +5,8 @@ namespace Sati.Models;
 ///
 /// <para>
 /// Deliberately narrower than OPERATIONS.md's full record-class/scope hold model — this exists
-/// only to gate <c>ConsumerDeletionRules</c>'s deletion-window command, not as a general-purpose
-/// purge-job registry. Release is single-admin for v1, a documented shortfall against
-/// OPERATIONS.md's dual-control requirement — see DECISIONS.md and AGENDA.md.
+/// to retain compatibility with existing person holds. RecordsGovernance preserves its effect,
+/// imports active holds, and requires independent approval before marking this row released.
 /// </para>
 /// </summary>
 public sealed class LegalHold

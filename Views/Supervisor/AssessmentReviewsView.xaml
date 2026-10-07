@@ -1,0 +1,62 @@
+<UserControl x:Class="Sati.Views.Supervisor.AssessmentReviewsView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Background="{DynamicResource SurfaceRaisedBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+ AutomationProperties.Name="Comprehensive Assessment supervisor review">
+ <Grid Margin="16">
+  <Grid.ColumnDefinitions><ColumnDefinition Width="270"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+  <DockPanel>
+   <StackPanel DockPanel.Dock="Top">
+    <Button Content="Load assessments" Command="{Binding LoadCommand}" AutomationProperties.Name="Load submitted assessments" Margin="0,0,0,8"/>
+    <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" Margin="0,0,0,8"/>
+   </StackPanel>
+   <ListBox ItemsSource="{Binding Queue}" SelectedItem="{Binding Selected}" AutomationProperties.Name="Submitted assessments awaiting independent review">
+    <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="4,6">
+     <TextBlock Text="{Binding ConsumerName}" FontWeight="SemiBold"/>
+     <TextBlock Text="{Binding AuthorName}"/>
+     <TextBlock Text="{Binding TargetEffectiveDate, StringFormat='Annual target: {0:MM/dd/yyyy}'}"/>
+    </StackPanel></DataTemplate></ListBox.ItemTemplate>
+   </ListBox>
+  </DockPanel>
+  <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+   <StackPanel>
+    <TextBlock Text="Comprehensive Assessment review" FontSize="18" FontWeight="SemiBold"/>
+    <TextBlock Text="{Binding VersionLabel}" TextWrapping="Wrap" Margin="0,6"/>
+    <ComboBox ItemsSource="{Binding Submissions}" SelectedItem="{Binding SelectedSnapshot}" AutomationProperties.Name="Exact assessment submission version">
+     <ComboBox.ItemTemplate><DataTemplate><TextBlock><Run Text="Version "/><Run Text="{Binding AssessmentVersion, Mode=OneWay}"/><Run Text=" · review "/><Run Text="{Binding CycleNumber, Mode=OneWay}"/><Run Text=" · submission "/><Run Text="{Binding Id, Mode=OneWay}"/></TextBlock></DataTemplate></ComboBox.ItemTemplate>
+    </ComboBox>
+    <Button Content="Save this version as PDF" Command="{Binding GeneratePdfCommand}" HorizontalAlignment="Left" Margin="0,8" AutomationProperties.Name="Save exact submitted assessment as PDF"/>
+    <ListBox x:Name="ValidationSummary" ItemsSource="{Binding ValidationIssues}" AutomationProperties.Name="Assessment review validation summary" MaxHeight="170" Margin="0,6">
+     <ListBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="Wrap"><Run Text="{Binding Location, Mode=OneWay}"/><Run Text=": "/><Run Text="{Binding Message, Mode=OneWay}"/></TextBlock></DataTemplate></ListBox.ItemTemplate>
+    </ListBox>
+    <Expander Header="Submitted author answers" IsExpanded="True">
+     <ItemsControl ItemsSource="{Binding Answers}"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,8">
+      <TextBlock Text="{Binding Location}" FontWeight="SemiBold"/>
+      <TextBlock Text="{Binding Prompt}" TextWrapping="Wrap"/>
+      <TextBox Text="{Binding Answer, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Immutable assessment answer" Margin="0,3"/>
+     </StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    </Expander>
+    <StackPanel IsEnabled="{Binding CanReview}" Margin="0,12">
+     <TextBlock Text="Comment or flag location"/>
+     <ComboBox ItemsSource="{Binding Locations}" SelectedValue="{Binding Location}" SelectedValuePath="Key" DisplayMemberPath="Label" AutomationProperties.Name="Assessment section or question to review"/>
+     <TextBox Text="{Binding ReviewText, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70" AutomationProperties.Name="Assessment review comment or decision reason" Margin="0,6"/>
+     <CheckBox Content="Blocking flag — must be resolved before approval" IsChecked="{Binding Blocking}" AutomationProperties.Name="Assessment flag blocks approval"/>
+     <WrapPanel Margin="0,8"><Button Content="Add comment" Command="{Binding CommentCommand}" Margin="0,0,8,0"/><Button Content="Add flag" Command="{Binding FlagCommand}"/></WrapPanel>
+     <ComboBox ItemsSource="{Binding OpenFlags}" SelectedItem="{Binding SelectedFlag}" DisplayMemberPath="Text" AutomationProperties.Name="Unresolved assessment flags from all review cycles"/>
+     <Button Content="Resolve selected flag with the explanation above" Command="{Binding ResolveCommand}" HorizontalAlignment="Left" Margin="0,8"/>
+     <Button Content="Return to author with the reason above" Command="{Binding ReturnCommand}" HorizontalAlignment="Left" Margin="0,4"/>
+     <TextBlock Text="Approval freezes this submission. It does not imply publication, signatures or external acceptance." TextWrapping="Wrap" Margin="0,10,0,6"/>
+     <CheckBox IsChecked="{Binding CompletionAttested}" AutomationProperties.Name="Explicit assessment Form completion attestation">
+      <TextBlock Text="Also attest the annual Form complete. Applicable completion and signature requirements were met outside Sati." TextWrapping="Wrap"/>
+     </CheckBox>
+     <TextBlock Text="Actual completion date" Margin="0,6,0,0"/>
+     <DatePicker SelectedDate="{Binding CompletedOn}" IsEnabled="{Binding CompletionAttested}" AutomationProperties.Name="Actual assessment completion date" Margin="0,6"/>
+     <Button Content="Approve this entire submission" Command="{Binding ApproveCommand}" HorizontalAlignment="Left" AutomationProperties.Name="Approve exact assessment submission"/>
+    </StackPanel>
+    <Expander Header="Review and resolution history" IsExpanded="True"><ItemsControl ItemsSource="{Binding History}"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,6">
+     <TextBlock><Run Text="{Binding Action, Mode=OneWay}"/><Run Text=" · submission "/><Run Text="{Binding SubmissionId, Mode=OneWay}"/><Run Text=" · staff "/><Run Text="{Binding ActorUserId, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding RecordedAtUtc, Mode=OneWay, StringFormat={}{0:u}}"/></TextBlock>
+     <TextBlock Text="{Binding Location}"/><TextBlock Text="{Binding Text}" TextWrapping="Wrap"/>
+    </StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></Expander>
+   </StackPanel>
+  </ScrollViewer>
+ </Grid>
+</UserControl>

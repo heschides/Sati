@@ -99,6 +99,16 @@ internal static class DocumentArtifactStore
 
         if (prior is not null)
         {
+            if (kind == AnnualDocumentKind.ComprehensiveAssessment &&
+                (replacement.SourceContentId < prior.SourceContentId ||
+                 replacement.Origin == DocumentArtifactOrigin.Draft && prior.Origin == DocumentArtifactOrigin.GeneratedInSati))
+            {
+                // A PDF of earlier review evidence must not replace the operative document.
+                replacement.MarkSuperseded(prior.Id);
+                context.DocumentArtifacts.Add(replacement);
+                await context.SaveChangesAsync(cancellationToken);
+                return replacement;
+            }
             // Release the filtered unique slot inside the caller's transaction. The
             // self-reference is replaced with the real successor id before commit.
             prior.MarkSuperseded(prior.Id);

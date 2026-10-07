@@ -530,11 +530,24 @@ public sealed class CloudComprehensiveAssessmentService(CloudApiClient api) : IC
 
     public async Task SubmitForReviewAsync(ComprehensiveAssessment assessment)
     {
-        var updated = await api.PostAsync<object, ComprehensiveAssessmentDto>(
+        var request = assessment.SubmissionRequest ?? throw new AssessmentValidationException([new("form", "Choose an annual assessment Form first.")]);
+        var updated = await api.PostAsync<SubmitAssessmentRequest, ComprehensiveAssessmentDto>(
             $"/api/v1/assessments/{assessment.Id}/submit?authorUserId={assessment.AuthorUserId}&expectedRevision={assessment.Revision}",
-            new { });
+            request);
         ApplyServerState(assessment, updated);
     }
+
+    public async Task<IReadOnlyList<AssessmentQueueItemDto>> GetReviewQueueAsync() =>
+        await api.GetAsync<List<AssessmentQueueItemDto>>("/api/v1/assessments/review-queue");
+    public Task<ComprehensiveAssessmentDto> ReopenLegacyAsync(int assessmentId, int expectedRevision) =>
+        api.PostAsync<ReopenLegacyAssessmentRequest, ComprehensiveAssessmentDto>(
+            $"/api/v1/assessments/{assessmentId}/reopen-legacy", new(expectedRevision));
+    public Task<AssessmentReviewDetailsDto> GetReviewAsync(int assessmentId) =>
+        api.GetAsync<AssessmentReviewDetailsDto>($"/api/v1/assessments/{assessmentId}/review");
+    public Task<AssessmentReviewDetailsDto> ReviewAsync(int assessmentId, AssessmentReviewRequest request) =>
+        api.PostAsync<AssessmentReviewRequest, AssessmentReviewDetailsDto>($"/api/v1/assessments/{assessmentId}/review", request);
+    public Task<AssessmentPdfDto> GeneratePdfAsync(int assessmentId, int submissionId) =>
+        api.PostAsync<object, AssessmentPdfDto>($"/api/v1/assessments/{assessmentId}/submissions/{submissionId}/pdf", new { });
 
     private static void ApplyServerState(
         ComprehensiveAssessment assessment,

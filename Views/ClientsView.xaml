@@ -2745,7 +2745,7 @@
                         <TabItem Header="Comprehensive Assessment"
                                  Visibility="{Binding IsComprehensiveAssessmentAuthoringEnabled, Converter={StaticResource BoolToVisibilityConverter}}"
                                  Style="{StaticResource ClientWorkspaceTabItemStyle}">
-                            <clientDocuments:ComprehensiveAssessmentWorkspace />
+                            <clientDocuments:ComprehensiveAssessmentWorkspace Workspace="{Binding AssessmentWorkspace}" />
                         </TabItem>
 
                         <TabItem Header="Person-Centered Plan"

@@ -240,8 +240,11 @@ namespace Sati
                         services.AddTransient<NoteEntryViewModel>();
                         services.AddTransient<Func<NoteEntryViewModel>>(sp => () => sp.GetRequiredService<NoteEntryViewModel>());
                         services.AddTransient<NoteAmendmentsViewModel>();
+                        services.AddTransient<ViewModels.Supervisor.AssessmentReviewsViewModel>();
+                        services.AddTransient<ViewModels.ClientDocuments.ComprehensiveAssessmentViewModel>();
                         services.AddTransient<NoteAmendmentFinancialReviewsViewModel>();
                         services.AddTransient<PayerBillingViewModel>();
+                        services.AddTransient<RecordsGovernanceViewModel>();
                         services.AddSingleton<BillingDashboardViewModel>();
                         services.AddSingleton<BillingOverviewViewModel>();
                         services.AddSingleton<BillingQueueViewModel>();
@@ -555,6 +558,7 @@ namespace Sati
             services.AddTransient<IPersonService, PersonService>();
             services.AddTransient<IPersonPhotoService, PersonPhotoService>();
             services.AddTransient<IAdminService, AdminService>();
+            services.AddTransient<IRecordsGovernanceService, RecordsGovernanceService>();
             services.AddTransient<ILegalHoldRegistry, LocalLegalHoldRegistry>();
             services.AddTransient<IIncidentReporter, LocalIncidentReporter>();
             services.AddTransient<IPlatformHealthService, LocalPlatformHealthService>();
@@ -637,6 +641,7 @@ namespace Sati
             services.AddSingleton<IncidentOutbox>();
             services.AddTransient<IAuthService, CloudAuthService>();
             services.AddTransient<IAdminService, CloudAdminService>();
+            services.AddTransient<IRecordsGovernanceService, CloudRecordsGovernanceService>();
             // One reporter owns the per-session retry loop and its cancellation.
             services.AddSingleton<IIncidentReporter, CloudIncidentReporter>();
             services.AddTransient<IPlatformHealthService, CloudPlatformHealthService>();

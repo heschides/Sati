@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 
@@ -9,7 +10,7 @@ namespace Sati.Services;
 
 /// <summary>
 /// Handles Win+Shift+number only while the Sati shell is active and an explicitly
-/// marked note/Scratchpad TextBox has focus. All other keyboard input is passed to
+/// marked note/Scratchpad text editor has focus. All other keyboard input is passed to
 /// Windows unchanged.
 /// </summary>
 public sealed class TextShortcutHook(TextShortcutService shortcuts) : IDisposable
@@ -113,7 +114,7 @@ public sealed class TextShortcutHook(TextShortcutService shortcuts) : IDisposabl
         if (_owner is not { IsActive: true } owner)
             return CallNextHookEx(_hook, code, message, data);
 
-        if (!HasRequiredModifiers() || Keyboard.FocusedElement is not TextBox target ||
+        if (!HasRequiredModifiers() || Keyboard.FocusedElement is not TextBoxBase target ||
             !TextShortcutTarget.GetIsEnabled(target) || target.IsReadOnly || !target.IsEnabled)
         {
             return CallNextHookEx(_hook, code, message, data);

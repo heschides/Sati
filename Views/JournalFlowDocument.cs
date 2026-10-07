@@ -3,6 +3,8 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Media;
+using System.Globalization;
 
 namespace Sati.Views;
 
@@ -16,7 +18,8 @@ internal static class JournalFlowDocument
 {
     public static FlowDocument Build(
         IReadOnlyList<JournalParagraph> paragraphs,
-        Func<bool, CheckBox> createCheckBox)
+        Func<bool, CheckBox> createCheckBox,
+        Func<bool, decimal?, CheckBox>? createNumberedCheckBox = null)
     {
         var document = new FlowDocument { PagePadding = new Thickness(2) };
         foreach (var paragraph in paragraphs)
@@ -26,7 +29,10 @@ internal static class JournalFlowDocument
             {
                 if (inline.IsCheckbox)
                 {
-                    block.Inlines.Add(new InlineUIContainer(createCheckBox(inline.IsChecked))
+                    var checkbox = createNumberedCheckBox?.Invoke(inline.IsChecked, inline.Number)
+                        ?? createCheckBox(inline.IsChecked);
+                    checkbox.Tag = inline.Number;
+                    block.Inlines.Add(new InlineUIContainer(checkbox)
                     {
                         BaselineAlignment = BaselineAlignment.Center
                     });
@@ -38,8 +44,16 @@ internal static class JournalFlowDocument
                     run.FontWeight = FontWeights.Bold;
                 if (inline.Italic)
                     run.FontStyle = FontStyles.Italic;
-                if (inline.Underline)
-                    run.TextDecorations = TextDecorations.Underline;
+                var decorations = new TextDecorationCollection();
+                if (inline.Underline) decorations.Add(TextDecorations.Underline);
+                if (inline.Strikethrough) decorations.Add(TextDecorations.Strikethrough);
+                if (decorations.Count > 0) run.TextDecorations = decorations;
+                if (inline.Highlight != TextHighlight.None)
+                {
+                    run.Background = HighlightBrush(inline.Highlight);
+                    // The pale palette needs dark ink in both light and dark themes.
+                    run.Foreground = Brushes.Black;
+                }
                 block.Inlines.Add(run);
             }
             document.Blocks.Add(block);
@@ -99,13 +113,15 @@ internal static class JournalFlowDocument
         switch (inline)
         {
             case Run run:
-                builder.AddText(run.Text, IsBold(run), IsItalic(run), IsUnderlined(run));
+                builder.AddText(run.Text, IsBold(run), IsItalic(run),
+                    HasDecoration(run, TextDecorationLocation.Underline),
+                    HasDecoration(run, TextDecorationLocation.Strikethrough), ReadHighlight(run));
                 break;
             case LineBreak:
                 builder.Break();
                 break;
             case InlineUIContainer { Child: CheckBox checkBox }:
-                builder.AddCheckbox(checkBox.IsChecked == true);
+                builder.AddCheckbox(checkBox.IsChecked == true, CheckboxNumber(checkBox));
                 break;
             case Span span:
                 foreach (var child in span.Inlines)
@@ -116,44 +132,73 @@ internal static class JournalFlowDocument
 
     private static bool IsBold(TextElement element) => element.FontWeight.ToOpenTypeWeight() >= 600;
 
+    // WPF's restrictive undo reader restores the visible string content but can
+    // drop the object-typed Tag. Accept only our numeric label as its fallback.
+    internal static decimal? CheckboxNumber(CheckBox checkbox) =>
+        JournalDocument.NormalizeCheckboxNumber(checkbox.Tag as decimal?) ??
+        (checkbox.Content is string label && decimal.TryParse(label, NumberStyles.Number,
+            CultureInfo.CurrentCulture, out var number) ? JournalDocument.NormalizeCheckboxNumber(number) : null);
+
     private static bool IsItalic(TextElement element) =>
         element.FontStyle == FontStyles.Italic || element.FontStyle == FontStyles.Oblique;
 
     // TextDecorations is not inherited, and the editor may put an underline on the run or on
     // any span around it, so every ancestor up to the paragraph is asked.
-    private static bool IsUnderlined(Inline inline)
+    private static bool HasDecoration(Inline inline, TextDecorationLocation location)
     {
         for (DependencyObject? current = inline; current is Inline element; current = element.Parent)
         {
             if (element.TextDecorations?.Any(decoration =>
-                    decoration.Location == TextDecorationLocation.Underline) == true)
+                    decoration.Location == location) == true)
                 return true;
         }
         return false;
+    }
+
+    internal static Brush HighlightBrush(TextHighlight highlight) => highlight switch
+    {
+        TextHighlight.Yellow => Brushes.PaleGoldenrod,
+        TextHighlight.Green => Brushes.PaleGreen,
+        TextHighlight.Blue => Brushes.LightBlue,
+        TextHighlight.Pink => Brushes.LightPink,
+        _ => Brushes.Transparent
+    };
+
+    private static TextHighlight ReadHighlight(Inline inline)
+    {
+        for (DependencyObject? current = inline; current is Inline element; current = element.Parent)
+        {
+            if (element.Background is not SolidColorBrush brush || brush.Color.A == 0) continue;
+            foreach (var highlight in Enum.GetValues<TextHighlight>().Where(value => value != TextHighlight.None))
+                if (((SolidColorBrush)HighlightBrush(highlight)).Color == brush.Color) return highlight;
+            return TextHighlight.None;
+        }
+        return TextHighlight.None;
     }
 
     private sealed class ParagraphBuilder(List<JournalParagraph> result)
     {
         private readonly List<JournalInline> _inlines = [];
         private readonly StringBuilder _text = new();
-        private (bool Bold, bool Italic, bool Underline)? _marks;
+        private (bool Bold, bool Italic, bool Underline, bool Strikethrough, TextHighlight Highlight)? _marks;
 
-        public void AddText(string text, bool bold, bool italic, bool underline)
+        public void AddText(string text, bool bold, bool italic, bool underline,
+            bool strikethrough, TextHighlight highlight)
         {
             if (text.Length == 0)
                 return;
             // Adjacent runs with the same marks are one run in storage; the editor splits
             // runs freely and the stored form should not grow with every keystroke.
-            if (_marks != (bold, italic, underline))
+            if (_marks != (bold, italic, underline, strikethrough, highlight))
                 FlushText();
-            _marks = (bold, italic, underline);
+            _marks = (bold, italic, underline, strikethrough, highlight);
             _text.Append(text);
         }
 
-        public void AddCheckbox(bool isChecked)
+        public void AddCheckbox(bool isChecked, decimal? number)
         {
             FlushText();
-            _inlines.Add(JournalInline.Checkbox(isChecked));
+            _inlines.Add(JournalInline.Checkbox(isChecked, number));
         }
 
         public void Break()
@@ -170,8 +215,8 @@ internal static class JournalFlowDocument
 
         private void FlushText()
         {
-            if (_text.Length > 0 && _marks is var (bold, italic, underline))
-                _inlines.Add(JournalInline.Run(_text.ToString(), bold, italic, underline));
+            if (_text.Length > 0 && _marks is var (bold, italic, underline, strikethrough, highlight))
+                _inlines.Add(JournalInline.Run(_text.ToString(), bold, italic, underline, strikethrough, highlight));
             _text.Clear();
             _marks = null;
         }

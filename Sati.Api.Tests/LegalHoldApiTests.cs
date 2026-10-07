@@ -59,7 +59,7 @@ public sealed class LegalHoldApiTests(SatiApiFactory factory)
     }
 
     [Fact]
-    public async Task AnAdminCanReleaseAHoldTheyPlaced()
+    public async Task AnAdminCanRequestButCannotUnilaterallyReleaseAHold()
     {
         using var admin = await factory.CreateAuthenticatedClientAsync("admin-one");
         var person = await CreateConsumerAsync(admin);
@@ -74,8 +74,9 @@ public sealed class LegalHoldApiTests(SatiApiFactory factory)
         var released = await releaseResponse.Content.ReadFromJsonAsync<LegalHoldDto>();
 
         Assert.Equal(HttpStatusCode.OK, releaseResponse.StatusCode);
-        Assert.True(released!.IsReleased);
-        Assert.Equal("Review concluded.", released.ReleaseNote);
+        Assert.False(released!.IsReleased);
+        var governance = await admin.GetFromJsonAsync<List<GovernanceHoldDto>>("/api/v1/admin/records-governance/holds");
+        Assert.Contains(governance!, x => x.PersonId == person.Id && x.ReleaseRequestedById == 11 && !x.IsReleased);
     }
 
     [Fact]

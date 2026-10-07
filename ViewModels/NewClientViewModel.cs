@@ -82,6 +82,7 @@ namespace Sati.ViewModels
         public ConsumerProvidersViewModel ConsumerProviders { get; }
         public ConsumerScheduleViewModel? ConsumerSchedule { get; }
         public NoteEntryViewModel? ClientNoteEntry { get; }
+        public Sati.ViewModels.ClientDocuments.ComprehensiveAssessmentViewModel? AssessmentWorkspace { get; }
         private readonly Func<NoteEntryViewModel>? _reviewNoteEntryFactory;
         private readonly LatestRequestTracker _reviewEditorLoads = new();
         public Func<Person, Form, Task>? ReviewCompletionRequestedAsync { get; set; }
@@ -826,7 +827,8 @@ namespace Sati.ViewModels
                            BenefitsApplicationViewModel? benefitsApplication = null,
                            ConsumerScheduleViewModel? consumerSchedule = null,
                            NoteEntryViewModel? clientNoteEntry = null,
-                           Func<NoteEntryViewModel>? reviewNoteEntryFactory = null)
+                           Func<NoteEntryViewModel>? reviewNoteEntryFactory = null,
+                           Sati.ViewModels.ClientDocuments.ComprehensiveAssessmentViewModel? assessmentWorkspace = null)
         {
             _personService = personService;
             _sessionService = session;
@@ -852,6 +854,7 @@ namespace Sati.ViewModels
             ConsumerProviders = consumerProviders;
             ConsumerSchedule = consumerSchedule;
             ClientNoteEntry = clientNoteEntry;
+            AssessmentWorkspace = assessmentWorkspace;
             _reviewNoteEntryFactory = reviewNoteEntryFactory;
             if (ClientNoteEntry is not null)
             {

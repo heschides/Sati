@@ -62,6 +62,18 @@
                 <TextBlock Text="COMPREHENSIVE ASSESSMENT" FontSize="15" FontWeight="Bold"
                            Foreground="{DynamicResource TextPrimaryBrush}" />
                 <TextBlock Text="{Binding PersonName}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0" />
+                <ComboBox ItemsSource="{Binding AnnualForms}" SelectedItem="{Binding SelectedAnnualForm}" IsEnabled="{Binding CanEdit}"
+                          AutomationProperties.Name="Annual assessment Form being documented" Margin="0,6" MaxWidth="500" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate><DataTemplate><TextBlock>
+                        <Run Text="Annual target "/><Run Text="{Binding TargetEffectiveDate, Mode=OneWay, StringFormat={}{0:MM/dd/yyyy}}"/>
+                        <Run Text=" · due "/><Run Text="{Binding DueDate, Mode=OneWay, StringFormat={}{0:MM/dd/yyyy}}"/>
+                    </TextBlock></DataTemplate></ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Content="Create a new version from approved content" Command="{Binding CreateNewVersionCommand}"
+                        IsEnabled="{Binding CanCreateVersion}" HorizontalAlignment="Left"/>
+                <Button Content="Reopen legacy submission for validated review" Command="{Binding ReopenLegacyCommand}"
+                        Visibility="{Binding CanReopenLegacy, Converter={StaticResource BoolToVisibility}}"
+                        AutomationProperties.Name="Reopen legacy assessment without review snapshots" HorizontalAlignment="Left"/>
             </StackPanel>
             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                 <TextBlock Text="{Binding CompletionText}" HorizontalAlignment="Right" FontWeight="SemiBold"
@@ -107,6 +119,30 @@
 
             <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                 <StackPanel>
+                    <ListBox x:Name="ValidationSummary" ItemsSource="{Binding ValidationIssues}" MaxHeight="180"
+                             AutomationProperties.Name="Assessment submission validation summary" Margin="0,0,12,10">
+                        <ListBox.ItemTemplate><DataTemplate><TextBlock TextWrapping="Wrap">
+                            <Run Text="{Binding Location, Mode=OneWay}"/><Run Text=": "/><Run Text="{Binding Message, Mode=OneWay}"/>
+                        </TextBlock></DataTemplate></ListBox.ItemTemplate>
+                    </ListBox>
+                    <Expander Header="Submissions and review history" Margin="0,0,12,12">
+                        <StackPanel>
+                            <ItemsControl ItemsSource="{Binding Submissions}"><ItemsControl.ItemTemplate><DataTemplate><DockPanel Margin="0,4">
+                                <Button DockPanel.Dock="Right" Content="Save version PDF" Command="{Binding DataContext.GeneratePdfCommand, RelativeSource={RelativeSource AncestorType=Grid}}"
+                                        CommandParameter="{Binding}" AutomationProperties.Name="Save identified assessment submission PDF"/>
+                                <TextBlock><Run Text="Version "/><Run Text="{Binding AssessmentVersion, Mode=OneWay}"/><Run Text=" · review "/><Run Text="{Binding CycleNumber, Mode=OneWay}"/><Run Text=" · submission "/><Run Text="{Binding Id, Mode=OneWay}"/></TextBlock>
+                            </DockPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            <ItemsControl ItemsSource="{Binding ReviewHistory}"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,4">
+                                <TextBlock><Run Text="{Binding Action, Mode=OneWay}"/><Run Text=" · submission "/><Run Text="{Binding SubmissionId, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding RecordedAtUtc, Mode=OneWay, StringFormat={}{0:u}}"/></TextBlock>
+                                <TextBlock Text="{Binding Location}"/><TextBlock Text="{Binding Text}" TextWrapping="Wrap"/>
+                            </StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            <StackPanel IsEnabled="{Binding CanRespond}">
+                                <ComboBox ItemsSource="{Binding OpenFlags}" SelectedItem="{Binding SelectedReviewFlag}" DisplayMemberPath="Text" AutomationProperties.Name="Assessment flag to respond to"/>
+                                <TextBox Text="{Binding FlagResponse, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50" AutomationProperties.Name="Author response to assessment review flag"/>
+                                <Button Content="Record response; reviewer resolves the flag" Command="{Binding RespondToFlagCommand}" HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
                     <Border Style="{StaticResource Card}" IsEnabled="{Binding CanEdit}">
                         <Expander IsExpanded="False">
                             <Expander.Header>
@@ -342,6 +378,12 @@
                                                            Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,5" />
                                                 <TextBox Text="{Binding DissentingOpinion, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
                                                          MinHeight="60" TextWrapping="Wrap" AutomationProperties.Name="Differing perspective" />
+                                                <TextBox Text="{Binding DissentContributor, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Whose differing perspective" Margin="0,6"/>
+                                                <TextBox Text="{Binding DissentDiscussion, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="45" AutomationProperties.Name="Discussion of differing perspective"/>
+                                                <WrapPanel Margin="0,6">
+                                                    <RadioButton Content="Still unresolved" IsChecked="{Binding DissentUnresolved, Converter={StaticResource NullableBoolChoice}, ConverterParameter=True}" Margin="0,0,16,0"/>
+                                                    <RadioButton Content="Resolved through the discussion above" IsChecked="{Binding DissentUnresolved, Converter={StaticResource NullableBoolChoice}, ConverterParameter=False}"/>
+                                                </WrapPanel>
                                             </StackPanel>
                                         </Expander>
                                         </StackPanel>
@@ -433,6 +475,8 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                                <TextBlock Text="If no needs were identified, explain why." TextWrapping="Wrap" Margin="0,6"/>
+                                <TextBox Text="{Binding NoIdentifiedNeedsReason, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="45" AutomationProperties.Name="No identified needs explanation"/>
                                 <Button Content="Add identified need" Command="{Binding AddNeedCommand}" HorizontalAlignment="Left" Padding="12,5" />
                             </StackPanel>
                         </Expander>

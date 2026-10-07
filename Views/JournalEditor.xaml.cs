@@ -129,6 +129,7 @@ public partial class JournalEditor : UserControl
             var plain = new DataObject();
             plain.SetData(DataFormats.UnicodeText, text);
             e.DataObject = plain;
+            e.FormatToApply = DataFormats.UnicodeText;
             return;
         }
 

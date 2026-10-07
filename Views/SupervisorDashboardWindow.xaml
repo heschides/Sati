@@ -322,6 +322,28 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Border>
+                <Border Cursor="Hand" CornerRadius="4" Padding="12,4" Margin="0,0,4,0"
+                        helpers:ClickableSurface.Command="{Binding NavigateToNoteCorrectionsCommand}"
+                        AutomationProperties.Name="Note corrections awaiting review">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Style.Triggers><DataTrigger Binding="{Binding IsNoteCorrectionsActive}" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger></Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Note corrections" FontSize="12">
+                        <TextBlock.Style><Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                            <Style.Triggers><DataTrigger Binding="{Binding IsNoteCorrectionsActive}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+                            </DataTrigger></Style.Triggers>
+                        </Style></TextBlock.Style>
+                    </TextBlock>
+                </Border>
+                <Button Content="Assessment reviews" Command="{Binding NavigateToAssessmentReviewsCommand}"
+                        AutomationProperties.Name="Comprehensive Assessments awaiting supervisor review" Margin="0,0,4,0"/>
                 <!-- Monthly productivity -->
                 <Border Cursor="Hand"
                         CornerRadius="4"

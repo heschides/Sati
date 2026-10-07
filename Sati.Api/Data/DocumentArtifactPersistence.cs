@@ -117,6 +117,15 @@ internal static class DocumentArtifactPersistence
             cancellationToken);
         if (prior is not null)
         {
+            if (replacement.Kind == nameof(AnnualDocumentKind.ComprehensiveAssessment) &&
+                (replacement.SourceContentId < prior.SourceContentId ||
+                 replacement.Origin == nameof(DocumentArtifactOrigin.Draft) && prior.Origin == nameof(DocumentArtifactOrigin.GeneratedInSati)))
+            {
+                replacement.SupersededByArtifactId = prior.Id;
+                db.DocumentArtifacts.Add(replacement);
+                await db.SaveChangesAsync(cancellationToken);
+                return replacement;
+            }
             prior.SupersededByArtifactId = prior.Id;
             await db.SaveChangesAsync(cancellationToken);
             await SignaturePersistenceMutations.RevokeOpenForArtifactAsync(

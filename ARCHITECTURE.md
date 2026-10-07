@@ -1,5 +1,85 @@
 # Sati — Architecture Reference
 
+## October 7 — Formatted personal scratchpads (source only)
+
+`ScratchpadEditor` is a presentation-only rich editor over the shared, closed
+`JournalDocument` contract. Both agenda tabs retain their existing Content column,
+own-user services, revision guard, autosave and rollover paths; there is no schema
+or API route change. Plain legacy content still reads as text. Optional strike-through,
+four named highlights and checkbox numbers extend the existing portable run format;
+stored values are never loaded as XAML/RTF. External paste is reduced to plain text.
+`JournalFlowDocument` is the one client rendering/serialization adapter, including
+numbered checkbox metadata, and history uses it read-only with disabled checkboxes.
+Scratchpad previews expose the plain text projection instead of the stored JSON.
+
+Numbered checkbox values are positive, bounded decimals with at most two decimal
+places. `JournalDocument.ChecklistTotals` sums checked values over all assigned values;
+unnumbered boxes contribute to neither sum. The separate bottom-right indicator is
+hidden unless at least one numbered box exists and updates with toggles and number edits.
+It is personal checklist progress, never clinical completion or billable units. The
+inline number prompt changes nothing until accepted and closes on draft replacement
+or unloading. Checkbox insertion is one undo action. Recreated controls after undo/redo
+recover their number from the controlled numeric label and receive fresh click/edit
+handlers; only JSON metadata is persisted. Text size remains an unstored display preference. Snippet insertion
+supports explicitly opted-in RichTextBox editors with the same read-only/session guards.
+
+The save baseline captures the exact document sent, and close/rollover refuses a flush
+if editing during that request leaves newer unsaved content. Regression tests reproduce
+the former lost-dirty-state race. `scratchpad-formatted-numbered-checklist-v1` records
+the content compatibility boundary in the API fingerprint. No real PHI was read,
+no migration was applied and no release was cut for this source slice.
+
+## October 7 — Comprehensive Assessment review (Prompt 04, source only)
+
+`AssessmentCatalog` and `AssessmentReviewRules` in Contracts.V1 own version-1 question
+definitions, portable document types, completeness, provider snapshot validation and
+independent review authority. Persistence owns immutable `AssessmentSubmission` and
+append-only `AssessmentReviewEvent` tables and shared transactional staging in
+`AssessmentReviewWorkflow`; both contexts configure/protect the same model. Narrow
+API DTOs carry snapshots, never EF entities. Submission pins the stored revision/hash
+and exact canonical annual Form/current configured deadline. A failed editor save
+cannot submit an older document. Returned content creates another cycle on resubmit;
+blocking flags remain until reasoned independent resolution.
+
+Assessment authoring remains assigned-case-manager only; review is current scoped
+supervision with an explicit self-review prohibition. Supervisor workspace answers
+are read-only, and each action checks latest snapshot/hash/revision. Approval creates
+an existing-owner DocumentArtifact and freezes content. Optional explicit dated staff
+attestation links the matching Form through its existing invariant and ledger in that
+same transaction; approval alone is not Form completion/signature/publication.
+ComprehensiveAssessment signing is not activated. Legacy unversioned submissions can
+only be explicitly reopened by their author, then fully validated/resubmitted.
+
+Author and supervisor selection loads use LatestRequestTracker plus account guards;
+the author workspace receives its constructor-injected ViewModel through the parent
+and a dependency-property binding, with no App.Services service lookup.
+saved approval/return refreshes profile/caseload/form/note context. Validation summaries
+are focusable and cloud validation preserves their locations. Versioned PDF exports
+retain artifact provenance and cannot supersede newer approved content. Review clinical
+text is stored only in protected clinical tables, while audit uses IDs/hashes. Consumer
+deletion refuses review history. Migration 128 and guarded Demo scripts are unexecuted;
+see ASSESSMENT_REVIEW_RUNBOOK.md for activation and external-policy gates.
+
+## October 6 — Durable navigation breadcrumbs (unreleased)
+
+ApplicationRunState persists a maximum of 32 closed-vocabulary operation/phase entries
+with sequence and UTC timestamp in the existing per-session run marker. Shell navigation,
+Supervisor chart cleanup and Work Agenda host movement record before/after steps.
+Each marker write flushes a temporary file before atomic replacement; no heartbeat or
+fatal-exception callback is needed to save a breadcrumb. Graceful exit removes the active
+trail. Unclean-session replay sanitizes the retained enum values and attaches the trail
+to AppErrorLog's existing crash diagnostic, using the same reference. Breadcrumbs stay
+local; incident API contracts, payloads and permissions are unchanged. Existing log
+rotation and run-marker retention apply. No record content/IDs or arbitrary strings are accepted.
+
+## October 6 — Correction workspace placement (unreleased)
+
+NotesWindowViewModel drives its transient NoteAmendmentsViewModel from the selected
+approved note. SupervisorDashboardViewModel receives a separate transient correction
+workspace in review mode and exposes its submitted-note queue through Note corrections.
+Both retain INoteAmendmentService and existing authorization/transaction boundaries.
+LatestRequestTracker protects selection loads; account switching clears both workspaces.
+
 ## October 6 — Note follow-up suggestion correction (source only)
 
 The note editor excludes the current scheduled note and, for an exact Q1–Q4 Form
@@ -1585,10 +1665,9 @@ First functional Comprehensive Assessment slice:
   `Database.Migrate()` applies it. The migration updates a legacy 120-day assessment setting
   to 60 only when it still equals 120. It deliberately does not rewrite existing `Form`
   due-date rows.
-- `ComprehensiveAssessmentWorkspace` currently resolves its services from `App.Services`
-  because it is instantiated directly inside `ClientsView.xaml`. This reintroduces a localized
-  service-locator exception and is documented debt; move workspace creation to DI/factory when
-  the document-workspace composition is refactored.
+- Historical first-slice service lookup through `App.Services` was removed in Prompt 04,
+  October 7: NewClientViewModel receives the author ViewModel through constructor injection,
+  and ClientsView supplies it through the workspace dependency-property binding.
 
 ## Session Changelog — 2026-06-29
 
@@ -1891,7 +1970,7 @@ is absent.
 
 - A 900 ms `DispatcherTimer` debounces writes. Person changes flush the outgoing draft before
   loading the incoming consumer.
-- Question definitions and practical guidance currently live in `BuildSections`; persisted
+- Question definitions and practical guidance live in `Contracts.V1.AssessmentCatalog`; persisted
   answers use stable string keys so wording can evolve without losing saved responses.
 - `AssessmentAnswerStatus.FollowUpRequired` is the default. `IsComplete` requires every question
   to be addressed and rejects any remaining follow-up-required answer.
@@ -1899,11 +1978,11 @@ is absent.
   hands-on assistance, another person completing an activity, and situational variation may
   coexist. `NoSupportCurrentlyNeeded` is exclusive in the ViewModel. `Varies` is complete only
   with another concrete support and explanatory detail.
-- Needs are independent records inside the JSON aggregate. The current provider link is a name
-  snapshot placeholder; relational consumer/provider selection is deferred.
-- The current slice records general activity audit events but does not yet implement supervisor
-  flags/approval, PDF/signatures, attachment storage, or immutable document versions after
-  return/approval.
+- Needs are independent records inside the JSON aggregate. Provider identity/name/practice/network
+  snapshots are frozen; shared validation checks new references against current linked providers.
+- Prompt 04 adds immutable submission cycles, independent flags/returns/approval and versioned
+  PDF artifacts. Approved answers cannot change; a new version uses the existing draft path.
+  Comprehensive Assessment signatures and external publication remain activation gates.
 
 **Deadline owner remains `Form` + `FormDueDateCalculator`.** The assessment table does not
 introduce another due-date field. The September 14 correction supersedes the temporary 60-day
@@ -2385,7 +2464,7 @@ old rows as a side effect.
   an agency configuration or clinical record, so it does not use the Settings API or weaken its
   administration-permission boundary.
 - The keyboard hook handles Win+Shift+number only while the Sati shell is active, a non-empty mapping
-  exists, and an explicitly marked editable note narrative or Scratchpad `TextBox` has focus. Every
+  exists, and an explicitly marked editable note narrative or Scratchpad text editor has focus. Every
   other key event is passed through to Windows unchanged. Snippet text is never diagnostic-log data.
 
 ### `ScratchpadService`
@@ -2681,10 +2760,10 @@ support questions need either `NoSupportCurrentlyNeeded` or a concrete support; 
 needs details; follow-up-required never completes. Submission saves first, transitions through
 the service, then disables editing. Needs and contributors use write-through wrapper ViewModels.
 
-**Known first-slice limitations:** no supervisor UI, section flags, approval transition, PDF,
-signature upload, attachment store, concurrency token, save retry queue, question-definition
-version, rich need validation, or runtime provider selection. The code-behind service-locator
-construction is a temporary composition seam, not the preferred architecture.
+**Remaining limitations after Prompt 04:** Comprehensive Assessment signing/upload and
+external publication/acceptance remain gated; durable autosave retry/recovery is deferred.
+Supervisor review, immutable cycles, versioned PDF/artifacts, revision checks, shared
+catalog/completeness, rich needs/provider validation and injected composition now exist.
 
 ### Compliance state writes — attestation-only since September 14
 
@@ -3420,3 +3499,22 @@ Administration without Billing can configure through its own tab, without loadin
 No credentials are client configuration. A profile is not enrollment or payer certification.
 See PAYER_BILLING_REQUIREMENTS.md and PAYER_BILLING_CERTIFICATION.md for source evidence,
 controlled migration 126, compatibility, correction limits and unactivated operational gates.
+
+
+## Records governance (October 6, 2026, unreleased source)
+
+`RecordsGovernanceRules` in Contracts owns Admin authority, independent hold-release decisions,
+revision/scope transitions, policy validation, connected-component dependency preservation and
+fixture-only execution eligibility. Portable Persistence writers own six new governance tables,
+append-only histories, serializable agency row locks and durable retention checkpoints. The API
+and transitional local services use the same writers; distributed clients use narrow HTTP DTOs.
+Admin's Records governance tab has an injected service and LatestRequestTracker/account clearing.
+No ViewModel obtains a context. General audit records contain metadata only.
+
+Legacy active person holds are imported without changing their source rows. Both existing registries
+also consult broader holds. Both consumer deletion commands now share the agency preservation lock
+with placement/release/policy/batch work. An intervening epoch change defeats a prepared plan.
+Previews report unknown counts when inventories are unavailable. Runtime adapters remain unavailable
+and execution remains PolicyOnly. Only owned synthetic fixtures can execute bounded transactional
+batches; backup/object/recovery receipts are required and reference protected evidence by opaque UUID.
+See RECORDS_GOVERNANCE_RUNBOOK.md for migration 127, adapter boundaries and activation prerequisites.

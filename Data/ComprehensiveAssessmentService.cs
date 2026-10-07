@@ -2,14 +2,17 @@ using Microsoft.EntityFrameworkCore;
 using Sati.Models;
 using Sati.Models.Assessments;
 using System.Text.Json;
+using Sati.Contracts.V1;
 
 namespace Sati.Data;
 
-public sealed class ComprehensiveAssessmentService(
+public sealed partial class ComprehensiveAssessmentService(
     IDbContextFactory<SatiContext> contextFactory,
     ISessionService sessionService)
     : IComprehensiveAssessmentService
 {
+    private IDbContextFactory<SatiContext> Factory => contextFactory;
+    private ISessionService Session => sessionService;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<ComprehensiveAssessment?> GetLatestForAgendaAsync(int personId)
@@ -90,6 +93,7 @@ public sealed class ComprehensiveAssessmentService(
             return document is not null
                 && (document.Contributors.Count > 0
                     || document.Needs.Count > 0
+                    || !string.IsNullOrWhiteSpace(document.NoIdentifiedNeedsReason)
                     || document.Answers.Values.Any(HasAnswerContent));
         }
         catch (JsonException)
@@ -107,6 +111,9 @@ public sealed class ComprehensiveAssessmentService(
         || !string.IsNullOrWhiteSpace(answer.SupportDetails)
         || !string.IsNullOrWhiteSpace(answer.ExceptionReason)
         || !string.IsNullOrWhiteSpace(answer.DissentingOpinion)
+        || !string.IsNullOrWhiteSpace(answer.DissentContributor)
+        || !string.IsNullOrWhiteSpace(answer.DissentDiscussion)
+        || answer.DissentUnresolved.HasValue
         || answer.YesNoResponse.HasValue
         || answer.FollowUpYesNoResponse.HasValue
         || !string.IsNullOrWhiteSpace(answer.Details)
@@ -132,8 +139,9 @@ public sealed class ComprehensiveAssessmentService(
         await EnsureCanAuthorAsync(db, actor, stored);
         if (stored.Revision != assessment.Revision)
             throw new DbUpdateConcurrencyException("This assessment was changed by someone else. Reload it before saving.");
-        if (stored.Status is AssessmentStatus.Approved or AssessmentStatus.Superseded)
+        if (!AssessmentReviewRules.CanEdit(stored.Status.ToString()))
             throw new InvalidOperationException("Approved assessment versions cannot be changed.");
+        await ValidateProvidersAsync(db, actor.AgencyId, stored.PersonId, document, AssessmentReviewRules.Parse(stored.DocumentJson));
         stored.DocumentJson = JsonSerializer.Serialize(document, JsonOptions);
         stored.UpdatedAt = DateTime.UtcNow;
         stored.Revision++;
@@ -145,33 +153,7 @@ public sealed class ComprehensiveAssessmentService(
         assessment.Revision = stored.Revision;
     }
 
-    public async Task SubmitForReviewAsync(ComprehensiveAssessment assessment)
-    {
-        var actor = CurrentAuthor(assessment.AuthorUserId);
-        await using var db = await contextFactory.CreateDbContextAsync();
-        await LocalTenantAccess.EnsureSessionAsync(db, sessionService);
-        await EnsureAuthoringEnabledAsync(db, actor.AgencyId);
-        await LocalTenantAccess.EnsureCurrentActorAsync(db, actor);
-        var stored = await db.ComprehensiveAssessments
-            .Include(candidate => candidate.Person)
-            .SingleAsync(candidate => candidate.Id == assessment.Id);
-        await EnsureCanAuthorAsync(db, actor, stored);
-        if (stored.Revision != assessment.Revision)
-            throw new DbUpdateConcurrencyException("This assessment was changed by someone else. Reload it before submitting.");
-        if (stored.Status is not (AssessmentStatus.Draft or AssessmentStatus.Returned))
-            throw new InvalidOperationException("This assessment is not editable.");
-        stored.Status = AssessmentStatus.ReadyForReview;
-        stored.SubmittedAt = DateTime.UtcNow;
-        stored.UpdatedAt = stored.SubmittedAt.Value;
-        stored.Revision++;
-        LocalAuditTrail.Record(
-            db, actor, LocalAuditActions.AssessmentSubmitted, "ComprehensiveAssessment", stored.Id);
-        await db.SaveChangesAsync();
-        assessment.Status = stored.Status;
-        assessment.SubmittedAt = stored.SubmittedAt;
-        assessment.UpdatedAt = stored.UpdatedAt;
-        assessment.Revision = stored.Revision;
-    }
+    public Task SubmitForReviewAsync(ComprehensiveAssessment assessment) => SubmitCoreAsync(assessment);
 
     private User CurrentAuthor(int requestedAuthorUserId)
     {

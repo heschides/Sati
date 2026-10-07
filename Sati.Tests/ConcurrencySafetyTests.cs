@@ -222,6 +222,28 @@ public sealed class ConcurrencySafetyTests
         Assert.Equal(["call guardian"], service.SavedContents);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ScratchpadEditsMadeDuringSaveRemainDirty(bool tomorrow)
+    {
+        var service = new BlockingScratchpadService();
+        var viewModel = new ScratchpadViewModel(service, CreateSession(UserRole.CaseManager));
+        await viewModel.InitializeAsync();
+        if (tomorrow) viewModel.TomorrowAgendaContent = "First saved document";
+        else viewModel.ScratchpadContent = "First saved document";
+        var save = viewModel.SaveAllScratchpadsAsync();
+        await service.FirstSaveEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        if (tomorrow) viewModel.TomorrowAgendaContent = "New formatting while saving";
+        else viewModel.ScratchpadContent = "New formatting while saving";
+        service.ReleaseFirstSave.TrySetResult();
+        Assert.False(await save);
+        Assert.True(viewModel.HasUnsavedChanges);
+        Assert.True(await viewModel.SaveAllScratchpadsAsync());
+        Assert.Equal(["First saved document", "New formatting while saving"], service.SavedContents);
+        Assert.False(viewModel.HasUnsavedChanges);
+    }
+
     [Fact]
     public async Task ExpiredScratchpadSessionStopsTheSecondWriteAndFurtherRetries()
     {

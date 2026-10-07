@@ -302,6 +302,17 @@ public sealed class CloudApiRouteTests
     private static HttpContent JsonBody(string json) =>
         new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
+    [Fact]
+    public async Task AssessmentServerValidationRetainsFocusableLocations()
+    {
+        var service = new CloudComprehensiveAssessmentService(ClientFor(new UriRecorder(JsonBody("""
+            {"code":"assessment_incomplete","message":"Resolve validation","issues":[{"location":"completedOn","message":"Choose an actual completion date."}]}
+            """), HttpStatusCode.UnprocessableEntity)));
+        var failure = await Assert.ThrowsAsync<AssessmentValidationException>(() => service.ReviewAsync(71,
+            new AssessmentReviewRequest(5, 3, new string('A', 64), "Approve")));
+        Assert.Equal("completedOn", Assert.Single(failure.Issues).Location);
+    }
+
     private static CloudApiClient ClientFor(UriRecorder recorder)
     {
         var client = new HttpClient(recorder) { BaseAddress = new Uri("https://api.invalid") };

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 
 namespace Sati.Services;
 
@@ -17,15 +18,25 @@ public static class TextShortcutTarget
     public static bool GetIsEnabled(DependencyObject element) =>
         (bool)element.GetValue(IsEnabledProperty);
 
-    internal static bool TryInsert(TextBox textBox, string text)
+    internal static bool TryInsert(TextBoxBase textBox, string text)
     {
         if (!GetIsEnabled(textBox) || !textBox.IsEnabled || textBox.IsReadOnly || string.IsNullOrEmpty(text))
             return false;
 
-        var insertionPoint = textBox.SelectionStart;
-        textBox.SelectedText = text;
-        textBox.CaretIndex = insertionPoint + text.Length;
-        textBox.SelectionLength = 0;
+        if (textBox is TextBox plain)
+        {
+            var insertionPoint = plain.SelectionStart;
+            plain.SelectedText = text;
+            plain.CaretIndex = insertionPoint + text.Length;
+            plain.SelectionLength = 0;
+        }
+        else if (textBox is RichTextBox rich)
+        {
+            rich.Selection.Text = text;
+            rich.CaretPosition = rich.Selection.End;
+            rich.Selection.Select(rich.CaretPosition, rich.CaretPosition);
+        }
+        else return false;
         return true;
     }
 }

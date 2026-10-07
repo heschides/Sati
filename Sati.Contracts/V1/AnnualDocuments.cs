@@ -12,7 +12,8 @@ public enum AnnualDocumentKind
     HousingSupportFundsApplication,
     DhhsAuthorizedRepresentative,
     SafetyDeviceRequest,
-    BenefitsApplication
+    BenefitsApplication,
+    ComprehensiveAssessment
 }
 
 public enum DocumentArtifactOrigin
@@ -44,7 +45,8 @@ public static class AnnualDocumentCatalog
         new(AnnualDocumentKind.HousingSupportFundsApplication, "Housing Support Funds application", null, false, false),
         new(AnnualDocumentKind.DhhsAuthorizedRepresentative, "DHHS Authorized Representative", null, false, false),
         new(AnnualDocumentKind.SafetyDeviceRequest, "Safety Device Request Form", null, false, false),
-        new(AnnualDocumentKind.BenefitsApplication, "OFI Application for Benefits", null, false, false)
+        new(AnnualDocumentKind.BenefitsApplication, "OFI Application for Benefits", null, false, false),
+        new(AnnualDocumentKind.ComprehensiveAssessment, "Comprehensive Assessment", "ComprehensiveAssessment", false, false)
     ];
 
     public static AnnualDocumentCatalogEntry? ForFormType(string formType) =>

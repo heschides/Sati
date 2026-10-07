@@ -54,7 +54,7 @@ public sealed class WorkAgendaViewRenderTests
 
             var scheduled = WpfUiHarness.FindByAutomationName<ScrollViewer>(
                 view, "Today's scheduled work by type");
-            var scratchpad = WpfUiHarness.FindByAutomationName<TextBox>(
+            var scratchpad = WpfUiHarness.FindByAutomationName<ScratchpadEditor>(
                 view, "Today's Work freeform scratchpad");
             var starts = WpfUiHarness.Descendants(view)
                 .OfType<Button>()

@@ -41,7 +41,7 @@ public sealed record PlaceLegalHoldRequest(
     string? IssuedBy,
     DateTime EffectiveAtUtc);
 
-/// <summary>Releases an existing legal hold. Single-admin for v1 — see <c>LegalHold</c>.</summary>
+/// <summary>Requests release of an existing person hold; independent approval is required.</summary>
 public sealed record ReleaseLegalHoldRequest(string? ReleaseNote);
 
 public sealed record LegalHoldDto(

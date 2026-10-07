@@ -21,7 +21,7 @@ public sealed class LocalLegalHoldRegistry(IDbContextFactory<SatiContext> contex
             var hasActiveHold = await context.LegalHolds.AsNoTracking().AnyAsync(
                 hold => hold.AgencyId == agencyId && hold.PersonId == personId && !hold.IsReleased,
                 cancellationToken);
-            return hasActiveHold ? LegalHoldStatus.Active : LegalHoldStatus.Clear;
+            return await LegacyRecordsHoldBridge.PersonStatusAsync(context, agencyId, personId, hasActiveHold, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

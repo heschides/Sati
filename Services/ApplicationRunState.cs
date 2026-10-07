@@ -18,7 +18,8 @@ internal sealed record ApplicationRunMarker(
     string ProcessName = "unknown",
     DateTime LastHeartbeatUtc = default,
     string SessionReference = "",
-    string? LastReportedDiagnosticStatus = null);
+    string? LastReportedDiagnosticStatus = null,
+    IReadOnlyList<DiagnosticBreadcrumb>? Breadcrumbs = null);
 
 internal sealed class UnexpectedApplicationTerminationException : Exception
 {
@@ -164,6 +165,29 @@ public sealed class ApplicationRunState
         }
     }
 
+    /// <summary>Persist before risky UI work; a fatal process failure cannot flush an in-memory trail.</summary>
+    public void RecordBreadcrumb(DiagnosticOperation operation, DiagnosticPhase phase = DiagnosticPhase.Started)
+    {
+        if (!Enum.IsDefined(operation) || !Enum.IsDefined(phase)) return;
+        lock (_sync)
+        {
+            if (_activeMarkerPath is null || _activeMarker is null) return;
+            var previous = DiagnosticBreadcrumbs.Sanitize(_activeMarker.Breadcrumbs);
+            var sequence = previous.LastOrDefault()?.Sequence ?? 0;
+            if (sequence == long.MaxValue) return;
+            _activeMarker = _activeMarker with
+            {
+                Breadcrumbs = previous.Append(new DiagnosticBreadcrumb(sequence + 1,
+                    AsUtc(_utcNow()), operation, phase)).TakeLast(DiagnosticBreadcrumbs.Limit).ToArray()
+            };
+            try { WriteMarker(_activeMarkerPath, _activeMarker); }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Debug.WriteLine($"Sati breadcrumb write failed. Failure type: {exception.GetType().FullName}");
+            }
+        }
+    }
+
     private void RefreshHeartbeat()
     {
         lock (_sync)
@@ -249,7 +273,8 @@ public sealed class ApplicationRunState
                 AppErrorLog.RecordCrashDiagnostic(
                     marker.SessionReference,
                     diagnostic,
-                    _diagnosticLogDirectory);
+                    _diagnosticLogDirectory,
+                    marker.Breadcrumbs);
                 try
                 {
                     await reporter.ReportCrashAsync(
@@ -375,7 +400,8 @@ public sealed class ApplicationRunState
     {
         try
         {
-            return JsonSerializer.Deserialize<ApplicationRunMarker>(File.ReadAllText(path), JsonOptions);
+            var marker = JsonSerializer.Deserialize<ApplicationRunMarker>(File.ReadAllText(path), JsonOptions);
+            return marker is null ? null : marker with { Breadcrumbs = DiagnosticBreadcrumbs.Sanitize(marker.Breadcrumbs) };
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -388,7 +414,12 @@ public sealed class ApplicationRunState
         var temporary = path + $".pending-{Guid.NewGuid():N}";
         try
         {
-            File.WriteAllText(temporary, JsonSerializer.Serialize(marker, JsonOptions));
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(marker, JsonOptions);
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                stream.Write(bytes);
+                stream.Flush(flushToDisk: true);
+            }
             File.Move(temporary, path, overwrite: true);
         }
         finally

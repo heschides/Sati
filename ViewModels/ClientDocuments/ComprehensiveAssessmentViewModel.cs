@@ -5,9 +5,7 @@ using Sati.Contracts.V1;
 using Sati.Models;
 using Sati.Models.Assessments;
 using Sati.Services;
-using System.Diagnostics;
 using System.Collections.ObjectModel;
-using System.Text.Json;
 using System.Windows.Threading;
 
 namespace Sati.ViewModels.ClientDocuments;
@@ -16,430 +14,269 @@ public sealed partial class ComprehensiveAssessmentViewModel : ObservableObject
 {
     private readonly IComprehensiveAssessmentService _service;
     private readonly ISessionService _session;
-    // The consumer's own provider list, and the directory it resolves against. A need is
-    // associated with somebody the consumer actually sees, and the practice and network are
-    // frozen onto the document at the moment of choosing.
     private readonly IConsumerProviderService _consumerProviders;
     private readonly IProviderService _providers;
     private readonly DispatcherTimer _saveTimer;
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private readonly SemaphoreSlim _saveGate = new(1, 1);
+    private readonly LatestRequestTracker _loads = new();
+    private (int, int)? _loadedAccount;
     private ComprehensiveAssessment? _record;
     private AssessmentDocument _document = new();
     private bool _loading;
+    private int _changeVersion;
 
     [ObservableProperty] private string personName = "Select a consumer to begin.";
     [ObservableProperty] private bool hasPerson;
     [ObservableProperty] private bool canEdit;
     [ObservableProperty] private string saveStatus = "Not loaded";
     [ObservableProperty] private AssessmentSectionViewModel? selectedSection;
-
+    [ObservableProperty] private string noIdentifiedNeedsReason = string.Empty;
+    [ObservableProperty] private Form? selectedAnnualForm;
+    [ObservableProperty] private AssessmentReviewEventDto? selectedReviewFlag;
+    [ObservableProperty] private string flagResponse = string.Empty;
+    [ObservableProperty] private int validationFocusRequest;
     public ObservableCollection<AssessmentSectionViewModel> Sections { get; } = [];
     public ObservableCollection<AssessmentContributorViewModel> Contributors { get; } = [];
     public ObservableCollection<AssessmentNeedViewModel> Needs { get; } = [];
-
-    /// <summary>
-    /// The providers a need may be associated with: the ones this consumer actually sees, each
-    /// carrying its resolved practice and network. Shared by every need row rather than rebuilt
-    /// per row, so one load answers for all of them.
-    /// </summary>
     public ObservableCollection<AssessmentProviderOption> ProviderOptions { get; } = [];
-
+    public ObservableCollection<Form> AnnualForms { get; } = [];
+    public ObservableCollection<AssessmentValidationIssue> ValidationIssues { get; } = [];
+    public ObservableCollection<AssessmentSubmissionDto> Submissions { get; } = [];
+    public ObservableCollection<AssessmentReviewEventDto> ReviewHistory { get; } = [];
+    public ObservableCollection<AssessmentReviewEventDto> OpenFlags { get; } = [];
+    public event Func<AssessmentPdfDto, Task>? PdfReady;
+    public bool CanCreateVersion => _record?.Status == AssessmentStatus.Approved;
+    public bool CanRespond => _record?.Status == AssessmentStatus.Returned;
+    public bool CanReopenLegacy => _record is not null && AssessmentReviewRules.CanReopenLegacy(_record.Status.ToString(), Submissions.Count > 0);
     public bool HasProviderOptions => ProviderOptions.Count > 0;
     public Array AnswerStatuses => Enum.GetValues<AssessmentAnswerStatus>();
     public Array NeedTypes => Enum.GetValues<AssessmentNeedType>();
-    public Array TherapySessionFormats => Enum.GetValues<TherapySessionFormat>().Cast<TherapySessionFormat>()
-        .Where(value => value != TherapySessionFormat.NotSelected).ToArray();
-    public Array TherapyFrequencyDirections => Enum.GetValues<TherapyFrequencyDirection>().Cast<TherapyFrequencyDirection>()
-        .Where(value => value != TherapyFrequencyDirection.NotSelected).ToArray();
+    public Array TherapySessionFormats => Enum.GetValues<TherapySessionFormat>().Where(v => v != TherapySessionFormat.NotSelected).ToArray();
+    public Array TherapyFrequencyDirections => Enum.GetValues<TherapyFrequencyDirection>().Where(v => v != TherapyFrequencyDirection.NotSelected).ToArray();
+    private (int, int)? Account => _session.CurrentUser is User user ? (user.Id, user.AgencyId) : null;
 
-    public ComprehensiveAssessmentViewModel(
-        IComprehensiveAssessmentService service,
-        ISessionService session,
-        IConsumerProviderService consumerProviders,
-        IProviderService providers)
+    public ComprehensiveAssessmentViewModel(IComprehensiveAssessmentService service, ISessionService session,
+        IConsumerProviderService consumerProviders, IProviderService providers)
     {
-        _service = service;
-        _session = session;
-        _consumerProviders = consumerProviders;
-        _providers = providers;
+        _service = service; _session = session; _consumerProviders = consumerProviders; _providers = providers;
         _saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
         _saveTimer.Tick += async (_, _) => { _saveTimer.Stop(); await SaveAsync(); };
-        BuildSections(Sections, ScheduleSave);
-        SelectedSection = Sections.FirstOrDefault();
+        BuildSections(Sections, ScheduleSave); SelectedSection = Sections.FirstOrDefault();
     }
-
-    partial void OnSelectedSectionChanged(AssessmentSectionViewModel? value) =>
-        OnPropertyChanged(nameof(IsSummarySelected));
+    partial void OnSelectedSectionChanged(AssessmentSectionViewModel? value) => OnPropertyChanged(nameof(IsSummarySelected));
+    partial void OnNoIdentifiedNeedsReasonChanged(string value) => ScheduleSave();
     public bool IsSummarySelected => SelectedSection?.Title == "Summary & needs";
 
     public async Task LoadPersonAsync(Person? person)
     {
-        // Selection changes can arrive back-to-back. For example, saving an edited
-        // client briefly clears SelectedPerson before restoring it. Serialize those
-        // loads so an older request cannot clear or overwrite a newer request's state.
+        var request = _loads.Begin(); var account = Account;
         await _loadGate.WaitAsync();
         try
         {
+            if (!_loads.IsCurrent(request) || Account != account) return;
             _saveTimer.Stop();
-            if (_record is not null) await SaveAsync();
-
+            if (_record is not null && _loadedAccount == account && CanEdit && !await SaveAsync())
+            { if (_loads.IsCurrent(request)) SaveStatus = "The outgoing draft could not be saved. Retry before switching assessments."; return; }
+            if (!_loads.IsCurrent(request) || Account != account) return;
             _loading = true;
-            try
-            {
-                _record = null;
-                _document = new();
-                PersonName = person?.FullName ?? "Select a consumer to begin.";
-                foreach (var question in Sections.SelectMany(section => section.Questions))
-                    question.SetPerson(person);
-                HasPerson = person is not null;
-                var user = _session.CurrentUser;
-                CanEdit = person is not null && user is not null && person.UserId == user.Id;
-                ClearAnswers();
-                Contributors.Clear();
-                Needs.Clear();
-                ProviderOptions.Clear();
-                OnPropertyChanged(nameof(HasProviderOptions));
-                if (person is null || user is null) { SaveStatus = "Not loaded"; return; }
-                if (!CanEdit) { SaveStatus = "Read only — this consumer is not on your caseload"; return; }
-
-                await LoadProviderOptionsAsync(person.Id);
-
-                ComprehensiveAssessment record;
-                AssessmentDocument document;
-                try
-                {
-                    record = await _service.GetOrCreateDraftAsync(person.Id, user.Id);
-                    document = JsonSerializer.Deserialize<AssessmentDocument>(record.DocumentJson,
-                        new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? new();
-                }
-                catch (Exception ex)
-                {
-                    // Callers start this load from selection changes without awaiting it,
-                    // so a failure left to escape surfaces only as an unobserved task.
-                    // Leave the workspace unloaded and read-only instead.
-                    var reference = AppErrorLog.Record(ex, "client-documents.assessment.load");
-                    CanEdit = false;
-                    SaveStatus = $"The assessment could not be loaded. Reference {reference}.";
-                    return;
-                }
-
-                _record = record;
-                _document = document;
-                ApplyDocument();
-                SaveStatus = $"Draft v{record.Version} · All changes saved";
-            }
-            finally
-            {
-                _loading = false;
-                RefreshProgress();
-            }
+            _record = null; _document = new(); _loadedAccount = account;
+            PersonName = person?.FullName ?? "Select a consumer to begin."; HasPerson = person is not null;
+            foreach (var q in Sections.SelectMany(s => s.Questions)) { q.SetPerson(person); q.Load(new()); }
+            Contributors.Clear(); Needs.Clear(); ProviderOptions.Clear(); AnnualForms.Clear(); Submissions.Clear();
+            ReviewHistory.Clear(); OpenFlags.Clear(); ValidationIssues.Clear(); NoIdentifiedNeedsReason = ""; SelectedAnnualForm = null;
+            OnPropertyChanged(nameof(HasProviderOptions));
+            var user = _session.CurrentUser;
+            CanEdit = person is not null && user is { HasCaseManagerPermissions: true } && person.UserId == user.Id;
+            if (person is null || user is null) { SaveStatus = "Not loaded"; return; }
+            if (!CanEdit) { SaveStatus = "Read only — this consumer is not on your caseload"; return; }
+            foreach (var form in person.Forms.Where(f => f.Type == FormType.ComprehensiveAssessment && f.TargetEffectiveDate != default).OrderBy(f => f.TargetEffectiveDate)) AnnualForms.Add(form);
+            SelectedAnnualForm = AnnualForms.Count == 1 ? AnnualForms[0] : null;
+            await LoadProviderOptionsAsync(person.Id, request);
+            if (!_loads.IsCurrent(request) || Account != account) return;
+            var latest = await _service.GetLatestForAgendaAsync(person.Id);
+            if (!_loads.IsCurrent(request) || Account != account) return;
+            var record = latest is { Status: AssessmentStatus.ReadyForReview or AssessmentStatus.Approved }
+                ? latest : await _service.GetOrCreateDraftAsync(person.Id, user.Id);
+            if (!_loads.IsCurrent(request) || Account != account) return;
+            _record = record; _document = AssessmentReviewRules.Parse(record.DocumentJson); ApplyDocument();
+            CanEdit = AssessmentReviewRules.CanEdit(record.Status.ToString());
+            SaveStatus = $"{record.Status} v{record.Version} · All changes saved";
+            await LoadReviewHistoryAsync(record, request);
+        }
+        catch (Exception ex)
+        {
+            if (_loads.IsCurrent(request) && Account == account)
+            { CanEdit = false; var reference = AppErrorLog.Record(ex, "client-documents.assessment.load"); SaveStatus = $"The assessment could not be loaded. Reference {reference}."; }
         }
         finally
         {
+            _loading = false; RefreshProgress(); OnPropertyChanged(nameof(CanCreateVersion)); OnPropertyChanged(nameof(CanRespond)); OnPropertyChanged(nameof(CanReopenLegacy));
             _loadGate.Release();
         }
     }
-
-    [RelayCommand]
-    public void AddContributor()
+    private async Task LoadProviderOptionsAsync(int personId, int request)
     {
-        if (!CanEdit) return;
-        var contributor = new AssessmentContributorViewModel(new AssessmentContributor(), ScheduleSave, RemoveContributor);
-        Contributors.Add(contributor);
-        ScheduleSave();
-    }
-
-    private void RemoveContributor(AssessmentContributorViewModel contributor)
-    {
-        Contributors.Remove(contributor);
-        ScheduleSave();
-    }
-
-    /// <summary>
-    /// Builds the provider choices from this consumer's current links, resolving each one's
-    /// chain once. Only current links: a need being written today should not offer somebody the
-    /// consumer stopped seeing last year.
-    /// <para>
-    /// A failure here leaves the list empty rather than blocking the assessment. The provider
-    /// association is optional, and an assessment that will not open because a directory read
-    /// failed is a worse outcome than one where the picker is briefly unavailable.
-    /// </para>
-    /// </summary>
-    private async Task LoadProviderOptionsAsync(int personId)
-    {
+        var account = Account;
         try
         {
             var directory = (await _providers.GetAllAsync()).ToAffiliationNodes();
             var links = await _consumerProviders.GetByPersonAsync(personId);
-
-            foreach (var option in links
-                         .Where(link => link.IsActive)
-                         .Select(link => new AssessmentProviderOption(
-                             ProviderAffiliation.Snapshot(link.ProviderId, directory)))
-                         .Where(option => option.ProviderId != 0)
-                         .OrderBy(option => option.Display, StringComparer.CurrentCultureIgnoreCase))
-            {
-                ProviderOptions.Add(option);
-            }
+            if (!_loads.IsCurrent(request) || Account != account) return;
+            foreach (var option in links.Where(link => link.IsActive).Select(link => new AssessmentProviderOption(ProviderAffiliation.Snapshot(link.ProviderId, directory)))
+                .Where(option => option.ProviderId != 0).OrderBy(option => option.Display, StringComparer.CurrentCultureIgnoreCase)) ProviderOptions.Add(option);
         }
-        catch (Exception exception) when (exception is InvalidOperationException
-                                              or UnauthorizedAccessException)
-        {
-            Debug.WriteLine($"Assessment provider options could not be loaded: {exception.Message}");
-        }
-
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        { if (_loads.IsCurrent(request)) SaveStatus = "Provider choices could not be loaded."; }
         OnPropertyChanged(nameof(HasProviderOptions));
     }
-
-    [RelayCommand]
-    public void AddNeed()
-    {
-        if (!CanEdit) return;
-        Needs.Add(new AssessmentNeedViewModel(new AssessmentNeed(), ScheduleSave, RemoveNeed, ProviderOptions));
-        ScheduleSave();
-    }
-
-    private void RemoveNeed(AssessmentNeedViewModel need) { Needs.Remove(need); ScheduleSave(); }
-
+    [RelayCommand] public void AddContributor()
+    { if (!CanEdit) return; Contributors.Add(new(new(), ScheduleSave, RemoveContributor)); ScheduleSave(); }
+    private void RemoveContributor(AssessmentContributorViewModel row) { if (!CanEdit) return; Contributors.Remove(row); ScheduleSave(); }
+    [RelayCommand] public void AddNeed()
+    { if (!CanEdit) return; Needs.Add(new(new(), ScheduleSave, RemoveNeed, ProviderOptions)); ScheduleSave(); }
+    private void RemoveNeed(AssessmentNeedViewModel row) { if (!CanEdit) return; Needs.Remove(row); ScheduleSave(); }
     private void ApplyDocument()
     {
-        foreach (var section in Sections)
-        foreach (var question in section.Questions)
-            if (_document.Answers.TryGetValue(question.Key, out var answer)) question.Load(answer);
-
-        foreach (var contributor in _document.Contributors)
-            Contributors.Add(new AssessmentContributorViewModel(contributor, ScheduleSave, RemoveContributor));
-        foreach (var need in _document.Needs)
-            Needs.Add(new AssessmentNeedViewModel(need, ScheduleSave, RemoveNeed, ProviderOptions));
+        NoIdentifiedNeedsReason = _document.NoIdentifiedNeedsReason;
+        foreach (var q in Sections.SelectMany(s => s.Questions)) q.Load(_document.Answers.GetValueOrDefault(q.Key) ?? new());
+        foreach (var c in _document.Contributors) Contributors.Add(new(c, ScheduleSave, RemoveContributor));
+        foreach (var n in _document.Needs) Needs.Add(new(n, ScheduleSave, RemoveNeed, ProviderOptions));
     }
-
-    private void ClearAnswers()
+    private AssessmentDocument CaptureDocument() => new()
     {
-        foreach (var section in Sections)
-        foreach (var question in section.Questions) question.Load(new AssessmentAnswer());
-    }
-
+        NoIdentifiedNeedsReason = NoIdentifiedNeedsReason,
+        Contributors = Contributors.Select(c => c.ToModel()).ToList(), Needs = Needs.Select(n => n.ToModel()).ToList(),
+        Answers = Sections.SelectMany(s => s.Questions).ToDictionary(q => q.Key, q => q.ToModel())
+    };
     private void ScheduleSave()
     {
         if (_loading || !CanEdit || _record is null) return;
-        SaveStatus = "Saving…";
-        _saveTimer.Stop();
-        _saveTimer.Start();
-        RefreshProgress();
+        _changeVersion++; SaveStatus = "Saving…"; _saveTimer.Stop(); _saveTimer.Start(); RefreshProgress();
     }
-
-    private async Task SaveAsync()
+    private async Task<bool> SaveAsync(bool submitting = false)
     {
-        var record = _record;
-        if (_loading || !CanEdit || record is null) return;
-
-        // Everything used after the database await is captured locally. A subsequent
-        // client-selection notification may replace or clear the ViewModel fields while
-        // this save is in flight, but it cannot invalidate this operation's snapshot.
-        var document = new AssessmentDocument
-        {
-            Contributors = Contributors.Select(c => c.ToModel()).ToList(),
-            Needs = Needs.Select(n => n.ToModel()).ToList(),
-            Answers = Sections.SelectMany(s => s.Questions)
-                .ToDictionary(q => q.Key, q => q.ToModel())
-        };
-
+        var record = _record; var account = Account;
+        if (_loading || (!CanEdit && !submitting) || record is null) return false;
         await _saveGate.WaitAsync();
         try
         {
+            if (!ReferenceEquals(_record, record) || account != _loadedAccount) return false;
+            var document = CaptureDocument(); var changes = _changeVersion;
             await _service.SaveDocumentAsync(record, document);
-
-            // Do not let completion of an old client's save overwrite the status or
-            // document belonging to a client that was selected in the meantime.
-            if (ReferenceEquals(_record, record))
-            {
-                _document = document;
-                SaveStatus = $"Draft v{record.Version} · All changes saved";
-            }
+            if (ReferenceEquals(_record, record) && Account == account)
+            { _document = document; SaveStatus = $"Draft v{record.Version} · All changes saved"; }
+            return ReferenceEquals(_record, record) && Account == account && changes == _changeVersion;
         }
         catch (Exception ex)
-        {
-            if (ReferenceEquals(_record, record))
-                SaveStatus = $"Could not save: {ex.Message}";
-        }
-        finally
-        {
-            _saveGate.Release();
-        }
+        { if (ReferenceEquals(_record, record) && Account == account) SaveStatus = $"Could not save: {ex.Message}"; return false; }
+        finally { _saveGate.Release(); }
     }
-
-    [RelayCommand]
-    private async Task SubmitForReviewAsync()
+    [RelayCommand] private async Task SubmitForReviewAsync()
     {
-        var record = _record;
-        var user = _session.CurrentUser;
-        if (record is null || user is null) return;
-        if (!IsComplete)
+        var record = _record; var account = Account; var form = SelectedAnnualForm;
+        if (record is null || account is null || !CanEdit || _loading) return;
+        ValidationIssues.Clear(); foreach (var issue in AssessmentReviewRules.Validate(CaptureDocument())) ValidationIssues.Add(issue);
+        if (form is null) ValidationIssues.Add(new("form", "Choose the annual assessment Form this version documents."));
+        if (ValidationIssues.Count > 0) { SaveStatus = "Resolve the validation summary before submission."; ValidationFocusRequest++; return; }
+        _saveTimer.Stop(); CanEdit = false;
+        if (!await SaveAsync(submitting: true)) { if (ReferenceEquals(_record, record) && Account == account) CanEdit = true; return; }
+        if (!ReferenceEquals(_record, record) || Account != account) return;
+        try
         {
-            SaveStatus = "Every question must be addressed before submission.";
-            return;
+            record.SubmissionRequest = new(record.Revision, AssessmentReviewRules.Hash(record.DocumentJson), form!.Id, form.TargetEffectiveDate, form.DueDate);
+            await _service.SubmitForReviewAsync(record);
+            if (!ReferenceEquals(_record, record) || Account != account) return;
+            SaveStatus = "Submitted for supervisor review"; await LoadReviewHistoryAsync(record, _loads.Begin());
         }
-        await SaveAsync();
-
-        // A selection change during the save means this command no longer owns the
-        // visible record. Do not submit whichever assessment happened to load next.
-        if (!ReferenceEquals(_record, record)) return;
-
-        await _service.SubmitForReviewAsync(record);
-        CanEdit = false;
-        SaveStatus = "Submitted for supervisor review";
+        catch (AssessmentValidationException ex)
+        { if (ReferenceEquals(_record, record) && Account == account) { foreach (var issue in ex.Issues) ValidationIssues.Add(issue); ValidationFocusRequest++; CanEdit = true; SaveStatus = ex.Message; } }
+        catch (Exception ex)
+        { if (ReferenceEquals(_record, record) && Account == account) { CanEdit = true; SaveStatus = $"Could not submit: {ex.Message}"; } }
     }
-
+    private async Task LoadReviewHistoryAsync(ComprehensiveAssessment record, int request)
+    {
+        var account = Account;
+        try
+        {
+            var details = await _service.GetReviewAsync(record.Id);
+            if (!_loads.IsCurrent(request) || !ReferenceEquals(_record, record) || Account != account) return;
+            Submissions.Clear(); ReviewHistory.Clear(); OpenFlags.Clear();
+            foreach (var s in details.Submissions) Submissions.Add(s);
+            foreach (var e in details.Events) ReviewHistory.Add(e);
+            foreach (var flag in details.Events.Where(e => e.Action == "Flag" && !details.Events.Any(r => r.Action == "Resolve" && r.FlagId == e.Id))) OpenFlags.Add(flag);
+            var latest = details.Submissions.LastOrDefault(); if (latest is not null) SelectedAnnualForm = AnnualForms.FirstOrDefault(f => f.Id == latest.FormId);
+            OnPropertyChanged(nameof(CanReopenLegacy));
+        }
+        catch (NotSupportedException) { }
+        catch (Exception ex) { if (_loads.IsCurrent(request) && Account == account) SaveStatus = $"Review history could not be read: {ex.Message}"; }
+    }
+    [RelayCommand] private async Task ReopenLegacyAsync()
+    {
+        var record = _record; var account = Account;
+        if (!CanReopenLegacy || record is null || _loading) return;
+        var request = _loads.Begin();
+        try
+        {
+            var updated = await _service.ReopenLegacyAsync(record.Id, record.Revision);
+            if (!_loads.IsCurrent(request) || !ReferenceEquals(_record, record) || Account != account) return;
+            record.Status = Enum.Parse<AssessmentStatus>(updated.Status); record.Revision = updated.Revision;
+            record.UpdatedAt = updated.UpdatedAt; CanEdit = true;
+            SaveStatus = "Legacy submission reopened. Complete the document and select its annual Form before resubmitting.";
+            OnPropertyChanged(nameof(CanReopenLegacy)); OnPropertyChanged(nameof(CanRespond));
+        }
+        catch (Exception ex) { if (_loads.IsCurrent(request) && Account == account) SaveStatus = $"Could not reopen the legacy submission: {ex.Message}"; }
+    }
+    [RelayCommand] private async Task RespondToFlagAsync()
+    {
+        var record = _record; var snapshot = Submissions.LastOrDefault(); var flag = SelectedReviewFlag; var account = Account;
+        if (!CanRespond || record is null || snapshot is null || flag is null || !await SaveAsync()) return;
+        try
+        {
+            var details = await _service.ReviewAsync(record.Id, new(snapshot.Id, record.Revision, snapshot.ContentSha256, "Respond", flag.Location, FlagResponse, FlagId: flag.Id));
+            if (!ReferenceEquals(_record, record) || Account != account) return;
+            record.Revision = details.Assessment.Revision; FlagResponse = ""; await LoadReviewHistoryAsync(record, _loads.Begin());
+        }
+        catch (Exception ex) { if (ReferenceEquals(_record, record) && Account == account) SaveStatus = $"Could not record response: {ex.Message}"; }
+    }
+    [RelayCommand] private async Task CreateNewVersionAsync()
+    {
+        if (!CanCreateVersion || _record is null || _session.CurrentUser is not User user) return;
+        var current = _record; var request = _loads.Begin(); var account = Account;
+        try
+        {
+            var draft = await _service.GetOrCreateDraftAsync(current.PersonId, user.Id);
+            if (!_loads.IsCurrent(request) || Account != account) return;
+            _loading = true; _record = draft; _document = AssessmentReviewRules.Parse(draft.DocumentJson);
+            Contributors.Clear(); Needs.Clear(); ApplyDocument(); CanEdit = true;
+            Submissions.Clear(); ReviewHistory.Clear(); OpenFlags.Clear(); SaveStatus = $"Draft v{draft.Version} · All changes saved";
+        }
+        catch (Exception ex) { if (_loads.IsCurrent(request) && Account == account) SaveStatus = $"Could not create a new version: {ex.Message}"; }
+        finally { _loading = false; RefreshProgress(); OnPropertyChanged(nameof(CanCreateVersion)); OnPropertyChanged(nameof(CanRespond)); }
+    }
+    [RelayCommand] private async Task GeneratePdfAsync(AssessmentSubmissionDto? snapshot)
+    {
+        if (_record is null || snapshot is null) return; var record = _record; var account = Account;
+        try { var pdf = await _service.GeneratePdfAsync(record.Id, snapshot.Id); if (ReferenceEquals(_record, record) && Account == account && PdfReady is not null) await PdfReady(pdf); }
+        catch (Exception ex) { if (ReferenceEquals(_record, record) && Account == account) SaveStatus = $"Could not generate PDF: {ex.Message}"; }
+    }
     private void RefreshProgress()
     {
         foreach (var section in Sections) section.RefreshProgress();
-        OnPropertyChanged(nameof(AnsweredCount));
-        OnPropertyChanged(nameof(TotalCount));
-        OnPropertyChanged(nameof(IsComplete));
-        OnPropertyChanged(nameof(CompletionText));
+        OnPropertyChanged(nameof(AnsweredCount)); OnPropertyChanged(nameof(TotalCount)); OnPropertyChanged(nameof(IsComplete)); OnPropertyChanged(nameof(CompletionText));
     }
-
     public int AnsweredCount => Sections.Sum(s => s.Questions.Count(q => q.IsAddressed));
-    public int TotalCount => Sections.Sum(s => s.Questions.Count);
-    public bool IsComplete => HasPerson && TotalCount > 0 && AnsweredCount == TotalCount &&
-        Sections.SelectMany(s => s.Questions).All(q => q.Status != AssessmentAnswerStatus.FollowUpRequired);
+    public int TotalCount => AssessmentCatalog.Questions.Count;
+    public bool IsComplete => HasPerson && AssessmentReviewRules.Validate(CaptureDocument()).Count == 0;
     public string CompletionText => $"{AnsweredCount} of {TotalCount} questions addressed";
-
-    internal static AssessmentProgress CalculateProgress(AssessmentDocument document)
+    internal static AssessmentProgress CalculateProgress(AssessmentDocument document) => new(
+        AssessmentCatalog.Questions.Count(q => document.Answers.TryGetValue(q.Key, out var a) && a is not null && AssessmentReviewRules.IsAddressed(q, a)), AssessmentCatalog.Questions.Count);
+    private static void BuildSections(ICollection<AssessmentSectionViewModel> target, Action changed)
     {
-        var sections = new List<AssessmentSectionViewModel>();
-        BuildSections(sections, static () => { });
-        foreach (var question in sections.SelectMany(section => section.Questions))
-        {
-            question.Load(document.Answers.TryGetValue(question.Key, out var answer)
-                ? answer
-                : new AssessmentAnswer());
-        }
-
-        return new AssessmentProgress(
-            sections.Sum(section => section.Questions.Count(question => question.IsAddressed)),
-            sections.Sum(section => section.Questions.Count));
+        foreach (var section in AssessmentCatalog.Sections) target.Add(new(section.Title, section.Subtitle,
+            section.Questions.Select(q => new AssessmentQuestionViewModel(q.Key, q.Prompt, q.WhyAsked, q.CompleteAnswerIncludes, q.Avoid, q.UsesSupports, q.Kind, q.Activities, changed))));
     }
-
-    private static void BuildSections(
-        ICollection<AssessmentSectionViewModel> target,
-        Action changed)
-    {
-        AssessmentQuestionViewModel Q(
-            string key, string prompt, string why, string include, string avoid) =>
-            new(key, prompt, why, include, avoid, false,
-                AssessmentQuestionKind.Narrative, [], changed);
-        AssessmentQuestionViewModel SQ(
-            string key, string prompt, string why, string include, string avoid) =>
-            new(key, prompt, why, include, avoid, true,
-                AssessmentQuestionKind.Narrative, [], changed);
-        AssessmentQuestionViewModel YN(string key, string prompt) =>
-            new(key, prompt, string.Empty, string.Empty, string.Empty, false,
-                AssessmentQuestionKind.YesNo, [], changed);
-        AssessmentQuestionViewModel HC(string key, string prompt) =>
-            new(key, prompt, string.Empty, string.Empty, string.Empty, false,
-                AssessmentQuestionKind.HealthConcern, [], changed);
-        AssessmentQuestionViewModel TH(string key, string prompt) =>
-            new(key, prompt, string.Empty, string.Empty, string.Empty, false,
-                AssessmentQuestionKind.Therapy, [], changed);
-        AssessmentQuestionViewModel AS(string key, string prompt, params string[] activities) =>
-            new(key, prompt, string.Empty, string.Empty, string.Empty, false,
-                AssessmentQuestionKind.ActivitySupport, activities, changed);
-        void AddSection(
-            string title,
-            string subtitle,
-            params AssessmentQuestionViewModel[] questions) =>
-            target.Add(new AssessmentSectionViewModel(title, subtitle, questions));
-
-        AddSection("Getting started", "People & context",
-            Q("self-view", "How {Name} sees {reflexive}",
-              "Center the assessment in the person’s own understanding of who they are.",
-              "Strengths, identity, interests, values, and anything the person wants others to understand.", "A diagnostic or service-based description written only by others."),
-            Q("what-people-like", "What do people like about {object}?",
-              "Capture strengths that other people experience in their relationship with the person.",
-              "Specific qualities, contributions, examples, and perspectives from people who know the person.", "Generic compliments without an example."),
-            Q("good-life", "What does a good life look like to {object}?",
-              "Describe the person’s own priorities, routines, relationships, places, and experiences that make life meaningful.",
-              "Concrete preferences and examples in everyday language.", "Happy, appropriate, doing well, or generic service goals without examples."));
-
-        AddSection("Communication", "Understanding & expression",
-            Q("communication-overview", "What should people know about communicating with {Name}?",
-              "Explain how the person communicates choices, agreement, refusal, discomfort, and a need for a break.",
-              "Methods that work, signs others may miss, processing time, and useful accommodations.", "Labels without describing how communication works."),
-            Q("receptive-communication", "What support {does} {subject} need with receptive communication?",
-              "Describe what helps the person understand information from other people.",
-              "Language, pacing, visual supports, repetition, environment, and how understanding is confirmed.", "Understands or does not understand without examples."),
-            Q("expressive-communication", "What support {does} {subject} need with expressive communication?",
-              "Describe what helps the person communicate thoughts, needs, preferences, and decisions.",
-              "Speech, gestures, devices, behavior, time, prompting, and how others confirm meaning.", "Verbal or nonverbal as a complete description."),
-            YN("communication-assessment-received", "{Has} {subject} received a communication assessment?"),
-            YN("communication-assessment-schedule", "Should a communication assessment be scheduled for the coming year?"));
-
-        AddSection("Home & daily life", "Home, routines & personal activities",
-            Q("home-independent", "What activities does {Name} do at home independently?",
-              "Identify existing independence before describing support needs.",
-              "Specific household, personal, and routine activities completed independently.", "Independent as a general label without examples."),
-            Q("home-supports", "What supports {does} {subject} need in the home with daily activities?",
-              "Describe how support helps while preserving choice, privacy, and existing skills.",
-              "Who helps, what they do, when support is needed, and what the person still does.", "Needs help with ADLs without naming the activity or support."),
-            AS("home-support-levels", "Indicate the level of support needed for each home and daily-life activity.",
-               "Meal preparation", "Eating and drinking", "Household cleaning", "Laundry", "Shopping and errands",
-               "Personal hygiene", "Dressing", "Toileting", "Medication routines", "Mobility and transfers"));
-
-        AddSection("Health & wellness", "Physical, behavioral & emotional health",
-            Q("physical-health-view", "How does {Name} feel about {possessive} physical health?",
-              "Capture the person’s view of their health, comfort, energy, and access to care.",
-              "What feels well, what does not, and the person’s own priorities.", "A diagnosis list without the person’s perspective."),
-            Q("physical-health-change", "Is there anything {subject} {wants} to change about {possessive} physical health?",
-              "Identify changes the person wants rather than assuming clinical priorities are shared.",
-              "Desired change, motivation, barriers, and support requested.", "Provider goals without the person’s view."),
-            HC("health-concerns", "Are there health and wellness concerns being actively monitored by healthcare providers?"),
-            Q("mental-health-view", "How does {Name} feel about {possessive} mental health?",
-              "Capture the person’s view of emotional well-being and any support they value.",
-              "Mood, stress, coping, relationships, routines, and what helps.", "A diagnosis or behavior list without the person’s perspective."),
-            TH("therapy", "{Is} {subject} seeing a therapist?"));
-
-        AddSection("Safety & rights", "Risk, safeguards, autonomy & restrictions",
-            Q("risks", "What current risks require planning or support?",
-              "Use factual, individualized information and distinguish possibility from established history.",
-              "Trigger, likelihood, consequence, existing safeguard, whether it works, and a backup response.", "Vague labels such as unsafe, elopes, noncompliant, or aggressive without context."),
-            Q("rights", "Are any rights, choices, access, or privacy currently restricted?",
-              "Identify any rule or practice that limits ordinary access or choice, even if intended for safety.",
-              "Specific assessed need, less restrictive approaches tried, consent, review date, and plan to reduce it.", "House rules or provider policy as the sole justification."));
-
-        AddSection("Community & relationships", "Belonging, transportation & social connection",
-            SQ("community-access", "How does the person access places and activities they choose?",
-               "Describe actual access, not merely what is available in theory.",
-               "Chosen destinations, transportation, scheduling, cost, staffing, accessibility, and barriers.", "Has community support or goes into the community without frequency, choice, or barriers."),
-            Q("relationships", "Which relationships matter, and what support is wanted to maintain or develop them?",
-              "Include paid and unpaid relationships while respecting privacy and the person’s preferences.",
-              "Who matters, desired contact, barriers, boundaries, intimacy, and unwanted isolation.", "Family involved or socializes with staff as a complete answer."));
-
-        AddSection("Learning & work", "Employment, education & skill development",
-            SQ("employment-learning", "What does the person want regarding work, learning, or meaningful activity?",
-               "Start with the person’s interests and desired life outcome before describing services.",
-               "Current experience, preferences, strengths, barriers, accommodations, benefits concerns, and next step.", "Not interested unless options were meaningfully explored and the context is documented."));
-
-        AddSection("Choice & advocacy", "Decisions, control & self-advocacy",
-            SQ("decision-support", "How does the person make decisions and what support helps?",
-               "Describe decision-making by topic rather than treating capacity as all-or-nothing.",
-               "How choices are presented, processing time, trusted supporters, risks understood, and final decision-maker.", "Guardian makes decisions without describing the person’s participation."),
-            Q("dissent", "How does the person show disagreement, refusal, or a desire for change?",
-              "Describe signals and the response expected from supporters.",
-              "Words, gestures, behavior, communication technology, escalation signs, and how choices are honored.", "Behaviors when told no without considering whether the person is communicating refusal."));
-
-        AddSection("Summary & needs", "Strengths, unmet needs & priorities",
-            Q("strengths", "Which strengths, resources, and supports should the plan build upon?",
-              "Identify capabilities and resources that are currently useful, not compliments detached from planning.",
-              "Skills, interests, relationships, technology, community resources, routines, and successful strategies.", "Sweet, nice, high-functioning, or resilient without practical examples."),
-            Q("priority-needs", "What needs attention during the coming plan year?",
-              "Include material needs and broader support, access, autonomy, health, relationship, or planning needs.",
-              "What is missing, desired result, urgency, responsible next step, and whether a provider should be associated.", "Needs more services without explaining the need or desired result."));
-    }
-
 }
-
 internal sealed record AssessmentProgress(int AnsweredCount, int TotalCount)
 {
     public string Text => $"{AnsweredCount} of {TotalCount} questions addressed";
@@ -486,6 +323,9 @@ public sealed partial class AssessmentQuestionViewModel : ObservableObject
     [ObservableProperty] private string supportDetails = string.Empty;
     [ObservableProperty] private string exceptionReason = string.Empty;
     [ObservableProperty] private string dissentingOpinion = string.Empty;
+    [ObservableProperty] private string dissentContributor = string.Empty;
+    [ObservableProperty] private string dissentDiscussion = string.Empty;
+    [ObservableProperty] private bool? dissentUnresolved;
     [ObservableProperty] private bool setupOrEnvironmental;
     [ObservableProperty] private bool promptingOrCoaching;
     [ObservableProperty] private bool handsOnAssistance;
@@ -507,6 +347,7 @@ public sealed partial class AssessmentQuestionViewModel : ObservableObject
         CompleteAnswerIncludes = include; Avoid = avoid; UsesSupports = usesSupports; Kind = kind; _changed = changed;
         foreach (var activity in activities)
             Activities.Add(new ActivitySupportViewModel(activity, ActivitySupportLevel.Independent, Changed));
+        SetPerson(null);
     }
 
     public void SetPerson(Person? person)
@@ -540,6 +381,9 @@ public sealed partial class AssessmentQuestionViewModel : ObservableObject
     partial void OnSupportDetailsChanged(string value) => Changed();
     partial void OnExceptionReasonChanged(string value) => Changed();
     partial void OnDissentingOpinionChanged(string value) => Changed();
+    partial void OnDissentContributorChanged(string value) => Changed();
+    partial void OnDissentDiscussionChanged(string value) => Changed();
+    partial void OnDissentUnresolvedChanged(bool? value) => Changed();
     partial void OnSetupOrEnvironmentalChanged(bool value) { ClearNoSupport(value); Changed(); }
     partial void OnPromptingOrCoachingChanged(bool value) { ClearNoSupport(value); Changed(); }
     partial void OnHandsOnAssistanceChanged(bool value) { ClearNoSupport(value); Changed(); }
@@ -596,41 +440,14 @@ public sealed partial class AssessmentQuestionViewModel : ObservableObject
         _ => "Additional explanation"
     };
     public bool HasConcreteSupport => SetupOrEnvironmental || PromptingOrCoaching || HandsOnAssistance || AnotherPersonCompletes;
-    public bool IsAddressed => Status switch
-    {
-        AssessmentAnswerStatus.Answered => Kind switch
-        {
-            AssessmentQuestionKind.Narrative => !string.IsNullOrWhiteSpace(Narrative)
-                && (!UsesSupports || NoSupportCurrentlyNeeded || HasConcreteSupport)
-                && (!Varies || (HasConcreteSupport && !string.IsNullOrWhiteSpace(SupportDetails))),
-            AssessmentQuestionKind.YesNo => YesNoResponse.HasValue,
-            AssessmentQuestionKind.HealthConcern => YesNoResponse.HasValue
-                && (YesNoResponse == false || !string.IsNullOrWhiteSpace(Details)),
-            AssessmentQuestionKind.Therapy => TherapyResponseComplete,
-            AssessmentQuestionKind.ActivitySupport => Activities.Count > 0,
-            _ => false
-        },
-        AssessmentAnswerStatus.FollowUpRequired => false,
-        AssessmentAnswerStatus.NotYetAnswered => false,
-        _ => !string.IsNullOrWhiteSpace(ExceptionReason)
-    };
-
-    private bool TherapyResponseComplete => YesNoResponse switch
-    {
-        false => FollowUpYesNoResponse.HasValue,
-        true => FollowUpYesNoResponse.HasValue
-            && TherapySessionFormat != TherapySessionFormat.NotSelected
-            && WantsOtherSessionFormat.HasValue
-            && WantsFrequencyChange.HasValue
-            && (WantsFrequencyChange == false || TherapyFrequencyDirection != TherapyFrequencyDirection.NotSelected),
-        _ => false
-    };
+    public bool IsAddressed => AssessmentReviewRules.IsAddressed(new AssessmentQuestionDefinition(Key, Prompt, WhyAsked, CompleteAnswerIncludes, Avoid, UsesSupports, Kind, Activities.Select(a => a.Name).ToArray()), ToModel());
 
     public void Load(AssessmentAnswer answer)
     {
         _loading = true;
         Status = answer.Status; Narrative = answer.Narrative; SupportDetails = answer.SupportDetails;
         ExceptionReason = answer.ExceptionReason; DissentingOpinion = answer.DissentingOpinion;
+        DissentContributor = answer.DissentContributor; DissentDiscussion = answer.DissentDiscussion; DissentUnresolved = answer.DissentUnresolved;
         SetupOrEnvironmental = answer.Supports.HasFlag(SupportMethod.SetupOrEnvironmental);
         PromptingOrCoaching = answer.Supports.HasFlag(SupportMethod.PromptingOrCoaching);
         HandsOnAssistance = answer.Supports.HasFlag(SupportMethod.HandsOnAssistance);
@@ -669,6 +486,7 @@ public sealed partial class AssessmentQuestionViewModel : ObservableObject
         {
             Status = Status, Narrative = Narrative, Supports = supports, SupportDetails = SupportDetails,
             ExceptionReason = ExceptionReason, DissentingOpinion = DissentingOpinion,
+            DissentContributor = DissentContributor, DissentDiscussion = DissentDiscussion, DissentUnresolved = DissentUnresolved,
             YesNoResponse = YesNoResponse, FollowUpYesNoResponse = FollowUpYesNoResponse, Details = Details,
             TherapySessionFormat = TherapySessionFormat, WantsOtherSessionFormat = WantsOtherSessionFormat,
             WantsFrequencyChange = WantsFrequencyChange, TherapyFrequencyDirection = TherapyFrequencyDirection,
@@ -846,9 +664,9 @@ public sealed partial class AssessmentNeedViewModel : ObservableObject
     public AssessmentNeed ToModel() => new()
     {
         Id = Id, Type = Type, Description = Description, DesiredResult = DesiredResult,
-        AssociateProvider = AssociateProvider, ProviderId = ProviderId,
-        ProviderNameSnapshot = ProviderNameSnapshot,
-        ProviderPracticeSnapshot = ProviderPracticeSnapshot,
-        ProviderNetworkSnapshot = ProviderNetworkSnapshot
+        AssociateProvider = AssociateProvider, ProviderId = AssociateProvider ? ProviderId : null,
+        ProviderNameSnapshot = AssociateProvider ? ProviderNameSnapshot : string.Empty,
+        ProviderPracticeSnapshot = AssociateProvider ? ProviderPracticeSnapshot : string.Empty,
+        ProviderNetworkSnapshot = AssociateProvider ? ProviderNetworkSnapshot : string.Empty
     };
 }

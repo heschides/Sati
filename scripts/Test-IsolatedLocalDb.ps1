@@ -27,13 +27,15 @@ param(
     [switch]$ClaimMdPreparationOnly,
     [switch]$NoteAmendmentsOnly,
     [switch]$PayerBillingOnly,
+    [switch]$RecordsGovernanceOnly,
+    [switch]$AssessmentReviewOnly,
     [switch]$FullApi,
     [switch]$FullSolution
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-if (@(@($ApiOnly, $DesktopOnly, $NoteAbandonmentOnly, $ClaimMdPreparationOnly, $NoteAmendmentsOnly, $PayerBillingOnly, $FullApi, $FullSolution) | Where-Object { $_ }).Count -gt 1) {
+if (@(@($ApiOnly, $DesktopOnly, $NoteAbandonmentOnly, $ClaimMdPreparationOnly, $NoteAmendmentsOnly, $PayerBillingOnly, $RecordsGovernanceOnly, $AssessmentReviewOnly, $FullApi, $FullSolution) | Where-Object { $_ }).Count -gt 1) {
     throw 'Choose at most one test-project filter.'
 }
 if ($env:OS -cne 'Windows_NT') { throw 'Isolated LocalDB tests require Windows.' }
@@ -90,7 +92,13 @@ try {
     }
 
     if (-not $DesktopOnly -and -not $FullSolution) {
-        $apiFilter = if ($PayerBillingOnly) {
+        $apiFilter = if ($AssessmentReviewOnly) {
+            'FullyQualifiedName~AssessmentReviewSqlTests'
+        }
+        elseif ($RecordsGovernanceOnly) {
+            'FullyQualifiedName~RecordsGovernanceSqlTests'
+        }
+        elseif ($PayerBillingOnly) {
             'FullyQualifiedName~PayerBillingSqlTests'
         }
         elseif ($NoteAmendmentsOnly) {
@@ -113,7 +121,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "API SQL test project failed (exit $LASTEXITCODE)." }
     }
 
-    if (-not $ApiOnly -and -not $NoteAbandonmentOnly -and -not $ClaimMdPreparationOnly -and -not $NoteAmendmentsOnly -and -not $PayerBillingOnly -and -not $FullApi -and -not $FullSolution) {
+    if (-not $ApiOnly -and -not $NoteAbandonmentOnly -and -not $ClaimMdPreparationOnly -and -not $NoteAmendmentsOnly -and -not $PayerBillingOnly -and -not $RecordsGovernanceOnly -and -not $AssessmentReviewOnly -and -not $FullApi -and -not $FullSolution) {
         $desktopFilter = 'FullyQualifiedName~LocalServiceTimeSqlServerTests|FullyQualifiedName~MigrationEffectAnalyzerAgainstLiveSchemaTests|FullyQualifiedName~WorkAgendaMigrationTests.SystemDataSqlClientSessionTempTableSurvivesParameterizedCommands|FullyQualifiedName~WorkAgendaMigrationTests.DuplicateRepairKeepsLowestExactRowCancelsSafeFanOutAndSkipsUnsafeGroups'
         $desktopArgs = @('test', $desktopProject, '--configuration', 'Release', '--filter', $desktopFilter,
             '--logger', 'trx', '--results-directory', (Join-Path $repository 'TestResults/IsolatedSqlServer/Desktop'),

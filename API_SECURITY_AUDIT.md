@@ -1,5 +1,20 @@
 # API security audit — 2026-08-14, 2026-08-15, 2026-08-30, 2026-08-31, 2026-09-05, 2026-09-10, 2026-09-11, 2026-09-14
 
+## October 7 — Prompt 04 assessment review source verification
+
+New routes recheck validated actor, tenant/person/current author scope and shared
+independent reviewer authority. No Admin/Billing-only clinical access or self-review.
+Author-only reopening is limited to legacy submissions without snapshots. Shared
+server completeness and exact persisted revision/hash close the direct-submit bypass;
+failed saves stop desktop submission. Immutable snapshots and review history are
+protected in both contexts; consumer deletion refuses retained review evidence.
+Final approval, artifact, dated attestation and audit share a serializable transaction.
+No clinical comment text enters general audit. Private regression evidence proves
+the original completeness/save defects and demonstrates stale approval/self-review
+tests fail when their guards are removed. All guards were restored for acceptance.
+This is source verification, not deployed or regulatory certification; signing and
+agency acceptance gates are in ASSESSMENT_REVIEW_RUNBOOK.md.
+
 Scope: the authorization surface of `Sati.Api`, the sensitive-data boundary between the server and
 distributed clients, and the artifacts the platform hands to a reviewer. Driven by the two risks
 `CLAUDE.md` names as open — caller-controlled scope values, and `User` fields that must never leave
@@ -660,3 +675,23 @@ Publication and audit save atomically. New configuration versions are append-onl
 start/revision indexes and a database-owned publication lock. Existing retained generation,
 correction and receipt protection owners are preserved. This review concerns this change only;
 it is not payer certification or a renewed platform security/compliance certification.
+
+
+## October 6, 2026 — records governance, limited review
+
+New Admin routes expose only the validated actor's agency. Shared rules require Administration,
+immutable hold scope, bounded requests, expected revisions, actor/request-bound operation replay
+and independent release decisions excluding the placer/requester. API and local services own
+serializable transactions and metadata-only audit. Legacy active holds remain enforced and are
+imported without rewriting originals; old release cannot bypass second approval. Broader holds
+also protect ordinary/test-consumer deletion under the same agency lock. Unresolved record-person
+mapping is unavailable rather than clear. Failed registry reads remain fail-closed.
+
+New dependency and batch tests cover preservation in all six classes and reverse references,
+missing stores, changed epochs/policies/fingerprints, receipt binding, exact retries and rollback
+without extra deletion. SQL tests verify real two-connection lock contention and evidence-preserving
+upgrade/downgrade guards. Removal probes prove the independent-approval and epoch regression tests
+fail against the unguarded source. WPF tests suppress stale account/selection loads. Runtime has no
+activated destructive adapter or policy; execution accepts only owned private fixtures, irrespective
+of a claimed fixture Boolean. This limited review does not certify regulatory compliance or cover
+unimplemented external backup/object adapters. See RECORDS_GOVERNANCE_RUNBOOK.md.

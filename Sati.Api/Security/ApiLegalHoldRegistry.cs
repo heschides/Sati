@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
+using Sati.Data;
 using Sati.Contracts.V1;
 
 namespace Sati.Api.Security;
@@ -20,7 +21,7 @@ internal sealed class ApiLegalHoldRegistry(ApiDbContext db) : ILegalHoldRegistry
             var hasActiveHold = await db.LegalHolds.AsNoTracking().AnyAsync(
                 hold => hold.AgencyId == agencyId && hold.PersonId == personId && !hold.IsReleased,
                 cancellationToken);
-            return hasActiveHold ? LegalHoldStatus.Active : LegalHoldStatus.Clear;
+            return await LegacyRecordsHoldBridge.PersonStatusAsync(db, agencyId, personId, hasActiveHold, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

@@ -18,8 +18,8 @@ Suggested sequencing
 Index
 01. Critical: Approved-note amendments
 02. Critical: Live payer billing requirements
-03. Critical: Complete retention and legal holds
-04. Significant: Comprehensive Assessment supervisor review
+03. Critical: Complete retention and legal holds — source implemented October 6; PolicyOnly; activation gates in RECORDS_GOVERNANCE_RUNBOOK.md
+04. Significant: Comprehensive Assessment supervisor review — source implemented October 7; controlled migration/signing/agency activation gates in ASSESSMENT_REVIEW_RUNBOOK.md
 05. Significant: Full Person-Centered Plan workflow
 06. Significant: Service authorization and utilization
 07. Significant: Complete remittance detail and multi-line claims
@@ -114,6 +114,7 @@ Verify successful and denied paths, atomic failures, immutable history and concu
 
 ========================================================================
 PROMPT 04  Comprehensive Assessment supervisor review
+Status: Source implemented October 7, 2026. Migration 128 prepared, unexecuted. See ASSESSMENT_REVIEW_RUNBOOK.md and AGENDA.md for verification and activation gates.
 Importance: Significant
 Dependency: Provides the approved assessment/version foundation for prompt 5.
 ========================================================================
@@ -522,3 +523,11 @@ Re-enabling the timer and one verification reset are final separately approved o
 
 Update the affected runbooks, current agenda and design records with verified status, retained evidence and unresolved gates. Do not report source or previews as successful activation.
 
+
+Implementation status checked October 6, 2026
+01: Source implemented; selected-note correction history and separate Supervisor queue also implemented.
+02: Payer configuration source released in 1.3.36; certification/real transmission gates remain separate.
+03: Authorized source foundation implemented with synthetic tests and controlled migration 127 prepared.
+    Runtime enforcement remains PolicyOnly. Approved periods and complete storage/backup/recovery
+    adapters remain explicitly unactivated operational/integration gates. See RECORDS_GOVERNANCE_RUNBOOK.md.
+04: Next unstarted feature prompt. This status update does not start it or authorize deployment.
