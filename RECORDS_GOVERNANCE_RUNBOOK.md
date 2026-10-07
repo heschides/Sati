@@ -1,8 +1,10 @@
 # Records governance — source implementation and activation gates
 
-Prepared October 6, 2026 for feature prompt 03. This is an unreleased source feature.
-No runtime database was queried or changed for this work. Migration 127, API publication,
-installer publication, approved legal periods and destructive retention are not activated.
+Prepared October 6, 2026 for feature prompt 03. Separately authorized release 1.3.37
+applied Demo migration 127 (then assessment review migration 128), published the matching
+API, replaced the synthetic baseline, and verified one completed reset. Exact hashes and
+operation evidence are in AGENDA.md. Approved legal periods and destructive retention
+remain unavailable; runtime enforcement stays PolicyOnly.
 
 ## Implemented boundary
 

@@ -24,11 +24,43 @@
   API 1,119, Signatures 119, Portal 8 and Carika 4 (4,205 passing). One documented
   on-device AI model opt-in skip; no SQL skips. Evidence: `TestResults/datt-1.3.37/`
   build/test logs and coverage index; unique TRX files in BackgroundWorkersFullSql.
-- [ ] Source commit/push and matching API package/deployment/health/contract evidence.
-- [ ] Controlled Demo migration rollback rehearsals, application and idempotent reruns.
-- [ ] Read-only pre-capture check, replacement baseline, completed reset and worker marker.
+- [x] Source `83c895d1ed00d3a3e1a1caecc838f89aa55d43f1` pushed to master.
+  API ZIP: 11,828,115 bytes, SHA-256
+  `6BE37C25C124F30A239A8BA90FA5EB335A24123290C75DC52C14D53C9646F7E9`;
+  assembly 1.3.37.0, 70 safe entries. Demo deployment
+  `9d53a76fb9da4b3fa9288fb34e965145` succeeded at 16:09:21.2189106Z.
+  Live/ready healthy before and after reset, version 1.3.37, contract `D33428799A40`.
+  Authenticated readiness skipped: designated environment/current-profile credentials absent.
+  Prior healthy 1.3.36 package/deployment retained.
+- [x] Controlled migration 127: rehearsal rolled back at 126, application reached 127,
+  rerun reported IDEMPOTENCY_VERIFIED. Guarded SHA-256
+  `7D611F45B4B22EA6FF6941B2ED0FDEFE709B55F2AA1FD73D5633DF4C07B5CB50`.
+  Migration 128: rehearsal rolled back at 127, application reached 128, rerun reported
+  IDEMPOTENCY_VERIFIED. Guarded SHA-256
+  `F544FE2360FFA9EB0726C0F14815935408352F3495A64D2121195E982B5D8B02`.
+  Existing reset Function paused for migration/capture, then resumed and verified Running.
+- [x] Read-only check: 177 synthetic clients, zero proposed changes and zero unexpected
+  billing holds. Replacement reported DEMO_FULL_RESET_BASELINE_CAPTURED, anchor
+  2026-10-07. One verification reset accepted (202) at 16:14:46Z, request
+  `25a4c367-0ed4-4359-a57f-4c845637956a`; demo.reset.completed at 16:18:47Z,
+  stage Completed, 226 seconds. Worker operation `427cc140bd19911cadb2a6a4e8e28d8a`
+  recorded DEMO_COMPLIANCE_HISTORY_COMPLETE. No retry.
 - [ ] User firewall-rule removal and successful absence verification.
-- [ ] Demo/Local installers, acceptance and cleanup, exact distribution hash verification.
+  Installer publication finished; the last successful Azure listing still showed
+  `datt-workstation-20261007`. Josh must remove it before release closure. This
+  published-gate checkpoint is not the final DATT evidence commit.
+- [x] Demo installer: 104,521,728 bytes, SHA-256
+  `CED2DEFFE247BD5941A4EF047C433A23C54967C0E4D7BDBE8F28B9AAE5394DD5`.
+  Five responsive 15-second launches, normal closes, exact 1.3.37.0 and cleanup passed.
+  Local installer: 206,833,705 bytes, SHA-256
+  `2D355CCC3B5667D1AAA7817D89B8B51EE223CA3FCE0BFFC52A6892D52D0A03F3`.
+  Exact version, embedded Microsoft MSI signature, integrated security and cleanup passed.
+  Acceptance was isolated on LONGCHENPA; external-machine attestation remains unverified.
+  Installers/checksums published without overwrite and final hashes verified:
+  `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop\SatiLocalSetup-1.3.37.exe`
+  and `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files\SatiDemoSetup-1.3.37.exe`.
+  Exact bundle acceptance/cleanup JSON and four-file distribution hash evidence are under
+  `TestResults/datt-1.3.37/`. No installer was applied to a working Local installation.
 - [ ] One final evidence commit/push and clean master matching the remote.
 
 Comprehensive Assessment signing/agency acceptance and runtime destructive retention
@@ -67,8 +99,8 @@ not establish or repair the intermittent stack-overflow cause.
   recovery-rule/local/UI recheck passed 9 tests. Migration-chain replay: 128 migrations,
   zero problems. Guarded SQL SHA-256:
   `F544FE2360FFA9EB0726C0F14815935408352F3495A64D2121195E982B5D8B02`.
-- [ ] Controlled deployment/schema activation, synthetic Demo baseline recapture and
-  verification reset remain separately authorized release actions.
+- [x] Separately authorized Demo migrations, matching API publication, synthetic baseline
+  replacement and verification reset completed in release 1.3.37; evidence above.
 - [ ] Comprehensive Assessment signing, required-signers/meaning, agency/OADS acceptance,
   accessible-PDF acceptance and broader keyboard/JAWS/high-contrast/200% layout checks
   remain activation gates. Queue pagination and richer coverage/recusal policy are deferred.
@@ -76,7 +108,7 @@ not establish or repair the intermittent stack-overflow cause.
 Runbook: ASSESSMENT_REVIEW_RUNBOOK.md. TRX evidence: TestResults/assessment-review
 and TestResults/IsolatedSqlServer/Api. Source work does not begin Prompt 05.
 
-## Unreleased — selected-note corrections and crash investigation (October 6)
+## October 6 — selected-note corrections and crash investigation (released 1.3.37)
 
 - [x] Notes Log correction history follows only the selected approved note; preserve
       unsaved proposals and suppress stale selection responses.

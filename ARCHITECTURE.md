@@ -1,6 +1,6 @@
 # Sati — Architecture Reference
 
-## October 7 — Formatted personal scratchpads (source only)
+## October 7 — Formatted personal scratchpads (release 1.3.37)
 
 `ScratchpadEditor` is a presentation-only rich editor over the shared, closed
 `JournalDocument` contract. Both agenda tabs retain their existing Content column,
@@ -26,10 +26,10 @@ supports explicitly opted-in RichTextBox editors with the same read-only/session
 The save baseline captures the exact document sent, and close/rollover refuses a flush
 if editing during that request leaves newer unsaved content. Regression tests reproduce
 the former lost-dirty-state race. `scratchpad-formatted-numbered-checklist-v1` records
-the content compatibility boundary in the API fingerprint. No real PHI was read,
-no migration was applied and no release was cut for this source slice.
+the content compatibility boundary in the API fingerprint. This feature adds no
+database migration. It ships in release 1.3.37; no real PHI was read for this work.
 
-## October 7 — Comprehensive Assessment review (Prompt 04, source only)
+## October 7 — Comprehensive Assessment review (Prompt 04, release 1.3.37)
 
 `AssessmentCatalog` and `AssessmentReviewRules` in Contracts.V1 own version-1 question
 definitions, portable document types, completeness, provider snapshot validation and
@@ -57,10 +57,11 @@ saved approval/return refreshes profile/caseload/form/note context. Validation s
 are focusable and cloud validation preserves their locations. Versioned PDF exports
 retain artifact provenance and cannot supersede newer approved content. Review clinical
 text is stored only in protected clinical tables, while audit uses IDs/hashes. Consumer
-deletion refuses review history. Migration 128 and guarded Demo scripts are unexecuted;
-see ASSESSMENT_REVIEW_RUNBOOK.md for activation and external-policy gates.
+deletion refuses review history. Release 1.3.37 applied guarded Demo migrations 127/128,
+published the matching API, and verified the replacement baseline/reset. Local schema
+activation remains per installation. See ASSESSMENT_REVIEW_RUNBOOK.md for external-policy gates.
 
-## October 6 — Durable navigation breadcrumbs (unreleased)
+## October 6 — Durable navigation breadcrumbs (release 1.3.37)
 
 ApplicationRunState persists a maximum of 32 closed-vocabulary operation/phase entries
 with sequence and UTC timestamp in the existing per-session run marker. Shell navigation,
@@ -72,7 +73,7 @@ to AppErrorLog's existing crash diagnostic, using the same reference. Breadcrumb
 local; incident API contracts, payloads and permissions are unchanged. Existing log
 rotation and run-marker retention apply. No record content/IDs or arbitrary strings are accepted.
 
-## October 6 — Correction workspace placement (unreleased)
+## October 6 — Correction workspace placement (release 1.3.37)
 
 NotesWindowViewModel drives its transient NoteAmendmentsViewModel from the selected
 approved note. SupervisorDashboardViewModel receives a separate transient correction

@@ -1,7 +1,9 @@
 # Comprehensive Assessment review — Prompt 04
 
-Source implemented October 7, 2026. This is not a deployment, migration execution,
-signing activation, or approval of an agency's assessment policy.
+Source implemented October 7, 2026. Separately authorized release 1.3.37 applied Demo
+migrations 127/128, published the matching API, replaced the synthetic baseline, and
+verified one completed reset. See AGENDA.md for exact hashes and operation evidence.
+Assessment signing and approval of an agency's assessment policy remain activation gates.
 
 ## Workflow and authority
 
@@ -74,7 +76,7 @@ answers or comment text. Snapshots/events cannot be modified/deleted through eit
 context. Consumer deletion refuses retained assessment review history; archive instead.
 No destructive retention adapter for these clinical records is enabled by this work.
 
-## Controlled schema activation (not executed)
+## Controlled schema activation
 
 1. Review the current release playbook and migrations 127 (RecordsGovernance) then 128
    (`20261007111016_AddAssessmentReviewCycles`). The hosted predecessor for this script
