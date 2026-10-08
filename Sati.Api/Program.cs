@@ -144,7 +144,7 @@ builder.Services.AddSingleton<SyntheticClearinghouseConnector>();
 builder.Services.AddSingleton<IClaimMdSandboxKeySource, EnvironmentClaimMdSandboxKeySource>();
 builder.Services.AddSingleton<IClaimMdSandboxCoordination, SqlClaimMdSandboxCoordination>();
 builder.Services.AddSingleton<IDemoWorkerResetCoordination, SqlDemoWorkerResetCoordination>();
-builder.Services.AddHttpClient<ClaimMdSandboxConnector>(client => client.Timeout = TimeSpan.FromSeconds(45))
+builder.Services.AddHttpClient<ClaimMdSandboxConnector>(ClaimMdSandboxConnector.ConfigureHttpClient)
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
 builder.Services.AddSingleton<IClearinghouseConnector, SandboxConnectorRouter>();
 builder.Services.AddHostedService<ClearinghouseDispatchWorker>();

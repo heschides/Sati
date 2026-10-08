@@ -42,11 +42,19 @@ internal sealed record ClaimMdUploadListing(string FileId, string FileName, long
 
 /// <summary>Fixed-host Claim.MD API 1.19 transport. No endpoint is supplied by a client or account row.</summary>
 internal sealed class ClaimMdSandboxConnector(HttpClient http, IClaimMdSandboxKeySource keys,
-    IClaimMdSandboxCoordination coordination) : IClearinghouseConnector
+    IClaimMdSandboxCoordination coordination, TimeProvider timeProvider) : IClearinghouseConnector
 {
     private const string Base = "https://svc.claim.md/services/";
     private const int MaximumResponseBytes = 16 * 1024 * 1024;
     internal const int EraListPageSize = 100;
+    internal static readonly TimeSpan HttpExchangeTimeout = TimeSpan.FromSeconds(45);
+
+    internal static void ConfigureHttpClient(HttpClient client)
+    {
+        // This connector owns one TimeProvider deadline for headers and body.
+        // A separate HttpClient timer would cover only headers, using system time.
+        client.Timeout = Timeout.InfiniteTimeSpan;
+    }
 
     public async Task<ClearinghouseUploadResult> UploadAsync(ClearinghouseUpload upload, CancellationToken token)
     {
@@ -200,23 +208,30 @@ internal sealed class ClaimMdSandboxConnector(HttpClient http, IClaimMdSandboxKe
     private Task<string> PostAsync(string path, HttpContent content, CancellationToken token) =>
         coordination.RequestAsync(async coordinatedToken =>
     {
+        // SQL lease acquisition and pacing retain their existing separate budgets.
+        using var deadline = new CancellationTokenSource(HttpExchangeTimeout, timeProvider);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(coordinatedToken, deadline.Token);
+        var exchangeToken = cancellation.Token;
+        exchangeToken.ThrowIfCancellationRequested();
         using var request = new HttpRequestMessage(HttpMethod.Post, Base + path) { Content = content };
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, coordinatedToken);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, exchangeToken);
         // Redirects must be disabled on the injected handler; never forward an AccountKey.
         if (!response.IsSuccessStatusCode || (int)response.StatusCode is >= 300 and < 400)
             throw new HttpRequestException("Claim.MD did not confirm the request.");
-        await using var stream = await response.Content.ReadAsStreamAsync(coordinatedToken);
+        await using var stream = await response.Content.ReadAsStreamAsync(exchangeToken);
         using var buffer = new MemoryStream();
         var chunk = new byte[8192];
         int read;
-        while ((read = await stream.ReadAsync(chunk, coordinatedToken)) > 0)
+        while ((read = await stream.ReadAsync(chunk, exchangeToken)) > 0)
         {
             if (buffer.Length + read > MaximumResponseBytes)
                 throw new FormatException("Claim.MD response exceeds the safe limit.");
             buffer.Write(chunk, 0, read);
         }
-        return Encoding.UTF8.GetString(buffer.ToArray());
+        var body = Encoding.UTF8.GetString(buffer.ToArray());
+        exchangeToken.ThrowIfCancellationRequested();
+        return body;
     }, token);
 
     private static XElement Parse(string xml)

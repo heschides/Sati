@@ -171,6 +171,83 @@ public sealed class ClearinghouseDispatchApiTests
     }
 
     [Fact]
+    public async Task HttpExchangeDeadlineKeepsAnUploadUnknownAndNeverRetriesItAutomatically()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using (var db = fixture.Factory.OpenDatabase())
+        {
+            var account = await db.ClearinghouseAccounts.SingleAsync();
+            account.SecretReference = "CLAIMMD_SANDBOX_KEY_TEST";
+            account.Revision++;
+            await db.SaveChangesAsync();
+        }
+        await fixture.GenerateAsync(fixture.AccountId);
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(fixture.GenerationId, fixture.AccountId)))
+            .EnsureSuccessStatusCode();
+        var clock = new ManualTimeProvider();
+        using var body = new StalledUploadResponseBody();
+        using var handler = new StalledUploadHandler(body);
+        // Only the connector's fake-time deadline can cancel this synthetic exchange.
+        using var http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        var keys = new SyntheticSandboxKeySource();
+        var connector = new ObservedDeadlineConnector(new ClaimMdSandboxConnector(
+            http, keys, new TestClaimMdCoordination(), clock));
+        var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
+        {
+            ExpectedEnvironment = "Testing", ExpectedDatabaseName = "SatiApiTests",
+            EnableClaimMdSandboxTransport = true
+        }), fixture.Factory.Services.GetRequiredService<IHostEnvironment>());
+        var worker = new ClearinghouseDispatchWorker(
+            fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(),
+            connector, gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
+            keys, new TestDemoWorkerResetCoordination(),
+            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>());
+        using var caller = new CancellationTokenSource();
+        var processing = worker.ProcessOneAsync(caller.Token);
+        try
+        {
+            await body.ReadStarted.WaitAsync(TimeSpan.FromSeconds(5));
+            await using (var sending = fixture.Factory.OpenDatabase())
+            {
+                Assert.Equal(ClearinghouseDispatchState.Sending,
+                    (await sending.ClearinghouseDispatches.SingleAsync()).State);
+                Assert.Empty(await sending.ClearinghouseDispatchAttempts.ToListAsync());
+            }
+            clock.Advance(TimeSpan.FromMilliseconds(44_999));
+            Assert.False(processing.IsCompleted);
+            Assert.False(body.ReadToken.IsCancellationRequested);
+            clock.Advance(TimeSpan.FromMilliseconds(1));
+            Assert.True(await processing.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.IsAssignableFrom<OperationCanceledException>(connector.Failure);
+            Assert.True(body.ReadToken.IsCancellationRequested);
+            Assert.False(caller.IsCancellationRequested);
+            Assert.True(body.WasDisposed);
+
+            Assert.False(await worker.ProcessOneAsync(CancellationToken.None));
+            Assert.Equal(1, handler.Calls);
+            await using var saved = fixture.Factory.OpenDatabase();
+            var dispatch = await saved.ClearinghouseDispatches.SingleAsync();
+            Assert.Equal(ClearinghouseDispatchState.OutcomeUnknown, dispatch.State);
+            Assert.Equal("upload_outcome_unknown", dispatch.SafeErrorCode);
+            var attempt = Assert.Single(await saved.ClearinghouseDispatchAttempts.ToListAsync());
+            Assert.Equal(1, attempt.AttemptNumber);
+            Assert.Equal(ClearinghouseAttemptOutcome.OutcomeUnknown, attempt.Outcome);
+            Assert.Null(attempt.ResponseCiphertext);
+            Assert.Empty(await saved.BillingSubmissionEvents.Where(row =>
+                row.EdiGenerationId == fixture.GenerationId &&
+                row.Stage == BillingSubmissionStage.Transmitted).ToListAsync());
+        }
+        finally
+        {
+            // The unfixed transport must leave no stalled task behind when this test fails.
+            body.Release();
+            caller.Cancel();
+            await processing.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    [Fact]
     public async Task ReturnedVendorEvidenceIsEncryptedAndBoundToTheAttempt()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -500,6 +577,83 @@ public sealed class ClearinghouseDispatchApiTests
             Calls++;
             throw new TimeoutException("No reliable upload verdict");
         }
+    }
+
+    private sealed class SyntheticSandboxKeySource : IClaimMdSandboxKeySource
+    {
+        public string Resolve(string? reference)
+        {
+            Assert.Equal("CLAIMMD_SANDBOX_KEY_TEST", reference);
+            return "SYNTHETIC_KEY";
+        }
+    }
+
+    private sealed class ObservedDeadlineConnector(ClaimMdSandboxConnector connector) : IClearinghouseConnector
+    {
+        public OperationCanceledException? Failure { get; private set; }
+
+        public async Task<ClearinghouseUploadResult> UploadAsync(ClearinghouseUpload upload,
+            CancellationToken token)
+        {
+            try { return await connector.UploadAsync(upload, token); }
+            catch (OperationCanceledException exception)
+            {
+                Failure = exception;
+                throw;
+            }
+        }
+    }
+
+    private sealed class StalledUploadHandler(StalledUploadResponseBody body) : HttpMessageHandler
+    {
+        public int Calls { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            Assert.Equal("https://svc.claim.md/services/upload/", request.RequestUri!.ToString());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(body)
+            });
+        }
+    }
+
+    private sealed class StalledUploadResponseBody : Stream
+    {
+        private readonly TaskCompletionSource _readStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task ReadStarted => _readStarted.Task;
+        public CancellationToken ReadToken { get; private set; }
+        public bool WasDisposed { get; private set; }
+        public void Release() => _released.TrySetResult(0);
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            ReadToken = cancellationToken;
+            _readStarted.TrySetResult();
+            return await _released.Task.WaitAsync(cancellationToken);
+        }
+        protected override void Dispose(bool disposing)
+        {
+            WasDisposed = true;
+            base.Dispose(disposing);
+        }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private sealed class Fixture : IAsyncDisposable

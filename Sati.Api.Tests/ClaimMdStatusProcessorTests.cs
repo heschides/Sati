@@ -199,7 +199,7 @@ public sealed class ClaimMdStatusProcessorTests
             }
             throw new InvalidOperationException("Unexpected Claim.MD test request.");
         }));
-        var connector = new ClaimMdSandboxConnector(http, new PageKeySource(), new TestClaimMdCoordination());
+        var connector = new ClaimMdSandboxConnector(http, new PageKeySource(), new TestClaimMdCoordination(), TimeProvider.System);
         var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
         {
             ExpectedEnvironment = "Demo", ExpectedDatabaseName = "SatiDemo",
@@ -245,7 +245,7 @@ public sealed class ClaimMdStatusProcessorTests
             requests++;
             return Task.FromResult(Xml("<result />"));
         }));
-        var connector = new ClaimMdSandboxConnector(http, new PageKeySource(), new TestClaimMdCoordination());
+        var connector = new ClaimMdSandboxConnector(http, new PageKeySource(), new TestClaimMdCoordination(), TimeProvider.System);
         var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
         {
             ExpectedEnvironment = "Demo", ExpectedDatabaseName = "SatiDemo",
@@ -284,7 +284,7 @@ public sealed class ClaimMdStatusProcessorTests
             requests++;
             return Task.FromResult(Xml("<result />"));
         }));
-        var connector = new ClaimMdSandboxConnector(http, new PageKeySource(), new TestClaimMdCoordination());
+        var connector = new ClaimMdSandboxConnector(http, new PageKeySource(), new TestClaimMdCoordination(), TimeProvider.System);
         var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
         {
             ExpectedEnvironment = "Demo", ExpectedDatabaseName = "SatiDemo",

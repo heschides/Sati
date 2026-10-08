@@ -271,6 +271,31 @@ diagnostic-sink redaction and original/dispatch release gates require their own 
 revalidation. Dispatch unsent-backoff implementation still requires the policy/schema proposal
 in [W8](../../BACKGROUND_WORKERS_HANDOFF.md). No cloud/live/approval blocker is silently closed.
 
+## 2026-10-08 — Documentation publication and HTTP source commit
+
+The reviewed prerequisite is local commit `b5ec4d4` and was successfully pushed to
+`origin/codex/agenda-sequence-2026-10-08`. After the automatic-review rejection, Josh explicitly
+approved this repository and documentation payload. The subsequent push succeeded without
+force, branch reconciliation, deployment or activation. This approval covers ordinary verified
+source/documentation chunks on that branch; other operating gates remain unchanged.
+
+The prerequisite contains 296 reviewed public documentation/gate files and excludes preexisting
+Settings/readiness product changes. The dated assessment's intentional hard breaks are retained
+under the documented exact-file attribute exception; index whitespace and the final staged
+documentation gate passed. The export was temporary and has been removed. Its location under
+the repository inadvertently entered a later WPF XAML build, causing duplicate generated members;
+that attempt supplies no test evidence. Bounded cleanup removed only the owned export, and build
+tooling cleaned generated output before normal verification resumed. Future source exports must
+be outside all project item globs.
+
+**SATI-WRK-001 HTTP source chunk:** the connector/client registration and three affected test
+files are committed separately from the still local note-worker discovery change. Actual deadline
+acceptance remains the [HTTP entry above](#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline):
+two original failures, 49 focused passes/four SQL skips and the separate 34-pass guarded selection.
+No source change after that verification alters this chunk. The sealed ledger is unchanged.
+The local agency paging suite is now green, but its completion/SQL proof and commit are recorded
+in the next entry rather than claimed as part of this HTTP chunk.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown
