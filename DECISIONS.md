@@ -38,10 +38,16 @@ errors is recorded in [DEC-0226](docs/decisions/current/2026-10-08-DEC-0226.md).
 exception provenance cannot waive remaining obligations. Service-date policy, exact-obligation
 exceptions, Admin recovery and immutable transport/correction rules retain their existing owners.
 
+The API request exception boundary is recorded in
+[DEC-0227](docs/decisions/current/2026-10-08-DEC-0227.md). It contains raw escaping exceptions
+before framework observability while retaining generic responses, safe correlation and best-effort
+incidents. Independent sink redaction and the incident execution-scope defect remain separate.
+
 ## Explicit supersession
 
 | Earlier statement | Later authority | Scope of supersession |
 |---|---|---|
+| Historical broad API logging assurance and raw-exception request handler | [DEC-0227](docs/decisions/current/2026-10-08-DEC-0227.md), [October 8 API audit correction](API_SECURITY_AUDIT.md#october-8--escaping-request-exception-boundary-and-logging-scope-correction) | Escaping request failures are contained with bounded safe fields. The earlier assurance does not cover all enabled framework/provider sinks; desktop curated-envelope policy remains. |
 | September 1 form identity keyed by DueDate; generated “born complete/in force” assumptions | September 14 annual-compliance decision; [current attestation design](NOTE_FORM_ATTESTATION_DESIGN.md) | Annual identity is target-identified and completion requires actual evidence. Historical migration compatibility is retained; current rows are not grouped by equal deadlines. |
 | September 28 rejection of completing an unopened PCP in one save | October 6 explicit annual-progress decision in the [record index](docs/decisions/README.md) | A confirmed actual opening/completion choice may occur in one atomic save; no automatic inferred completion. |
 | Early person-only holds and single-Admin release limitation | October 6 source update in [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md) | Scoped holds/independent release now exist in source; complete runtime retention/recovery remains gated. Old hold evidence is retained. |

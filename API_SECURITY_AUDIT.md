@@ -1,5 +1,32 @@
 # API security audit — 2026-08-14, 2026-08-15, 2026-08-30, 2026-08-31, 2026-09-05, 2026-09-10, 2026-09-11, 2026-09-14
 
+## October 8 — escaping request-exception boundary and logging scope correction
+
+The historical August logging assertions below are retained as dated observations. They do not
+establish redaction of every enabled API sink: source review and synthetic fail-first tests found
+raw request exceptions in logger arguments and ASP.NET Core diagnostic payloads, including an
+exception with a safe message but sensitive `Data`. Generic response text alone did not prevent
+that release. A Warning threshold on EF commands also does not sanitize other EF/provider
+categories, exceptions or DiagnosticListener payloads. The historical broad logging assurance is
+explicitly superseded within that scope; the desktop curated-envelope design is unchanged.
+
+The API now contains escaping downstream request exceptions with a constructor-injected
+boundary before the existing middleware pipeline. It emits only bounded content-free shape and
+correlation fields, preserves generic 500/correlation/security/cache headers when writable, and
+aborts safely after a started response or secondary error-response failure. Actual request-aborted
+operation/I/O cancellation keeps 499; unrelated cancellation remains an unexpected error.
+Raw exception objects do not escape this boundary into framework exception/hosting diagnostics.
+No route or actor/tenant authorization scope changes.
+
+[The logging owner](LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026),
+[DEC-0227](docs/decisions/current/2026-10-08-DEC-0227.md) and
+[working evidence](docs/readiness/work-evidence.md) own implementation, actual tests and limits.
+The isolated non-retrying SQLite incident positive is not production recording proof. Direct
+incident persistence with a configured retrying strategy currently fails its explicit-transaction
+guard; refusing a retrying outer scope also has a genuine failing baseline. That separate repair
+is next. Independent EF/provider, health/startup, callbacks and host paths remain unverified or
+open; no complete logging-redaction or renewed security-audit clearance is claimed.
+
 ## October 7 — Prompt 04 assessment review source verification
 
 New routes recheck validated actor, tenant/person/current author scope and shared

@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -215,22 +214,7 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
-{
-    var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
-    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-    logger.LogError(exception, "Unhandled API error. CorrelationId={CorrelationId}", context.TraceIdentifier);
-    if (exception is not null)
-    {
-        await context.RequestServices.GetRequiredService<ApiIncidentRecorder>()
-            .RecordAsync(exception, context, context.RequestAborted);
-    }
-    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-    await context.Response.WriteAsJsonAsync(new ApiErrorDto(
-        "server_error",
-        "The request could not be completed.",
-        context.TraceIdentifier));
-}));
+app.UseMiddleware<ApiExceptionBoundaryMiddleware>();
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Correlation-ID"] = context.TraceIdentifier;

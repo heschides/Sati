@@ -15,6 +15,7 @@ Read the individual registered record for the decision and rejected alternatives
 | DEC-0224 | 2026-10-08 | [Finite-range note-worker agency discovery](2026-10-08-DEC-0224.md) | accepted |
 | DEC-0225 | 2026-10-08 | [Note-worker completion cache follows the local day](2026-10-08-DEC-0225.md) | accepted |
 | DEC-0226 | 2026-10-08 | [Preserve authoritative residual billing export errors](2026-10-08-DEC-0226.md) | accepted |
+| DEC-0227 | 2026-10-08 | [Contain escaping API request exceptions](2026-10-08-DEC-0227.md) | accepted |
 
 Accepted decisions must retain their evidence and earlier rejected reasoning. A change to a
 decision creates a successor and supersession link; it does not rewrite the historical import.

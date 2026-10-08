@@ -21,7 +21,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
 | SATI-BIL-001 | residual export-error repair implemented; R1/full queue/send R2 open | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md). Five intended regressions and focused source/synthetic acceptance are recorded in working evidence; no complete send-gate closure. |
-| SATI-SEC-001 | escaping request-exception boundary eligible; other security evidence pending | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
+| SATI-SEC-001 | request boundary implemented; incident execution scope eligible; other security evidence pending | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
 | SATI-GOV-001 | source implemented/runtime gated | Governance activation, approved policy periods and complete storage/recovery adapters; [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md). Runtime retention stays PolicyOnly. |
 | SATI-CLI-001 | evidence pending | External-device/accessibility/mixed-version/clean-install acceptance and supported client/server/schema compatibility; [Demo acceptance](DEMO_ACCEPTANCE.md), [readiness](docs/readiness/README.md). |
 | SATI-DB-001 | planned | Incremental model/schema owner consolidation, controlled migration/rollback and bounded summary queries; [architecture](ARCHITECTURE.md), [environment procedures](DATABASE_ENVIRONMENTS.md). |
@@ -31,21 +31,19 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 
 **Next eligible item:** SATI-SEC-001
 
-**Eligibility:** the bounded escaping request-exception boundary is eligible under Josh's direct
-request to perform remaining eligible local work in sequence. The shared billing residual-error
-repair is implemented; [working evidence](docs/readiness/work-evidence.md) owns its actual
-fail-first/passing results and limits. That repair leaves R1 and full queue/pre-send R2 open.
+**Eligibility:** the bounded incident execution-scope repair follows the implemented request
+exception boundary under Josh's direct request to perform remaining eligible local work in
+sequence. [Working evidence](docs/readiness/work-evidence.md) owns actual fail-first/passing
+results and limits for both the billing residual-error repair and request boundary. Billing R1
+and full queue/pre-send R2 remain open.
 Follow [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** contain exceptions escaping downstream request execution inside the real
-`Sati.Api/Program.cs` pipeline before ASP.NET Core's exception handling/hosting observability can
-receive the raw exception. Preserve a generic 500 `server_error` response and correlation identity
-when a response can be written, bounded content-free logging and the existing safe incident
-envelope. Do not pass unrestricted exception objects, messages, inner exceptions or `Data` to
-general log/diagnostic sinks. A client-aborted request keeps its 499 handling; an unrelated
-`OperationCanceledException` remains an unexpected failure. When a response has started or a
-secondary handler/write fails, contain the failure and abort safely instead of rethrowing raw
-failure data through hosting.
+**Bounded slice:** make direct `IncidentAggregator.UpsertAsync` execute its complete explicit
+transaction inside a named zero-retry EF execution scope. Refuse an already-active retrying
+execution strategy before gate/context/transaction/write work, because a nested strategy cannot
+replace an active outer scope. Preserve valid existing zero-retry request scopes, short-lived
+contexts, the existing striped gate, SQL transaction/locking and immediate same-reference replay
+semantics. Do not automatically replay incident transactions, including ambiguous commit failures.
 
 **Dependencies and owners:** read [the logging design](LOGGING_DESIGN.md),
 [regulatory posture](REGULATORY_CONCERNS.md),
@@ -53,38 +51,39 @@ failure data through hosting.
 [the security review](SECURITY_REVIEW_2026-09-10.md),
 [the contingency owner](docs/readiness/multitenancy-contingencies.md) and
 [working evidence](docs/readiness/work-evidence.md). Revalidate `Program.cs`,
-`ApiIncidentRecorder`, `IncidentAggregator`, `ExceptionFingerprint`, the incident DTO/sanitization
-owners and `Sati.Api.Tests/ApiExceptionRedactionTests.cs`. No schema, cloud, provider or working-data
-prerequisite is needed. Preserve authentication/tenant middleware and safe staff-facing errors.
+`ApiIncidentRecorder`'s private fingerprint, `IncidentAggregator`, `SingleAttemptWriteFilter`,
+the incident DTO/sanitization owners and `Sati.Api.Tests/IncidentAggregationExecutionTests.cs`.
+Revalidate the configured EF package's `ExecutionStrategy.Current` and transaction guard.
+No schema, cloud, provider or working-data prerequisite is needed. Preserve authentication/tenant
+middleware and the implemented safe request boundary.
 
-October 8 revalidated source: `UseExceptionHandler` sends the unrestricted failure to a general
-logger and framework handling can report it before/around the safe response. Test-only middleware
-inside the actual authenticated Program pipeline reproduces four synthetic raw-narrative
-exposures through captured logger/DiagnosticListener observations. Preserve the failing-before
-proof and final executed counts in the evidence ledger; do not infer redaction from response
-body text or a log level alone.
+October 8 revalidated source: `Program` enables SQL retry and `IncidentAggregator` begins an
+explicit transaction without an execution scope. Direct aggregation under a configured retrying
+synthetic strategy fails before a successful write; an active retrying outer scope currently
+fails to refuse work. Both intended regressions failed against the unchanged aggregator. Preserve
+the fail-first proof and final executed counts in the ledger; no automatic retries are permitted
+as a shortcut to passing the direct case.
 
 **Boundaries and completion evidence:** implement only this reversible request-boundary/test
 slice with synthetic disposable storage. Ordinary verified commits/pushes to the approved branch
 remain authorized. No DATT, activation, release, deployment, schema, cloud/security change,
 working-data access or real external call is authorized. Keep sealed readiness/history unchanged.
 
-Acceptance covers nested and uncancelled operation failures, response-started and secondary
-incident/write failures, actual downstream execution and authenticated scope. Assert generic
-response/correlation where writable, safe incident identity in the isolated supported fixture,
-no raw exception reference or synthetic narrative in captured log messages/state/exception trees
-or diagnostic payloads, and unconditional cleanup. Retain request-aborted 499 and normal positive
-request behavior; run focused existing incident/health boundary checks with honest limits.
+Acceptance covers direct persistence with configured retry enabled, no-work refusal inside a
+retrying outer scope, valid single-attempt outer scope, immediate same-reference/new-reference
+counts, cancellation before work and after an actual write, retriable save failure with rollback,
+post-commit acknowledgement failure with no automatic replay, gate release and unconditional
+cleanup. Count context/transaction/query/save/commit attempts independently and inspect committed
+state through a fresh context. Run focused existing incident/request-boundary tests. Synthetic
+SQLite strategy/transaction observations do not establish production-engine locks or live operation.
 
-The boundary fixtures use non-retrying synthetic SQLite to isolate this request behavior.
-Production incident persistence is separately unresolved: `Program` enables SQL retry while
-`IncidentAggregator.UpsertAsync` starts an explicit transaction without an outer execution scope;
-`ApiIncidentRecorder` can contain a recording failure with no incident committed. A separate
-fail-first one-attempt incident execution-scope repair follows this slice. Do not credit the
-SQLite incident positive as evidence that production recording works. Independent EF/provider
-logs, health/startup diagnostics, callback/on-completed paths and a complete log inventory remain
-open; this pointer does not claim complete logging redaction. Admission/rate limits, structural
-tenancy, billing lifecycle/send gates, recovery and independent review retain their owners.
+The request-boundary fixtures intentionally remain non-retrying SQLite to isolate HTTP
+containment. This repair does not establish historical occurrence deduplication: only the stored
+last reference is replayed without increment. Health-check exception redaction follows next with
+its own fail-first direct/framework sink proof. Independent EF/provider logs, health/startup,
+callback/on-completed paths and the complete sink inventory remain open. No full logging-redaction
+or deployed incident-persistence claim follows from either local slice. Admission/rate limits,
+structural tenancy, billing lifecycle/send gates, recovery and independent review retain their owners.
 
 ## Preserved open-work inventory
 

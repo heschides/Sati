@@ -23,9 +23,14 @@ exception; [DEC-0226](../decisions/current/2026-10-08-DEC-0226.md) and
 own its scope and evidence limits. Exact-obligation exception and Admin recovery decisions remain
 with their existing shared owners. R1 physical-send/original-correction lifecycle and full
 exact-retained-subset queue/pre-send R2 remain open, including coordinated source-change races
-and a purpose policy for payer-held voids. The next bounded request-exception boundary slice is
-separate from general EF/provider, health/startup and callback redaction; the incident
-aggregator's explicit transaction/execution-scope gap is a separate follow-up.
+and a purpose policy for payer-held voids. The bounded request-exception boundary now contains
+escaping downstream failures before raw exceptions reach framework logging/hosting diagnostics;
+[the logging owner](../../LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026) and
+[DEC-0227](../decisions/current/2026-10-08-DEC-0227.md) record scope and observability tradeoffs.
+General EF/provider, health/startup and callback redaction remain open. The incident aggregator's
+explicit transaction/execution-scope gap is the next separate repair with two genuine failing
+baselines. Non-retrying boundary-fixture incident positives do not establish production recording;
+these local slices do not close scenario 42 or advance sealed readiness.
 
 The dated hosting inventory has one owner: [DATABASE_ENVIRONMENTS.md](../../DATABASE_ENVIRONMENTS.md). Consult its captured evidence and refresh requirements rather than copying a configuration here. Agency IDs and clearinghouse IDs do not allocate physical resources. A dedicated worker can still share SQL, key/storage/mail services and a vendor quota. RLS, separate databases, partitioned pools and dedicated resources are design options to evaluate, not universal prescriptions.
 

@@ -24,7 +24,7 @@ receiving protected health information.
 | Durable send queue | `Data/Cloud/IncidentOutbox.cs` | Atomic write-then-move envelopes, quarantine for unreadable files |
 | Unclean shutdown detection | `Services/ApplicationRunState.cs` | Per-agency PID/heartbeat marker; a surviving marker at next launch reports a Critical incident with a stable retry reference |
 | External fault signature | `Services/WindowsCrashEventReader.cs` | After restart, queries Application Error 1000 and .NET Runtime 1026 in a heartbeat-bounded window and requires process name plus PID |
-| API correlation | `Sati.Api/Program.cs:147` | Logs unhandled API errors with `TraceIdentifier` and echoes `X-Correlation-ID` |
+| API exception boundary and correlation | `Sati.Api/Infrastructure/ApiExceptionBoundaryMiddleware.cs`, registered first in `Program.cs` | Contains escaping request failures; logs only bounded type, HResult and `TraceIdentifier`, preserves generic errors and `X-Correlation-ID` |
 
 Two existing decisions govern everything below and are not being reopened:
 
@@ -32,6 +32,44 @@ Two existing decisions govern everything below and are not being reopened:
   (`DECISIONS.md`, 2026-08-13).
 - Raw workstation diagnostics stay workstation-only support material and are never copied into the
   aggregated incident table (same entry).
+
+### API request boundary — source, October 8, 2026
+
+`ApiExceptionBoundaryMiddleware` owns escaping downstream request failures. A writable response
+receives the generic `server_error` 500 DTO, correlation/security headers and no-cache/no-store
+headers. The boundary logs a fixed operation label, exception type capped at 160 characters,
+HResult and server correlation ID. It never gives the general logger an exception object,
+message, inner exception, `Data`, stack or request body. `ApiIncidentRecorder` remains the
+best-effort safe-envelope owner; failure to record does not replace the request's response.
+
+An `OperationCanceledException` or `IOException` with an actually cancelled `RequestAborted`
+token retains the 499 path without an incident. An unrelated cancellation exception receives the
+generic failure path. A response that has started is aborted; secondary logger, incident, response
+write and abort failures are contained without rethrowing raw exceptions through hosting.
+Authentication, authorization and tenant middleware remain downstream in their existing order.
+No request is re-executed and no automatic retry is added.
+
+The previous `UseExceptionHandler` delegate supplied a raw exception to both its own logger and
+framework exception diagnostics. Suppressing successful-handler diagnostics alone leaves
+started-response and handler-failure paths uncovered. The replacement also removes that
+middleware's exception-specific events/metrics; safe Error records, ordinary HTTP status/duration
+observability and best-effort incidents remain. See the reviewed
+[ASP.NET Core 10.0.12 exception handler](https://raw.githubusercontent.com/dotnet/aspnetcore/v10.0.12/src/Middleware/Diagnostics/src/ExceptionHandler/ExceptionHandlerMiddlewareImpl.cs)
+and [hosting diagnostics](https://raw.githubusercontent.com/dotnet/aspnetcore/v10.0.12/src/Hosting/Hosting/src/Internal/HostingApplicationDiagnostics.cs).
+
+[DEC-0227](docs/decisions/current/2026-10-08-DEC-0227.md) records the choice;
+[working evidence](docs/readiness/work-evidence.md) owns fail-first proofs, actual passing results
+and limits. Real Program synthetic tests observe logger messages/state/scopes/exception references
+and hosting/exception diagnostic payloads, with positive request and listener observations.
+Their non-retrying SQLite context isolates request containment. It does not establish production
+incident persistence: the separate explicit-transaction/execution-strategy defect remains the
+next repair.
+
+This is a request-boundary control. Independent EF/provider logs and diagnostic payloads,
+health/startup failures, cancellation callbacks, response-completion callbacks, host failures and
+the full enabled-sink inventory remain open. The configured API logger is JSON console; a log
+level or disabled sensitive-parameter logging does not sanitize arbitrary exception payloads.
+No deployment, live sink, real-data or compliance acceptance is established by this source slice.
 
 ### 1.1 Gaps this design closes
 

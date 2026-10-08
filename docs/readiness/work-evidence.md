@@ -637,6 +637,118 @@ claim or production incident-persistence credit is implied.
 
 **Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
 
+## 2026-10-08 — SATI-SEC-001 escaping request-exception boundary
+
+**Stable work ID and bounded slice:** SATI-SEC-001, contain exceptions escaping downstream
+execution in the actual Program request pipeline before general logger/framework diagnostic sinks.
+
+**Status and source/revision:** implemented and locally verified; unreleased. Reviewed branch
+`codex/agenda-sequence-2026-10-08` after billing prerequisite `e1ea61f`, committed and pushed to
+Josh's explicitly approved repository/branch. This request-boundary source/tests/docs await their
+own verified commit. Josh's direct remaining-work request supplies bounded local and ordinary
+commit/push authority; this was not DATT. Unrelated Settings/readiness work is preserved.
+
+**Changed behavior, ownership and canonical paths:** new constructor-injected
+`Sati.Api/Infrastructure/ApiExceptionBoundaryMiddleware.cs` replaces the raw-exception
+`UseExceptionHandler` delegate in `Sati.Api/Program.cs`, first in the explicit pipeline. It logs
+fixed operation, type capped at 160 characters, HResult and server correlation ID without the
+Exception object, message/inner/Data/stack or request content. Existing `ApiIncidentRecorder`
+remains the best-effort safe fingerprint/envelope owner. Writable failures return the generic
+`server_error` 500 with correlation/security/no-store headers. Started responses and secondary
+logger/store/write/abort failures are contained and aborted without rethrowing raw exceptions.
+Cancelled request operation/I/O failures retain 499 without an incident or Error log; uncancelled
+operation cancellation remains unexpected. Existing authentication/authorization/tenant order,
+DTOs and route authority remain unchanged. No request replay or automatic retry is added.
+
+[The logging owner](../../LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026),
+[architecture](../architecture/identity.md),
+[API audit scope correction](../../API_SECURITY_AUDIT.md#october-8--escaping-request-exception-boundary-and-logging-scope-correction),
+[contingencies](multitenancy-contingencies.md) and
+[DEC-0227](../decisions/current/2026-10-08-DEC-0227.md) own behavior/choice/limits. The historical
+API audit's broad logging assurance is explicitly corrected without deleting its dated evidence.
+
+Test owner `Sati.Api.Tests/ApiExceptionRedactionTests.cs` runs a unique synthetic throw seam inside
+the real Program pipeline via a test-only startup filter. Disposable seeded parent/child hosts
+preserve an authenticated agency actor and use a child non-retrying SQLite context solely to
+isolate the request boundary. Per-host log capture observes messages, state, scopes, exception
+references and Data; path-filtered DiagnosticListener subscriptions positively observe hosting
+start/stop and raw exception events. Gates prove downstream execution, throwing, actual response
+start/write and caller cancellation. Finally-based cleanup drains/releases/disposes owned hosts,
+requests, listeners, cancellation sources and private fixture storage, including setup failure.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+| Executed check | Result and evidence |
+|---|---|
+| Revised unchanged-boundary nested/uncancelled/start/write baseline | **4 intended failures, 0 passed/skipped** after isolating the separate incident transaction defect. All four positively observed requests reached raw-narrative logger assertions. Normal generic500/auth/scoped-incident assertions passed first; started and write-fault paths observed client failure. `artifacts/test-results/api-exception-redaction/api-exception-redaction-fail-first-bounded.trx`. |
+| Final harness baseline | **5 failed, 0 passed/skipped**: four genuine narrative exposures; Data-only initially stopped at the old missing Cache-Control before its leak assertion. This mixed run is preserved and is not credited as five leak proofs. `artifacts/test-results/api-exception-redaction/api-exception-redaction-final-fail-first.trx`. |
+| Reordered Data-only assertion against unchanged handler | **1 intended failure, 0 passed/skipped**. A safe message's `Exception.Data` sentinel appeared in the actual HandledException diagnostic reference. Positive enter/throw/start/stop counts were all one, with one raw exception payload and nine log entries. `artifacts/test-results/api-exception-redaction/api-exception-data-fail-first.trx`. |
+| Fixed complete new boundary class | **9 passed, 0 failed/skipped**, 1m1s. Nested/uncancelled failure, safe-message Data, started response, secondary write/store/logger failures, cancelled operation and cancelled I/O. Every case observed one enter/throw/hosting start/stop and zero raw framework exception payloads. Write failure was injected once; logger/store failure counts were each asserted once. `artifacts/test-results/api-exception-redaction/api-exception-redaction-passing.trx`. |
+| Focused existing API controls | **41 passed, 0 failed/skipped**, 6s. API surface 5; schema-health 4; SSN/form 15; tenant authorization 11 (incident 8 and protected/renewal 3); user-session 6. `artifacts/test-results/api-exception-redaction/api-exception-boundary-controls.trx`. |
+| Serial Release API test-project build | Passed, **0 errors / 7 existing warnings**: endpoint CS8602 and six test nullable/xUnit warnings. No test correction was needed after the source fix. No full-solution run is claimed. |
+| This slice's documentation/whitespace checks | `scripts/Test-DocumentationStructure.ps1` passed: 46 root documents, 28 scoped owners, 12 snapshots, 11 active items, 454 legacy items, 218 imported decisions and nine current decisions; SATI-SEC-001 pointer selects the incident slice. All **22 negative mutation proofs** passed via `scripts/Test-DocumentationStructureChecks.ps1`. `git diff --check` passed; structure/whitespace are rerun after recording these results. |
+
+Passing acceptance contains **50 cases total**. Separate baseline/rerun counts are not additional
+unique passing tests. The four narrative and separately reordered Data observations establish
+five genuine escaping-content regressions; other failure-handling/cancellation cases are positive
+acceptance rather than separate fail-first claims.
+
+Commands: `dotnet build Sati.Api.Tests/Sati.Api.Tests.csproj --no-restore --disable-build-servers
+-m:1 -c Release -v minimal`; `dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj --no-build
+--no-restore -c Release` with quoted filter/logger arguments and
+`--results-directory artifacts/test-results/api-exception-redaction`. New-class filter:
+`FullyQualifiedName~ApiExceptionRedactionTests`; logger
+`trx;LogFileName=api-exception-redaction-passing.trx`.
+Existing-control filter:
+`FullyQualifiedName~SsnAndFormApiTests|FullyQualifiedName~SchemaDriftHealthCheckTests|FullyQualifiedName~ApiSurfaceTests|(FullyQualifiedName~TenantAuthorizationTests&FullyQualifiedName~Incident)|FullyQualifiedName~TenantAuthorizationTests.MatchingWindowsRecordEnrichesPendingCrashWithoutCountingASecondCrash|FullyQualifiedName~TenantAuthorizationTests.ProtectedEndpointRejects|FullyQualifiedName~TenantAuthorizationTests.ActiveSessionCanRenewItsShortLivedAccessToken|FullyQualifiedName~UserSessionApiTests.MissingOrMalformedSecurityVersionFailsClosedEvenWithValidSignature|FullyQualifiedName~UserSessionApiTests.FailedPasswordCheckLeavesTheCurrentSessionAndVersionIntact`;
+logger `trx;LogFileName=api-exception-boundary-controls.trx`. Final baseline selected the first
+four method names (nested/uncancelled theory supplies two cases); Data-only then ran separately
+with its exact method name and `api-exception-data-fail-first.trx` logger.
+
+**Failed/unrun checks, reason and verification limits:** the first baseline, preserved as
+`api-exception-redaction-fail-first.trx`, had two genuine started/write leak failures but two normal
+cases stopped at missing incident rows. Investigation reproduced a separate production-source
+gap: configured retrying EF refuses the aggregator's explicit transaction outside a strategy
+scope. Switching only the boundary child's synthetic context to non-retrying SQLite isolated
+request containment for the revised proof above; it is not a production fix or incident-persistence
+claim. Final five-case baseline's Data header failure likewise is not silently counted as leakage;
+the subsequent unchanged-handler Data-only run establishes that separate proof.
+
+This control removes exception-handler-specific framework events/metrics. Tests positively retain
+ordinary hosting start/stop and safe Error logs; no live exporter/alert/metric behavior was tested.
+Independent EF/provider logs and diagnostics may publish failures before they reach this boundary.
+Health/startup, cancellation/response-completion callbacks, host failures and a complete enabled-sink
+inventory remain outside this proof. No full logging-redaction, live SQL locking, deployment,
+real-data, restore, provider or legal acceptance was run. Generic JSON alone is not sink proof.
+
+**Relevant readiness criterion IDs and evidence class:** source/synthetic working evidence for
+OP06 and scenario 42 redaction, with MT14 safe support-envelope and OP03 operational dependencies.
+This does not close those criteria or advance any sealed score. Readiness SHA-256 remains
+`292ACBA3C331FF98B00125CBEAA23073C5EC916403C157CD08426ED639E63B48`; sealed rubrics/history are unchanged.
+
+**Durable decisions, alternatives and supersession links:**
+[DEC-0227](../decisions/current/2026-10-08-DEC-0227.md) rejects response-only assurance,
+log-level-only repair, suppression of successful handler diagnostics alone and request replay.
+It replaces the raw request handler and scopes the broad historical logging claim; desktop
+curated-envelope policy, route authority, D1–D4 and operating permissions remain governing.
+
+**Remaining risks/blockers, dependencies and deferred work:** direct incident aggregation under
+a configured retrying strategy and refusal of a retrying outer scope have two genuine failing
+baselines in `artifacts/test-results/incident-aggregation-execution/incident-aggregation-execution-fail-first.trx`.
+Eight focused incident execution cases are prepared, not yet passing. Implement a zero-retry
+scope around the entire existing transaction and refuse a retrying outer scope before work.
+Keep immediate last-reference replay limits explicit; no new historical dedupe/schema is added.
+Health-check exception/Data redaction follows separately; startup/provider/callback/global sink
+work remains open. Billing R1/full R2, W8 budgets/fairness, tenancy, recovery and independent review
+retain their canonical owners and separate operating authority.
+
+**Next eligible stable ID and bounded slice:** SATI-SEC-001, the incident single-attempt
+execution-scope repair in [the agenda](../../AGENDA.md#next-eligible-work), with direct persistence,
+no-work outer-retry refusal, rollback/cancellation/commit-ack attempt counts and existing incident
+controls. Health redaction is prepared as a later local slice, not executed evidence.
+
+**Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

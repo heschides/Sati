@@ -30,6 +30,11 @@ The API's Claim.MD connector owns the HTTP I/O deadline; client registration del
 configuration to that owner. [Background execution](docs/architecture/workers.md) and the
 [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md) describe its component boundary and evidence limits.
 
+The API's constructor-injected request exception boundary owns containment and safe failure
+responses before downstream middleware exceptions reach hosting. [The identity boundary](docs/architecture/identity.md)
+and [logging owner](LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026) describe the
+scope; general sink redaction and production incident persistence remain separate work.
+
 ## Feature ownership
 
 | Area | Current architecture reference | Canonical detailed policy/runbook |

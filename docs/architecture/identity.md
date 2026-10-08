@@ -6,6 +6,15 @@ Implemented: JWT verification followed by persisted enabled/security-version/age
 
 Planned: structural tenant defaults/composite constraints, database-tenancy choice and multi-instance admission/abuse controls. RLS/session-context pooling is a planned spike, not current Sati enforcement.
 
+`ApiExceptionBoundaryMiddleware`, registered first in the API pipeline, owns containment of
+escaping downstream request failures and generic 500/correlation responses or safe abort.
+Constructor-injected logging emits bounded type/HResult/correlation fields without raw exceptions;
+`ApiIncidentRecorder` retains best-effort safe-envelope ownership. Authentication/tenant middleware
+order and route authority are unchanged. Request containment does not sanitize independent
+EF/provider, health/startup or callback sinks, or prove incident persistence under configured SQL
+retry. [The logging owner](../../LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026)
+and [working evidence](../readiness/work-evidence.md) describe the boundary and actual proof.
+
 ## Canonical detailed owners
 
 - [API_AUTHORIZATION.md](../../API_AUTHORIZATION.md)

@@ -72,6 +72,15 @@
       "status": "accepted",
       "evidence": ["docs/architecture/billing.md", "CLAIMMD_SANDBOX_RUNBOOK.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0227",
+      "date": "2026-10-08",
+      "title": "Contain escaping API request exceptions",
+      "path": "docs/decisions/current/2026-10-08-DEC-0227.md",
+      "status": "accepted",
+      "evidence": ["LOGGING_DESIGN.md", "API_SECURITY_AUDIT.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }
