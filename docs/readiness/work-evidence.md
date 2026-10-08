@@ -296,6 +296,114 @@ No source change after that verification alters this chunk. The sealed ledger is
 The local agency paging suite is now green, but its completion/SQL proof and commit are recorded
 in the next entry rather than claimed as part of this HTTP chunk.
 
+## 2026-10-08 — SATI-WRK-001 note-worker agency discovery pages
+
+**Stable work ID and bounded slice:** SATI-WRK-001, third local implementation slice:
+replace unbounded note-worker agency-ID materialization with named 100-agency keyset pages.
+
+**Status and source/revision:** implemented and locally verified; unreleased. Portable synthetic
+acceptance, two existing guarded SQL preservation proofs and updated documentation/whitespace
+checks passed within their recorded scope. This entry does not yet claim a paging commit/push. Reviewed branch:
+`codex/agenda-sequence-2026-10-08`, with documentation foundation `b5ec4d4` and HTTP source
+chunk `ca14bbb` already pushed to the approved `origin` branch. The paging work preserves the
+earlier local note-failure implementation and unrelated Settings/readiness product changes.
+Josh directly requested remaining eligible tasks in sequence with ordinary verified commits/pushes;
+this is not DATT, worker activation or a release invocation.
+
+**Changed behavior, ownership and canonical paths:** `NoteAbandonmentWorker.RunDueAsync`
+captures a nullable maximum agency ID and reads ordered keyset pages of at most
+`AgencyDiscoveryPageSize` (100). A nullable first cursor preserves damaged nonpositive-ID
+failure behavior. Each page's last observed ID advances discovery, including completed and
+failed agencies; the distinct `NoteAbandonmentSweep.WorkerBatchSize` (100 notes) is retained.
+If the pass could otherwise complete, a bounded `AnyAsync` above the captured maximum keeps
+the day due when growth is observed; an initially empty range checks for any agency. An already
+due pass needs no extra growth check. Max/page/growth errors remain outside the agency-sweep
+recoverable catch. Cancellation/disablement are checked around discovery/turns/final completion.
+The sweep's revision guards, atomic audits/committed counts, successful-agency/day skipping,
+global SQL/reset coordination and default-off/hourly/no-idle-SQL behavior are retained.
+
+Source owner: `Sati.Api/Infrastructure/NoteAbandonmentWorker.cs`; synthetic test owner:
+`Sati.Api.Tests/NoteAbandonmentWorkerTests.cs`. [W8](../../BACKGROUND_WORKERS_HANDOFF.md),
+[worker architecture](../architecture/workers.md),
+[the contingency owner](multitenancy-contingencies.md) and
+[DEC-0224](../decisions/current/2026-10-08-DEC-0224.md) record ownership, policy and limits.
+No route, schema, authoritative business-rule owner, provider/account scheduler or deployment changed.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+| Executed check | Result and evidence |
+|---|---|
+| Unfixed agency discovery, new materialization regression | **1 failed, 0 passed**. `AgencyDiscoveryMaterializesAtMostOneHundredIdsAndVisitsEveryStableAgencyOnce` observed **251 IDs in one query**, failing the required 0–100 range. `artifacts/test-results/note-agency-discovery/note-agency-discovery-fail-first.trx`. |
+| Fixed main regression | **1 passed, 0 failed**; this overlaps the class run, not another unique case. `artifacts/test-results/note-agency-discovery/note-agency-discovery-main-passing.trx`. |
+| Fixed complete worker class | **34 total: 32 passed, 0 failed, 2 SQL-gated skipped**. `artifacts/test-results/note-agency-discovery/note-agency-discovery-passing.trx`. Ten added cases cover 251 stable agencies with reader-observed page bounds/exact visits and counts/audits, recoverable fault plus exact note limits across pages, between-page disablement/cancellation with unconditional cleanup, zero/negative IDs, higher-ID growth, initially empty growth and shared max/growth failures. Existing worker controls remain in this class. |
+| Release API test-project builds | Passed before each of the three recorded portable executions, with existing warnings and no build errors. No full-solution build is claimed. |
+| Existing isolated SQL sweep/reset preservation proofs | **2 passed, 0 failed/skipped**: separate-host sweep exclusion and Demo reset exclusive-lease refusal. `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-08_15_38_21_net10.0.trx`. The guarded script created `SatiSqlTests_a000ffc20876410cb9526617aa3e8dd1` and reported its stop/delete in `finally`; no existing/shared instance or working database was used. This portable class's two skips remain separate from the SQL execution. |
+| Updated documentation and whitespace | The current documentation structure gate and its **22 negative mutation proofs passed**. It validated 46 root documents, 28 scoped owners, 12 preserved snapshots, 11 active items, 454 retained legacy items, 218 imported decisions and six current decisions. `git diff --check` and `git diff --cached --check` passed. Sealed readiness/rubric/history and byte-preserved captures were not edited. |
+
+Each portable build used `dotnet build Sati.Api.Tests/Sati.Api.Tests.csproj --no-restore
+--disable-build-servers -m:1 -c Release -v minimal`. Tests used `dotnet test
+Sati.Api.Tests/Sati.Api.Tests.csproj --no-build --no-restore -c Release`, with
+`--results-directory artifacts/test-results/note-agency-discovery`. The fail-first and main passing
+filter was `FullyQualifiedName~AgencyDiscoveryMaterializesAtMostOneHundredIdsAndVisitsEveryStableAgencyOnce`;
+their `--logger` values were `trx;LogFileName=note-agency-discovery-fail-first.trx` and
+`trx;LogFileName=note-agency-discovery-main-passing.trx`. The complete class used
+`--filter FullyQualifiedName~NoteAbandonmentWorkerTests` and
+`--logger trx;LogFileName=note-agency-discovery-passing.trx`. Shell execution quoted each filter
+and logger value. Bounded approved test execution supplied local IPC access outside the sandbox
+restriction. The executing agent confirmed commands; counters and the 251-ID failure were also
+independently read from the three TRX files. Earlier API/rule and SQL results remain in their
+dated entries and are not silently counted again here. The new guarded SQL command was
+`pwsh -NoProfile -File scripts/Test-IsolatedLocalDb.ps1 -NoteAbandonmentOnly`. Updated documentation
+checks were `pwsh -NoProfile -File scripts/Test-DocumentationStructure.ps1` and
+`pwsh -NoProfile -File scripts/Test-DocumentationStructureChecks.ps1`, plus the tracked/staged
+whitespace checks above. These new checks verify this chunk, rather than borrowing the prerequisite's result.
+
+**Failed/unrun checks, reason and verification limits:** the intended fail-first regression failed
+as required. Only that new materialization regression has unfixed-code proof; the other new cases
+are boundary/preserved-control acceptance. Synthetic SQLite reader observation demonstrates
+materialized ID cardinality and tested local behavior, not SQL Server query plans, retry timing,
+locks under load, runtime memory, total-pass duration or aggregate capacity. No new full-solution,
+performance/load, live-host, provider, alert, restore or installed-client acceptance was run for
+this slice. The new SQL run preserves existing coordination/reset behavior; it does not measure
+SQL paging plans/capacity or dynamic membership. Documentation validation proves ownership,
+registry/link/history structure and tested refusals, not runtime workload behavior.
+
+The captured maximum is a finite key range, not frozen membership. Within-range inserts after
+the last discovery query can be missed even above the last cursor, as can lower-ID inserts or
+reseeding behind it and inserts after the final existence check. Observed higher-ID/initially-empty
+growth leaves the day due; complete provisioning/membership invalidation is unimplemented.
+Do not claim that every start-time or newly inserted agency was visited.
+
+**Relevant readiness criterion IDs and evidence class:** local source/synthetic working evidence
+for the bounded discovery portions of MT06/MT08, scenario 16, and preserved ID03/ID04/OP06
+revision/audit rules and the separate existing MT10 SQL sweep/reset preservation proofs. None of these
+criteria is closed, and no sealed release score advances. Discovery bounds each query, not
+dictionary cardinality, total turns/time or healthy-agency wait. No worker activation, cloud or
+security change, working-data access or real external send occurred.
+
+**Durable decisions, alternatives and supersession links:**
+[DEC-0224](../decisions/current/2026-10-08-DEC-0224.md) records keyset progression, nullable
+range/cursor, bounded observed-growth recheck and the independent agency/note bounds. Unbounded
+lists, zero initial cursors, chasing unbounded higher-ID growth and enlarging this slice into
+membership snapshots were rejected. Only source discovery materialization changes; no earlier
+governing decision, D1–D4, route/schema ownership, sealed snapshot or operating permission is superseded.
+
+**Remaining risks/blockers, dependencies and deferred work:** stale-day completion-cache retention,
+current-day agency cardinality/churn, provisioning invalidation, fair lane selection, total
+operation/account/pass budgets, API admission, aggregate capacity and live progress/alert/vendor
+proof remain open. Dispatch known-unsent poison isolation still requires the durable hold/backoff/
+reopen policy and additive schema proposal recorded in W8. Activation, structural tenancy,
+billing R1/R2, recovery and independent-review gates retain their separate owners.
+
+**Next eligible stable ID and bounded slice:** SATI-WRK-001, retire non-current-local-day
+`completedByAgency` entries under `runGate`, preserving current-day retry/skip and next-day/
+no-idle-SQL controls. The target is current-day retention cardinality, not 100 entries or complete
+memory/fairness. [The agenda pointer](../../AGENDA.md#next-eligible-work) owns fail-first retention
+acceptance, dependencies and action boundaries. Ordinary source commits/pushes remain subject
+to verified staged scope; no paging commit or push is claimed in advance here.
+
+**Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

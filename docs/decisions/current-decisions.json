@@ -45,6 +45,15 @@
       "status": "accepted",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "CLAIMMD_SANDBOX_RUNBOOK.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0224",
+      "date": "2026-10-08",
+      "title": "Finite-range note-worker agency discovery",
+      "path": "docs/decisions/current/2026-10-08-DEC-0224.md",
+      "status": "accepted",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

@@ -344,8 +344,9 @@ local backup without asking Josh.
 
 ### W8 — Tenant workload isolation and worker fairness *(Significant now; required evidence before a multi-agency pilot)*
 
-**Status:** first two SATI-WRK-001 slices implemented in local source on 2026-10-08; verification
-is recorded below. Remaining discovery, fairness, total-budget, admission and capacity work is open.
+**Status:** first three SATI-WRK-001 slices implemented and locally verified on 2026-10-08; actual
+verification and limits are recorded below and in working evidence. Remaining bookkeeping,
+fairness, total-budget, admission and capacity work is open.
 W1–W6 remain implemented as recorded above; their activation gates remain.
 
 #### October 8 — bounded note-worker agency-failure isolation
@@ -398,10 +399,43 @@ or lock cleanup, a whole account turn or a worker pass. Tests establish local co
 not actual provider cancellation, remote nonreceipt, deployed configuration or fair agency latency.
 No worker/transport activation, schema, live-data access, provider call or deployment occurred.
 
-**Next bounded slice:** named 100-agency keyset discovery pages for the note worker, within a
-captured finite ID range. [The agenda](AGENDA.md#next-eligible-work) owns precise scope,
-dynamic-membership limits, dependencies and fail-first acceptance. This bounds each agency-ID
-materialization; successful-day bookkeeping and total-pass/fair-wait budgets remain later work.
+#### October 8 — bounded note-worker agency discovery
+
+`NoteAbandonmentWorker.RunDueAsync` now captures a nullable maximum agency ID and discovers
+ordered IDs in pages of at most `AgencyDiscoveryPageSize` (100). Its nullable initial cursor
+applies no first-page lower bound, preserving rejection of damaged nonpositive IDs. Every page's
+last observed ID advances discovery, including IDs whose agency already completed or failed.
+The separate `NoteAbandonmentSweep.WorkerBatchSize` (100 notes) is unchanged.
+[DEC-0224](docs/decisions/current/2026-10-08-DEC-0224.md) owns this paging policy.
+
+This traverses a finite key range, not a frozen membership snapshot. If the pass could otherwise
+complete, a bounded final existence check for IDs above the captured maximum leaves the day due
+when growth is observed; an initially empty range checks for any agency. The next existing hourly
+pass can discover that growth while skipping completed agencies. Inserts within the range after
+the last discovery query can be missed even above the last cursor, as can lower-ID inserts or
+reseeding behind it and inserts after the final check. Complete provisioning/membership cache
+invalidation remains open. No all-start-time/new-agency visitation guarantee is claimed.
+
+The reader-observer regression measured 251 materialized IDs in one query against the unfixed
+worker and failed the 100-ID bound. The fixed class passed 32 cases with two SQL-only skips;
+ten added cases cover stable visitation/counts/audits, failure and exact note limits across pages,
+between-page cancellation/disablement with cleanup, damaged IDs, finite higher-ID and initially
+empty growth, and shared range/growth failures. Only the main materialization regression has
+the new fail-first proof. The two existing guarded SQL sweep/reset proofs passed separately in
+a new private instance that was stopped/deleted. The updated documentation gate, its 22 negative
+proofs and tracked/staged whitespace checks passed; exact results and limits belong to
+[working evidence](docs/readiness/work-evidence.md).
+
+Global SQL/reset leases, classified sweep-fault policy, cancellation/disablement, atomic audits,
+committed counts, successful-agency/day skipping, next-day/default-off and hourly/no-idle-SQL
+behavior are retained. This bounds each agency-ID materialization, not the retained day cache,
+total pass time/turns or a healthy-agency wait. No route, schema, worker activation, provider call
+or deployment changed.
+
+**Next bounded slice:** retire non-current-local-day completion-cache entries under `runGate`,
+preserving current-day retry/skip and successful-day no-idle-SQL behavior.
+[The agenda](AGENDA.md#next-eligible-work) owns dependencies and fail-first acceptance. Its
+retention bound is current-day completion cardinality, not 100 agencies or complete memory/fairness.
 
 **Dispatch poison isolation blocker:** the globally oldest Queued dispatch can still be selected
 repeatedly after a missing-key preflight failure, before any send. Existing acceptance correctly
@@ -441,7 +475,7 @@ isolate shared SQL, key/storage/mail services, or vendor quotas.
   provider deadline proof remain open.
 - `NoteAbandonmentWorker.cs` still visits agencies in ID order under the global sweep lock.
   The October 8 slice above isolates only classified recoverable sweep failures; unknown/shared
-  failures still stop the pass. Agency discovery, total-pass budgets and healthy-agency wait
+  failures still stop the pass. Agency discovery pages are now bounded; bookkeeping, total-pass budgets and healthy-agency wait
   bounds remain open. Preserve `NoteAbandonmentSweep` transaction/audit rules.
 - `SignatureProcessingService.cs` already advances its package scan beyond damaged rows;
   `Sati.Signatures/SignatureMailWorker.cs` has durable leases, due times and bounded retries.

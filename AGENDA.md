@@ -16,7 +16,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | Stable ID | Status | Work and acceptance owner |
 |---|---|---|
 | SATI-TEN-001 | planned | Structural tenant owners/composite constraints and shared/database-per-tenant/hybrid decision; [architecture](docs/architecture/identity.md), [structural review](SATI_STRUCTURAL_REVIEW_2026-09-28.md). Preserve current caseload/capability checks. |
-| SATI-WRK-001 | partial; note failure and HTTP deadline slices implemented; agency discovery slice eligible | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [worker handoff](BACKGROUND_WORKERS_HANDOFF.md), [working evidence](docs/readiness/work-evidence.md). |
+| SATI-WRK-001 | partial; note failure, HTTP deadline and agency paging implemented; stale-day cache slice eligible | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [worker handoff](BACKGROUND_WORKERS_HANDOFF.md), [working evidence](docs/readiness/work-evidence.md). |
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
@@ -31,69 +31,65 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 
 **Next eligible item:** SATI-WRK-001
 
-**Eligibility:** ready for the third bounded local implementation below. Note-worker recoverable
-failure continuation and the connector HTTP deadline are implemented; [W8](BACKGROUND_WORKERS_HANDOFF.md)
-and [working evidence](docs/readiness/work-evidence.md) own acceptance and limits. This is the
-next-work pointer, not an invocation or permission for the entire priority. Follow the workflow in
-[AGENTS.md](AGENTS.md#standing-work-and-documentation-upkeep).
+**Eligibility:** the fourth bounded local source slice is eligible under Josh's direct request
+to perform remaining eligible work in sequence. Note-worker failure continuation, the connector
+HTTP deadline and 100-agency keyset discovery are implemented; [W8](BACKGROUND_WORKERS_HANDOFF.md)
+and [working evidence](docs/readiness/work-evidence.md) own their actual verification and limits.
+The paging chunk's portable acceptance, two guarded SQL preservation proofs and updated
+documentation checks passed within their recorded scope. This pointer does not authorize the whole priority or a release.
+Follow [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** replace `NoteAbandonmentWorker.RunDueAsync`'s unbounded ordered agency-ID
-`ToListAsync` with keyset discovery pages of at most a named 100 agencies. Capture an initial
-nullable maximum agency ID and traverse that finite key range. Use a nullable initial cursor
-with no first-page lower-bound predicate, so damaged nonpositive IDs retain existing failure
-behavior rather than being silently skipped. Advance to each page's last observed ID, including
-completed agencies, and preserve the distinct 100-note per-agency sweep bound.
+**Bounded slice:** in `NoteAbandonmentWorker.RunDueAsync`, retire `completedByAgency` entries
+whose completion date is not the current `ApiClock.Today`, while holding the existing `runGate`
+and before a due pass uses the cache. Preserve current-day successful entries and the existing
+`allCompletedOn` no-idle-SQL check. Removed agencies from earlier dates must not remain retained
+indefinitely. This bounds retention to current-day completion records after the enabled due check;
+it does not impose a 100-agency cache cap or bound current-day agency churn/cardinality.
 
-The upper bound is a finite key range, not a frozen membership snapshot. Agencies can appear or
-disappear between queries; lower-ID inserts/reseeding behind the cursor are not guaranteed that
-pass. At range completion, a bounded existence check for IDs above the upper bound leaves the
-day due if growth is observed, allowing the existing hourly pass to discover them. For an
-initially empty range, use a bounded existence check for any agency. These checks cannot
-protect within-range inserts after the last discovery query, lower-ID growth behind the cursor,
-or inserts after the final check. Complete provisioning/
-membership cache invalidation is deferred; do not claim all start-time/new agencies were visited.
+Preserve the separate 100-agency discovery and 100-note sweep limits, captured finite key range,
+observed-growth due behavior and documented membership limits. Preserve narrowly recoverable
+failure continuation, at-limit retries, committed counts/atomic audits, cancellation/disablement,
+global SQL/reset coordination, successful-agency/day skipping, next-local-day catch-up and
+default-off/hourly/no-idle-SQL cadence. Do not add a scheduler, parallelism, durable state,
+provisioning invalidation, dispatch/account policy or total-pass/healthy-agency wait claim.
 
-Preserve global SQL/reset coordination, current recoverable-failure policy, cancellation,
-disablement, committed-count/atomic-audit semantics, successful-agency/day skipping, next-day
-behavior, default-off settings and hourly/no-idle-SQL cadence. Bound per-query agency-ID
-materialization only. This slice does not bound the day cache, total turns/time or healthy-agency
-wait, add parallelism or change dispatch/account scheduling.
+**Dependencies and owners:** read [W8](BACKGROUND_WORKERS_HANDOFF.md),
+[DEC-0222](docs/decisions/current/2026-10-08-DEC-0222.md),
+[DEC-0224](docs/decisions/current/2026-10-08-DEC-0224.md),
+[worker architecture](docs/architecture/workers.md),
+[failure contingencies](docs/readiness/multitenancy-contingencies.md),
+[the protocol baseline](docs/readiness/protocol-baseline.md) and
+[tenant boundaries](docs/architecture/identity.md). Revalidate `NoteAbandonmentWorker`, its
+`runGate`, `completedByAgency` and `allCompletedOn`, `NoteAbandonmentSweep`, shared
+`NoteAbandonmentRules` and `Sati.Api.Tests/NoteAbandonmentWorkerTests.cs`. No schema,
+cloud, provider or working-data prerequisite is needed. The committed documentation/HTTP
+foundation and paging's local source acceptance do not establish activation or capacity.
 
-**Dependencies and owners:** the first two local slices are complete within their evidence
-limits. Read [W8](BACKGROUND_WORKERS_HANDOFF.md), [DEC-0222](docs/decisions/current/2026-10-08-DEC-0222.md),
-[worker architecture](docs/architecture/workers.md), [failure contingencies](docs/readiness/multitenancy-contingencies.md),
-[the protocol baseline](docs/readiness/protocol-baseline.md), [tenant boundaries](docs/architecture/identity.md)
-and [the dated inventory](DATABASE_ENVIRONMENTS.md). Inspect `NoteAbandonmentWorker`,
-`NoteAbandonmentSweep`, shared `NoteAbandonmentRules`, existing coordination/reset proofs and
-`Sati.Api.Tests/NoteAbandonmentWorkerTests.cs`; reuse the synthetic fixture's
-`DatabaseCommandInterceptor` seam. No schema, vendor or cloud prerequisite is needed.
+October 8 revalidated source: discovery pages are bounded, but the dictionary retains completion
+dates for every previously successful agency and has no stale-date removal. This is a source
+assertion to reproduce, not a measured process-memory guarantee.
 
-October 8 revalidated source: `RunDueAsync` materializes all ordered IDs before the loop;
-completion uses the per-agency day cache and `allCompletedOn`. These are source assertions,
-not dynamic-membership or runtime evidence; revalidate before implementation.
+**Boundaries and completion evidence:** implement only this reversible local cache/test slice
+with synthetic fixtures in disposable private storage. Ordinary verified commits/pushes to the
+already approved repository/branch are authorized by Josh's sequential-work request. No DATT,
+activation, release, deployment, publication of a service/installer, schema or cloud/security
+change, working-data access or real external call is authorized.
 
-**Boundaries and completion evidence:** implement only this reversible local worker/test slice
-and synthetic tests in disposable private storage under a valid next-work invocation or direct
-instruction. No activation, schema change, release, deployment, publication, cloud/security
-change, working-data access or real external call.
+Use deterministic dates and a large synthetic day-one population, then remove earlier agencies
+and change the day. Prove the stale-retention regression fails against the current cache and
+passes after repair; record retained cache cardinality and exact agency attempts/committed
+counts/audits. Current-day failed/at-limit agencies must remain due while successful agencies
+are skipped on later same-day passes. Prove next-day catch-up and successful-day idle checks
+still avoid SQL/coordination, including enablement/cancellation controls and unconditional
+barrier cleanup. Verify both discovery and note-batch bounds remain distinct. Describe current-day
+retention honestly; do not infer an absolute memory, pass-duration or fairness bound.
 
-With at least 251 stable synthetic agencies and a reader/materialization observer, prove no
-page materializes more than 100 IDs and each stable agency is visited once with exact committed
-counts/audits. Demonstrate the page-bound regression fails against the current unbounded query.
-Put a recoverable agency fault early and healthy work in a later page: progress continues, the
-failed/at-limit agencies remain due and completed agencies are skipped on the later pass.
-Deterministic barriers must prove cancellation/disablement between pages stops later-page work
-and leaves the day due, with unconditional test cleanup. Preserve damaged nonpositive-ID
-failure behavior. Insert a higher-ID agency after the upper-bound capture: the finite range
-terminates; observed growth leaves the day due, and a later hourly pass visits it while skipping
-completed agencies. Record the narrower guarantee and unobserved/lower-ID insertion limits.
-
-Retain existing worker/rule/API/SQL coordination acceptance and report actual passes/skips and
-disposable instance cleanup. Update W8, ownership/decisions as needed and dated working evidence,
-then advance this pointer. Sealed readiness stays unchanged. Dispatch poison isolation is
-blocked on the durable known-unsent hold/backoff/reopen policy and additive schema proposal
-recorded in W8; total budgets, fair lane selection, API admission, aggregate capacity and live
-notification/vendor proof remain later work.
+Retain the existing worker/rule/API and guarded SQL coordination acceptance, report actual
+passes/skips and disposable instance cleanup, update W8/decisions/evidence and then advance
+this pointer. Sealed readiness stays unchanged. Dispatch known-unsent hold/backoff/reopen
+implementation remains blocked on its recovery policy and additive schema proposal under W8.
+Total budgets, fair lane selection, API admission, aggregate capacity, provisioning invalidation
+and live notification/vendor proof remain later work.
 
 ## Preserved open-work inventory
 

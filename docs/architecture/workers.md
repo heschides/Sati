@@ -16,11 +16,22 @@ and [the sandbox runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md) own the timer policy
 boundary. This is local cooperative I/O acceptance; admission, processing and cleanup remain
 separate components, and whole-operation/pass bounds remain open.
 
-Remaining W8: bounded agency discovery/bookkeeping, fair healthy-agency wait bounds, total
+The third slice bounds note-worker discovery to named 100-agency keyset pages within a captured
+nullable maximum ID. The nullable first cursor preserves damaged-ID rejection; observed higher-ID
+growth keeps the day due, with an any-agency check for an initially empty range. This is a finite
+key range, not membership isolation: within-range insertions after the last discovery query,
+lower-ID insertions behind the cursor and post-check growth remain unguaranteed.
+[DEC-0224](../decisions/current/2026-10-08-DEC-0224.md), W8 and working evidence own the paging
+policy, exact passing acceptance and evidence limits. The distinct 100-note sweep and existing coordination,
+failure, audit, cancellation and cadence owners are retained.
+
+Remaining W8: current-day completion bookkeeping, fair healthy-agency wait bounds, total
 operation/pass deadlines, per-account failure/dependency isolation, aggregate and tenant
 budgets, API admission and synthetic
 multi-host/load evidence. Agency IDs and a worker per agency do not by themselves isolate
-shared SQL or vendor capacity. Business-rule, route and persistence boundaries are unchanged.
+shared SQL or vendor capacity. Next is stale-local-day cache retirement under the existing run
+gate; this bounds historical retention, not current-day cardinality or total memory. Business-rule,
+route and persistence boundaries are unchanged.
 
 ## Canonical detailed owners
 

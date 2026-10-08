@@ -23,6 +23,11 @@ The connector-owned HTTP exchange deadline and client registration's timer polic
 in [DEC-0223](docs/decisions/current/2026-10-08-DEC-0223.md). Existing upload uncertainty and
 coordination policy remain in force; the decision establishes no whole-pass or live-service bound.
 
+The note-worker agency discovery policy is recorded in
+[DEC-0224](docs/decisions/current/2026-10-08-DEC-0224.md): named 100-agency keyset pages,
+a captured finite key range and bounded observed-growth recheck. This bounds per-query
+materialization without establishing frozen membership, cache capacity or a fair wait.
+
 ## Explicit supersession
 
 | Earlier statement | Later authority | Scope of supersession |

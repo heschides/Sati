@@ -1,4 +1,6 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 using Sati.Api.Data;
 
@@ -109,6 +111,7 @@ internal sealed class NoteAbandonmentWorker(
     ILogger<NoteAbandonmentWorker> logger) : BackgroundService
 {
     private readonly SemaphoreSlim runGate = new(1, 1);
+    internal const int AgencyDiscoveryPageSize = 100;
     private readonly Dictionary<int, DateTime> completedByAgency = [];
     private DateTime? allCompletedOn;
 
@@ -125,31 +128,96 @@ internal sealed class NoteAbandonmentWorker(
             var acquired = await coordination.RunOnceAsync(async innerToken =>
             {
                 await using var db = await contexts.CreateDbContextAsync(innerToken);
-                var agencyIds = await db.Agencies.AsNoTracking()
-                    .OrderBy(agency => agency.Id).Select(agency => agency.Id)
-                    .ToListAsync(innerToken);
+                var agencies = db.Agencies.AsNoTracking();
+                // Bound the key range, not membership: agencies may change between pages.
+                var upperBound = await agencies.MaxAsync(agency => (int?)agency.Id, innerToken);
+                int? lastAgencyId = null;
                 allCompleted = true;
-                foreach (var agencyId in agencyIds)
+                while (upperBound is { } maximumId)
                 {
+                    innerToken.ThrowIfCancellationRequested();
                     if (!options.CurrentValue.EnableNoteAbandonmentWorker)
                     {
                         allCompleted = false;
-                        break;
+                        return;
                     }
-                    if (completedByAgency.GetValueOrDefault(agencyId) == today) continue;
-                    var result = await sweep.RunAsync(agencyId, userId: null,
-                        NoteAbandonmentSweep.WorkerBatchSize, "worker", innerToken);
-                    changedCount += result.ChangedCount;
-                    if (result.AtLimit) allCompleted = false;
-                    else completedByAgency[agencyId] = today;
+                    var pageQuery = agencies.Where(agency => agency.Id <= maximumId);
+                    // A nullable first cursor preserves rejection of damaged nonpositive IDs.
+                    if (lastAgencyId is { } cursor)
+                        pageQuery = pageQuery.Where(agency => agency.Id > cursor);
+                    var agencyIds = await pageQuery.OrderBy(agency => agency.Id)
+                        .Select(agency => agency.Id).Take(AgencyDiscoveryPageSize)
+                        .ToListAsync(innerToken);
+                    if (agencyIds.Count == 0) break;
+                    lastAgencyId = agencyIds[^1];
+                    foreach (var agencyId in agencyIds)
+                    {
+                        innerToken.ThrowIfCancellationRequested();
+                        if (!options.CurrentValue.EnableNoteAbandonmentWorker)
+                        {
+                            allCompleted = false;
+                            return;
+                        }
+                        if (completedByAgency.GetValueOrDefault(agencyId) == today) continue;
+                        NoteAbandonmentResult result;
+                        try
+                        {
+                            result = await sweep.RunAsync(agencyId, userId: null,
+                                NoteAbandonmentSweep.WorkerBatchSize, "worker", innerToken);
+                        }
+                        catch (Exception error) when (!innerToken.IsCancellationRequested &&
+                            IsRecoverableAgencyFailure(error))
+                        {
+                            // The sweep has rolled back and disposed its transaction. Leave
+                            // this agency due for the next hourly pass, without another retry.
+                            allCompleted = false;
+                            logger.LogWarning("Note abandonment worker deferred agency {AgencyId} ({FailureType}).",
+                                agencyId, error.GetType().Name);
+                            continue;
+                        }
+                        changedCount += result.ChangedCount;
+                        if (result.AtLimit) allCompleted = false;
+                        else completedByAgency[agencyId] = today;
+                    }
+                    if (agencyIds.Count < AgencyDiscoveryPageSize || lastAgencyId == maximumId)
+                        break;
                 }
+                innerToken.ThrowIfCancellationRequested();
+                if (!options.CurrentValue.EnableNoteAbandonmentWorker)
+                {
+                    allCompleted = false;
+                    return;
+                }
+                // Observed higher-ID growth keeps the existing hourly pass due. This cannot
+                // detect within-range inserts after discovery or inserts after this check.
+                if (allCompleted && await (upperBound is { } bound
+                        ? agencies.AnyAsync(agency => agency.Id > bound, innerToken)
+                        : agencies.AnyAsync(innerToken)))
+                    allCompleted = false;
+                innerToken.ThrowIfCancellationRequested();
+                if (!options.CurrentValue.EnableNoteAbandonmentWorker) allCompleted = false;
             }, token);
+            token.ThrowIfCancellationRequested();
             if (acquired && allCompleted) allCompletedOn = today;
             if (changedCount > 0)
                 logger.LogInformation("Note abandonment worker changed {NoteCount} notes.", changedCount);
             return changedCount;
         }
         finally { runGate.Release(); }
+    }
+
+    private static bool IsRecoverableAgencyFailure(Exception error)
+    {
+        // EF can wrap an exhausted deadlock retry or an audit-save failure.
+        // Unknown wrappers, connection errors and ambiguous commits must escape.
+        while (error is not DbUpdateConcurrencyException &&
+            (error is DbUpdateException or RetryLimitExceededException) &&
+            error.InnerException is { } inner)
+            error = inner;
+
+        if (error is DbUpdateConcurrencyException) return true;
+        return error is SqlException sql && sql.Errors.Count > 0 &&
+            sql.Errors.Cast<SqlError>().All(item => item.Number == 1205 && item.Class < 20);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
