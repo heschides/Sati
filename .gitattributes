@@ -3,6 +3,13 @@
 ###############################################################################
 * text=auto
 scripts/Apply-PayerBillingMigration.guarded.sql text eol=lf
+# Preserve captured historical bytes, including deliberately mixed original line endings.
+docs/archive/** -text -whitespace
+docs/decisions/records/** -text -whitespace
+# Preserve this dated assessment's bytes, including its intentional Markdown hard breaks.
+reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md -text -whitespace
+# Source-exact multiline backlog text is compared using LF by the documentation gate.
+docs/backlog/legacy-open-items.md text eol=lf
 
 ###############################################################################
 # Set default behavior for command prompt diff.

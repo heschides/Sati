@@ -1,0 +1,693 @@
+{
+  "requiredLinks": [
+    "AGENDA.md",
+    "AGENTS.md",
+    "AI_CASE_NOTE_RULES.md",
+    "API_AUTHORIZATION.md",
+    "ARCHITECTURE.md",
+    "ASSESSMENT_REVIEW_RUNBOOK.md",
+    "AUDIT_EVENTS.md",
+    "BACKGROUND_WORKERS_HANDOFF.md",
+    "CLAIMMD_SANDBOX_RUNBOOK.md",
+    "CREDIBLE_IMPORT_DESIGN.md",
+    "DATABASE_ENVIRONMENTS.md",
+    "DECISIONS.md",
+    "DEMO_ACCEPTANCE.md",
+    "DEMO_RUNBOOK.md",
+    "DISPLAY_MODES_DESIGN.md",
+    "DOCUMENT_TEMPLATES.md",
+    "HANDOFF_CLIENT_DELETION_POLICY.md",
+    "HANDOFF_DUPLICATE_COMPLIANCE_FORMS.md",
+    "LOGGING_DESIGN.md",
+    "NOTE_AMENDMENTS_RUNBOOK.md",
+    "NOTE_FORM_ATTESTATION_DESIGN.md",
+    "OPERATIONS.md",
+    "PAYER_BILLING_CERTIFICATION.md",
+    "PAYER_BILLING_REQUIREMENTS.md",
+    "PLATFORM_DOMAIN.md",
+    "PLATFORM_RESTRUCTURE_PLAN.md",
+    "README.md",
+    "RECORDS_GOVERNANCE_RUNBOOK.md",
+    "REGULATORY_CONCERNS.md",
+    "RELEASE_PLAYBOOK.md",
+    "SIGNATURE_PORTAL_GUIDE.md",
+    "SIGNATURE_PORTAL_REVIEW.md",
+    "SIGNATURE_PORTAL_VALIDATION.md",
+    "TEAM_CHAT_DESIGN.md",
+    "TEAM_CHAT_GUIDE.md",
+    "TEAM_CHAT_REVIEW.md",
+    "TEAM_CHAT_VALIDATION.md",
+    "WORKSPACE_REFLECTIONS.md",
+    "docs/readiness/README.md",
+    "docs/readiness/readiness-method.md",
+    "docs/readiness/work-evidence.md",
+    "docs/readiness/protocol-baseline.md",
+    "docs/readiness/multitenancy-contingencies.md",
+    "docs/readiness/authoritative-release-bars.md",
+    "docs/documentation-governance.md",
+    "docs/documentation-migration.md",
+    "docs/architecture/identity.md",
+    "docs/architecture/clinical.md",
+    "docs/architecture/billing.md",
+    "docs/architecture/workers.md",
+    "docs/architecture/communication.md",
+    "docs/architecture/desktop.md",
+    "docs/architecture/governance.md",
+    "docs/architecture/platform.md",
+    "docs/decisions/current/README.md",
+    "CLAUDE.md",
+    "docs/decisions/README.md"
+  ],
+  "schemaVersion": 1,
+  "briefingOwner": "AGENTS.md",
+  "backlogOwner": "AGENDA.md",
+  "factsOwner": "DATABASE_ENVIRONMENTS.md",
+  "reviewedOn": "2026-10-08",
+  "historicalWhitespaceExceptions": [
+    {
+      "path": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md",
+      "reason": "Preserve the dated assessment bytes and two intentional Markdown hard breaks; the exact file has -text -whitespace Git attributes. Current canonical documents retain ordinary whitespace checks."
+    }
+  ],
+  "snapshots": [
+    {
+      "sha256": "38ca3727ebeb73d17b28727b7c5094877884f2a2cb118d7d96ce275b71323fea",
+      "path": "docs/archive/2026-10-08/AGENTS.md",
+      "source": "AGENTS.md"
+    },
+    {
+      "sha256": "d0d9d26f59ba334dd0db74d86f6cad0c2253ff27c6032a89c31d45bc0246aad1",
+      "path": "docs/archive/2026-10-08/CLAUDE.md",
+      "source": "CLAUDE.md"
+    },
+    {
+      "sha256": "f5660216aa0544533cd3203320fe2b11a8e70d331fe351836f31338f18d11c77",
+      "path": "docs/archive/2026-10-08/README.md",
+      "source": "README.md"
+    },
+    {
+      "sha256": "5c2951fcd72e272bff47bbad6fbf75305c70f4af8da66199b501537d0948bb83",
+      "path": "docs/archive/2026-10-08/ARCHITECTURE.md",
+      "source": "ARCHITECTURE.md"
+    },
+    {
+      "sha256": "1014321a95c16eb01342587f62fa9f4d530be908993e750d4a9ef6ff59cfac33",
+      "path": "docs/archive/2026-10-08/DECISIONS.md",
+      "source": "DECISIONS.md"
+    },
+    {
+      "sha256": "c9e83aca6843d022ea8e43a5ef2cb0a5ae3de881e1d667cf989bd9618bfee5a7",
+      "path": "docs/archive/2026-10-08/AGENDA.md",
+      "source": "AGENDA.md"
+    },
+    {
+      "sha256": "7a5984bcb842f5ec2886583607173b69e8dd4c6e96929931958533794d34908c",
+      "path": "docs/archive/2026-10-08/DATABASE_ENVIRONMENTS.md",
+      "source": "DATABASE_ENVIRONMENTS.md"
+    },
+    {
+      "sha256": "4667ef26c9e8a252334574789abd62ffd190d4874a93d3e9b3229fa3f9e488c6",
+      "path": "docs/archive/2026-10-08/OPERATIONS.md",
+      "source": "OPERATIONS.md"
+    },
+    {
+      "source": "CONCURRENCY_AUDIT.md",
+      "sha256": "0377f98e5d76eafe23b555b153a44487f05eae75378aa08f2032cc153563e8d3",
+      "path": "docs/archive/reviews/CONCURRENCY_AUDIT.md"
+    },
+    {
+      "source": "SECURITY_AUDIT_2026-09-03.md",
+      "sha256": "054ed2b2a8e2aba1c5c4149738d6a64ea469f6a7db48d13f78a9562f477b8689",
+      "path": "docs/archive/reviews/SECURITY_AUDIT_2026-09-03.md"
+    },
+    {
+      "source": "SATI_STRUCTURAL_REVIEW_2026-09-28.md",
+      "sha256": "1715badcda5840c77dba4acb39d0ecd693d5c9071de88d82cefd62bdceb3cb7b",
+      "path": "docs/archive/reviews/SATI_STRUCTURAL_REVIEW_2026-09-28.md"
+    },
+    {
+      "source": "SATI_SYSTEM_MAP.md",
+      "sha256": "2b65dc71d44c12075df7086b05547d814c360eda94e39069cd77d0326d02589d",
+      "path": "docs/archive/reviews/SATI_SYSTEM_MAP.md"
+    }
+  ],
+  "readinessOwner": "docs/readiness/README.md",
+  "documents": [
+    {
+      "state": "current",
+      "path": "AGENDA.md",
+      "canonicalPath": "AGENDA.md",
+      "role": "canonical",
+      "topic": "active-backlog",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "AGENTS.md",
+      "canonicalPath": "AGENTS.md",
+      "role": "canonical",
+      "topic": "assistant-briefing",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "AI_CASE_NOTE_RULES.md",
+      "canonicalPath": "AI_CASE_NOTE_RULES.md",
+      "role": "canonical",
+      "topic": "ai-case-note-rules",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "API_AUTHORIZATION.md",
+      "canonicalPath": "API_AUTHORIZATION.md",
+      "role": "canonical",
+      "topic": "api-authorization",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "mixed-evidence",
+      "path": "API_SECURITY_AUDIT.md",
+      "canonicalPath": "API_SECURITY_AUDIT.md",
+      "role": "canonical",
+      "topic": "api-security-evidence",
+      "reason": "Dated review with later amendments; no complete unresolved finding is discarded."
+    },
+    {
+      "state": "current",
+      "path": "ARCHITECTURE.md",
+      "canonicalPath": "ARCHITECTURE.md",
+      "role": "canonical",
+      "topic": "architecture-index",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "ASSESSMENT_REVIEW_RUNBOOK.md",
+      "canonicalPath": "ASSESSMENT_REVIEW_RUNBOOK.md",
+      "role": "canonical",
+      "topic": "assessment-review-runbook",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "AUDIT_EVENTS.md",
+      "canonicalPath": "AUDIT_EVENTS.md",
+      "role": "canonical",
+      "topic": "audit-events",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "BACKGROUND_WORKERS_HANDOFF.md",
+      "canonicalPath": "BACKGROUND_WORKERS_HANDOFF.md",
+      "role": "canonical",
+      "topic": "background-workers-handoff",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "CLAIMMD_SANDBOX_RUNBOOK.md",
+      "canonicalPath": "CLAIMMD_SANDBOX_RUNBOOK.md",
+      "role": "canonical",
+      "topic": "claimmd-sandbox-runbook",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "CLAUDE.md",
+      "canonicalPath": "AGENTS.md",
+      "role": "forwarder",
+      "topic": "assistant-briefing",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "historical",
+      "path": "CONCURRENCY_AUDIT.md",
+      "canonicalPath": "docs/archive/reviews/CONCURRENCY_AUDIT.md",
+      "role": "forwarder",
+      "topic": "concurrency-review-2026-08-14",
+      "reason": "Historical evidence archived byte-for-byte; forwarding root path preserves readers and unresolved findings."
+    },
+    {
+      "state": "current",
+      "path": "CREDIBLE_IMPORT_DESIGN.md",
+      "canonicalPath": "CREDIBLE_IMPORT_DESIGN.md",
+      "role": "canonical",
+      "topic": "credible-import-design",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "DATABASE_ENVIRONMENTS.md",
+      "canonicalPath": "DATABASE_ENVIRONMENTS.md",
+      "role": "canonical",
+      "topic": "deployment-inventory",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "DECISIONS.md",
+      "canonicalPath": "DECISIONS.md",
+      "role": "canonical",
+      "topic": "decision-index",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "DEMO_ACCEPTANCE.md",
+      "canonicalPath": "DEMO_ACCEPTANCE.md",
+      "role": "canonical",
+      "topic": "demo-acceptance",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "DEMO_RUNBOOK.md",
+      "canonicalPath": "DEMO_RUNBOOK.md",
+      "role": "canonical",
+      "topic": "demo-runbook",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "DISPLAY_MODES_DESIGN.md",
+      "canonicalPath": "DISPLAY_MODES_DESIGN.md",
+      "role": "canonical",
+      "topic": "display-modes-design",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "DOCUMENT_TEMPLATES.md",
+      "canonicalPath": "DOCUMENT_TEMPLATES.md",
+      "role": "canonical",
+      "topic": "document-templates",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "HANDOFF_CLIENT_DELETION_POLICY.md",
+      "canonicalPath": "HANDOFF_CLIENT_DELETION_POLICY.md",
+      "role": "canonical",
+      "topic": "handoff-client-deletion-policy",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "HANDOFF_DUPLICATE_COMPLIANCE_FORMS.md",
+      "canonicalPath": "HANDOFF_DUPLICATE_COMPLIANCE_FORMS.md",
+      "role": "canonical",
+      "topic": "handoff-duplicate-compliance-forms",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "LOGGING_DESIGN.md",
+      "canonicalPath": "LOGGING_DESIGN.md",
+      "role": "canonical",
+      "topic": "logging-design",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "NOTE_AMENDMENTS_RUNBOOK.md",
+      "canonicalPath": "NOTE_AMENDMENTS_RUNBOOK.md",
+      "role": "canonical",
+      "topic": "note-amendments-runbook",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "NOTE_FORM_ATTESTATION_DESIGN.md",
+      "canonicalPath": "NOTE_FORM_ATTESTATION_DESIGN.md",
+      "role": "canonical",
+      "topic": "note-form-attestation-design",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "OPERATIONS.md",
+      "canonicalPath": "OPERATIONS.md",
+      "role": "canonical",
+      "topic": "operations-policy",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "PAYER_BILLING_CERTIFICATION.md",
+      "canonicalPath": "PAYER_BILLING_CERTIFICATION.md",
+      "role": "canonical",
+      "topic": "payer-billing-certification",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "PAYER_BILLING_REQUIREMENTS.md",
+      "canonicalPath": "PAYER_BILLING_REQUIREMENTS.md",
+      "role": "canonical",
+      "topic": "payer-billing-requirements",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "PLATFORM_DOMAIN.md",
+      "canonicalPath": "PLATFORM_DOMAIN.md",
+      "role": "canonical",
+      "topic": "platform-domain",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "PLATFORM_RESTRUCTURE_PLAN.md",
+      "canonicalPath": "PLATFORM_RESTRUCTURE_PLAN.md",
+      "role": "canonical",
+      "topic": "platform-restructure-plan",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "README.md",
+      "canonicalPath": "README.md",
+      "role": "canonical",
+      "topic": "documentation-entry",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "RECORDS_GOVERNANCE_RUNBOOK.md",
+      "canonicalPath": "RECORDS_GOVERNANCE_RUNBOOK.md",
+      "role": "canonical",
+      "topic": "records-governance-runbook",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "REGULATORY_CONCERNS.md",
+      "canonicalPath": "REGULATORY_CONCERNS.md",
+      "role": "canonical",
+      "topic": "regulatory-concerns",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "RELEASE_PLAYBOOK.md",
+      "canonicalPath": "RELEASE_PLAYBOOK.md",
+      "role": "canonical",
+      "topic": "release-playbook",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "historical",
+      "path": "SATI_STRUCTURAL_REVIEW_2026-09-28.md",
+      "canonicalPath": "docs/archive/reviews/SATI_STRUCTURAL_REVIEW_2026-09-28.md",
+      "role": "forwarder",
+      "topic": "structural-review-2026-09-28",
+      "reason": "Historical evidence archived byte-for-byte; forwarding root path preserves readers and unresolved findings."
+    },
+    {
+      "state": "historical",
+      "path": "SATI_SYSTEM_MAP.md",
+      "canonicalPath": "docs/archive/reviews/SATI_SYSTEM_MAP.md",
+      "role": "forwarder",
+      "topic": "system-map-snapshot",
+      "reason": "Historical evidence archived byte-for-byte; forwarding root path preserves readers and unresolved findings."
+    },
+    {
+      "state": "historical",
+      "path": "SECURITY_AUDIT_2026-09-03.md",
+      "canonicalPath": "docs/archive/reviews/SECURITY_AUDIT_2026-09-03.md",
+      "role": "forwarder",
+      "topic": "security-review-2026-09-03",
+      "reason": "Historical evidence archived byte-for-byte; forwarding root path preserves readers and unresolved findings."
+    },
+    {
+      "state": "mixed-evidence",
+      "path": "SECURITY_REVIEW_2026-09-10.md",
+      "canonicalPath": "SECURITY_REVIEW_2026-09-10.md",
+      "role": "canonical",
+      "topic": "security-review-2026-09-10",
+      "reason": "Dated review with later amendments; no complete unresolved finding is discarded."
+    },
+    {
+      "state": "historical",
+      "path": "SIGNATURE_PORTAL_DESIGN.md",
+      "canonicalPath": "archive/SIGNATURE_PORTAL_DESIGN.md",
+      "role": "forwarder",
+      "topic": "signature-design-history",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "SIGNATURE_PORTAL_GUIDE.md",
+      "canonicalPath": "SIGNATURE_PORTAL_GUIDE.md",
+      "role": "canonical",
+      "topic": "signature-portal-guide",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "SIGNATURE_PORTAL_REVIEW.md",
+      "canonicalPath": "SIGNATURE_PORTAL_REVIEW.md",
+      "role": "canonical",
+      "topic": "signature-portal-review",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "SIGNATURE_PORTAL_VALIDATION.md",
+      "canonicalPath": "SIGNATURE_PORTAL_VALIDATION.md",
+      "role": "canonical",
+      "topic": "signature-portal-validation",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "TEAM_CHAT_DESIGN.md",
+      "canonicalPath": "TEAM_CHAT_DESIGN.md",
+      "role": "canonical",
+      "topic": "team-chat-design",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "TEAM_CHAT_GUIDE.md",
+      "canonicalPath": "TEAM_CHAT_GUIDE.md",
+      "role": "canonical",
+      "topic": "team-chat-guide",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "TEAM_CHAT_REVIEW.md",
+      "canonicalPath": "TEAM_CHAT_REVIEW.md",
+      "role": "canonical",
+      "topic": "team-chat-review",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "TEAM_CHAT_VALIDATION.md",
+      "canonicalPath": "TEAM_CHAT_VALIDATION.md",
+      "role": "canonical",
+      "topic": "team-chat-validation",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    },
+    {
+      "state": "current",
+      "path": "WORKSPACE_REFLECTIONS.md",
+      "canonicalPath": "WORKSPACE_REFLECTIONS.md",
+      "role": "canonical",
+      "topic": "workspace-reflections",
+      "reason": "Canonical topic owner; link rather than copy this topic."
+    }
+  ],
+  "scopedOwners": [
+    {
+      "topic": "launch-readiness-index",
+      "path": "docs/readiness/README.md",
+      "state": "current"
+    },
+    {
+      "topic": "readiness-rubrics-ledger",
+      "path": "docs/readiness/readiness.json",
+      "state": "current"
+    },
+    {
+      "topic": "readiness-method",
+      "path": "docs/readiness/readiness-method.md",
+      "state": "current"
+    },
+    {
+      "topic": "working-evidence-ledger",
+      "path": "docs/readiness/work-evidence.md",
+      "state": "current"
+    },
+    {
+      "topic": "idempotency-protocol-baseline",
+      "path": "docs/readiness/protocol-baseline.md",
+      "state": "current"
+    },
+    {
+      "topic": "multitenancy-contingency-catalog",
+      "path": "docs/readiness/multitenancy-contingencies.md",
+      "state": "current"
+    },
+    {
+      "topic": "official-guidance-release-bars",
+      "path": "docs/readiness/authoritative-release-bars.md",
+      "state": "current"
+    },
+    {
+      "topic": "documentation-governance",
+      "path": "docs/documentation-governance.md",
+      "state": "current"
+    },
+    {
+      "topic": "documentation-migration",
+      "path": "docs/documentation-migration.md",
+      "state": "current"
+    },
+    {
+      "topic": "legacy-open-work",
+      "path": "docs/backlog/legacy-open-items.json",
+      "state": "historical"
+    },
+    {
+      "topic": "retained-decision-records",
+      "path": "docs/decisions/records.json",
+      "state": "historical"
+    },
+    {
+      "state": "historical",
+      "path": "docs/archive/reviews/CONCURRENCY_AUDIT.md",
+      "topic": "concurrency-review-2026-08-14"
+    },
+    {
+      "state": "historical",
+      "path": "docs/archive/reviews/SECURITY_AUDIT_2026-09-03.md",
+      "topic": "security-review-2026-09-03"
+    },
+    {
+      "state": "historical",
+      "path": "docs/archive/reviews/SATI_STRUCTURAL_REVIEW_2026-09-28.md",
+      "topic": "structural-review-2026-09-28"
+    },
+    {
+      "state": "historical",
+      "path": "docs/archive/reviews/SATI_SYSTEM_MAP.md",
+      "topic": "system-map-snapshot"
+    },
+    {
+      "state": "historical",
+      "path": "archive/SIGNATURE_PORTAL_DESIGN.md",
+      "topic": "signature-design-history"
+    },
+    {
+      "state": "current",
+      "path": "docs/architecture/identity.md",
+      "topic": "architecture-identity"
+    },
+    {
+      "state": "current",
+      "path": "docs/architecture/clinical.md",
+      "topic": "architecture-clinical"
+    },
+    {
+      "state": "current",
+      "path": "docs/architecture/billing.md",
+      "topic": "architecture-billing"
+    },
+    {
+      "state": "current",
+      "path": "docs/architecture/workers.md",
+      "topic": "architecture-workers"
+    },
+    {
+      "state": "current",
+      "path": "docs/architecture/communication.md",
+      "topic": "architecture-communication"
+    },
+    {
+      "state": "current",
+      "path": "docs/architecture/desktop.md",
+      "topic": "architecture-desktop"
+    },
+    {
+      "state": "current",
+      "path": "docs/architecture/governance.md",
+      "topic": "architecture-governance"
+    },
+    {
+      "state": "current",
+      "path": "docs/architecture/platform.md",
+      "topic": "architecture-platform"
+    },
+    {
+      "role": "derived",
+      "canonicalPath": "docs/backlog/legacy-open-items.json",
+      "path": "docs/backlog/legacy-open-items.md",
+      "topic": "legacy-open-work",
+      "state": "mixed-evidence"
+    },
+    {
+      "role": "derived",
+      "canonicalPath": "docs/decisions/records.json",
+      "path": "docs/decisions/README.md",
+      "topic": "retained-decision-records",
+      "state": "historical"
+    },
+    {
+      "path": "docs/decisions/current-decisions.json",
+      "state": "current",
+      "topic": "current-decision-registry"
+    },
+    {
+      "path": "docs/decisions/current/README.md",
+      "state": "current",
+      "topic": "current-decision-registry",
+      "role": "derived",
+      "canonicalPath": "docs/decisions/current-decisions.json"
+    }
+  ],
+  "currentFactConsumers": [
+    "AGENDA.md",
+    "AGENTS.md",
+    "AI_CASE_NOTE_RULES.md",
+    "API_AUTHORIZATION.md",
+    "ARCHITECTURE.md",
+    "ASSESSMENT_REVIEW_RUNBOOK.md",
+    "AUDIT_EVENTS.md",
+    "BACKGROUND_WORKERS_HANDOFF.md",
+    "CLAIMMD_SANDBOX_RUNBOOK.md",
+    "CLAUDE.md",
+    "CREDIBLE_IMPORT_DESIGN.md",
+    "DECISIONS.md",
+    "DEMO_ACCEPTANCE.md",
+    "DEMO_RUNBOOK.md",
+    "DISPLAY_MODES_DESIGN.md",
+    "DOCUMENT_TEMPLATES.md",
+    "HANDOFF_CLIENT_DELETION_POLICY.md",
+    "HANDOFF_DUPLICATE_COMPLIANCE_FORMS.md",
+    "LOGGING_DESIGN.md",
+    "NOTE_AMENDMENTS_RUNBOOK.md",
+    "NOTE_FORM_ATTESTATION_DESIGN.md",
+    "OPERATIONS.md",
+    "PAYER_BILLING_CERTIFICATION.md",
+    "PAYER_BILLING_REQUIREMENTS.md",
+    "PLATFORM_DOMAIN.md",
+    "PLATFORM_RESTRUCTURE_PLAN.md",
+    "README.md",
+    "RECORDS_GOVERNANCE_RUNBOOK.md",
+    "REGULATORY_CONCERNS.md",
+    "RELEASE_PLAYBOOK.md",
+    "SIGNATURE_PORTAL_GUIDE.md",
+    "SIGNATURE_PORTAL_REVIEW.md",
+    "SIGNATURE_PORTAL_VALIDATION.md",
+    "TEAM_CHAT_DESIGN.md",
+    "TEAM_CHAT_GUIDE.md",
+    "TEAM_CHAT_REVIEW.md",
+    "TEAM_CHAT_VALIDATION.md",
+    "WORKSPACE_REFLECTIONS.md"
+  ]
+}

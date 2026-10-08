@@ -11,7 +11,7 @@ agency, security, accessibility, and operating requirements have been reviewed.
 
 This guide explains the implemented behavior and the decisions Josh and an agency need to make. It
 does not establish that the software or any document is legally sufficient. The original proposal
-is retained in [SIGNATURE_PORTAL_DESIGN.md](SIGNATURE_PORTAL_DESIGN.md); the changes to that proposal
+is retained in [SIGNATURE_PORTAL_DESIGN.md](archive/SIGNATURE_PORTAL_DESIGN.md); the changes to that proposal
 are explained in [SIGNATURE_PORTAL_REVIEW.md](SIGNATURE_PORTAL_REVIEW.md).
 
 ## 1. What a person should experience

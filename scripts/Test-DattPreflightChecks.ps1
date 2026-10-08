@@ -2,11 +2,30 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('SatiDattPreflight_' + [Guid]::NewGuid().ToString('N'))
 try {
-    $owners=@('Sati.csproj','Sati.Api/Sati.Api.csproj','Services/ProductReleaseNotes.cs',
+    $owners=@('.gitattributes','Sati.csproj','Sati.Api/Sati.Api.csproj','Services/ProductReleaseNotes.cs',
         'Sati.Tests/StabilizationTests.cs','Sati.Api.Tests/TenantAuthorizationTests.cs',
         'installer/Build-DemoInstaller.ps1','installer/Build-LocalInstaller.ps1','installer/Build-LocalDbDiagnostic.ps1',
         'scripts/Test-DemoReadiness.ps1','scripts/Test-DemoGlobalAdmin.ps1','scripts/Configure-DemoSignatureRehearsal.ps1',
         'scripts/Enable-DemoAgencySignatureRehearsal.ps1','AGENDA.md','installer/README.md')
+    # The real preflight now includes documentation/readiness gates; fixtures retain their owners.
+    $owners += @(Get-ChildItem -LiteralPath $repo -Filter '*.md' -File | ForEach-Object Name)
+    foreach ($folder in @('docs','archive','karuna','Sati.Portal')) {
+        $folderPath = Join-Path $repo $folder
+        foreach ($file in Get-ChildItem -LiteralPath $folderPath -Recurse -File | Where-Object {
+            $_.Extension -eq '.md' -or ($folder -eq 'docs' -and $_.Extension -in @('.json','.txt'))
+        }) { $owners += [IO.Path]::GetRelativePath($repo, $file.FullName) }
+    }
+    # Evidence references validate public source paths, not private settings or real database contents.
+    $ledger = [IO.File]::ReadAllText((Join-Path $repo 'docs/readiness/readiness.json')) | ConvertFrom-Json
+    $references = @($ledger.rubrics | ForEach-Object criteria | ForEach-Object references) +
+        @($ledger.snapshots | ForEach-Object assessments | ForEach-Object evidence | ForEach-Object reference)
+    foreach ($reference in $references) {
+        if ($reference -notmatch '^https://') {
+            $relative = ($reference -split '#', 2)[0] -replace ':\d+(?:[-,]\d+)*$', ''
+            $owners += $relative
+        }
+    }
+    $owners = @($owners | Select-Object -Unique)
     foreach ($owner in $owners) {
         $to=Join-Path $fixture $owner
         [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($to))

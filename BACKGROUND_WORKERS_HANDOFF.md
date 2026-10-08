@@ -7,6 +7,14 @@
 2026-10-03: **3,948 passed, zero failed, one local AI evaluation skipped**. W7 remains deferred.
 No cloud publication, configuration change, migration, or restore rehearsal was performed.
 
+### Multitenancy scope review — October 8, 2026
+
+W8 below adds tenant workload isolation and fairness investigation/acceptance work; it has not
+been implemented by this documentation review. The review used `master` @ `a1af921` (1.3.37)
+and `reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md`. Hosting constraint 6
+links to the authoritative dated environment inventory. D1–D4, W1–W7, activation gates
+and the original implementation record remain in force. No production source was changed.
+
 ### Implementation record — October 3, 2026
 
 - **W1/W4:** `Sati.DemoRefresh/DemoWatchdog` runs a daily read-only check after the reset;
@@ -49,10 +57,32 @@ against unfixed variants. Operator activation and deferred work are tracked at t
 
 The sections below preserve the original scope and acceptance criteria for future review.
 
-Read `AGENTS.md` (or `CLAUDE.md`) first, then `ARCHITECTURE.md`, `DECISIONS.md`, and the
-release 1.3.34 section at the top of `AGENDA.md`. This brief is a map with file references, not a
+Read `AGENTS.md` first, then `ARCHITECTURE.md`, `DECISIONS.md`, and the
+original release 1.3.34 evidence linked below. This brief is a map with file references, not a
 replacement for those documents. Where this brief and a later recorded decision disagree, the
 decision wins. Record your own choices in `DECISIONS.md`.
+
+### Consolidated ownership and remaining launch work — October 8, 2026
+
+Current priorities are in [AGENDA.md](AGENDA.md); the original 1.3.34 release evidence is in the
+[preserved agenda](docs/archive/2026-10-08/AGENDA.md). W8 is SATI-WRK-001. Its completion covers
+worker fairness, bounded dependency use, and dispatch/admission isolation; it does not complete
+the wider cloud Production launch gate. Tenant data constraints/identity/lifecycle, durable replay
+and external-send recovery, current billing correctness, and complete-service recovery have their
+own acceptance owners in the [readiness registry](docs/readiness/README.md) and stable agenda IDs.
+
+Read the [known failure inventory](docs/readiness/multitenancy-contingencies.md) before implementation
+and record any uncovered failure there. Use the [protocol baseline](docs/readiness/protocol-baseline.md)
+for explicit delivery/retry guarantees. Capture W8 results under the relevant versioned criteria
+in [readiness.json](docs/readiness/readiness.json); source tests and live hosting proof remain distinct.
+The Settings thermometer changes only through that reviewed evidence, never because W8 is checked off.
+
+After each significant W8 slice, follow [the standing upkeep and next-work workflow](AGENTS.md#standing-work-and-documentation-upkeep):
+update this handoff's current findings/implementation/acceptance state, the stable agenda item and
+next eligible pointer, affected owners/decisions, and [dated working evidence](docs/readiness/work-evidence.md).
+Record what was actually tested, unrun gates, remaining dependencies and the next concrete slice.
+Preserve the original implementation record and D1–D4; append dated updates rather than rewriting
+historical evidence. The user can start the selected bounded slice with `Perform the next thing on the list`.
 
 ---
 
@@ -72,10 +102,13 @@ decision wins. Record your own choices in `DECISIONS.md`.
 
 ## 2. Hosting constraints that shape the design
 
-These are facts about the current deployment. Design around them; do not change them.
+Read [DATABASE_ENVIRONMENTS.md](DATABASE_ENVIRONMENTS.md) for authoritative dated hosting facts.
+The following are worker design constraints and implementation references; they do not authorize
+infrastructure changes. Revalidate observed hosting limits before a different environment is used.
 
-1. **The Demo API runs on App Service Free F1 with `alwaysOn` false** (`AGENDA.md:5827`). The site
-   sleeps when idle and has a 60-minute daily CPU quota. An in-process `BackgroundService` timer
+1. **Catch up after host sleep**, using the dated API hosting limits in
+   [the inventory](DATABASE_ENVIRONMENTS.md#observed-demo-inventory--october-8-2026).
+   An in-process `BackgroundService` timer
    does not fire while the site is asleep. Every API worker must therefore be **catch-up on wake**:
    on start and on each tick, it asks "is a run overdue?" and runs once if so, rather than
    assuming it fired at the scheduled minute.
@@ -97,14 +130,16 @@ These are facts about the current deployment. Design around them; do not change 
    `DECISIONS.md`. Don't invent a fake user row.
 5. **Agency time:** use `ApiClock` / `TenantClock`, never `DateTime.Now`. The banned-symbol list
    is `architecture/BannedSymbols.ServerClock.txt`.
-6. **The Demo database is serverless on a free monthly allowance** (`GP_S_Gen5_2`, 0.5 minimum
-   vCore, auto-pause when the allowance is exhausted; `DATABASE_ENVIRONMENTS.md`). Anything that
-   queries SQL every few minutes around the clock keeps the database from pausing and spends that
-   allowance. Once it runs out, Demo pauses for the rest of the month. **Nothing in this brief may
-   poll SQL on a short fixed interval while nobody is using Demo.**
-7. **The Function App already reports to Application Insights.** The 1.3.33 release notes
-   (`AGENDA.md`) record the reset's `DEMO_COMPLIANCE_HISTORY_COMPLETE` marker arriving there. Its
-   managed identity can already read `dbo` and its own storage queues.
+6. **Bound shared database work** against the dated SQL capacity in
+   [the inventory](DATABASE_ENVIRONMENTS.md#observed-demo-inventory--october-8-2026).
+   Agencies share capacity; their IDs do not reserve database resources. Preserve D2's
+   no-wake-ping decision and bounded catch-up work.
+   **Nothing in this brief may poll SQL on a short fixed interval while nobody is using Demo.**
+   Reassess pause/allowance constraints if the selected SQL tier changes.
+7. **Reuse the Function's established telemetry architecture.** The preserved 1.3.33 release
+   evidence records the reset's `DEMO_COMPLIANCE_HISTORY_COMPLETE` marker. Validate current
+   telemetry access and managed-identity grants through the inventory and activation gate;
+   historical success is not proof of present permissions or received alerts.
 
 ## 3. The common worker pattern
 
@@ -112,12 +147,17 @@ Every server worker in this brief must:
 
 - put its decision rule in one named owner in `Sati.Contracts.V1`, used by both the API and the
   local service;
-- be idempotent and safe to run twice or concurrently: take an `sp_getapplock` per job, and leave
-  scale-out to the database lock, not the host;
+- be idempotent and safe to run twice or concurrently: document each `sp_getapplock` resource
+  and scope (deployment/reset, agency/account, or record), and coordinate across hosts through
+  SQL. Preserve existing global locks where their invariant requires them; W8 investigates
+  narrower scope and fairness rather than assuming a job-global lock isolates agencies;
 - catch up on wake (constraint 1) without polling SQL while idle (constraint 6). Record each
   run that changes data as **one summary audit event** per agency (counts and ids, no
   narratives), using the system actor from D3;
 - work in bounded batches with a cancellation token, and stop at the batch limit;
+- for new or revised multi-agency execution, follow W8: bounded agency turns and total run/
+  dependency budgets, recoverable agency failure isolation, and explicit progress evidence;
+  existing W1–W6 implementations are not claimed to satisfy the new W8 criteria;
 - respect optimistic concurrency: increment `Revision`, and never overwrite a row whose revision
   changed since it was read;
 - log failure type, job name, and counts only. No narratives, names, payloads, tokens, or vendor
@@ -302,6 +342,160 @@ backups under `%LOCALAPPDATA%\Sati\schema-backups` are never pruned or verified
 migrating, keep the newest N, and never write outside `%LOCALAPPDATA%`. Do not add a scheduled
 local backup without asking Josh.
 
+### W8 — Tenant workload isolation and worker fairness *(Significant now; required evidence before a multi-agency pilot)*
+
+**Status:** first two SATI-WRK-001 slices implemented in local source on 2026-10-08; verification
+is recorded below. Remaining discovery, fairness, total-budget, admission and capacity work is open.
+W1–W6 remain implemented as recorded above; their activation gates remain.
+
+#### October 8 — bounded note-worker agency-failure isolation
+
+`NoteAbandonmentWorker.RunDueAsync` now continues after a narrowly classified recoverable
+agency sweep failure. The failed agency stays due, is invoked once per pass and prevents
+global day completion. Later healthy agencies can finish in the same pass; their committed
+counts and successful agency/day skipping are retained when the failed agency is attempted
+on a later existing hourly pass. At-limit batches still remain due.
+
+[DEC-0222](docs/decisions/current/2026-10-08-DEC-0222.md) owns the classification and rejected
+alternatives: EF concurrency faults and a nonempty all-1205, nonfatal SQL error collection,
+including deliberate EF update/retry-limit wrappers. Cancellation takes precedence. Shared
+agency-list/connection/coordination, timeout, fatal, mixed SQL and unknown failures propagate.
+The catch encloses only the agency sweep. Diagnostics contain agency ID and failure type,
+without exception objects/messages, note narratives or credentials.
+
+The sweep transaction, execution strategy, 100-note batch, guarded revisions and atomic
+note/audit writes are unchanged. The global SQL lock and Demo reset lease, default-off option,
+next-local-day behavior and hourly cadence are retained. This is failure continuation, not a
+new scheduler, immediate retry or a guarantee of fair capacity or bounded agency wait.
+
+The fail-first regression injects an EF concurrency fault at A's audit insertion after its
+guarded update. Against the original worker it failed with that propagated exception before
+B could progress. Passing acceptance and its limits are recorded in
+[the dated working evidence](docs/readiness/work-evidence.md); synthetic SQL exception injection
+is distinct from a real SQL deadlock/retry-exhaustion proof. No worker activation, schema,
+live-data access, provider send, cloud change or deployment is part of this slice.
+
+#### October 8 — bounded Claim.MD HTTP exchange deadline
+
+`ClaimMdSandboxConnector` now owns the existing 45-second budget through headers, stream
+acquisition and every response-body read. A single `TimeProvider` deadline starts inside the
+coordinated callback after SQL admission/pacing, linked to caller cancellation. Client registration
+uses the connector's configuration helper and removes the competing `HttpClient` timer.
+[DEC-0223](docs/decisions/current/2026-10-08-DEC-0223.md) records ownership and rejected alternatives.
+
+The stalled-body connector and real-connector upload regressions both failed against the original
+transport. Fake-time acceptance proves cancellation at 45 seconds, including a delayed-header
+exchange's remaining body budget, response/body disposal and following healthy callback progress.
+An upload remains `Sending` while stalled and becomes `OutcomeUnknown` after deadline cancellation;
+there is one physical request/attempt and no automatic replay. Existing SQL coordination/reset
+proofs passed separately in a disposable private instance. Counts, commands and TRX evidence are
+in [the dated working evidence](docs/readiness/work-evidence.md).
+
+The fixed host, redirect/key validation, response cap, default-off gates, provider-wide quota,
+SQL lease/command budgets, pacing, reset/poller/dispatch locks and uncertainty policy are retained.
+This cooperative I/O deadline does not bound admission, synchronous decoding/parsing, disposal
+or lock cleanup, a whole account turn or a worker pass. Tests establish local component behavior,
+not actual provider cancellation, remote nonreceipt, deployed configuration or fair agency latency.
+No worker/transport activation, schema, live-data access, provider call or deployment occurred.
+
+**Next bounded slice:** named 100-agency keyset discovery pages for the note worker, within a
+captured finite ID range. [The agenda](AGENDA.md#next-eligible-work) owns precise scope,
+dynamic-membership limits, dependencies and fail-first acceptance. This bounds each agency-ID
+materialization; successful-day bookkeeping and total-pass/fair-wait budgets remain later work.
+
+**Dispatch poison isolation blocker:** the globally oldest Queued dispatch can still be selected
+repeatedly after a missing-key preflight failure, before any send. Existing acceptance correctly
+leaves it Queued with no attempt or unknown-send evidence. The current model has no durable
+preflight due/backoff/hold/reopen owner. Implementing that isolation needs a reviewed known-unsent
+recovery policy and additive schema proposal under §8; it is not eligible as a silent local
+state workaround. `CancelledBeforeSend` would discard temporarily blocked due work, while a
+process-memory failed-ID list would lose protection across restart/hosts. Local policy/design and
+reproduction can precede any separately approved schema work. Fair lane selection, API admission,
+aggregate capacity and live progress/alert evidence also remain open.
+
+**Problem.** Agency authorization and same-agency billing account/file linkage protect identity
+and record integrity. Agencies still share API CPU/memory, SQL/connection capacity, worker
+selection, and some external-service budgets. Agency or clearinghouse IDs do not create dedicated
+Azure resources. A separate worker per agency is one option to evaluate; it does not by itself
+isolate shared SQL, key/storage/mail services, or vendor quotas.
+
+**Already covered — extend these owners rather than rebuilding them:**
+
+| Existing work | Evidence and remaining distinction |
+|---|---|
+| Structural tenancy | `AGENDA.md`, "Tenant model"; `SATI_STRUCTURAL_REVIEW_2026-09-28.md` S-2. Explicit predicates and selected composite tenant keys exist. General query-filter/RLS/database-tenancy strategy remains planned; no current cross-tenant exploit was demonstrated by the October 8 assessment. |
+| W2 maintenance safety | Shared rules, 100-candidate agency batches, revision-checked writes, atomic system audits, catch-up on wake and cross-host/reset coordination exist. Bounded batches do not establish failure isolation or a maximum wait for later agencies. |
+| Clearinghouse integrity | Same-agency account/generation links, retained dispatch intent, per-dispatch leases, independent feed cursors and uncertain-send quarantine exist. `ClaimMdSandboxCoordination` intentionally coordinates a global request budget and one poller across hosts; rate safety does not establish agency fairness. |
+| Resource and operations backlog | `AGENDA.md` already tracks summary projections for fat loading, distributed sign-in guard state, watchdog activation and restore evidence. SATI-SEC-010 in `SECURITY_AUDIT_2026-09-03.md` already proposed request/parser limits and per-actor/IP rate/concurrency partitions with bounded queues. `SECURITY_REVIEW_2026-09-10.md` B11 records body/X12 limits implemented, with expensive-operation per-user limits still a platform gap. Recheck current source. Validated agency admission, worker starvation and interactive-latency acceptance need explicit coverage. |
+
+**Source paths to reproduce before claiming a fix:**
+
+- `Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs` selects the globally oldest Queued
+  dispatch and awaits upload. Secret/key preflight failure before Sending can leave that row
+  Queued and selected again, delaying healthy agencies.
+- `ClaimMdSandboxPoller.cs` visits ordered accounts serially. It already catches per-feed
+  exceptions; slow exchanges can still delay later accounts. `ClaimMdSandboxCoordination.cs`
+  holds the shared request lease through pacing and HTTP. Verify the vendor's actual quota scope
+  before changing that lock. The local connector deadline above now covers HTTP body I/O after
+  `ResponseHeadersRead`; admission/processing/cleanup, whole-account/pass bounds and live
+  provider deadline proof remain open.
+- `NoteAbandonmentWorker.cs` still visits agencies in ID order under the global sweep lock.
+  The October 8 slice above isolates only classified recoverable sweep failures; unknown/shared
+  failures still stop the pass. Agency discovery, total-pass budgets and healthy-agency wait
+  bounds remain open. Preserve `NoteAbandonmentSweep` transaction/audit rules.
+- `SignatureProcessingService.cs` already advances its package scan beyond damaged rows;
+  `Sati.Signatures/SignatureMailWorker.cs` has durable leases, due times and bounded retries.
+  Preserve those controls while checking fairness across agencies and notification types.
+
+**Build:**
+
+1. Inventory each worker and expensive API workflow: trusted agency/account owner, due selection,
+   query/page/batch limits, lock keys and order, held SQL connections, dependency quotas,
+   deadlines, retry/uncertainty states, feature flags and continuation after restart. Map shared
+   App Service, SQL, Function/reset, key, storage, mail and vendor capacity using dated evidence.
+2. Define measurable service bounds: eligible healthy agency B gets a turn within a configured
+   number of agency turns; define a deadline and maximum concurrency for each dependency and a
+   total run budget. Bound query materialization and tenant bookkeeping as agency count grows.
+   Rotate or fairly select agency/account/feed lanes; preserve ordering only where required.
+3. Isolate recoverable agency/account failures, use bounded backoff for work proven unsent,
+   continue healthy lanes, and propagate cancellation. Distinguish an agency fault from a shared
+   dependency outage. Cap total concurrency and queued work across hosts as well as per agency;
+   prioritize capacity needed for interactive case management. A process-local semaphore alone
+   cannot enforce a limit across hosts.
+4. Classify each lock/quota as deployment-wide, tenant/account, or record-specific. Keep Demo
+   reset exclusion, single-attempt external send and necessary vendor-wide limits. Narrow locks
+   only with evidence of independent ownership/quota and SQL multi-host regression tests.
+5. Add admission and concurrency limits for expensive authenticated API paths, derived from
+   the validated stored actor/agency, with predictable bounded overload responses. Keep existing
+   authorization/revocation checks; profile their SQL cost before calling authorization a
+   serialized bottleneck or introducing a cache that could weaken revocation.
+6. Expose content-free queue depth/oldest eligible age, last progress, lease wait, processing
+   duration, backoff/quarantine and budget rejection. Keep agency-level diagnostic access scoped;
+   avoid unbounded metric labels, narrative/payload/secret/vendor-response logging. Extend W1/W4
+   outcomes/runbooks with stalled agency/feed progress and a named owner, preserving D1–D4.
+7. Compare a fair shared pool, partitioned pools and selected dedicated hosting/database options
+   against measured capacity, costs and service objectives. Record the choice in `DECISIONS.md`;
+   infrastructure proposals remain for Josh. Queue/session-per-agency is not proof of fairness.
+
+**Accept when:** synthetic A/B agencies demonstrate bounded B progress while A has a sustained
+backlog, missing key, slow headers/body, repeated recoverable failures or throttling. Test note
+sweeps and signature work as well as dispatch/polling. Define the scheduling bound before the
+test; do not rely on an arbitrary sleep or eventual completion. With fake time and deterministic
+barriers, test cancellation, feature disablement, agency/account eligibility changes, restart,
+expired leases and recovery. Across two independent API hosts with disposable SQL Server, prove
+same-work exclusion, reset/reconciliation safety and aggregate limits. No cross-agency bytes,
+credentials, cursor effects or audits; no resend of Sending/OutcomeUnknown after timeout or
+failed evidence commit. Measure healthy interactive latency under a defined synthetic noisy
+neighbor workload, including query/connection pressure. Regression tests must fail against the
+original implementation; retain failing and passing evidence plus commands, counts and skips.
+
+The October 8 assessment's billing R1/R2 (another original generation after accepted dispatch;
+incomplete current documentation/compliance recheck before send) are separate existing findings.
+Link their remediation and preserve billability/uncertainty gates; fairness changes do not close
+them. Watchdog activation, actual alert delivery and actual vendor/cloud acceptance remain
+distinct from source tests. A schema requirement needs a proposal and §8 approval; this W8 entry
+does not authorize a migration, deployment, live vendor call or Azure configuration change.
+
 ---
 
 ## 6. Considered and deliberately not built
@@ -334,6 +528,7 @@ changing Azure resources, role assignments, firewall rules, or app settings; tou
 `invoke DATT!` does not extend to any of these beyond what `RELEASE_PLAYBOOK.md` already allows.
 A schema change needs Josh's approval and the controlled migration process in
 `DATABASE_ENVIRONMENTS.md`. The pattern in §3 is designed so none of W1–W5 needs one.
+W8 may require a schema proposal; its scope does not waive that approval or D4.
 
 ## 9. Done means
 
@@ -344,3 +539,5 @@ A schema change needs Josh's approval and the controlled migration process in
 - `AUDIT_EVENTS.md`: every new action. `API_AUTHORIZATION.md`: any new or rescoped route.
 - `OPERATIONS.md`: the alert owner, the conditions, and the operator response for each.
 - `AGENDA.md`: anything deferred, with the reason.
+- W8: declared scheduling/capacity bounds, synthetic A/B failure and load evidence, and
+  SQL multi-host results; distinguish source verification from owner-run live acceptance.

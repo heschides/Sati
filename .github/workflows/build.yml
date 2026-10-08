@@ -12,12 +12,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check release source consistency
         run: ./scripts/Test-DattPreflight.ps1
 
+      - name: Preserve release readiness history across this change
+        env:
+          READINESS_BASE_REVISION: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if ($env:READINESS_BASE_REVISION) {
+            ./scripts/Test-ReleaseReadiness.ps1 -BaselineRevision $env:READINESS_BASE_REVISION
+          }
+
       - name: Test release tooling
         run: |
+          ./scripts/Test-DocumentationStructureChecks.ps1
+          ./scripts/Test-ReleaseReadinessChecks.ps1
           ./scripts/Test-DattPreflightChecks.ps1
           foreach ($case in @('DemoCleanupFailure','DemoSuccess','DemoKeepFiles','DemoExistingEvidence','LocalSuccess','LocalCleanupFailure','LocalSignatureFailure','LocalExistingEvidence')) {
             ./scripts/Test-InstallerAcceptanceEvidence.ps1 -Case $case

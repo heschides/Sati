@@ -1,6 +1,6 @@
 # Operations and records governance
 
-*Current as of 2026-10-03. Retention enforcement remains `PolicyOnly`; nothing in this document
+*Operational policy/runbook owner; consolidated 2026-10-08. Retention enforcement remains `PolicyOnly`; nothing in this document
 describes an automated deletion process that exists today.*
 
 This runbook describes the operational controls represented in the Admin dashboard and the
@@ -82,7 +82,7 @@ Admin may permanently delete an ordinary consumer created within the last 20 day
   `Unavailable`, never `Clear` — the same fail-closed shape items 1-5 above describe, just scoped
   to this one command rather than to general retention.
 
-This registry is **not** the retention workflow items 1-5 above describe in full:
+The following describes the original narrow registry. The October 6 governance source update below supersedes its person-only/single-Admin limitations, while complete runtime retention remains gated:
 
 - It has no record-class or agency-wide scope — it only answers "is this one person held."
 - Release is **single-admin**, not the dual-control release item 3 requires. Tracked in
@@ -126,6 +126,13 @@ Database permissions should deny application updates/deletes to `AuditEvents` an
 `PersonVersions` in addition to the application-level append-only check. Secrets belong in the
 deployment secret store, never in appsettings, source control, logs, or support tickets.
 
+## Environment inventory owner
+
+[DATABASE_ENVIRONMENTS.md](DATABASE_ENVIRONMENTS.md) is the sole owner of dated deployment observations.
+[Readiness](docs/readiness/README.md) owns feature activation and evidence gaps. This document owns
+operating policy and procedures; historical commands/resource names identify their bounded target,
+not a claim that permissions, quotas, alerts or feature settings were freshly verified.
+
 ## Health, monitoring, and alerts
 
 The API exposes liveness and readiness health checks, validates the expected database/environment
@@ -149,7 +156,7 @@ expectations. A dashboard without notification routing is visibility, not an ale
 
 Josh owns the Demo notification route. `DemoWatchdog` is prepared for a daily 04:00 Eastern
 Function run, after the existing 03:15 reset. It checks outcomes once per day; it does not keep
-App Service F1 or serverless SQL awake. This implementation has not published the Function,
+the API or SQL awake; see [the dated environment inventory](DATABASE_ENVIRONMENTS.md). This implementation has not published the Function,
 configured an email receiver, enabled API maintenance, or created Azure alert rules.
 
 The watchdog emits one narrative-free `SATI_WATCHDOG_OK` or `SATI_WATCHDOG_FINDING` trace.
@@ -322,7 +329,7 @@ of those and performs no export or restore of personal PHI.
 
 ## Demo schema changes without a firewall rule
 
-`SatiDemo`'s SQL allow-list admits only `sati-demo-api-satilogica`'s three outbound addresses. A
+Use [DATABASE_ENVIRONMENTS.md](DATABASE_ENVIRONMENTS.md) for dated SQL/network observations; the reviewed migration procedure requires only already-authorized hosted connectivity. A
 migration run from a workstation therefore needs a temporary exact-IP rule, which is a security
 setting nobody but the operator may add. The `demo-history-reconciliation` triggered WebJob exists
 so that step is not needed: it runs inside the App Service, from addresses already on the list.
@@ -545,14 +552,14 @@ not supplied by this source work; enabling the timer on linked data yields refus
 - Decide the retention answer for the mixed-era archives in `%LOCALAPPDATA%\Sati\Archive`.
   They predate the Production/Demo split and may hold real records, so disposing of them is a
   records decision under the retention classes above, not workstation cleanup.
-- Implement the legal-hold registry, dual-control release, dry-run, and destructive job.
+- Accept the implemented scoped-hold/dual-control source and complete reviewed runtime storage/recovery adapters and destructive-job activation; see RECORDS_GOVERNANCE_RUNBOOK.md. Source existence does not authorize runtime purge.
 - Apply the production SQL grants/denies and verify them in deployment tests.
 - Connect logs/health/database signals to an external metrics and paging platform.
 - Add backup restore drills, incident response exercises, and evidence retention.
 
 ## Electronic signature operations
 
-The feature and its server workers remain off by default. Follow `Sati.Portal/README.md` for
+Source defaults and per-agency activation are separate; consult [the readiness registry](docs/readiness/README.md) and the signature runbook for accepted activation state. Follow `Sati.Portal/README.md` for
 separate identities, exact environment configuration, private storage, distinct versioned keys,
 manual role grants, trusted proxies, token-free hosting logs and controlled synthetic recipients.
 Follow `SIGNATURE_PORTAL_GUIDE.md` for legal, program and staff procedures. No real signature,
@@ -583,7 +590,7 @@ monitoring remain uncompleted launch evidence, as listed in `SIGNATURE_PORTAL_VA
 
 ## Records governance implementation status — October 6, 2026
 
-The unreleased source implements scoped/versioned holds, independent second-Admin release,
+The October 6 implementation record below is retained; later release evidence is indexed in [readiness](docs/readiness/README.md). Source implements scoped/versioned holds, independent second-Admin release,
 versioned proposed policies, connected dependency evaluation and bounded/checkpointed execution
 in owned private fixtures. The legacy single-Admin release limitation described in historical
 sections above is superseded in this source: the compatibility route requests release and keeps

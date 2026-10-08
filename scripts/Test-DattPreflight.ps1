@@ -67,4 +67,8 @@ $examples=[regex]::Matches((Read-Source 'installer/README.md'),'Sati(?:Local|Dem
 Check ($examples.Count -gt 0) 'Installer examples have no versioned filenames.'
 foreach ($example in $examples) { Check ($example.Groups[1].Value -ceq $version) 'Installer README example version is stale.' }
 if ($failures.Count) { throw ("DATT preflight failed:`n- " + ($failures -join "`n- ")) }
+# Documentation ownership and a truthful, version-matched report are release prerequisites.
+# A low readiness score is allowed for a Demo/Local release; it does not authorize cloud Production.
+& (Join-Path $PSScriptRoot 'Test-DocumentationStructure.ps1') -RepositoryRoot $root | Out-Null
+& (Join-Path $PSScriptRoot 'Test-ReleaseReadiness.ps1') -RepositoryRoot $root | Out-Null
 [pscustomobject]@{Gate='DattSourceConsistency';Passed=$true;ReleaseVersion=$version;ReleaseName=$name;ReleaseDate=$date;MigrationCount=$migrationIds.Count;LatestMigration=$latest}

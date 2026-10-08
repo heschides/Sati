@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "id": "DEC-0219",
+      "date": "2026-10-08",
+      "title": "Canonical documentation ownership and preserved history",
+      "path": "docs/decisions/current/2026-10-08-DEC-0219.md",
+      "status": "accepted",
+      "evidence": ["docs/documentation-migration.md", "docs/documentation-governance.md"],
+      "supersedes": []
+    },
+    {
+      "id": "DEC-0220",
+      "date": "2026-10-08",
+      "title": "Evidence-based release readiness thermometers",
+      "path": "docs/decisions/current/2026-10-08-DEC-0220.md",
+      "status": "accepted",
+      "evidence": ["docs/readiness/readiness-method.md", "RELEASE_PLAYBOOK.md"],
+      "supersedes": []
+    },
+    {
+      "id": "DEC-0221",
+      "date": "2026-10-08",
+      "title": "Standing documentation upkeep and bounded next-work invocation",
+      "path": "docs/decisions/current/2026-10-08-DEC-0221.md",
+      "status": "accepted",
+      "evidence": ["AGENTS.md", "AGENDA.md", "docs/documentation-governance.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
+    },
+    {
+      "id": "DEC-0222",
+      "date": "2026-10-08",
+      "title": "Recoverable agency faults in the note-abandonment worker",
+      "path": "docs/decisions/current/2026-10-08-DEC-0222.md",
+      "status": "accepted",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
+    },
+    {
+      "id": "DEC-0223",
+      "date": "2026-10-08",
+      "title": "One Claim.MD HTTP exchange deadline",
+      "path": "docs/decisions/current/2026-10-08-DEC-0223.md",
+      "status": "accepted",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "CLAIMMD_SANDBOX_RUNBOOK.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
+    }
+  ]
+}

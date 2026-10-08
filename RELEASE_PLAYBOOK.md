@@ -46,6 +46,8 @@ A DATT release is complete only when all applicable conditions are true:
 - the working tree contains no unexplained or accidentally omitted changes;
 - the version, Settings release tracker, builders, readiness checks, tests, and release documents
   agree on one new version;
+- documentation ownership checks pass, and the Settings readiness report has a reviewed snapshot
+  for that exact version, retaining previous releases and their original scoring criteria;
 - the full Release build and all available automated test projects pass;
 - source commits are pushed without rewriting remote history;
 - the Demo API reports healthy liveness and readiness, the new release version, and the expected
@@ -188,6 +190,8 @@ Update all coordinated owners before the source release commit, including as app
 - Demo, Local, and diagnostic installer builder defaults;
 - Demo readiness expectations and explicit version assertions;
 - `Services/ProductReleaseNotes.cs`, which supplies the Settings version tracker and release notes;
+- a reviewed, append-only snapshot in `docs/readiness/readiness.json` for the new version (see
+  [Readiness reporting](#readiness-reporting) below);
 - current installer and runbook examples; and
 - a new current-release section in `AGENDA.md` with deployment and artifact evidence still marked
   pending.
@@ -205,6 +209,10 @@ an existing version number.
    source-only check catches stale project versions, builder/readiness defaults, release-note
    assertions, migration-count/latest-migration assertions, and installer examples without
    compiling or connecting to a database. Fix every mismatch first; it supplements the full gates.
+   The preflight also runs `Test-DocumentationStructure.ps1` and `Test-ReleaseReadiness.ps1`.
+   Run their negative-case checks when either gate or its format changes. CI runs these checks
+   on every change. A valid report can show unfinished multitenancy work; a missing, malformed,
+   stale, or rewritten report cannot pass.
 2. Build the complete `SatiLogica.slnx` solution in Release configuration.
 3. Run every test project in `SatiLogica.slnx`, including Sati desktop/domain tests, API integration
    tests, and Carika tests when present. Run profile-dependent DPAPI, WPF, or Avalonia checks under
@@ -221,6 +229,46 @@ Reuse passing evidence only while that gate's verified source, configuration, to
 and artifact bytes remain unchanged. Repeat a gate when its inputs changed, it failed, or a specific
 unresolved concern requires it.
 Evidence-only ledger edits do not require another build, test run, package, or acceptance run.
+The readiness JSON is embedded in the desktop. Changing it changes the shipped UI and therefore
+requires rebuilding and verifying that artifact; it is not a post-build operational ledger edit.
+
+### Readiness reporting
+
+The authoritative scoring method is [docs/readiness/readiness-method.md](docs/readiness/readiness-method.md).
+The known risk and failure inventory is [docs/readiness/multitenancy-contingencies.md](docs/readiness/multitenancy-contingencies.md);
+the protocol guarantees and limitations are in [docs/readiness/protocol-baseline.md](docs/readiness/protocol-baseline.md).
+Read these during release review. The Settings Release tab presents separate multitenancy and
+idempotency thermometers, overall readiness including operations, hard blockers, plain-language
+current state and next steps, and the change from the preceding release. Progress is evidence-based;
+a new version or more tests alone earns no points. A release with no progress must say so honestly.
+
+1. After coordinating the new version, create a template with
+   `scripts/New-ReleaseReadinessSnapshot.ps1 -Release <new-version> -SourceRevision <audited-40-character-commit> -DraftPath <review-file>`.
+   This creates unknown assessments requiring review; it does not copy claims of verification.
+2. Review every criterion against the release inputs. Supply precise versioned evidence references,
+   the date and audited source commit, an explanation of what changed or remains unproven, and
+   concrete next steps in plain language. Evidence must identify its tested inputs and results.
+   Label source inspection, synthetic tests, SQL/provider tests, live hosting exercises, and
+   independent review accurately. Unknown or unavailable evidence earns no verification credit.
+   A source revision records the commit inspected before preparing the report; later relevant
+   source changes require reassessment. Do not create self-referential commit hashes.
+3. Append the reviewed file with
+   `scripts/New-ReleaseReadinessSnapshot.ps1 -Release <new-version> -SnapshotPath <review-file>`.
+   The helper validates the exact current source version, evidence references, complete coverage,
+   and unchanged history before replacing the ledger. Repeating an identical append is harmless;
+   a different snapshot under the same release is rejected.
+4. Run preflight and build/test the final embedded report. If relevant inputs change before source
+   commit, reassess the unreleased draft. Once committed, the report and its rubric are immutable:
+   record corrections in the next release. Add a new rubric version when requirements change;
+   retain old rubrics. The UI explains that scores from different rubrics cannot be compared.
+5. Record any deployment/hosting observations obtained after packaging in the dated operational
+   release evidence, then assess them in the next shipped snapshot. Do not overwrite an accepted
+   installer to improve its thermometer.
+
+The initial 1.3.37 report is an October 8 retrospective assessment of the inspected source,
+not a claim that this feature shipped on October 7 and not a completed release in this task.
+The readiness evidence gate checks report integrity; the independent cloud Production launch gate
+requires every mandatory protection to be verified. A high average never clears a hard blocker.
 
 ## 5. Source commit and push
 
@@ -386,6 +434,8 @@ Stop before the next side effect and explain the blocker when any of these occur
 - a merge conflict lacks an evidence-backed resolution;
 - the version is ambiguous or an artifact already uses it;
 - a build, required test, security check, or acceptance gate fails;
+- documentation structure or readiness-report validation fails, including missing current-version
+  coverage or changed prior snapshots/rubrics;
 - a secret, credential, private configuration, or unrestricted narrative appears in an artifact or
   log;
 - a cloud database migration or Production deployment would be required;

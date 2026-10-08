@@ -1,11 +1,26 @@
-# Production and Demo Data Environments
+# Data environments — authoritative dated inventory
 
-*Current as of 2026-10-03 (release 1.3.34). The full-baseline Demo reset runs nightly and on Admin
-request; failure alerting is not yet routed to anyone — see the checklist at the end of this file.*
+**Inventory owner:** this file. **Latest evidence date:** October 8, 2026. Read-only assessment
+observations are dated below; this consolidation made no cloud/database call. Current release
+readiness belongs to [the readiness registry](docs/readiness/README.md). Historical deployment
+chronology is retained in [the original inventory](docs/archive/2026-10-08/DATABASE_ENVIRONMENTS.md).
 
-Sati maintains deliberately separate Production and Demo identities. This separation protects
-real working data during development and prepares the synthetic Demo environment for Azure.
+## Observed Demo inventory — October 8, 2026
 
+| Fact | Observed value / evidence boundary |
+|---|---|
+| Demo SQL | `SatiDemo`, logical server `sati-demo-satilogica-central`, Basic capacity 5, Online |
+| SQL recovery configuration | Seven-day short-term retention; 12-hour differential interval; Local backup redundancy; no returned LTR, zone redundancy, replication links or named-server failover groups |
+| Demo API | `sati-demo-api-satilogica`, App Service Free F1; Always On false; WebSockets false |
+| Host/SQL identities | Managed identity architecture exists; current exact grants/key/log permissions were not inspected by this assessment |
+| Monitoring | Planned watchdog alert rules absent in bounded October 8 reads; actual notification receipt not established |
+| Temporary workstation rule | `datt-workstation-20261007` absence confirmed by October 8 follow-up after Josh removed it; this item is closed in that dated evidence |
+| Future cloud Production | Not deployed; Demo observations do not establish PHI/financial Production readiness |
+
+Source: [October 8 engineering assessment](reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md),
+sections 7–8 and its bounded control-plane evidence. No live record, PHI, credential or private
+setting was inspected. Earlier `GP_S_Gen5_2`/free monthly allowance/auto-pause entries are historical,
+not current Basic facts. D2 no wake ping and the no-idle-polling policy remain in force.
 ## What `SatiProduction` is
 
 `SatiProduction` is the developer's personal working environment. It holds real PHI from daily
@@ -79,283 +94,38 @@ Implemented properties:
 - The Demo client does not register an EF context and does not run database migrations.
 - The database retains the `dbo.SatiDatabaseIdentity` marker as an additional environment guard.
 
-Current HTTP-backed Demo workflows are authentication, caseload and person summaries, journals,
+Historical initial HTTP-backed Demo workflows included authentication, caseload and person summaries, journals,
 case notes, settings reads, scratchpads, exempt dates, incentives, and form state updates. Features
 that have not yet received an authorized API endpoint fail explicitly in Demo; they do not fall back
 to LocalDB or direct Azure SQL.
 
-## Canonical Demo and nightly reset
+## Canonical reset and environment safety
 
-Demo migrations define schema. A separate, versioned Demo seed defines the canonical superhero
-and sitcom dataset. Do not use production migrations as a nightly data-reset mechanism.
+Schema migrations and versioned synthetic seed/baseline are separate assets. Reset excludes
+concurrent mutations, validates the Demo marker/ownership/inventory, records outcome and invalidates
+prior sessions through instance identity rotation. Admin reset requests use the single-delivery
+queue; an interrupted outcome may leave poison evidence. Never replay poison or infer success
+from queue acceptance. External clearinghouse linkage can intentionally block reset; preserve it.
 
-The scheduled reset should:
+[OPERATIONS.md](OPERATIONS.md) owns reset/watchdog/uncertainty response procedures.
+[CLAIMMD_SANDBOX_RUNBOOK.md](CLAIMMD_SANDBOX_RUNBOOK.md) owns sandbox windows and reset pause.
+[RELEASE_PLAYBOOK.md](RELEASE_PLAYBOOK.md) owns release authorization and evidence gates.
 
-1. stop or reject new mutations;
-2. restore or reseed the canonical Demo data;
-3. reset stored demonstration logins;
-4. validate tenant ownership, record counts, and the `Demo` marker;
-5. record reset success or failure; and
-6. reopen mutations only after validation succeeds.
+## Migration and recovery requirements
 
-The reset job should run in Azure under its own managed identity with only the permissions needed
-for reset operations. Its permissions should be separate from the normal API identity.
+Cloud migrations require separate authorization, identity validation, reviewed additive/rollback
+behavior, backup/rehearsal evidence and the controlled runner. Installed Demo clients never migrate
+cloud schemas. Temporary firewall changes remain operator-run; no release or generic “proceed”
+authorizes the assistant to alter them. Personal working data is never queried/copied/transformed
+for Demo without explicit authorization. Future cloud Production requires separate approval.
 
-### Running daily caseload refresh
+Configuration describes available backups, not tested restoration. A restore must preserve SQL,
+object/key evidence, immutable lineage and later/external effects under the operations/readiness
+criteria. Local backup creation/pruning remains PHI-copy work governed by workstation policy.
 
-On September 6, 2026, `sati-demo-refresh-satilogica` was deployed as a timer-triggered Azure
-Function scheduled for 3:15 AM Eastern. Its separate system-assigned managed identity maps to the
-`sati_demo_refresh` database role, which has SELECT, INSERT, and UPDATE on `dbo`, but no DELETE or
-schema permissions. The SQL firewall admits the Function's exact published possible outbound
-addresses; the temporary workstation rule used to establish the contained identity was removed and
-verified absent.
+## Updating this inventory
 
-The refresh keeps dates current, fills ordinary agency-2 client profiles and related showcase data,
-preserves exactly six labeled incomplete teaching cases, retains funny superhero/TV biographies and
-case notes, and repairs synthetic zero-value or snapshot-less claim rows. It validates the `Demo`
-marker, caseload count, deliberate-exception count, ordinary-client completeness, and claim
-readiness after each transaction. The first live run and an immediate idempotency run both passed.
-
-This does not yet stop mutations, delete all user-created Demo activity, or reset demonstration
-passwords. Those stronger full-reset requirements and a notification action for failure alerts
-remain outstanding.
-
-> **Superseded.** The same timer now runs the full-baseline reset in
-> `Sati.DemoRefresh/Shared/DemoReset.ps1`, under an exclusive lock with the API's mutation lease
-> turning sign-ins away while it runs. Admin-requested resets go through the single-delivery
-> `demo-reset-requests` queue. Every outcome is recorded as `demo.reset.completed` or
-> `demo.reset.failed` (`DECISIONS.md`, 2026-09-26). A reset that dies before writing its outcome
-> leaves only a poison-queue entry; nothing alerts a person.
-
-## Current Azure Demo database
-
-On September 14, 2026, the three additive migrations for Representative Payee workflow, weekly
-check-request automation, and case-note goal progress were rehearsed with rollback, applied, and
-rerun idempotently against identity-checked `SatiDemo`, moving migration history from 102 to 105.
-After separate authorization, the canonical full-reset baseline was replaced with a September 14
-timeline anchor. Its 56-table inventory and row counts matched the live database, the new workflow
-tables were present as empty canonical tables, and a complete reset rehearsal inside an outer
-transaction left constraints trusted before rolling back to the exact prior live state. The
-temporary workstation firewall rule remained operator-managed throughout and must be removed by
-the operator after database work is complete.
-
-Provisioned and validated on August 11, 2026:
-
-| Setting | Value |
-|---|---|
-| Subscription | `Azure subscription 1` |
-| Resource group | `rg-sati-demo` |
-| Logical server | `sati-demo-satilogica-central.database.windows.net` |
-| Database | `SatiDemo` |
-| Region | Central US |
-| Authentication | Microsoft Entra-only; `Joshua White` is the server Entra administrator |
-| Compute | Free-limit General Purpose serverless, `GP_S_Gen5_2`, 0.5 minimum vCore |
-| Cost guard | `AutoPause` when the monthly free allowance is exhausted |
-| Network | Public endpoint with exact API and Demo-refresh outbound-IP rules; tester IPs are not allowed |
-| SSN key vault | `sati-demo-kv-satilogica`, key `ssn-demo`; purge protection enabled; API identity has only `wrapKey` / `unwrapKey` |
-
-The imported database was read back through an exact-IP temporary firewall rule and matched the
-verified local source: `Demo` identity marker, 15 users, 167 people, and 3,769 notes. On August 12,
-2026, the controlled Admin/audit deployment brought the database to 55 migrations, reconciled all
-legacy Person and Note ownership to the owning user's agency, and verified zero null or mismatched
-tenant assignments. Every temporary import, migration, and validation firewall rule was removed
-after use.
-
-The API is hosted on Windows App Service Free F1 in Central US at
-`https://sati-demo-api-satilogica.azurewebsites.net/`. Its system-assigned managed identity is a
-contained database user with only `db_datareader` and `db_datawriter`. The API uses a managed-
-identity connection; its token-signing key is an App Service setting and is not stored in source.
-Both `/health/live` and `/health/ready` returned HTTP 200 after the Admin/audit API deployment on
-August 12, 2026. Authenticated verification also covered the agency-scoped Admin overview, all 167
-Person list rows, first-view lifecycle baseline creation, recent activity, and PDF export; anonymous
-Admin access returned HTTP 401.
-
-On September 9, 2026, the identity-validated Demo database received the additive
-`AddCheckRequests` migration and moved from 96 to 97 migration-history rows. The guarded runner
-completed a rollback-only rehearsal, the real application, and an idempotent second application.
-The user removed the temporary exact-IP workstation firewall rule immediately afterward, and the
-Azure allow-list confirmed it absent. Demo API 1.3.6 was then published with OneDeploy deployment
-`1d06555ef0b54b81830e643b5f8244c3`; live and ready returned HTTP 200 and contract revision
-`AF5889A2C7E5` matched the compiled debugger client. This was an API alignment only: no Production
-operation and no 1.3.6 installer publication occurred.
-
-On August 20, 2026, the Demo-only SSN Key Vault and guarded operational seed route
-were deployed with OneDeploy deployment `6bd6cf80e3a2490f80777135d60bf93f`.
-Post-deploy live and ready health returned HTTP 200, and the authenticated agency
-Admin seed encrypted deterministic synthetic SSNs for all 177 Demo People. The
-ordinary read/write/form routes remain restricted to each Person's assigned case
-manager; the seed did not broaden those permissions.
-
-On August 13, 2026, the additive billing configuration/snapshot migration was applied to Azure
-`SatiDemo`, and ten clearly marked synthetic billing scenarios were seeded for Sandbox Mode:
-three ready and seven independently blocked. The real billing service verified the expected 3/7
-split and partial-unit values before the matching API package was deployed. Post-deploy liveness and
-readiness returned HTTP 200, the release endpoint returned 1.2.1, and the new anonymous billing-
-configuration request returned HTTP 401. Temporary exact-IP migration rules were removed after use.
-
-Later on August 13, the billing-complete desktop client and API were versioned together as 1.2.2.
-The exact 1.2.2 installer passed isolated install, public-configuration, version, 15-second launch,
-and cleanup checks. Azure OneDeploy deployment `204b1019a81746508f7e3585723b5ec6`
-succeeded for the matching API package; after the normal restart interval, `/health/live` and
-`/health/ready` returned HTTP 200 and `/health/version` returned 1.2.2. Authenticated Admin
-preflight and clean external-machine evidence remain explicit final Demo gates.
-
-Later on August 13, the tenant-safe incident pipeline was applied as migration 62 and the matching
-API/client release 1.2.3 was deployed with OneDeploy deployment
-`8e1d1e6de769418c87fc15588237d28d`. Live, ready, and version checks returned HTTP 200/1.2.3. A
-separately provisioned `global-admin` account returned the `PlatformOperator` role, read four
-cross-agency health rows, and was correctly denied an agency provider route. Its randomly generated
-password is retained only in a Windows user-bound encrypted credential file outside the repository.
-The temporary migration firewall rule and a stale client-IP rule were removed; only the three App
-Service outbound-IP rules remain. The 1.2.3 installer passed isolated version, public-configuration,
-15-second launch, responsiveness, and cleanup checks. External-machine and presenter attestations
-remain separate final evidence gates.
-
-Later on August 13, release 1.2.5 corrected the missing-telemetry failure mode and clarified the
-note review handoff. Guarded migration `20260813210000_AddIncidentScope` was applied to `SatiDemo`
-as migration 63; its temporary single-IP firewall rule was verified and removed immediately. API
-1.2.5 was deployed with OneDeploy deployment `4d16d2e572094579b0e427f8fdaac55f`.
-Live, ready, version, Global Admin role, four-agency visibility, and agency-route denial checks
-passed. With no received incidents, platform health now reports No telemetry rather than 100.
-The exact 1.2.5 installer passed isolated installation, version 1.2.5.0, 15-second responsiveness,
-and cleanup checks; SHA-256 is
-`86a16127cb595cae70af8e709de681e2afabf00561aed65b5decb2f196a17737`.
-
-Release 1.2.6 follows 1.2.5 with two focused corrections: the desktop defers its second
-save-on-close request until the Windows dispatcher is idle, and the platform operator may use
-only the authenticated self-service password endpoint in addition to its existing platform
-surface. API 1.2.6 was deployed with OneDeploy deployment
-`60119571fdb84ab1a1e6dac52cacf93f`; live, ready, exact-version, platform-role,
-agency-route-denial, and non-mutating self-password-route checks passed. The exact 1.2.6
-installer passed isolated installation, version 1.2.6.0, 15-second responsiveness, and cleanup;
-SHA-256 is `5bba56cf90f80a44089a7d47fe9a0ca330272ec33841c4d8c8c63d492b1e0929`.
-
-Release 1.2.7 corrected Global Admin account switching without weakening the platform boundary:
-the desktop now opens neutral username/password entry rather than requesting an agency user
-directory, and ordinary picker initialization failures remain contained in the dialog. API 1.2.7
-was deployed with OneDeploy deployment `d4afc62157994bc49ff75696c148d8cc`; live, ready, and
-exact-version checks passed. The encrypted verification credential returned 401 after the user's
-password-change attempt, consistent with that separate credential retaining the prior password,
-so the authenticated Global Admin script awaits an intentional credential refresh. The exact
-1.2.7 installer passed isolated installation, version 1.2.7.0, 15-second responsiveness, and
-cleanup; SHA-256 is `92f37711eb9c208c19d9424d7b6a4d7b4efbed8a4bb93f39eeb5d37485552752`.
-
-Release 1.2.8 added explicit supervisor-name display to both administrative and personal user
-profiles and replaced the legacy application artwork with a validated multi-resolution Windows
-icon. API 1.2.8 was deployed with OneDeploy deployment `b8ed5a41ad0e40efbde8b13a9d2f7543`;
-live, ready, and exact-version checks passed. The exact 1.2.8 installer passed isolated
-installation, version 1.2.8.0, 15-second responsiveness, and cleanup; SHA-256 is
-`85b0aa688860638d77d4197ac203ce3daf82d50e2ebb651bf9dcf51cc633e4e6`.
-
-Release 1.2.9 is locally source-complete but is not yet the live Azure pair. The runtime durability
-pass made theme resources component-relative, rendered the parameterless feature views on an STA
-WPF thread, and strengthened installer acceptance to require five responsive launches followed by
-normal window shutdown and exit code zero. Debug, Release, Demo, and current NuGet vulnerability
-checks passed. The rebuilt local installer SHA-256 is
-`c5d1e6bbaa1bd563d1b812ac0d8a283ce5e6a3895fd8c29fe66a7b95180ef9d8`. Do not collect final
-acceptance evidence until Azure authentication is refreshed and API 1.2.9 is deployed and verified.
-
-Release 1.2.10 adds explicit billing-compliance reasons, clearer note-workflow guidance, serialized
-journal saves during user switching, and the bright geometric watercolor Bodhi-leaf icon. The exact
-local installer passed isolated installation plus five responsive, normal open/close cycles; SHA-256
-is `c36ad62e01170568e06c268d9807ea139c4bc93b3f2d83ca3c7f28b1709b5a3b`. The live Demo API still
-reported 1.2.8 on August 14, 2026, so deploy and verify API 1.2.10 before collecting final matched-pair
-company-demo evidence.
-
-Release 1.2.11 gives the icon's ivory container fully transparent, more generously rounded outer
-corners while preserving the watercolor leaf. The exact local installer passed isolated installation
-plus five responsive, normal open/close cycles; SHA-256 is
-`b2956b02862d42a50daedb068055670d79b3bbc7de4993fd18a2e21cc3115c4f`. The live Demo API remains
-behind this packaged release, so deploy and verify the matching API before final matched-pair evidence.
-
-Release 1.2.13 gives shortcuts a release-specific icon file, migrates recognized stale Sati taskbar
-pins, refreshes the Windows icon cache, and displays the assembly release tactfully on the login
-window. The exact local installer passed isolated installation plus five responsive, normal open/close
-cycles; SHA-256 is `baa2baee825ed751c63b658254abe8d50a3f88ba6a0ba58980066784f0f844dd`.
-The real per-user install was also verified at version 1.2.13 with the login label and pinned icon both
-present. The live Demo API remains behind this packaged release, so deploy and verify the matching API
-before final matched-pair evidence.
-
-Release 1.2.15 separates personal Settings from Admin-only agency configuration, contains rejected
-cloud saves inside the Settings window, removes the implicit save-on-close request, and makes sign-in
-completion safe against overlapping requests. The installed release is now rendered in a dedicated,
-higher-contrast login footer. The exact local installer passed isolated installation plus five
-responsive, normal open/close cycles; SHA-256 is
-`1d8d31acf1ae34e05ad3a5fe6bd90bbb4cdbba24cb49c8850dcab4ec8f47f81f`. The real per-user install
-was verified at version 1.2.15, including normal login-window shutdown, a visible unclipped release
-footer at 150% Windows scaling, and Desktop/taskbar shortcuts using the 1.2.15 icon. The live Demo API
-remains behind this packaged release, so deploy and verify API 1.2.15 before final matched-pair evidence.
-
-Release 1.2.16 serialized high-risk user-interface operations and introduced the watercolor login and
-splash branding, but its installer is **rejected and must not be distributed**. Post-build startup
-logs proved that an assembly-qualified WPF resource address looked for `Sati` while the Demo assembly
-is named `Sati.Demo`. The original lifecycle test closed the startup error dialog and mistook that for
-a successful login-window close. Release 1.2.17 uses assembly-agnostic application resources, and its
-installer acceptance additionally requires the visible window title to be the login window.
-
-Release 1.2.17 corrected the Demo resource addresses and strengthened installer acceptance. The exact
-local installer reached the actual login window and completed five responsive, normal open/close
-cycles; no 1.2.17 startup error was written to the local error log. SHA-256 is
-`0090791649b4c37315e61eb57d784368f765a520801809c40e6c4ed9f4d65217`. The live Demo API remains
-version 1.2.8, so deploy and verify API 1.2.17 before collecting final version-matched company-demo
-evidence.
-
-Release 1.2.21 added payload-free database-wait feedback, bounded DNS-only retries, safer Scratchpad
-save recovery, and the representative-payee Person profile. Guarded migration
-`20260822210734_AddRepresentativePayeeProfile` was applied and verified against identity-marked
-Local `SatiProduction` and Azure `SatiDemo`; both report all three columns and migration history row
-70. Azure retained point-in-time recovery before the change, and the temporary exact-IP migration
-firewall rule was removed and verified absent immediately afterward. API package SHA-256 is
-`ead7ea151edc36ecdc116a9a7b631d5a72f8eadd1a391e40fb2e9352ad6894b2`; OneDeploy deployment
-`c399adc1b0a14808971a4320998a70a5` succeeded, and live, schema-readiness, and exact-version checks
-returned Healthy/Healthy/1.2.21. The Demo installer completed five responsive sign-in launches and
-normal closes (SHA-256 `b7d4637e6e47215dde61305e04255f0dfb99e460fda8d5751f5461836104826e`),
-and the Local installer passed isolated version, integrated-security, payload, and cleanup acceptance
-(SHA-256 `cc8649f32aa40277e340d3d9dc451f9a3b9e43530e587750dd3db2b1fd2c5c9c`).
-Authenticated hosted smoke evidence remains outstanding because this operator profile has neither the
-synthetic agency Admin environment credential nor the encrypted Global Admin credential file.
-
-On August 27, 2026, guarded migration `20260827141239_AddBillingComplianceRequirements` was applied
-and verified against identity-marked Local `SatiProduction` and Azure `SatiDemo`. Local moved from
-72 to 73 recorded migrations; its one existing Settings row received the supported default flags and
-EF reports no pending code migration. Demo moved from 73 to 74 history rows, retained all 177
-synthetic People, and reports the new non-null column with no invalid Settings values. The difference
-in history counts reflects previously reconciled long-lived database history; pending status is
-evaluated against the current compiled migration chain for each target. The temporary exact-IP Azure
-firewall rule was removed and verified absent. No Production-cloud database was accessed.
-
-On September 27, 2026, guarded migration
-`20260927232039_SupportDurableOneOffReleases` passed its rollback-only rehearsal, was applied to
-identity-marked Azure `SatiDemo`, and passed complete schema and idempotency verification. Demo moved
-from 119 to 120 recorded migrations, and the hosted API readiness endpoint returned HTTP 200
-`Healthy`. The temporary exact-IP workstation firewall rule was removed and verified absent by the
-operator. No Production database was accessed. A separately authorized read-only audit then found
-zero planned compliance changes and zero unexpected billing blockers across all 177 synthetic
-People. Baseline capture returned `DEMO_FULL_RESET_BASELINE_CAPTURED` with timeline anchor
-`2026-09-27`; queued verification reset `d325db36-f16b-469a-bae7-888cf51e4a84` completed in 219
-seconds with audited action `demo.reset.completed` and worker log marker
-`DEMO_COMPLIANCE_HISTORY_COMPLETE`. Post-reset verification found the same 120-migration boundary,
-76/76 `dbo` and `demo_baseline` tables, all 177 People, all three new one-off artifact columns, and
-HTTP 200 `Healthy` readiness. The temporary exact-IP rule used for the capture and verification was
-again removed and verified absent by the operator.
-
-## Azure migration checklist
-
-- [x] Confirm every Demo record is synthetic.
-- [ ] Extract canonical seed data from the current Demo database.
-- [x] Provision Azure SQL and the hosted API in the intended region and subscription.
-- [x] Establish managed identity and least-privilege database permissions.
-- [ ] Deploy schema and the `Demo` identity marker through a controlled pipeline.
-- [x] Import and validate the current synthetic Demo data.
-- [x] Implement token-based API authentication and authorization for the initial Demo surface.
-- [x] Move the initial Demo workflows to HTTP-backed service implementations.
-- [x] Remove client-side `Database.Migrate()` and EF registration from Demo.
-- [x] Configure and live-test the daily canonical caseload refresh with its own identity and validation.
-- [x] Configure full-baseline restoration and mutation pause, with every outcome audited.
-- [ ] Route reset failures, including a missing outcome, to a named person.
-- [ ] Test from a clean computer outside the development network.
-- [x] Verify that the Demo client configuration contains no database credential or Azure SQL connection.
-- [ ] Exercise backup, restore, and environment-rejection procedures.
-
-Production cloud deployment is a later, separately approved operation. Nothing in Demo deployment
-authorizes movement of the real working database to Azure.
+Record environment, observation time, bounded source, observed value and what was not verified.
+Replace the current table with dated evidence while retaining the previous observation in history.
+Other current documents link here; do not repeat SKU, quota, pause, grants or alert-deployment facts.
+Never refresh observations by querying a private database or changing infrastructure as doc upkeep.

@@ -28,10 +28,28 @@ Archived 2026-10-03, against release 1.3.34.
 - `HANDOFF_CLIENT_DELETION_POLICY.md`: code and tests across `Sati.Contracts`, `Sati.Api`, and
   `Data/` cite it as the policy of record.
 - `HANDOFF_DUPLICATE_COMPLIANCE_FORMS.md`: a migration's and a script's runtime error messages
-  tell the operator to read it, and it marks its piece 4 and an adjacent defect as not done.
-- `CONCURRENCY_AUDIT.md`, `API_SECURITY_AUDIT.md`, `SECURITY_AUDIT_2026-09-03.md`,
-  `SECURITY_REVIEW_2026-09-10.md`: dated audit evidence. Other documents cite most of them, and
-  not every finding they record has been confirmed resolved, so they stay where a reader will
-  find them.
+  tell the operator to read it, with the current maintenance correction taking precedence over historical diagnosis/status.
+- `API_SECURITY_AUDIT.md` and `SECURITY_REVIEW_2026-09-10.md` remain mixed review records with later amendments and unresolved evidence. Static dated reviews now have root forwarders and byte-preserved archives as documented below.
 - `DEMO_ACCEPTANCE.md`: `scripts/Test-CompanyDemoAcceptance.ps1` and its tests depend on it.
 - `WORKSPACE_REFLECTIONS.md`: the CC0 dedication for `Helpers/WorkspaceReflections.cs`.
+
+## Archive additions October 8 2026
+
+| Document | Why it was archived | Current source of truth |
+|---|---|---|
+| `SIGNATURE_PORTAL_DESIGN.md` | The original September 5 proposal explicitly gives the revised review/guide/portal setup precedence. Historical content is preserved byte-for-byte. | `SIGNATURE_PORTAL_REVIEW.md`, `SIGNATURE_PORTAL_GUIDE.md`, `SIGNATURE_PORTAL_VALIDATION.md`, `Sati.Portal/README.md` |
+
+The root `SIGNATURE_PORTAL_DESIGN.md` is a short forwarding note so older references continue
+to resolve. Current guide/review links point directly to the archived proposal. Mixed living audits and policy handoffs remain at the root; static dated originals are indexed below with root forwarders. Age alone does not establish resolution.
+
+## October 8, 2026 documentation consolidation
+
+Completed release/session history is retained in [byte-preserved migration snapshots](../docs/archive/2026-10-08/index.md).
+Static dated concurrency, September 3 security, September 28 structural review and system map
+are archived under [docs/archive/reviews](../docs/documentation-index.json), with original root
+paths retained as explicit historical forwarders. Unresolved findings are not closed by this move.
+Mixed living security reviews, current policy/runbooks, code-cited deletion/repair policy,
+DEMO_ACCEPTANCE and WORKSPACE_REFLECTIONS remain at their original paths.
+
+[Documentation governance](../docs/documentation-governance.md) and its validator own the
+current canonical map. This index records history, not current deployment facts.

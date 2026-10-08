@@ -121,26 +121,11 @@ transformed, or uploaded as part of Demo work without explicit authorization.
 
 ## Near-term priority
 
-The cloud platform foundation in `AGENDA.md` takes precedence over broad feature expansion. Most of
-the original eight-item foundation is now in place; state as of 2026-10-03 (release 1.3.34):
-
-| Foundation item | State |
-|---|---|
-| ASP.NET Core API and safe contracts | In place. `Sati.Api` + `Sati.Contracts`; no EF entity is a network contract. |
-| Server-side authentication, short-lived tokens | In place. JWT, 30-minute lifetime, server-side verification. |
-| Tenant ownership and authorization | In place. `TenantAccess` + `ValidatedActorFilter`; inventory in `API_AUTHORIZATION.md`. |
-| Audit events, record versions, optimistic concurrency | In place. Append-only `AuditEvent`, `PersonVersion`, `Revision` tokens with typed 409s. |
-| Desktop services from EF to HTTP | In place for Demo — every service interface has a `Cloud*` HTTP implementation. The local `SatiProduction` working environment still uses EF by design. |
-| Automated tests | In place. 3,886 passing across five test projects at release 1.3.34. Controlled migrations remain manual. |
-| Azure-hosted Demo with managed identity | Hosted with managed identity. The full Demo reset runs nightly (`Sati.DemoRefresh/RefreshCaseload`, 03:15 Eastern) and on Admin request through a single-delivery queue; each outcome is written as a `demo.reset.*` audit event. **Failures are not alerted to anyone**: a reset that dies before writing its audit leaves only a poison-queue entry (see `AGENDA.md`, release 1.3.34). |
-| Clean-machine packaging | In place and verified through release 1.3.34. |
-
-Remaining foundation work: alerting routed to a named owner (including detection of a missing
-reset outcome), controlled migration deployment, backup restore verification, legal-hold and
-retention enforcement (`OPERATIONS.md`), and external monitoring. `BACKGROUND_WORKERS_HANDOFF.md`
-scopes the server-side workers. Feature work may proceed when it reinforces these boundaries or
-is explicitly prioritized.
-
+[AGENDA.md](AGENDA.md) owns the active backlog; [the readiness registry](docs/readiness/README.md)
+owns launch/activation status and evidence. Neither source implementation nor a historical green
+test count establishes deployment, service operation or compliance. The dated inventory in
+[DATABASE_ENVIRONMENTS.md](DATABASE_ENVIRONMENTS.md) owns deployment facts. Feature work may
+proceed when it reinforces the governing boundaries or is explicitly prioritized.
 ## Engineering rules
 
 - Preserve unrelated user changes in the dirty worktree.
@@ -215,4 +200,47 @@ qualified counsel, agency stakeholders, and the appropriate Maine authorities.
 Sati is simultaneously a working tool and the seed of a much larger product. Protect the working
 system while deliberately moving the platform boundary in the intended direction.
 
-*Last updated: October 3, 2026, against release 1.3.34.*
+## Documentation governance
+
+Read [docs/documentation-governance.md](docs/documentation-governance.md) before changing docs.
+Update one canonical owner; link it instead of copying its state. Register new root Markdown in
+`docs/documentation-index.json`, use stable backlog/decision IDs, and record explicit supersession.
+Preserve historical snapshots. Run `scripts/Test-DocumentationStructure.ps1` and its negative
+mutation checks before completing documentation or release work. These rules do not expand user
+authorization, DATT, migration, infrastructure or real-data permissions.
+
+## Standing work and documentation upkeep
+
+After each significant portion of work, update the canonical documentation thoroughly before
+finishing: changed behavior and ownership, status, decisions and reasons, tests and their actual
+results, evidence limits, remaining risks/blockers, dependencies, and the concrete next slice.
+Read [the documentation governance](docs/documentation-governance.md) and the relevant owners;
+update their content in place and link it from indices instead of copying policy or current facts.
+Record dated working evidence in [the working evidence ledger](docs/readiness/work-evidence.md).
+Preserve all sealed release snapshots and rubric versions; working evidence does not change a
+sealed release score. A later release assessment requires its own reviewed evidence snapshot.
+
+Treat the newest user message as a next-work invocation only when its entire trimmed text equals
+`Perform the next thing on the list` using a case-insensitive comparison. Discussion, quotation
+or a longer message containing the phrase is not an invocation. Adding these standing rules
+does not invoke the phrase.
+
+On a valid invocation:
+
+1. Read [AGENDA.md](AGENDA.md), its single **Next eligible item** pointer, the listed dependencies,
+   this briefing, and the canonical topic/acceptance/evidence owners. Revalidate the pointer
+   against current source and recorded blockers; do not choose an old checkbox from the archive.
+2. Announce the concrete stable ID, bounded slice, expected result and verification before work.
+   Execute the eligible reversible local slice within the authority stated there and existing
+   user constraints. If that slice is blocked, record the blocker and select the next eligible
+   slice with satisfied dependencies in the current agenda; continue independent authorized work.
+   Ask for a missing decision only when no eligible bounded work can proceed without it.
+3. Keep release, deployment, publication, cloud settings, database changes, real-data access and
+   external actions subject to their existing separate authorization. The next-work phrase does
+   not invoke DATT or broaden those permissions. Do not silently implement a larger project.
+4. Before the final response, update the canonical owner, agenda status/dependencies and next
+   eligible pointer, durable decisions when needed, and dated working readiness evidence.
+   Record what passed, failed, was not run, and remains unverified. Run the relevant checks and
+   documentation checks; report the completed slice and the next concrete step.
+
+*Consolidated October 8, 2026. AGENTS.md is the authoritative assistant briefing.*

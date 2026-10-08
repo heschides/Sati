@@ -1,0 +1,1724 @@
+{
+  "schemaVersion": 1,
+  "rubrics": [
+    {
+      "version": "2026-10-v1",
+      "criteria": [
+        {
+          "id": "MT01",
+          "dimension": "multitenancy",
+          "title": "Use the caller's current agency and permissions",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API security owner",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "A caller supplies another agency's ID or retains revoked permissions.",
+            "A long-lived connection keeps authority after account changes."
+          ],
+          "acceptance": [
+            "Derive agency and capabilities from current stored identity; never trust a target ID as authority.",
+            "Prove foreign-agency, revoked-version and long-lived-session refusal through real registered routes; review deployed identity configuration."
+          ],
+          "references": [
+            "Sati.Api/Security/TenantAccess.cs:10-90",
+            "Sati.Api/Security/TenantAccess.cs:101-157",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:132-140"
+          ]
+        },
+        {
+          "id": "MT02",
+          "dimension": "multitenancy",
+          "title": "Keep every record read and change inside its agency",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API and feature owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "independent"
+          ],
+          "failureModes": [
+            "A new join, bulk update, nested resource or report omits agency scope.",
+            "An inconsistent person and owner pairing releases or changes records."
+          ],
+          "acceptance": [
+            "Maintain a complete route and data-release inventory, including absence of enabled optional features.",
+            "Run cross-agency success/refusal matrices for reads, writes, joins, bulk paths and derived projections; refusal leaves no effects."
+          ],
+          "references": [
+            "API_AUTHORIZATION.md",
+            "Sati.Api/Security/TenantAccess.cs:63-90",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:136-140"
+          ]
+        },
+        {
+          "id": "MT03",
+          "dimension": "multitenancy",
+          "title": "Enforce consistent agency ownership in stored data",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Persistence and architecture owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "independent"
+          ],
+          "failureModes": [
+            "Valid IDs from separate agencies are combined in one relationship.",
+            "Direct writes or pooled connection state bypass the chosen database boundary."
+          ],
+          "acceptance": [
+            "Record and prove a shared, separate-database or hybrid tenancy decision; RLS is one option rather than an automatic requirement.",
+            "Use appropriate composite relationships, constrained write owners or equivalent controls; test raw writes, migrations and connection reuse under the intended principal."
+          ],
+          "references": [
+            "SATI_STRUCTURAL_REVIEW_2026-09-28.md",
+            "Sati.Persistence/Data/SatiContext.cs",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138"
+          ]
+        },
+        {
+          "id": "MT04",
+          "dimension": "multitenancy",
+          "title": "Keep files, caches, search and exports inside their agency",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API, storage and feature owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "A cache key, search index, blob path, signed URL or temporary export lacks trusted agency scope.",
+            "Account switching, background refresh or a stale client result retains another agency's data."
+          ],
+          "acceptance": [
+            "Inventory every secondary store and document absent features; use trusted agency plus resource/version keys and scoped permissions.",
+            "Test cache poisoning, URL replay, search filters, temporary-file cleanup, export downloads and account changes; prove enabled storage access in deployment."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/SignatureProcessingService.cs",
+            "Sati.Signatures/SignatureMailWorker.cs:131-143",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:307-313"
+          ]
+        },
+        {
+          "id": "MT05",
+          "dimension": "multitenancy",
+          "title": "Use the right clearinghouse account for every file and response",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Billing integration owner",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Agency A's retained bytes use B's credential, account or claim namespace.",
+            "A status or ERA receipt advances the wrong account or feed cursor."
+          ],
+          "acceptance": [
+            "Bind agency, account, generation, credential reference, remote claim identity and independent feed cursors at selection and execution.",
+            "Test cross-account and cross-agency refusal with no partial effects, credential rotation and namespace collisions; retain account-specific vendor acceptance."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/ClearinghouseDispatchGate.cs:44-100",
+            "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:73-80",
+            "Sati.Api.Tests/ClaimMdStatusProcessorTests.cs:114-157"
+          ]
+        },
+        {
+          "id": "MT06",
+          "dimension": "multitenancy",
+          "title": "Give each eligible agency a bounded worker turn",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Background worker owner",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "A large early agency backlog indefinitely delays a small later agency.",
+            "Multiple accounts or repeated restarts let one agency dominate selection."
+          ],
+          "acceptance": [
+            "Define eligible healthy lanes, finite scheduling bounds, per-turn and total-pass budgets, and durable or proved restart continuation.",
+            "Prove B's service bound under sustained A backlog, multiple A accounts, inactive lanes and restart; state shared-outage conditions explicitly."
+          ],
+          "references": [
+            "BACKGROUND_WORKERS_HANDOFF.md#W8",
+            "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:55-58",
+            "Sati.Api/Infrastructure/ClaimMdSandboxPoller.cs:26-50"
+          ]
+        },
+        {
+          "id": "MT07",
+          "dimension": "multitenancy",
+          "title": "Keep one agency's recoverable failure from stopping others",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Background worker and integration owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "A missing key, poisoned row or failed agency sweep prevents later healthy work.",
+            "A slow response body holds shared coordination or retries forever."
+          ],
+          "acceptance": [
+            "Use explicit whole-attempt deadlines, safe per-lane backoff and recoverable exception boundaries; separate account faults from shared outages.",
+            "Inject preflight, slow-header/body, malformed-response and first-agency sweep failures; B progresses and unsent work never becomes falsely uncertain."
+          ],
+          "references": [
+            "BACKGROUND_WORKERS_HANDOFF.md#W8",
+            "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:102-108",
+            "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs:132-145",
+            "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs:205-219"
+          ]
+        },
+        {
+          "id": "MT08",
+          "dimension": "multitenancy",
+          "title": "Limit expensive requests by trusted agency",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API performance owner",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "A valid user exhausts CPU, parsing memory or query/export capacity.",
+            "Unbounded waiting queues move overload from the database to the API."
+          ],
+          "acceptance": [
+            "Apply bounded admission/concurrency and endpoint-specific byte, page, query and runtime budgets using validated agency/actor.",
+            "Test overload responses, bounded queue/memory, cancellation and costly authorized work while healthy B performs ordinary case management."
+          ],
+          "references": [
+            "BACKGROUND_WORKERS_HANDOFF.md#W8",
+            "SECURITY_REVIEW_2026-09-10.md",
+            "SECURITY_AUDIT_2026-09-03.md#SATI-SEC-010"
+          ]
+        },
+        {
+          "id": "MT09",
+          "dimension": "multitenancy",
+          "title": "Respect shared service and provider capacity",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Integration and operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "Per-agency workers multiply requests beyond a provider-wide quota.",
+            "A common breaker or shared plan throttles healthy tenants without visible cause."
+          ],
+          "acceptance": [
+            "Map quota scope by service, credential, account, endpoint and deployment using dated primary evidence; cap aggregate work across hosts.",
+            "Preserve required global limits while fairly sharing permits; test throttling, delayed recovery and half-open probes without a retry storm."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs:16-32",
+            "Sati.Api.Tests/ClaimMdSandboxCoordinationTests.cs:24-56",
+            "BACKGROUND_WORKERS_HANDOFF.md#W8"
+          ]
+        },
+        {
+          "id": "MT10",
+          "dimension": "multitenancy",
+          "title": "Coordinate worker selection across separate hosts",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Background worker and persistence owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "Two hosts run the same work or treat local semaphores as global limits.",
+            "A stale lease holder resumes after expiry or reset and changes newer work."
+          ],
+          "acceptance": [
+            "Document lock keys/order and lease scope; enforce same-work exclusion and aggregate limits with database or equivalent durable coordination.",
+            "Use independent hosts with real SQL for races, lock loss, lease expiry, cancellation and reset; refuse stale owners and release resources safely."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs:20-69",
+            "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs:17-43",
+            "Sati.Api.Tests/DemoWorkerResetCoordinationTests.cs:30-108"
+          ]
+        },
+        {
+          "id": "MT11",
+          "dimension": "multitenancy",
+          "title": "Preserve ordinary case-management response time",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API performance and operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "Background jobs, reports or exports consume the capacity needed by case managers.",
+            "Saturation is hidden by averages or tested only on an empty local database."
+          ],
+          "acceptance": [
+            "Define supported agencies, data sizes and latency/error objectives, then reserve or prioritize interactive capacity.",
+            "Measure baseline and contended B tail latency, throughput, SQL waits, connections, memory and rejected work under repeatable load and fault conditions."
+          ],
+          "references": [
+            "BACKGROUND_WORKERS_HANDOFF.md#W8",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:363-364",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:384"
+          ]
+        },
+        {
+          "id": "MT12",
+          "dimension": "multitenancy",
+          "title": "Use the correct agency's settings and business dates",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Feature and shared-rules owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "A global clock, setting or cached projection silently applies A's policy to B.",
+            "Day rollover, DST or ownership transfer leaves stale obligations and work decisions."
+          ],
+          "acceptance": [
+            "Use authoritative agency settings and the recorded supported timezone policy; preserve one shared owner for business rules.",
+            "Test two agencies with different settings, date boundaries, DST, rollover, settings changes and stale projections without wall-clock sleeps."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/NoteAbandonmentSweep.cs:31-47",
+            "Sati.Contracts/V1/NoteAbandonmentRules.cs",
+            "platform/SatiLogica.Contracts/TenantClock.cs",
+            "BACKGROUND_WORKERS_HANDOFF.md"
+          ]
+        },
+        {
+          "id": "MT13",
+          "dimension": "multitenancy",
+          "title": "Provision, change and close an agency safely",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Tenant lifecycle and operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Provisioning leaves partial accounts, permissions, credentials or defaults.",
+            "Closure, transfer or restoration loses held records or revives stale access."
+          ],
+          "acceptance": [
+            "Define repeatable provisioning, suspension, transfer, export, retention/hold and offboarding procedures without reusing tenant identifiers.",
+            "Rehearse partial failure and replay, cross-agency transfer approval, revocation, tenant-specific recovery and cleanup under least privilege."
+          ],
+          "references": [
+            "AGENDA.md",
+            "SATI_STRUCTURAL_REVIEW_2026-09-28.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:384,404"
+          ]
+        },
+        {
+          "id": "MT14",
+          "dimension": "multitenancy",
+          "title": "Keep support and administrative access accountable",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API security and operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Support authority becomes unrestricted clinical access or hides cross-agency actions.",
+            "An agency administrator can select or export another agency's operational evidence."
+          ],
+          "acceptance": [
+            "Preserve the separate narrowly scoped support identity and define privileged access, approval and immutable action evidence.",
+            "Test role escalation, cross-agency diagnostics, admin export and emergency access; verify deployed access and review records."
+          ],
+          "references": [
+            "Sati.Api/Security/TenantAccess.cs:146-155",
+            "API_AUTHORIZATION.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:134,399"
+          ]
+        },
+        {
+          "id": "ID01",
+          "dimension": "idempotency",
+          "title": "Recognize a repeated action with a lasting request identity",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API, persistence and client owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "A successful request loses its reply and a retry creates another business record.",
+            "A retry key is reused for a changed payload or another agency."
+          ],
+          "acceptance": [
+            "Inventory mutation operations and scope durable keys by trusted agency, operation and documented actor/resource boundaries; persist a versioned canonical request fingerprint.",
+            "Same key and same request returns the retained result; changed request conflicts; key reuse across tenants cannot disclose or merge results. Cover note creation as well as generation."
+          ],
+          "references": [
+            "Sati.Api/Endpoints/ApiEndpoints.cs",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:202,405",
+            "Sati.Api.Tests/JoinedBillingPipelineAcceptanceTests.cs"
+          ]
+        },
+        {
+          "id": "ID02",
+          "dimension": "idempotency",
+          "title": "Give competing repeats one lasting effect",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API and persistence owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "Two simultaneous retries both pass a check-then-insert guard.",
+            "Process memory recognizes duplicates until a restart or another host."
+          ],
+          "acceptance": [
+            "Use durable unique identities and atomic claim/result transitions rather than a check in memory.",
+            "Race independent hosts against the same scoped key and payload; inject commit ambiguity, restart and conflict, and assert one business effect and a truthful replay result."
+          ],
+          "references": [
+            "Sati.Api/Data/ApiDbContext.cs",
+            "Sati.Api.Tests/JoinedBillingPipelineAcceptanceTests.cs",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:365-367"
+          ]
+        },
+        {
+          "id": "ID03",
+          "dimension": "idempotency",
+          "title": "Refuse stale changes and keep related writes together",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API, persistence and shared-rules owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "Two approvals or edits silently overwrite each other.",
+            "A refused workflow leaves forms, claims or audit rows committed independently."
+          ],
+          "acceptance": [
+            "Use current scope, explicit expected revisions and database compare-and-write guards inside the correct aggregate transaction.",
+            "Prove stale writes conflict, rollback leaves no partial official effects, and targeted agency/owner/period locks coordinate separate hosts. Document conditional HTTP mapping."
+          ],
+          "references": [
+            "Sati.Persistence/Data/ServiceTimeWriteScope.cs:25-58",
+            "Sati.Persistence/Data/BillingPeriodWriteScope.cs:32-66",
+            "Sati.Api.Tests/ServiceTimeSqlServerConcurrencyTests.cs",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:212,363-364"
+          ]
+        },
+        {
+          "id": "ID04",
+          "dimension": "idempotency",
+          "title": "Save the work request before contacting another service",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API and persistence owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "Business data commits but the background intent disappears.",
+            "An event is published although its related transaction rolled back."
+          ],
+          "acceptance": [
+            "For each external/background effect, commit the business transition and durable intent together; record audit in that transaction where required.",
+            "Inject failures before/after commit and before delivery; replay the outbox safely. Document compensating steps where multiple stores cannot commit atomically."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:111-115",
+            "Sati.Signatures/SignatureMailWorker.cs",
+            "BACKGROUND_WORKERS_HANDOFF.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:190,227"
+          ]
+        },
+        {
+          "id": "ID05",
+          "dimension": "idempotency",
+          "title": "Stop an old worker from acting after replacement",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Background worker and persistence owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "An expired worker resumes after a replacement already acted.",
+            "Cancellation, transaction retry or lock loss repeats an external effect."
+          ],
+          "acceptance": [
+            "Define lease ownership, fencing/compare-and-write tokens, expiry and recovery for each worker; never wrap external effects in generic transaction retries.",
+            "Pause the original holder through expiry, restart another host, then resume the original; prove stale writes and duplicate sends are refused."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:61-71,221-225",
+            "Sati.Signatures/SignatureMailWorker.cs:94-129",
+            "Sati.Api.Tests/DemoWorkerResetCoordinationTests.cs"
+          ]
+        },
+        {
+          "id": "ID06",
+          "dimension": "idempotency",
+          "title": "Hold uncertain external sends for reconciliation",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Billing and integration owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "A timeout is treated as proof of nonreceipt and the claim is sent again.",
+            "The vendor accepts but local receipt persistence fails or the host dies."
+          ],
+          "acceptance": [
+            "Commit Sending before the external call and preserve Sending/OutcomeUnknown as quarantine; reconcile exact retained identities/evidence before any separately authorized resend.",
+            "Inject accepted-but-reply-lost and accepted-but-commit-failed paths plus restart; no blind replay. Retain account-specific reconciliation acceptance."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:111-190,221-225",
+            "Sati.Api.Tests/ClearinghouseDispatchApiTests.cs:155-171,229-410",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:190,366"
+          ]
+        },
+        {
+          "id": "ID07",
+          "dimension": "idempotency",
+          "title": "Prevent another original claim after one was accepted",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Billing workflow owner",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "A new generation key produces another original after earlier acceptance.",
+            "A correction or replacement is presented as an unrelated original."
+          ],
+          "acceptance": [
+            "Enforce original/correction/replacement lifecycle centrally across generation, queueing, dispatch and reconciliation; business identity supplements transport keys.",
+            "Prove accepted-original then fresh-key is refused or routed through the permitted correction path, without unsafe concurrent loopholes; certify the vendor duplicate policy."
+          ],
+          "references": [
+            "Sati.Api/Endpoints/ApiEndpoints.cs:7198-7260",
+            "Sati.Api/Endpoints/ClearinghouseDispatchEndpoints.cs:104-129",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:198,398"
+          ]
+        },
+        {
+          "id": "ID08",
+          "dimension": "idempotency",
+          "title": "Repeat required billing checks before sending",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Billing and shared-rules owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "A queued frozen file remains eligible after attestation withdrawal or a material source change.",
+            "A pre-send guard and changing source race so stale authority escapes."
+          ],
+          "acceptance": [
+            "Define material changes requiring a hold and enforce the complete applicable documentation/compliance policy at external release, while preserving frozen bytes and amendments.",
+            "Revoke attestation, change eligibility and race a hold between generation/queue/send; assert held unsent state, immutable evidence and accurate authorized recovery."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/NoteAmendmentDispatchGuard.cs",
+            "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:73-115",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:200,398"
+          ]
+        },
+        {
+          "id": "ID09",
+          "dimension": "idempotency",
+          "title": "Apply incoming receipts once and track each feed",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Billing integration owner",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "A repeated webhook/receipt creates another payment or status event.",
+            "The cursor advances before all effects commit, skipping data forever."
+          ],
+          "acceptance": [
+            "Bind inbox/dedup identity to trusted provider/account/agency/feed; authenticate and bound callbacks if introduced; commit retained effects and cursor together.",
+            "Test duplicate/re-enveloped/reordered/altered messages, replay after rollback and concurrent processors; unsupported or unmatched pages fail closed without advancing."
+          ],
+          "references": [
+            "Sati.Api.Tests/ClaimMdStatusProcessorTests.cs:21-157",
+            "Sati.Api.Tests/ClearinghouseResponseIntakeTests.cs",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:367"
+          ]
+        },
+        {
+          "id": "ID10",
+          "dimension": "idempotency",
+          "title": "Retry only when the effect is safe and the budget allows",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API, client and integration owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "Nested retries multiply traffic and hold scarce resources.",
+            "A validation failure, stale conflict or uncertain send is repeatedly retried as transient."
+          ],
+          "acceptance": [
+            "Maintain an operation-specific retry matrix with whole-operation deadlines, capped exponential delay/jitter and aggregate budgets; respect trusted retry guidance.",
+            "Test safe read/replay, known-unsent failure, terminal refusal, throttling, shared outage and recovery; cancellation releases connections and permits without claiming no remote effect."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs:205-219",
+            "Sati.Api/Program.cs:147",
+            "BACKGROUND_WORKERS_HANDOFF.md#W8",
+            "docs/readiness/protocol-baseline.md"
+          ]
+        },
+        {
+          "id": "ID11",
+          "dimension": "idempotency",
+          "title": "Deliver signature copies and notifications without unsafe repeats",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Signature workflow and integration owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "A lost mail-provider response creates another invitation or copy.",
+            "A stale signer/document or exhausted retry publishes invalid content."
+          ],
+          "acceptance": [
+            "Preserve generation-scoped outbox identity, durable provider operation, leases, attempt caps and stale-document/signer guards; reconcile uncertainty rather than blind resend.",
+            "Race two workers and change signer/source state at each boundary; test provider ambiguity, cancel/restart, lease expiry and exact authorized copy recovery."
+          ],
+          "references": [
+            "Sati.Signatures/SignatureMailWorker.cs:94-143,161-260",
+            "Sati.Signatures.Tests/SignatureMailWorkerTests.cs",
+            "SIGNATURE_PORTAL_VALIDATION.md"
+          ]
+        },
+        {
+          "id": "ID12",
+          "dimension": "idempotency",
+          "title": "Keep repeat identities for the supported lifetime",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Persistence and operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "An expired dedup record permits a late original or restores an obsolete result.",
+            "A schema/client change computes a different fingerprint for the same operation."
+          ],
+          "acceptance": [
+            "Define maximum retry/redelivery/restore horizons, versioned fingerprints and immutable operation-result retention; unresolved sends are not silently expired.",
+            "Test near/after-expiry replay, restore and mixed-version keys; an expired key never silently represents permission for another business effect."
+          ],
+          "references": [
+            "Sati.Api/Infrastructure/ApiOptions.cs:42-43",
+            "OPERATIONS.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:286,404",
+            "docs/readiness/protocol-baseline.md"
+          ]
+        },
+        {
+          "id": "ID13",
+          "dimension": "idempotency",
+          "title": "Reconcile external effects after a restore or rollback",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Reliability, billing and integration owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "A database restore forgets accepted sends, payments or consumed keys.",
+            "Old binaries or a restored cursor replay external effects that already happened."
+          ],
+          "acceptance": [
+            "Before reopening writers, reconcile retained external identities, later valid records, receipts, outbox/inbox and replay keys; define read-only/recovery restrictions.",
+            "Run an approved full-service drill spanning external acceptance and restored history; retain reconciliation, prevented duplicate and resumed-operation evidence."
+          ],
+          "references": [
+            "OPERATIONS.md",
+            "BACKGROUND_WORKERS_HANDOFF.md#W6",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:286,397"
+          ]
+        },
+        {
+          "id": "ID14",
+          "dimension": "idempotency",
+          "title": "Tell clients accurately whether an action succeeded",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API and client owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql"
+          ],
+          "failureModes": [
+            "A 202 response is described as completed work or a failed save leads to an action on stale stored content.",
+            "Generic errors cause clients to resubmit with fresh keys or reveal sensitive details."
+          ],
+          "acceptance": [
+            "Document operation states, polling/replay and typed safe errors; preserve an operation's key across uncertainty and require refetch/review after revision conflict.",
+            "Test lost replies, rejected save then submit, duplicate-key conflict and incompatible client handling; expose safe correlation without narratives or secrets."
+          ],
+          "references": [
+            "Sati.Api/Program.cs:218-239",
+            "Data/Cloud/CloudApiClient.cs",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:202,307,403",
+            "BACKGROUND_WORKERS_HANDOFF.md#7"
+          ]
+        },
+        {
+          "id": "OP01",
+          "dimension": "operations",
+          "title": "Use a separately approved cloud Production environment",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Operations and release owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Demo settings or a personal working PHI database are treated as a customer production deployment.",
+            "Wrong endpoint, database, identity, key or backup crosses the environment boundary."
+          ],
+          "acceptance": [
+            "Provision an approved Production topology with separate environment identities, credentials, keys, storage, logs, backups and administrative access.",
+            "Prove wrong-environment failures through desktop/API/jobs, review current deployment and distinguish synthetic gates from live-customer approval."
+          ],
+          "references": [
+            "DATABASE_ENVIRONMENTS.md",
+            "BACKGROUND_WORKERS_HANDOFF.md:67-75",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:381-386"
+          ]
+        },
+        {
+          "id": "OP02",
+          "dimension": "operations",
+          "title": "Prove deployed permissions and secret boundaries",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Security and operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Managed identity exists but has excessive SQL, blob, key or log permissions.",
+            "A credential rotation or pooled tenant context grants access to unrelated data."
+          ],
+          "acceptance": [
+            "Review intended and actual principals/grants/denies, network boundaries and environment-bound key/storage access; no client database credentials.",
+            "Exercise permitted and forbidden actions under deployed identities using approved synthetic probes; rehearse rotation, revocation and key unavailability without PHI disclosure."
+          ],
+          "references": [
+            "OPERATIONS.md",
+            "Sati.Portal/README.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138,313,399"
+          ]
+        },
+        {
+          "id": "OP03",
+          "dimension": "operations",
+          "title": "Obtain independent security and tenant assurance",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Security owner and independent reviewer",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Internal green tests are mistaken for a complete tenant-security review.",
+            "An unreviewed release path or new dependency introduces an unnoticed boundary."
+          ],
+          "acceptance": [
+            "Review every enabled release and administration path, attack surface, tenancy decision and deployed control; record residual risks with accountable owners.",
+            "Retain independent findings, reproducible negative tests and remediation acceptance; refresh after material architecture/security changes."
+          ],
+          "references": [
+            "API_SECURITY_AUDIT.md",
+            "API_AUTHORIZATION.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383,388,399"
+          ]
+        },
+        {
+          "id": "OP04",
+          "dimension": "operations",
+          "title": "Restore a complete usable service within agreed limits",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Reliability and operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "A SQL backup restores but keys, files, identity or valid later writes do not.",
+            "The recovery time and permitted data loss have never been measured."
+          ],
+          "acceptance": [
+            "Set agency-approved RPO/RTO and dependencies, restore SQL/key/blob/service, perform cutover and reconcile later records/external outcomes.",
+            "Run an approved synthetic drill, verify usable workflows and record measured time, recovered identities, rejected stale access and recovery sign-off."
+          ],
+          "references": [
+            "scripts/Invoke-DemoRestoreVerification.ps1",
+            "OPERATIONS.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:255-286,397"
+          ]
+        },
+        {
+          "id": "OP05",
+          "dimension": "operations",
+          "title": "Detect failed or missing work and reach an owner",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Operations owner",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live"
+          ],
+          "failureModes": [
+            "A worker, watchdog or incident sink fails silently while readiness stays healthy.",
+            "An alert rule exists but no person receives, acknowledges or escalates it."
+          ],
+          "acceptance": [
+            "Detect missing outcomes and useful agency/feed progress through independent monitoring, safe scoped signals and explicit thresholds.",
+            "Activate the owner-approved rules, induce safe failure/missing-job/poison/starvation cases, retain actual delivery and response evidence; sleeping Demo detection delay is explicit."
+          ],
+          "references": [
+            "BACKGROUND_WORKERS_HANDOFF.md#W1",
+            "BACKGROUND_WORKERS_HANDOFF.md#W4",
+            "scripts/Set-DemoWatchdogAlerts.ps1",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:313-315,402"
+          ]
+        },
+        {
+          "id": "OP06",
+          "dimension": "operations",
+          "title": "Keep complete activity records and safe error logs",
+          "weight": 1,
+          "blocking": true,
+          "owner": "API audit and security owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Ordinary note changes or privileged failures leave no required action audit.",
+            "Full exception messages or metric labels reveal PHI, credentials or vendor payloads."
+          ],
+          "acceptance": [
+            "Maintain an action/read/deny/export policy and coverage inventory, atomic required evidence and deployed tamper/access protections.",
+            "Close R4/R5; inject synthetic secret/narrative sentinels through all enabled sinks, test audit failure/no release, bounded labels and retention/access under actual principals."
+          ],
+          "references": [
+            "AUDIT_EVENTS.md",
+            "Sati.Api/Security/AuditTrail.cs",
+            "Sati.Api/Program.cs",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:295-313,400-401"
+          ]
+        },
+        {
+          "id": "OP07",
+          "dimension": "operations",
+          "title": "Rehearse incidents and degraded service for agencies",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Operations and agency owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "A shared SQL/vendor/key outage has no usable degraded mode or response plan.",
+            "Staff see misleading success or operators bypass holds to clear backlog."
+          ],
+          "acceptance": [
+            "Define severity, owner/escalation, tenant notification, safe degraded functions, backlog recovery and continuity procedures.",
+            "Exercise database/vendor/storage/key/network failure, containment, recovery and agency communication with synthetic records; retain acknowledgment and closure evidence."
+          ],
+          "references": [
+            "OPERATIONS.md",
+            "docs/readiness/multitenancy-contingencies.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383-384,402"
+          ]
+        },
+        {
+          "id": "OP08",
+          "dimension": "operations",
+          "title": "Release compatible versions and rehearse rollback",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Release and persistence owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "A fingerprint warning permits an incompatible client to change records.",
+            "Rolling back binaries is mistaken for reversing a schema or external send."
+          ],
+          "acceptance": [
+            "Define supported client/API/schema versions and admission rules, controlled migrations and expand/contract paths with independently usable repair tools.",
+            "Test old/new pairs, interrupted update and rollback under synthetic data; incompatible writes fail predictably and evidence identities remain intact."
+          ],
+          "references": [
+            "RELEASE_PLAYBOOK.md",
+            "DATABASE_ENVIRONMENTS.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:245,403,409"
+          ]
+        },
+        {
+          "id": "OP09",
+          "dimension": "operations",
+          "title": "Preserve records through retention, holds and agency closure",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Records, legal and operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "A purge/export/offboarding action removes held records or backup evidence.",
+            "Policy-only retention is described as enforced operational preservation."
+          ],
+          "acceptance": [
+            "Approve applicable retention/hold/export/discovery policy across SQL, blobs, caches, logs, backups and external evidence; avoid automatic deletion before prerequisites.",
+            "Rehearse hold, lawful scoped export and closure/recovery; prove retention execution, archive access and accountable approvals without unapproved PHI copying."
+          ],
+          "references": [
+            "OPERATIONS.md",
+            "REGULATORY_CONCERNS.md",
+            "BACKGROUND_WORKERS_HANDOFF.md#6",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:404"
+          ]
+        },
+        {
+          "id": "OP10",
+          "dimension": "operations",
+          "title": "Validate capacity and faults on the intended hosting",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Reliability and performance owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "sql",
+            "live"
+          ],
+          "failureModes": [
+            "Local fixture speed is presented as Azure or agency-scale capacity.",
+            "A sleeping host or shared-plan/database ceiling breaks promised availability."
+          ],
+          "acceptance": [
+            "Document target topology, agency/data/load envelope, budget and SLOs with dated limits; choose shared, partitioned or dedicated resources from evidence.",
+            "Measure sustained and burst load, noisy neighbor, scale-out, restart and dependency failure on approved representative hosting; record saturation/recovery and costs."
+          ],
+          "references": [
+            "BACKGROUND_WORKERS_HANDOFF.md#W8",
+            "assessment-working/live-demo-evidence.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:17,262-270,313"
+          ]
+        },
+        {
+          "id": "OP11",
+          "dimension": "operations",
+          "title": "Keep settings, dependencies and deployments controlled",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Release and security operations owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Configuration drift enables a gated transport, wrong environment or broad grant.",
+            "An outdated dependency or untrusted/incomplete installer compromises recovery."
+          ],
+          "acceptance": [
+            "Inventory dependencies and infrastructure/configuration intent, review drift/patches, protect releases and preserve a tested repair/rollback artifact.",
+            "Prove exact-source/package provenance, clean-device update/repair, safe switch defaults and approved drift response without weakening security settings."
+          ],
+          "references": [
+            "RELEASE_PLAYBOOK.md",
+            "ARCHITECTURE.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:245,373,409"
+          ]
+        },
+        {
+          "id": "OP12",
+          "dimension": "operations",
+          "title": "Operate accounts, privileged sessions and recovery safely",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Identity, security and agency owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Distributed lockout or session recovery behaves differently across hosts.",
+            "An offboarded staff member, administrator or compromised secret retains access."
+          ],
+          "acceptance": [
+            "Agree identity/MFA/federation requirements by role, shared abuse controls, enrollment/recovery and privileged access; preserve current security-version revocation.",
+            "Test scaled authentication, disable/reset/re-enable, credential/key rotation and long-lived session expiry; retain approved offboarding/recovery and actual identity evidence."
+          ],
+          "references": [
+            "Sati.Api/Security/TenantAccess.cs",
+            "Sati.Api/Security/LoginAttemptGuard.cs",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:128-140,383,404"
+          ]
+        },
+        {
+          "id": "OP13",
+          "dimension": "operations",
+          "title": "Approve each enabled external integration for real use",
+          "weight": 1,
+          "blocking": true,
+          "owner": "Integration, security and agency owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "live",
+            "independent"
+          ],
+          "failureModes": [
+            "Synthetic acceptance is described as payer acceptance, inbox delivery or lawful signature use.",
+            "Provider duplicate/correction semantics or agreements differ from assumed behavior."
+          ],
+          "acceptance": [
+            "For each intended enabled transport, obtain account-specific certification and operating/privacy/security agreements; explicitly gated unavailable features remain unavailable.",
+            "Prove supported vendor/payer/copy workflows, duplicate and late-response handling, least privilege and agency approval before enabling real effects."
+          ],
+          "references": [
+            "CLAIMMD_SANDBOX_RUNBOOK.md",
+            "SIGNATURE_PORTAL_GUIDE.md",
+            "Sati.Portal/README.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,383,398"
+          ]
+        },
+        {
+          "id": "OP14",
+          "dimension": "operations",
+          "title": "Keep each release's readiness evidence current and understandable",
+          "weight": 1,
+          "blocking": false,
+          "owner": "Release, documentation and agency acceptance owners",
+          "requiredEvidence": [
+            "source",
+            "synthetic",
+            "independent"
+          ],
+          "failureModes": [
+            "A stale score is displayed as the current release or historical criteria are silently rewritten.",
+            "Staff cannot understand remaining launch gates or use required workflows accessibly."
+          ],
+          "acceptance": [
+            "Append a source-bound release snapshot under an immutable versioned rubric, validate coverage/evidence and show unavailable state on mismatch; review new risks at every material change.",
+            "Verify plain-language Settings content, accessible workflows and comparison without invented history; preserve signed-off evidence and expose unresolved blockers. Every catalog change starts a new rubric."
+          ],
+          "references": [
+            "docs/readiness/readiness.json",
+            "docs/readiness/readiness-method.md",
+            "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383,388,507"
+          ]
+        }
+      ]
+    }
+  ],
+  "snapshots": [
+    {
+      "release": "1.3.37",
+      "assessedAt": "2026-10-08",
+      "sourceRevision": "a1af92129f60728a0bbcf0dd27c42190644b1e3b",
+      "rubricVersion": "2026-10-v1",
+      "summary": "Starting assessment of release 1.3.37: agency access checks and some retry protections have recorded tests. We still need to prove that agencies cannot hold up each other's work, that every information boundary is protected, and that the whole service can be operated and recovered safely. Cloud Production is not deployed. This dated assessment uses the architecture review's evidence; it does not establish live operation.",
+      "nextSteps": [
+        "Show that a busy or failing agency cannot hold up another agency.",
+        "Prevent duplicate original claims and repeat the required billing checks immediately before sending.",
+        "Check that every screen, file and report keeps each agency's information separate, and that activity records and error logs are safe.",
+        "Practice recovering the whole service, reaching the person responsible for an alert, and safely returning to an earlier release using made-up data.",
+        "Agree how agencies and staff join, lose access and leave, then check the service in its intended hosting environment with an independent reviewer."
+      ],
+      "assessments": [
+        {
+          "criterionId": "MT01",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Security/TenantAccess.cs:10-90,101-157"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:140,347,361-362"
+            }
+          ],
+          "notes": "The API checks the caller's current agency and permissions, with passing tests recorded for this release. Independent review and checks of the deployed sign-in setup are still needed."
+        },
+        {
+          "criterionId": "MT02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:136-140"
+            }
+          ],
+          "notes": "Many actions restrict records to the right agency. Complete checks of every search, download, export and action affecting many records have not been independently established."
+        },
+        {
+          "criterionId": "MT03",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138"
+            }
+          ],
+          "notes": "Some linked records must belong to the same agency. Complete protection against inconsistent ownership and overly powerful database access remains unfinished."
+        },
+        {
+          "criterionId": "MT04",
+          "status": "unknown",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138,307-313"
+            }
+          ],
+          "notes": "There is no complete evidence inventory for agency separation across files, saved search results, temporary copies, exports and information left on the screen. Check existing stores and record unavailable features."
+        },
+        {
+          "criterionId": "MT05",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchGate.cs:44-100"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,347,366-367"
+            }
+          ],
+          "notes": "Recorded tests reject the wrong clearinghouse account and track different kinds of responses separately. They use synthetic accounts; real account routing and provider acceptance remain unverified."
+        },
+        {
+          "criterionId": "MT06",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:55-58"
+            }
+          ],
+          "notes": "Fair turns and a measured maximum wait are planned. The worker currently chooses the oldest queued clearinghouse file across all agencies."
+        },
+        {
+          "criterionId": "MT07",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs:132-145"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:102-108,204-208"
+            }
+          ],
+          "notes": "A failed first agency or missing account key can delay healthy agencies. Limits on the full wait and tests showing other agencies continue are still needed."
+        },
+        {
+          "criterionId": "MT08",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "SECURITY_REVIEW_2026-09-10.md"
+            },
+            {
+              "kind": "source",
+              "reference": "SECURITY_AUDIT_2026-09-03.md"
+            }
+          ],
+          "notes": "Some limits on incoming data exist. Limits on each agency's expensive work and on how much work can wait are still needed."
+        },
+        {
+          "criterionId": "MT09",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs:16-32"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347-357"
+            }
+          ],
+          "notes": "Recorded database tests show separate hosts share one clearinghouse request limit. They do not prove fair agency turns or the provider's actual account limits."
+        },
+        {
+          "criterionId": "MT10",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs:20-69"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            }
+          ],
+          "notes": "Workers coordinate some resets, sends and scans across hosts. Complete shared-work limits and protection against an interrupted worker returning remain unfinished."
+        },
+        {
+          "criterionId": "MT11",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:363-364,384"
+            }
+          ],
+          "notes": "Ordinary staff response time has not been measured while another agency runs costly reports or background work. Define the expected load and measure it."
+        },
+        {
+          "criterionId": "MT12",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentSweep.cs:31-47"
+            },
+            {
+              "kind": "source",
+              "reference": "platform/SatiLogica.Contracts/TenantClock.cs"
+            }
+          ],
+          "notes": "Shared rules use the supported business date and each agency's note settings. Complete tests of settings changes, date boundaries and stale screens remain needed."
+        },
+        {
+          "criterionId": "MT13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:384,404"
+            }
+          ],
+          "notes": "Procedures to create, change, close and recover customer agencies are not established for an approved cloud Production service."
+        },
+        {
+          "criterionId": "MT14",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Security/TenantAccess.cs:146-155"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:134,399"
+            }
+          ],
+          "notes": "The separate support account is restricted to a small set of actions. Complete checks of deployed support access and accountable cross-agency review remain needed."
+        },
+        {
+          "criterionId": "ID01",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,202,365,405"
+            }
+          ],
+          "notes": "Some billing and chat actions recognize repeats. Ordinary note creation still lacks a lasting request identity, so a lost reply can leave a repeat uncertain."
+        },
+        {
+          "criterionId": "ID02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:198,202,365-367"
+            }
+          ],
+          "notes": "Specific claim, file and receipt protections exist. Complete protection against hosts repeating every kind of action simultaneously is not established."
+        },
+        {
+          "criterionId": "ID03",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:212"
+            },
+            {
+              "kind": "sql",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:349-357,363-364"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,361"
+            }
+          ],
+          "notes": "Recorded database tests show certain schedule and billing changes reject stale updates and keep related work together. They do not cover every workflow or heavy-load condition."
+        },
+        {
+          "criterionId": "ID04",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:190,227,295-305,400"
+            }
+          ],
+          "notes": "Some background requests and action records are saved safely. Complete records of official actions and saved requests for every changing operation remain unfinished."
+        },
+        {
+          "criterionId": "ID05",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:61-71,221-225"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Signatures/SignatureMailWorker.cs:94-129"
+            }
+          ],
+          "notes": "Some send and mail workers hold exclusive permission to act. Complete tests of permission expiry, replaced workers and cancellation remain needed."
+        },
+        {
+          "criterionId": "ID06",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:111-190"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,366"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            }
+          ],
+          "notes": "Recorded tests show uncertain clearinghouse sends are held rather than automatically repeated. Real provider acceptance of the investigation and recovery process remains needed."
+        },
+        {
+          "criterionId": "ID07",
+          "status": "blocked",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:198,398"
+            }
+          ],
+          "notes": "The assessment found a missing server rule: a new request key can produce another original claim after earlier acceptance. No duplicate payment was shown; reproduce and repair this before real billing sends."
+        },
+        {
+          "criterionId": "ID08",
+          "status": "blocked",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:200,398"
+            }
+          ],
+          "notes": "The assessment found queued sends do not repeat all required documentation and compliance checks. A test where eligibility changes before sending still needs to run."
+        },
+        {
+          "criterionId": "ID09",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api.Tests/ClaimMdStatusProcessorTests.cs:21-157"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,367"
+            }
+          ],
+          "notes": "Recorded tests cover repeated receipts, related updates and response tracking, including rejection of the wrong account. Actual provider completeness and unsupported formats remain outside that evidence."
+        },
+        {
+          "criterionId": "ID10",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs:205-219"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Program.cs:147"
+            }
+          ],
+          "notes": "Current retry and time limits differ by workflow. A complete policy for safe repeats, the full response wait and shared retry limits still needs proof."
+        },
+        {
+          "criterionId": "ID11",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Signatures/SignatureMailWorker.cs:94-143,161-260"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_VALIDATION.md"
+            }
+          ],
+          "notes": "Signature mail saves request state, wait times and attempt limits. Complete interruption tests and actual provider delivery and recovery checks remain needed."
+        },
+        {
+          "criterionId": "ID12",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiOptions.cs:42-43"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:286,404"
+            }
+          ],
+          "notes": "Settings define how long some repeat identities are kept. Their relationship to late responses, restoration and different client versions is not established."
+        },
+        {
+          "criterionId": "ID13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:286,397"
+            }
+          ],
+          "notes": "A complete recovery drill has not reconciled external actions, valid later records and identities used to recognize repeats."
+        },
+        {
+          "criterionId": "ID14",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:202,307,403"
+            },
+            {
+              "kind": "source",
+              "reference": "BACKGROUND_WORKERS_HANDOFF.md"
+            }
+          ],
+          "notes": "Some stale-update errors and safe support references exist. Lost note replies, submitting after a failed save and different client versions still have separate gaps."
+        },
+        {
+          "criterionId": "OP01",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:381-386"
+            }
+          ],
+          "notes": "Cloud Production is not deployed. Demo and the owner's personal local PHI store do not establish an approved production service for multiple agencies."
+        },
+        {
+          "criterionId": "OP02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138,313,399"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_VALIDATION.md:134-175"
+            }
+          ],
+          "notes": "Service identities and a limited portal permission rehearsal exist. Actual deployed database, key, file, log and network permissions are not independently proven."
+        },
+        {
+          "criterionId": "OP03",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383,388,399"
+            }
+          ],
+          "notes": "Internal source review and targeted tests exist. Independent review of agency access and actual deployed protections is still required."
+        },
+        {
+          "criterionId": "OP04",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:274,286,397"
+            },
+            {
+              "kind": "source",
+              "reference": "scripts/Invoke-DemoRestoreVerification.ps1"
+            }
+          ],
+          "notes": "A guarded Demo restore script and procedure exist. Complete usable-service recovery, switch-over and reconciliation of later records have not been rehearsed."
+        },
+        {
+          "criterionId": "OP05",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "BACKGROUND_WORKERS_HANDOFF.md"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:313-315,402"
+            }
+          ],
+          "notes": "Watchdog source and alert scripts exist. The assessment found planned rules absent and no established actual alert delivery."
+        },
+        {
+          "criterionId": "OP06",
+          "status": "blocked",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:295-313,400-401"
+            }
+          ],
+          "notes": "The assessment identifies missing records of ordinary note actions and potentially unsafe full error logging. Complete action evidence and safe diagnostics are required before PHI hosting."
+        },
+        {
+          "criterionId": "OP07",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383-384,402"
+            }
+          ],
+          "notes": "No completed agency-level exercise of shared-service failure, safe reduced service and recovery response was established."
+        },
+        {
+          "criterionId": "OP08",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:245,403,409"
+            }
+          ],
+          "notes": "Release tools retain prior packages and controlled migration procedures. Supported app/server/database versions and safe rollback are not fully proven."
+        },
+        {
+          "criterionId": "OP09",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:404"
+            }
+          ],
+          "notes": "Some preservation controls and written policies exist. Actual retention, backup and file preservation, agency closure and export procedures remain incomplete."
+        },
+        {
+          "criterionId": "OP10",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:17,262-270,313,384"
+            }
+          ],
+          "notes": "Demo has dated evidence of its hosting limits. Measurements of intended Production capacity, faults and competing agencies remain future work."
+        },
+        {
+          "criterionId": "OP11",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:245,373,409"
+            }
+          ],
+          "notes": "Manual release and deployment checks exist. Complete proof of consistent settings, maintained dependencies and safe repair after an interrupted installation remains unfinished."
+        },
+        {
+          "criterionId": "OP12",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:128-140,383,404"
+            }
+          ],
+          "notes": "Current accounts can revoke old access after certain changes. Required stronger sign-in controls, shared abuse limits and actual recovery/offboarding checks are not established."
+        },
+        {
+          "criterionId": "OP13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,383,398"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_GUIDE.md"
+            }
+          ],
+          "notes": "Server billing sends are test-only; vendor and payer acceptance is not established. Real signature and email use also needs separate checks and agreements."
+        },
+        {
+          "criterionId": "OP14",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383,388,507"
+            }
+          ],
+          "notes": "This retrospective baseline starts release tracking; no earlier snapshot exists. This baseline does not count a readiness display or independent accessibility/readiness review as previously shipped."
+        }
+      ]
+    }
+  ]
+}

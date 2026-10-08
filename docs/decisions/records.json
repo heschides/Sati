@@ -1,0 +1,1968 @@
+{
+  "records": [
+    {
+      "status": "retained-record",
+      "date": "2026-10-07",
+      "path": "docs/decisions/records/2026-10-07-DEC-0001.md",
+      "supersededBy": [],
+      "sourceLine": 3,
+      "id": "DEC-0001",
+      "title": "2026-10-07 — Assessment approval reviews an exact immutable submission"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-06",
+      "path": "docs/decisions/records/2026-10-06-DEC-0002.md",
+      "supersededBy": [],
+      "sourceLine": 20,
+      "id": "DEC-0002",
+      "title": "2026-10-06 — Persist fatal-crash context before the crash"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-06",
+      "path": "docs/decisions/records/2026-10-06-DEC-0003.md",
+      "supersededBy": [],
+      "sourceLine": 29,
+      "id": "DEC-0003",
+      "title": "2026-10-06 — Corrections follow the selected note; supervisory review has its own queue"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-06",
+      "path": "docs/decisions/records/2026-10-06-DEC-0004.md",
+      "supersededBy": [],
+      "sourceLine": 37,
+      "id": "DEC-0004",
+      "title": "2026-10-06 - Telehealth is a distinct remote-contact activity"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-06",
+      "path": "docs/decisions/records/2026-10-06-DEC-0005.md",
+      "supersededBy": [],
+      "sourceLine": 47,
+      "id": "DEC-0005",
+      "title": "2026-10-06 - Explicit annual document progress during note saves"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0006.md",
+      "supersededBy": [],
+      "sourceLine": 72,
+      "id": "DEC-0006",
+      "title": "Purpose"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0007.md",
+      "supersededBy": [],
+      "sourceLine": 82,
+      "id": "DEC-0007",
+      "title": "Platform direction"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0008.md",
+      "supersededBy": [],
+      "sourceLine": 186,
+      "id": "DEC-0008",
+      "title": "Data & persistence"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0009.md",
+      "supersededBy": [],
+      "sourceLine": 235,
+      "id": "DEC-0009",
+      "title": "ViewModels & UI"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0010.md",
+      "supersededBy": [],
+      "sourceLine": 272,
+      "id": "DEC-0010",
+      "title": "Provider directory"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0011.md",
+      "supersededBy": [],
+      "sourceLine": 312,
+      "id": "DEC-0011",
+      "title": "Scope calls (things deliberately NOT built)"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0012.md",
+      "supersededBy": [],
+      "sourceLine": 332,
+      "id": "DEC-0012",
+      "title": "Comprehensive Assessment and Person-Centered Plan"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0013.md",
+      "supersededBy": [],
+      "sourceLine": 435,
+      "id": "DEC-0013",
+      "title": "Local AI-Assisted Case Notes"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-14",
+      "path": "docs/decisions/records/2026-08-14-DEC-0014.md",
+      "supersededBy": [],
+      "sourceLine": 495,
+      "id": "DEC-0014",
+      "title": "2026-08-14 — The local model is force-reset across a consumer switch, not trusted to reset itself"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-12",
+      "path": "docs/decisions/records/2026-08-12-DEC-0015.md",
+      "supersededBy": [],
+      "sourceLine": 513,
+      "id": "DEC-0015",
+      "title": "2026-08-12 — Protected API requests revalidate the actor and distinguish review from authorship"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-12",
+      "path": "docs/decisions/records/2026-08-12-DEC-0016.md",
+      "supersededBy": [],
+      "sourceLine": 522,
+      "id": "DEC-0016",
+      "title": "2026-08-12 — Audit content is minimal, state changes are atomic, and stale assessments fail closed"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-13",
+      "path": "docs/decisions/records/2026-08-13-DEC-0017.md",
+      "supersededBy": [],
+      "sourceLine": 532,
+      "id": "DEC-0017",
+      "title": "2026-08-13 — Billing records freeze their claim inputs"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-13",
+      "path": "docs/decisions/records/2026-08-13-DEC-0018.md",
+      "supersededBy": [],
+      "sourceLine": 544,
+      "id": "DEC-0018",
+      "title": "2026-08-13 — Billing rules are configured per tenant and revalidated at promotion"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-13",
+      "path": "docs/decisions/records/2026-08-13-DEC-0019.md",
+      "supersededBy": [],
+      "sourceLine": 556,
+      "id": "DEC-0019",
+      "title": "2026-08-13 — Agency incident visibility is curated; cross-tenant visibility is separate"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-14",
+      "path": "docs/decisions/records/2026-08-14-DEC-0020.md",
+      "supersededBy": [],
+      "sourceLine": 590,
+      "id": "DEC-0020",
+      "title": "2026-08-14 — Service time is a claim on the case manager's day, enforced server-side"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-14",
+      "path": "docs/decisions/records/2026-08-14-DEC-0021.md",
+      "supersededBy": [],
+      "sourceLine": 623,
+      "id": "DEC-0021",
+      "title": "2026-08-14 — Input and grid text colors are owned by App.xaml, not by the framework theme"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-14",
+      "path": "docs/decisions/records/2026-08-14-DEC-0022.md",
+      "supersededBy": [],
+      "sourceLine": 640,
+      "id": "DEC-0022",
+      "title": "2026-08-14 — The audit export is an execution surface, and its format has one owner"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-14",
+      "path": "docs/decisions/records/2026-08-14-DEC-0023.md",
+      "supersededBy": [],
+      "sourceLine": 662,
+      "id": "DEC-0023",
+      "title": "2026-08-14 — Sign-in spends the same work whether or not the account exists"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-15",
+      "path": "docs/decisions/records/2026-08-15-DEC-0024.md",
+      "supersededBy": [],
+      "sourceLine": 679,
+      "id": "DEC-0024",
+      "title": "2026-08-15 — Provider directory entries are local knowledge about a shared organization"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-15",
+      "path": "docs/decisions/records/2026-08-15-DEC-0025.md",
+      "supersededBy": [],
+      "sourceLine": 753,
+      "id": "DEC-0025",
+      "title": "2026-08-15 — Publishing an AT request records an attestation, not a signature"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-15",
+      "path": "docs/decisions/records/2026-08-15-DEC-0026.md",
+      "supersededBy": [],
+      "sourceLine": 804,
+      "id": "DEC-0026",
+      "title": "2026-08-15 — Item evidence is a pasted clip on its own page, beside its URL"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-15",
+      "path": "docs/decisions/records/2026-08-15-DEC-0027.md",
+      "supersededBy": [],
+      "sourceLine": 860,
+      "id": "DEC-0027",
+      "title": "2026-08-15 — A filed AT request regenerates faithfully, from the record"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-15",
+      "path": "docs/decisions/records/2026-08-15-DEC-0028.md",
+      "supersededBy": [],
+      "sourceLine": 937,
+      "id": "DEC-0028",
+      "title": "2026-08-15 — An installation bootstraps its first administrator; it never ships with one"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-17",
+      "path": "docs/decisions/records/2026-08-17-DEC-0029.md",
+      "supersededBy": [],
+      "sourceLine": 986,
+      "id": "DEC-0029",
+      "title": "The case-note workflow has one transition table (2026-08-17)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-17",
+      "path": "docs/decisions/records/2026-08-17-DEC-0030.md",
+      "supersededBy": [],
+      "sourceLine": 1029,
+      "id": "DEC-0030",
+      "title": "Review and billing read the same clock (2026-08-17)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-18",
+      "path": "docs/decisions/records/2026-08-18-DEC-0031.md",
+      "supersededBy": [],
+      "sourceLine": 1042,
+      "id": "DEC-0031",
+      "title": "A Reminder is a journal entry, not a note (2026-08-18)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-26",
+      "path": "docs/decisions/records/2026-08-26-DEC-0032.md",
+      "supersededBy": [],
+      "sourceLine": 1081,
+      "id": "DEC-0032",
+      "title": "A future-dated Reminder is a scheduled note row (2026-08-26)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-18",
+      "path": "docs/decisions/records/2026-08-18-DEC-0033.md",
+      "supersededBy": [],
+      "sourceLine": 1107,
+      "id": "DEC-0033",
+      "title": "A client newer than its server writes the reminder anyway, and says so (2026-08-18)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-18",
+      "path": "docs/decisions/records/2026-08-18-DEC-0034.md",
+      "supersededBy": [],
+      "sourceLine": 1154,
+      "id": "DEC-0034",
+      "title": "An official DHHS form is filled, never redrawn (2026-08-18)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-18",
+      "path": "docs/decisions/records/2026-08-18-DEC-0035.md",
+      "supersededBy": [],
+      "sourceLine": 1210,
+      "id": "DEC-0035",
+      "title": "An SSN is cloud-only, envelope-encrypted, and readable only during a form fill (2026-08-18)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-19",
+      "path": "docs/decisions/records/2026-08-19-DEC-0036.md",
+      "supersededBy": [],
+      "sourceLine": 1253,
+      "id": "DEC-0036",
+      "title": "An agency release is a Sati document, with preparation confirmation rather than an inferred signature (2026-08-19)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-19",
+      "path": "docs/decisions/records/2026-08-19-DEC-0037.md",
+      "supersededBy": [],
+      "sourceLine": 1280,
+      "id": "DEC-0037",
+      "title": "The desktop backs up before it migrates a database with records in it (2026-08-19)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-19",
+      "path": "docs/decisions/records/2026-08-19-DEC-0038.md",
+      "supersededBy": [],
+      "sourceLine": 1314,
+      "id": "DEC-0038",
+      "title": "Local Production stores SSNs under the Windows account key (2026-08-19)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-20",
+      "path": "docs/decisions/records/2026-08-20-DEC-0039.md",
+      "supersededBy": [],
+      "sourceLine": 1352,
+      "id": "DEC-0039",
+      "title": "Tomorrow's Agenda is tomorrow's dated scratchpad, not a rollover copy (2026-08-20)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-21",
+      "path": "docs/decisions/records/2026-08-21-DEC-0040.md",
+      "supersededBy": [],
+      "sourceLine": 1371,
+      "id": "DEC-0040",
+      "title": "Carika is an API client, not a database client (2026-08-21)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-21",
+      "path": "docs/decisions/records/2026-08-21-DEC-0041.md",
+      "supersededBy": [],
+      "sourceLine": 1384,
+      "id": "DEC-0041",
+      "title": "The Local Production package bootstraps software, never PHI (2026-08-21)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-22",
+      "path": "docs/decisions/records/2026-08-22-DEC-0042.md",
+      "supersededBy": [],
+      "sourceLine": 1397,
+      "id": "DEC-0042",
+      "title": "Local case-note drafting is a closed-world transformation (2026-08-22)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-22",
+      "path": "docs/decisions/records/2026-08-22-DEC-0043.md",
+      "supersededBy": [],
+      "sourceLine": 1438,
+      "id": "DEC-0043",
+      "title": "Database waits have one payload-free activity owner (2026-08-22)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-22",
+      "path": "docs/decisions/records/2026-08-22-DEC-0044.md",
+      "supersededBy": [],
+      "sourceLine": 1456,
+      "id": "DEC-0044",
+      "title": "DNS failure retries are safe only before a connection exists (2026-08-22)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-22",
+      "path": "docs/decisions/records/2026-08-22-DEC-0045.md",
+      "supersededBy": [],
+      "sourceLine": 1475,
+      "id": "DEC-0045",
+      "title": "Representative-payee profile state is not payment authorization (2026-08-22)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-22",
+      "path": "docs/decisions/records/2026-08-22-DEC-0046.md",
+      "supersededBy": [],
+      "sourceLine": 1498,
+      "id": "DEC-0046",
+      "title": "The brochure is HTML source, rendered to PDF (2026-08-22)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-23",
+      "path": "docs/decisions/records/2026-08-23-DEC-0047.md",
+      "supersededBy": [],
+      "sourceLine": 1527,
+      "id": "DEC-0047",
+      "title": "Shutdown flushes send only unsaved work (2026-08-23)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-23",
+      "path": "docs/decisions/records/2026-08-23-DEC-0048.md",
+      "supersededBy": [],
+      "sourceLine": 1584,
+      "id": "DEC-0048",
+      "title": "A note is shown in one panel, and viewing is a locked mode of editing (2026-08-23)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0049.md",
+      "supersededBy": [],
+      "sourceLine": 1859,
+      "id": "DEC-0049",
+      "title": "2026-08-28 — Provider affiliation is one parent link, not three typed tiers"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0050.md",
+      "supersededBy": [],
+      "sourceLine": 1916,
+      "id": "DEC-0050",
+      "title": "2026-08-28 — A consumer's provider list stores the link, never the resolved chain"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0051.md",
+      "supersededBy": [],
+      "sourceLine": 1966,
+      "id": "DEC-0051",
+      "title": "2026-08-28 — `EndDate` is the only fact that says a provider link is current"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0052.md",
+      "supersededBy": [],
+      "sourceLine": 1989,
+      "id": "DEC-0052",
+      "title": "2026-08-28 — A directory entry on a consumer's record cannot be deleted, and the refusal counts rather than names"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0053.md",
+      "supersededBy": [],
+      "sourceLine": 2012,
+      "id": "DEC-0053",
+      "title": "2026-08-28 — Removing a consumer provider link is separate from ending one"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0054.md",
+      "supersededBy": [],
+      "sourceLine": 2030,
+      "id": "DEC-0054",
+      "title": "2026-08-28 — The legacy provider fields are linked by hand, never backfilled"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0055.md",
+      "supersededBy": [],
+      "sourceLine": 2076,
+      "id": "DEC-0055",
+      "title": "2026-08-28 — `PersonContactKind.HealthcareProvider` is redefined, not retired"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0056.md",
+      "supersededBy": [],
+      "sourceLine": 2087,
+      "id": "DEC-0056",
+      "title": "2026-08-28 — A document freezes the provider chain; everything else derives it"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-28",
+      "path": "docs/decisions/records/2026-08-28-DEC-0057.md",
+      "supersededBy": [],
+      "sourceLine": 2119,
+      "id": "DEC-0057",
+      "title": "2026-08-28 — Provider-directory editing is broad, destructive curation is Admin-only"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-29",
+      "path": "docs/decisions/records/2026-08-29-DEC-0058.md",
+      "supersededBy": [],
+      "sourceLine": 2156,
+      "id": "DEC-0058",
+      "title": "2026-08-29 — Synthetic provenance is data, and exchange history is append-only"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-30",
+      "path": "docs/decisions/records/2026-08-30-DEC-0059.md",
+      "supersededBy": [],
+      "sourceLine": 2180,
+      "id": "DEC-0059",
+      "title": "2026-08-30 — Deposit reconciliation is a separate anchor, and PLB is never hidden"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-30",
+      "path": "docs/decisions/records/2026-08-30-DEC-0060.md",
+      "supersededBy": [],
+      "sourceLine": 2197,
+      "id": "DEC-0060",
+      "title": "2026-08-30 — The migration chain belongs to a platform-neutral persistence assembly"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-30",
+      "path": "docs/decisions/records/2026-08-30-DEC-0061.md",
+      "supersededBy": [],
+      "sourceLine": 2222,
+      "id": "DEC-0061",
+      "title": "2026-08-30 — Demo schema changes run from inside the App Service, not from a workstation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-30",
+      "path": "docs/decisions/records/2026-08-30-DEC-0062.md",
+      "supersededBy": [],
+      "sourceLine": 2270,
+      "id": "DEC-0062",
+      "title": "2026-08-30 — A catalog proof cannot tell \"absent\" from \"invisible\""
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-30",
+      "path": "docs/decisions/records/2026-08-30-DEC-0063.md",
+      "supersededBy": [],
+      "sourceLine": 2301,
+      "id": "DEC-0063",
+      "title": "SatiProduction migration-history reconciliation — 2026-08-30"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-30",
+      "path": "docs/decisions/records/2026-08-30-DEC-0064.md",
+      "supersededBy": [],
+      "sourceLine": 2335,
+      "id": "DEC-0064",
+      "title": "2026-08-30 — Startup repairs the provable half of a history disagreement"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-30",
+      "path": "docs/decisions/records/2026-08-30-DEC-0065.md",
+      "supersededBy": [],
+      "sourceLine": 2386,
+      "id": "DEC-0065",
+      "title": "2026-08-30 — A claim remains visible from promotion through payment"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-30",
+      "path": "docs/decisions/records/2026-08-30-DEC-0066.md",
+      "supersededBy": [],
+      "sourceLine": 2408,
+      "id": "DEC-0066",
+      "title": "2026-08-30 — Agency authorization is per-user permissions, with billing independent"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-31",
+      "path": "docs/decisions/records/2026-08-31-DEC-0067.md",
+      "supersededBy": [],
+      "sourceLine": 2440,
+      "id": "DEC-0067",
+      "title": "2026-08-31 — Agency-wide supervision is its own capability, and user management is enforced in the service"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-08-31",
+      "path": "docs/decisions/records/2026-08-31-DEC-0068.md",
+      "supersededBy": [],
+      "sourceLine": 2513,
+      "id": "DEC-0068",
+      "title": "2026-08-31 — Quarterly evidence does not complete the quarterly attestation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0069.md",
+      "supersededBy": [],
+      "sourceLine": 2541,
+      "id": "DEC-0069",
+      "title": "2026-09-03 — Form evidence never completes a form; explicit attestations do"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0070.md",
+      "supersededBy": [],
+      "sourceLine": 2582,
+      "id": "DEC-0070",
+      "title": "2026-09-03 — Provisional Privacy Practices default and versioned templates"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0071.md",
+      "supersededBy": [],
+      "sourceLine": 2601,
+      "id": "DEC-0071",
+      "title": "2026-09-03 — Document prerequisites are server facts, with a narrow technical override"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-01",
+      "path": "docs/decisions/records/2026-09-01-DEC-0072.md",
+      "supersededBy": [],
+      "sourceLine": 2626,
+      "id": "DEC-0072",
+      "title": "2026-09-01 — The initial login agenda is once daily and local"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-01",
+      "path": "docs/decisions/records/2026-09-01-DEC-0073.md",
+      "supersededBy": [],
+      "sourceLine": 2658,
+      "id": "DEC-0073",
+      "title": "2026-09-01 — The database owns \"one form per person, type, and due date\""
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-01",
+      "path": "docs/decisions/records/2026-09-01-DEC-0074.md",
+      "supersededBy": [],
+      "sourceLine": 2695,
+      "id": "DEC-0074",
+      "title": "2026-09-01 — Duplicate form rows merge unattended; conflicting completion dates do not"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-01",
+      "path": "docs/decisions/records/2026-09-01-DEC-0075.md",
+      "supersededBy": [],
+      "sourceLine": 2734,
+      "id": "DEC-0075",
+      "title": "2026-09-01 — Compliance is the completion date, and nothing else"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-01",
+      "path": "docs/decisions/records/2026-09-01-DEC-0076.md",
+      "supersededBy": [],
+      "sourceLine": 2779,
+      "id": "DEC-0076",
+      "title": "2026-09-01 — Cycle form generation is on again, because the constraint now holds"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-01",
+      "path": "docs/decisions/records/2026-09-01-DEC-0077.md",
+      "supersededBy": [],
+      "sourceLine": 2802,
+      "id": "DEC-0077",
+      "title": "2026-09-01 — Every cycle gets forms, and only the current one is assumed satisfied"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-01",
+      "path": "docs/decisions/records/2026-09-01-DEC-0078.md",
+      "supersededBy": [],
+      "sourceLine": 2844,
+      "id": "DEC-0078",
+      "title": "2026-09-01 — 1080p and smaller get compact starting state, not a globally shrunken UI"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-02",
+      "path": "docs/decisions/records/2026-09-02-DEC-0079.md",
+      "supersededBy": [],
+      "sourceLine": 2863,
+      "id": "DEC-0079",
+      "title": "2026-09-02 — Existing-profile Credible import is explicit, reviewed, and single-record"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-02",
+      "path": "docs/decisions/records/2026-09-02-DEC-0080.md",
+      "supersededBy": [],
+      "sourceLine": 2875,
+      "id": "DEC-0080",
+      "title": "2026-09-02 — The VR assistant title is agency reference text, not consumer data"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-02",
+      "path": "docs/decisions/records/2026-09-02-DEC-0081.md",
+      "supersededBy": [],
+      "sourceLine": 2887,
+      "id": "DEC-0081",
+      "title": "2026-09-02 — Easy Eyes is a personal opt-in presentation mode"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0082.md",
+      "supersededBy": [],
+      "sourceLine": 2903,
+      "id": "DEC-0082",
+      "title": "The inactivity screen is a privacy screen, not a lock (2026-09-03)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0083.md",
+      "supersededBy": [],
+      "sourceLine": 2926,
+      "id": "DEC-0083",
+      "title": "The waking mouse-move has to be a real move (2026-09-03)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0084.md",
+      "supersededBy": [],
+      "sourceLine": 2933,
+      "id": "DEC-0084",
+      "title": "Button fill became its own palette token (2026-09-03)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0085.md",
+      "supersededBy": [],
+      "sourceLine": 2948,
+      "id": "DEC-0085",
+      "title": "The case note template never removes text (2026-09-03)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0086.md",
+      "supersededBy": [],
+      "sourceLine": 2962,
+      "id": "DEC-0086",
+      "title": "The follow-up suggestion asks a different question than the dashboard (2026-09-03)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0087.md",
+      "supersededBy": [],
+      "sourceLine": 2979,
+      "id": "DEC-0087",
+      "title": "The API package must be zipped by .NET 10, not by Windows PowerShell (2026-09-03)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0088.md",
+      "supersededBy": [],
+      "sourceLine": 2994,
+      "id": "DEC-0088",
+      "title": "2026-09-03 — Annual packet, exact-copy receipts, and staff-sent requests"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0089.md",
+      "supersededBy": [],
+      "sourceLine": 3018,
+      "id": "DEC-0089",
+      "title": "2026-09-03 — Explicit API writes are not automatically replayed"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-03",
+      "path": "docs/decisions/records/2026-09-03-DEC-0090.md",
+      "supersededBy": [],
+      "sourceLine": 3028,
+      "id": "DEC-0090",
+      "title": "2026-09-03 — Ordinary-client deletion within a 20-day window, and a real (narrow) legal-hold registry"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-05",
+      "path": "docs/decisions/records/2026-09-05-DEC-0091.md",
+      "supersededBy": [],
+      "sourceLine": 3083,
+      "id": "DEC-0091",
+      "title": "2026-09-05 - Case Management navigation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-05",
+      "path": "docs/decisions/records/2026-09-05-DEC-0092.md",
+      "supersededBy": [],
+      "sourceLine": 3091,
+      "id": "DEC-0092",
+      "title": "2026-09-05 - Client save outcome and screen refresh"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-05",
+      "path": "docs/decisions/records/2026-09-05-DEC-0093.md",
+      "supersededBy": [],
+      "sourceLine": 3099,
+      "id": "DEC-0093",
+      "title": "2026-09-05 - Paged supervisory review and explicit threshold approval"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-05",
+      "path": "docs/decisions/records/2026-09-05-DEC-0094.md",
+      "supersededBy": [],
+      "sourceLine": 3122,
+      "id": "DEC-0094",
+      "title": "2026-09-05 - Adaptive display modes with a central Work Agenda"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-05",
+      "path": "docs/decisions/records/2026-09-05-DEC-0095.md",
+      "supersededBy": [],
+      "sourceLine": 3155,
+      "id": "DEC-0095",
+      "title": "2026-09-05 - Fixed Overview roles and a bounded Statistics report"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-05",
+      "path": "docs/decisions/records/2026-09-05-DEC-0096.md",
+      "supersededBy": [],
+      "sourceLine": 3180,
+      "id": "DEC-0096",
+      "title": "2026-09-05 - Today's Work uses Scheduled notes as its structured plan"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-05",
+      "path": "docs/decisions/records/2026-09-05-DEC-0097.md",
+      "supersededBy": [],
+      "sourceLine": 3212,
+      "id": "DEC-0097",
+      "title": "Team chat — safer defaults after design review (2026-09-05)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0098.md",
+      "supersededBy": [],
+      "sourceLine": 3241,
+      "id": "DEC-0098",
+      "title": "2026-09-06 — Electronic signatures preserve originals and signer-specific evidence"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-27",
+      "path": "docs/decisions/records/2026-09-27-DEC-0099.md",
+      "supersededBy": [],
+      "sourceLine": 3290,
+      "id": "DEC-0099",
+      "title": "2026-09-27 — External signing is the default; internal signing is an additive agency opt-in"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-27",
+      "path": "docs/decisions/records/2026-09-27-DEC-0100.md",
+      "supersededBy": [],
+      "sourceLine": 3325,
+      "id": "DEC-0100",
+      "title": "2026-09-27 — One-off release recipients are durable documents, not implicit providers"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0101.md",
+      "supersededBy": [],
+      "sourceLine": 3385,
+      "id": "DEC-0101",
+      "title": "2026-09-06 — Team chat is a room dock with open rooms as tabs"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0102.md",
+      "supersededBy": [],
+      "sourceLine": 3449,
+      "id": "DEC-0102",
+      "title": "2026-09-06 — Account switching is an opaque two-phase privacy boundary"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0103.md",
+      "supersededBy": [],
+      "sourceLine": 3467,
+      "id": "DEC-0103",
+      "title": "2026-09-06 — Demo mock submission consumes the retained generated 837P"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0104.md",
+      "supersededBy": [],
+      "sourceLine": 3480,
+      "id": "DEC-0104",
+      "title": "2026-09-06 — Billing-period selection is a draft work queue with exact-row readiness"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0105.md",
+      "supersededBy": [],
+      "sourceLine": 3499,
+      "id": "DEC-0105",
+      "title": "2026-09-06 — Installer implementation consoles stay hidden behind one progress surface"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0106.md",
+      "supersededBy": [],
+      "sourceLine": 3518,
+      "id": "DEC-0106",
+      "title": "2026-09-06 — Decorative themes pattern the shell, not the work"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0107.md",
+      "supersededBy": [],
+      "sourceLine": 3540,
+      "id": "DEC-0107",
+      "title": "2026-09-06 — 837 staging is derived from readiness and history, not status alone"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-06",
+      "path": "docs/decisions/records/2026-09-06-DEC-0108.md",
+      "supersededBy": [],
+      "sourceLine": 3553,
+      "id": "DEC-0108",
+      "title": "2026-09-06 — Demo teaching exceptions cannot remove hard billing identifiers"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0109.md",
+      "supersededBy": [],
+      "sourceLine": 3563,
+      "id": "DEC-0109",
+      "title": "2026-09-07 — Theme legibility is measured, not reviewed by eye"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0110.md",
+      "supersededBy": [],
+      "sourceLine": 3610,
+      "id": "DEC-0110",
+      "title": "2026-09-07 — PATTERNED_THEME_SCRIM: control-dense screens quiet an illustrated theme"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0111.md",
+      "supersededBy": [],
+      "sourceLine": 3634,
+      "id": "DEC-0111",
+      "title": "2026-09-07 — Patterned themes use crisp canvas and frosted content glass"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0112.md",
+      "supersededBy": [],
+      "sourceLine": 3662,
+      "id": "DEC-0112",
+      "title": "2026-09-07 — Illustrated repeats need variation inside the tile"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0113.md",
+      "supersededBy": [],
+      "sourceLine": 3670,
+      "id": "DEC-0113",
+      "title": "2026-09-07 — Vanilla Bean treats food texture as quiet vector atmosphere"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0114.md",
+      "supersededBy": [],
+      "sourceLine": 3678,
+      "id": "DEC-0114",
+      "title": "2026-09-07 — One door into settings, and switching accounts still closes it"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0115.md",
+      "supersededBy": [],
+      "sourceLine": 3706,
+      "id": "DEC-0115",
+      "title": "2026-09-07 — Accessibility is measured through the automation tree, not the markup"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0116.md",
+      "supersededBy": [],
+      "sourceLine": 3747,
+      "id": "DEC-0116",
+      "title": "2026-09-07 — Membership and authority are separate, and OADS is an authority"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0117.md",
+      "supersededBy": [],
+      "sourceLine": 3778,
+      "id": "DEC-0117",
+      "title": "2026-09-07 — One person registry, products link to it"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0118.md",
+      "supersededBy": [],
+      "sourceLine": 3799,
+      "id": "DEC-0118",
+      "title": "2026-09-07 — Cross-tenant access has two mechanisms, and sharing has two layers"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-07",
+      "path": "docs/decisions/records/2026-09-07-DEC-0119.md",
+      "supersededBy": [],
+      "sourceLine": 3851,
+      "id": "DEC-0119",
+      "title": "2026-09-07 — Outlook import is a protected local overlay, not a Sati record"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-09",
+      "path": "docs/decisions/records/2026-09-09-DEC-0120.md",
+      "supersededBy": [],
+      "sourceLine": 3869,
+      "id": "DEC-0120",
+      "title": "2026-09-09 — The repository solution is the platform; Sati remains a product"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-09",
+      "path": "docs/decisions/records/2026-09-09-DEC-0121.md",
+      "supersededBy": [],
+      "sourceLine": 3885,
+      "id": "DEC-0121",
+      "title": "2026-09-09 — Check requests are immutable financial records, not electronic signatures"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-09",
+      "path": "docs/decisions/records/2026-09-09-DEC-0122.md",
+      "supersededBy": [],
+      "sourceLine": 3923,
+      "id": "DEC-0122",
+      "title": "2026-09-09 — Richer themes remain light-surface themes"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-10",
+      "path": "docs/decisions/records/2026-09-10-DEC-0123.md",
+      "supersededBy": [],
+      "sourceLine": 3936,
+      "id": "DEC-0123",
+      "title": "2026-09-10 — Productivity separates secured work, recoverable documentation, and future capacity"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-10",
+      "path": "docs/decisions/records/2026-09-10-DEC-0124.md",
+      "supersededBy": [],
+      "sourceLine": 3954,
+      "id": "DEC-0124",
+      "title": "2026-09-10 — Every managed desktop failure writes locally; Admin receives only the curated envelope"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-10",
+      "path": "docs/decisions/records/2026-09-10-DEC-0125.md",
+      "supersededBy": [],
+      "sourceLine": 3975,
+      "id": "DEC-0125",
+      "title": "2026-09-10 — Fatal Windows faults are correlated after restart, never by the dying process"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-07",
+      "path": "docs/decisions/records/2026-10-07-DEC-0126.md",
+      "supersededBy": [],
+      "sourceLine": 4004,
+      "id": "DEC-0126",
+      "title": "2026-10-07 — Scratchpad formatting reuses the portable journal format"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-10",
+      "path": "docs/decisions/records/2026-09-10-DEC-0127.md",
+      "supersededBy": [],
+      "sourceLine": 4024,
+      "id": "DEC-0127",
+      "title": "2026-09-10 — Scratchpad history is an Overview workspace, not another window"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-10",
+      "path": "docs/decisions/records/2026-09-10-DEC-0128.md",
+      "supersededBy": [],
+      "sourceLine": 4046,
+      "id": "DEC-0128",
+      "title": "2026-09-10 — Umber Facets translates the reference palette into an accessible dark theme"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-10",
+      "path": "docs/decisions/records/2026-09-10-DEC-0129.md",
+      "supersededBy": [],
+      "sourceLine": 4059,
+      "id": "DEC-0129",
+      "title": "2026-09-10 — response intake matches evidence, not the selected billing period"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-10",
+      "path": "docs/decisions/records/2026-09-10-DEC-0130.md",
+      "supersededBy": [],
+      "sourceLine": 4088,
+      "id": "DEC-0130",
+      "title": "2026-09-10 — persisted forms cannot be deleted through the standalone operation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-11",
+      "path": "docs/decisions/records/2026-09-11-DEC-0131.md",
+      "supersededBy": [],
+      "sourceLine": 4112,
+      "id": "DEC-0131",
+      "title": "2026-09-11 — Assignments do not survive capability revocation as authority"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-11",
+      "path": "docs/decisions/records/2026-09-11-DEC-0132.md",
+      "supersededBy": [],
+      "sourceLine": 4150,
+      "id": "DEC-0132",
+      "title": "2026-09-11 — revocation belongs to retained account state"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-12",
+      "path": "docs/decisions/records/2026-09-12-DEC-0133.md",
+      "supersededBy": [],
+      "sourceLine": 4177,
+      "id": "DEC-0133",
+      "title": "2026-09-12 — Profile photos are separate current media"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-13",
+      "path": "docs/decisions/records/2026-09-13-DEC-0134.md",
+      "supersededBy": [],
+      "sourceLine": 4191,
+      "id": "DEC-0134",
+      "title": "2026-09-13 — The canonical Demo is a rolling calendar template"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-13",
+      "path": "docs/decisions/records/2026-09-13-DEC-0135.md",
+      "supersededBy": [],
+      "sourceLine": 4213,
+      "id": "DEC-0135",
+      "title": "2026-09-13 — The CWIC packet keeps the publisher's pages and Sati supplies an overlay"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-13",
+      "path": "docs/decisions/records/2026-09-13-DEC-0136.md",
+      "supersededBy": [],
+      "sourceLine": 4233,
+      "id": "DEC-0136",
+      "title": "2026-09-13 — Housing Support Funds uses the controlled OADS AcroForm as a draft"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-13",
+      "path": "docs/decisions/records/2026-09-13-DEC-0137.md",
+      "supersededBy": [],
+      "sourceLine": 4257,
+      "id": "DEC-0137",
+      "title": "2026-09-13 — The DHHS Authorized Representative appointment is once-only annual-work context"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-13",
+      "path": "docs/decisions/records/2026-09-13-DEC-0138.md",
+      "supersededBy": [],
+      "sourceLine": 4282,
+      "id": "DEC-0138",
+      "title": "2026-09-13 — Check-request workflow and Representative Payee ledger are append-only records"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-13",
+      "path": "docs/decisions/records/2026-09-13-DEC-0139.md",
+      "supersededBy": [],
+      "sourceLine": 4308,
+      "id": "DEC-0139",
+      "title": "2026-09-13 — Weekly check-request automation creates review drafts, never payments"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-13",
+      "path": "docs/decisions/records/2026-09-13-DEC-0140.md",
+      "supersededBy": [],
+      "sourceLine": 4336,
+      "id": "DEC-0140",
+      "title": "2026-09-13 — Goal progress is required at case-note submission, not draft creation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-13",
+      "path": "docs/decisions/records/2026-09-13-DEC-0141.md",
+      "supersededBy": [],
+      "sourceLine": 4349,
+      "id": "DEC-0141",
+      "title": "2026-09-13 — A live form preview observes a draft; it does not become the record"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-14",
+      "path": "docs/decisions/records/2026-09-14-DEC-0142.md",
+      "supersededBy": [],
+      "sourceLine": 4362,
+      "id": "DEC-0142",
+      "title": "2026-09-14 — annual compliance is target-identified, explicitly attested, and evaluated under the service-date policy"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-16",
+      "path": "docs/decisions/records/2026-09-16-DEC-0143.md",
+      "supersededBy": [],
+      "sourceLine": 4593,
+      "id": "DEC-0143",
+      "title": "2026-09-16 — annual forms show the plan in force and the renewal being prepared"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-16",
+      "path": "docs/decisions/records/2026-09-16-DEC-0144.md",
+      "supersededBy": [],
+      "sourceLine": 4650,
+      "id": "DEC-0144",
+      "title": "2026-09-16 — monthly contact is an optional rolling 30-day billing requirement"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-16",
+      "path": "docs/decisions/records/2026-09-16-DEC-0145.md",
+      "supersededBy": [],
+      "sourceLine": 4700,
+      "id": "DEC-0145",
+      "title": "2026-09-16 — the non-authoritative local Production database may be seeded to match external tracking"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-17",
+      "path": "docs/decisions/records/2026-09-17-DEC-0146.md",
+      "supersededBy": [],
+      "sourceLine": 4733,
+      "id": "DEC-0146",
+      "title": "2026-09-17 — crash dumps may be captured on one workstation, by hand, to diagnose a stack overflow"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-17",
+      "path": "docs/decisions/records/2026-09-17-DEC-0147.md",
+      "supersededBy": [],
+      "sourceLine": 4752,
+      "id": "DEC-0147",
+      "title": "2026-09-17 — the documented daily average owns which calendar days are green"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-17",
+      "path": "docs/decisions/records/2026-09-17-DEC-0148.md",
+      "supersededBy": [],
+      "sourceLine": 4774,
+      "id": "DEC-0148",
+      "title": "2026-09-17 — a day joins the daily average when it is finished, not when it is first written"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-17",
+      "path": "docs/decisions/records/2026-09-17-DEC-0149.md",
+      "supersededBy": [],
+      "sourceLine": 4806,
+      "id": "DEC-0149",
+      "title": "2026-09-17 — the pace divides by every day units can still land on, and a zero day says so"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-17",
+      "path": "docs/decisions/records/2026-09-17-DEC-0150.md",
+      "supersededBy": [],
+      "sourceLine": 4836,
+      "id": "DEC-0150",
+      "title": "2026-09-17 — a settled day with no billable work is visible to a supervisor"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-18",
+      "path": "docs/decisions/records/2026-09-18-DEC-0151.md",
+      "supersededBy": [],
+      "sourceLine": 4860,
+      "id": "DEC-0151",
+      "title": "2026-09-18 — planned work left undone is resolved at shutdown, not left on its day"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-18",
+      "path": "docs/decisions/records/2026-09-18-DEC-0152.md",
+      "supersededBy": [],
+      "sourceLine": 4885,
+      "id": "DEC-0152",
+      "title": "2026-09-18 — the leaf, window icon, and interface font belong to the theme"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-18",
+      "path": "docs/decisions/records/2026-09-18-DEC-0153.md",
+      "supersededBy": [],
+      "sourceLine": 4898,
+      "id": "DEC-0153",
+      "title": "2026-09-18 — a profile photo is prepared on the desktop, then validated as before"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-19",
+      "path": "docs/decisions/records/2026-09-19-DEC-0154.md",
+      "supersededBy": [],
+      "sourceLine": 4920,
+      "id": "DEC-0154",
+      "title": "2026-09-19 — the journal is stored as pages of marked text, and plain text stays valid"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-19",
+      "path": "docs/decisions/records/2026-09-19-DEC-0155.md",
+      "supersededBy": [],
+      "sourceLine": 4944,
+      "id": "DEC-0155",
+      "title": "2026-09-19 — checking journal text can put it on the calendar"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-19",
+      "path": "docs/decisions/records/2026-09-19-DEC-0156.md",
+      "supersededBy": [],
+      "sourceLine": 4958,
+      "id": "DEC-0156",
+      "title": "2026-09-19 — Scheduled work whose day has passed is disregarded"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-19",
+      "path": "docs/decisions/records/2026-09-19-DEC-0157.md",
+      "supersededBy": [],
+      "sourceLine": 4975,
+      "id": "DEC-0157",
+      "title": "2026-09-19 — the mock clearinghouse denies for named reasons, and the worklist says why"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-19",
+      "path": "docs/decisions/records/2026-09-19-DEC-0158.md",
+      "supersededBy": [],
+      "sourceLine": 4991,
+      "id": "DEC-0158",
+      "title": "2026-09-19 — a recorded bank deposit is an entry, not a field"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-19",
+      "path": "docs/decisions/records/2026-09-19-DEC-0159.md",
+      "supersededBy": [],
+      "sourceLine": 5013,
+      "id": "DEC-0159",
+      "title": "2026-09-19 — a sent claim is corrected by frequency code, not by editing it"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-19",
+      "path": "docs/decisions/records/2026-09-19-DEC-0160.md",
+      "supersededBy": [],
+      "sourceLine": 5042,
+      "id": "DEC-0160",
+      "title": "2026-09-19 — Annual Forms is one workflow, and a facsimile is not a document preview"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-21",
+      "path": "docs/decisions/records/2026-09-21-DEC-0161.md",
+      "supersededBy": [],
+      "sourceLine": 5058,
+      "id": "DEC-0161",
+      "title": "2026-09-21 — annual form labels and the caseload matrix identify renewals"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-21",
+      "path": "docs/decisions/records/2026-09-21-DEC-0162.md",
+      "supersededBy": [],
+      "sourceLine": 5073,
+      "id": "DEC-0162",
+      "title": "2026-09-21 — A submitted form-work note attests one exact obligation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-24",
+      "path": "docs/decisions/records/2026-09-24-DEC-0163.md",
+      "supersededBy": [],
+      "sourceLine": 5114,
+      "id": "DEC-0163",
+      "title": "2026-09-24 — Renewal overlap requires explicit cycle disambiguation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-22",
+      "path": "docs/decisions/records/2026-09-22-DEC-0164.md",
+      "supersededBy": [],
+      "sourceLine": 5129,
+      "id": "DEC-0164",
+      "title": "2026-09-22 — One note may document several activities"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-22",
+      "path": "docs/decisions/records/2026-09-22-DEC-0165.md",
+      "supersededBy": [],
+      "sourceLine": 5145,
+      "id": "DEC-0165",
+      "title": "2026-09-22 — Manual checkmarks must reconcile note evidence"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-22",
+      "path": "docs/decisions/records/2026-09-22-DEC-0166.md",
+      "supersededBy": [],
+      "sourceLine": 5181,
+      "id": "DEC-0166",
+      "title": "2026-09-22 — Legacy Dark theme"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-22",
+      "path": "docs/decisions/records/2026-09-22-DEC-0167.md",
+      "supersededBy": [],
+      "sourceLine": 5199,
+      "id": "DEC-0167",
+      "title": "2026-09-22 — Scheduled form work may become a draft after a dated checkmark"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-23",
+      "path": "docs/decisions/records/2026-09-23-DEC-0168.md",
+      "supersededBy": [],
+      "sourceLine": 5214,
+      "id": "DEC-0168",
+      "title": "2026-09-23 — Scheduled Work Agenda identity is exact form identity, with a narrow legacy bridge"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-24",
+      "path": "docs/decisions/records/2026-09-24-DEC-0169.md",
+      "supersededBy": [],
+      "sourceLine": 5260,
+      "id": "DEC-0169",
+      "title": "2026-09-24 — Outlook calendar import streams bulk exports and retains only supported fields"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-24",
+      "path": "docs/decisions/records/2026-09-24-DEC-0170.md",
+      "supersededBy": [],
+      "sourceLine": 5282,
+      "id": "DEC-0170",
+      "title": "2026-09-24 — Startup prepares one visible workspace and defers the rest"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-25",
+      "path": "docs/decisions/records/2026-09-25-DEC-0171.md",
+      "supersededBy": [],
+      "sourceLine": 5325,
+      "id": "DEC-0171",
+      "title": "2026-09-25 — leftover work may stay on today, never on a finished day"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0172.md",
+      "supersededBy": [],
+      "sourceLine": 5345,
+      "id": "DEC-0172",
+      "title": "2026-09-26 — the Demo reset records past compliance as done, keeping one overdue review per caseload"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0173.md",
+      "supersededBy": [],
+      "sourceLine": 5405,
+      "id": "DEC-0173",
+      "title": "2026-09-26 — the Admin's Demo reset is queued, and every reset's outcome is audited"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0174.md",
+      "supersededBy": [],
+      "sourceLine": 5430,
+      "id": "DEC-0174",
+      "title": "2026-09-26 — one 837P formatter with versioned trading-partner profiles"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0175.md",
+      "supersededBy": [],
+      "sourceLine": 5459,
+      "id": "DEC-0175",
+      "title": "2026-09-26 — durable clearinghouse dispatch is a server-owned outbox"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0176.md",
+      "supersededBy": [],
+      "sourceLine": 5487,
+      "id": "DEC-0176",
+      "title": "2026-09-26 — synthetic dispatch crosses only an API-owned connector seam"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0177.md",
+      "supersededBy": [],
+      "sourceLine": 5515,
+      "id": "DEC-0177",
+      "title": "2026-09-26 — Claim.MD sandbox API statuses are not X12 acknowledgments"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0178.md",
+      "supersededBy": [],
+      "sourceLine": 5544,
+      "id": "DEC-0178",
+      "title": "2026-09-26 — Claim.MD sandbox workers share a server-side coordination boundary"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0179.md",
+      "supersededBy": [],
+      "sourceLine": 5561,
+      "id": "DEC-0179",
+      "title": "2026-09-26 — Annual Forms is organized by plan year, and an item is done only when its completion is recorded"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-26",
+      "path": "docs/decisions/records/2026-09-26-DEC-0180.md",
+      "supersededBy": [],
+      "sourceLine": 5597,
+      "id": "DEC-0180",
+      "title": "2026-09-26 — the flatter layout is a time-boxed, opt-in pilot, and Modern themes change color only"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-28",
+      "path": "docs/decisions/records/2026-09-28-DEC-0181.md",
+      "supersededBy": [],
+      "sourceLine": 5623,
+      "id": "DEC-0181",
+      "title": "2026-09-28 — Karuna's foundational decisions"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-28",
+      "path": "docs/decisions/records/2026-09-28-DEC-0182.md",
+      "supersededBy": [],
+      "sourceLine": 5745,
+      "id": "DEC-0182",
+      "title": "2026-09-28 — agenda-generated exact-form work is idempotent at the write boundary"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-28",
+      "path": "docs/decisions/records/2026-09-28-DEC-0183.md",
+      "supersededBy": [],
+      "sourceLine": 5764,
+      "id": "DEC-0183",
+      "title": "2026-09-28 — every displayed DHHS release choice must be in the shared consent inventory"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-28",
+      "path": "docs/decisions/records/2026-09-28-DEC-0184.md",
+      "supersededBy": [],
+      "sourceLine": 5777,
+      "id": "DEC-0184",
+      "title": "2026-09-28 — settings saves refresh every loaded projection before reporting success"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-28",
+      "path": "docs/decisions/records/2026-09-28-DEC-0185.md",
+      "supersededBy": [],
+      "sourceLine": 5801,
+      "id": "DEC-0185",
+      "title": "2026-09-28 — Annual PCP notes advance one confirmed state; Unbilled is durable"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-28",
+      "path": "docs/decisions/records/2026-09-28-DEC-0186.md",
+      "supersededBy": [],
+      "sourceLine": 5824,
+      "id": "DEC-0186",
+      "title": "2026-09-28 — Karuna prerequisite corrections, D-10 to D-13"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-28",
+      "path": "docs/decisions/records/2026-09-28-DEC-0187.md",
+      "supersededBy": [],
+      "sourceLine": 5942,
+      "id": "DEC-0187",
+      "title": "2026-09-28 — Karuna prerequisite refinements after the second review"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-28",
+      "path": "docs/decisions/records/2026-09-28-DEC-0188.md",
+      "supersededBy": [],
+      "sourceLine": 6044,
+      "id": "DEC-0188",
+      "title": "2026-09-28 — Safety device requests fill the OADS form as drafts"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-29",
+      "path": "docs/decisions/records/2026-09-29-DEC-0189.md",
+      "supersededBy": [],
+      "sourceLine": 6061,
+      "id": "DEC-0189",
+      "title": "2026-09-29 — OFI benefits application uses a controlled page overlay"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0190.md",
+      "supersededBy": [],
+      "sourceLine": 6081,
+      "id": "DEC-0190",
+      "title": "September 29 — Form wizard progress belongs in an encrypted author draft"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-29",
+      "path": "docs/decisions/records/2026-09-29-DEC-0191.md",
+      "supersededBy": [],
+      "sourceLine": 6099,
+      "id": "DEC-0191",
+      "title": "2026-09-29 — Availability cannot come after a required opening deadline"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-29",
+      "path": "docs/decisions/records/2026-09-29-DEC-0192.md",
+      "supersededBy": [],
+      "sourceLine": 6121,
+      "id": "DEC-0192",
+      "title": "2026-09-29 — Modern earth tones darken the surrounding space"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-29",
+      "path": "docs/decisions/records/2026-09-29-DEC-0193.md",
+      "supersededBy": [],
+      "sourceLine": 6135,
+      "id": "DEC-0193",
+      "title": "2026-09-29 — Demo reset diagnostics must survive an interrupted worker"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-30",
+      "path": "docs/decisions/records/2026-09-30-DEC-0194.md",
+      "supersededBy": [],
+      "sourceLine": 6161,
+      "id": "DEC-0194",
+      "title": "2026-09-30 — Consumer schedules track activities and ride work separately"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-09-30",
+      "path": "docs/decisions/records/2026-09-30-DEC-0195.md",
+      "supersededBy": [],
+      "sourceLine": 6181,
+      "id": "DEC-0195",
+      "title": "2026-09-30 — Safety Device entry reveals one task at a time"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-01",
+      "path": "docs/decisions/records/2026-10-01-DEC-0196.md",
+      "supersededBy": [],
+      "sourceLine": 6192,
+      "id": "DEC-0196",
+      "title": "2026-10-01 — One desktop launch owns the workstation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-02",
+      "path": "docs/decisions/records/2026-10-02-DEC-0197.md",
+      "supersededBy": [],
+      "sourceLine": 6202,
+      "id": "DEC-0197",
+      "title": "2026-10-02 — Admin status writes invalidate the shared desktop caseload"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-02",
+      "path": "docs/decisions/records/2026-10-02-DEC-0198.md",
+      "supersededBy": [],
+      "sourceLine": 6214,
+      "id": "DEC-0198",
+      "title": "2026-10-02 — Overview month history uses secured daily facts"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-02",
+      "path": "docs/decisions/records/2026-10-02-DEC-0199.md",
+      "supersededBy": [],
+      "sourceLine": 6228,
+      "id": "DEC-0199",
+      "title": "2026-10-02 — The calendar separates documented and uncompleted planned units"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-02",
+      "path": "docs/decisions/records/2026-10-02-DEC-0200.md",
+      "supersededBy": [],
+      "sourceLine": 6249,
+      "id": "DEC-0200",
+      "title": "2026-10-02 — Statistics names each kind of unit by its evidence"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-02",
+      "path": "docs/decisions/records/2026-10-02-DEC-0201.md",
+      "supersededBy": [],
+      "sourceLine": 6282,
+      "id": "DEC-0201",
+      "title": "2026-10-02 — Consumer Notes reuse the established editor"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0202.md",
+      "supersededBy": [],
+      "sourceLine": 6292,
+      "id": "DEC-0202",
+      "title": "2026-10-03 — Opt-in SQL tests own an isolated LocalDB instance"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0203.md",
+      "supersededBy": [],
+      "sourceLine": 6303,
+      "id": "DEC-0203",
+      "title": "2026-10-03 — `SatiProduction` is a personal working environment, not a deployment target"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0204.md",
+      "supersededBy": [],
+      "sourceLine": 6320,
+      "id": "DEC-0204",
+      "title": "2026-10-03 — Background worker operating decisions"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0205.md",
+      "supersededBy": [],
+      "sourceLine": 6345,
+      "id": "DEC-0205",
+      "title": "2026-10-03 — Theme-derived brushes live in the theme, not States.xaml"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0206.md",
+      "supersededBy": [],
+      "sourceLine": 6363,
+      "id": "DEC-0206",
+      "title": "2026-10-03 — Maintenance follows shared rules and the reset boundary"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0207.md",
+      "supersededBy": [],
+      "sourceLine": 6386,
+      "id": "DEC-0207",
+      "title": "2026-10-03 — Date rollover refresh preserves editors"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0208.md",
+      "supersededBy": [],
+      "sourceLine": 6401,
+      "id": "DEC-0208",
+      "title": "2026-10-03 — Incident delivery binds account and credential generation"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0209.md",
+      "supersededBy": [],
+      "sourceLine": 6420,
+      "id": "DEC-0209",
+      "title": "2026-10-03 — Restore evidence compares a historical inventory"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0210.md",
+      "supersededBy": [],
+      "sourceLine": 6437,
+      "id": "DEC-0210",
+      "title": "2026-10-03 — Claim.MD setup and manual uncertainty findings"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-03",
+      "path": "docs/decisions/records/2026-10-03-DEC-0211.md",
+      "supersededBy": [],
+      "sourceLine": 6459,
+      "id": "DEC-0211",
+      "title": "2026-10-03 — Sandbox testing pauses canonical Demo resets"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0212.md",
+      "supersededBy": [],
+      "sourceLine": 6479,
+      "id": "DEC-0212",
+      "title": "Consumer provider order — October 3, 2026 (source only)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-04",
+      "path": "docs/decisions/records/2026-10-04-DEC-0213.md",
+      "supersededBy": [],
+      "sourceLine": 6500,
+      "id": "DEC-0213",
+      "title": "2026-10-04 — Approved notes use linked versions and independent review"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-04",
+      "path": "docs/decisions/records/2026-10-04-DEC-0214.md",
+      "supersededBy": [],
+      "sourceLine": 6519,
+      "id": "DEC-0214",
+      "title": "2026-10-04 — Release evidence follows the completed gate"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-04",
+      "path": "docs/decisions/records/2026-10-04-DEC-0215.md",
+      "supersededBy": [],
+      "sourceLine": 6540,
+      "id": "DEC-0215",
+      "title": "2026-10-04: Payer configuration and financial snapshot compatibility"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-06",
+      "path": "docs/decisions/records/2026-10-06-DEC-0216.md",
+      "supersededBy": [],
+      "sourceLine": 6566,
+      "id": "DEC-0216",
+      "title": "2026-10-06: Quarterly completion waits for note submission (source only)"
+    },
+    {
+      "status": "retained-record",
+      "date": "2026-10-06",
+      "path": "docs/decisions/records/2026-10-06-DEC-0217.md",
+      "supersededBy": [],
+      "sourceLine": 6579,
+      "id": "DEC-0217",
+      "title": "2026-10-06: Follow-up suggestions distinguish scheduling from deadlines"
+    },
+    {
+      "status": "retained-record",
+      "date": "undated",
+      "path": "docs/decisions/records/undated-DEC-0218.md",
+      "supersededBy": [],
+      "sourceLine": 6590,
+      "id": "DEC-0218",
+      "title": "October 6, 2026 — records governance with preservation before destruction"
+    }
+  ],
+  "schemaVersion": 1,
+  "source": "docs/archive/2026-10-08/DECISIONS.md"
+}

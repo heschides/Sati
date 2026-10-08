@@ -100,6 +100,25 @@ takes the exclusive reset lease and refuses external linkage, attempts, receipts
 reviewed checkpoints or onboarding history in either live data or baseline.
 This guard complements the paused timer.
 
+## HTTP exchange deadline — local source, October 8, 2026
+
+`ClaimMdSandboxConnector.HttpExchangeTimeout` owns one 45-second budget from the start of the
+coordinated HTTP callback. The connector's client configuration removes the separate client
+timer; one `TimeProvider` deadline linked to caller cancellation covers request/headers, stream
+acquisition and all response-body reads. Request, response and stream disposal unwind on failure.
+SQL admission, pacing and lock cleanup keep their existing budgets. The byte cap, fixed host,
+redirect/key validation, coordination and default-off activation gates are retained.
+
+This cooperative I/O budget does not supply a hard bound for parsing/decoding, cleanup, an
+account turn or a worker pass. A timed-out upload after committed `Sending` is recorded as
+`OutcomeUnknown` by the existing worker. It is never automatically resent, and a lost reply
+does not prove remote nonreceipt. Follow the reconciliation procedure below.
+
+[DEC-0223](docs/decisions/current/2026-10-08-DEC-0223.md) owns the choice and rejected alternatives;
+[W8](BACKGROUND_WORKERS_HANDOFF.md) and [working evidence](docs/readiness/work-evidence.md)
+record local fake-time/HTTP and separate SQL proof. These tests do not activate transport or
+establish live vendor behavior, deployed configuration, total budgets or agency fairness.
+
 ## Resolve an uncertain upload without resending
 
 Sending after interruption and OutcomeUnknown are quarantine states. Do not
