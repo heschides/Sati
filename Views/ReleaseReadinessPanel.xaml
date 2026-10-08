@@ -1,0 +1,148 @@
+<UserControl x:Class="Sati.Views.ReleaseReadinessPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="Release readiness assessment"
+             Background="{DynamicResource SurfaceBrush}"
+             Foreground="{DynamicResource TextPrimaryBrush}"
+             FontSize="14">
+    <UserControl.Resources>
+        <Style x:Key="ReadinessText" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style x:Key="ReadinessHeading" TargetType="TextBlock" BasedOn="{StaticResource ReadinessText}">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,16,0,8" />
+        </Style>
+        <DataTemplate x:Key="ReadinessListItem">
+            <Grid Margin="0,4,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="&#x2022;" />
+                <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
+            </Grid>
+        </DataTemplate>
+        <!-- The meter uses Windows system brushes so its track and fill remain
+             distinguishable in high contrast. Percentages and words carry status. -->
+        <Style x:Key="ReadinessThermometer" TargetType="ProgressBar">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="110" />
+            <Setter Property="Orientation" Value="Vertical" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+            <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="2"
+                                CornerRadius="11" Padding="3">
+                            <Border.LayoutTransform><RotateTransform Angle="-90" /></Border.LayoutTransform>
+                            <Grid x:Name="PART_Track">
+                                <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}"
+                                        CornerRadius="5" HorizontalAlignment="Left" />
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <StackPanel>
+        <TextBlock Text="Progress toward safe use by multiple agencies"
+                   Style="{StaticResource ReadinessHeading}" />
+        <TextBlock Text="{Binding Status}" AutomationProperties.Name="Readiness status"
+                   AutomationProperties.LiveSetting="Polite" FontWeight="Bold" FontSize="18"
+                   Style="{StaticResource ReadinessText}" />
+        <TextBlock Text="{Binding AssessmentDate}" Style="{StaticResource ReadinessText}"
+                   Foreground="{DynamicResource TextMutedBrush}" />
+        <TextBlock Text="{Binding Summary}" AutomationProperties.Name="Current readiness explanation"
+                   Style="{StaticResource ReadinessText}" />
+        <TextBlock Text="Agency separation means each agency's records and workload are protected from the others. Safe repeat requests means a repeated save, delayed reply, or retry produces one intended result."
+                   Style="{StaticResource ReadinessText}" />
+        <ItemsControl ItemsSource="{Binding Scores}" AutomationProperties.Name="Release readiness thermometers">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Width="240" Padding="12" Margin="0,8,12,8"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="38" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Margin="0,0,8,0">
+                                <ProgressBar Value="{Binding Percentage}" IsEnabled="{Binding IsAvailable}"
+                                             Style="{StaticResource ReadinessThermometer}"
+                                             AutomationProperties.Name="{Binding AccessibleSummary}"
+                                             AutomationProperties.HelpText="Evidence score from zero to one hundred. The written status and launch blockers decide readiness." />
+                                <Border Width="30" Height="30" CornerRadius="15" Margin="0,-4,0,0"
+                                        BorderThickness="2" BorderBrush="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"
+                                        Background="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{Binding Title}" Style="{StaticResource ReadinessText}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding ScoreLabel}" Style="{StaticResource ReadinessText}" FontSize="24" FontWeight="Bold" />
+                                <TextBlock Text="{Binding Change}" Style="{StaticResource ReadinessText}" />
+                                <TextBlock Text="{Binding Basis}" Style="{StaticResource ReadinessText}" FontSize="12" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{Binding Comparison}" AutomationProperties.Name="Release progress comparison"
+                   Style="{StaticResource ReadinessText}" />
+        <TextBlock Text="{Binding Explanation}" Style="{StaticResource ReadinessText}" FontSize="12" />
+        <TextBlock Text="Next priorities for future versions" Style="{StaticResource ReadinessHeading}" />
+        <ItemsControl ItemsSource="{Binding NextSteps}" ItemTemplate="{StaticResource ReadinessListItem}"
+                      AutomationProperties.Name="Future release priorities" />
+        <TextBlock Text="{Binding KnownBlockerHeading}" Style="{StaticResource ReadinessHeading}" />
+        <ItemsControl ItemsSource="{Binding KnownBlockers}" ItemTemplate="{StaticResource ReadinessListItem}"
+                      AutomationProperties.Name="Known problems stopping launch" />
+        <TextBlock Text="{Binding BlockerHeading}" Style="{StaticResource ReadinessHeading}"
+                   AutomationProperties.Name="Remaining launch check count" />
+        <TextBlock Text="Each open launch check needs its required proof before Sati is ready for multiple agencies. Expand below to review all of them."
+                   Style="{StaticResource ReadinessText}" />
+        <Expander Header="All open launch checks" Margin="0,8,0,0"
+                  AutomationProperties.Name="All open launch checks">
+            <ItemsControl ItemsSource="{Binding Blockers}" Margin="8,8,0,0"
+                          ItemTemplate="{StaticResource ReadinessListItem}" AutomationProperties.Name="Open launch blockers" />
+        </Expander>
+        <Expander Header="{Binding ProtectedHeading}" Margin="0,16,0,0"
+                  AutomationProperties.Name="Safeguards with recorded test evidence">
+            <StackPanel Margin="8,8,0,0">
+                <TextBlock Text="These safeguards have recorded test evidence. The launch checks above show where more proof is still needed."
+                           Style="{StaticResource ReadinessText}" />
+                <ItemsControl ItemsSource="{Binding ProtectedItems}" ItemTemplate="{StaticResource ReadinessListItem}" />
+            </StackPanel>
+        </Expander>
+        <Expander Header="{Binding NeedsWorkHeading}" Margin="0,12,0,0"
+                  AutomationProperties.Name="Remaining readiness work">
+            <ItemsControl ItemsSource="{Binding NeedsWork}" Margin="8,8,0,0"
+                          ItemTemplate="{StaticResource ReadinessListItem}" />
+        </Expander>
+        <Expander Header="Release assessment history" Margin="0,12,0,20"
+                  AutomationProperties.Name="Release readiness history">
+            <ItemsControl ItemsSource="{Binding History}" Margin="8,8,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="0,0,0,16">
+                            <TextBlock Text="{Binding Release, StringFormat='Release {0}'}" Style="{StaticResource ReadinessText}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding AssessedAt}" Style="{StaticResource ReadinessText}" />
+                            <TextBlock Text="{Binding Scores}" Style="{StaticResource ReadinessText}" />
+                            <TextBlock Text="{Binding Summary}" Style="{StaticResource ReadinessText}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Expander>
+    </StackPanel>
+</UserControl>

@@ -120,6 +120,7 @@ namespace Sati.ViewModels
         public string ReleaseName => ProductReleaseNotes.ReleaseName;
         public string ReleaseDate => ProductReleaseNotes.ReleaseDate;
         public IReadOnlyList<ReleaseNoteSection> ReleaseNoteSections => ProductReleaseNotes.Sections;
+        public ReleaseReadinessReport Readiness { get; } = ReleaseReadiness.LoadInstalled();
         public ObservableCollection<TextShortcutEditorViewModel> TextShortcuts { get; }
         public ObservableCollection<BillingCompliancePolicyHistoryItem> BillingPolicyHistory { get; }
         public ObservableCollection<BillingCompliancePolicyReviewFlagItem> BillingPolicyReviewFlags { get; }

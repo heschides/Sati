@@ -21,7 +21,23 @@ Source: [October 8 engineering assessment](reports/SATI_ARCHITECTURE_ENGINEERING
 sections 7–8 and its bounded control-plane evidence. No live record, PHI, credential or private
 setting was inspected. Earlier `GP_S_Gen5_2`/free monthly allowance/auto-pause entries are historical,
 not current Basic facts. D2 no wake ping and the no-idle-polling policy remain in force.
+## Demo API release preflight — October 8, 2026, 23:03:45 UTC
+
+Bounded public checks returned `/health/live` HTTP 200 (`live`), `/health/ready` HTTP 200
+(`Healthy`), and `/health/version` HTTP 200 for `Sati.Api` release `1.3.37`, contract revision
+`D33428799A40`. The inspected source manifest independently matched that revision (268 routes,
+69 contract shapes). The existing successful deployment metadata identified active deployment
+`9d53a76fb9da4b3fa9288fb34e965145`, completed October 7 at 16:09:21.2189106 UTC.
+
+These were read-only public health and projected Azure deployment metadata checks. They establish
+the pre-release API state, not database contents, current principal grants, enabled worker progress,
+vendor acceptance or complete service operation. No token, application setting or protected record
+was printed, and no resource, database or security setting was changed. The reviewed candidate
+diff against fetched `origin/master` adds no persistence migration/model or reset-baseline change;
+no Demo migration or baseline replacement is required by this release slice.
+
 ## What `SatiProduction` is
+
 
 `SatiProduction` is the developer's personal working environment. It holds real PHI from daily
 case-management use, run alongside the employing agency's system, which remains the official

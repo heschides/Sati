@@ -10,10 +10,17 @@ Planned: structural tenant defaults/composite constraints, database-tenancy choi
 escaping downstream request failures and generic 500/correlation responses or safe abort.
 Constructor-injected logging emits bounded type/HResult/correlation fields without raw exceptions;
 `ApiIncidentRecorder` retains best-effort safe-envelope ownership. Authentication/tenant middleware
-order and route authority are unchanged. Request containment does not sanitize independent
-EF/provider, health/startup or callback sinks, or prove incident persistence under configured SQL
-retry. [The logging owner](../../LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026)
-and [working evidence](../readiness/work-evidence.md) describe the boundary and actual proof.
+order and route authority are unchanged. `IncidentAggregator` owns the complete aggregation
+transaction in a named zero-retry scope and refuses an active retrying caller before work.
+[The incident execution owner](../../LOGGING_DESIGN.md#api-incident-execution--source-october-8-2026)
+records the immediate-reference replay limit; no historical deduplication or deployed SQL
+persistence is established. The separate
+[two-check health boundary](../../LOGGING_DESIGN.md#api-health-failures--source-october-8-2026)
+removes caught exceptions from health results/framework sinks while retaining identity/schema
+validation, anonymous failure status and current cancellation behavior. Hosted startup identity
+handling is unchanged. Independent EF/provider, startup, registration-construction and callback
+sinks remain outside these proofs. [The request logging owner](../../LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026)
+and [working evidence](../readiness/work-evidence.md) describe actual proof and remaining scope.
 
 ## Canonical detailed owners
 

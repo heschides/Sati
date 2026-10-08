@@ -722,7 +722,7 @@ inventory remain outside this proof. No full logging-redaction, live SQL locking
 real-data, restore, provider or legal acceptance was run. Generic JSON alone is not sink proof.
 
 **Relevant readiness criterion IDs and evidence class:** source/synthetic working evidence for
-OP06 and scenario 42 redaction, with MT14 safe support-envelope and OP03 operational dependencies.
+OP06 and scenario 42 redaction, with MT14 safe support-envelope and OP03 independent-review dependencies.
 This does not close those criteria or advance any sealed score. Readiness SHA-256 remains
 `292ACBA3C331FF98B00125CBEAA23073C5EC916403C157CD08426ED639E63B48`; sealed rubrics/history are unchanged.
 
@@ -748,6 +748,316 @@ no-work outer-retry refusal, rollback/cancellation/commit-ack attempt counts and
 controls. Health redaction is prepared as a later local slice, not executed evidence.
 
 **Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
+
+## 2026-10-08 — SATI-SEC-001 incident single-attempt execution
+
+**Stable work ID and bounded slice:** SATI-SEC-001, give `IncidentAggregator.UpsertAsync` its
+complete zero-retry execution scope and refuse retrying outer callers before any work. Preserve
+safe incident envelopes, valid single-attempt request scopes and current aggregation behavior.
+
+**Status and source/revision:** implemented and locally verified after request-boundary commit
+`3393a45` (DEC-0227). This record accompanies the bounded incident source/test/documentation
+change and DEC-0228; its ordinary commit hash is pending. No DATT, deployment, working-data access,
+schema, cloud/security setting or live provider action was invoked. Unrelated dirty files and
+sealed release evidence remain preserved.
+
+**Changed behavior, ownership and canonical paths:**
+[`IncidentAggregator`](../../Sati.Api/Infrastructure/IncidentAggregator.cs) first checks
+cancellation, then `ExecutionStrategy.Current?.RetriesOnFailure` before acquiring its striped
+gate or creating a context. An active retrying caller is refused; a valid single-attempt scope is
+supported. Named `IncidentSingleAttempt` owns the entire existing Serializable transaction,
+query, save and both commit branches with zero retries. Existing short-lived context, gate
+release and SQL `UPDLOCK, HOLDLOCK` query are retained. No automatic retry is added for save,
+cancellation or an ambiguous commit acknowledgement.
+
+[`The logging owner`](../../LOGGING_DESIGN.md#api-incident-execution--source-october-8-2026),
+[API audit](../../API_SECURITY_AUDIT.md#october-8--escaping-request-exception-boundary-and-logging-scope-correction),
+[architecture](../../ARCHITECTURE.md), [identity boundary](../architecture/identity.md) and
+[DEC-0228](../decisions/current/2026-10-08-DEC-0228.md) own behavior and limits. The same stored
+last reference can enrich diagnostics without another occurrence; older references are not a
+durable deduplication history. A/B/A can count A again. There is no new schema or locking policy.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+| Executed check | Result and evidence |
+|---|---|
+| Unchanged aggregator direct regressions | **2 intended failures, 0 passed/skipped**: direct aggregation with a configured retrying strategy fails the explicit-transaction guard; an active retrying outer scope is not refused before work. `artifacts/test-results/incident-aggregation-execution/incident-aggregation-execution-fail-first.trx`. |
+| Actual Program authenticated write baseline | **1 intended failure, 0 passed/skipped**: no persisted incident after the real `SingleAttemptWriteFilter` unwinds. Before the missing-row assertion, enter/throw = 1/1, authentication and generic 500/security/correlation/cache headers pass, the endpoint observes a single-attempt scope, and the one incident context observes configured retries with no active outer scope. `artifacts/test-results/incident-aggregation-execution/api-request-incident-execution-fail-first.trx`. |
+| Corrected focused acceptance | **26 passed, 0 failed/skipped**, 1m8s: direct execution 8, full request-boundary class 10, existing endpoint incident controls 8. `artifacts/test-results/incident-aggregation-execution/incident-aggregation-execution-passing.trx`; counters and individual cases independently read from TRX. |
+| Serial Release API test-project build | Corrected build passed, **0 errors / 7 existing warnings**. Initial wrapper selected a Task-returning overload and failed with **2 CS8031 errors / 1 existing CS8602 warning**; no tests ran from that discarded compile attempt. The explicit generic state/result overload corrected source typing; no test change followed the baseline. |
+| This slice's documentation/whitespace checks | `scripts/Test-DocumentationStructure.ps1` passed: 46 root documents, 28 scoped owners, 12 snapshots, 11 active items, 454 legacy items, 218 imported decisions and ten current decisions; SATI-SEC-001 pointer selects the two-check health slice. All **22 negative mutation proofs** passed in one run of `scripts/Test-DocumentationStructureChecks.ps1`. `git diff --check` passed; structure/whitespace are rerun after recording these results. |
+
+Build command:
+
+```powershell
+dotnet build Sati.Api.Tests/Sati.Api.Tests.csproj --no-restore --disable-build-servers -m:1 -c Release -v minimal
+```
+
+All incident tests use `dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj --no-build --no-restore
+-c Release`, the filter below, `--logger 'trx;LogFileName=<listed TRX filename>'` and
+`--results-directory artifacts/test-results/incident-aggregation-execution`. Bounded approval
+allows local synthetic testhost IPC. The direct baseline used
+`FullyQualifiedName~IncidentAggregationExecutionTests.DirectIncidentAggregationPersistsWithAConfiguredRetryingStrategy|FullyQualifiedName~IncidentAggregationExecutionTests.RetryingOuterScopeIsRefusedBeforeAnyContextTransactionOrWrite`;
+its preceding serial build passed with 0 errors / 6 existing warnings. The actual Program baseline selects
+`FullyQualifiedName~ApiExceptionRedactionTests.EscapingAuthenticatedWriteFailurePersistsIncidentAfterSingleAttemptFilterUnwinds`.
+Passing filter:
+
+```text
+FullyQualifiedName~IncidentAggregationExecutionTests|FullyQualifiedName~ApiExceptionRedactionTests|(FullyQualifiedName~TenantAuthorizationTests&FullyQualifiedName~Incident)|FullyQualifiedName~TenantAuthorizationTests.MatchingWindowsRecordEnrichesPendingCrashWithoutCountingASecondCrash
+```
+
+The eight direct cases independently count contexts, transaction starts, queries, save attempts,
+commit attempts and completed commits, then inspect committed state through a fresh context.
+They cover direct configured-strategy persistence; zero-work outer-retry refusal; immediate
+same-reference/new-reference behavior with and without a valid single-attempt caller; pre-cancel;
+cancellation after an actual database save; a configured retriable save fault with rollback; and
+a post-commit acknowledgement fault without automatic replay. Later calls prove gates are
+released. The commit-fault fixture knows its private SQLite commit completed; a real caller
+cannot infer that from the exception. Finally/disposal cleans owned storage and contexts.
+
+The passing configured-request case retains enter/throw = 1/1, actual filter single-attempt
+scope, one incident context, configured retries and absent outer scope; it now retains exactly
+one safe Agency/Api/Error incident, correct actor role/reference/count, generic 500 and safe
+headers. The other nine boundary cases continue to cover raw sink containment, cancellation and
+secondary failure controls. Eight existing incident cases preserve agency/platform scope,
+concurrent counts, immediate enrichment, metadata refusal and audited Admin/status denial.
+These are 26 cases in this focused run, not additional unique credit for controls already run.
+
+**Failed/unrun checks, reason and verification limits:** three genuine regression failures above
+are retained as fail-first evidence. The compile failure is not runtime evidence. No full-solution,
+SQL Server locking/race, hosted incident service, health acceptance, live sink/provider, real-data,
+restore or independent security/regulatory review was run in this slice. SQLite with configured
+retrying strategies proves EF execution/cancellation/transaction semantics and the synthetic
+actual Program path, not production engine behavior. Original boundary fixtures remain
+non-retrying to isolate HTTP containment; the added case separately observes configured retries.
+Immediate last-reference replay is not historical deduplication or exactly-once recording.
+
+**Relevant readiness criterion IDs and evidence class:** source/synthetic working evidence for
+OP06 safe error recording and scenario 42, with MT14 safe scoped envelopes. OP03 is the
+independent security/tenant-review dependency, not an operational-persistence criterion. No
+criterion is closed and no sealed score advances. The sealed readiness SHA-256 was independently
+rechecked as `292ACBA3C331FF98B00125CBEAA23073C5EC916403C157CD08426ED639E63B48`.
+
+**Durable decisions, alternatives and supersession links:**
+[DEC-0228](../decisions/current/2026-10-08-DEC-0228.md) rejects save-only wrapping, configured
+automatic transaction retry, relying on the unwound endpoint filter and refusing valid
+single-attempt callers. It supersedes only missing incident execution ownership and unrestricted
+retrying outer calls. DEC-0227 request containment, safe envelope/fingerprint policy, tenant
+authority, desktop diagnostics, D1–D4, operating permissions and imported/history evidence remain.
+
+**Remaining risks/blockers, dependencies and deferred work:** independent EF/provider,
+startup identity, registration-construction, callback/on-completed and host diagnostics plus a
+complete enabled-sink inventory remain open. SQL concurrency and live incident evidence are
+unverified; historical occurrence deduplication would require a separate accepted design/schema
+slice. Billing R1/full queue/pre-send R2, worker budgets/fairness, tenancy, recovery and independent
+review retain their owners and separate authority.
+
+Prepared health work has **11 genuine target failures and four passing controls**, across three
+non-overlapping runs against unchanged health source; it is not implemented or passing acceptance:
+
+| Prepared health baseline | Result and evidence |
+|---|---|
+| Direct failures, framework failures and actual Program readiness route | **5 failed, 0 passed/skipped**. Both direct checks retain the original result exception; both framework cases expose raw logger fields; Program reaches anonymous 503/Unhealthy and both registered checks before the sink assertion. `artifacts/test-results/health-check-redaction/health-check-redaction-fail-first.trx`. |
+| Schema/identity/framework controls | **2 target failures, 4 passed, 0 skipped**. Identity mismatch and missing marker retain raw report exceptions. Matching and missing-column schema cases, framework pre-cancel/no-probe, and case-insensitive matching identity pass. `artifacts/test-results/health-check-redaction/health-check-redaction-baseline-controls.trx`. |
+| Direct operation cancellation | **4 failed, 0 passed/skipped**: two checks × cancelled/uncancelled token. All reach the existing Unhealthy classification, then fail raw exception retention. `artifacts/test-results/health-check-redaction/health-check-redaction-cancellation-fail-first.trx`. |
+
+The prepared health build uses the serial API build command above and passed with 0 errors /
+7 existing warnings. Tests share `dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj --no-build
+--no-restore -c Release --results-directory artifacts/test-results/health-check-redaction`, each
+listed TRX logger filename and its non-overlapping filter:
+
+```text
+FullyQualifiedName~HealthCheckExceptionRedactionTests.DirectProbeFailureReturnsContentFreeUnhealthyWithoutTheOriginalException|FullyQualifiedName~HealthCheckExceptionRedactionTests.FrameworkHealthServiceLogsVisibleSafeFailureWithoutExceptionPayload|FullyQualifiedName~HealthCheckExceptionRedactionTests.ProgramReadinessRouteKeepsAnonymous503AndBothChecksLogSafeFailure
+FullyQualifiedName~HealthCheckExceptionRedactionTests.SchemaHealthyAndMissingModelColumnRemainDistinct|FullyQualifiedName~HealthCheckExceptionRedactionTests.FrameworkPreCancellationInvokesNoProbeAndEmitsNoFailure|FullyQualifiedName~HealthCheckExceptionRedactionTests.RealIdentityValidatorKeepsHealthyMismatchAndMissingMarkerResults
+FullyQualifiedName~HealthCheckExceptionRedactionTests.DirectOperationCancellationRetainsCurrentSafeUnhealthyClassification
+```
+
+There are no health setup failures. Faulting factories fail before EF/provider logging; Program
+replaces only concrete health dependencies while preserving ordinary request storage and actual
+registrations. Controlled fake identity commands exercise the real validator without a SQL
+server. The missing-column control changes only disposable synthetic SQLite. These baseline
+observations do not establish global health/provider/startup/callback redaction or live readiness.
+
+**Next eligible stable ID and bounded slice:** SATI-SEC-001, the two actual health checks'
+exception/result and framework logger redaction in [the agenda](../../AGENDA.md#next-eligible-work).
+Keep direct cancellation Unhealthy and framework pre-cancel/no-probe behavior; preserve known
+schema/identity distinctions and anonymous 503/Unhealthy. Broader sink work remains separate.
+
+**Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
+
+## 2026-10-08 — SATI-SEC-001 two-check health redaction and repair-sequence handoff
+
+**Stable work ID and bounded slice:** SATI-SEC-001, remove caught raw exceptions from the two
+actual health checks' results and the schema check's failure logger. Preserve current status,
+cancellation, readiness response and schema/identity validation.
+
+**Status and source/revision:** implemented and locally verified. The preceding incident repair
+(DEC-0228) and this health repair (DEC-0229) remain **uncommitted**; `3393a45` is the last completed
+commit/push in this sequence. Josh explicitly requested completion of the current worker,
+billing-export and request/incident/health repairs before a completion handoff and further Git,
+migration or release actions. Those further actions are held. No DATT, cloud/security change,
+working-data access or live provider action was invoked; these repairs added no schema migration.
+Unrelated dirty files and sealed release evidence remain preserved.
+
+**Changed behavior, ownership and canonical paths:**
+[`SchemaDriftHealthCheck`](../../Sati.Api/Infrastructure/SchemaDriftHealthCheck.cs) logs caught
+failures using only a fixed operation, type capped at 160 characters and HResult. It supplies no
+raw exception argument. Both it and
+[`DatabaseIdentityHealthCheck`](../../Sati.Api/Infrastructure/DatabaseIdentityValidator.cs)
+return fixed Unhealthy descriptions with no exception and empty failure Data. Framework
+Unhealthy Error/status observations remain visible without raw exception/message/inner/Data/stack
+payloads. Anonymous `/health/ready` still returns 503/`Unhealthy` for failures.
+
+Known missing model-object diagnostics, healthy schema/identity results and the real identity
+validator's case-insensitive matching/mismatch/missing-marker behavior remain. Both direct
+checks keep operation cancellation Unhealthy, including a cancelled caller token; framework
+pre-cancellation still invokes no probe. `DatabaseIdentityHostedService`, startup identity
+validation, check registrations, routes, schema and authorization are unchanged.
+
+[The health logging owner](../../LOGGING_DESIGN.md#api-health-failures--source-october-8-2026),
+[API audit follow-up](../../API_SECURITY_AUDIT.md#october-8--escaping-request-exception-boundary-and-logging-scope-correction),
+[architecture](../../ARCHITECTURE.md), [identity boundary](../architecture/identity.md),
+[DEC-0229](../decisions/current/2026-10-08-DEC-0229.md) and
+[contingencies](multitenancy-contingencies.md) own the bounded behavior and remaining evidence.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+| Executed check | Result and evidence |
+|---|---|
+| Unchanged health direct/framework/Program baseline | **5 intended failures, 0 passed/skipped**. Status/probe/anonymous 503 controls passed before raw result or logger assertions. `artifacts/test-results/health-check-redaction/health-check-redaction-fail-first.trx`. |
+| Unchanged health schema/identity/pre-cancel baseline | **2 intended failures, 4 passed, 0 skipped**. Actual identity mismatch/missing marker retain raw report exceptions; matching/missing-column schema, matching identity and framework pre-cancel/no-probe controls pass. `artifacts/test-results/health-check-redaction/health-check-redaction-baseline-controls.trx`. |
+| Unchanged health direct cancellation baseline | **4 intended failures, 0 passed/skipped**, two checks × cancelled/uncancelled tokens; existing Unhealthy status passes before raw exception retention fails. `artifacts/test-results/health-check-redaction/health-check-redaction-cancellation-fail-first.trx`. |
+| Fixed focused health and regression acceptance | **37 passed, 0 failed/skipped**, 38s: health redaction class 15, existing schema-health 4, full request-boundary class 10, existing incident controls 8. `artifacts/test-results/health-check-redaction/health-check-redaction-passing.trx`; TRX counters and class groupings independently verified. |
+| Serial Release API test-project build | Passed, **0 errors / 1 existing CS8602 warning** at ApiEndpoints:7598. This incremental build did not re-emit test warnings; it is not warning cleanup. No failed acceptance attempt or test correction followed the baseline. |
+| This slice's documentation/whitespace checks | `scripts/Test-DocumentationStructure.ps1` passed: 46 root documents, 28 scoped owners, 12 snapshots, 11 active items, 454 legacy items, 218 imported decisions and eleven current decisions; SATI-BIL-001 pointer selects future bounded R1 fact/policy design. All **22 negative mutation proofs** passed in one run of `scripts/Test-DocumentationStructureChecks.ps1`. `git diff --check` passed; only structure/whitespace are rerun after recording these results. |
+
+There are **11 genuine target failures and four positive controls across 15 non-overlapping
+baseline cases**. The [preceding incident record](#2026-10-08--sati-sec-001-incident-single-attempt-execution)
+retains their exact three filters, build command, setup controls and limits. The passing 37-case
+selection includes repeated request/incident controls; it is not 37 newly added cases or a
+full-solution run. The direct eight incident execution cases were verified separately in that
+record's 26-case run and are not included in this health filter.
+
+Actual acceptance commands, with bounded approved local synthetic testhost IPC:
+
+```powershell
+dotnet build Sati.Api.Tests/Sati.Api.Tests.csproj --no-restore --disable-build-servers -m:1 -c Release -v minimal
+dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj --no-build --no-restore -c Release --filter 'FullyQualifiedName~HealthCheckExceptionRedactionTests|FullyQualifiedName~SchemaDriftHealthCheckTests|FullyQualifiedName~ApiExceptionRedactionTests|(FullyQualifiedName~TenantAuthorizationTests&FullyQualifiedName~Incident)|FullyQualifiedName~TenantAuthorizationTests.MatchingWindowsRecordEnrichesPendingCrashWithoutCountingASecondCrash' --logger 'trx;LogFileName=health-check-redaction-passing.trx' --results-directory artifacts/test-results/health-check-redaction
+```
+
+[`HealthCheckExceptionRedactionTests`](../../Sati.Api.Tests/HealthCheckExceptionRedactionTests.cs)
+checks raw references, nested message/inner/Data sentinels, descriptions and result/report Data.
+It observes framework logger messages/state/scopes/exception arguments with positive failure
+fields, not just HTTP response text. Direct and framework tests count the failing dependency
+probe. Program's anonymous readiness request runs both actual registered checks and counts two
+probes while retaining the ordinary request database factory. Pre-cancel counts zero probes and
+no failure log. Matching/missing-column schema and real identity validator controls preserve
+meaningful distinctions. Faulting factories fail before EF/provider logging; controlled fake
+identity commands run the actual comparison without a SQL server. The missing-column case
+changes only owned disposable SQLite. Owned provider/host/log/storage cleanup remains in scope.
+
+**Failed/unrun checks, reason and verification limits:** all 11 genuine failing baseline cases
+are retained; no setup failures or failed acceptance run occurred. No full-solution, live SQL,
+deployment, installed client, hosted readiness, provider account, real-data, restore or independent
+security/regulatory review was run. These two caught-failure paths do not sanitize registration
+construction, arbitrary other checks, a failing logger, startup identity warnings, independent
+EF/provider diagnostics or callback/host sinks. The hosted startup warning still accepts a raw
+SqlException and remains explicit future work. No full logging-redaction claim follows. Incident
+SQL locking, historical occurrence deduplication and live recording remain outside this proof.
+
+**Relevant readiness criterion IDs and evidence class:** source/synthetic working evidence for
+OP06 and scenario 42, with OP03 independent security/tenant-review dependency. No criterion is
+closed or sealed score advanced. The sealed readiness SHA-256 was independently rechecked as
+`292ACBA3C331FF98B00125CBEAA23073C5EC916403C157CD08426ED639E63B48`; sealed rubrics/history and
+preserved captures are unchanged.
+
+**Durable decisions, alternatives and supersession links:**
+[DEC-0229](../decisions/current/2026-10-08-DEC-0229.md) rejects response-only assurance,
+log-level suppression, replacing raw exceptions with unnecessary exception payloads, and
+changing direct cancellation behavior. It supersedes only the two raw health-result fields and
+schema logger argument. DEC-0227 request containment, DEC-0228 incident execution, safe-envelope
+policy, tenant authority, desktop diagnostics, D1–D4 and operating permissions remain governing.
+
+**Current project completion and remaining risks/blockers:** the bounded worker fault isolation,
+HTTP exchange deadline, agency discovery and date-cache retirement; billing residual export-error
+preservation; and request/incident/two-check health repairs are locally implemented and verified.
+This completes the current repair sequence for a completion handoff. It does not complete the
+broader active agenda or authorize further Git, migration or release actions. Incident/health
+changes remain uncommitted and earlier evidence remains retained at its recorded revision.
+
+Future work still includes full billing R1/original-release and exact-subset queue/pre-send R2,
+cross-mode/rejection/void-purpose decisions, worker budgets/fairness, admission and distributed
+login controls, structural tenancy, independent sink/startup/callback inventory, recovery and
+independent review. Their canonical owners and operating permissions remain authoritative.
+
+**Next eligible stable ID and bounded slice:** SATI-BIL-001, future bounded R1 fact/policy design
+in [the agenda](../../AGENDA.md#next-eligible-work) when work resumes. Specify one shared owner for
+original release, exact retained claim mapping, generated-only/known-unsent positives, malformed
+physical-history hold, receipt/uncertainty/nonreceipt precedence and deterministic SQL barrier
+design across current different lock paths. Cross-mode history and generic rejection need an
+explicit policy decision before full guard implementation. No billing source/test implementation
+or SQL execution is part of the current handoff; the proposal is not an implemented fact matrix.
+
+**Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
+
+## 2026-10-08 — DATT preflight and audited source checkpoint preparation
+
+**Scope and authority:** Josh's exact `Invoke DATT!` starts the bounded release in
+[the playbook](../../RELEASE_PLAYBOOK.md), following the completed repair handoff. It replaces
+the hold on ordinary release Git/publication work, while preserving separate cloud-database,
+security-setting, Production, PHI and provider-activation boundaries. Candidate patch `1.3.38`
+has no API ZIP, installer/checksum, acceptance-record or distribution filename collision.
+
+**Audited source:** fetched remote default `master` remains
+`a1af92129f60728a0bbcf0dd27c42190644b1e3b`; this checkout and its upstream remain
+`3393a4549ab40758c4e4acece9377560a0d29872` before the checkpoint. The reviewed pending source
+contains DEC-0228 incident execution, DEC-0229 health redaction, their tests/documentation,
+and the Settings readiness reader/panel/tests plus embedding project changes. The forthcoming
+checkpoint must include those inputs; `3393a45` alone does not represent them. The only subsequent
+incident edit corrected closing-brace indentation without changing behavior. Published prior
+worker/billing/request chunks and their failed-before/passed-after evidence remain retained above.
+
+**Preflight observations:** [the environment inventory](../../DATABASE_ENVIRONMENTS.md#demo-api-release-preflight--october-8-2026-230345-utc)
+owns the bounded live API checks. The diff against fetched default has no persistence migrations,
+entity/context changes or API Data changes; Contracts changes only the billing export rule.
+No migration, baseline capture, firewall access or reset is needed for this slice. Old API ZIP
+`artifacts/SatiApi-1.3.37-fx-x86.zip` remains retained (11,828,115 bytes;
+SHA-256 `6BE37C25C124F30A239A8BA90FA5EB335A24123290C75DC52C14D53C9646F7E9`).
+Its 70 ZIP entries had no unsafe paths, duplicates or private desktop settings; assembly version
+was `1.3.37.0`. This is rollback inventory, not authority to redeploy a rollback.
+
+**Installer prerequisites:** durable `artifacts/Prerequisites/SqlLocalDB.msi` is 63,508,480 bytes,
+SQL Server 2022 LocalDB 16.0.1000.6, Authenticode Valid with Microsoft Corporation signer;
+SHA-256 `224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+Required SDK 10.0.401, Windows packaging executables and icon are present. Both exact playbook
+distribution folders exist and can be listed; actual publication writes/renames remain untested.
+No Sati process was running at preflight. Builders do not require Inno Setup.
+
+**Fresh source acceptance:** `dotnet build Sati.Tests/Sati.Tests.csproj --configuration Release
+--no-restore --disable-build-servers -m:1 -p:UseSharedCompilation=false -v minimal` passed:
+12 existing warnings, zero errors, 50.64 seconds. Under the signed-in Windows profile,
+`dotnet test ... --configuration Release --no-build --no-restore --filter
+'FullyQualifiedName~ReleaseReadinessTests|FullyQualifiedName~ReleaseReadinessViewTests'` passed
+**58**, failed **0**, skipped **0**. Retained TRX:
+`artifacts/datt-1.3.38/test-results/readiness-source-checkpoint.trx`. Root inspected all four
+rendered PNGs under `artifacts/datt-1.3.38/readiness-source-qa` (actual 1.3.37 baseline,
+synthetic ordinary/enlarged/high-contrast states); visible text and wrapped meters remained legible.
+The candidate embedded report is not yet appended or built. These checks do not establish human
+screen-reader acceptance, installed-device acceptance, live load or independent readiness review.
+
+**Preserved exclusions and branches:** `assessment-working/Remove-TemporaryDemoFirewallRule.ps1`
+and seven old assessment TRX files are preexisting untracked work, retained and excluded from the
+source/artifacts. The obsolete helper was read but never executed. No force/stash/reset or branch
+deletion occurred. The detached 1.3.31 worktree is retained. Older local background-worker and
+remote Claude branches have no commits unique to fetched default, but active/retention intent is
+not independently established; retain them. The current agenda branch remains active until its
+verified source is reconciled with default.
+
+**Readiness and next work:** review all 42 existing criteria against the audited checkpoint and
+actual retained acceptance. Preserve the 1.3.37 snapshot/rubric; add no Verified state merely for
+a version/test count. Full release build/tests, exact-source default push, Demo publication,
+installer acceptance/publication and final evidence remain pending. SATI-BIL-001 remains the
+future bounded fact/policy design pointer after release, not extra release implementation.
 
 ## Entry template for the next significant portion
 

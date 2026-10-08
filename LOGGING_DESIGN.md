@@ -61,15 +61,72 @@ and [hosting diagnostics](https://raw.githubusercontent.com/dotnet/aspnetcore/v1
 [working evidence](docs/readiness/work-evidence.md) owns fail-first proofs, actual passing results
 and limits. Real Program synthetic tests observe logger messages/state/scopes/exception references
 and hosting/exception diagnostic payloads, with positive request and listener observations.
-Their non-retrying SQLite context isolates request containment. It does not establish production
-incident persistence: the separate explicit-transaction/execution-strategy defect remains the
-next repair.
+Their original non-retrying SQLite context isolates request containment. A separate configured
+retrying-strategy request case covers incident persistence after the request's single-attempt
+filter unwinds; the execution owner below governs that path. Neither fixture establishes deployed
+SQL Server incident persistence.
 
 This is a request-boundary control. Independent EF/provider logs and diagnostic payloads,
-health/startup failures, cancellation callbacks, response-completion callbacks, host failures and
+startup failures, cancellation callbacks, response-completion callbacks, host failures and
 the full enabled-sink inventory remain open. The configured API logger is JSON console; a log
 level or disabled sensitive-parameter logging does not sanitize arbitrary exception payloads.
 No deployment, live sink, real-data or compliance acceptance is established by this source slice.
+
+### API incident execution — source, October 8, 2026
+
+`IncidentAggregator.UpsertAsync` owns the complete aggregation transaction inside named
+`IncidentSingleAttempt`, an EF execution strategy with zero retries. It checks cancellation and
+refuses an active `ExecutionStrategy.Current` whose `RetriesOnFailure` is true before acquiring
+the striped gate or creating a context. A valid existing single-attempt scope remains supported.
+The existing short-lived context, Serializable transaction, query, save and both commit paths
+stay together; SQL Server's existing `UPDLOCK, HOLDLOCK` query remains unchanged.
+
+The early refusal matters because EF's outermost active strategy controls nested execution;
+adding a nested zero-retry strategy cannot prevent a retrying caller from replaying the write.
+See the matching [EF Core 10.0.10 implementation](https://raw.githubusercontent.com/dotnet/efcore/v10.0.10/src/EFCore/Storage/ExecutionStrategy.cs)
+and [connection-resiliency guidance](https://learn.microsoft.com/en-us/ef/core/miscellaneous/connection-resiliency).
+Incident transactions are never automatically replayed, including an ambiguous commit failure.
+An error response remains best effort if its incident sink fails; no success is inferred from
+an exception after commit.
+
+An immediate replay of the stored `LastReference` can enrich diagnostics without incrementing
+the occurrence count. This is not historical reference deduplication: A, then B, then A can count
+A again. No new occurrence ledger, schema, cross-process locking policy or exactly-once guarantee
+is introduced. [DEC-0228](docs/decisions/current/2026-10-08-DEC-0228.md) records the choice;
+[working evidence](docs/readiness/work-evidence.md) owns fail-first and acceptance results.
+Synthetic strategy, attempt-count, rollback and committed-state observations do not establish
+production SQL locking, a live incident service or complete logging redaction. The two-check
+health boundary below separately covers caught check failures; independent provider, startup,
+callback and complete enabled-sink work remains open.
+
+### API health failures — source, October 8, 2026
+
+`SchemaDriftHealthCheck` and `DatabaseIdentityHealthCheck` keep caught failures Unhealthy with
+their fixed descriptions, no retained exception and empty failure Data. The schema check logs
+only its fixed operation, type capped at 160 characters and HResult, without an exception
+argument, message, inner exception, Data or stack. The identity check's fixed result remains
+visible through the framework's ordinary Unhealthy Error/status record.
+
+The matching [ASP.NET Core 10.0.12 health service](https://raw.githubusercontent.com/dotnet/aspnetcore/v10.0.12/src/HealthChecks/HealthChecks/src/DefaultHealthCheckService.cs)
+copies result exception/Data into report entries and supplies the exception to Unhealthy logging.
+Suppressing anonymous response detail alone cannot protect those sinks. These checks therefore
+remove raw exceptions at the result source while retaining useful fixed descriptions and status.
+`/health/ready` stays anonymous and returns 503/`Unhealthy` for failed checks. Known missing
+model-object details and healthy schema/identity results are preserved; real identity comparison,
+mismatch and missing-marker validation remain in `DatabaseIdentityValidator`.
+
+Both direct checks keep their existing operation-cancellation classification as Unhealthy,
+including when the caller token is cancelled. Framework pre-cancellation still runs no probe.
+There is no change to startup identity validation, `DatabaseIdentityHostedService`, health
+registration, routes, schema or authorization. [DEC-0229](docs/decisions/current/2026-10-08-DEC-0229.md)
+and [working evidence](docs/readiness/work-evidence.md) own fail-first/acceptance and limits.
+
+This boundary covers caught failures in these two checks and their framework logger/result
+sinks. Registration-construction failures, arbitrary other checks, logger failure, startup
+identity logs, independent EF/provider diagnostics, callbacks and the complete enabled-sink
+inventory remain outside its proof. Synthetic dependency faults occur before EF/provider
+logging; fake identity commands exercise the actual validator without a SQL server. No complete
+logging-redaction, live readiness, deployment or independent security/regulatory claim follows.
 
 ### 1.1 Gaps this design closes
 
@@ -300,14 +357,16 @@ paths have no contract field.
 WER can finish after an impatient relaunch. Sati retries once after 750 ms, records
 `PendingOrUnavailable` rather than denying the unclean exit, and retains the previous marker for a
 later launch. A later match uses the same support reference, replaces a queued pending envelope,
-and enriches the existing incident without incrementing its occurrence count. The Application log
+and enriches the existing incident without another count when that reference is still the group's
+retained last reference. The Application log
 is readable as a standard user on supported Windows installations; Sati requests no elevation and
 records `ApplicationLogUnavailable` if local policy denies access.
 
 The replay uses one stable session reference. A matched or inherently uncorrelatable legacy marker
-is deleted after reporting; a pending or temporarily unreadable marker is retained. Replays with
-the same reference are idempotent in both incident aggregators, and a later higher-quality result
-enriches rather than increments the occurrence.
+is deleted after reporting; a pending or temporarily unreadable marker is retained. In both
+incident aggregators, an immediate replay matching the retained last reference can enrich a
+higher-quality result without another occurrence. Older references are not a historical
+deduplication ledger; the API execution boundary above does not enlarge that guarantee.
 
 ---
 

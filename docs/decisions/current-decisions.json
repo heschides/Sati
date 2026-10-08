@@ -81,6 +81,24 @@
       "status": "accepted",
       "evidence": ["LOGGING_DESIGN.md", "API_SECURITY_AUDIT.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0228",
+      "date": "2026-10-08",
+      "title": "Execute incident aggregation once",
+      "path": "docs/decisions/current/2026-10-08-DEC-0228.md",
+      "status": "accepted",
+      "evidence": ["LOGGING_DESIGN.md", "API_SECURITY_AUDIT.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
+    },
+    {
+      "id": "DEC-0229",
+      "date": "2026-10-08",
+      "title": "Remove raw exceptions from two health checks",
+      "path": "docs/decisions/current/2026-10-08-DEC-0229.md",
+      "status": "accepted",
+      "evidence": ["LOGGING_DESIGN.md", "API_SECURITY_AUDIT.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

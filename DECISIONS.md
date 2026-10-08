@@ -41,12 +41,28 @@ exceptions, Admin recovery and immutable transport/correction rules retain their
 The API request exception boundary is recorded in
 [DEC-0227](docs/decisions/current/2026-10-08-DEC-0227.md). It contains raw escaping exceptions
 before framework observability while retaining generic responses, safe correlation and best-effort
-incidents. Independent sink redaction and the incident execution-scope defect remain separate.
+incidents. Independent sink redaction remains separate.
+
+The complete incident aggregation transaction's single-attempt execution is recorded in
+[DEC-0228](docs/decisions/current/2026-10-08-DEC-0228.md). A retrying outer caller is refused
+before gate/context work; valid single-attempt callers remain supported. Immediate last-reference
+replay is preserved without claiming historical deduplication, SQL locking or deployed persistence.
+
+The two actual health checks' caught-failure logger/result boundary is recorded in
+[DEC-0229](docs/decisions/current/2026-10-08-DEC-0229.md). Fixed Unhealthy descriptions,
+visible framework failure records, direct cancellation classification and real schema/identity
+validation remain. Startup/provider/registration/callback sinks require separate future work.
+The current repair sequence is complete. Josh's valid October 8 `Invoke DATT!` invocation now
+authorizes the bounded actions in [the release playbook](RELEASE_PLAYBOOK.md), subject to its
+gates. Cloud database changes, security settings and Production actions retain their separate
+authorization requirements.
 
 ## Explicit supersession
 
 | Earlier statement | Later authority | Scope of supersession |
 |---|---|---|
+| Two health results retained caught exceptions; schema failures passed a raw exception to the logger | [DEC-0229](docs/decisions/current/2026-10-08-DEC-0229.md), [health logging owner](LOGGING_DESIGN.md#api-health-failures--source-october-8-2026) | Remove those logger/result payloads while retaining fixed Unhealthy status/descriptions, current cancellation and real validation. Startup and arbitrary other sinks remain separate. |
+| Incident aggregation began an explicit transaction without its own execution scope and allowed retrying outer callers | [DEC-0228](docs/decisions/current/2026-10-08-DEC-0228.md), [incident execution owner](LOGGING_DESIGN.md#api-incident-execution--source-october-8-2026) | Full zero-retry transaction ownership and early outer-retry refusal; current immediate-reference replay, safe envelopes and SQL query policy remain. |
 | Historical broad API logging assurance and raw-exception request handler | [DEC-0227](docs/decisions/current/2026-10-08-DEC-0227.md), [October 8 API audit correction](API_SECURITY_AUDIT.md#october-8--escaping-request-exception-boundary-and-logging-scope-correction) | Escaping request failures are contained with bounded safe fields. The earlier assurance does not cover all enabled framework/provider sinks; desktop curated-envelope policy remains. |
 | September 1 form identity keyed by DueDate; generated “born complete/in force” assumptions | September 14 annual-compliance decision; [current attestation design](NOTE_FORM_ATTESTATION_DESIGN.md) | Annual identity is target-identified and completion requires actual evidence. Historical migration compatibility is retained; current rows are not grouped by equal deadlines. |
 | September 28 rejection of completing an unopened PCP in one save | October 6 explicit annual-progress decision in the [record index](docs/decisions/README.md) | A confirmed actual opening/completion choice may occur in one atomic save; no automatic inferred completion. |

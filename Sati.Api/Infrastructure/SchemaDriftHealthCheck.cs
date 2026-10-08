@@ -80,8 +80,12 @@ internal sealed class SchemaDriftHealthCheck(
         {
             // A drift probe that cannot read metadata says nothing about drift.
             // Report it rather than letting a connection fault read as "healthy".
-            logger.LogError(ex, "The schema drift check could not read database metadata.");
-            return HealthCheckResult.Unhealthy("Could not read database metadata.", ex);
+            var failureType = ex.GetType().FullName ?? "Unknown";
+            logger.LogError(
+                "The schema drift check could not read database metadata. FailureType={FailureType} HResult={HResult}",
+                failureType[..Math.Min(failureType.Length, 160)], ex.HResult);
+            // The framework logs result.Exception and retains it in its report.
+            return HealthCheckResult.Unhealthy("Could not read database metadata.");
         }
     }
 }

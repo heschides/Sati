@@ -83,9 +83,11 @@ internal sealed class DatabaseIdentityHealthCheck(DatabaseIdentityValidator vali
             await validator.ValidateAsync(cancellationToken);
             return HealthCheckResult.Healthy("SatiDemo identity validated.");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return HealthCheckResult.Unhealthy("SatiDemo identity validation failed.", ex);
+            // The fixed description remains visible without exposing the validator's
+            // exception message, database identifiers or Data to framework sinks.
+            return HealthCheckResult.Unhealthy("SatiDemo identity validation failed.");
         }
     }
 }

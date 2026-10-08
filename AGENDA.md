@@ -21,69 +21,91 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
 | SATI-BIL-001 | residual export-error repair implemented; R1/full queue/send R2 open | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md). Five intended regressions and focused source/synthetic acceptance are recorded in working evidence; no complete send-gate closure. |
-| SATI-SEC-001 | request boundary implemented; incident execution scope eligible; other security evidence pending | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
+| SATI-SEC-001 | current request/incident/health repair sequence implemented and locally verified; broader sink/admission/security work open | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
 | SATI-GOV-001 | source implemented/runtime gated | Governance activation, approved policy periods and complete storage/recovery adapters; [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md). Runtime retention stays PolicyOnly. |
 | SATI-CLI-001 | evidence pending | External-device/accessibility/mixed-version/clean-install acceptance and supported client/server/schema compatibility; [Demo acceptance](DEMO_ACCEPTANCE.md), [readiness](docs/readiness/README.md). |
 | SATI-DB-001 | planned | Incremental model/schema owner consolidation, controlled migration/rollback and bounded summary queries; [architecture](ARCHITECTURE.md), [environment procedures](DATABASE_ENVIRONMENTS.md). |
 | SATI-DOC-001 | implemented; upkeep required | Canonical documentation owners, stable IDs, dated evidence and no duplicate current inventory; [governance](docs/documentation-governance.md). Validator and mutation checks are required. |
 
+## Current repair sequence — completion handoff
+
+The bounded worker failure/deadline/discovery/cache repairs, billing residual export-error repair,
+request exception boundary, incident execution scope and two-check health redaction are locally
+implemented and verified. [Working evidence](docs/readiness/work-evidence.md) owns actual results,
+failed baselines and limits. This completes the current repair sequence, not the broader active
+agenda. Billing R1/full R2, worker budgets/fairness and general security/operational evidence remain
+future work.
+
+The incident and health changes remain uncommitted; `3393a45` is the last completed commit/push
+in this sequence. The completion handoff was followed by Josh's valid October 8 `Invoke DATT!`
+invocation, which now authorizes the bounded release actions in
+[the release playbook](RELEASE_PLAYBOOK.md), subject to its gates. These repairs added no schema
+migration. Cloud database changes, security settings and Production actions retain their separate
+authorization requirements; no release outcome is established by this invocation.
+
 ## Next eligible work
 
-**Next eligible item:** SATI-SEC-001
+**Next eligible item:** SATI-BIL-001
 
-**Eligibility:** the bounded incident execution-scope repair follows the implemented request
-exception boundary under Josh's direct request to perform remaining eligible local work in
-sequence. [Working evidence](docs/readiness/work-evidence.md) owns actual fail-first/passing
-results and limits for both the billing residual-error repair and request boundary. Billing R1
-and full queue/pre-send R2 remain open.
+**Eligibility:** future bounded R1 fact/policy design when agenda work resumes after the current
+DATT release. This pointer does not select billing work during the release. The residual
+export-error repair is verified, but it does not implement an
+original-release lifecycle rule. Read-only source exploration identifies suitable physical-history
+and late-receipt test seams; no proposed fact matrix is an implemented gate. Cross-mode history
+and generic upload-rejection semantics require an explicit decision before full guard implementation.
 Follow [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** make direct `IncidentAggregator.UpsertAsync` execute its complete explicit
-transaction inside a named zero-retry EF execution scope. Refuse an already-active retrying
-execution strategy before gate/context/transaction/write work, because a nested strategy cannot
-replace an active outer scope. Preserve valid existing zero-retry request scopes, short-lived
-contexts, the existing striped gate, SQL transaction/locking and immediate same-reference replay
-semantics. Do not automatically replay incident transactions, including ambiguous commit failures.
+**Bounded slice:** design one shared Contracts owner for original-release permission using actual
+recorded transport/uncertainty/receipt facts. Define precise tenant/period/generation/business-claim
+mapping from retained immutable content and explicit correction links. Generation alone is not
+receipt or physical transmission; damaged, unmapped or ambiguous retained physical history must
+be held for review in the proposed rule. Preserve harmless generation, exact replay, known-unsent
+recovery and explicit correction lineage, including frequency-1 Resubmit. Describe admission at
+fresh generation, new queue intent and immediately before durable Sending without making a
+test-mode bypass. Do not implement the guard until policy and race design are settled.
 
-**Dependencies and owners:** read [the logging design](LOGGING_DESIGN.md),
+**Dependencies and owners:** read [the billing architecture](docs/architecture/billing.md),
+[the sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md),
+[payer requirements](PAYER_BILLING_REQUIREMENTS.md),
+[payer certification](PAYER_BILLING_CERTIFICATION.md),
 [regulatory posture](REGULATORY_CONCERNS.md),
-[the API audit](API_SECURITY_AUDIT.md),
-[the security review](SECURITY_REVIEW_2026-09-10.md),
+[the protocol baseline](docs/readiness/protocol-baseline.md),
 [the contingency owner](docs/readiness/multitenancy-contingencies.md) and
-[working evidence](docs/readiness/work-evidence.md). Revalidate `Program.cs`,
-`ApiIncidentRecorder`'s private fingerprint, `IncidentAggregator`, `SingleAttemptWriteFilter`,
-the incident DTO/sanitization owners and `Sati.Api.Tests/IncidentAggregationExecutionTests.cs`.
-Revalidate the configured EF package's `ExecutionStrategy.Current` and transaction guard.
-No schema, cloud, provider or working-data prerequisite is needed. Preserve authentication/tenant
-middleware and the implemented safe request boundary.
+[working evidence](docs/readiness/work-evidence.md). Revalidate original export, local `EdiService`,
+queue/worker, mock transmission, manual reconciliation, receipt ingestion, `ClaimCorrectionRules`
+and `LoadClaimHistoryAsync`. The latter currently counts generated-only files as submissions and
+skips malformed content, so it cannot become an original-release guard unchanged. A new key,
+account or control number does not create a new business claim. No schema/cloud/vendor or
+working-data access is needed for this design.
 
-October 8 revalidated source: `Program` enables SQL retry and `IncidentAggregator` begins an
-explicit transaction without an execution scope. Direct aggregation under a configured retrying
-synthetic strategy fails before a successful write; an active retrying outer scope currently
-fails to refuse work. Both intended regressions failed against the unchanged aggregator. Preserve
-the fail-first proof and final executed counts in the ledger; no automatic retries are permitted
-as a shortcut to passing the direct case.
+**Required policy/design outputs:** classify Generated-only, CancelledBeforeSend, Queued, Sending,
+OutcomeUnknown, accepted/manual received and exact matched receipts separately. Specify when
+ConfirmedNotReceived permits a separate generation and how a later matched receipt takes
+precedence. Decide cross-mode history and whether generic upload rejection supplies definitive
+nonreceipt evidence; do not equate it with a 999 rejection or invent a payer decision. Preserve
+the existing correction owner. Design deterministic synthetic SQL barriers across the distinct
+ServiceTime/BillingPeriod named-lock paths and plain Serializable receipt transactions; do not
+assume their different lock resources coordinate or claim SQLite proves SQL locking.
 
-**Boundaries and completion evidence:** implement only this reversible request-boundary/test
-slice with synthetic disposable storage. Ordinary verified commits/pushes to the approved branch
-remain authorized. No DATT, activation, release, deployment, schema, cloud/security change,
-working-data access or real external call is authorized. Keep sealed readiness/history unchanged.
+**Boundaries and completion evidence:** this next pointer selects design and a concrete proposed
+fail-first test plan only. No billing production/test implementation or SQL execution is part of
+the current DATT release through this pointer. The valid invocation supplies only the separate
+[playbook release authority](RELEASE_PLAYBOOK.md); this design pointer does not broaden it to
+billing activation, schema/cloud database changes, security settings, Production actions,
+working-data access or real billing provider calls. Preserve sealed readiness/history and
+unrelated work.
 
-Acceptance covers direct persistence with configured retry enabled, no-work refusal inside a
-retrying outer scope, valid single-attempt outer scope, immediate same-reference/new-reference
-counts, cancellation before work and after an actual write, retriable save failure with rollback,
-post-commit acknowledgement failure with no automatic replay, gate release and unconditional
-cleanup. Count context/transaction/query/save/commit attempts independently and inspect committed
-state through a fresh context. Run focused existing incident/request-boundary tests. Synthetic
-SQLite strategy/transaction observations do not establish production-engine locks or live operation.
+The proposed acceptance must cover fresh-key generation and a previously retained original
+after actual accepted upload; Unknown/Sending refusal; generated-only and known-unsent positives;
+exact replay; correction lineage; malformed-history hold; and a genuine nonreceipt → later exact
+receipt → queued successor sequence with no second upload. Remediate old positive fixtures with
+legitimate separate lifecycle histories, not an `IsTest` exception. Identify an exact shared owner,
+query adapters, enforcement order, deterministic SQL barrier and evidence limits before source work.
 
-The request-boundary fixtures intentionally remain non-retrying SQLite to isolate HTTP
-containment. This repair does not establish historical occurrence deduplication: only the stored
-last reference is replayed without increment. Health-check exception redaction follows next with
-its own fail-first direct/framework sink proof. Independent EF/provider logs, health/startup,
-callback/on-completed paths and the complete sink inventory remain open. No full logging-redaction
-or deployed incident-persistence claim follows from either local slice. Admission/rate limits,
-structural tenancy, billing lifecycle/send gates, recovery and independent review retain their owners.
+Full R2 current eligibility for the exact retained original/correction subset, payer-held void
+purpose policy, broader sink/admission work, worker fairness, structural tenancy, recovery and
+independent review remain separate future work. The current repair sequence supplies local
+source/synthetic evidence only; no complete billing send-gate or logging-redaction claim follows.
 
 ## Preserved open-work inventory
 

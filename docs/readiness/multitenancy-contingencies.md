@@ -27,10 +27,25 @@ and a purpose policy for payer-held voids. The bounded request-exception boundar
 escaping downstream failures before raw exceptions reach framework logging/hosting diagnostics;
 [the logging owner](../../LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026) and
 [DEC-0227](../decisions/current/2026-10-08-DEC-0227.md) record scope and observability tradeoffs.
-General EF/provider, health/startup and callback redaction remain open. The incident aggregator's
-explicit transaction/execution-scope gap is the next separate repair with two genuine failing
-baselines. Non-retrying boundary-fixture incident positives do not establish production recording;
-these local slices do not close scenario 42 or advance sealed readiness.
+General EF/provider, startup and callback redaction remain open. The incident aggregator
+now owns its complete transaction inside a named zero-retry scope and refuses a retrying outer
+caller before gate/context work. [DEC-0228](../decisions/current/2026-10-08-DEC-0228.md) and
+[the incident execution owner](../../LOGGING_DESIGN.md#api-incident-execution--source-october-8-2026)
+record actual evidence and the immediate last-reference replay limit. Configured-strategy
+synthetic positives do not establish production SQL locking, historical occurrence deduplication
+or live recording. The two actual health checks now remove caught exception payloads from
+results and schema failure logging, retaining fixed Unhealthy status/descriptions, existing
+cancellation behavior and real identity/schema validation.
+[DEC-0229](../decisions/current/2026-10-08-DEC-0229.md) and
+[the health logging owner](../../LOGGING_DESIGN.md#api-health-failures--source-october-8-2026)
+record actual local evidence and limits. Registration construction, other checks and hosted
+startup identity logs remain outside this proof. The current repair sequence completed its
+handoff. Josh's valid October 8 `Invoke DATT!` invocation now authorizes the bounded
+[playbook release actions](../../RELEASE_PLAYBOOK.md), subject to their gates; cloud database
+changes, security settings and Production actions retain separate authorization requirements.
+These local slices do not close scenario 42 or advance sealed readiness or independent review.
+Future billing R1 work starts with bounded fact/policy design, not an implemented original-release
+gate, and is not selected during this release.
 
 The dated hosting inventory has one owner: [DATABASE_ENVIRONMENTS.md](../../DATABASE_ENVIRONMENTS.md). Consult its captured evidence and refresh requirements rather than copying a configuration here. Agency IDs and clearinghouse IDs do not allocate physical resources. A dedicated worker can still share SQL, key/storage/mail services and a vendor quota. RLS, separate databases, partitioned pools and dedicated resources are design options to evaluate, not universal prescriptions.
 

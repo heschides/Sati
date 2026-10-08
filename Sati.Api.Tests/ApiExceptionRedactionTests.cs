@@ -8,10 +8,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Sati.Api.Data;
+using Sati.Api.Infrastructure;
 using Sati.Contracts.V1;
 using Xunit;
 using Xunit.Abstractions;
@@ -20,6 +22,48 @@ namespace Sati.Api.Tests;
 
 public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
 {
+    [Fact]
+    public async Task EscapingAuthenticatedWriteFailurePersistsIncidentAfterSingleAttemptFilterUnwinds()
+    {
+        await using var harness = await BoundaryHarness.CreateAsync(FailureMode.ConfiguredIncident);
+        using var response = await harness.Client.PostAsync(harness.Probe.Path, content: null);
+
+        await AssertGenericErrorAsync(harness, response);
+        await harness.Diagnostics.WaitForStopAsync();
+        AssertSafeHeaders(harness, response);
+        Assert.Equal(1, harness.Probe.Entered);
+        Assert.Equal(1, harness.Probe.Thrown);
+        Assert.True(harness.Probe.Authenticated);
+        Assert.True(harness.Probe.HadSingleAttemptScope);
+        var observed = Assert.IsType<ConfiguredIncidentFactory>(harness.ConfiguredIncidents);
+        Assert.Equal(1, observed.IncidentContexts);
+        Assert.True(observed.IncidentStrategyRetries);
+        Assert.True(observed.IncidentOuterScopeWasAbsent);
+        Assert.Null(ExecutionStrategy.Current);
+        output.WriteLine($"Authenticated write entered={harness.Probe.Entered}; thrown={harness.Probe.Thrown}; " +
+            $"filter single-attempt scope={harness.Probe.HadSingleAttemptScope}; " +
+            $"incident contexts={observed.IncidentContexts}; configured retries={observed.IncidentStrategyRetries}; " +
+            $"incident ambient scope absent={observed.IncidentOuterScopeWasAbsent}.");
+
+        // The missing incident is the regression target. Provider error logging is
+        // independent of containment of an exception escaping the request delegate.
+        var incident = Assert.Single(await harness.IncidentsAsync());
+        Assert.Equal(1, incident.AgencyId);
+        Assert.Equal("Agency", incident.Scope);
+        Assert.Equal("Api", incident.Source);
+        Assert.Equal("Error", incident.Severity);
+        Assert.Equal("Admin", incident.LastActorRole);
+        Assert.Equal(harness.Probe.TraceIdentifier, incident.LastReference);
+        Assert.Equal(1, incident.OccurrenceCount);
+        Assert.Equal("POST.unmatched", incident.Operation);
+        Assert.Null(incident.LastCrashDiagnosticJson);
+        Assert.All(harness.Probe.Sentinels, sentinel =>
+        {
+            Assert.DoesNotContain(sentinel, harness.Logs.Text);
+            Assert.DoesNotContain(sentinel, harness.Diagnostics.ExceptionText);
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -224,7 +268,7 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
 
     private enum FailureMode
     {
-        Nested, DataOnly, UncancelledOperation, StartedResponse, ResponseWriteFailure, CancelledOperation, CancelledIo
+        Nested, DataOnly, ConfiguredIncident, UncancelledOperation, StartedResponse, ResponseWriteFailure, CancelledOperation, CancelledIo
     }
 
     private sealed class BoundaryHarness : IAsyncDisposable
@@ -236,12 +280,15 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
         public BoundaryLogCapture Logs { get; }
         public RequestDiagnostics Diagnostics { get; }
         public FailingIncidentFactory? IncidentFailure { get; }
+        public ConfiguredIncidentFactory? ConfiguredIncidents { get; }
 
         private BoundaryHarness(SatiApiFactory parent, WebApplicationFactory<Program> child, HttpClient client,
-            FailureProbe probe, BoundaryLogCapture logs, RequestDiagnostics diagnostics, FailingIncidentFactory? incidentFailure)
+            FailureProbe probe, BoundaryLogCapture logs, RequestDiagnostics diagnostics, FailingIncidentFactory? incidentFailure,
+            ConfiguredIncidentFactory? configuredIncidents)
         {
             _parent = parent; _child = child; Client = client; Probe = probe; Logs = logs;
             Diagnostics = diagnostics; IncidentFailure = incidentFailure;
+            ConfiguredIncidents = configuredIncidents;
         }
 
         public static async Task<BoundaryHarness> CreateAsync(FailureMode mode, bool failIncidentStorage = false)
@@ -264,19 +311,23 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
                 var contextOptions = new DbContextOptionsBuilder<ApiDbContext>()
                     .UseSqlite(seedContext.Database.GetConnectionString()).Options;
                 var ordinaryContexts = new OrdinaryContextFactory(contextOptions);
+                var configuredIncidents = mode == FailureMode.ConfiguredIncident
+                    ? new ConfiguredIncidentFactory(parent.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), probe) : null;
                 var incidentFailure = failIncidentStorage
                     ? new FailingIncidentFactory(ordinaryContexts, () => probe.Thrown > 0, probe.IncidentSentinel) : null;
                 IDbContextFactory<ApiDbContext> childContexts = incidentFailure is not null ? incidentFailure : ordinaryContexts;
+                if (configuredIncidents is not null) childContexts = configuredIncidents;
+                var writeFilter = configuredIncidents is not null ? new SingleAttemptWriteFilter(configuredIncidents) : null;
                 child = parent.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
                 {
                     services.AddSingleton<ILoggerProvider>(logs);
-                    services.AddSingleton<IStartupFilter>(new FailureStartupFilter(probe));
+                    services.AddSingleton<IStartupFilter>(new FailureStartupFilter(probe, writeFilter));
                     services.RemoveAll<IDbContextFactory<ApiDbContext>>();
                     services.AddSingleton(childContexts);
                 }));
                 client = child.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
                 client.DefaultRequestHeaders.Authorization = seedClient.DefaultRequestHeaders.Authorization;
-                return new BoundaryHarness(parent, child, client, probe, logs, diagnostics, incidentFailure);
+                return new BoundaryHarness(parent, child, client, probe, logs, diagnostics, incidentFailure, configuredIncidents);
             }
             catch
             {
@@ -319,14 +370,23 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
         }
     }
 
-    private sealed class FailureStartupFilter(FailureProbe probe) : IStartupFilter
+    private sealed class FailureStartupFilter(FailureProbe probe, SingleAttemptWriteFilter? writeFilter) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
             next(app);
             // Minimal hosting wires Program's source pipeline before this unmatched fallthrough.
-            app.Use((context, continuation) => context.Request.Path == probe.Path
-                ? probe.InvokeAsync(context) : continuation());
+            app.Use(async (context, continuation) =>
+            {
+                if (context.Request.Path != probe.Path) { await continuation(); return; }
+                if (writeFilter is null) { await probe.InvokeAsync(context); return; }
+                var invocation = new DefaultEndpointFilterInvocationContext(context, []);
+                await writeFilter.InvokeAsync(invocation, async _ =>
+                {
+                    await probe.InvokeAsync(context);
+                    return null;
+                });
+            });
         };
     }
 
@@ -345,6 +405,7 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
         public string TraceIdentifier { get; private set; } = string.Empty;
         public bool Authenticated { get; private set; }
         public bool ResponseStarted { get; private set; }
+        public bool HadSingleAttemptScope { get; private set; }
         public int Entered => Volatile.Read(ref _entered);
         public int Thrown => Volatile.Read(ref _thrown);
         public int WriteAttempts => Volatile.Read(ref _writes);
@@ -357,6 +418,7 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
             Interlocked.Increment(ref _entered);
             TraceIdentifier = context.TraceIdentifier;
             Authenticated = context.User.Identity?.IsAuthenticated == true;
+            HadSingleAttemptScope = ExecutionStrategy.Current is { RetriesOnFailure: false };
             if (mode is FailureMode.CancelledOperation or FailureMode.CancelledIo)
             {
                 context.RequestAborted = RequestAbort.Token;
@@ -432,6 +494,28 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
     {
         public ApiDbContext CreateDbContext() => new(options);
         public Task<ApiDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) => Task.FromResult(CreateDbContext());
+    }
+
+    private sealed class ConfiguredIncidentFactory(IDbContextFactory<ApiDbContext> inner, FailureProbe probe)
+        : IDbContextFactory<ApiDbContext>
+    {
+        private int _incidentContexts;
+        public int IncidentContexts => Volatile.Read(ref _incidentContexts);
+        public bool IncidentStrategyRetries { get; private set; }
+        public bool IncidentOuterScopeWasAbsent { get; private set; }
+        public ApiDbContext CreateDbContext() => Observe(inner.CreateDbContext());
+        public async Task<ApiDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
+            Observe(await inner.CreateDbContextAsync(cancellationToken));
+        private ApiDbContext Observe(ApiDbContext context)
+        {
+            if (probe.Thrown > 0)
+            {
+                Interlocked.Increment(ref _incidentContexts);
+                IncidentStrategyRetries = context.Database.CreateExecutionStrategy().RetriesOnFailure;
+                IncidentOuterScopeWasAbsent = ExecutionStrategy.Current is null;
+            }
+            return context;
+        }
     }
 
     private sealed record LogEntry(LogLevel Level, string Category, string Message, string Text, bool HasExceptionReference);

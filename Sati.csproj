@@ -109,6 +109,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="docs\readiness\readiness.json" LogicalName="Sati.ReleaseReadiness.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="appsettings.Public.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="WORKSPACE_REFLECTIONS.md"
           CopyToOutputDirectory="PreserveNewest"

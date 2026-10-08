@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
+        xmlns:views="clr-namespace:Sati.Views"
         mc:Ignorable="d"
         Title="Settings"
         Height="720"
@@ -1496,6 +1497,8 @@
                                    FontSize="11"
                                    Foreground="{DynamicResource TextMutedBrush}"
                                    Margin="0,2,0,22" />
+
+                        <views:ReleaseReadinessPanel DataContext="{Binding Readiness}" />
 
                         <ItemsControl ItemsSource="{Binding ReleaseNoteSections}">
                             <ItemsControl.ItemTemplate>

@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Sati.Api.Data;
 using Sati.Contracts.V1;
 
@@ -32,6 +32,12 @@ internal sealed class IncidentAggregator(IDbContextFactory<ApiDbContext> context
         IncidentAggregation report,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        // EF keeps the outermost strategy: a nested zero-retry scope cannot
+        // prevent an active retrying caller from replaying an ambiguous write.
+        if (ExecutionStrategy.Current?.RetriesOnFailure == true)
+            throw new InvalidOperationException("Incident aggregation cannot run inside a retrying execution scope.");
+
         var gate = Gates[(int)((uint)HashCode.Combine(
             report.AgencyId,
             report.Scope,
@@ -45,87 +51,96 @@ internal sealed class IncidentAggregator(IDbContextFactory<ApiDbContext> context
                 ? null
                 : CrashDiagnosticRules.Serialize(report.CrashDiagnostic);
             await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable,
-                cancellationToken);
-            var query = db.Database.IsSqlServer()
-                ? db.IncidentGroups.FromSqlInterpolated($"""
-                    SELECT * FROM [IncidentGroups] WITH (UPDLOCK, HOLDLOCK)
-                    WHERE [AgencyId] = {report.AgencyId}
-                      AND [Scope] = {report.Scope}
-                      AND [Source] = {report.Source}
-                      AND [Operation] = {report.Operation}
-                      AND [ExceptionFingerprint] = {report.Fingerprint}
-                    """)
-                : db.IncidentGroups.Where(candidate =>
-                    candidate.AgencyId == report.AgencyId &&
-                    candidate.Scope == report.Scope &&
-                    candidate.Source == report.Source &&
-                    candidate.Operation == report.Operation &&
-                    candidate.ExceptionFingerprint == report.Fingerprint);
-            var incident = await query.SingleOrDefaultAsync(cancellationToken);
-            if (incident is null)
-            {
-                incident = new ServerIncidentGroup
+            return await new IncidentSingleAttempt(db).ExecuteAsync<IncidentAggregation, ServerIncidentGroup>(
+                report, async (_, currentReport, token) =>
                 {
-                    AgencyId = report.AgencyId,
-                    Scope = report.Scope,
-                    Source = report.Source,
-                    Severity = report.Severity,
-                    Operation = report.Operation,
-                    FirstRelease = report.Release,
-                    LastRelease = report.Release,
-                    ExceptionFingerprint = report.Fingerprint,
-                    Status = "Open",
-                    OccurrenceCount = 1,
-                    FirstSeenUtc = report.OccurredAtUtc,
-                    LastSeenUtc = report.OccurredAtUtc,
-                    LastReference = report.Reference,
-                    LastActorRole = report.ActorRole,
-                    LastCrashDiagnosticJson = diagnosticJson
-                };
-                db.IncidentGroups.Add(incident);
-            }
-            else
-            {
-                // Durable clients may retry an accepted envelope when the local
-                // acknowledgement could not be removed. The support reference is
-                // the idempotency key for that individual occurrence.
-                if (incident.LastReference == report.Reference)
-                {
-                    incident.LastCrashDiagnosticJson = PreferDiagnostic(
-                        incident.LastCrashDiagnosticJson,
-                        diagnosticJson);
-                    await db.SaveChangesAsync(cancellationToken);
-                    await transaction.CommitAsync(cancellationToken);
+                    await using var transaction = await db.Database.BeginTransactionAsync(
+                        IsolationLevel.Serializable,
+                        token);
+                    var query = db.Database.IsSqlServer()
+                        ? db.IncidentGroups.FromSqlInterpolated($"""
+                            SELECT * FROM [IncidentGroups] WITH (UPDLOCK, HOLDLOCK)
+                            WHERE [AgencyId] = {currentReport.AgencyId}
+                              AND [Scope] = {currentReport.Scope}
+                              AND [Source] = {currentReport.Source}
+                              AND [Operation] = {currentReport.Operation}
+                              AND [ExceptionFingerprint] = {currentReport.Fingerprint}
+                            """)
+                        : db.IncidentGroups.Where(candidate =>
+                            candidate.AgencyId == currentReport.AgencyId &&
+                            candidate.Scope == currentReport.Scope &&
+                            candidate.Source == currentReport.Source &&
+                            candidate.Operation == currentReport.Operation &&
+                            candidate.ExceptionFingerprint == currentReport.Fingerprint);
+                    var incident = await query.SingleOrDefaultAsync(token);
+                    if (incident is null)
+                    {
+                        incident = new ServerIncidentGroup
+                        {
+                            AgencyId = currentReport.AgencyId,
+                            Scope = currentReport.Scope,
+                            Source = currentReport.Source,
+                            Severity = currentReport.Severity,
+                            Operation = currentReport.Operation,
+                            FirstRelease = currentReport.Release,
+                            LastRelease = currentReport.Release,
+                            ExceptionFingerprint = currentReport.Fingerprint,
+                            Status = "Open",
+                            OccurrenceCount = 1,
+                            FirstSeenUtc = currentReport.OccurredAtUtc,
+                            LastSeenUtc = currentReport.OccurredAtUtc,
+                            LastReference = currentReport.Reference,
+                            LastActorRole = currentReport.ActorRole,
+                            LastCrashDiagnosticJson = diagnosticJson
+                        };
+                        db.IncidentGroups.Add(incident);
+                    }
+                    else
+                    {
+                        // An immediate replay of the retained last reference may enrich
+                        // diagnostics without another occurrence. Older references are
+                        // not a durable deduplication history in this aggregate.
+                        if (incident.LastReference == currentReport.Reference)
+                        {
+                            incident.LastCrashDiagnosticJson = PreferDiagnostic(
+                                incident.LastCrashDiagnosticJson,
+                                diagnosticJson);
+                            await db.SaveChangesAsync(token);
+                            await transaction.CommitAsync(token);
+                            return incident;
+                        }
+
+                        incident.Severity = MoreSevere(incident.Severity, currentReport.Severity);
+                        incident.FirstSeenUtc = currentReport.OccurredAtUtc < incident.FirstSeenUtc
+                            ? currentReport.OccurredAtUtc
+                            : incident.FirstSeenUtc;
+                        incident.LastRelease = currentReport.Release;
+                        incident.LastSeenUtc = currentReport.OccurredAtUtc > incident.LastSeenUtc
+                            ? currentReport.OccurredAtUtc
+                            : incident.LastSeenUtc;
+                        incident.LastReference = currentReport.Reference;
+                        incident.LastActorRole = currentReport.ActorRole;
+                        if (diagnosticJson is not null)
+                            incident.LastCrashDiagnosticJson = diagnosticJson;
+                        incident.OccurrenceCount++;
+                        if (incident.Status == "Resolved")
+                            incident.Status = "Reopened";
+                    }
+
+                    await db.SaveChangesAsync(token);
+                    await transaction.CommitAsync(token);
                     return incident;
-                }
-
-                incident.Severity = MoreSevere(incident.Severity, report.Severity);
-                incident.FirstSeenUtc = report.OccurredAtUtc < incident.FirstSeenUtc
-                    ? report.OccurredAtUtc
-                    : incident.FirstSeenUtc;
-                incident.LastRelease = report.Release;
-                incident.LastSeenUtc = report.OccurredAtUtc > incident.LastSeenUtc
-                    ? report.OccurredAtUtc
-                    : incident.LastSeenUtc;
-                incident.LastReference = report.Reference;
-                incident.LastActorRole = report.ActorRole;
-                if (diagnosticJson is not null)
-                    incident.LastCrashDiagnosticJson = diagnosticJson;
-                incident.OccurrenceCount++;
-                if (incident.Status == "Resolved")
-                    incident.Status = "Reopened";
-            }
-
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return incident;
+                }, verifySucceeded: null, cancellationToken: cancellationToken);
         }
         finally
         {
             gate.Release();
         }
+    }
+
+    private sealed class IncidentSingleAttempt(ApiDbContext context) : ExecutionStrategy(context, 0, TimeSpan.Zero)
+    {
+        protected override bool ShouldRetryOn(Exception exception) => false;
     }
 
     private static string? PreferDiagnostic(string? currentJson, string? reportedJson)

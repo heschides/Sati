@@ -33,7 +33,14 @@ configuration to that owner. [Background execution](docs/architecture/workers.md
 The API's constructor-injected request exception boundary owns containment and safe failure
 responses before downstream middleware exceptions reach hosting. [The identity boundary](docs/architecture/identity.md)
 and [logging owner](LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026) describe the
-scope; general sink redaction and production incident persistence remain separate work.
+scope. `IncidentAggregator` owns its full transaction inside a named zero-retry execution scope
+and refuses an active retrying caller before gate/context work; the
+[incident execution owner](LOGGING_DESIGN.md#api-incident-execution--source-october-8-2026)
+records its immediate-reference replay limit. The
+[two-check health boundary](LOGGING_DESIGN.md#api-health-failures--source-october-8-2026)
+owns safe caught-failure results/logging while preserving status, cancellation and identity/schema
+validation. General sink redaction, startup/provider work, SQL locking evidence and deployed
+incident persistence remain separate work.
 
 ## Feature ownership
 

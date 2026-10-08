@@ -21,11 +21,26 @@ No route or actor/tenant authorization scope changes.
 [The logging owner](LOGGING_DESIGN.md#api-request-boundary--source-october-8-2026),
 [DEC-0227](docs/decisions/current/2026-10-08-DEC-0227.md) and
 [working evidence](docs/readiness/work-evidence.md) own implementation, actual tests and limits.
-The isolated non-retrying SQLite incident positive is not production recording proof. Direct
-incident persistence with a configured retrying strategy currently fails its explicit-transaction
-guard; refusing a retrying outer scope also has a genuine failing baseline. That separate repair
-is next. Independent EF/provider, health/startup, callbacks and host paths remain unverified or
-open; no complete logging-redaction or renewed security-audit clearance is claimed.
+The original non-retrying SQLite incident positive is not production recording proof. The
+separate incident execution repair now places its complete transaction inside a named zero-retry
+scope and refuses a retrying outer scope before gate/context work. It retains current immediate
+last-reference replay behavior, not a historical occurrence ledger. Direct and actual Program
+configured-strategy regressions and acceptance belong to
+[the incident execution owner](LOGGING_DESIGN.md#api-incident-execution--source-october-8-2026),
+[DEC-0228](docs/decisions/current/2026-10-08-DEC-0228.md) and working evidence. No SQL locking or
+deployed incident-persistence claim follows.
+
+The separate health repair removes caught exceptions from `SchemaDriftHealthCheck` and
+`DatabaseIdentityHealthCheck` results and removes the schema logger's raw exception argument.
+Fixed descriptions, empty failure Data, visible framework Unhealthy Error/status records and
+anonymous 503/Unhealthy remain. Direct operation cancellation keeps its existing Unhealthy
+classification; framework pre-cancel runs no probe. Known schema details and the real identity
+validator's matching/mismatch/missing-marker behavior are preserved. See
+[the health logging owner](LOGGING_DESIGN.md#api-health-failures--source-october-8-2026) and
+[DEC-0229](docs/decisions/current/2026-10-08-DEC-0229.md) for source/synthetic evidence and limits.
+Hosted startup identity handling is unchanged. Registration construction, other checks, independent
+EF/provider, startup, callbacks, host paths and the complete sink inventory remain unverified or
+open. No complete logging-redaction or renewed independent security-audit clearance is claimed.
 
 ## October 7 — Prompt 04 assessment review source verification
 
