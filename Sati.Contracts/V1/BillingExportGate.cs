@@ -58,10 +58,9 @@ public static class BillingExportGate
                 source.ApprovedAt != source.OverrideApprovedAt || !source.OverrideApproverInAgency)
                 errors.Add("The frozen compliance exception does not match a complete stored supervisory approval.");
         }
-        else
-        {
-            errors.AddRange(complianceErrors);
-        }
+        // The caller has already applied exact-obligation exceptions and recovery.
+        // Matching stored provenance cannot waive any blockers that remain.
+        errors.AddRange(complianceErrors);
         return errors.Distinct(StringComparer.Ordinal).ToArray();
     }
 }

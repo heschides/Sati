@@ -16,9 +16,16 @@ checks retained cardinality across synthetic date/population changes, not measur
 current-day churn/capacity. Rotation runs only after an enabled gate-acquired check; disabled
 workers do not gain an idle scheduler. [DEC-0225](../decisions/current/2026-10-08-DEC-0225.md) and
 working evidence retain actual local checks and limits. This does not close scenario 16 or remove
-same-day provisioning/removed-agency cache limitations. The next eligible billing slice preserves
-authoritative residual compliance blockers in the shared export gate; R1 and full queue/pre-send
-R2 remain open.
+same-day provisioning/removed-agency cache limitations. The bounded billing export/replay repair
+now retains caller-authoritative residual compliance blockers even with a matching stored
+exception; [DEC-0226](../decisions/current/2026-10-08-DEC-0226.md) and
+[the sandbox runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md#current-export-and-replay-compliance--local-source-october-8-2026)
+own its scope and evidence limits. Exact-obligation exception and Admin recovery decisions remain
+with their existing shared owners. R1 physical-send/original-correction lifecycle and full
+exact-retained-subset queue/pre-send R2 remain open, including coordinated source-change races
+and a purpose policy for payer-held voids. The next bounded request-exception boundary slice is
+separate from general EF/provider, health/startup and callback redaction; the incident
+aggregator's explicit transaction/execution-scope gap is a separate follow-up.
 
 The dated hosting inventory has one owner: [DATABASE_ENVIRONMENTS.md](../../DATABASE_ENVIRONMENTS.md). Consult its captured evidence and refresh requirements rather than copying a configuration here. Agency IDs and clearinghouse IDs do not allocate physical resources. A dedicated worker can still share SQL, key/storage/mail services and a vendor quota. RLS, separate databases, partitioned pools and dedicated resources are design options to evaluate, not universal prescriptions.
 

@@ -63,6 +63,15 @@
       "status": "accepted",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0226",
+      "date": "2026-10-08",
+      "title": "Preserve authoritative residual billing export errors",
+      "path": "docs/decisions/current/2026-10-08-DEC-0226.md",
+      "status": "accepted",
+      "evidence": ["docs/architecture/billing.md", "CLAIMMD_SANDBOX_RUNBOOK.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

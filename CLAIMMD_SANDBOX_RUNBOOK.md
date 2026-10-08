@@ -119,6 +119,35 @@ does not prove remote nonreceipt. Follow the reconciliation procedure below.
 record local fake-time/HTTP and separate SQL proof. These tests do not activate transport or
 establish live vendor behavior, deployed configuration, total budgets or agency fairness.
 
+## Current export and replay compliance — local source, October 8, 2026
+
+`BillingExportGate` in `Sati.Contracts.V1` retains the API/local callers' authoritative
+remaining service-date compliance errors on every evaluation, including a complete matching
+stored supervisory exception. Those callers already apply the exact selected obligation IDs
+and immutable Admin recovery evidence. The gate separately checks frozen agency/person/date,
+current approval, supported configuration and stored exception provenance. It cannot grant an
+exception or use today's requirements to replace that service-date decision.
+
+API original generation and exact replay use this gate through `LoadExportablePeriodAsync`;
+the transitional local `EdiService.GenerateAndSaveAsync` uses the same rule. A separately required
+obligation revoked after a retained generation blocks both a fresh key and exact replay even
+when a PCP exception remains valid. The API returns `billing_export_blocked`/409 and the local
+service refuses the export; the failure preserves frozen claim JSON, retained content/name and
+generation/audit/submission-event counts. The note's form-work deadline remains a separate,
+non-waivable check. Legitimate exact exceptions and Admin recovery remain releasable when no
+authoritative blocker remains. [DEC-0226](docs/decisions/current/2026-10-08-DEC-0226.md) and
+[working evidence](docs/readiness/work-evidence.md) own the decision, actual synthetic checks
+and their limits.
+
+This repair does not close assessment R1 or full R2. Original/correction lifecycle needs
+physical receipt/uncertainty facts in addition to generation keys; a Generated event alone does
+not prove a physical send. Complete current compliance is not yet rechecked for the exact
+retained original/correction subset at queue and immediately before committed Sending.
+Necessary voids must preserve payer-held claim facts and need an explicit purpose policy rather
+than inheriting a new-billability check. These follow-ups remain in
+[billing architecture](docs/architecture/billing.md) and [the agenda](AGENDA.md). No provider,
+payer, SQL concurrency, deployed or regulatory acceptance follows from this local repair.
+
 ## Resolve an uncertain upload without resending
 
 Sending after interruption and OutcomeUnknown are quarantine states. Do not

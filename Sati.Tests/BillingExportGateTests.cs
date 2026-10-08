@@ -28,6 +28,22 @@ public sealed class BillingExportGateTests
             Source, [], BillingComplianceGate.DefaultRequirements));
     }
 
+    [Fact]
+    public void StoredExceptionCannotDiscardAuthoritativeRemainingComplianceErrors()
+    {
+        var exception = Source with { ComplianceOverride = true, OverrideReason = "Recorded reason",
+            OverrideApprovedById = 21, OverrideApprovedAt = ServiceDate, OverrideApproverInAgency = true };
+        // The caller has already removed the blockers covered by this exact exception.
+        Assert.Empty(BillingExportGate.Evaluate(Frozen, 2, ServiceDate, true, "Recorded reason",
+            exception, [], BillingComplianceGate.DefaultRequirements));
+        const string remainingBlocker = "Comprehensive Assessment was due Aug 1, 2026 and was not completed as of this service date.";
+
+        var blocked = BillingExportGate.Evaluate(Frozen, 2, ServiceDate, true, "Recorded reason",
+            exception, [remainingBlocker], BillingComplianceGate.DefaultRequirements);
+
+        Assert.Contains(remainingBlocker, blocked);
+    }
+
     [Theory]
     [InlineData("missing-approver")]
     [InlineData("foreign-approver")]

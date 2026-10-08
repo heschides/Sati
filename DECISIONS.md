@@ -33,6 +33,11 @@ The completion-cache local-date/storage lifecycle is recorded in
 retires earlier-day storage while preserving current-day retries/skips; current-day capacity,
 measured memory, provisioning invalidation and fair-wait bounds remain open.
 
+The shared billing export/replay gate's preservation of caller-authoritative residual compliance
+errors is recorded in [DEC-0226](docs/decisions/current/2026-10-08-DEC-0226.md). Matching stored
+exception provenance cannot waive remaining obligations. Service-date policy, exact-obligation
+exceptions, Admin recovery and immutable transport/correction rules retain their existing owners.
+
 ## Explicit supersession
 
 | Earlier statement | Later authority | Scope of supersession |

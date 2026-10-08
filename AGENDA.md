@@ -20,8 +20,8 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
-| SATI-BIL-001 | residual export-error slice eligible; R1/full queue/send R2 open | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md). Reproduce with synthetic fixtures and fail-first tests. |
-| SATI-SEC-001 | planned/evidence pending | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
+| SATI-BIL-001 | residual export-error repair implemented; R1/full queue/send R2 open | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md). Five intended regressions and focused source/synthetic acceptance are recorded in working evidence; no complete send-gate closure. |
+| SATI-SEC-001 | escaping request-exception boundary eligible; other security evidence pending | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
 | SATI-GOV-001 | source implemented/runtime gated | Governance activation, approved policy periods and complete storage/recovery adapters; [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md). Runtime retention stays PolicyOnly. |
 | SATI-CLI-001 | evidence pending | External-device/accessibility/mixed-version/clean-install acceptance and supported client/server/schema compatibility; [Demo acceptance](DEMO_ACCEPTANCE.md), [readiness](docs/readiness/README.md). |
 | SATI-DB-001 | planned | Incremental model/schema owner consolidation, controlled migration/rollback and bounded summary queries; [architecture](ARCHITECTURE.md), [environment procedures](DATABASE_ENVIRONMENTS.md). |
@@ -29,64 +29,62 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 
 ## Next eligible work
 
-**Next eligible item:** SATI-BIL-001
+**Next eligible item:** SATI-SEC-001
 
-**Eligibility:** a bounded shared-rule repair is eligible under Josh's direct request to perform
-remaining eligible work in sequence. The note worker's daily cache rotation is implemented and
-its fail-first/main/class and updated documentation checks passed within the scope recorded in
-[working evidence](docs/readiness/work-evidence.md). This billing slice is
-independent of those unchanged coordination/business-rule owners. Follow
-[the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
+**Eligibility:** the bounded escaping request-exception boundary is eligible under Josh's direct
+request to perform remaining eligible local work in sequence. The shared billing residual-error
+repair is implemented; [working evidence](docs/readiness/work-evidence.md) owns its actual
+fail-first/passing results and limits. That repair leaves R1 and full queue/pre-send R2 open.
+Follow [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** `Sati.Contracts.V1.BillingExportGate.Evaluate` must retain the caller's
-authoritative residual `complianceErrors` even when the frozen claim and source have a complete
-matching stored supervisory exception. That list already accounts for exact-obligation exceptions
-and Admin recovery; the export gate validates source/exception integrity and must not discard
-remaining blockers or recompute a weaker decision from today's mask. Keep this one shared rule
-as the API and transitional local export/replay owner.
+**Bounded slice:** contain exceptions escaping downstream request execution inside the real
+`Sati.Api/Program.cs` pipeline before ASP.NET Core's exception handling/hosting observability can
+receive the raw exception. Preserve a generic 500 `server_error` response and correlation identity
+when a response can be written, bounded content-free logging and the existing safe incident
+envelope. Do not pass unrestricted exception objects, messages, inner exceptions or `Data` to
+general log/diagnostic sinks. A client-aborted request keeps its 499 handling; an unrelated
+`OperationCanceledException` remains an unexpected failure. When a response has started or a
+secondary handler/write fails, contain the failure and abort safely instead of rethrowing raw
+failure data through hosting.
 
-Preserve legitimate exact-obligation exceptions and Admin recovery when their residual error
-list is empty, current actor/tenant/source/date/approval checks, invalid-configuration refusal,
-generation/replay identity, immutable retained financial/file bytes, transaction/audit behavior
-and typed safe refusal. Do not change exception authority, grant a blanket waiver, rewrite frozen
-evidence or duplicate compliance logic in callers.
+**Dependencies and owners:** read [the logging design](LOGGING_DESIGN.md),
+[regulatory posture](REGULATORY_CONCERNS.md),
+[the API audit](API_SECURITY_AUDIT.md),
+[the security review](SECURITY_REVIEW_2026-09-10.md),
+[the contingency owner](docs/readiness/multitenancy-contingencies.md) and
+[working evidence](docs/readiness/work-evidence.md). Revalidate `Program.cs`,
+`ApiIncidentRecorder`, `IncidentAggregator`, `ExceptionFingerprint`, the incident DTO/sanitization
+owners and `Sati.Api.Tests/ApiExceptionRedactionTests.cs`. No schema, cloud, provider or working-data
+prerequisite is needed. Preserve authentication/tenant middleware and safe staff-facing errors.
 
-**Dependencies and owners:** read [billing architecture](docs/architecture/billing.md),
-[the billing requirements](PAYER_BILLING_REQUIREMENTS.md),
-[the sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md),
-[the contingency owner](docs/readiness/multitenancy-contingencies.md),
-[the protocol baseline](docs/readiness/protocol-baseline.md) and
-[working evidence](docs/readiness/work-evidence.md). Revalidate `BillingExportGate`,
-`BillingComplianceGate`, `BillingComplianceException` and service-date policy/recovery owners;
-API `ApiEndpoints.BillingExport.cs`, local `Data/Billing/IdeService.cs` and the existing
-`BillingExportGateTests`, `BillingExportComplianceTests` and `LocalBillingExportComplianceTests`.
-No schema, cloud, provider or working-data prerequisite is needed. Existing stored exception
-semantics govern this repair; unsupported new policy cases remain decisions for their owners.
+October 8 revalidated source: `UseExceptionHandler` sends the unrestricted failure to a general
+logger and framework handling can report it before/around the safe response. Test-only middleware
+inside the actual authenticated Program pipeline reproduces four synthetic raw-narrative
+exposures through captured logger/DiagnosticListener observations. Preserve the failing-before
+proof and final executed counts in the evidence ledger; do not infer redaction from response
+body text or a log level alone.
 
-October 8 revalidated source: `BillingExportGate` adds `complianceErrors` only in the branch
-without a stored exception. API and local callers already calculate authoritative remaining
-errors, so a complete exception can suppress an unrelated/revoked obligation's blocker during
-new generation or replay. Reproduce the gap before changing the shared rule.
+**Boundaries and completion evidence:** implement only this reversible request-boundary/test
+slice with synthetic disposable storage. Ordinary verified commits/pushes to the approved branch
+remain authorized. No DATT, activation, release, deployment, schema, cloud/security change,
+working-data access or real external call is authorized. Keep sealed readiness/history unchanged.
 
-**Boundaries and completion evidence:** implement only this reversible shared-rule/test slice
-with synthetic fixtures in disposable private storage. Ordinary verified commits/pushes to the
-approved repository/branch remain authorized. No DATT, activation, release, deployment, schema,
-cloud/security change, working-data access, real provider call or financial transmission is authorized.
+Acceptance covers nested and uncancelled operation failures, response-started and secondary
+incident/write failures, actual downstream execution and authenticated scope. Assert generic
+response/correlation where writable, safe incident identity in the isolated supported fixture,
+no raw exception reference or synthetic narrative in captured log messages/state/exception trees
+or diagnostic payloads, and unconditional cleanup. Retain request-aborted 499 and normal positive
+request behavior; run focused existing incident/health boundary checks with honest limits.
 
-Retain failing-before/fixed-after evidence for the pure residual-error regression and API/local
-fresh-generation/replay cases. Use a complete exact PCP exception, then revoke an independently
-required Comprehensive Assessment attestation not selected by that exception. Both export and
-same-key replay must refuse with the remaining blocker, commit no new generation/audit/submission
-event and preserve exact frozen claim/file/name evidence. Positive complete-exception and Admin
-recovery fixtures must remain releasable and replay the original bytes when no blocker remains.
-Run focused shared/API/local compliance acceptance, report actual results/skips and evidence limits,
-update canonical owners/decisions/evidence and advance this pointer. Sealed readiness stays unchanged.
-
-This addresses the shared residual-error release gate only. Assessment R1 accepted-original
-lifecycle and full queue/pre-send R2 compliance recheck remain open; no vendor/payer acceptance
-is inferred. W8 current-day cache cardinality/churn, provisioning invalidation, total budgets,
-fair lane selection, API admission, aggregate capacity and live progress proof remain open.
-Dispatch known-unsent hold/backoff/reopen implementation retains its policy/schema blocker.
+The boundary fixtures use non-retrying synthetic SQLite to isolate this request behavior.
+Production incident persistence is separately unresolved: `Program` enables SQL retry while
+`IncidentAggregator.UpsertAsync` starts an explicit transaction without an outer execution scope;
+`ApiIncidentRecorder` can contain a recording failure with no incident committed. A separate
+fail-first one-attempt incident execution-scope repair follows this slice. Do not credit the
+SQLite incident positive as evidence that production recording works. Independent EF/provider
+logs, health/startup diagnostics, callback/on-completed paths and a complete log inventory remain
+open; this pointer does not claim complete logging redaction. Admission/rate limits, structural
+tenancy, billing lifecycle/send gates, recovery and independent review retain their owners.
 
 ## Preserved open-work inventory
 

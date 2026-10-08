@@ -508,6 +508,135 @@ This is an independent local shared-rule slice, not activation or a broader fina
 
 **Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
 
+## 2026-10-08 — SATI-BIL-001 authoritative residual export errors
+
+**Stable work ID and bounded slice:** SATI-BIL-001, preserve caller-authoritative residual
+compliance errors in the shared export/replay gate even with a complete matching stored exception.
+
+**Status and source/revision:** implemented and locally verified; unreleased. Reviewed branch:
+`codex/agenda-sequence-2026-10-08`, after the committed/pushed cache prerequisite `80193cc`.
+The current billing source/tests/documentation await their own verified commit; no billing push,
+release, activation or financial transmission is claimed. Josh's direct sequential-work request
+supplies the bounded local and ordinary commit/push authority. Unrelated dirty changes are preserved.
+
+**Changed behavior, ownership and canonical paths:** `Sati.Contracts.V1.BillingExportGate`
+now always appends the caller's authoritative remaining `complianceErrors` after existing frozen
+source/exception provenance checks, preserving ordinal deduplication. API and local callers
+already resolve service-date policy, exact selected obligations and immutable Admin recovery;
+the gate must retain their residual blockers and cannot grant a blanket waiver or recalculate a
+second decision from today's requirements. Caller comments now describe that ownership and the
+separate non-waivable form-work deadline accurately; no gate call or transaction/serialization
+shape changes. Source files are `Sati.Contracts/V1/BillingExportGate.cs`,
+`Sati.Api/Endpoints/ApiEndpoints.BillingExport.cs` and `Data/Billing/IdeService.cs`.
+
+Test owners are `Sati.Tests/BillingExportGateTests.cs`,
+`Sati.Api.Tests/BillingExportComplianceTests.cs` and
+`Sati.Tests/LocalBillingExportComplianceTests.cs`. The older positive exception fixtures now
+retain the exact selected PCP obligation ID and explicit confirmation, with matching stored actor,
+time and reason. New API/local cases first retain an export with a valid PCP exception and a
+completed unselected Comprehensive Assessment, then revoke that assessment through the real
+attestation owner. Fresh keys and exact replays refuse the remaining assessment blocker, keeping
+frozen claim JSON, retained content/file name, generation/audit/submission-event counts and local
+file bytes. Two additional positives record exact Admin recovery through the real API/local owner
+while the synthetic note is unbilled, then stage the frozen claim and prove export/replay remains
+valid without setting a supervisory exception. The local fixture captures a fresh session after
+test permission changes and cleans only its own random-key synthetic EDI files.
+
+[The sandbox runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md#current-export-and-replay-compliance--local-source-october-8-2026),
+[billing architecture](../architecture/billing.md),
+[the contingency owner](multitenancy-contingencies.md) and
+[DEC-0226](../decisions/current/2026-10-08-DEC-0226.md) own behavior, decisions and limits.
+No route, schema, external transport, correction policy or exception/recovery authority changes.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+| Executed check | Result and evidence |
+|---|---|
+| Unchanged gate, pure residual-error regression | **1 failed, 0 passed/skipped**. `StoredExceptionCannotDiscardAuthoritativeRemainingComplianceErrors` returned an empty collection instead of retaining the assessment error; its matched-exception/empty-residual positive assertion passed first. `artifacts/test-results/billing-export-residual-errors/billing-export-residual-errors-fail-first.trx`. |
+| Unchanged gate, API revocation/fresh-key/replay cases plus repaired positive | **2 intended failures, 1 passed, 0 skipped**. Both actual revoke calls succeeded; export returned **200 instead of 409** for the new key and exact replay. The repaired exact-PCP-exception positive passed. `artifacts/test-results/billing-export-residual-errors/billing-api-residual-errors-fail-first.trx`. |
+| Unchanged gate, local revocation/fresh-key/replay cases plus repaired positive | **2 intended failures, 1 passed, 0 skipped**. Real local revocation succeeded; both exports threw **no exception** instead of refusing the residual blocker. The repaired exact-PCP-exception positive passed. `artifacts/test-results/billing-export-residual-errors/billing-local-residual-errors-fail-first.trx`. |
+| Fixed focused desktop/shared acceptance | **66 passed, 0 failed/skipped**. Complete shared export, local export, exact-exception, service-date policy/recovery, local recovery-service and local form-work classes, including the pure/two local residual-error regressions and the real Admin recovery export/replay positive. `artifacts/test-results/billing-export-residual-errors/billing-desktop-residual-errors-passing.trx`. |
+| Fixed focused API acceptance | **31 passed, 0 failed/skipped**. Complete API export, recovery and form-work classes, including both new revocation cases, corrected exact-exception positive and the real Admin recovery export/replay positive. `artifacts/test-results/billing-export-residual-errors/billing-api-residual-errors-passing.trx`. |
+| Serial Release project builds | Desktop and API test-project builds passed with existing unrelated warnings and no errors. A final incremental desktop build/rerun followed the fresh-session correction in the new positive fixture. No full-solution build is claimed. |
+| Documentation/whitespace | Current structure gate and all **22 negative mutation proofs passed**: 46 root documents, 28 scoped owners, 12 snapshots, 11 active items, 454 legacy items, 218 imported decisions and eight current decisions. The next pointer is SATI-SEC-001. `git diff --check` passed. Sealed readiness SHA-256 was independently rechecked as `292ACBA3C331FF98B00125CBEAA23073C5EC916403C157CD08426ED639E63B48`; sealed rubrics/history and preserved captures were not edited. |
+
+These passing selections contain **97 cases total**, not an additional count for separately
+rerunning their main cases. The five intended unfixed failures and two positive baseline controls
+are separate observations of the earlier source, not further unique passing acceptance. The added
+Admin recovery positives are preserved-behavior tests, not fail-first claims. Counters and the two
+Admin recovery passing results were independently read from the final TRX files.
+
+Serial builds used `dotnet build Sati.Tests/Sati.Tests.csproj -c Release --no-restore
+--disable-build-servers -m:1 -v minimal` and the same command for
+`Sati.Api.Tests/Sati.Api.Tests.csproj`. Test commands used `dotnet test` with their respective
+project, `-c Release --no-build --no-restore`, quoted filter/logger values and
+`--results-directory artifacts/test-results/billing-export-residual-errors`. Pure baseline filter:
+`FullyQualifiedName=Sati.Tests.BillingExportGateTests.StoredExceptionCannotDiscardAuthoritativeRemainingComplianceErrors`.
+API baseline selected `BillingExportComplianceTests.RevokedUnselectedObligationBlocksExportAndReplayWithoutChangingRetainedEvidence`
+and `CompleteStoredExceptionPermitsExportAndRetryWithoutRebuildingFrozenInputs`; the local
+baseline selected the corresponding local revocation case and
+`CompleteFrozenExceptionStillExportsAndReplaysTheOriginalBytes`.
+Final desktop filter was `FullyQualifiedName~BillingExportGateTests|FullyQualifiedName~LocalBillingExportComplianceTests|FullyQualifiedName~BillingComplianceExceptionTests|FullyQualifiedName~BillingCompliancePolicyAndRecoveryTests|FullyQualifiedName~BillingComplianceRecoveryServiceTests|FullyQualifiedName~LocalFormWorkBillingTests`.
+Final API filter was `FullyQualifiedName~BillingExportComplianceTests|FullyQualifiedName~BillingComplianceRecoveryApiTests|FullyQualifiedName~ApiFormWorkBillingTests`.
+The five logger file names are the TRX names in the table, prefixed by `trx;LogFileName=`.
+Bounded approved test execution supplied local testhost IPC and access only to the local fixture's
+owned random-key EDI output/cleanup. No cloud or working database was used.
+Documentation commands were `pwsh -NoProfile -File scripts/Test-DocumentationStructure.ps1`
+and `pwsh -NoProfile -File scripts/Test-DocumentationStructureChecks.ps1`, followed by
+`git diff --check`; these are this billing chunk's checks rather than borrowed earlier results.
+
+**Failed/unrun checks, reason and verification limits:** all five intended regressions failed
+against the unchanged gate and passed after the repair. The first local integration attempt
+stopped before the target assertion because its older actor fixture omitted CaseManagement;
+the correct caseload permission was restored before the retained fail-first result above. A new
+local Admin positive initially stopped at stale-session refusal after fixture permission changes;
+capturing a fresh session corrected the setup and the final 66-case run passed. Neither setup
+failure is product-regression evidence. An earlier no-output test attempt supplied no evidence;
+an incidental temporary source export caused a WPF duplicate-XAML build failure until its owner
+removed that export and normal `dotnet clean`/serial build succeeded. No incidental project
+exception or unrelated source repair was introduced for this billing work.
+
+The synthetic SQLite/shared-rule executions prove tested local export/replay behavior and
+preservation. No SQL Server source-change race, query/lock/load proof, full-solution, physical
+vendor upload, payer duplicate/correction policy, deployed incident/alert, installed-client,
+real-data, restore or regulatory acceptance was run. R1/full R2 remain unresolved; this repair
+does not prove complete send eligibility or close a readiness criterion.
+
+**Relevant readiness criterion IDs and evidence class:** source/synthetic working evidence for
+the export/replay prerequisite of ID08 and scenario 30; preserved frozen/atomic/refusal controls
+relate to ID03/ID04, MT01/MT02 and OP06. ID07/scenario 29 original-claim lifecycle remains open;
+ID08's complete queue/immediately-pre-send gate and SQL race proof remain open. No sealed release
+score advances. No activation, cloud/security change, working-data access or real external effect occurred.
+
+**Durable decisions, alternatives and supersession links:**
+[DEC-0226](../decisions/current/2026-10-08-DEC-0226.md) records retaining authoritative residual
+errors in the single shared gate. Blanket exception bypass, a new decision from today's mask,
+duplicated caller rules, weakened provenance/recovery and rewriting frozen financial content are
+rejected. Only the prior residual-error omission is replaced; existing decisions and operating
+authority remain governing.
+
+**Remaining risks/blockers, dependencies and deferred work:** R1 needs an original/correction
+lifecycle owner using actual receipt/uncertainty facts rather than treating retained generation as
+send proof; preserve known-unsent cancellation and authoritative ConfirmedNotReceived recovery.
+Full R2 needs a trusted system-scoped validator for the exact retained original/correction subset,
+current source/compliance/form-work/overlap checks within existing coordinated write boundaries,
+a source-change race proof and a purpose policy for payer-held voids. Background workers must not
+impersonate the requesting human to reuse an authorization wrapper. Vendor/payer and live evidence
+remain separate. W8 fairness/budgets/admission/provisioning/hold policy, structural tenancy,
+recovery and independent-review gaps retain their owners.
+
+**Next eligible stable ID and bounded slice:** SATI-SEC-001, contain exceptions escaping
+downstream request execution in the real Program pipeline before unrestricted failure data reaches
+general logging/hosting diagnostic sinks. [The agenda](../../AGENDA.md#next-eligible-work) owns
+actual Program fail-first logger/DiagnosticListener proof, generic 500/correlation/safe incident
+acceptance, request-aborted 499 and contained started-response/secondary failures. Non-retrying
+SQLite isolates that boundary; the production incident aggregator's explicit transaction without
+an outer execution scope is a separately revalidated follow-up, before health diagnostics.
+Independent EF/provider, health/startup and callback gaps remain open; no full logging-redaction
+claim or production incident-persistence credit is implied.
+
+**Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

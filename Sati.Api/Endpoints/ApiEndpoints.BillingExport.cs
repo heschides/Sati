@@ -99,8 +99,8 @@ internal static partial class ApiEndpoints
                 compliancePolicy,
                 recoveryByNote.GetValueOrDefault(note.Id) ?? [],
                 providerLinksByPerson.GetValueOrDefault(source.Person.Id) ?? []);
-            // BillingExportGate omits historical compliance errors for a valid
-            // exception, so the form-work deadline must be checked separately.
+            // The release evaluation accounts for exact-obligation exceptions/recovery.
+            // This note's form-work deadline is a separate, non-waivable check.
             errors.AddRange(EvaluateFormWorkBilling(note, personForms)
                 .Select(error => $"Note {line.NoteId}: {error}"));
             errors.AddRange(BillingExportGate.Evaluate(

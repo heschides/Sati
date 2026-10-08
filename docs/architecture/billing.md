@@ -9,7 +9,20 @@ The local connector deadline now covers response-body I/O as well as headers. Th
 owns the component boundary; [working evidence](../readiness/work-evidence.md) records synthetic
 upload timeout acceptance. No retry, quarantine or account/generation policy changes.
 
-The October 8 assessment identifies server original/correction lifecycle and current documentation/compliance release gaps (R1/R2). Fair scheduling must preserve these separate gates; formatter/parser tests do not certify vendor or payer acceptance.
+`Sati.Contracts.V1.BillingExportGate` is the shared API/transitional-local export and replay
+owner. It checks frozen source/exception integrity and retains the callers' authoritative
+service-date compliance errors after exact-obligation exceptions and Admin recovery have been
+applied. A matching stored exception cannot discard an unrelated remaining blocker. The
+[sandbox runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md#current-export-and-replay-compliance--local-source-october-8-2026)
+owns this bounded source behavior and its release limits; [DEC-0226](../decisions/current/2026-10-08-DEC-0226.md)
+records the choice and rejected alternatives. Working evidence records actual verification.
+
+The October 8 assessment's server original/correction lifecycle (R1) and full current
+documentation/compliance recheck at queue and immediately before Sending (R2) remain open.
+This residual-error repair does not extract the exact retained claim subset for dispatch,
+classify physical send history or establish a correction/void release policy. Fresh generation
+keys are not business lifecycle permission. Fair scheduling must preserve these separate gates;
+formatter/parser tests do not certify vendor or payer acceptance.
 
 ## Canonical detailed owners
 

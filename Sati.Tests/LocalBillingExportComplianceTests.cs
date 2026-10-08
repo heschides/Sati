@@ -6,6 +6,7 @@ using Sati.Data;
 using Sati.Edi;
 using Sati.Models;
 using Sati.Models.Billing;
+using Sati.Services.Billing;
 using Xunit;
 
 namespace Sati.Tests;
@@ -102,16 +103,9 @@ public sealed class LocalBillingExportComplianceTests
     {
         await using var fixture = await ExportFixture.CreateAsync();
         await using var db = fixture.Inner.Factory.CreateDbContext();
-        var note = await db.Notes.SingleAsync();
-        var line = await db.ClaimLines.SingleAsync();
-        note.ComplianceOverride = line.IsComplianceException = true;
-        note.OverrideReason = line.ComplianceExceptionReason = "Recorded supervisory exception";
-        note.ApprovedById = note.OverrideApprovedById = fixture.Inner.CaseManagerOne.Id;
-        note.ApprovedAt = note.OverrideApprovedAt = DateTime.UtcNow;
-        db.Forms.Add(new Form(FormType.PCP, note.EventDate!.Value.AddDays(-1),
-            targetEffectiveDate: note.EventDate!.Value.AddDays(-1).Date) { PersonId = note.PersonId });
-        await db.SaveChangesAsync();
+        await RecordExactPcpExceptionAsync(db, fixture.Inner.CaseManagerOne.Id);
         var first = await File.ReadAllTextAsync(await fixture.ExportAsync());
+        var note = await db.Notes.SingleAsync();
         (await db.People.SingleAsync(x => x.Id == note.PersonId)).FirstName = "Changed live name";
         (await db.Agencies.SingleAsync(x => x.Id == fixture.Inner.CaseManagerOne.AgencyId)).BillingUnitRate = 999m;
         await db.SaveChangesAsync();
@@ -120,17 +114,163 @@ public sealed class LocalBillingExportComplianceTests
         Assert.Single(await db.EdiGenerations.ToListAsync());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RevokedUnselectedObligationBlocksExportAndReplayWithoutChangingRetainedEvidence(bool replay)
+    {
+        await using var fixture = await ExportFixture.CreateAsync();
+        await using var db = fixture.Inner.Factory.CreateDbContext();
+        var pcp = await RecordExactPcpExceptionAsync(db, fixture.Inner.CaseManagerOne.Id);
+        var note = await db.Notes.SingleAsync();
+        var completedOn = note.EventDate!.Value.Date.AddDays(-2);
+        var assessment = new Form(FormType.ComprehensiveAssessment,
+            ComplianceScheduleRules.DueDate("ComprehensiveAssessment", pcp.TargetEffectiveDate,
+                new ComplianceScheduleSettings()), targetEffectiveDate: pcp.TargetEffectiveDate)
+            { PersonId = note.PersonId };
+        assessment.Attest(FormAttestation.Attested(completedOn, AttestationActorKind.Supervisor,
+            fixture.Inner.CaseManagerOne.Id, DateTime.UtcNow));
+        db.Forms.Add(assessment);
+        await db.SaveChangesAsync();
+        var frozen = (await db.ClaimLines.SingleAsync()).ClaimSnapshotJson;
+        var path = await fixture.ExportAsync();
+        var originalBytes = await File.ReadAllBytesAsync(path);
+        var original = await File.ReadAllTextAsync(path);
+        var fileName = Path.GetFileName(path);
+
+        await fixture.RevokeAttestationAsync(assessment);
+        Assert.Null(await db.Forms.AsNoTracking().Where(x => x.Id == assessment.Id)
+            .Select(x => x.CompletedDate).SingleAsync());
+        Assert.Single(await db.FormAttestations.AsNoTracking().Where(x =>
+            x.FormId == assessment.Id && x.Kind == FormAttestationKind.Revoked).ToListAsync());
+        var auditBefore = await db.AuditEvents.CountAsync();
+        var eventsBefore = await db.BillingSubmissionEvents.CountAsync();
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            fixture.ExportAsync(replay ? null : Guid.NewGuid().ToString("N")));
+
+        Assert.Contains("Comprehensive Assessment", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(auditBefore, await db.AuditEvents.CountAsync());
+        Assert.Equal(eventsBefore, await db.BillingSubmissionEvents.CountAsync());
+        Assert.Equal(frozen, (await db.ClaimLines.AsNoTracking().SingleAsync()).ClaimSnapshotJson);
+        var retained = Assert.Single(await db.EdiGenerations.AsNoTracking().ToListAsync());
+        Assert.Equal(original, retained.Content);
+        Assert.Equal(fileName, retained.FileName);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(path));
+    }
+
+    private static async Task<Form> RecordExactPcpExceptionAsync(SatiContext db, int approverId)
+    {
+        var note = await db.Notes.SingleAsync();
+        var line = await db.ClaimLines.SingleAsync();
+        var target = note.EventDate!.Value.Date.AddDays(-1);
+        var pcp = new Form(FormType.PCP,
+            ComplianceScheduleRules.DueDate("PCP", target, new ComplianceScheduleSettings()),
+            targetEffectiveDate: target) { PersonId = note.PersonId };
+        db.Forms.Add(pcp);
+        await db.SaveChangesAsync();
+        note.ComplianceOverride = line.IsComplianceException = true;
+        note.OverrideReason = line.ComplianceExceptionReason = "Recorded supervisory exception";
+        note.ApprovedById = note.OverrideApprovedById = approverId;
+        note.ApprovedAt = note.OverrideApprovedAt = DateTime.UtcNow;
+        note.OverrideAttestationConfirmed = true;
+        note.OverrideObligationIds = [$"form:{pcp.Id}"];
+        await db.SaveChangesAsync();
+        return pcp;
+    }
+
+    [Fact]
+    public async Task ExactAdminRecoveryPermitsExportAndReplayOfTheFrozenClaim()
+    {
+        await using var fixture = await ExportFixture.CreateAsync();
+        await using var db = fixture.Inner.Factory.CreateDbContext();
+        var note = await db.Notes.SingleAsync();
+        var line = await db.ClaimLines.SingleAsync();
+        var frozen = line.ClaimSnapshotJson;
+        // Recovery is recorded for an approved unbilled note, before claim promotion.
+        db.ClaimLines.Remove(line);
+        fixture.Inner.CaseManagerOne.Permissions |= UserPermissions.Administration;
+        (await db.Users.SingleAsync(x => x.Id == fixture.Inner.CaseManagerOne.Id)).Permissions =
+            fixture.Inner.CaseManagerOne.Permissions;
+        var person = await db.People.SingleAsync(x => x.Id == note.PersonId);
+        person.MaineCareId = line.ClientMaineCareId;
+        person.DiagnosisCode = line.DiagnosisCode;
+        person.PlaceOfService = line.PlaceOfService;
+        person.BillingStreet = "10 Test Street";
+        person.BillingCity = "Portland";
+        person.BillingState = "ME";
+        person.BillingZip = "04101";
+        var agency = await db.Agencies.SingleAsync(x => x.Id == person.AgencyId);
+        agency.Npi = "1999999984";
+        agency.TaxId = "111111111";
+        agency.Street = "1 Test Street";
+        agency.City = "Portland";
+        agency.State = "ME";
+        agency.Zip = "04101";
+        agency.BillingProcedureCode = "G9012";
+        agency.BillingModifier = "HI";
+        agency.BillingUnitRate = 25m;
+        agency.EdiSubmitterId = "SATITEST";
+        agency.EdiPayerName = "Synthetic Payer";
+        agency.EdiPayerId = "99999";
+        agency.EdiContactName = "Synthetic Contact";
+        agency.EdiContactPhone = "2075550101";
+        var target = note.EventDate!.Value.Date.AddDays(-1);
+        var completedOn = note.EventDate.Value.Date.AddDays(1);
+        var pcp = new Form(FormType.PCP,
+            ComplianceScheduleRules.DueDate("PCP", target, new ComplianceScheduleSettings()),
+            targetEffectiveDate: target) { PersonId = note.PersonId };
+        pcp.Attest(FormAttestation.Attested(completedOn, AttestationActorKind.Supervisor,
+            fixture.Inner.CaseManagerOne.Id, DateTime.UtcNow));
+        db.Forms.Add(pcp);
+        await db.SaveChangesAsync();
+        var decision = await fixture.RecordAdminRecoveryAsync(note.Id, note.PersonId);
+        Assert.Equal([note.Id], decision.NoteIds);
+        Assert.Equal($"form:{pcp.Id}", Assert.Single(decision.Obligations).ObligationId);
+        db.ClaimLines.Add(line);
+        await db.SaveChangesAsync();
+
+        var path = await fixture.ExportAsync();
+        var originalBytes = await File.ReadAllBytesAsync(path);
+        var replayPath = await fixture.ExportAsync();
+
+        Assert.Equal(path, replayPath);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(replayPath));
+        Assert.Single(await db.EdiGenerations.AsNoTracking().ToListAsync());
+        Assert.Equal(frozen, (await db.ClaimLines.AsNoTracking().SingleAsync()).ClaimSnapshotJson);
+        Assert.False((await db.Notes.AsNoTracking().SingleAsync()).ComplianceOverride);
+    }
+
     private sealed class ExportFixture(NoteEntryFixture inner, int periodId, SessionService session) : IAsyncDisposable
     {
         public NoteEntryFixture Inner { get; } = inner;
         private readonly string _key = Guid.NewGuid().ToString("N");
+        private readonly HashSet<string> _keys = [];
 
-        public Task<string> ExportAsync() => new EdiService(Inner.Factory, session).GenerateAndSaveAsync(periodId, true, _key);
+        public Task<string> ExportAsync(string? key = null)
+        {
+            var requestKey = key ?? _key;
+            _keys.Add(requestKey);
+            return new EdiService(Inner.Factory, session).GenerateAndSaveAsync(periodId, true, requestKey);
+        }
+
+        public Task RevokeAttestationAsync(Form form) => new FormService(Inner.Factory, session)
+            .RevokeAttestationAsync(form, "Synthetic unselected assessment evidence was withdrawn.");
+
+        public Task<Sati.Contracts.V1.BillingComplianceRecoveryDecision> RecordAdminRecoveryAsync(int noteId, int personId)
+        {
+            // Permission changes require a fresh captured session, just as in the app.
+            session.SetUser(Inner.CaseManagerOne);
+            return new BillingService(Inner.Factory, session).RecordComplianceRecoveryAsync(
+                Inner.CaseManagerOne.ToAgencyActor(), personId,
+                new CreateBillingComplianceRecoveryRequest([noteId],
+                    "The exact PCP evidence is complete; recover this synthetic service note.", true));
+        }
 
         public static async Task<ExportFixture> CreateAsync()
         {
             var inner = await NoteEntryFixture.CreateAsync();
-            inner.CaseManagerOne.Permissions = UserPermissions.Billing | UserPermissions.Supervision;
+            inner.CaseManagerOne.Permissions = UserPermissions.CaseManagement | UserPermissions.Billing | UserPermissions.Supervision;
             await using var db = inner.Factory.CreateDbContext();
             (await db.Users.SingleAsync(x => x.Id == inner.CaseManagerOne.Id)).Permissions = inner.CaseManagerOne.Permissions;
             db.Settings.Add(new Settings { AgencyId = inner.CaseManagerOne.AgencyId });
@@ -166,7 +306,9 @@ public sealed class LocalBillingExportComplianceTests
             // Only this isolated fixture's random-key files are eligible for cleanup.
             await using (var db = Inner.Factory.CreateDbContext())
             {
-                var names = await db.EdiGenerations.Where(x => x.IdempotencyKey == _key).Select(x => x.FileName).ToListAsync();
+                var keys = _keys.ToList();
+                var names = await db.EdiGenerations.Where(x => keys.Contains(x.IdempotencyKey))
+                    .Select(x => x.FileName).ToListAsync();
                 foreach (var name in names)
                 {
                     Assert.StartsWith("837P.OATEST_", name);
