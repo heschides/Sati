@@ -16,11 +16,11 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | Stable ID | Status | Work and acceptance owner |
 |---|---|---|
 | SATI-TEN-001 | planned | Structural tenant owners/composite constraints and shared/database-per-tenant/hybrid decision; [architecture](docs/architecture/identity.md), [structural review](SATI_STRUCTURAL_REVIEW_2026-09-28.md). Preserve current caseload/capability checks. |
-| SATI-WRK-001 | partial; note failure, HTTP deadline and agency paging implemented; stale-day cache slice eligible | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [worker handoff](BACKGROUND_WORKERS_HANDOFF.md), [working evidence](docs/readiness/work-evidence.md). |
+| SATI-WRK-001 | partial; note failure, HTTP deadline, agency paging and daily cache rotation implemented | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [worker handoff](BACKGROUND_WORKERS_HANDOFF.md), [working evidence](docs/readiness/work-evidence.md). |
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
-| SATI-BIL-001 | investigation/repair pending | Assessment R1/R2 original/correction lifecycle and current compliance recheck before send; [billing architecture](docs/architecture/billing.md), [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md). Reproduce with synthetic fixtures and fail-first tests. |
+| SATI-BIL-001 | residual export-error slice eligible; R1/full queue/send R2 open | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md). Reproduce with synthetic fixtures and fail-first tests. |
 | SATI-SEC-001 | planned/evidence pending | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
 | SATI-GOV-001 | source implemented/runtime gated | Governance activation, approved policy periods and complete storage/recovery adapters; [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md). Runtime retention stays PolicyOnly. |
 | SATI-CLI-001 | evidence pending | External-device/accessibility/mixed-version/clean-install acceptance and supported client/server/schema compatibility; [Demo acceptance](DEMO_ACCEPTANCE.md), [readiness](docs/readiness/README.md). |
@@ -29,67 +29,64 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 
 ## Next eligible work
 
-**Next eligible item:** SATI-WRK-001
+**Next eligible item:** SATI-BIL-001
 
-**Eligibility:** the fourth bounded local source slice is eligible under Josh's direct request
-to perform remaining eligible work in sequence. Note-worker failure continuation, the connector
-HTTP deadline and 100-agency keyset discovery are implemented; [W8](BACKGROUND_WORKERS_HANDOFF.md)
-and [working evidence](docs/readiness/work-evidence.md) own their actual verification and limits.
-The paging chunk's portable acceptance, two guarded SQL preservation proofs and updated
-documentation checks passed within their recorded scope. This pointer does not authorize the whole priority or a release.
-Follow [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
+**Eligibility:** a bounded shared-rule repair is eligible under Josh's direct request to perform
+remaining eligible work in sequence. The note worker's daily cache rotation is implemented and
+its fail-first/main/class and updated documentation checks passed within the scope recorded in
+[working evidence](docs/readiness/work-evidence.md). This billing slice is
+independent of those unchanged coordination/business-rule owners. Follow
+[the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** in `NoteAbandonmentWorker.RunDueAsync`, retire `completedByAgency` entries
-whose completion date is not the current `ApiClock.Today`, while holding the existing `runGate`
-and before a due pass uses the cache. Preserve current-day successful entries and the existing
-`allCompletedOn` no-idle-SQL check. Removed agencies from earlier dates must not remain retained
-indefinitely. This bounds retention to current-day completion records after the enabled due check;
-it does not impose a 100-agency cache cap or bound current-day agency churn/cardinality.
+**Bounded slice:** `Sati.Contracts.V1.BillingExportGate.Evaluate` must retain the caller's
+authoritative residual `complianceErrors` even when the frozen claim and source have a complete
+matching stored supervisory exception. That list already accounts for exact-obligation exceptions
+and Admin recovery; the export gate validates source/exception integrity and must not discard
+remaining blockers or recompute a weaker decision from today's mask. Keep this one shared rule
+as the API and transitional local export/replay owner.
 
-Preserve the separate 100-agency discovery and 100-note sweep limits, captured finite key range,
-observed-growth due behavior and documented membership limits. Preserve narrowly recoverable
-failure continuation, at-limit retries, committed counts/atomic audits, cancellation/disablement,
-global SQL/reset coordination, successful-agency/day skipping, next-local-day catch-up and
-default-off/hourly/no-idle-SQL cadence. Do not add a scheduler, parallelism, durable state,
-provisioning invalidation, dispatch/account policy or total-pass/healthy-agency wait claim.
+Preserve legitimate exact-obligation exceptions and Admin recovery when their residual error
+list is empty, current actor/tenant/source/date/approval checks, invalid-configuration refusal,
+generation/replay identity, immutable retained financial/file bytes, transaction/audit behavior
+and typed safe refusal. Do not change exception authority, grant a blanket waiver, rewrite frozen
+evidence or duplicate compliance logic in callers.
 
-**Dependencies and owners:** read [W8](BACKGROUND_WORKERS_HANDOFF.md),
-[DEC-0222](docs/decisions/current/2026-10-08-DEC-0222.md),
-[DEC-0224](docs/decisions/current/2026-10-08-DEC-0224.md),
-[worker architecture](docs/architecture/workers.md),
-[failure contingencies](docs/readiness/multitenancy-contingencies.md),
+**Dependencies and owners:** read [billing architecture](docs/architecture/billing.md),
+[the billing requirements](PAYER_BILLING_REQUIREMENTS.md),
+[the sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md),
+[the contingency owner](docs/readiness/multitenancy-contingencies.md),
 [the protocol baseline](docs/readiness/protocol-baseline.md) and
-[tenant boundaries](docs/architecture/identity.md). Revalidate `NoteAbandonmentWorker`, its
-`runGate`, `completedByAgency` and `allCompletedOn`, `NoteAbandonmentSweep`, shared
-`NoteAbandonmentRules` and `Sati.Api.Tests/NoteAbandonmentWorkerTests.cs`. No schema,
-cloud, provider or working-data prerequisite is needed. The committed documentation/HTTP
-foundation and paging's local source acceptance do not establish activation or capacity.
+[working evidence](docs/readiness/work-evidence.md). Revalidate `BillingExportGate`,
+`BillingComplianceGate`, `BillingComplianceException` and service-date policy/recovery owners;
+API `ApiEndpoints.BillingExport.cs`, local `Data/Billing/IdeService.cs` and the existing
+`BillingExportGateTests`, `BillingExportComplianceTests` and `LocalBillingExportComplianceTests`.
+No schema, cloud, provider or working-data prerequisite is needed. Existing stored exception
+semantics govern this repair; unsupported new policy cases remain decisions for their owners.
 
-October 8 revalidated source: discovery pages are bounded, but the dictionary retains completion
-dates for every previously successful agency and has no stale-date removal. This is a source
-assertion to reproduce, not a measured process-memory guarantee.
+October 8 revalidated source: `BillingExportGate` adds `complianceErrors` only in the branch
+without a stored exception. API and local callers already calculate authoritative remaining
+errors, so a complete exception can suppress an unrelated/revoked obligation's blocker during
+new generation or replay. Reproduce the gap before changing the shared rule.
 
-**Boundaries and completion evidence:** implement only this reversible local cache/test slice
+**Boundaries and completion evidence:** implement only this reversible shared-rule/test slice
 with synthetic fixtures in disposable private storage. Ordinary verified commits/pushes to the
-already approved repository/branch are authorized by Josh's sequential-work request. No DATT,
-activation, release, deployment, publication of a service/installer, schema or cloud/security
-change, working-data access or real external call is authorized.
+approved repository/branch remain authorized. No DATT, activation, release, deployment, schema,
+cloud/security change, working-data access, real provider call or financial transmission is authorized.
 
-Use deterministic dates and a large synthetic day-one population, then remove earlier agencies
-and change the day. Prove the stale-retention regression fails against the current cache and
-passes after repair; record retained cache cardinality and exact agency attempts/committed
-counts/audits. Current-day failed/at-limit agencies must remain due while successful agencies
-are skipped on later same-day passes. Prove next-day catch-up and successful-day idle checks
-still avoid SQL/coordination, including enablement/cancellation controls and unconditional
-barrier cleanup. Verify both discovery and note-batch bounds remain distinct. Describe current-day
-retention honestly; do not infer an absolute memory, pass-duration or fairness bound.
+Retain failing-before/fixed-after evidence for the pure residual-error regression and API/local
+fresh-generation/replay cases. Use a complete exact PCP exception, then revoke an independently
+required Comprehensive Assessment attestation not selected by that exception. Both export and
+same-key replay must refuse with the remaining blocker, commit no new generation/audit/submission
+event and preserve exact frozen claim/file/name evidence. Positive complete-exception and Admin
+recovery fixtures must remain releasable and replay the original bytes when no blocker remains.
+Run focused shared/API/local compliance acceptance, report actual results/skips and evidence limits,
+update canonical owners/decisions/evidence and advance this pointer. Sealed readiness stays unchanged.
 
-Retain the existing worker/rule/API and guarded SQL coordination acceptance, report actual
-passes/skips and disposable instance cleanup, update W8/decisions/evidence and then advance
-this pointer. Sealed readiness stays unchanged. Dispatch known-unsent hold/backoff/reopen
-implementation remains blocked on its recovery policy and additive schema proposal under W8.
-Total budgets, fair lane selection, API admission, aggregate capacity, provisioning invalidation
-and live notification/vendor proof remain later work.
+This addresses the shared residual-error release gate only. Assessment R1 accepted-original
+lifecycle and full queue/pre-send R2 compliance recheck remain open; no vendor/payer acceptance
+is inferred. W8 current-day cache cardinality/churn, provisioning invalidation, total budgets,
+fair lane selection, API admission, aggregate capacity and live progress proof remain open.
+Dispatch known-unsent hold/backoff/reopen implementation retains its policy/schema blocker.
 
 ## Preserved open-work inventory
 

@@ -25,13 +25,20 @@ lower-ID insertions behind the cursor and post-check growth remain unguaranteed.
 policy, exact passing acceptance and evidence limits. The distinct 100-note sweep and existing coordination,
 failure, audit, cancellation and cadence owners are retained.
 
-Remaining W8: current-day completion bookkeeping, fair healthy-agency wait bounds, total
+The fourth slice rotates completion-cache storage when the captured `ApiClock.Today` changes,
+under `runGate` before the global completed-day idle check. Same-day completion entries and
+retry/skip behavior remain. [DEC-0225](../decisions/current/2026-10-08-DEC-0225.md), W8 and working
+evidence distinguish source storage replacement, tested retained cardinality and passing local checks.
+Rotation follows an enabled gate-acquired check; there is no new idle cleanup scheduler or
+measured memory bound. Current-day cardinality/churn and same-day removed-agency entries remain.
+
+Remaining W8: current-day completion capacity, fair healthy-agency wait bounds, total
 operation/pass deadlines, per-account failure/dependency isolation, aggregate and tenant
 budgets, API admission and synthetic
 multi-host/load evidence. Agency IDs and a worker per agency do not by themselves isolate
-shared SQL or vendor capacity. Next is stale-local-day cache retirement under the existing run
-gate; this bounds historical retention, not current-day cardinality or total memory. Business-rule,
-route and persistence boundaries are unchanged.
+shared SQL or vendor capacity. The next agenda slice is the independent shared billing export
+residual-error gate; full queue/send lifecycle remains separate. Business-rule, route and
+persistence boundaries are unchanged by the worker slices.
 
 ## Canonical detailed owners
 

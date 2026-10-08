@@ -344,8 +344,8 @@ local backup without asking Josh.
 
 ### W8 — Tenant workload isolation and worker fairness *(Significant now; required evidence before a multi-agency pilot)*
 
-**Status:** first three SATI-WRK-001 slices implemented and locally verified on 2026-10-08; actual
-verification and limits are recorded below and in working evidence. Remaining bookkeeping,
+**Status:** first four SATI-WRK-001 slices implemented and locally verified on 2026-10-08; actual
+verification and limits are recorded below and in working evidence. Current-day cardinality,
 fairness, total-budget, admission and capacity work is open.
 W1–W6 remain implemented as recorded above; their activation gates remain.
 
@@ -432,10 +432,36 @@ behavior are retained. This bounds each agency-ID materialization, not the retai
 total pass time/turns or a healthy-agency wait. No route, schema, worker activation, provider call
 or deployment changed.
 
-**Next bounded slice:** retire non-current-local-day completion-cache entries under `runGate`,
-preserving current-day retry/skip and successful-day no-idle-SQL behavior.
-[The agenda](AGENDA.md#next-eligible-work) owns dependencies and fail-first acceptance. Its
-retention bound is current-day completion cardinality, not 100 agencies or complete memory/fairness.
+#### October 8 — note-worker daily completion-cache rotation
+
+`NoteAbandonmentWorker.RunDueAsync` now tracks the cache's captured local day. After acquiring
+`runGate`, it replaces `completedByAgency` storage when `ApiClock.Today` differs, before the
+existing global successful-day idle check. Every completion is written for that same captured
+day under the gate. Current-day successful agencies remain skipped while failed/at-limit agencies
+remain due. Disabled or already-canceled checks still avoid SQL/coordination; rotation occurs
+only when an enabled call acquires the gate, not through an idle cleanup scheduler.
+[DEC-0225](docs/decisions/current/2026-10-08-DEC-0225.md) records the lifecycle choice.
+
+The regression used 251 zero-note agencies on day one, removed 150 and added ten on day two,
+then kept one agency due with a recoverable fault. The original cache retained 261 entries where
+110 current-day successes were expected. After the fix, retained counts are 251, then 110,
+111 after same-day recovery, and 66 on day three; exact attempts and zero note/audit effects are
+checked. The main regression and full class passed (33 passes/two SQL-gated skips), followed by
+the updated documentation gate, 22 negative proofs and tracked whitespace check. Exact results
+belong to [working evidence](docs/readiness/work-evidence.md). Prior SQL paging/coordination proof is
+retained without rerunning or counting it as new cache evidence.
+
+Replacing the dictionary retires its old storage as well as entries; source review establishes
+that choice, not an immediate garbage-collection or measured process-memory bound. This limits
+historical retention after an enabled date-change check, not current-day cardinality/churn or
+the number of removed agencies completed earlier the same day. The distinct 100-agency discovery
+and 100-note sweep limits, finite-range membership caveats, global leases, atomic audits, fault
+classification, cancellation/disablement, default-off/hourly/no-idle-SQL and next-day rules remain.
+
+**Next eligible local work:** the agenda switches to SATI-BIL-001's shared `BillingExportGate`
+residual-compliance-error repair. [The agenda](AGENDA.md#next-eligible-work) owns precise
+dependencies and fail-first acceptance. This does not close assessment R1 or full queue/pre-send
+R2. W8 total budgets, current-day capacity and fair wait/admission evidence remain later work.
 
 **Dispatch poison isolation blocker:** the globally oldest Queued dispatch can still be selected
 repeatedly after a missing-key preflight failure, before any send. Existing acceptance correctly
@@ -475,7 +501,8 @@ isolate shared SQL, key/storage/mail services, or vendor quotas.
   provider deadline proof remain open.
 - `NoteAbandonmentWorker.cs` still visits agencies in ID order under the global sweep lock.
   The October 8 slice above isolates only classified recoverable sweep failures; unknown/shared
-  failures still stop the pass. Agency discovery pages are now bounded; bookkeeping, total-pass budgets and healthy-agency wait
+  failures still stop the pass. Agency discovery pages and prior-day cache retention are now bounded;
+  current-day capacity, total-pass budgets and healthy-agency wait
   bounds remain open. Preserve `NoteAbandonmentSweep` transaction/audit rules.
 - `SignatureProcessingService.cs` already advances its package scan beyond damaged rows;
   `Sati.Signatures/SignatureMailWorker.cs` has durable leases, due times and bounded retries.

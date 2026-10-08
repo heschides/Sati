@@ -112,7 +112,8 @@ internal sealed class NoteAbandonmentWorker(
 {
     private readonly SemaphoreSlim runGate = new(1, 1);
     internal const int AgencyDiscoveryPageSize = 100;
-    private readonly Dictionary<int, DateTime> completedByAgency = [];
+    private Dictionary<int, DateTime> completedByAgency = [];
+    private DateTime? completionCacheDay;
     private DateTime? allCompletedOn;
 
     internal async Task<int> RunDueAsync(CancellationToken token)
@@ -122,6 +123,13 @@ internal sealed class NoteAbandonmentWorker(
         try
         {
             var today = clock.Today;
+            if (completionCacheDay != today)
+            {
+                // Entries are written only for this pass's captured local day under runGate.
+                // Replace storage too, so removed agencies do not retain past-day capacity.
+                completedByAgency = [];
+                completionCacheDay = today;
+            }
             if (allCompletedOn == today) return 0;
             var changedCount = 0;
             var allCompleted = false;

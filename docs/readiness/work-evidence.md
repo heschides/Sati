@@ -404,6 +404,110 @@ to verified staged scope; no paging commit or push is claimed in advance here.
 
 **Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
 
+## 2026-10-08 — SATI-WRK-001 note-worker completion-cache day lifecycle
+
+**Stable work ID and bounded slice:** SATI-WRK-001, fourth local implementation slice:
+retire completion-cache entries and storage from other captured local dates.
+
+**Status and source/revision:** implemented and locally verified; unreleased. Portable
+fail-first/main/class verification and this chunk's documentation/whitespace checks passed. Reviewed branch:
+`codex/agenda-sequence-2026-10-08`, after paging commit `b42f226` was pushed to the approved
+`origin` branch. The earlier documentation foundation `b5ec4d4` and HTTP chunk `ca14bbb` remain
+separate commits. No cache commit/push is claimed in advance. Preexisting Settings/readiness
+product work and unrelated billing tests are preserved outside this chunk. Josh's sequential-work
+request authorizes ordinary verified local source/documentation chunks and approved branch pushes;
+no DATT, activation or release authority is inferred.
+
+**Changed behavior, ownership and canonical paths:** `NoteAbandonmentWorker` now owns a
+`completionCacheDay`. After an enabled call acquires `runGate`, it captures `ApiClock.Today`,
+replaces `completedByAgency` when the date differs and records that captured date before the
+existing global completed-day idle check. Every cache write uses the same captured date under
+the gate. Same-day successful agencies stay skipped while recoverable-fault/at-limit agencies
+remain due. Replacing the dictionary also retires the worker's reference to prior backing storage;
+that is a source assertion, not a garbage-collection or measured-memory result. Disabled or
+already-canceled calls retain their no-SQL/coordination controls; rotation waits for an enabled
+gate-acquired check instead of adding idle SQL or another timer.
+
+Source owner: `Sati.Api/Infrastructure/NoteAbandonmentWorker.cs`; test owner:
+`Sati.Api.Tests/NoteAbandonmentWorkerTests.cs`. [W8](../../BACKGROUND_WORKERS_HANDOFF.md),
+[worker architecture](../architecture/workers.md),
+[the contingency owner](multitenancy-contingencies.md) and
+[DEC-0225](../decisions/current/2026-10-08-DEC-0225.md) own behavior, lifecycle rationale and limits.
+The separate 100-agency discovery and 100-note sweep bounds, finite-range/growth membership
+caveats, classified faults, audit/count rules, default-off/hourly/next-day cadence and SQL/reset
+coordination remain. No shared business rule, route, schema, worker activation or provider policy changed.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+| Executed check | Result and evidence |
+|---|---|
+| Original cache, new stale-retention regression | **1 failed, 0 passed**. `CompletionCacheRetainsOnlyCurrentDayAgenciesAndPreservesSameDayRetries` expected 110 current-day successes but observed 261 retained entries after a 251-agency first day and changed second-day population/recoverable fault. `artifacts/test-results/note-completion-cache/note-completion-cache-fail-first.trx`. |
+| Fixed main regression | **1 passed, 0 failed**. Retained counts were 251 on day one, 110 after day-two failure, 111 after same-day recovery and 66 on day three. The fixture proves exact attempts, same-day skip/retry and idle/disabled/canceled no-SQL/coordination behavior, bounded discovery and zero notes/audit effects. `artifacts/test-results/note-completion-cache/note-completion-cache-main-passing.trx`. This overlaps the class run, not another unique case. |
+| Fixed complete worker class | **35 total: 33 passed, 0 failed, 2 SQL-gated skipped**. `artifacts/test-results/note-completion-cache/note-completion-cache-passing.trx`. Includes the one added retention case and existing paging/fault/cancellation/limit/atomic-audit controls. The two skipped cases remain real-SQL sweep exclusion/reset proofs, not portable acceptance of those guarantees. |
+| Serial Release API test-project builds | Passed with no errors and existing warnings; before-fix build reported six warnings and fixed build seven. No full-solution build is claimed. |
+| SQL coordination preservation | No additional SQL run for the cache slice. The two-case paging selection and private-instance cleanup remain recorded in the earlier paging entry; they are not rerun or recounted as new cache evidence. This source change does not alter the SQL coordination/sweep/business-rule owners. |
+| Updated documentation/whitespace | The current structure gate and all **22 negative mutation proofs passed**, with 46 root documents, 28 scoped owners, 12 snapshots, 11 active items, 454 legacy items, 218 imported decisions and seven current decisions; the next pointer is SATI-BIL-001. `git diff --check` passed. Sealed readiness SHA-256 remains `292ACBA3C331FF98B00125CBEAA23073C5EC916403C157CD08426ED639E63B48`; rubrics/history and byte-preserved captures were not edited. |
+
+The serial build used `dotnet build Sati.Api.Tests/Sati.Api.Tests.csproj --no-restore
+--disable-build-servers -m:1 -c Release -v minimal`. Tests used `dotnet test
+Sati.Api.Tests/Sati.Api.Tests.csproj --no-build --no-restore -c Release` with
+`--results-directory artifacts/test-results/note-completion-cache`. The fail-first and fixed main
+filter was `FullyQualifiedName~CompletionCacheRetainsOnlyCurrentDayAgenciesAndPreservesSameDayRetries`,
+with quoted logger values `trx;LogFileName=note-completion-cache-fail-first.trx` and
+`trx;LogFileName=note-completion-cache-main-passing.trx`. The complete class used
+`--filter FullyQualifiedName~NoteAbandonmentWorkerTests` and quoted logger value
+`trx;LogFileName=note-completion-cache-passing.trx`. Bounded approved test execution supplied
+local IPC access. Counters and the 110-versus-261 failure were independently read from the TRX files.
+Updated documentation commands were `pwsh -NoProfile -File scripts/Test-DocumentationStructure.ps1`
+and `pwsh -NoProfile -File scripts/Test-DocumentationStructureChecks.ps1`, followed by
+`git diff --check`; these are this chunk's results rather than borrowed earlier checks.
+
+**Failed/unrun checks, reason and verification limits:** the intended retention regression failed
+against the unfixed worker and passed after rotation. This case uses zero-note agencies and
+reflection over retained cache contents; its zero note/audit assertions are deliberate fixture
+controls, not proof of new clinical effects. Existing class cases retain nonzero exact changes/
+atomic-audit evidence. No allocation/heap/GC measurement, load/fairness test, new SQL run,
+full-solution, live-host, provider, alert, restore or installed-client acceptance was performed
+for this slice. Documentation checks validate the current ownership/link/registry/history structure
+and tested refusals, not measured worker memory or capacity.
+
+After an enabled date-change check, the worker retains successes for its captured current day.
+This does not cap current-day agency cardinality/churn or remove agencies completed then deleted
+within that day. Prior storage can remain while disabled/before the next gate-acquired check,
+and object collection timing is not guaranteed. Successful-day membership/provisioning invalidation,
+finite-range insertion caveats, restart persistence and total-pass/healthy-agency wait remain open.
+
+**Relevant readiness criterion IDs and evidence class:** local source/synthetic working evidence
+for the historical-bookkeeping portion of MT06/MT08, scenario 16. Existing ID03/ID04/OP06 audit
+and revision controls remain in the passing class; earlier MT10 SQL evidence retains its original
+scope. These checks do not close criteria, establish total capacity/fairness or advance a sealed
+release score. No cloud/security change, working-data access or external effect occurred.
+
+**Durable decisions, alternatives and supersession links:**
+[DEC-0225](../decisions/current/2026-10-08-DEC-0225.md) records captured-local-day rotation and
+storage replacement under the existing gate. Lifetime retention, entry-only clearing/pruning,
+a mistaken 100-entry cache cap, repeated same-day eviction and a new cleanup scheduler were
+rejected. Only the source's prior-day cache lifecycle changes; no governing decision, D1–D4,
+shared business rule, route/schema ownership, sealed snapshot or operating permission is superseded.
+
+**Remaining risks/blockers, dependencies and deferred work:** current-day completion cardinality/
+churn, same-day removed agencies, provisioning invalidation, total operation/account/pass budgets,
+fair account/feed selection, API admission, aggregate capacity and live progress/alert/vendor proof
+remain W8 gaps. Dispatch's known-unsent poison path still needs durable hold/backoff/reopen policy
+and an additive schema proposal. Activation, structural tenancy, recovery and independent review
+retain their separate owners. Billing R1 accepted-original lifecycle and full queue/pre-send R2
+compliance release remain open.
+
+**Next eligible stable ID and bounded slice:** SATI-BIL-001, preserve authoritative residual
+`complianceErrors` in the shared `BillingExportGate` even with a complete matching stored
+supervisory exception. API/local callers already account for exact-obligation exceptions and Admin
+recovery; the release gate must retain remaining blockers without rewriting frozen evidence.
+[The agenda pointer](../../AGENDA.md#next-eligible-work) owns pure/API/local fail-first acceptance,
+fresh generation/replay cases, positive exceptions/recovery and the explicit R1/full-send R2 limits.
+This is an independent local shared-rule slice, not activation or a broader financial workflow repair.
+
+**Later reviewed release snapshot, if any:** pending; the sealed 1.3.37 assessment is unchanged.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

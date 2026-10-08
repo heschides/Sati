@@ -28,6 +28,11 @@ The note-worker agency discovery policy is recorded in
 a captured finite key range and bounded observed-growth recheck. This bounds per-query
 materialization without establishing frozen membership, cache capacity or a fair wait.
 
+The completion-cache local-date/storage lifecycle is recorded in
+[DEC-0225](docs/decisions/current/2026-10-08-DEC-0225.md). Rotation under the existing run gate
+retires earlier-day storage while preserving current-day retries/skips; current-day capacity,
+measured memory, provisioning invalidation and fair-wait bounds remain open.
+
 ## Explicit supersession
 
 | Earlier statement | Later authority | Scope of supersession |

@@ -54,6 +54,15 @@
       "status": "accepted",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0225",
+      "date": "2026-10-08",
+      "title": "Note-worker completion cache follows the local day",
+      "path": "docs/decisions/current/2026-10-08-DEC-0225.md",
+      "status": "accepted",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

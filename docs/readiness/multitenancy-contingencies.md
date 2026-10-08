@@ -10,6 +10,16 @@ The October 8 assessment reviewed release 1.3.37 at `a1af92129f60728a0bbcf0dd27c
 
 Concrete existing gaps include the global oldest-dispatch/preflight poison path, serial account polling, completion bookkeeping and provisioning invalidation, note-sweep fairness/pass budgets, total operation/account/pass deadlines and live deadline proof, expensive-work admission, a complete structural tenancy strategy and tenant lifecycle evidence. The October 8 local slices isolate narrowly recoverable note-agency faults, supply the connector HTTP I/O deadline including response bodies, and bound each note-worker agency-ID discovery to 100 IDs within a captured finite key range; [working evidence](work-evidence.md) records their fail-first proof, actual checks and remaining limits. Discovery does not freeze membership: within-range inserts after the last discovery query may be missed even above the cursor, along with behind-cursor/lower-ID changes and growth after the final check. Bounded observed higher-ID growth (or any agency after an empty capture) leaves the day due. These component controls do not close scenarios 12/13/16 or establish a healthy-agency wait bound. Billing R1/R2 remain separate: a fresh generation key after acceptance and incomplete current documentation/compliance recheck before send. Ordinary API note audits and arbitrary full-exception redaction also remain unresolved. See [the assessment](../../reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md), [the worker handoff](../../BACKGROUND_WORKERS_HANDOFF.md) W8 and the ledger's notes for the bounded current status.
 
+The fourth local worker slice rotates completion-cache storage on the captured local date under
+the existing run gate, retaining same-day success skips and failed-agency retries. Its regression
+checks retained cardinality across synthetic date/population changes, not measured memory or
+current-day churn/capacity. Rotation runs only after an enabled gate-acquired check; disabled
+workers do not gain an idle scheduler. [DEC-0225](../decisions/current/2026-10-08-DEC-0225.md) and
+working evidence retain actual local checks and limits. This does not close scenario 16 or remove
+same-day provisioning/removed-agency cache limitations. The next eligible billing slice preserves
+authoritative residual compliance blockers in the shared export gate; R1 and full queue/pre-send
+R2 remain open.
+
 The dated hosting inventory has one owner: [DATABASE_ENVIRONMENTS.md](../../DATABASE_ENVIRONMENTS.md). Consult its captured evidence and refresh requirements rather than copying a configuration here. Agency IDs and clearinghouse IDs do not allocate physical resources. A dedicated worker can still share SQL, key/storage/mail services and a vendor quota. RLS, separate databases, partitioned pools and dedicated resources are design options to evaluate, not universal prescriptions.
 
 ## Failure response rules

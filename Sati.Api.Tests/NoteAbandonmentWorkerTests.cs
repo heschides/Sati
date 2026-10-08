@@ -20,6 +20,113 @@ namespace Sati.Api.Tests;
 public sealed class NoteAbandonmentWorkerTests
 {
     [Fact]
+    public async Task CompletionCacheRetainsOnlyCurrentDayAgenciesAndPreservesSameDayRetries()
+    {
+        var clock = new FrozenTimeProvider(new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero));
+        var probe = new SweepCommandProbe();
+        await using var database = new SyntheticPipelineDatabase();
+        await database.InitializeAsync();
+        var contexts = new OwnedFactory(database.Options(probe));
+        await using (var db = await contexts.CreateDbContextAsync())
+        {
+            db.Agencies.AddRange(Enumerable.Range(1, 251)
+                .Select(id => new ServerAgency { Id = id, Name = $"Synthetic zero-note agency {id}" }));
+            await db.SaveChangesAsync();
+        }
+        var apiClock = new ApiClock(Options.Create(new SatiApiOptions()), clock);
+        var settings = new TestOptionsMonitor(new SatiApiOptions { EnableNoteAbandonmentWorker = true });
+        var coordination = new InlineCoordination();
+        var worker = new NoteAbandonmentWorker(contexts, new NoteAbandonmentSweep(contexts, apiClock),
+            coordination, settings, apiClock, clock, NullLogger<NoteAbandonmentWorker>.Instance);
+        probe.Armed = true;
+
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(251, CompletedAgencyCache(worker).Count);
+        Assert.All(CompletedAgencyCache(worker).Values, date => Assert.Equal(apiClock.Today, date));
+        Assert.All(Enumerable.Range(1, 251), id => Assert.Equal(1, probe.Attempts(id)));
+        var firstRangeQueries = probe.AgencyRangeQueries;
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(firstRangeQueries, probe.AgencyRangeQueries);
+        Assert.Equal(1, coordination.Attempts);
+
+        await using (var db = await contexts.CreateDbContextAsync())
+        {
+            await db.Agencies.Where(agency => agency.Id <= 150).ExecuteDeleteAsync();
+            db.Agencies.AddRange(Enumerable.Range(252, 10)
+                .Select(id => new ServerAgency { Id = id, Name = $"Synthetic day-two agency {id}" }));
+            await db.SaveChangesAsync();
+        }
+        clock.Instant = clock.Instant.AddDays(1);
+        settings.CurrentValue = new SatiApiOptions { EnableNoteAbandonmentWorker = false };
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(firstRangeQueries, probe.AgencyRangeQueries);
+        Assert.Equal(1, coordination.Attempts);
+        settings.CurrentValue = new SatiApiOptions { EnableNoteAbandonmentWorker = true };
+        using (var cancelled = new CancellationTokenSource())
+        {
+            cancelled.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => worker.RunDueAsync(cancelled.Token));
+        }
+        Assert.Equal(firstRangeQueries, probe.AgencyRangeQueries);
+        Assert.Equal(1, coordination.Attempts);
+        probe.AgencyTurnFailure = id => id == 151
+            ? new DbUpdateConcurrencyException("Synthetic day-two recoverable agency fault.") : null;
+
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        var secondDayCache = CompletedAgencyCache(worker);
+        Assert.Equal(110, secondDayCache.Count);
+        Assert.Equal(Enumerable.Range(152, 110), secondDayCache.Keys.Order());
+        Assert.All(secondDayCache.Values, date => Assert.Equal(apiClock.Today, date));
+        Assert.Equal(2, probe.Attempts(151));
+        Assert.All(Enumerable.Range(152, 100), id => Assert.Equal(2, probe.Attempts(id)));
+        Assert.All(Enumerable.Range(252, 10), id => Assert.Equal(1, probe.Attempts(id)));
+
+        // Global completion remains due; only the failed agency runs on same-day retries.
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(3, probe.Attempts(151));
+        Assert.Equal(110, CompletedAgencyCache(worker).Count);
+        Assert.All(Enumerable.Range(152, 100), id => Assert.Equal(2, probe.Attempts(id)));
+        Assert.All(Enumerable.Range(252, 10), id => Assert.Equal(1, probe.Attempts(id)));
+        probe.AgencyTurnFailure = null;
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(4, probe.Attempts(151));
+        Assert.Equal(111, CompletedAgencyCache(worker).Count);
+        var completedRangeQueries = probe.AgencyRangeQueries;
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(completedRangeQueries, probe.AgencyRangeQueries);
+        Assert.Equal(4, coordination.Attempts);
+
+        await using (var db = await contexts.CreateDbContextAsync())
+        {
+            await db.Agencies.Where(agency => agency.Id <= 200).ExecuteDeleteAsync();
+            db.Agencies.AddRange(Enumerable.Range(262, 5)
+                .Select(id => new ServerAgency { Id = id, Name = $"Synthetic day-three agency {id}" }));
+            await db.SaveChangesAsync();
+        }
+        clock.Instant = clock.Instant.AddDays(1);
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        var thirdDayCache = CompletedAgencyCache(worker);
+        Assert.Equal(66, thirdDayCache.Count);
+        Assert.Equal(Enumerable.Range(201, 66), thirdDayCache.Keys.Order());
+        Assert.All(thirdDayCache.Values, date => Assert.Equal(apiClock.Today, date));
+        Assert.All(Enumerable.Range(201, 51), id => Assert.Equal(3, probe.Attempts(id)));
+        Assert.All(Enumerable.Range(252, 10), id => Assert.Equal(2, probe.Attempts(id)));
+        Assert.All(Enumerable.Range(262, 5), id => Assert.Equal(1, probe.Attempts(id)));
+        var thirdRangeQueries = probe.AgencyRangeQueries;
+        Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(thirdRangeQueries, probe.AgencyRangeQueries);
+        Assert.Equal(5, coordination.Attempts);
+        Assert.All(probe.AgencyPages, page => Assert.InRange(page.Count, 0, 100));
+        await using var evidence = await contexts.CreateDbContextAsync();
+        Assert.Equal(0, await evidence.Notes.CountAsync());
+        Assert.Equal(0, await evidence.AuditEvents.CountAsync());
+    }
+
+    private static Dictionary<int, DateTime> CompletedAgencyCache(NoteAbandonmentWorker worker) =>
+        new((Dictionary<int, DateTime>)typeof(NoteAbandonmentWorker)
+            .GetField("completedByAgency", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(worker)!);
+
+    [Fact]
     public async Task AgencyDiscoveryMaterializesAtMostOneHundredIdsAndVisitsEveryStableAgencyOnce()
     {
         var clock = new FrozenTimeProvider(new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero));
@@ -77,6 +184,7 @@ public sealed class NoteAbandonmentWorkerTests
         probe.AuditFailure = id => id == 1 ? new DbUpdateConcurrencyException("Synthetic recoverable fault.") : null;
 
         Assert.Equal(349, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(249, CompletedAgencyCache(worker).Count);
         Assert.Equal((NoteWorkflow.Pending, 1), await factory.GetNoteStateAsync(noteByAgency[1]));
         Assert.Equal((NoteWorkflow.Abandoned, 2), await factory.GetNoteStateAsync(noteByAgency[251]));
         Assert.All(noteByAgency.Keys, id => Assert.Equal(1, probe.Attempts(id)));
@@ -92,12 +200,14 @@ public sealed class NoteAbandonmentWorkerTests
         Assert.Equal(0, await worker.RunDueAsync(CancellationToken.None));
         Assert.Equal(2, probe.Attempts(1));
         Assert.Equal(2, probe.Attempts(2));
+        Assert.Equal(250, CompletedAgencyCache(worker).Count);
         Assert.All(noteByAgency.Keys.Where(id => id > 2), id => Assert.Equal(1, probe.Attempts(id)));
         Assert.Equal(250, (await factory.GetAuditEventsAsync("note.abandoned-by-system")).Count);
 
         probe.AuditFailure = null;
         clock.Instant = clock.Instant.AddHours(1);
         Assert.Equal(1, await worker.RunDueAsync(CancellationToken.None));
+        Assert.Equal(251, CompletedAgencyCache(worker).Count);
         Assert.Equal(3, probe.Attempts(1));
         Assert.Equal(2, probe.Attempts(2));
         Assert.All(noteByAgency.Keys.Where(id => id > 2), id => Assert.Equal(1, probe.Attempts(id)));
@@ -821,6 +931,7 @@ public sealed class NoteAbandonmentWorkerTests
         private readonly Dictionary<int, int> updates = [];
         public bool Armed { get; set; }
         public Func<int, Exception?>? AuditFailure { get; set; }
+        public Func<int, Exception?>? AgencyTurnFailure { get; set; }
         public Func<int, CancellationToken, Task>? BeforeAudit { get; set; }
         public Func<int, CancellationToken, Task>? BeforeAgencyPage { get; set; }
         public Func<CancellationToken, Task>? BeforeAgencyGrowth { get; set; }
@@ -860,6 +971,7 @@ public sealed class NoteAbandonmentWorkerTests
             {
                 var agencyId = AgencyParameter(command);
                 attempts[agencyId] = Attempts(agencyId) + 1;
+                if (AgencyTurnFailure?.Invoke(agencyId) is { } error) throw error;
             }
             if (Armed && command.CommandText.Contains("INSERT INTO \"AuditEvents\"", StringComparison.Ordinal))
             {
@@ -1053,8 +1165,10 @@ public sealed class NoteAbandonmentWorkerTests
 
     private sealed class InlineCoordination : INoteAbandonmentCoordination
     {
+        public int Attempts { get; private set; }
         public async Task<bool> RunOnceAsync(Func<CancellationToken, Task> sweep, CancellationToken token)
         {
+            Attempts++;
             await sweep(token);
             return true;
         }
