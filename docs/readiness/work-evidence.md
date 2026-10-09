@@ -1549,6 +1549,78 @@ handoff after push and exact default-branch confirmation rather than inserted by
 self-referential ledger commit. The concrete next agenda slice is SATI-BIL-001's bounded R1
 fact/policy design after release completion, with its existing decision and authorization boundaries.
 
+## 2026-10-09 — Billing original-release design
+
+**Stable work ID and bounded slice:** SATI-BIL-001, the post-release bounded R1 fact/policy design
+selected by the agenda. Josh requested the next item. This is source inspection and a concrete
+proposed rule/projection/admission/SQL acceptance plan; no billing application/test implementation.
+
+**Status and source/revision:** design complete, policy P1–P3 review pending. Inspected released
+source/evidence checkpoint `de23bd175445b1caf5caee52ccc8870d021b88da`; tracked source was clean
+before this documentation chunk. Existing untracked assessment helper and test results are retained
+and excluded. The resulting documentation commit is reported in the handoff after verification.
+
+**Changed behavior, ownership and canonical paths:** executable behavior and ownership are unchanged.
+[The sandbox runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md#proposed-original-release-guard--october-9-2026)
+owns the proposed `OriginalClaimReleaseRules` Contracts rule, shared retained-content projection,
+fact matrix, policy choices, three admission points, writer/lock inventory and ten proposed test
+cases. The billing architecture links the proposal as unimplemented; the active agenda advances
+from producing the design to disposing of policy/transaction-boundary choices. No new root topic,
+route or persistence model was added.
+
+**Actual tests/checks, commands, results and evidence locations:** read-only source review covered
+API original export, local `EdiService`, queue/worker, mock transmission, manual reconciliation,
+manual/mock/status/ERA receipt ingestion, correction records/rules/history and the two SQL scope
+helpers. Two independent agent reviews checked mapping/legacy replay/fixtures and transport/late
+receipts/lock ordering; a third reviewed the final design/agenda consistency and found no remaining
+material flaw. Inspection confirms a late exact manual receipt can coexist with state-7
+ConfirmedNotReceived, generated-only history is counted by the old correction projection, and
+distinct BillingPeriod/ServiceTime locks do not share a named admission resource. Checks executed:
+`pwsh -NoProfile -File scripts/Test-DocumentationStructure.ps1` passed (46 root documents,
+28 scoped owners, 12 preserved snapshots, 11 active items, SATI-BIL-001 pointer);
+`pwsh -NoProfile -File scripts/Test-DocumentationStructureChecks.ps1` passed all **22** negative
+mutation proofs; `pwsh -NoProfile -File scripts/Test-ReleaseReadiness.ps1 -BaselineRevision
+de23bd175445b1caf5caee52ccc8870d021b88da` passed with history checked and unchanged sealed
+readiness; `git diff --check` passed. Results are the local tool outputs, not proposed R1 test runs.
+
+**Failed/unrun checks, reason and verification limits:** the first documentation check refused an
+agenda edit that renamed its required **Boundaries and completion evidence** label. Restoring the
+canonical label resolved the failure; the validator was not weakened. All R1 rule, local/API, fail-first and SQL
+barrier tests are proposed and **not run**. No guard exists to test in this slice. No app build,
+release suite or model test was rerun for prose-only work. No SQL, cloud, working-data, vendor or
+external billing call occurred. An inspected lock graph is not SQL lock/wait proof; the proposed
+agency admission lock requires refactoring all participating writers and proving ordering and
+bounded contention. Exact late receipt test uses supported manual/mock HTTP ingestion; automated
+status/ERA currently requires Accepted dispatch and cannot supply that state-7 sequence unchanged.
+
+**Relevant readiness criterion IDs and evidence class:** ID07/scenario 29 design; ID03/ID04/ID09,
+MT01/MT02/MT05/MT10 and OP06 describe its scope/atomicity/receipt dependencies. Full ID08/R2 is
+separate. Evidence is source inspection and proposed acceptance, not implemented safeguard,
+executed concurrency, deployed operation, vendor acceptance or regulatory clearance. Sealed
+1.3.38 and earlier reports/rubrics/scores are unchanged.
+
+**Durable decisions, alternatives and supersession links:** no accepted policy or implemented
+architecture decision is inferred. P1 proposes cross-mode/account history in the same database,
+P2 holds generic rejection without definitive nonreceipt, and P3 reserves a Queued original against
+another fresh original. Alternatives and their dependencies are explicit in the canonical design;
+Josh's policy answer remains pending. The proposed shared owner/common short-transaction lock
+rejects duplicated caller rules, generation-only send inference, IsTest bypass, unchanged history
+loader reuse, nested scope transactions and claims of atomic external exactly-once. Existing
+`ClaimCorrectionRules`, DEC-0226 and external certification/operating authority remain governing.
+
+**Remaining risks/blockers, dependencies and deferred work:** P1–P3 disposition; complete writer
+refactor/lock-order and private SQL proof; fail-first fixture isolation; legacy null control and
+Generated-event compatibility; ambiguous physical history and late receipt precedence. Full exact
+retained-subset queue/send R2, payer-held void purpose, generic-rejection recovery-route extension,
+cross-mode lane identity if chosen, W8 budgets/fairness, general service deduplication, tenant/recovery
+and live payer/agency acceptance remain separate. No readiness closure follows from this design.
+
+**Next eligible stable ID and bounded slice:** SATI-BIL-001, review P1–P3 and the common transaction
+boundary, record the accepted policy in a dated decision, then scope the first fail-first projection/
+rule implementation slice. [The agenda](../../AGENDA.md#next-eligible-work) owns current eligibility.
+
+**Later reviewed release snapshot, if any:** no new assessment; sealed 1.3.38 remains unchanged.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

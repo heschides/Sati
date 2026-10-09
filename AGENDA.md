@@ -43,7 +43,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
-| SATI-BIL-001 | residual export-error repair implemented; R1/full queue/send R2 open | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md). Five intended regressions and focused source/synthetic acceptance are recorded in working evidence; no complete send-gate closure. |
+| SATI-BIL-001 | residual export-error repair implemented; R1 design complete, policy review pending; R1/full queue/send R2 open | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [October 9 design](CLAIMMD_SANDBOX_RUNBOOK.md#proposed-original-release-guard--october-9-2026). Source inspection and proposed fail-first/SQL barriers are recorded in working evidence; no guard implementation or complete send-gate closure. |
 | SATI-SEC-001 | current request/incident/health repair sequence implemented and locally verified; broader sink/admission/security work open | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
 | SATI-GOV-001 | source implemented/runtime gated | Governance activation, approved policy periods and complete storage/recovery adapters; [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md). Runtime retention stays PolicyOnly. |
 | SATI-CLI-001 | evidence pending | External-device/accessibility/mixed-version/clean-install acceptance and supported client/server/schema compatibility; [Demo acceptance](DEMO_ACCEPTANCE.md), [readiness](docs/readiness/README.md). |
@@ -70,22 +70,19 @@ authorization requirements; no release outcome is established by this invocation
 
 **Next eligible item:** SATI-BIL-001
 
-**Eligibility:** future bounded R1 fact/policy design when agenda work resumes after the current
-DATT release. This pointer does not select billing work during the release. The residual
-export-error repair is verified, but it does not implement an
-original-release lifecycle rule. Read-only source exploration identifies suitable physical-history
-and late-receipt test seams; no proposed fact matrix is an implemented gate. Cross-mode history
-and generic upload-rejection semantics require an explicit decision before full guard implementation.
-Follow [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
+**Eligibility:** the 1.3.38 release is complete. The October 9 bounded R1 fact/policy design is
+complete as a proposal; original-release implementation and SQL proof remain open. The next
+slice is policy/transaction-boundary review of that concrete design. Cross-mode history, generic
+upload rejection and queued-reservation choices P1–P3 are pending an explicit decision before
+implementation. Follow [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** design one shared Contracts owner for original-release permission using actual
-recorded transport/uncertainty/receipt facts. Define precise tenant/period/generation/business-claim
-mapping from retained immutable content and explicit correction links. Generation alone is not
-receipt or physical transmission; damaged, unmapped or ambiguous retained physical history must
-be held for review in the proposed rule. Preserve harmless generation, exact replay, known-unsent
-recovery and explicit correction lineage, including frequency-1 Resubmit. Describe admission at
-fresh generation, new queue intent and immediately before durable Sending without making a
-test-mode bypass. Do not implement the guard until policy and race design are settled.
+**Bounded slice:** resolve P1–P3 in
+[the canonical design](CLAIMMD_SANDBOX_RUNBOOK.md#policy-choices-needed-before-implementation),
+record the accepted choices/rejected alternatives in a dated decision, and review the common
+admission lock order and complete writer inventory. Then define a separately bounded fail-first
+projection/rule implementation slice with its acceptance, preserving the existing correction
+owner and exact retained-content mapping. No policy approval is implied by the existence of this
+design, a documentation gate or a general request to continue.
 
 **Dependencies and owners:** read [the billing architecture](docs/architecture/billing.md),
 [the sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md),
@@ -96,34 +93,24 @@ test-mode bypass. Do not implement the guard until policy and race design are se
 [the contingency owner](docs/readiness/multitenancy-contingencies.md) and
 [working evidence](docs/readiness/work-evidence.md). Revalidate original export, local `EdiService`,
 queue/worker, mock transmission, manual reconciliation, receipt ingestion, `ClaimCorrectionRules`
-and `LoadClaimHistoryAsync`. The latter currently counts generated-only files as submissions and
-skips malformed content, so it cannot become an original-release guard unchanged. A new key,
-account or control number does not create a new business claim. No schema/cloud/vendor or
-working-data access is needed for this design.
+and `LoadClaimHistoryAsync`. The October 9 design revalidated these source paths at released
+`de23bd1` and identifies their mapping defects, distinct transaction/lock seams and existing positive
+fixtures needing legitimate lifecycle isolation. No schema/cloud/vendor or working-data access is
+needed for policy review. Revalidate source again before implementation.
 
-**Required policy/design outputs:** classify Generated-only, CancelledBeforeSend, Queued, Sending,
-OutcomeUnknown, accepted/manual received and exact matched receipts separately. Specify when
-ConfirmedNotReceived permits a separate generation and how a later matched receipt takes
-precedence. Decide cross-mode history and whether generic upload rejection supplies definitive
-nonreceipt evidence; do not equate it with a 999 rejection or invent a payer decision. Preserve
-the existing correction owner. Design deterministic synthetic SQL barriers across the distinct
-ServiceTime/BillingPeriod named-lock paths and plain Serializable receipt transactions; do not
-assume their different lock resources coordinate or claim SQLite proves SQL locking.
+**Required outputs and completion evidence:** the canonical design contains the proposed shared
+Contracts rule/projection, state and receipt-precedence matrix, three admission points, ten proposed
+fail-first cases and deterministic SQL barriers across ServiceTime/BillingPeriod/plain Serializable
+receipt writers. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--billing-original-release-design)
+owns actual documentation checks, source review and unrun tests. Review must explicitly dispose of
+P1–P3, legacy local null controls/events, frequency-1 Resubmit lineage, malformed physical history,
+late receipt after genuine nonreceipt, lock order and known fixture reuse. Do not treat different
+application-lock names, SQLite tests or a timeout/deadlock as proof of the intended SQL safeguard.
 
-**Boundaries and completion evidence:** this next pointer selects design and a concrete proposed
-fail-first test plan only. No billing production/test implementation or SQL execution is part of
-the current DATT release through this pointer. The valid invocation supplies only the separate
-[playbook release authority](RELEASE_PLAYBOOK.md); this design pointer does not broaden it to
-billing activation, schema/cloud database changes, security settings, Production actions,
-working-data access or real billing provider calls. Preserve sealed readiness/history and
-unrelated work.
-
-The proposed acceptance must cover fresh-key generation and a previously retained original
-after actual accepted upload; Unknown/Sending refusal; generated-only and known-unsent positives;
-exact replay; correction lineage; malformed-history hold; and a genuine nonreceipt → later exact
-receipt → queued successor sequence with no second upload. Remediate old positive fixtures with
-legitimate separate lifecycle histories, not an `IsTest` exception. Identify an exact shared owner,
-query adapters, enforcement order, deterministic SQL barrier and evidence limits before source work.
+**Boundaries and completion evidence:** policy/design review only; no billing application/test
+implementation or SQL execution through this pointer. No new release invocation, billing activation, schema/cloud
+database change, security setting, Production action, working-data access or real provider call
+is authorized by this design. Preserve sealed readiness/history and unrelated work.
 
 Full R2 current eligibility for the exact retained original/correction subset, payer-held void
 purpose policy, broader sink/admission work, worker fairness, structural tenancy, recovery and

@@ -1,6 +1,6 @@
 # Billing and clearinghouse boundaries
 
-**Status:** current architecture reference, October 8, 2026. Detailed rules remain with the linked canonical owners.
+**Status:** current architecture reference, October 9, 2026. Detailed rules remain with the linked canonical owners.
 
 Implemented: approved-note projection is a query, not a separate message queue; claim promotion freezes inputs, generation retains immutable bytes, dispatch stages durable intent, and receipt/effect/feed-cursor writes commit together. Agency/account/generation identity is verified. Sending/OutcomeUnknown is quarantined; timeout never proves nonreceipt.
 
@@ -23,6 +23,14 @@ This residual-error repair does not extract the exact retained claim subset for 
 classify physical send history or establish a correction/void release policy. Fresh generation
 keys are not business lifecycle permission. Fair scheduling must preserve these separate gates;
 formatter/parser tests do not certify vendor or payer acceptance.
+
+The [October 9 R1 design](../../CLAIMMD_SANDBOX_RUNBOOK.md#proposed-original-release-guard--october-9-2026)
+proposes one `OriginalClaimReleaseRules` Contracts owner, a shared retained-content projection,
+three admission points and a common SQL decision boundary. These owners and locks do not yet
+exist. Cross-mode, generic rejection and queued-reservation choices require policy review;
+deterministic fail-first and private SQL acceptance are specified but not executed. The design
+preserves the existing correction owner, safe result replay and late-receipt precedence. It does
+not change implemented architecture, close R1/full R2 or advance sealed readiness.
 
 ## Canonical detailed owners
 
