@@ -2448,12 +2448,64 @@ setting. Final documentation structure and **22 negative proofs passed**
 The installed working Sati process remained present after firewall removal; the outstanding
 save/close request is the remaining acceptance prerequisite.
 
-**Next sequence and limits:** run both
-exact installer acceptance gates sequentially once the working app is closed, then publish only
-their accepted EXEs/checksums. The operational checkpoint records the completed rollout and the
-remaining app-close prerequisite. Structure/negative checks passed; acceptance/distribution and
-one closing evidence/default push remain pending. No complete release, installed Local uptake, real
-transmission or independent readiness is claimed yet.
+**Checkpoint and supersession:** operational checkpoint `5f815b07b610be35ca3827fb06a5adfcd7d17e73`
+preserved the interrupted rollout. The following dated acceptance record supersedes its pending
+app-close/acceptance/distribution state; earlier failed observations remain retained. Installed
+Local uptake, real transmission and independent readiness remain unverified.
+
+## 2026-10-09 — 1.3.39 installer acceptance and distribution
+
+**Stable work and authority:** close the existing DATT 1.3.39 release; no new source feature,
+deployment, migration, reset, version or security-setting change. Josh closed the working app;
+precondition inspection observed zero Sati processes before the successful isolated Demo gate.
+Artifact bytes and the sealed embedded readiness report were unchanged.
+
+**Actual sequential acceptance:** `scripts/Test-DemoInstaller.ps1 -LaunchIterations 5` against
+the exact `artifacts/SatiDemoInstaller/SatiDemoSetup-1.3.39.exe` passed all five responsive
+15-second launches, normal closes, exit code zero, version **1.3.39.0** and cleanup. Evidence
+`TestResults/datt-1.3.39-demo-installer-acceptance.json` was written at **21:45:34 UTC** with
+`Passed=true`, `CleanupPassed=true`, `InstalledFilesRetained=false`. The earlier all-Sati-closed
+refusal remains recorded above; no guard was relaxed and no user process was closed by the test.
+
+Next, `scripts/Test-LocalInstaller.ps1` against the exact
+`artifacts/SatiLocalInstaller/SatiLocalSetup-1.3.39.exe` passed exact **1.3.39.0**, Windows integrated
+security, `SatiProduction` configuration mapping and cleanup. The exact embedded MSI signature
+was **Valid**, signer Microsoft Corporation, SHA-256
+`224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+`TestResults/datt-1.3.39-local-installer-acceptance.json` was written at **21:46:30 UTC** with
+`Passed=true`, `CleanupPassed=true`. No working Local application or database was launched.
+Both gates used the normal signed-in Windows profile and completed without a failure.
+
+**Publication:** the reviewed fixed-version `artifacts/datt-1.3.39/Publish-AcceptedInstallers.ps1`
+validated both acceptance records and expected hashes before any distribution write. It published
+exactly two EXEs and two checksum files through verified unique temporary siblings with no-replace
+renames, then verified final lengths/hashes and checksum contents. All four outcomes were
+`Published`. Create-new `artifacts/datt-1.3.39/distribution-evidence.json` at **21:46:45 UTC** binds
+acceptance hashes and final paths/sizes/hashes. [The canonical environment inventory](../../DATABASE_ENVIRONMENTS.md#1339-installer-publication--october-9-2026)
+owns exact destinations and Local uptake; [the release agenda](../../AGENDA.md#release-1339--billing-release-and-account-recovery-safeguards)
+records the full release checklist. Previously built installer hashes remained unchanged.
+
+**Closing checks and source:** final documentation structure, all **22** negative mutation proofs
+and source preflight/readiness history gates **passed**. Negative evidence is retained in
+`artifacts/datt-1.3.39/documentation-negative-closing.json`; whitespace checks passed. Fetched
+default master and local HEAD both remained `5f815b07b610be35ca3827fb06a5adfcd7d17e73` before the
+one ordinary closing evidence commit and push. Evidence-only owner/ledger edits require no repeated build, package,
+model test or installer acceptance under the playbook. The handoff reports the resulting commit
+and exact remote equality; the ledger does not need a second commit to insert its own identifier.
+Unrelated desktop-project formatting and scratch files remain preserved and excluded.
+
+**Limits and remaining work:** acceptance was on LONGCHENPA with the source tree present,
+`ExternalMachineConfirmed=false`; independent external-machine launch and cloud-sync receipt
+remain unverified. No installer code-signing claim follows from the embedded MSI signature.
+Working Local installation/migration remains at last observed **1.3.38.0**, other machines unknown.
+No real transmission, dispatch activation, cloud Production, live working-data access or tested
+recovery occurred. Existing build warnings remain; the retained fixture failure was resolved with
+the bounded test-only repair described above. Release evidence supports OP14 within this scope;
+it does not change the sealed readiness scores or satisfy independent launch criteria.
+
+**Next eligible work:** SATI-WRK-001 idle/wake/activity/due scheduling **design**, with the bounded
+scope/dependencies and separate activation authority in [the agenda](../../AGENDA.md#next-eligible-work).
+No broader worker implementation is started by closing this release.
 
 ## Entry template for the next significant portion
 

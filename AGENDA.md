@@ -6,9 +6,12 @@ Historical completions/releases remain in the [byte-preserved agenda](docs/archi
 
 ## Release 1.3.39 — billing release and account recovery safeguards
 
-**Status:** October 9 DATT rollout waiting for the working application to close: source and Demo migration/API/reset verified;
-installer acceptance/distribution await working-app close; operator firewall removal verified. Bounded Demo migration, baseline replacement
-and one verification reset are separately approved; workstation access is operator-managed.
+**Status:** October 9 DATT release gates complete: source, Demo migration/API/reset, both installer
+acceptance gates and exact distribution verified; operator firewall removal verified. Final
+documentation/preflight gates passed. This closing record supplies the evidence for the final
+ordinary commit/push; the handoff reports its identifier and exact remote confirmation.
+Bounded Demo migration, baseline replacement and one verification reset were
+separately approved; workstation access was operator-managed.
 Completed billing/worker source and controlled migration preparation fast-forwarded into local
 `master` at `6a5c6497aab7c4f761d6aef5194087475c00424d`. Older branches/worktree remain retained
 because their retention or activity is uncertain. Unrelated `Sati.csproj` formatting and
@@ -18,10 +21,12 @@ assessment scratch files are preserved. Dispatch activation and broader W8 work 
 |---|---|
 | Source and readiness | Source release `6fbfeb65730697d4e0244a551fca736f5a3e82a1` pushed and remote equality verified. Version 1.3.39 coordinated; all 42 criteria reviewed and current embedded WPF report verified; prior sealed reports/rubric unchanged. |
 | Build and tests | Complete Release build passed; final desktop 3,028, API 1,289, signatures 119, portal 8 and Carika 4 passed. Actual cached-model test passed all three scenarios (3m08s); 4,449 accepted cases, zero unresolved failures/skips. Retained failed run and bounded fixture repair are in the working ledger. |
-| Demo schema and reset | Revalidated exact 128-migration predecessor and live/baseline reset guards without persistent changes. Approved rehearsal/apply/rerun, matching API, zero-change compliance dry-run and baseline replacement passed; single request `d851db02-81c6-4559-ab9c-e15ea880bddd` has completed audit and correlated Function compliance marker. Environment inventory owns exact deployed facts; operator firewall removal verified. |
-| API and installers | API deployment `943c4d4f09154180b32f33fe20a57338`, all 70 exact file hashes and health/version/contract verified. Both installers built; isolated acceptance awaits working-app close, distribution pending. |
+| Demo schema and reset | Approved rollback rehearsal, apply and idempotent rerun passed at 129 migrations. `DEMO_FULL_RESET_BASELINE_CAPTURED`, anchor 2026-10-09; single request `d851db02-81c6-4559-ab9c-e15ea880bddd` recorded `demo.reset.completed` and correlated Function compliance marker. [Environment inventory](DATABASE_ENVIRONMENTS.md#1339-controlled-demo-rollout--october-9-2026) owns exact deployed facts; operator firewall removal verified. |
+| Demo API | ZIP SHA-256 `ED56F687601B26D986893AF26900929DCD3E3260B4872ECB46CD8E8C7D3247C6`; completed deployment `943c4d4f09154180b32f33fe20a57338`. All 70 exact deployed file lengths/hashes and HTTP 200 live/Healthy/version 1.3.39/contract `D30D44631876` verified. |
+| Installers | Demo `SatiDemoSetup-1.3.39.exe`: 104,583,168 bytes, SHA-256 `B7E18B675B53C0B024E09162183DEE0E4B3A9EE9A9ECEF1FE6051D4AA99FFCEB`; all five responsive launches, normal closes, exact 1.3.39.0 and cleanup passed. Local `SatiLocalSetup-1.3.39.exe`: 206,932,521 bytes, SHA-256 `07F3850B46315537405C584770BFE8B6D7930DB14E8BFFF396AAE6A2E3BADF10`; exact 1.3.39.0, embedded Microsoft signature, integrated security and cleanup passed. [Acceptance evidence and limits](docs/readiness/work-evidence.md#2026-10-09--1339-installer-acceptance-and-distribution). |
+| Distribution | Both accepted EXEs and checksums published and final hashes/sizes verified at `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop` (Local) and `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files` (Demo). Four allowlisted files, no overwrite. [Inventory](DATABASE_ENVIRONMENTS.md#1339-installer-publication--october-9-2026) records exact destinations; cloud-sync receipt and independent external-device acceptance remain unverified. |
 | Local schema uptake | Known LONGCHENPA installed Local Sati is 1.3.38.0 at preflight; next-launch migration belongs to desktop and is not run by this release audit. Other machine inventory requested; unknown versions will remain explicit. |
-| Final evidence | Operational rollout checkpoint preserves verified migration/API/reset, firewall absence and both build hashes. Acceptance/distribution and the one closing evidence commit/push remain pending; release is incomplete. |
+| Final evidence | Operational checkpoint `5f815b07b610be35ca3827fb06a5adfcd7d17e73` preserves the interrupted rollout. Both acceptance JSON records and create-new distribution evidence complete the operational checklist. Final documentation structure, 22 negative proofs and preflight/report/history gates passed (`artifacts/datt-1.3.39/documentation-negative-closing.json`). The handoff reports the one closing evidence commit's resulting identifier and exact default remote equality without a self-referential ledger commit. |
 
 ## Release 1.3.38 — readiness evidence and service safeguards
 

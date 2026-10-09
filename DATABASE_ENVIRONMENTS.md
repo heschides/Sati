@@ -271,3 +271,27 @@ request and same nonempty operation ID. No reset replay was attempted. Josh conf
 The temporary `datt-workstation-20261009` rule is **absent**, verified without a settings change
 by the assistant. `artifacts/datt-1.3.39/firewall-removal-verification.json` records the target
 and successful absence evidence.
+
+## 1.3.39 installer publication — October 9, 2026
+
+After Josh closed the working application, the unchanged release installers passed sequential
+isolated acceptance on **LONGCHENPA**. Demo recorded five responsive 15-second launches, normal
+closes, exact version **1.3.39.0** and cleanup at **21:45:34 UTC**. Local recorded exact version,
+Windows integrated security, `SatiProduction` mapping, valid embedded Microsoft LocalDB signature
+and cleanup at **21:46:30 UTC**; it did not launch the working Local application or query its database.
+These workstation gates are not independent external-machine acceptance.
+
+At **21:46:45 UTC**, the two accepted installers and their `.sha256` files were published without
+overwrite. All four final lengths/hashes and both checksum contents were verified:
+
+| Artifact | Exact published path | Bytes | SHA-256 |
+|---|---|---:|---|
+| Local | `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop\SatiLocalSetup-1.3.39.exe` | 206,932,521 | `07F3850B46315537405C584770BFE8B6D7930DB14E8BFFF396AAE6A2E3BADF10` |
+| Demo | `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files\SatiDemoSetup-1.3.39.exe` | 104,583,168 | `B7E18B675B53C0B024E09162183DEE0E4B3A9EE9A9ECEF1FE6051D4AA99FFCEB` |
+
+`artifacts/datt-1.3.39/distribution-evidence.json` records all four exact paths, hashes and sizes,
+and binds the two successful acceptance JSON hashes. Cloud-sync receipt is unverified. Distribution
+does not update the working installation: LONGCHENPA's last observed installed Local version remains
+**1.3.38.0**; other machines remain unknown. Upgraded desktop next-launch migration is still the
+Local owner's responsibility. [The dated working ledger](docs/readiness/work-evidence.md#2026-10-09--1339-installer-acceptance-and-distribution)
+owns commands, earlier refusal and gate limits. No working database or real claim was exercised.
