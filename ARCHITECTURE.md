@@ -34,6 +34,9 @@ retains its reviewed design. The [implemented W8 boundary](BACKGROUND_WORKERS_HA
 adds shared Contracts readiness rules, Persistence account state and API-owned due/hold/reopen.
 WPF uses safe DTOs and an authorized HTTP command; no desktop scheduler or key resolver is added.
 Source migration and local verification do not establish deployed activation or broader fairness.
+The [idle/wake design](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal)
+proposes one API-owned scheduling boundary around the existing loop. Its policy is pending review;
+existing hosted cadence remains unchanged and no client scheduler/activity heartbeat is added.
 
 The [desktop test boundary](docs/architecture/desktop.md) explicitly suppresses production
 startup while loading canonical UI resources; omitting Application.Run does not suppress the

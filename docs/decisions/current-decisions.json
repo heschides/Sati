@@ -153,6 +153,15 @@
       "status": "accepted",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": ["DEC-0234"]
+    },
+    {
+      "id": "DEC-0236",
+      "date": "2026-10-09",
+      "title": "Activity-bounded Demo dispatch scheduling proposal",
+      "path": "docs/decisions/current/2026-10-09-DEC-0236.md",
+      "status": "proposed",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

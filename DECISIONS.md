@@ -10,6 +10,11 @@ current-decision collection. New decisions never change the immutable import's c
 
 ## Governing boundaries
 
+The bounded dispatch idle/wake/activity/due design is proposed in
+[DEC-0236](docs/decisions/current/2026-10-09-DEC-0236.md). [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal)
+owns the concrete policy, tradeoffs and unrun acceptance. Runtime adoption remains pending;
+this fills a design dependency without changing D1–D4 or DEC-0235's accepted recovery behavior.
+
 Accepted account readiness, scoped recovery and additive source migration are recorded in
 [DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md), explicitly superseding DEC-0234's pending
 approval/implementation status. [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)

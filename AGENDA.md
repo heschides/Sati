@@ -63,7 +63,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | Stable ID | Status | Work and acceptance owner |
 |---|---|---|
 | SATI-TEN-001 | planned | Structural tenant owners/composite constraints and shared/database-per-tenant/hybrid decision; [architecture](docs/architecture/identity.md), [structural review](SATI_STRUCTURAL_REVIEW_2026-09-28.md). Preserve current caseload/capability checks. |
-| SATI-WRK-001 | partial; bounded missing-key readiness/recovery source implemented; broader W8 pending | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [isolation proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal), [working evidence](docs/readiness/work-evidence.md). |
+| SATI-WRK-001 | partial; missing-key recovery released; idle/wake design complete, policy review pending; broader W8 open | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [scheduling proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal), [working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-design). |
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
@@ -96,35 +96,34 @@ authorization requirements; no release outcome is established by this invocation
 
 **Next eligible item:** SATI-WRK-001
 
-**Eligibility:** the approved missing-key account isolation source slice is complete. Josh's
-explicit approval is recorded in [DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md);
-[W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
-owns behavior and [working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
-owns actual checks and limits. Later approved Demo migration/baseline/reset preparation is tracked
-in [working evidence](docs/readiness/work-evidence.md#2026-10-09--readiness-migration-runner-preparation),
-with observations and scope in [the environment inventory](DATABASE_ENVIRONMENTS.md#demo-readiness-migration-preflight--october-9-2026).
-A new release invocation and the prescribed rollout checks remain pending; dispatch activation
-remains separate. This preparation does not change the next-work design pointer.
+**Eligibility:** the approved missing-key account recovery is included in completed release 1.3.39;
+[DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md) retains its authority and
+[the environment inventory](DATABASE_ENVIRONMENTS.md#1339-controlled-demo-rollout--october-9-2026)
+owns dated rollout facts. Dispatch activation remains separate. The October 9 idle/wake design
+is now complete at audited source `d223b1736df18202e397cea53a328984c50c3416`;
+[DEC-0236](docs/decisions/current/2026-10-09-DEC-0236.md) records the concrete **proposed** policy.
 
-**Bounded slice:** design reviewed idle/wake/activity/due scheduling for dispatch before
-activation. Inventory current three-second idle SQL selection, host wake catch-up, earliest-due
-eligibility and available trusted activity signals; propose a bounded wait policy and acceptance.
-Do not add wake pings, a second scheduler, shorter polling, live load or cloud changes. Numeric
-backoff alone does not establish idle capacity protection. Implementation of a new runtime
-cadence requires review of the concrete policy and satisfied D1–D4 dependencies. Broader fair
-lane selection, global/tenant budgets, API admission, sustained-load proof and owner-run alerts
-remain open. This pointer does not start that larger slice in the current task.
+**Bounded slice:** review/adopt or amend [the idle/wake/activity/due proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal),
+especially its inactivity tradeoff and signal allowlist. Once explicitly adopted, the next local
+source slice implements only this scheduling boundary in the existing API loop and validated/
+committed handlers, with fail-first hosted fake-time/race and private synthetic SQL acceptance.
+Until then, runtime cadence is blocked on that policy decision; do not infer adoption from design
+completion or a request to start unrelated work. No new wake ping, heartbeat, scheduler, shorter
+polling, schema, live load, cloud setting, release or dispatch activation belongs to this slice.
 
 **Dependencies and owners:** [W8](BACKGROUND_WORKERS_HANDOFF.md), D1–D4,
-[operations](OPERATIONS.md), trusted activity sources and supported host/schema versions.
-The concrete idle-wait policy must be reviewed before runtime changes. Schema, cloud settings,
-live provider work and release actions retain separate authorization.
+[operations](OPERATIONS.md), supported compatible host/schema versions and approved publishers.
+Inventory found no general trusted presence service; authenticated allowlisted request activity
+is a bounded contract, not proof of human presence. Typed turn outcomes must distinguish empty
+work from contention/failure. Existing billing/readiness/lease/uncertainty gates remain unchanged.
+Broader fair selection, global/tenant budgets, API admission, sustained-load and owner alerts
+remain open and do not follow from adopting this proposal.
 
-**Boundaries and completion evidence:** source/design inventory and a concrete scheduling
-proposal with fake-time acceptance, no-user idle SQL budget and startup/wake catch-up cases.
-Record actual/unrun evidence in the working ledger; follow
-[standing upkeep](AGENTS.md#standing-work-and-documentation-upkeep). This does not close W8
-capacity/fairness or change a sealed readiness score.
+**Boundaries and completion evidence:** [dated design evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-design)
+records actual source/structure checks and explicitly **unrun** scheduling acceptance. Future
+implementation must measure zero dormant scheduling SQL, finite active turns, due boundaries,
+lost-hint/cross-host/startup/suspend behavior and safe cancellation without touching working data.
+Follow [standing upkeep](AGENTS.md#standing-work-and-documentation-upkeep); no sealed score changes.
 
 ## Preserved open-work inventory
 

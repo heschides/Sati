@@ -2507,6 +2507,72 @@ it does not change the sealed readiness scores or satisfy independent launch cri
 scope/dependencies and separate activation authority in [the agenda](../../AGENDA.md#next-eligible-work).
 No broader worker implementation is started by closing this release.
 
+## 2026-10-09 — SATI-WRK-001 dispatch idle-wake design
+
+**Stable work ID and bounded slice:** SATI-WRK-001, review the existing dispatch scheduling and
+design idle/wake/activity/due integration. Josh requested the next agenda item after 1.3.39;
+this is a design/documentation slice, not runtime cadence implementation or dispatch activation.
+
+**Status and source:** inventory/design complete at
+`d223b1736df18202e397cea53a328984c50c3416`. [DEC-0236](../decisions/current/2026-10-09-DEC-0236.md)
+is proposed for policy review. [The worker owner](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal)
+owns exact recommendation, numbers, source inventory, acceptance cases and tradeoffs. The agenda
+pointer now identifies review/adoption as the next dependency, not another release invocation.
+
+**Actual inventory:** read the current loop/selection/account recovery, gate, reset/dispatch/account
+coordination, queue/reopen commits, login/renewal, stored actor filter and billing ViewModel loads/
+refreshes. `rg` source searches located every API Queued insertion and readiness-to-Ready writer;
+no dispatch activity service, post-commit signal or general trustworthy presence timestamp was
+found. The enabled loop delays three seconds only after false/failure and immediately continues
+after true. About 20 empty selection attempts/minute is arithmetic from that source, not measured
+command/connection/CPU evidence. Reset coordination also opens SQL for locks, so selection count
+alone cannot establish total cost. Initial path/glob searches used nonexistent conventional
+Services/Workers paths and unsupported literal wildcard paths; corrected searches covered the
+actual Infrastructure/Endpoints owners. No source mutation was made during inspection.
+
+**Proposal and ownership:** one constructor-injected API activity/wait owner, finite local activity,
+bounded startup, paced single turns, durable relevant due times and active-only reconciliation;
+park without SQL on inactivity. Stored actor/permission checks and post-commit queue/reopen facts
+precede hints. Qualifying requests are not human-presence proof, global budget or reliable events.
+Preserve common admission, same-account ownership, reset/dispatch leases, current exact-subset
+billing checks and Sending/OutcomeUnknown reconciliation. The proposal needs no new schema,
+client timer, provider API, external notification or security setting. Architecture indices and
+operations link the canonical proposal; the decision registry records rejected alternatives and
+unchanged D1–D4/DEC-0235. Prior release/decision/snapshot reasoning remains intact.
+
+**Actual checks:** documentation structure **passed** with 46 root documents, 28 scoped owners,
+12 preserved snapshots, 454 retained open items, 218 imported and 18 current decision records.
+All **22** disposable negative mutation proofs passed. Evidence is in
+`artifacts/worker-idle-wake-design-2026-10-09/structure.json` and `documentation-negative.json`.
+Source preflight/report-history passed at unchanged release 1.3.39 / 129 migrations; whitespace
+checks passed. The first structure check rejected two renamed required agenda labels; restored
+`Bounded slice` and `Boundaries and completion evidence` without changing the validator, then
+reran successfully. Final review also requires committed queue/reopen signals to follow owned
+lease disposal, avoiding manufactured contention. Local HEAD and fetched default master both
+remained the audited `d223b1736df18202e397cea53a328984c50c3416` before this design commit.
+No production/test source changed,
+so build, full product suites, actual-model gate and installer acceptance are not rerun.
+
+**Unrun evidence and limits:** fake-time hosted-loop/publisher/barrier/clock cases and independent
+host private SQL cases are explicitly proposed, **not executed**. Existing direct-call account
+due tests establish eligibility only and are not used as hosted cadence proof. No live SQL,
+real-data access, hosting/capacity measurement, transport, cloud setting, deployment or activation
+was attempted. Source inspection does not prove a currently exploited incident or global fairness.
+No timer/connection/memory bound is claimed for the unchanged implementation. Acceptance still
+requires fail-first verification against the original loop and actual publisher paths.
+
+**Readiness class and remaining dependencies:** design/source inventory relevant to MT06, MT09,
+MT10, MT11 and OP10; no criterion advances and all sealed scores/rubrics remain unchanged.
+Review the five-minute inactivity policy, request allowlist, per-host pacing/cooldown and overdue
+retry tradeoff before implementation. Missing-key retries beyond the active window can wait until
+next qualifying use/start; future cloud Production needs its own durable scheduling/objective
+review. Broader aggregate SQL/dependency limits, agency fairness, API admission, intended-host
+load and owner/alert receipt remain activation dependencies.
+
+**Next eligible stable ID:** SATI-WRK-001, concrete policy review/adoption; then the narrowly
+bounded local scheduling implementation and acceptance once explicitly adopted. This design
+does not silently start the rest of W8 or a new release.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

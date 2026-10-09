@@ -621,3 +621,10 @@ queued and uncertain work during operational rollback; Down refuses unresolved s
 The existing idle loop, aggregate connection budget, configuration consistency, live notification
 owner/receipt and deployed query plans remain activation blockers, separately from source proof.
 No existing database migration or alert activation was performed by this source task.
+
+The later [dispatch idle/wake proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal)
+documents the inactivity/due tradeoff for review: an earliest retry time does not promise an
+unattended send, and delayed work catches up on qualifying use/start. This is proposed operating
+policy, not deployed behavior. No polling/heartbeat or support-console action should be added to
+keep dispatch active. Review/adopt the concrete policy before its separate local source slice;
+broader resource/alert/load requirements still gate activation.

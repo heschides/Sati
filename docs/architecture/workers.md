@@ -39,7 +39,12 @@ own exact recovery, staging, account session ownership, safe API/UI and additive
 [Working evidence](../readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
 distinguishes fake-time/source tests from private SQL ownership and operating evidence.
 
-Remaining W8: reviewed idle/wake integration (the three-second idle loop is unchanged), sustained
+The October 9 [idle/wake proposal](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal)
+inventories current cadence and proposes one API-owned activity/wait boundary. [DEC-0236](../decisions/current/2026-10-09-DEC-0236.md)
+is pending policy review; no new scheduling service or runtime cadence is implemented. It uses
+validated/committed existing requests as hints, not authorization or guaranteed user presence.
+
+Remaining W8: adoption and implementation of idle/wake integration (the three-second idle loop is unchanged), sustained
 fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant
 sessions and dependency budgets, API admission and synthetic load/live owner evidence. Account
 leases and missing-key deferral do not establish complete shared-dependency isolation or global

@@ -549,6 +549,130 @@ Remaining W8 includes reviewed idle/wake scheduling (the existing three-second i
 unchanged), fairness under sustained backlog/contention, aggregate sessions/dependency budgets,
 API admission, configuration consistency and owner-run operational/alert evidence.
 
+#### October 9 — dispatch idle-wake scheduling proposal
+
+**Status:** SATI-WRK-001 source inventory and concrete design complete; runtime policy **proposed**
+in [DEC-0236](docs/decisions/current/2026-10-09-DEC-0236.md), awaiting Josh's review. No application,
+schema, client, worker flag or hosting setting changes in this slice. D1–D4 and the approved
+account recovery rules remain in force. The next source implementation depends on adoption of
+this policy; activation additionally depends on the broader W8 gates. This section owns the
+proposal; indices and operational notes link here instead of copying its numeric policy.
+
+**Inventory at `d223b1736df18202e397cea53a328984c50c3416`:**
+
+| Source owner | Observed behavior and design consequence |
+|---|---|
+| `ClearinghouseDispatchWorker.ExecuteAsync` | Default-off startup exits before work. When enabled, first turn runs immediately; a true result continues without delay, false or caught failure delays three seconds. The delay does not use the injected clock. An enabled empty queue therefore causes about 20 selection attempts per minute while the host remains alive; this is a cadence calculation, not a measured SQL command/CPU bound. |
+| `ProcessOneAsync` / `ProcessUnderResetLeaseAsync` | Each enabled turn enters reset coordination and creates a context before selecting the globally oldest eligible Queued row. Durable Deferred time is checked with `TimeProvider`; Held and future Deferred accounts are excluded. It does not return the earliest future due time. False also means lease contention, changed/stale work or disabled gate, so false cannot safely mean an empty queue. |
+| `SqlDemoWorkerResetCoordination` | Reset, dispatch and account session leases can open separate SQL connections. Reset/account locks are zero-wait; they are not resource reservations. Even an empty turn may do reset lock acquire/release in addition to selection. Count these separately from the selection budget. All connections/leases must be disposed before a scheduling wait. |
+| Queue/reopen endpoints | New queue intent is saved and committed before success; reopen commits restored readiness with the human audit. There is no post-commit scheduling notification. Queue's exact-file replay/recovery paths can return an existing row and must not fabricate a new commit or send. |
+| Login / `ValidatedActorFilter` | Login verifies stored enabled identity, current password/security/agency/role/permissions, saves its audit and issues a database-bound token. Ordinary API routes validate stored identity and database instance before the handler. There is no general trusted user-presence timestamp or dispatch activity service. Authentication middleware alone is too early. |
+| Billing workspace / client calls | The billing GET is gated and scoped, and currently loads on billing navigation, explicit refresh and related command completion in `BillingSubmissionsViewModel`; no periodic dispatch timer was found in that ViewModel. It is a possible validated work signal, not proof of human presence. Token renewal, health probes, incident delivery and WebSocket traffic are unsuitable activity sources. |
+| Startup/restart and existing tests | The first turn reevaluates durable UTC readiness, so overdue work is eligible after restart. A suspended surviving process has no explicit wake hook. Current account due tests invoke `ProcessOneAsync` directly: they prove eligibility, not hosted waiting or inactivity. There is no cross-host wake channel. |
+
+**Recommended activity contract.** Add one constructor-injected API scheduling owner used only
+by the existing hosted dispatch loop and the exact successful handlers below. It holds scalar
+activity/deadline state and a capacity-one coalesced signal, with no per-user/agency/account map.
+The signal is only a hint to reread authoritative work; it grants no permission, account selection
+or release eligibility. Never enqueue a file, key, token or caller-supplied timestamp in it.
+
+- Successful **login** for a supported, positive-agency ordinary user, after current stored
+  checks, audit persistence and token issuance; exclude PlatformOperator/support identities.
+- Successful, enabled **billing clearinghouse workspace GET**, after stored actor validation,
+  billing permission, scope checks and completion of the response projection.
+- Newly committed **queue** intent, or an authorized exact-file replay/recovery whose returned
+  row remains Queued for that same agency/account. A replay hint changes no audit or business state.
+- Successfully committed **Admin preflight reopen**, after its second authority/binding/revision
+  checks and commit. Failed, rolled-back, stale, foreign, busy or key-unavailable responses do not
+  signal. A commit followed by response loss may still signal; response success is not its authority.
+
+Exclude `/auth/renew`, generic `/me`/GETs, health, telemetry/watchdogs, worker progress, reset logs,
+chat keep-alives and anonymous/failed requests. No request header, UI idle timestamp or JWT claim
+creates activity. Existing request checks are reused; the signal performs no extra SQL and never
+weakens revocation. Notification failure must not turn a successful business commit into a retryable
+error. For queue/reopen, capture the committed outcome inside the owned write, but publish only
+after its transaction/account coordination scopes release: waking a worker while the reopening
+lease is still held would manufacture contention and a needless cooldown. Do not await work
+completion from the request. Automatic clients must not add a heartbeat/refresh loop to these routes. The supported
+contract means qualifying authenticated API use, not guaranteed physical user presence: an
+authorized caller can automate an allowed action. Expensive-request admission remains SATI-SEC-001.
+
+**Recommended wait policy (Demo/Testing only):**
+
+| State/event | Proposed action and bound |
+|---|---|
+| Disabled, stopping or canceled before a turn | Zero dispatch scheduling SQL or key/provider calls; clear pending hints/waits and stop. Enabling requires a compatible host restart under the existing configuration model, not an idle SQL feature-flag poll. |
+| Enabled host start | Exactly one catch-up turn against persisted Queued/readiness state. Startup alone does not grant an active period, drain a backlog or schedule future retries. This is a bounded startup exception, not a recurring idle poll; repeated hosting restarts are a separate capacity risk. |
+| Qualifying activity | Grant/renew a **five-minute** local active period from server monotonic time and coalesce a catch-up hint. Start the next turn when its pacing/cooldown allows; recheck the gate and cancellation first. |
+| Any dispatch turn | One turn at a time per host, with **at least three seconds between turn starts**, including successful turns. Thus at most **20 starts in any half-open 60-second interval per host**; current immediate successful-loop draining is deliberately removed. This bounds starts, not duration or total SQL. |
+| Active with eligible backlog | Continue paced turns only until activity expires; work completion never renews activity. Preserve the existing one-row selection, leases, account readiness and current release checks. No fairness or queue-drain deadline is promised. |
+| Active, truly empty selection | Obtain one bounded schedule snapshot: scalar existence of eligible Queued work plus earliest future Deferred UTC time joined to same-agency Queued work. Held, Sending, OutcomeUnknown and future Deferred in synthetic-only mode never cause a retry timer. Materialize no account list. |
+| Active, waiting | Wait in memory until the earliest of a coalesced hint, relevant due instant, **60-second active reconciliation**, active expiry or cancellation. The reconciliation checks cross-host commits/lost hints only while active, through this same loop. No separate scheduler or SQL-held timer. |
+| Active expiry / dormant | Dispose all contexts/leases and cancel due/reconciliation timers. **Zero further dispatch scheduling SQL for any idle duration**, even if a Deferred account becomes due. Wait for a qualifying signal or a real host restart. Due work remains durable and overdue; the next catch-up reevaluates it. |
+| Reset/dispatch/account contention or shared/unclassified failure | Do not interpret it as empty or consume an account failure. Apply a **60-second local cooldown**, bounded by activity expiry, before another automatic turn. A new hint coalesces but cannot bypass cooldown. No automatic startup-only retry. Preserve safe logging and existing uncertainty. |
+
+Persisted account due times retain UTC and the approved 1/5/15/60-minute recovery delays; they are
+earliest eligibility, not promised delivery times. Five-minute activity/pacing/cooldown use the
+injected TimeProvider's monotonic timestamps. In active state recheck UTC at least at the
+60-second reconciliation boundary to handle clock changes; a backward change must never probe
+before the current persisted due instant. Never replay each missed tick after suspend/restart.
+On expiry do not start another turn. An in-flight turn finishes or cancels under its existing
+safe write/retention rules: inactivity does not roll back Sending, discard a receipt or schedule
+another upload. The 45-second connector exchange deadline is not a whole-turn deadline.
+
+**SQL and signal integration:** replace the ambiguous scheduling bool with internal typed outcomes
+for processed, empty-with-snapshot, contended, disabled and failed turns; retain a compatibility
+wrapper if the existing one-turn tests need it. Do not treat account/stale-selection lease misses
+as empty. The empty snapshot runs under reset exclusion and has bounded scalar projection;
+SQL-provider indexes/query-plan evidence remains required. Per host, the proposal caps selection
+starts at 20/minute and allows at most one schedule-snapshot command for a truly empty turn.
+This is at most 40 top-level selection/snapshot commands/minute under continuous activity, plus
+existing locks, validation, history and write commands. It is **not a total SQL/connection budget**.
+With H active hosts those local caps can multiply by H; aggregate admission remains open W8 work.
+
+Capture a signal generation before discovery and recheck it atomically when arming the wait;
+commit/signal between an empty read and parking must not disappear. Repeated signals merge into
+one pending hint, never spawn another processor or accumulate payloads. A stale due snapshot
+can cause only a requery, never override current readiness/gate/authority. Failure to publish a
+local hint or a commit on another host is recovered within the active reconciliation opportunity,
+subject to pacing/available dependencies; a dormant other host remains dormant. No new distributed
+event service, schema or cross-host latency guarantee is invented. Existing SQL coordination
+continues to exclude duplicate sends; signal delivery is not exactly-once execution.
+
+**Fake-time acceptance to implement after review (not executed in this design slice):** count
+selection/snapshot commands and coordination opens separately, with deterministic barriers;
+drive the actual hosted loop and real signal publishers, not only a second copy of the policy.
+
+| Case | Required observation |
+|---|---|
+| Disabled / pre-canceled | Zero scheduling contexts, coordination opens and connectors, regardless of signals/time advances. |
+| Enabled cold start, empty or overdue | One catch-up turn; no automatic backlog drain or second startup-only query after 24 hours. Overdue work passes the ordinary release gate; held/uncertain work is never sent. |
+| Five-minute inactivity | After an authorized hint and any already-started turn, advance through exact expiry and another 24 hours: zero additional scheduling SQL. Fake due times during dormancy do not wake SQL. |
+| Ready backlog and hint flood | No start at 2.999 seconds after the prior start, next allowed at three seconds; at most 20 starts in any half-open minute, one processor and one pending hint. Completed work does not extend expiry. |
+| Active empty queue | No three-second SQL polling: reconciliation only at 60-second boundaries unless a qualifying hint or relevant due time intervenes. At expiry, no reconciliation SQL even if its timer also fires. |
+| Deferred before/at due | With an active period covering due, no key/connector before the exact persisted instant. At due, one paced ordinary turn; if due follows expiry it remains parked until activity. No drift-based early probe or missed-tick replay. |
+| Held / synthetic-only deferred | No due timer from either state; unrelated healthy Queued work still gets paced turns. |
+| Publisher authorization and commit order | Only the four allowlisted successful paths signal. Revoked/foreign/failed/unsupported/renewal/health requests signal zero times. Queue rollback emits no hint; barriers prove commit and owned lease disposal precede the hint. Valid committed/replayed Queued identity coalesces without a second business effect. |
+| Empty-read/commit race | Commit just before wait-arm and just after wait-arm with barriers: neither local hint is lost; no parallel processing. |
+| Cross-host or lost hint | Active host learns committed work at its next 60-second reconciliation opportunity; dormant host does zero SQL. Private SQL two-host tests retain same-dispatch/reset/account exclusion and exact retained bytes/audits. |
+| Contention / shared failure | Retry not before 60 seconds while still active; signal storms cannot bypass cooldown. No account failure consumed, no tight false-result loop; expiry parks. |
+| Restart / surviving-host wake | Restart gets one catch-up from persisted UTC; an existing process gets catch-up only through qualifying activity. Neither needs a wake ping or fires missed intervals in a burst. |
+| Clock change | Monotonic activity/pacing remain stable; forward/backward UTC changes requery eligibility without early send or an inactive query. |
+| Disable / cancel / expiry in flight | Gate/cancel before start avoids I/O; cancellation/expiry after Sending preserves uncertainty and receipt handling, with no resend. Wait cancellation disposes timers/readers and all lease/context ownership. |
+
+Regression acceptance must fail against the unchanged idle loop for zero-idle-SQL, pacing after
+success and publisher/race cases before any implementation is kept. Existing direct-call due,
+billing admission, missed-key recovery and uncertainty tests remain necessary but do not prove
+hosted scheduling. Do not count these proposed cases as passing tests or readiness credit.
+
+**Tradeoff for review:** an overdue retry may wait beyond an hour, until the next qualifying use
+or host start; long active backlogs stop when activity expires. This deliberately preserves D2
+instead of keeping Demo awake for unattended dispatch. Future cloud Production needs a separately
+reviewed durable wake/capacity/service objective, not automatic reuse of this Demo policy. No
+shorter polling, client heartbeat, new timer Function, periodic health-driven wake, per-account
+scheduler, implicit key reopen or increased concurrency is proposed. Broader fairness, aggregate
+resource budgets, measured query cost, alert receipt and intended-host load remain activation gates.
+
 #### October 9 — retained isolation proposal detail
 
 **Reviewed proposal status before acceptance:** SATI-WRK-001 design and bounded failure reproduction; application scheduling is
