@@ -26,7 +26,7 @@ public sealed partial class FoundryLocalCaseNoteFormatter : ICaseNoteFormatter, 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
-        WriteIndented = true
+        WriteIndented = false
     };
 
     private readonly LocalAiOptions _options;
@@ -121,7 +121,12 @@ public sealed partial class FoundryLocalCaseNoteFormatter : ICaseNoteFormatter, 
                         - Sparse facts require sparse prose. Never complete a plausible story.
                         - Begin the first narrative sentence with `CCM ` as its subject. Sati expands
                           that token into the required author envelope after validation.
-                        - Return JSON only. Do not return markdown fences, a title, or commentary.
+                        - The JSON followUp.text contains only the section body. Sati adds the
+                          `Follow-up:` section label when rendering; do not prefix that label to the field.
+                        - Return either a compact JSON plan or the exact unquoted token
+                          {UseSafeBaselineToken} when uncertain. For JSON, omit indentation and formatting
+                          whitespace outside quoted string values. Keep spaces within text values.
+                          Do not return markdown fences, a title, or commentary.
 
                         LOCAL CASE-NOTE STYLE STANDARD:
                         {rules}
@@ -143,9 +148,18 @@ public sealed partial class FoundryLocalCaseNoteFormatter : ICaseNoteFormatter, 
                         SAFE BASELINE PLAN:
                         {{baselineJson}}
 
+                        FIXED NO-FOLLOW-UP FIELD:
+                        If the baseline followUp.factIds contains {{CaseNoteDraftRules.NoFollowUpFactId}},
+                        copy that entire followUp object exactly. Its text must remain
+                        {{JsonSerializer.Serialize(CaseNoteDraftRules.NoFollowUpText)}} and its only fact id
+                        must remain {{CaseNoteDraftRules.NoFollowUpFactId}}. Do not polish, paraphrase,
+                        expand, or prefix a section label to that fixed text.
+
                         Make the SAFE BASELINE PLAN's sentence text more professional only when you can
-                        satisfy every rule. Never remove a sentence or fact id. If uncertain, return exactly
+                        satisfy every rule and preserve the fixed field above. Never remove a sentence
+                        or fact id. If uncertain, return exactly
                         {{UseSafeBaselineToken}} instead of JSON.
+                        Otherwise return compact JSON without indentation.
                         Return no commentary or markdown.
                         """
                 }
@@ -239,9 +253,14 @@ public sealed partial class FoundryLocalCaseNoteFormatter : ICaseNoteFormatter, 
                         The previous answer was rejected by Sati's deterministic fact checks:
                         {repairErrors}
 
-                        Return a completely new JSON plan from the same CURRENT NOTE FACTS. Retain every
+                        When returning JSON, produce a completely new compact plan from the same CURRENT NOTE FACTS. Retain every
                         required fact and required selector phrase. Use source vocabulary wherever possible.
                         Add no names, numbers, conclusions, chronology, negation, or other content.
+                        The followUp.text is only the section body; Sati adds the `Follow-up:` label.
+                        If the baseline followUp.factIds contains {CaseNoteDraftRules.NoFollowUpFactId},
+                        copy that entire followUp object exactly: text
+                        {JsonSerializer.Serialize(CaseNoteDraftRules.NoFollowUpText)} and only fact id
+                        {CaseNoteDraftRules.NoFollowUpFactId}. Do not polish, expand or prefix that fixed text.
                         If there is any uncertainty, return exactly {UseSafeBaselineToken} and nothing else.
                         """
                 });

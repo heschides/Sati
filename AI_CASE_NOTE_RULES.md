@@ -13,6 +13,9 @@ with approved, de-identified examples.
 3. End every note with a final section beginning exactly `Follow-up:`. Use only a follow-up
    explicitly supplied in a follow-up-enabled current-note fact. If none is supplied, Sati
    will render exactly `Follow-up: No follow-up was documented.` Never infer a next action.
+   The JSON `followUp.text` holds only the body: Sati adds the section label when rendering.
+   Copy the supplied no-follow-up baseline object verbatim; its fixed text and fact id are
+   not prose to polish or expand.
 4. Produce a concise professional narrative, not a list of invented template fields.
 5. Retain the source's meaning and all material facts. Never add a fact merely because
    it would make the note more complete.
