@@ -25,6 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Sati.Api.Tests\PayerBillingSynthetic.cs" Link="PayerBillingSynthetic.cs" />
+    <Compile Include="..\Sati.Api.Tests\RetainedGenerationReplayInterceptor.cs" Link="RetainedGenerationReplayInterceptor.cs" />
     <None Update="Fixtures\PayerBilling-MaineCare.837" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

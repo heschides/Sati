@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Sati.Contracts.V1;
 using Sati.Data;
 using Sati.Models;
@@ -30,11 +31,11 @@ internal sealed class NoteEntryFixture : IAsyncDisposable
     public int PersonOneId { get; private set; }
     public int PersonTwoId { get; private set; }
 
-    public static async Task<NoteEntryFixture> CreateAsync()
+    public static async Task<NoteEntryFixture> CreateAsync(params IInterceptor[] interceptors)
     {
         var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<SatiContext>().UseSqlite(connection).Options;
+        var options = new DbContextOptionsBuilder<SatiContext>().UseSqlite(connection).AddInterceptors(interceptors).Options;
         var fixture = new NoteEntryFixture(connection, options);
         await fixture.SeedAsync();
         return fixture;

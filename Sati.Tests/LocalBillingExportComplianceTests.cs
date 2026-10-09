@@ -1,5 +1,7 @@
 using System.IO;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Sati.Testing;
 using Sati.Contracts.V1;
 using SatiLogica.Contracts;
 using Sati.Data;
@@ -13,6 +15,88 @@ namespace Sati.Tests;
 
 public sealed class LocalBillingExportComplianceTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetainedOriginalReplaysThroughRecoveryAndRefusesChangedPeriodOrMode(bool duplicateWriteRecovery)
+    {
+        var replayLookup = new RetainedGenerationReplayInterceptor();
+        await using var fixture = await ExportFixture.CreateAsync(replayLookup);
+        var key = Guid.NewGuid().ToString("N");
+        var path = await fixture.ExportAsync(key);
+        var bytes = await File.ReadAllBytesAsync(path);
+        await using var db = fixture.Inner.Factory.CreateDbContext();
+        var counts = (await db.EdiGenerations.CountAsync(), await db.BillingSubmissionEvents.CountAsync(), await db.AuditEvents.CountAsync());
+        if (duplicateWriteRecovery) replayLookup.HideKeyOnce = key;
+        Assert.Equal(path, await fixture.ExportAsync(key));
+        Assert.Equal(duplicateWriteRecovery, replayLookup.RecoveryLookupObserved);
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(path));
+        var wrongMode = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.ExportAsync(key, false));
+        var wrongPeriod = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.ExportAsync(key, true, fixture.PeriodId + 1));
+        Assert.Contains("retry key", wrongMode.Message);
+        Assert.Contains("retry key", wrongPeriod.Message);
+        Assert.Equal(counts, (await db.EdiGenerations.CountAsync(), await db.BillingSubmissionEvents.CountAsync(), await db.AuditEvents.CountAsync()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OriginalExportCannotReplayARetainedFrequencyOneCorrection(bool duplicateWriteRecovery)
+    {
+        var replayLookup = new RetainedGenerationReplayInterceptor();
+        await using var fixture = await ExportFixture.CreateAsync(replayLookup);
+        var originalPath = await fixture.ExportAsync();
+        var originalBytes = await File.ReadAllBytesAsync(originalPath);
+        var key = Guid.NewGuid().ToString("N");
+        await using var db = fixture.Inner.Factory.CreateDbContext();
+        var original = await db.EdiGenerations.AsNoTracking().SingleAsync();
+        var period = await db.BillingPeriods.Include(x => x.Lines).SingleAsync();
+        var line = Assert.Single(period.Lines);
+        var correction = new ClaimCorrection
+        {
+            AgencyId = original.AgencyId, BillingPeriodId = period.Id, ClaimLineId = line.Id, NoteId = line.NoteId,
+            Action = ClaimCorrectionAction.Resubmit, CorrectsEdiGenerationId = original.Id,
+            ClaimSnapshotJson = line.ClaimSnapshotJson!, ClientMaineCareId = line.ClientMaineCareId,
+            RenderingProviderNpi = line.RenderingProviderNpi, DiagnosisCode = line.DiagnosisCode,
+            PlaceOfService = line.PlaceOfService, Reason = "Synthetic rejected claim identity corrected.",
+            RequestedByUserId = original.ActorUserId, RequestedAtUtc = DateTime.UtcNow
+        };
+        db.ClaimCorrections.Add(correction);
+        var retained = new EdiGeneration
+        {
+            AgencyId = original.AgencyId, ActorUserId = original.ActorUserId, BillingPeriodId = period.Id,
+            IdempotencyKey = key, IsTest = true, IsCorrection = true, ControlNumber = "987654321",
+            FileName = $"837P.OATEST_CORRECTION_{key}.txt",
+            Content = Professional837Formatter.Generate(period.Id, period.Year, period.Month,
+                [new Professional837Claim(line.NoteId, new ProfessionalClaimLineFacts(line.Id, line.DateOfService,
+                    line.ProcedureCode, line.ProcedureModifier, line.Units, line.ChargeAmount, line.ClientMaineCareId,
+                    line.RenderingProviderNpi, line.DiagnosisCode, line.PlaceOfService, line.ClaimSnapshotJson), "1", null)],
+                TradingPartnerProfile.OfficeAlly, true, DateTime.UtcNow, "987654321")
+        };
+        db.EdiGenerations.Add(retained);
+        await db.SaveChangesAsync();
+        db.ClaimCorrectionSubmissions.Add(new ClaimCorrectionSubmission
+            { ClaimCorrectionId = correction.Id, EdiGenerationId = retained.Id });
+        await db.SaveChangesAsync();
+        Assert.Equal("1", Assert.Single(ClaimResponseReader.ReadSubmission(retained.Content).Claims).FrequencyCode);
+        var correctionPath = Path.Combine(Path.GetDirectoryName(originalPath)!, retained.FileName);
+        Assert.False(File.Exists(correctionPath));
+        var counts = (await db.EdiGenerations.CountAsync(), await db.ClaimCorrectionSubmissions.CountAsync(),
+            await db.BillingSubmissionEvents.CountAsync(), await db.AuditEvents.CountAsync());
+
+        if (duplicateWriteRecovery) replayLookup.HideKeyOnce = key;
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.ExportAsync(key));
+
+        Assert.Contains("retry key", failure.Message);
+        Assert.Equal(duplicateWriteRecovery, replayLookup.LookupHidden);
+        Assert.Equal(duplicateWriteRecovery, replayLookup.RecoveryLookupObserved);
+        Assert.False(File.Exists(correctionPath));
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(originalPath));
+        Assert.Equal(counts, (await db.EdiGenerations.CountAsync(), await db.ClaimCorrectionSubmissions.CountAsync(),
+            await db.BillingSubmissionEvents.CountAsync(), await db.AuditEvents.CountAsync()));
+        Assert.Equal(retained.Content, (await db.EdiGenerations.AsNoTracking().SingleAsync(x => x.Id == retained.Id)).Content);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -244,14 +328,15 @@ public sealed class LocalBillingExportComplianceTests
     private sealed class ExportFixture(NoteEntryFixture inner, int periodId, SessionService session) : IAsyncDisposable
     {
         public NoteEntryFixture Inner { get; } = inner;
+        public int PeriodId { get; } = periodId;
         private readonly string _key = Guid.NewGuid().ToString("N");
         private readonly HashSet<string> _keys = [];
 
-        public Task<string> ExportAsync(string? key = null)
+        public Task<string> ExportAsync(string? key = null, bool isTest = true, int? requestedPeriodId = null)
         {
             var requestKey = key ?? _key;
             _keys.Add(requestKey);
-            return new EdiService(Inner.Factory, session).GenerateAndSaveAsync(periodId, true, requestKey);
+            return new EdiService(Inner.Factory, session).GenerateAndSaveAsync(requestedPeriodId ?? PeriodId, isTest, requestKey);
         }
 
         public Task RevokeAttestationAsync(Form form) => new FormService(Inner.Factory, session)
@@ -267,9 +352,9 @@ public sealed class LocalBillingExportComplianceTests
                     "The exact PCP evidence is complete; recover this synthetic service note.", true));
         }
 
-        public static async Task<ExportFixture> CreateAsync()
+        public static async Task<ExportFixture> CreateAsync(params IInterceptor[] interceptors)
         {
-            var inner = await NoteEntryFixture.CreateAsync();
+            var inner = await NoteEntryFixture.CreateAsync(interceptors);
             inner.CaseManagerOne.Permissions = UserPermissions.CaseManagement | UserPermissions.Billing | UserPermissions.Supervision;
             await using var db = inner.Factory.CreateDbContext();
             (await db.Users.SingleAsync(x => x.Id == inner.CaseManagerOne.Id)).Permissions = inner.CaseManagerOne.Permissions;

@@ -59,6 +59,12 @@ authorization requirements.
 
 ## Explicit supersession
 
+The shared retained EDI request identity is recorded in
+[DEC-0231](docs/decisions/current/2026-10-09-DEC-0231.md). Original/correction kind is checked
+alongside period/mode in API and transitional local replay, including recovery. The
+[runbook](CLAIMMD_SANDBOX_RUNBOOK.md#retained-request-replay--local-source-october-9-2026)
+owns behavior and evidence limits; full lifecycle and queue/send compliance remain open.
+
 The original-claim cross-mode history, generic rejection and queued-reservation policy is recorded
 in [DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md), following Josh's explicit adoption of
 P1–P3. The rule and common transaction boundary remain unimplemented; the

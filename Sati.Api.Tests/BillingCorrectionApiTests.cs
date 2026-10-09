@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Sati.Testing;
 using Sati.Contracts.V1;
 using Xunit;
 
@@ -182,19 +184,25 @@ public sealed class BillingCorrectionApiTests
         Assert.Equal([nameof(ClaimCorrectionAction.Resubmit)], reversed.AllowedActions);
     }
 
-    [Fact]
-    public async Task AClaimRejectedBeforeReviewIsResentAsANewClaim()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AClaimRejectedBeforeReviewIsResentAsANewClaim(bool duplicateWriteRecovery)
     {
         // A fresh pipeline: the shared fixture's claim already has payment history, and a claim
         // the payer once adjudicated is (rightly) replaced rather than resent.
         await using var database = new SyntheticPipelineDatabase();
         await database.InitializeAsync();
-        await using var factory = new SyntheticPipelineFactory(database);
+        var replayLookup = new RetainedGenerationReplayInterceptor();
+        await using var factory = new SyntheticPipelineFactory(database, null, replayLookup);
         var actors = await factory.SeedAsync();
         var periodId = await JoinedBillingPipelineAcceptanceTests.PrepareSubmittedPeriodAsync(factory, actors);
         using var biller = await factory.SignInAsync("synthetic-biller");
-        (await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/edi",
-            new GenerateEdiRequest(true, Guid.NewGuid().ToString("N")))).EnsureSuccessStatusCode();
+        var originalKey = Guid.NewGuid().ToString("N");
+        var originalResponse = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/edi",
+            new GenerateEdiRequest(true, originalKey));
+        originalResponse.EnsureSuccessStatusCode();
+        var originalFile = (await originalResponse.Content.ReadFromJsonAsync<EdiFileDto>())!;
         (await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/mock-clearinghouse",
             new MockClearinghouseRequest(MockClearinghouseScenario.ClaimsRejected))).EnsureSuccessStatusCode();
 
@@ -212,14 +220,66 @@ public sealed class BillingCorrectionApiTests
         Assert.Equal(HttpStatusCode.OK, (await biller.PostAsJsonAsync(
             $"/api/v1/billing/periods/{periodId}/corrections",
             new CreateClaimCorrectionRequest(first.ClaimLineId, ClaimCorrectionAction.Resubmit, "MaineCare ID corrected."))).StatusCode);
+        var correctionKey = Guid.NewGuid().ToString("N");
         var response = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/corrections/edi",
-            new GenerateEdiRequest(true, Guid.NewGuid().ToString("N")));
+            new GenerateEdiRequest(true, correctionKey));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         var file = (await response.Content.ReadFromJsonAsync<EdiFileDto>())!;
         // Only the corrected claim goes, as a new claim with no payer number to cite.
         Assert.Single(ClaimResponseReader.ReadSubmission(file.Content).Claims);
         Assert.Contains("::1*", file.Content);
         Assert.DoesNotContain("REF*F8*", file.Content);
+
+        await using var db = factory.OpenDatabase();
+        var correctionGeneration = await db.EdiGenerations.AsNoTracking().SingleAsync(x => x.IdempotencyKey == correctionKey);
+        Assert.True(correctionGeneration.IsCorrection);
+        var link = await db.ClaimCorrectionSubmissions.AsNoTracking().SingleAsync(x => x.EdiGenerationId == correctionGeneration.Id);
+        var correction = await db.ClaimCorrections.AsNoTracking().SingleAsync(x => x.Id == link.ClaimCorrectionId);
+        Assert.Equal(first.ClaimLineId, correction.ClaimLineId);
+        Assert.Equal(ClaimCorrectionAction.Resubmit, correction.Action);
+        Assert.Equal((await db.EdiGenerations.SingleAsync(x => x.IdempotencyKey == originalKey)).Id,
+            correction.CorrectsEdiGenerationId);
+        var counts = (await db.EdiGenerations.CountAsync(), await db.ClaimCorrectionSubmissions.CountAsync(),
+            await db.BillingSubmissionEvents.CountAsync(), await db.AuditEvents.CountAsync());
+
+        // Both wire files have frequency 1. The retained request kind, rather than the
+        // wire frequency, must prevent replaying a correction through original export.
+        if (duplicateWriteRecovery)
+        {
+            replayLookup.HideKeyOnce = correctionKey;
+            replayLookup.HideControlOnce = correctionGeneration.ControlNumber;
+            replayLookup.InjectKeyConflict = true;
+        }
+        var wrongKind = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/edi",
+            new GenerateEdiRequest(true, correctionKey));
+        Assert.Equal(HttpStatusCode.Conflict, wrongKind.StatusCode);
+        Assert.Equal(duplicateWriteRecovery, replayLookup.LookupHidden);
+        Assert.Equal(duplicateWriteRecovery, replayLookup.RecoveryLookupObserved);
+        Assert.Equal("idempotency_key_reused", (await wrongKind.Content.ReadFromJsonAsync<ApiErrorDto>())!.Code);
+        var reverseKind = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/corrections/edi",
+            new GenerateEdiRequest(true, originalKey));
+        Assert.Equal(HttpStatusCode.Conflict, reverseKind.StatusCode);
+        var correctionReplay = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/corrections/edi",
+            new GenerateEdiRequest(true, correctionKey));
+        correctionReplay.EnsureSuccessStatusCode();
+        Assert.Equal(file, await correctionReplay.Content.ReadFromJsonAsync<EdiFileDto>());
+        if (duplicateWriteRecovery)
+        {
+            replayLookup.HideKeyOnce = originalKey;
+            replayLookup.HideControlOnce = (await db.EdiGenerations.SingleAsync(x => x.IdempotencyKey == originalKey)).ControlNumber;
+            replayLookup.InjectKeyConflict = true;
+        }
+        var originalReplay = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/edi",
+            new GenerateEdiRequest(true, originalKey));
+        originalReplay.EnsureSuccessStatusCode();
+        Assert.Equal(originalFile, await originalReplay.Content.ReadFromJsonAsync<EdiFileDto>());
+        var changedMode = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/corrections/edi",
+            new GenerateEdiRequest(false, correctionKey));
+        Assert.Equal(HttpStatusCode.Conflict, changedMode.StatusCode);
+        Assert.Equal("idempotency_key_reused", (await changedMode.Content.ReadFromJsonAsync<ApiErrorDto>())!.Code);
+        Assert.Equal(counts, (await db.EdiGenerations.CountAsync(), await db.ClaimCorrectionSubmissions.CountAsync(),
+            await db.BillingSubmissionEvents.CountAsync(), await db.AuditEvents.CountAsync()));
+        Assert.Equal(file.Content, (await db.EdiGenerations.AsNoTracking().SingleAsync(x => x.Id == correctionGeneration.Id)).Content);
     }
 
     [Fact]

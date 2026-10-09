@@ -7223,14 +7223,16 @@ internal static partial class ApiEndpoints
             var previous = await db.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(generation =>
                 generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                 generation.IdempotencyKey == normalizedKey, cancellationToken);
-            if (previous is not null && (previous.BillingPeriodId != periodId || previous.IsTest != request.IsTest))
-                return ReplayEdiOrConflict(previous, periodId, request.IsTest, profile);
+            if (previous is not null && !EdiReplayRules.Matches(
+                    new(previous.BillingPeriodId, previous.IsTest, previous.IsCorrection ? EdiRequestKind.Correction : EdiRequestKind.Original),
+                    new(periodId, request.IsTest, EdiRequestKind.Original)))
+                return ReplayEdiOrConflict(previous, periodId, request.IsTest, EdiRequestKind.Original, profile);
 
             var export = await LoadExportablePeriodAsync(db, actor, periodId, cancellationToken);
             if (export.Failure is not null) return export.Failure;
             var period = export.Period!;
             if (previous is not null)
-                return ReplayEdiOrConflict(previous, periodId, request.IsTest, profile);
+                return ReplayEdiOrConflict(previous, periodId, request.IsTest, EdiRequestKind.Original, profile);
 
             foreach (var line in period.Lines) await NoteAmendmentBilling.ValidateLineVersionAsync(db, actor.AgencyId, line.NoteId, line.AmendedNoteVersionId, cancellationToken);
             var generatedAt = clock.Now;
@@ -7293,7 +7295,7 @@ internal static partial class ApiEndpoints
                 var completed = await db.EdiGenerations.AsNoTracking().SingleAsync(generation =>
                     generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                     generation.IdempotencyKey == normalizedKey, cancellationToken);
-                return ReplayEdiOrConflict(completed, periodId, request.IsTest, profile);
+                return ReplayEdiOrConflict(completed, periodId, request.IsTest, EdiRequestKind.Original, profile);
             }
             return Results.Ok(file);
         });
@@ -10338,8 +10340,11 @@ internal static partial class ApiEndpoints
         ServerEdiGeneration generation,
         int billingPeriodId,
         bool isTest,
+        EdiRequestKind requestKind,
         TradingPartnerProfile profile) =>
-        generation.BillingPeriodId == billingPeriodId && generation.IsTest == isTest &&
+        EdiReplayRules.Matches(
+            new(generation.BillingPeriodId, generation.IsTest, generation.IsCorrection ? EdiRequestKind.Correction : EdiRequestKind.Original),
+            new(billingPeriodId, isTest, requestKind)) &&
         ClearinghouseAccountSelection.Matches(generation.Content, profile, generation.AgencyId, billingPeriodId, isTest)
             ? Results.Ok(new EdiFileDto(generation.FileName, generation.Content))
             : Results.Conflict(new ApiErrorDto(

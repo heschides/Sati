@@ -108,6 +108,15 @@
       "status": "accepted",
       "evidence": ["CLAIMMD_SANDBOX_RUNBOOK.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0231",
+      "date": "2026-10-09",
+      "title": "Retained EDI replay includes request kind",
+      "path": "docs/decisions/current/2026-10-09-DEC-0231.md",
+      "status": "accepted",
+      "evidence": ["CLAIMMD_SANDBOX_RUNBOOK.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

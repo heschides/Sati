@@ -38,9 +38,11 @@ identifies all normal history writers, current local capability limits, failed-t
 seams, poller execution ownership and Key Vault wrapping inside existing SQL transactions.
 The proposed no-network admission boundary requires staged encryption with protected revalidation
 and preserved duplicate/no-op behavior; it is not established by adding a lock. The first source
-slice is the independently bounded original/correction replay-kind check, using a proposed
-shared `EdiReplayRules` request-identity owner. Full lifecycle and transaction integration follow
-under separately scoped acceptance.
+slice now implements the shared `EdiReplayRules` request-identity owner for original/correction
+kind, period and mode, including duplicate-write recovery. The
+[replay owner](../../CLAIMMD_SANDBOX_RUNBOOK.md#retained-request-replay--local-source-october-9-2026)
+and [DEC-0231](../decisions/current/2026-10-09-DEC-0231.md) describe its bounded behavior and
+verification. Full lifecycle and transaction integration follow under their own acceptance.
 
 ## Canonical detailed owners
 

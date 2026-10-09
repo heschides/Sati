@@ -44,6 +44,10 @@ incident persistence remain separate work.
 
 ## Feature ownership
 
+The shared Contracts `EdiReplayRules` owns retained EDI request identity for API and transitional
+local replay. [The billing boundary](docs/architecture/billing.md) links its implementation and
+evidence; lifecycle permission and dispatch compliance remain separate owners.
+
 | Area | Current architecture reference | Canonical detailed policy/runbook |
 |---|---|---|
 | Identity, tenancy and sessions | [Identity boundary](docs/architecture/identity.md) | [Route inventory](API_AUTHORIZATION.md), [API security review](API_SECURITY_AUDIT.md) |

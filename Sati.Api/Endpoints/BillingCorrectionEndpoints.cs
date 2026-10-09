@@ -313,10 +313,7 @@ internal static partial class ApiEndpoints
                 generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.UserId &&
                 generation.IdempotencyKey == normalizedKey, cancellationToken);
             if (previous is not null)
-                return previous.IsCorrection
-                    ? ReplayEdiOrConflict(previous, periodId, request.IsTest, profile)
-                    : Results.Conflict(new ApiErrorDto("idempotency_key_reused",
-                        "This retry key was already used for a different EDI request.", string.Empty));
+                return ReplayEdiOrConflict(previous, periodId, request.IsTest, EdiRequestKind.Correction, profile);
 
             var period = await LoadAgencyPeriodAsync(db, actor, periodId, cancellationToken);
             if (period is null)

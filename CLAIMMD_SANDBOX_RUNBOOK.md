@@ -148,7 +148,44 @@ than inheriting a new-billability check. These follow-ups remain in
 [billing architecture](docs/architecture/billing.md) and [the agenda](AGENDA.md). No provider,
 payer, SQL concurrency, deployed or regulatory acceptance follows from this local repair.
 
+## Retained request replay — local source October 9, 2026
+
+**SATI-BIL-001 / R1-05 request-kind slice: implemented and verified in local source.**
+`Sati.Contracts.V1.EdiReplayRules` owns equality of period, test mode and Original/Correction
+request kind. API original initial/ordinary/duplicate-write recovery, API correction replay
+and both local `EdiService` original replay paths apply that rule. Keys remain agency/actor
+scoped. API routing-profile checks and current original export source/compliance checks remain
+required; correction replay retains its separately scoped purpose. Queue replay's exact-account
+identity is unchanged. Frequency 1 can be either original or linked Resubmit and cannot choose
+the request kind.
+
+Wrong-kind requests return API `idempotency_key_reused` or a local retry-key exception before
+file output. Exact authorized original/correction replay returns the retained file and creates
+no generation, correction-link, submission event or audit. The
+[decision](docs/decisions/current/2026-10-09-DEC-0231.md) records ownership and alternatives;
+[working evidence](docs/readiness/work-evidence.md#2026-10-09--retained-edi-request-kind)
+records actual fail-first/check results and evidence limits.
+
+The API reproducer runs a fresh submitted original through mock response ingestion and a linked
+frequency-1 Resubmit. The desktop reproducer retains a valid correction graph/content using the
+shared formatter. Both ordinary and post-rollback wrong-kind paths failed against their previous
+behavior: API returned OK, local service wrote the correction file. Recovery fixture interception
+hides one lookup and, in API, supplies the exact retry-key storage conflict; it exercises recovery
+but supplies no SQL race proof. Legitimate exact replay, current compliance and session/tenant
+restrictions remain separately tested. Existing synthetic files use unique fixture keys and
+narrow cleanup.
+
+Physical-history projection, the queued reservation/uncertain-send guard, common SQL admission,
+encryption staging and exact retained-subset queue/send compliance are still the remaining
+implementation. No migration, vendor call, deployed activation, payer certification or sealed
+readiness change follows from this slice.
+
 ## Proposed original-release guard — October 9, 2026
+
+The independently implemented replay-kind repair is described in
+[the retained request owner](#retained-request-replay--local-source-october-9-2026).
+The remaining projection, physical-history permission and transaction design below remain
+proposed until their acceptance is recorded.
 
 **SATI-BIL-001 / assessment R1: product policy adopted; guard implementation and SQL proof pending.**
 Source inspected at `de23bd175445b1caf5caee52ccc8870d021b88da` (released 1.3.38).

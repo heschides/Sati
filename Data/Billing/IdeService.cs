@@ -42,7 +42,9 @@ namespace Sati.Edi
                 generation.IdempotencyKey == normalizedKey);
             if (previous is not null)
             {
-                if (previous.BillingPeriodId != billingPeriodId || previous.IsTest != isTest)
+                if (!EdiReplayRules.Matches(
+                        new(previous.BillingPeriodId, previous.IsTest, previous.IsCorrection ? EdiRequestKind.Correction : EdiRequestKind.Original),
+                        new(billingPeriodId, isTest, EdiRequestKind.Original)))
                     throw new InvalidOperationException("This EDI retry key was already used for a different request.");
             }
 
@@ -108,7 +110,9 @@ namespace Sati.Edi
                     generation.IdempotencyKey == normalizedKey);
                 if (completed is null)
                     throw;
-                if (completed.BillingPeriodId != billingPeriodId || completed.IsTest != isTest)
+                if (!EdiReplayRules.Matches(
+                        new(completed.BillingPeriodId, completed.IsTest, completed.IsCorrection ? EdiRequestKind.Correction : EdiRequestKind.Original),
+                        new(billingPeriodId, isTest, EdiRequestKind.Original)))
                 {
                     throw new InvalidOperationException(
                         "This EDI retry key was already used for a different request.");

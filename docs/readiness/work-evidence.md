@@ -1698,6 +1698,74 @@ owns its explicit acceptance and authorization; full lifecycle and lock adoption
 
 **Later reviewed release snapshot, if any:** no new assessment; sealed 1.3.38 remains unchanged.
 
+## 2026-10-09 — Retained EDI request kind
+
+**Stable work ID and bounded slice:** SATI-BIL-001 / R1-05 request-kind replay, API original
+initial/recovery, API correction replay and both transitional local original replay branches.
+
+**Status and source/revision:** source implemented and verified after checkpoint `5e9825b`, before
+its ordinary commit/push. Josh explicitly requested duplicate-claim safeguards
+and compliance checks; the remaining lifecycle/full R2 sequence stays active.
+
+**Changed behavior, ownership and canonical paths:** shared Contracts `EdiReplayRules` compares
+period/mode/Original-or-Correction identity. A correction retry key cannot replay through original
+export. Scoped authority/key lookup, API routing profile, current original source/compliance
+checks, immutable retained bytes and correction-purpose rules are preserved. The
+[runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md#retained-request-replay--local-source-october-9-2026)
+is the behavior owner; [DEC-0231](../decisions/current/2026-10-09-DEC-0231.md) records rationale.
+
+**Actual tests/checks, commands, results and evidence locations:** normal SDK execution was
+required after the sandbox's service-control query failed. Isolated synthetic fixtures only.
+`dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj --no-restore --filter
+FullyQualifiedName~AClaimRejectedBeforeReviewIsResentAsANewClaim` with the previous request-kind-
+blind API behavior: both ordinary and recovery cases failed at the intended assertion (expected
+Conflict, actual OK). `r1-replay-api-proven-red.trx` records those two results. Local
+`OriginalExportCannotReplayARetainedFrequencyOneCorrection`: both branches failed before repair
+at the intended missing-exception assertion, `r1-replay-local-branches-red.trx`. Restored repaired
+API focused verification passed 37; final expanded API verification passed **54/54**, including
+clearinghouse account/profile and tenant-scoped dispatch cases, `r1-replay-api-final-green.trx`. Final local
+export/session/correction verification passed **63/63**, `r1-replay-local-final-green.trx`.
+TRX files are workspace evidence under `assessment-working/test-results/billing-safeguards/`,
+excluded from the commit. Regression assertions preserve generation/link/event/audit counts and
+retained bytes; legitimate original/correction replay and local recovery/period/mode positives
+are covered. Documentation structure passed (46 root documents, 28 scoped owners, 12 snapshots,
+11 active items and 13 new decisions). `Test-ReleaseReadiness.ps1 -BaselineRevision
+5e9825bc06ae981f63669ce16625ea4f251f82d0` passed with sealed 1.3.38 unchanged (overall 22;
+41 hard blockers). All **22** documentation negative-mutation proofs passed. The two final local
+identity/recovery cases passed again after removing the fixture's new constructor-capture warning.
+`git diff --check` passed. The agenda-label check initially refused renamed
+required labels; restoring the governed labels repaired that failure.
+
+**Failed/unrun checks, reason and verification limits:** the first local test attempt had a
+fixture constructor compile error; repaired before the red run. Initial API recovery scaffolding
+hit control uniqueness/reader setup rather than the target; it was repaired and rerun against the
+old behavior. Those setup failures are not credited as regression proof. API recovery uses a
+hidden first lookup and injected exact retry-key database conflict with an actual retained winner;
+local recovery reaches its real retry-key conflict. This is branch evidence, not concurrent SQL.
+Private SQL races, full lifecycle/queue/send compliance, vendor/payer and deployment checks were
+not run for this replay-only slice. Existing unrelated compiler/analyzer warnings remain.
+
+**Relevant readiness criterion IDs and evidence class:** ID01/ID02 retry scope, ID07 billing
+identity, MT01/MT02 actor/agency scope and OP06 audit preservation: local source plus synthetic
+regressions. No newly established SQL isolation, live service, regulatory, vendor or independent
+readiness acceptance. Full R1/R2 remain open and sealed scores are unchanged.
+
+**Durable decisions, alternatives and supersession links:** DEC-0231 establishes one request
+identity owner. Inferring kind from frequency 1 or duplicating client/server predicates is rejected.
+It supersedes only that slice's proposed status; DEC-0230 and `ClaimCorrectionRules` remain intact.
+
+**Remaining risks/blockers, dependencies and deferred work:** no policy answer remains missing
+for P1–P3. Physical/uncertain history projection, F8/account/receipt validation, all-writer common
+admission, staged key preparation/no-op/retry ownership and private SQL proof remain. Full R2
+exact retained-subset compliance must preserve standing-claim void purpose and financial review.
+General duplicate-service identity, fairness, recovery and certification retain separate owners.
+
+**Next eligible stable ID and bounded slice:** SATI-BIL-001 shared retained-history projection /
+`OriginalClaimReleaseRules`, followed by admission integration and full R2. The
+[agenda](../../AGENDA.md#next-eligible-work) records authorized local scope and acceptance.
+
+**Later reviewed release snapshot, if any:** none; sealed 1.3.38 remains unchanged.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

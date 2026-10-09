@@ -43,7 +43,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
-| SATI-BIL-001 | residual export-error repair implemented; R1 policy adopted/transaction review complete; R1/full queue/send R2 open | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [October 9 design/review](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026), [DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md). Policy and source review are recorded in working evidence; no lifecycle guard implementation or complete send-gate closure. |
+| SATI-BIL-001 | export-error and replay-kind repairs implemented; physical-history R1/full queue/send R2 in progress | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [October 9 replay repair](CLAIMMD_SANDBOX_RUNBOOK.md#retained-request-replay--local-source-october-9-2026), [policy/review](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026). Replay source evidence does not close the lifecycle or full send-gate work. |
 | SATI-SEC-001 | current request/incident/health repair sequence implemented and locally verified; broader sink/admission/security work open | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
 | SATI-GOV-001 | source implemented/runtime gated | Governance activation, approved policy periods and complete storage/recovery adapters; [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md). Runtime retention stays PolicyOnly. |
 | SATI-CLI-001 | evidence pending | External-device/accessibility/mixed-version/clean-install acceptance and supported client/server/schema compatibility; [Demo acceptance](DEMO_ACCEPTANCE.md), [readiness](docs/readiness/README.md). |
@@ -70,18 +70,19 @@ authorization requirements; no release outcome is established by this invocation
 
 **Next eligible item:** SATI-BIL-001
 
-**Eligibility:** Josh explicitly adopted P1–P3 on October 9; [DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md)
-records that policy. The bounded transaction/writer review is complete as source evidence, not
-executed SQL proof. The first source slice is R1-05's independently eligible request-kind replay
-repair; it needs no physical-history gate, new lock, schema or external data.
-Follow [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
+**Eligibility:** Josh adopted P1–P3 ([DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md))
+and then explicitly requested duplicate-claim safeguards and compliance checks. The transaction/
+writer review is source evidence; common SQL coordination remains unproved. R1-05 request-kind
+replay is implemented with fail-first API/local evidence. Follow
+[the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** introduce one shared Contracts `EdiReplayRules` request-identity owner for
-retained/requested period, mode and original/correction kind. Apply it to API original initial/
-duplicate-write recovery, correction replay and both local `EdiService` replay paths. Refuse an
-original request that reuses a correction-file key, while preserving legitimate original/correction
-replay, existing scoped key lookup, API routing-profile checks and current original export compliance.
-Do not implement full physical-history policy or common SQL admission in this slice.
+**Bounded slice:** implement the shared retained-content/history projection and
+`OriginalClaimReleaseRules` owner for trusted agency/NoteId claim identity and the adopted
+Generated/Queued/uncertain/received/nonreceipt matrix. Extend the shared parser to expose F8;
+validate original/correction links, controls, period/6R/D9 and receipt provenance. Preserve
+damaged physical/uncertain history as held/incomplete facts. Apply the decision at original
+generation, queue and immediately before Sending; introduce and prove common transaction
+admission across all history writers in a separately verified implementation chunk.
 
 **Dependencies and owners:** read [the billing architecture](docs/architecture/billing.md),
 [the sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md),
@@ -97,26 +98,27 @@ and `LoadClaimHistoryAsync`. The transaction review revalidated them at document
 [the first implementation scope](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026)
 and its replay/account/legacy/recovery boundaries. Revalidate source again before editing.
 
-**Required outputs and completion evidence:** legitimate isolated API original → rejection → linked
-frequency-1 correction; reuse the correction key at original export and prove the intended refusal
-fails before repair and passes after, with unchanged retained bytes/records/audits. A valid local
-retained-correction fixture must fail before repair and then refuse before file output. Verify
-legitimate original/correction exact replay, changed period/mode/profile, foreign/unauthorized scope,
-current original compliance refusal and duplicate-write recovery coverage. Use real API/local seams
-and focused synthetic tests, not shared-history fixture contamination or a mirrored predicate test.
-[Working evidence](docs/readiness/work-evidence.md#2026-10-09--billing-policy-and-transaction-review)
-owns current policy/review checks; proposed application acceptance is not yet executed.
+**Required outputs and completion evidence:** the canonical R1-01–R1-10 acceptance matrix requires
+fail-first tests through actual seams, legitimate correction/recovery/replay positives, unchanged
+retained bytes/effects and late-receipt precedence over nonreceipt. Test malformed/foreign scope,
+all-R accepted upload, generic rejection, modes/accounts and exact business identity. Independent
+positive histories replace shared-fixture lifecycle contamination. Prove all-writer admission with
+deterministic barriers using the guarded private synthetic SQL runner; SQLite/recovery branch
+tests are not SQL concurrency evidence. Preserve no-key replay/no-op and stage key wrapping
+outside decision transactions with protected revalidation.
 
-**Boundaries and completion evidence:** this next pointer permits the bounded reversible source/
-synthetic-test repair only. No SQL lock refactor/execution, physical-history guard, full R2/void
-policy, new exact-account fingerprint, migration, release/publication, security setting, cloud or
-working-data access, Production action or real provider call. Preserve sealed readiness/history
-and unrelated work. Complete normal documentation checks and record actual fail-first/results.
+**Remaining authorized sequence:** full R2 follows lifecycle integration: trusted system-scoped
+current compliance checks for the exact retained original/correction subset at queue and before
+Sending, preserving the explicit standing-claim void purpose, amendment financial review and
+immutable history. Record the purpose decision and actual race/atomicity results before closure.
 
-Full R2 current eligibility for the exact retained original/correction subset, payer-held void
-purpose policy, broader sink/admission work, worker fairness, structural tenancy, recovery and
-independent review remain separate future work. The current repair sequence supplies local
-source/synthetic evidence only; no complete billing send-gate or logging-redaction claim follows.
+**Boundaries and completion evidence:** reversible source changes, isolated synthetic tests and guarded private SQL proof;
+commit/push each verified significant chunk to the previously approved Sati repository. No cloud
+or working-data access, deployment/migration/publication, security setting, Production action or
+real provider call. Preserve sealed readiness/history and unrelated work. General fairness,
+structural tenancy, duplicate-service identity, recovery, logging sinks and external certification
+retain their separate owners. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--retained-edi-request-kind)
+records this slice's results; full lifecycle/send-gate acceptance is still required.
 
 ## Preserved open-work inventory
 
