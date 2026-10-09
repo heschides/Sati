@@ -27,10 +27,20 @@ formatter/parser tests do not certify vendor or payer acceptance.
 The [October 9 R1 design](../../CLAIMMD_SANDBOX_RUNBOOK.md#proposed-original-release-guard--october-9-2026)
 proposes one `OriginalClaimReleaseRules` Contracts owner, a shared retained-content projection,
 three admission points and a common SQL decision boundary. These owners and locks do not yet
-exist. Cross-mode, generic rejection and queued-reservation choices require policy review;
+exist. Josh adopted cross-mode, generic rejection and queued-reservation policy in
+[DEC-0230](../decisions/current/2026-10-09-DEC-0230.md);
 deterministic fail-first and private SQL acceptance are specified but not executed. The design
 preserves the existing correction owner, safe result replay and late-receipt precedence. It does
 not change implemented architecture, close R1/full R2 or advance sealed readiness.
+
+The [transaction review](../../CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026)
+identifies all normal history writers, current local capability limits, failed-transaction recovery
+seams, poller execution ownership and Key Vault wrapping inside existing SQL transactions.
+The proposed no-network admission boundary requires staged encryption with protected revalidation
+and preserved duplicate/no-op behavior; it is not established by adding a lock. The first source
+slice is the independently bounded original/correction replay-kind check, using a proposed
+shared `EdiReplayRules` request-identity owner. Full lifecycle and transaction integration follow
+under separately scoped acceptance.
 
 ## Canonical detailed owners
 

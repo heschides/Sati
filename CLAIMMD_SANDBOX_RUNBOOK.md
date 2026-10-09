@@ -150,7 +150,7 @@ payer, SQL concurrency, deployed or regulatory acceptance follows from this loca
 
 ## Proposed original-release guard — October 9, 2026
 
-**SATI-BIL-001 / assessment R1: design only, pending policy review and implementation.**
+**SATI-BIL-001 / assessment R1: product policy adopted; guard implementation and SQL proof pending.**
 Source inspected at `de23bd175445b1caf5caee52ccc8870d021b88da` (released 1.3.38).
 This section owns the proposed fact contract, admission rule and fail-first acceptance plan.
 It changes no executable rule, route, schema, transport setting or readiness score. The
@@ -232,7 +232,8 @@ Projection requirements:
 
 ### Proposed fact and admission matrix
 
-The following recommendations are **Sati product policy proposals**, not payer findings.
+The following matrix uses **Sati product policy adopted in
+[DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md)**, not payer findings. It is not yet enforced.
 Evaluate all mapped history, not the newest generation or dispatch state alone. Conflicting exact
 receipt/uncertainty evidence takes precedence over a known-unsent finding. A file containing several
 original claims releases only if every candidate claim is eligible; never silently omit a blocked
@@ -275,16 +276,20 @@ are separate work, rather than an accidental new-billability condition on a void
 
 ### Policy choices needed before implementation
 
-| ID | Recommendation and reason | Required decision / unresolved boundary |
+**Resolved October 9:** Josh explicitly chose “Adopt all three recommended rules.”
+[DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md) records the authority, choices and rejected
+alternatives. This heading remains a stable link to the original policy-review dependency.
+
+| ID | Adopted rule and reason | Implementation / operating boundary |
 |---|---|---|
-| P1 — cross-mode history | In one database, include physical/uncertain facts for the same agency/business claim across IsTest and synthetic/mock history, accounts and namespaces. Preserve mode/source as provenance; do not make IsTest a guard bypass. Independent synthetic cases use independent lifecycle fixtures. | Josh must choose whether this conservative local admission policy is acceptable. Separating a certified sandbox business lane would require an explicit durable lane identity and evidence boundary; current IsTest alone is not that design. Never combine separate Demo and working-PHI databases or access the latter to implement this. |
-| P2 — generic rejection | Treat generic upload Rejected/TransportFailed as insufficient proof of nonreceipt. Require exact supported receipt/correction evidence or an audited definitive nonreceipt finding. | Josh must accept the hold policy or obtain a documented connector-specific nonreceipt contract. Current manual reconciliation admits Sending/OutcomeUnknown, not generic Rejected: do not silently extend that route or manufacture a SupportCase. Any recovery-route extension is a separate explicit slice. A 999 rejection remains a received acknowledgement handled by `ClaimCorrectionRules`. |
-| P3 — queued reservation | Hold a fresh original generation as well as a competing queue while another original is Queued; preserve exact replay. This prevents a second downloadable original from escaping the reserved lifecycle. | Josh must choose this conservative reservation policy or permit extra unsent renders while still refusing competing queue/send. Generated-only history without an intent remains allowed either way. |
+| P1 — cross-mode history | In one database, include physical/uncertain facts for the same agency/business claim across IsTest and synthetic/mock history, accounts and namespaces. Preserve mode/source as provenance; do not make IsTest a guard bypass. Independent synthetic cases use independent lifecycle fixtures. | Adopted. A different certified sandbox lane would require a separately decided durable lane identity and evidence boundary. Never combine separate Demo and working-PHI databases or access the latter to implement this. |
+| P2 — generic rejection | Treat generic upload Rejected/TransportFailed as insufficient proof of nonreceipt. Require exact supported receipt/correction evidence or an audited definitive nonreceipt finding. | Adopted. Current manual reconciliation admits Sending/OutcomeUnknown, not generic Rejected: do not silently extend that route or manufacture a SupportCase. Any recovery-route extension is a separate explicit slice. A 999 rejection remains a received acknowledgement handled by `ClaimCorrectionRules`. |
+| P3 — queued reservation | Hold a fresh original generation as well as a competing queue while another original is Queued; preserve exact replay. This prevents a second downloadable original from escaping the reserved lifecycle. | Adopted. Generated-only history without an intent remains allowed. Test positive cases with legitimate separate histories instead of bypassing the reservation. |
 
 No external requirements research or vendor calls were performed for this design. Existing
 [payer requirements](PAYER_BILLING_REQUIREMENTS.md), [certification](PAYER_BILLING_CERTIFICATION.md)
 and [regulatory posture](REGULATORY_CONCERNS.md) remain the authority for their separate reviews.
-Record accepted policy and rejected alternatives in a dated decision before implementing the guard.
+The accepted product policy does not certify external billing behavior or implement the guard.
 
 ### Admission order and concurrent facts
 
@@ -317,12 +322,113 @@ helpers need an acquire-in-owned-transaction seam; their current BeginAsync call
 be nested. Pre-transaction scoped discovery is advisory and must be revalidated after admission.
 
 The agency scope deliberately covers multi-period receipts and unmapped-history holds without
-guessing a narrower partition. It serializes short local transactions, not network calls; contention,
+guessing a narrower partition. Its intended boundary is short local transactions; achieving the
+no-network boundary requires the encryption staging described below. Contention,
 wait/transaction limits and the complete lock-order graph require SQL proof and W8 review before
 adoption. Do not introduce a cycle through reset/dispatch/feed leases or hold it across upload/polling.
 Release it after committed Sending: a receipt already committed must defeat a successor; a receipt
 that arrives after that decision cannot undo an external request. Preserve truthful uncertainty and
 review that later conflict. This is a bounded database decision guarantee, never remote exactly-once.
+
+### Transaction-boundary review — October 9, 2026
+
+Read-only review at documentation checkpoint `08fc36e40a837d8e6e217e737fe78513623337c0`
+revalidated the actual call paths. No common lock, helper refactor or execution-strategy repair has
+been implemented/tested. The inventory below covers normal application writers; raw SQL,
+restore/cutover and operator changes retain their separate containment/reconciliation procedures.
+
+| Owner | Current transaction/read boundary | Required integration seam before full R1 adoption |
+|---|---|---|
+| API original export and duplicate-write recovery | `ApiEndpoints.cs`: each branch starts `BillingPeriodWriteScope`; actor/profile/previous/source reads follow. | Own one Serializable transaction, acquire ClaimRelease before the period lock and protected reads; preserve a fresh transaction and revalidation after rollback. |
+| Local `EdiService.GenerateAndSaveAsync` and recovery | Plain Serializable; session/actor and retained-key reads follow. | Resolve only advisory stored identity before admission; revalidate session/agency/source and kind under common admission. Do not activate local correction, receipt or transport functionality. |
+| Queue | `ClearinghouseDispatchEndpoints`: scoped period discovery precedes BillingPeriod scope; actor/generation/account/amendment/history reads follow. | Treat discovery as advisory. Common lock before period lock; reload full trusted scope, retain exact-generation/account replay and atomic intent/audit. |
+| Worker known-unsent cancellation | `UploadUnderDispatchLeaseAsync`: account/profile mismatch can save CancelledBeforeSend before ServiceTime scope. | Include this easily missed write in the decision boundary; it cannot race a receipt and become false nonreceipt evidence. |
+| Worker Sending | Reset/dispatch session leases; account/generation discovery; ServiceTime transaction; key/receipt preflight; Sending commit. | Move network preflight outside the SQL decision transaction. Common lock before ServiceTime, then reload dispatch/revision/account/generation/source/history and decide before Sending. |
+| Worker outcome append | Same outer leases/single-attempt operation; response protection and attempt/event construction precede implicit SaveChanges transaction. | Prepare protected response outside common admission. In a new common-lock transaction, verify the exact still-Sending identity/revision and atomically commit attempt, state, event and required evidence. |
+| Correction create/generation | `BillingCorrectionEndpoints`: BillingPeriod scope then actor, history, line/amendment and correction/link writes. | Common lock before BillingPeriod and all authoritative history reads; preserve `ClaimCorrectionRules` and exact links, including Resubmit. This review grants no additional correction action. |
+| Mock transmission | `/mock-clearinghouse`: period/latest-generation/submission checks, implicit Transmitted/audit save, then three separately owned response imports. | Add one explicit common-lock transaction for transmission admission/event/audit. Commit/release before importing responses; do not wrap intake's owned transactions inside it. Keep partial-response failure truthful. |
+| Manual/mock receipt intake | `ClaimResponseIngestion.ImportAsync`: parse/hashes outside, then Serializable duplicate/match/encryption/effect/audit commit. | Stage protection outside common admission while retaining no-key duplicate replay; reload exact matches and identities and commit receipt/effects atomically under the common boundary. |
+| Connector status / ERA | `ClaimMdStatusProcessor.ProcessAsync` / `ImportConnectorEraAsync`: plain Serializable then account/cursor/accepted-dispatch/match/protection/effects/checkpoint. | Protected local commit phase only; revalidate agency/account/cursor/full page and duplicate identities under common admission. Preserve accepted-dispatch feed eligibility; no state-7 late-receipt route extension. |
+| Manual reconciliation | Scoped dispatch discovery; dispatch session lease; BillingPeriod transaction; current actor/manifest/attempt/receipt checks and resolution/audit/event commit. | Common lock before period lock and refreshed manifest/history checks, preserving busy/foreign-ID refusal and exact evidence attestation. |
+
+Recovery seams also require review: queue currently rereads after a DbUpdateException without
+ending its failed transaction, and manual receipt recovery rolls back but leaves that transaction
+object current before rereading. Full common-boundary integration must dispose the failed scope
+and reacquire a fresh protected decision before using a recovered result. These are inspected
+paths, not newly executed failure claims or part of the first replay-kind repair.
+
+The local `BillingService` does **not** implement response import, correction creation/generation,
+dispatch or deposit recording; `IBillingService` defaults refuse them and `CloudBillingService`
+forwards supported operations to the API. Existing local model/history rows still need a read
+adapter. There is no local receipt/correction writer to add or enable through this review.
+
+Lease graph: Demo HTTP middleware or a worker owns the outer shared reset lease. Upload and
+reconciliation then own the per-dispatch session lease. Polling owns the **global** Poller session
+lease, uses the global ApiRequest lease for pacing/HTTP and releases ApiRequest before status/ERA
+commit. There is no account/feed-specific named lease in this path. Onboarding owns a separate
+global transaction lock. The proposed inner order is owned transaction → ClaimRelease → needed
+ServiceTime/period locks → authoritative data reads/writes. All participating paths must use that
+order, with stable ordering for multiple inner resources, or the common lock can introduce a cycle.
+Preserve current claim-insertion locks; do not acquire ClaimRelease late after taking them. Account
+onboarding/other non-history writers and their actual row-lock interactions need separate graph
+acceptance, not an assertion that unrelated lock names coordinate.
+
+**Execution ownership:** HTTP mutation endpoints run inside `SingleAttemptWriteFilter`, while the
+dispatch operation uses `DispatchSingleAttempt` around its upload path. Preserve their zero-retry
+behavior. The poller directly calls the status/ERA transaction owners; no equivalent execution
+scope is visible despite `Program` enabling SQL retries. This is a source-predicted setup hazard,
+not an executed failure. Full R1 integration must give these local commits an explicit supported
+single-attempt owner (without retrying the external fetch) and test it. Do not count an EF setup
+refusal as a concurrency-regression failure or replace the deadline/transaction owners wholesale.
+A zero-retry wrapper must also refuse an already retrying ambient execution strategy before work,
+following the separately proven incident-owner pattern; nesting a wrapper alone may not replace
+that ambient owner. Prove this at the actual processor/admission seam before claiming closure.
+
+**Key Vault staging:** `EnvelopeProtector.ProtectAsync` calls `IKeyWrapper.WrapAsync`; the configured
+API wrapper calls Azure `WrapKeyAsync`. Current receipt protection and worker preflight occur
+inside SQL transactions. Simply adding ClaimRelease there would hold the agency lock through
+Key Vault network waits. Release every SQL decision lock before protection/preflight, including
+the existing schedule/period locks, while retaining required outer reset/dispatch exclusion.
+
+Use a short admitted no-op/replay inspection, release without writes if new protection is needed,
+reserve immutable in-memory IDs/bindings, protect outside SQL, then reacquire admission and fully
+revalidate before commit. A reviewed advisory fast path may optimize that sequence, but cannot
+authorize a write or stale replay. Keep existing duplicate-receipt replay and stale-cursor no-op
+behavior working without a successful key-service call. Discard prepared envelopes when their
+binding/source/authority changes, and never persist plaintext or add an automatic retry.
+
+Receipt AAD binds agency, reserved receipt GUID, raw hash and parser version; attempt AAD binds
+agency, reserved attempt GUID and response hash. Fix those values before protection and verify
+them again with account/dispatch/generation hashes, expected revision/cursor, exact matches,
+duplicate identities and current authority after admission. Preflight establishes only observed
+readiness: credentials/key service can change after Sending, so preserve OutcomeUnknown and
+reconciliation on later evidence failure. Network/crypto budgets and session-lease loss remain
+W8/idempotency/recovery concerns; this proposed staging establishes no live capacity bound.
+Preserve caller cancellation for preparation/admission and the existing post-upload evidence
+obligation using CancellationToken.None. The connector's 45-second HTTP exchange budget does
+not bound Key Vault; changing those budgets or token semantics needs a separately verified slice.
+
+**First implementation slice:** the inspected replay gap can be repaired before the complete
+physical-history projection/lock integration. Original export and local `EdiService` compare
+period/mode but can return a retained `IsCorrection` file under an original request key. The common
+API replay helper also omits kind. Correction export already explicitly requires correction kind;
+the helper must accept the expected kind, rather than hard-coding originals and breaking that path.
+
+Select a shared **`Sati.Contracts.V1.EdiReplayRules`** request-identity owner for period, mode and
+original/correction kind. Preserve API routing-profile matching, scoped key lookup and original
+compliance revalidation. Apply it to every initial and duplicate-write recovery replay branch in
+API and local services. Do not infer a persisted exact account fingerprint where none exists.
+This named request-identity owner is separate from the future original-release lifecycle owner.
+
+Proposed acceptance for that bounded slice: build an isolated legitimate original → rejection →
+linked frequency-1 correction through real API workflows; reuse its correction key at original
+export and require conflict with no file/record/audit mutation. Use a valid retained correction
+fixture in the local original-export path; require refusal before file output. Confirm both tests
+fail against the unfixed paths, then verify legitimate original and correction exact replay, changed
+period/mode/profile, tenant/permission refusal, current original compliance refusal and duplicate-write
+recovery coverage. No test or source guard is implemented in this review. Full P1–P3 enforcement,
+retained physical projection, F8 extension, common SQL admission, key staging and full R2 remain
+separately bounded follow-ons.
 
 ### Proposed fail-first acceptance (not executed)
 

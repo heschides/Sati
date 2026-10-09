@@ -1621,6 +1621,83 @@ rule implementation slice. [The agenda](../../AGENDA.md#next-eligible-work) owns
 
 **Later reviewed release snapshot, if any:** no new assessment; sealed 1.3.38 remains unchanged.
 
+## 2026-10-09 — Billing policy and transaction review
+
+**Stable work ID and bounded slice:** SATI-BIL-001, disposition of P1–P3 and detailed source review
+of the proposed transaction/writer boundary, then selection of the first bounded implementation.
+This is the next agenda item after the design chunk, not a release or guard implementation.
+
+**Status and source/revision:** review complete; Josh explicitly answered “Adopt all three
+recommended rules” during this item. [DEC-0230](../decisions/current/2026-10-09-DEC-0230.md)
+records accepted product policy. Inspected checkpoint
+`08fc36e40a837d8e6e217e737fe78513623337c0`; executable application remains released 1.3.38.
+Existing untracked assessment helper/results are preserved/excluded. The resulting documentation
+commit is reported in the handoff after verification and exact remote confirmation.
+
+**Changed behavior, ownership and canonical paths:** no executable behavior/owner changed.
+[The canonical runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026)
+now owns the complete normal writer matrix, lease/execution/transaction integration requirements,
+Key Vault staging and replay/no-op preservation, remaining recovery seams and the first request-kind
+repair. Its policy matrix now links DEC-0230 as adopted but unenforced. Decision indices/registry,
+billing architecture and agenda are synchronized; the next pointer selects R1-05's shared
+`EdiReplayRules` request-identity repair, not the complete lifecycle guard.
+
+**Actual tests/checks, commands, results and evidence locations:** two independent read-only agent
+reviews and primary-source inspection covered original/correction initial and recovery branches,
+local supported/refused capabilities, queue, early worker cancellation/Sending/outcome saves,
+mock transmission and separately owned response imports, reconciliation, status/ERA, reset/dispatch/
+global request/poller/onboarding leases, write filters, retry configuration and envelope/Key Vault
+wrapping. Source confirms `ProtectAsync` can call Azure wrapping inside current receipt/preflight
+SQL transactions; merely adding the common lock would violate its intended no-network boundary.
+It also confirms direct poller transaction owners lack a visible single-attempt scope, and the
+API/local original replay paths omit retained correction kind. Actual local checks passed:
+`pwsh -NoProfile -File scripts/Test-DocumentationStructure.ps1` (46 root documents, 28 scoped
+owners, 12 preserved snapshots, 12 current decisions, 11 active items and SATI-BIL-001 pointer);
+`pwsh -NoProfile -File scripts/Test-DocumentationStructureChecks.ps1` (all **22** negative mutation
+proofs); `pwsh -NoProfile -File scripts/Test-ReleaseReadiness.ps1 -BaselineRevision
+08fc36e40a837d8e6e217e737fe78513623337c0` (history checked, sealed readiness unchanged);
+`git diff --check`. Evidence is the tool output for this review, not executed billing acceptance.
+A third final review checked the adopted policy, transaction/key-staging limits, replay-kind scope
+and registry/agenda consistency; it found no material remaining issue in this documentation chunk.
+
+**Failed/unrun checks, reason and verification limits:** no billing code/tests, SQL or external
+service calls executed in this review. No app build/release suite was repeated for prose-only
+work. Predicted retry-provider setup hazards, rollback/replay recovery gaps and lock-order/Key
+Vault staging are source findings and proposed acceptance, not newly executed regressions.
+The replay-kind reproducer and full R1 deterministic SQL barriers remain unrun. No secret,
+working database, PHI, cloud configuration, vendor account or deployed API was accessed/changed.
+
+**Relevant readiness criterion IDs and evidence class:** ID07 policy/design; ID01/ID02/ID03/ID04
+request/recovery and transaction prerequisites; ID09 receipt/cursor; MT01/MT02/MT05/MT08/MT10
+scope/coordination/capacity; OP06 audit. ID08/full R2 remains separate. Evidence is human policy
+plus source review/documentation checks. No implemented gate, executed SQL isolation, live service,
+vendor, regulatory or independent readiness acceptance is credited. Sealed releases/rubrics remain
+unchanged.
+
+**Durable decisions, alternatives and supersession links:** DEC-0230 records cross-mode/account
+physical/uncertain history, generic rejection holds and queued-original reservation; it supersedes
+only their pending recommendation status. It preserves exact result replay, generated-only recovery,
+explicit correction ownership and late receipt precedence. Mode bypass, unsupported rejection-as-
+nonreceipt and extra queued downloadable originals are rejected. The common agency lock remains
+proposed; staged encryption must preserve no-key duplicate replay/stale-cursor no-op and refreshed
+binding/source/authority before commit. No earlier accepted correction or operating decision changes.
+
+**Remaining risks/blockers, dependencies and deferred work:** no P1–P3 decision remains pending.
+Full lifecycle projection and F8/historical account provenance, all-writer transaction integration,
+crypto staging/cancellation/budgets, ambient retry refusal, queue/receipt recovery cleanup, truthful
+unsent hold state and SQL proof remain unimplemented. The ordinary local service has no receipt/
+correction/dispatch writer to activate. Full R2/void purpose, W8 fairness/resource budgets, lease
+loss, general duplicate-service identity, recovery and external certification retain their owners.
+
+**Next eligible stable ID and bounded slice:** SATI-BIL-001 / R1-05: one shared Contracts
+`EdiReplayRules` for period/mode/request kind, used by API original initial/recovery, correction
+replay and both local original replay branches. Fail-first real API/local correction-key-as-original
+cases, valid exact replay and unchanged current compliance/routing/tenant boundaries; synthetic
+post-rollback branch proof is not SQL concurrency proof. [The agenda](../../AGENDA.md#next-eligible-work)
+owns its explicit acceptance and authorization; full lifecycle and lock adoption are not included.
+
+**Later reviewed release snapshot, if any:** no new assessment; sealed 1.3.38 remains unchanged.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

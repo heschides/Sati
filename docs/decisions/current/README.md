@@ -18,6 +18,7 @@ Read the individual registered record for the decision and rejected alternatives
 | DEC-0227 | 2026-10-08 | [Contain escaping API request exceptions](2026-10-08-DEC-0227.md) | accepted |
 | DEC-0228 | 2026-10-08 | [Execute incident aggregation once](2026-10-08-DEC-0228.md) | accepted |
 | DEC-0229 | 2026-10-08 | [Remove raw exceptions from two health checks](2026-10-08-DEC-0229.md) | accepted |
+| DEC-0230 | 2026-10-09 | [Original-claim history, rejection and queued-reservation policy](2026-10-09-DEC-0230.md) | accepted; implementation pending |
 
 Accepted decisions must retain their evidence and earlier rejected reasoning. A change to a
 decision creates a successor and supersession link; it does not rewrite the historical import.

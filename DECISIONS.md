@@ -59,8 +59,16 @@ authorization requirements.
 
 ## Explicit supersession
 
+The original-claim cross-mode history, generic rejection and queued-reservation policy is recorded
+in [DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md), following Josh's explicit adoption of
+P1–P3. The rule and common transaction boundary remain unimplemented; the
+[billing owner](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026) records
+encryption/transaction preparation requirements and the bounded next source slice. Existing
+correction permissions, full R2/void-purpose review and operating authority remain unchanged.
+
 | Earlier statement | Later authority | Scope of supersession |
 |---|---|---|
+| October 9 billing design P1–P3 recommendations awaited a policy answer | [DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md) | Josh adopted the three product rules. This changes proposal status only; no implemented guard, SQL coordination or payer certification follows. |
 | Two health results retained caught exceptions; schema failures passed a raw exception to the logger | [DEC-0229](docs/decisions/current/2026-10-08-DEC-0229.md), [health logging owner](LOGGING_DESIGN.md#api-health-failures--source-october-8-2026) | Remove those logger/result payloads while retaining fixed Unhealthy status/descriptions, current cancellation and real validation. Startup and arbitrary other sinks remain separate. |
 | Incident aggregation began an explicit transaction without its own execution scope and allowed retrying outer callers | [DEC-0228](docs/decisions/current/2026-10-08-DEC-0228.md), [incident execution owner](LOGGING_DESIGN.md#api-incident-execution--source-october-8-2026) | Full zero-retry transaction ownership and early outer-retry refusal; current immediate-reference replay, safe envelopes and SQL query policy remain. |
 | Historical broad API logging assurance and raw-exception request handler | [DEC-0227](docs/decisions/current/2026-10-08-DEC-0227.md), [October 8 API audit correction](API_SECURITY_AUDIT.md#october-8--escaping-request-exception-boundary-and-logging-scope-correction) | Escaping request failures are contained with bounded safe fields. The earlier assurance does not cover all enabled framework/provider sinks; desktop curated-envelope policy remains. |
