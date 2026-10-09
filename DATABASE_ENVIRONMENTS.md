@@ -219,3 +219,20 @@ dispatch on all hosts, exact schema/history, recovery prerequisites and reset el
 the approved operation. After the matching API is healthy, capture the approved baseline and
 verify exactly one reset under the playbook; the user then removes the temporary rule and the
 assistant verifies absence. No new release invocation or reset outcome is recorded here yet.
+
+## 1.3.39 release preflight and Local uptake — October 9, 2026
+
+Josh subsequently sent the exact DATT invocation. During release preflight, the guarded Demo
+inspection and live/baseline reset guards passed again without persistent changes. The Demo API
+had **no deployment slots**; the existing `sati-demo-refresh-satilogica` Function was Running.
+The projected expected environment/database and absent dispatch flags matched the earlier
+observation. No other dispatch host was identified by this bounded resource/source inventory;
+this is not an exhaustive tenant host/configuration audit.
+
+Known Local machine **LONGCHENPA** has installed Sati **1.3.38.0**, confirmed from the installed
+executable's file metadata. It remains behind the 1.3.39 candidate and has not been migrated by
+this release work. The desktop applies pending local migrations at its next upgraded launch;
+installer distribution is not evidence that a machine was updated. Other Local machines and last
+known versions have been requested from Josh and are presently **unknown**, not assumed current.
+No working database or clinical record was queried. [The release working record](docs/readiness/work-evidence.md#2026-10-09--datt-1339-release-audit)
+owns gates and pending deployment/reset outcomes.

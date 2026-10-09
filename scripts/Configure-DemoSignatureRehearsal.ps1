@@ -29,7 +29,7 @@ param(
     [string]$OutboxVault = 'sati-demo-sign-out-kv',
     [string]$OutboxKey = 'signature-outbox',
     [string]$SenderRoleName = 'Sati Demo Signature Email Sender',
-    [string]$ExpectedReleaseVersion = '1.3.38'
+    [string]$ExpectedReleaseVersion = '1.3.39'
 )
 
 $ErrorActionPreference = 'Stop'

@@ -2328,6 +2328,80 @@ controlled schema changes only within its tested scope. Sealed 1.3.38 scores/rub
 unchanged. [The agenda](../../AGENDA.md#next-eligible-work) still points to SATI-WRK-001 idle/wake/
 activity/due scheduling design; this preparation does not start that separate work.
 
+## 2026-10-09 — DATT 1.3.39 release audit
+
+**Authority and scope:** Josh sent the exact plain-text DATT invocation after separately approving
+the Demo readiness migration, baseline replacement and one verification reset. The release covers
+the completed original-claim/current-compliance guards and account-key readiness/recovery source,
+plus controlled migration preparation. Dispatch activation, cloud Production, private working-data
+access and assistant-run firewall changes remain outside this authority.
+
+**Source and review:** fetched default `master` was `de23bd1`; all eight completed source/design/
+evidence commits through `6a5c6497aab7c4f761d6aef5194087475c00424d` were reviewed and fast-forwarded
+into local master. Older branches and the detached 1.3.31 worktree were retained because retention
+or activity is uncertain. Existing `Sati.csproj` BOM/formatting and assessment scratch files remain
+preserved; only the three coordinated project-version fields belong to the release commit.
+Version, builder/readiness defaults, Settings release notes and assertions now agree on **1.3.39**.
+
+**Readiness review:** all 42 existing criteria were reassessed against audited source `6a5c649`
+and the dated source/synthetic/private SQL evidence. ID07 and ID08 move from blocked to **tested**
+for their bounded supported controls; live/certification and complete intended-use acceptance
+remain open. Other stages and every prior sealed snapshot/rubric remain unchanged. The new
+embedded report and release-number/UI diff require current build/render acceptance; operational
+observations after packaging will remain outside this sealed snapshot.
+
+**Executed preflight:** source consistency and embedded-report integrity passed. The pinned Demo
+runner again passed default inspection at the exact 128-migration predecessor, and the shared
+live/baseline external-clearinghouse and empty scheduled-move guards passed inside a rolled-back
+inspection transaction. Host inventory found the Demo API with no slots and the existing reset
+Function; dispatch flags remain absent/default-off. No cloud change was made during preflight.
+The Microsoft LocalDB prerequisite signature is Valid. Versioned artifact/destination collisions
+were absent. [The environment inventory](../../DATABASE_ENVIRONMENTS.md) owns observed environment
+facts and known Local-machine versions.
+
+**Actual build and auxiliary checks:** complete Release solution build passed in **1m12s**,
+**18 existing warnings, 0 errors** (`TestResults/datt-1.3.39-build.log`). Documentation structure
+and **22 negative proofs** passed. Readiness helper negative/atomic checks passed after rerunning
+under the normal profile; the sandbox attempt denied a disposable fixture replacement and is
+not an application defect. Existing source and build inputs were preserved.
+
+**Full-gate interruption and bounded fixture follow-up:** the first complete private-SQL solution
+run completed its desktop portion with 3,027 passed, one model-gate skip and a genuine failure at
+`IncidentOutboxTests.TransientFailureRetriesDuringTheSameSessionWithoutAnotherUserAction`:
+its three-second file-polling completion assertion failed. The unmodified case then passed alone
+in **112 ms** (`TestResults/datt-1.3.39-affected/outbox-retry-unmodified.trx`). This does not prove
+the original cause. The test now captures and awaits the actual background retry task with the
+same three-second bound, preserving exact pending-state and two-request assertions. Its named
+nonparallel collection isolates short retry/session-switch barriers from unrelated desktop
+fixture startup; deliberate concurrency inside those cases remains. Production outbox/reporter,
+retry budget, authorization and handling are unchanged. The affected test-project Release build passed (nine existing warnings, zero errors), and all
+**12 incident-outbox cases passed** (`TestResults/datt-1.3.39-affected/outbox-retry-fixture.trx`).
+The complete API suite passed **1,289/1,289**, zero failed/skipped, in **15m51s**, and
+signatures **119**, portal **8** and Carika **4** passed. The initial owned private SQL instance
+was stopped/deleted. API source/configuration/dependencies remain unchanged by the later fixture
+diff, so that passing API gate is retained. The affected complete desktop rerun passed
+**3,028**, failed **0**, with the one opt-in model case subsequently exercised separately,
+in **6m11s** (`TestResults/BackgroundWorkersFinalDesktopSql/Joshu_LONGCHENPA_2026-10-09_17_03_35_net10.0.trx`).
+Its new private instance was also stopped/deleted. All four final WPF readiness renders were
+inspected in `TestResults/datt-1.3.39-readiness-renders-final`: standard, larger text, high contrast
+and the actual current embedded report. Actual scores are overall **24.4%**, agency **25.0%**,
+repeat request **33.9%**, operations **14.3%**, with **41** launch checks open. The fixture diff
+changes no assessed product control, permission or readiness stage. Earlier failed results
+remain retained. The cached actual-model gate passed **1 test / all three original scenarios**,
+failed **0**, skipped **0**, in **3m08s** (`TestResults/datt-1.3.39-actual-model/actual-model.trx`).
+Grounding/privacy assertions, scenario inputs and limits were unchanged. Final distinct accepted
+project cases total **4,449**, with no unresolved failure or skip; overlapping focused runs are
+not added to that total. Source preflight passed again after evidence updates.
+
+**Next sequence and limits:** finish complete applicable project tests, exercise the available
+cached-model gate and inspect current readiness renders, then commit/push source and verify exact
+remote equality. Rehearse/apply/rerun the approved Demo migration with dispatch disabled; publish
+the matching API; verify exact known bytes, health/version/contract; run compliance dry-run;
+capture today's baseline; queue one reset and correlate audit/log completion. Only then accept
+and distribute both new installers. The user removes the workstation rule afterward. Final
+evidence/default push and machine-uptake record are still pending. No complete release, cloud
+migration/reset outcome, real transmission or independent readiness is claimed here yet.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

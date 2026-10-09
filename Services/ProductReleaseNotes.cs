@@ -6,11 +6,30 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Readiness evidence and service safeguards";
-    public const string ReleaseDate = "October 8, 2026";
+    public const string ReleaseName = "Billing release and account recovery safeguards";
+    public const string ReleaseDate = "October 9, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Protect original claims across sending accounts",
+            [
+                "Another original is blocked while the same claim is queued, already sent, or awaiting evidence review, including history from another account or sending mode.",
+                "Replaying the exact retained file keeps its original identity. A new file or request number does not authorize sending the same claim again."
+            ]),
+        new(
+            "Check current requirements before sending retained claims",
+            [
+                "Queueing and sending recheck the exact retained claim set against current documentation and billing requirements. A competing change cannot silently bypass that decision.",
+                "Files and correction history remain intact when release is refused. Real clearinghouse transmission remains separately gated."
+            ]),
+        new(
+            "Recover accounts with missing sending keys",
+            [
+                "An account with a missing sending key waits before retrying, allowing healthy accounts to continue. After five failures, it remains held for review.",
+                "An agency administrator can reopen the account after restoring its key. Reopening sends nothing and cannot replay an uncertain upload.",
+                "These safeguards do not establish a delivery deadline or approve background transmission activation."
+            ]),
         new(
             "Review release readiness in Settings",
             [
@@ -28,7 +47,7 @@ public static class ProductReleaseNotes
             "Keep outstanding billing requirements blocking exports",
             [
                 "A stored billing exception cannot waive other outstanding compliance errors. Those errors still block export and replay of a retained file.",
-                "Original-claim release policy and the full eligibility check immediately before transmission still need further work; real transmission activation remains a separate review."
+                "Original-claim release safeguards and the current check before transmission now have source and synthetic acceptance. Real transmission activation remains a separate review."
             ]),
         new(
             "Make service failures safer to investigate",

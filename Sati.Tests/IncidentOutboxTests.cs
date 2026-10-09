@@ -9,6 +9,12 @@ using Xunit;
 
 namespace Sati.Tests;
 
+// Keep the short retry/cancellation barriers independent of unrelated desktop
+// fixture startup. Concurrency within each account-switch test remains explicit.
+[CollectionDefinition("Incident outbox retry", DisableParallelization = true)]
+public sealed class IncidentOutboxRetryCollection { }
+
+[Collection("Incident outbox retry")]
 public sealed class IncidentOutboxTests : IDisposable
 {
     private readonly string _root = Path.Combine(
@@ -151,9 +157,13 @@ public sealed class IncidentOutboxTests : IDisposable
         Assert.Single(outbox.ReadPending());
 
         await waiting.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        var retryTask = reporter.CurrentRetryTask;
+        Assert.NotNull(retryTask);
         handler.IsAvailable = true;
         resume.TrySetResult();
-        await WaitUntilAsync(() => outbox.ReadPending().Count == 0);
+        // Await the retry's own completion instead of repeatedly taking the
+        // outbox's file lock while its background task needs that same lock.
+        await retryTask.WaitAsync(TimeSpan.FromSeconds(3));
 
         Assert.Empty(outbox.ReadPending());
         Assert.Equal(2, handler.RequestCount);
@@ -348,14 +358,6 @@ public sealed class IncidentOutboxTests : IDisposable
         session.SetUser(User.Create(userId, "synthetic", "Synthetic User", string.Empty,
             string.Empty, UserRole.CaseManager, null, agencyId));
         return session;
-    }
-
-    private static async Task WaitUntilAsync(Func<bool> predicate)
-    {
-        var limit = DateTime.UtcNow.AddSeconds(3);
-        while (!predicate() && DateTime.UtcNow < limit)
-            await Task.Delay(20);
-        Assert.True(predicate());
     }
 
     private sealed class RecoveringHandler : HttpMessageHandler

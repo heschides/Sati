@@ -14,7 +14,7 @@
 param(
     [switch]$Apply,
     [string]$BaseAddress = 'https://sati-demo-api-satilogica.azurewebsites.net/',
-    [string]$ExpectedReleaseVersion = '1.3.38',
+    [string]$ExpectedReleaseVersion = '1.3.39',
     [string]$CredentialPath = (Join-Path $env:LOCALAPPDATA 'SatiLogica\Sati\Credentials\demo-agency-admin.xml')
 )
 
