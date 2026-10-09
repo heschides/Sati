@@ -6,6 +6,7 @@ using Sati.Api.Data;
 using Sati.Contracts.V1;
 using Sati.Models.Billing;
 using Sati.Data;
+using Sati.Api.Endpoints;
 
 namespace Sati.Api.Infrastructure;
 
@@ -45,6 +46,8 @@ internal sealed class ClearinghouseDispatchWorker(
 {
     internal async Task<bool> ProcessOneAsync(CancellationToken token)
     {
+        if (ExecutionStrategy.Current?.RetriesOnFailure == true)
+            throw new InvalidOperationException("Claim release writes cannot run inside a retrying execution scope.");
         if (!gate.IsEnabled) return false;
         return await resetCoordination.RunAsync(ProcessUnderResetLeaseAsync, false, token);
     }
@@ -74,22 +77,36 @@ internal sealed class ClearinghouseDispatchWorker(
             .SingleOrDefaultAsync(row => row.Id == dispatch.AccountId && row.AgencyId == dispatch.AgencyId, token);
         var generation = await db.EdiGenerations.AsNoTracking()
             .SingleOrDefaultAsync(row => row.Id == dispatch.EdiGenerationId && row.AgencyId == dispatch.AgencyId, token);
-        if (account is null || generation is null || !account.IsEnabled || !account.IsTest ||
-            !generation.IsTest || !gate.CanUseAccount(account) ||
-            dispatch.TradingPartnerProfileVersion != account.TradingPartnerProfileVersion ||
-            !ClearinghouseAccountSelection.Matches(generation.Content, account, generation.BillingPeriodId))
+        var preparedAccount = account;
+        if (gate.IsRealSandboxEnabled && account is not null && generation is not null && account.IsEnabled &&
+            account.IsTest && generation.IsTest && gate.CanUseAccount(account) &&
+            ClearinghouseAccountSelection.Matches(generation.Content, account, generation.BillingPeriodId))
         {
-            dispatch.State = ClearinghouseDispatchState.CancelledBeforeSend;
-            dispatch.SafeErrorCode = "source_or_account_changed";
-            dispatch.Revision++;
-            try { await db.SaveChangesAsync(token); }
-            catch (DbUpdateConcurrencyException) { return true; }
-            return true;
+            // Key Vault may perform network I/O. No SQL decision lock spans it.
+            _ = keys.Resolve(account.SecretReference);
+            _ = await protector.ProtectAsync("claimmd-receipt-preflight",
+                new FieldBinding(dispatch.AgencyId, 0, $"ClaimMdPreflight:{dispatch.Id:N}"), token);
         }
-
-        var ownerId = await db.BillingPeriods.AsNoTracking().Where(p => p.Id == generation.BillingPeriodId).Select(p => p.UserId).SingleAsync(token);
-        await using (var schedule = await ServiceTimeWriteScope.BeginAsync(db, generation.AgencyId, ownerId, token))
+        await using (var schedule = await ClaimReleaseWriteScope.BeginAsync(db, dispatch.AgencyId, token))
         {
+            await db.Entry(dispatch).ReloadAsync(token);
+            if (dispatch.State != ClearinghouseDispatchState.Queued) return false;
+            account = await db.ClearinghouseAccounts.AsNoTracking().SingleOrDefaultAsync(row =>
+                row.Id == dispatch.AccountId && row.AgencyId == dispatch.AgencyId, token);
+            generation = await db.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(row =>
+                row.Id == dispatch.EdiGenerationId && row.AgencyId == dispatch.AgencyId, token);
+            if (account is null || generation is null || !account.IsEnabled || !account.IsTest ||
+                !generation.IsTest || !gate.CanUseAccount(account) ||
+                dispatch.TradingPartnerProfileVersion != account.TradingPartnerProfileVersion ||
+                !ClearinghouseAccountSelection.Matches(generation.Content, account, generation.BillingPeriodId) ||
+                gate.IsRealSandboxEnabled && (preparedAccount is null || preparedAccount.SecretReference != account.SecretReference ||
+                    preparedAccount.ExternalAccountNumber != account.ExternalAccountNumber || preparedAccount.ClaimNamespace != account.ClaimNamespace))
+            {
+                dispatch.State = ClearinghouseDispatchState.CancelledBeforeSend;
+                dispatch.SafeErrorCode = "source_or_account_changed"; dispatch.Revision++;
+                await db.SaveChangesAsync(token); await schedule.CommitAsync(token);
+                return true;
+            }
             var history = await ApiClaimReleaseHistory.LoadAsync(db, dispatch.AgencyId, generation.Id, token);
             var retained = history.Files.SingleOrDefault(row => row.File.Id == generation.Id);
             if (!history.Complete || retained is null || history.Defects.Any(row => row.Code == "candidate_invalid") ||
@@ -104,22 +121,22 @@ internal sealed class ClearinghouseDispatchWorker(
                 catch (DbUpdateConcurrencyException) { }
                 return true;
             }
-            try { await NoteAmendmentDispatchGuard.ValidateAsync(db, generation, token); }
+            try
+            {
+                if (!await ApiEndpoints.IsRetainedReleaseAllowedAsync(db, generation, history, retained, token))
+                {
+                    dispatch.State = ClearinghouseDispatchState.CancelledBeforeSend;
+                    dispatch.SafeErrorCode = "billing_release_blocked"; dispatch.Revision++;
+                    await db.SaveChangesAsync(token); await schedule.CommitAsync(token);
+                    return true;
+                }
+            }
             catch (NoteAmendmentWorkflowException)
             {
                 dispatch.State = ClearinghouseDispatchState.CancelledBeforeSend;
                 dispatch.SafeErrorCode = "note_amendment_financial_hold"; dispatch.Revision++;
                 try { await db.SaveChangesAsync(token); await schedule.CommitAsync(token); } catch (DbUpdateConcurrencyException) { }
                 return true;
-            }
-
-            if (gate.IsRealSandboxEnabled)
-            {
-                // Neither a missing AccountKey nor an unavailable receipt-wrapping key should
-                // convert an unsent file into an uncertain upload. Preflight before Sending.
-                _ = keys.Resolve(account.SecretReference);
-                _ = await protector.ProtectAsync("claimmd-receipt-preflight",
-                    new FieldBinding(dispatch.AgencyId, 0, $"ClaimMdPreflight:{dispatch.Id:N}"), token);
             }
 
             dispatch.State = ClearinghouseDispatchState.Sending;
@@ -150,13 +167,6 @@ internal sealed class ClearinghouseDispatchWorker(
         var safeVendorCode = SafeIdentifier(outcome.VendorCode, 40);
         var accepted = outcome.Outcome == ClearinghouseAttemptOutcome.Accepted && safeFileId is not null;
         var rejected = outcome.Outcome == ClearinghouseAttemptOutcome.Rejected;
-        dispatch.State = accepted ? ClearinghouseDispatchState.AcceptedByClearinghouse :
-            rejected ? ClearinghouseDispatchState.RejectedByClearinghouse : ClearinghouseDispatchState.OutcomeUnknown;
-        dispatch.ExternalFileId = accepted ? safeFileId : null;
-        dispatch.AcceptedClaimCount = accepted ? outcome.AcceptedClaims : null;
-        dispatch.RejectedClaimCount = rejected ? outcome.RejectedClaims : null;
-        dispatch.SafeErrorCode = accepted ? null : safeVendorCode ?? "upload_outcome_unknown";
-        dispatch.Revision++;
         var attempt = new ClearinghouseDispatchAttempt
         {
             Id = Guid.NewGuid(), DispatchId = dispatch.Id, AttemptNumber = 1,
@@ -177,6 +187,26 @@ internal sealed class ClearinghouseDispatchWorker(
             attempt.ResponseWrappedDataKey = protectedResponse.WrappedDataKey;
             attempt.ResponseKeyId = protectedResponse.KeyId;
         }
+        // External upload and wrapping have completed. Re-enter admission only to
+        // retain their facts. A receipt arriving after Sending cannot unsend a file.
+        await using var resultWrite = await ClaimReleaseWriteScope.BeginAsync(db, dispatch.AgencyId, CancellationToken.None);
+        await db.Entry(dispatch).ReloadAsync(CancellationToken.None);
+        if (await db.ClearinghouseDispatchAttempts.AnyAsync(row => row.DispatchId == dispatch.Id, CancellationToken.None) ||
+            dispatch.State is not (ClearinghouseDispatchState.Sending or ClearinghouseDispatchState.ConfirmedNotReceived or
+                ClearinghouseDispatchState.AcceptedByClearinghouse))
+            throw new InvalidOperationException("Upload outcome requires reconciliation against retained dispatch evidence.");
+        if (dispatch.State != ClearinghouseDispatchState.AcceptedByClearinghouse)
+        {
+            dispatch.State = accepted ? ClearinghouseDispatchState.AcceptedByClearinghouse :
+                rejected ? ClearinghouseDispatchState.RejectedByClearinghouse : ClearinghouseDispatchState.OutcomeUnknown;
+            dispatch.ExternalFileId = accepted ? safeFileId : null;
+            dispatch.AcceptedClaimCount = accepted ? outcome.AcceptedClaims : null;
+            dispatch.RejectedClaimCount = rejected ? outcome.RejectedClaims : null;
+            dispatch.SafeErrorCode = accepted ? null : safeVendorCode ?? "upload_outcome_unknown";
+        }
+        else if (!accepted || dispatch.ExternalFileId != safeFileId)
+            dispatch.SafeErrorCode = "upload_reconciliation_conflict";
+        dispatch.Revision++;
         db.ClearinghouseDispatchAttempts.Add(attempt);
         db.BillingSubmissionEvents.Add(new ServerBillingSubmissionEvent
         {
@@ -184,7 +214,7 @@ internal sealed class ClearinghouseDispatchWorker(
             EdiGenerationId = generation.Id, OccurredAtUtc = DateTime.UtcNow,
             Stage = accepted ? BillingSubmissionStage.Transmitted : BillingSubmissionStage.TransportFailed,
             Reference = accepted ? safeFileId : null, ResponseType = "837P",
-            ResponseCode = accepted ? gate.IsRealSandboxEnabled ? "claimmd-upload" : "synthetic-upload" : dispatch.SafeErrorCode,
+            ResponseCode = accepted ? gate.IsRealSandboxEnabled ? "claimmd-upload" : "synthetic-upload" : safeVendorCode ?? "upload_outcome_unknown",
             Explanation = accepted
                 ? gate.IsRealSandboxEnabled
                     ? "Claim.MD received the test file; no payer acceptance or payment is implied."
@@ -196,7 +226,7 @@ internal sealed class ClearinghouseDispatchWorker(
         });
         // The queued audit event names the human requester. These rows are system-operated
         // transport evidence; no background process impersonates that human in AuditEvents.
-        try { await db.SaveChangesAsync(CancellationToken.None); }
+        try { await db.SaveChangesAsync(CancellationToken.None); await resultWrite.CommitAsync(CancellationToken.None); }
         catch (DbUpdateException)
         {
             logger.LogError("Clearinghouse dispatch evidence could not be committed; dispatch requires manual reconciliation.");

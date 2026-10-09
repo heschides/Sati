@@ -16,11 +16,13 @@ internal sealed class SingleAttemptWriteFilter(IDbContextFactory<ApiDbContext> f
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var method = context.HttpContext.Request.Method;
-        if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method))
-            return await next(context);
-        await using var db = await factory.CreateDbContextAsync(context.HttpContext.RequestAborted);
         try
         {
+            // Lazy reconciliation on a GET owns its own write scope. Preserve
+            // ordinary read retries while returning the same safe contention result.
+            if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method))
+                return await next(context);
+            await using var db = await factory.CreateDbContextAsync(context.HttpContext.RequestAborted);
             return await new SingleAttempt(db).ExecuteAsync(async () => await next(context));
         }
         catch (ServiceTimeWriteConflictException failure)
@@ -31,6 +33,11 @@ internal sealed class SingleAttemptWriteFilter(IDbContextFactory<ApiDbContext> f
         catch (BillingPeriodWriteConflictException failure)
         {
             return Results.Conflict(new ApiErrorDto("billing_period_busy", failure.Message,
+                context.HttpContext.TraceIdentifier));
+        }
+        catch (ClaimReleaseWriteConflictException failure)
+        {
+            return Results.Conflict(new ApiErrorDto("claim_release_busy", failure.Message,
                 context.HttpContext.TraceIdentifier));
         }
     }

@@ -33,6 +33,7 @@ public static class BillingPeriodWriteScope
             IsolationLevel.Serializable, cancellationToken);
         try
         {
+            await ClaimReleaseWriteScope.AcquireAsync(context, agencyId, cancellationToken);
             if (context.Database.IsSqlServer())
             {
                 await using var command = context.Database.GetDbConnection().CreateCommand();

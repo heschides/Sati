@@ -116,7 +116,7 @@ internal static partial class ApiEndpoints
             if (period is null)
                 return Results.NotFound();
 
-            var history = await LoadClaimHistoryAsync(db, actor.AgencyId, period, cancellationToken);
+            var history = await LoadClaimHistoryAsync(db, actor.AgencyId, period, cancellationToken, forDisplay: true);
             var names = await (from note in db.Notes.AsNoTracking()
                                join person in db.People.AsNoTracking() on note.PersonId equals person.Id
                                where history.NoteIds.Contains(note.Id) && person.AgencyId == actor.AgencyId
@@ -533,12 +533,14 @@ internal static partial class ApiEndpoints
     /// drift from the evidence it summarizes.
     /// </summary>
     private static async Task<ClaimHistory> LoadClaimHistoryAsync(
-        ApiDbContext db, int agencyId, ServerBillingPeriod period, CancellationToken cancellationToken)
+        ApiDbContext db, int agencyId, ServerBillingPeriod period, CancellationToken cancellationToken, bool forDisplay = false)
     {
-        var generations = await db.EdiGenerations.AsNoTracking()
-            .Where(item => item.AgencyId == agencyId && item.BillingPeriodId == period.Id)
-            .OrderBy(item => item.Id).ToListAsync(cancellationToken);
-        var generationIds = generations.Select(item => item.Id).ToList();
+        var projection = forDisplay
+            ? await ApiClaimReleaseHistory.LoadForDisplayAsync(db, agencyId, cancellationToken)
+            : await ApiClaimReleaseHistory.LoadAsync(db, agencyId, null, cancellationToken);
+        var generations = projection.Files.Where(item => item.File.BillingPeriodId == period.Id)
+            .OrderBy(item => item.File.Id).ToList();
+        var generationIds = generations.Select(item => item.File.Id).ToList();
         var fileVerdicts = await db.BillingSubmissionEvents.AsNoTracking()
             .Where(item => item.AgencyId == agencyId && item.EdiGenerationId.HasValue &&
                            generationIds.Contains(item.EdiGenerationId.Value) && item.ResponseType == "999")
@@ -560,39 +562,25 @@ internal static partial class ApiEndpoints
             .ToListAsync(cancellationToken);
 
         var submissions = new Dictionary<int, List<ClaimSubmissionRecord>>();
-        foreach (var generation in generations)
+        foreach (var retained in generations)
         {
-            ParsedClaimSubmission parsed;
-            try { parsed = ClaimResponseReader.ReadSubmission(generation.Content); }
-            catch (Exception failure) when (failure is FormatException or InvalidOperationException or OverflowException)
-            { continue; }
+            var generation = retained.File;
             var fileVerdict = fileVerdicts.Where(item => item.GenerationId == generation.Id)
                 .OrderByDescending(item => item.Id).Select(item => item.Stage).FirstOrDefault();
-            foreach (var claim in parsed.Claims)
+            foreach (var mapped in retained.Claims)
             {
-                if (!TryReadNoteId(claim.ClaimReference, out var noteId))
-                    continue;
+                var claim = mapped.Wire;
+                var noteId = mapped.NoteId;
+                var delivery = projection.Facts.Single(item => item.GenerationId == generation.Id && item.NoteId == noteId).Evidence;
+                if (delivery is OriginalClaimDeliveryEvidence.GeneratedOnly or OriginalClaimDeliveryEvidence.KnownUnsent) continue;
                 var acknowledgement = acknowledgements
                     .Where(item => item.EdiGenerationId == generation.Id && item.ClaimReference == claim.ClaimReference)
                     .MaxBy(item => item.Id);
                 var remittance = remittances
                     .Where(item => item.EdiGenerationId == generation.Id && item.ClaimReference == claim.ClaimReference)
                     .MaxBy(item => item.Id);
-                var correctionId = generation.IsCorrection
-                    ? corrections.Where(item => item.NoteId == noteId && correctionSubmissions.Any(link =>
-                            link.ClaimCorrectionId == item.Id && link.EdiGenerationId == generation.Id))
-                        .Select(item => (long?)item.Id).FirstOrDefault()
-                    : null;
-                ClaimCorrectionAction? action = generation.IsCorrection
-                    ? claim.FrequencyCode switch
-                    {
-                        "7" => ClaimCorrectionAction.Replace,
-                        "8" => ClaimCorrectionAction.Void,
-                        _ => ClaimCorrectionAction.Resubmit
-                    }
-                    : null;
                 var facts = new ClaimSubmissionFacts(
-                    action,
+                    mapped.Action,
                     fileVerdict switch
                     {
                         BillingSubmissionStage.FunctionalAccepted => ClaimFileVerdict.Accepted,
@@ -600,25 +588,27 @@ internal static partial class ApiEndpoints
                         _ => ClaimFileVerdict.None
                     },
                     acknowledgement?.Disposition,
-                    remittance?.Status,
+                    delivery == OriginalClaimDeliveryEvidence.Uncertain ? RemittanceClaimStatus.NeedsReview : remittance?.Status,
                     remittance?.PayerClaimControlNumber);
                 if (!submissions.TryGetValue(noteId, out var list))
                     submissions[noteId] = list = [];
-                list.Add(new ClaimSubmissionRecord(generation.Id, correctionId, facts));
+                list.Add(new ClaimSubmissionRecord(generation.Id, mapped.CorrectionId, facts));
             }
         }
 
-        var unsent = corrections.Where(item => correctionSubmissions.All(link => link.ClaimCorrectionId != item.Id))
+        foreach (var noteId in period.Lines.Select(line => line.NoteId).Distinct())
+            if (!projection.Complete || projection.Defects.Any(defect => defect.HasDeliveryEvidence &&
+                (defect.NoteId is int affected ? affected == noteId : defect.BillingPeriodId is null || defect.BillingPeriodId == period.Id)))
+            {
+                if (!submissions.TryGetValue(noteId, out var list)) submissions[noteId] = list = [];
+                list.Add(new ClaimSubmissionRecord(long.MaxValue, null,
+                    new ClaimSubmissionFacts(null, ClaimFileVerdict.None, null, RemittanceClaimStatus.NeedsReview, null)));
+            }
+        var unsent = corrections.Where(item => correctionSubmissions.Where(link => link.ClaimCorrectionId == item.Id)
+                .All(link => !projection.Facts.Any(fact => fact.GenerationId == link.EdiGenerationId && fact.NoteId == item.NoteId &&
+                    fact.Evidence is OriginalClaimDeliveryEvidence.Received or OriginalClaimDeliveryEvidence.Queued or OriginalClaimDeliveryEvidence.Uncertain)))
             .Select(item => item.NoteId).ToHashSet();
         return new ClaimHistory(period.Lines.Select(line => line.NoteId).ToList(), submissions, unsent, corrections);
-    }
-
-    // CLM01 is "{control}-{period}-{note}"; see ClaimSubmissionIdentity.
-    private static bool TryReadNoteId(string claimReference, out int noteId)
-    {
-        var parts = claimReference.Split('-');
-        noteId = 0;
-        return parts.Length == 3 && int.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out noteId);
     }
 
     private sealed record ClaimSubmissionRecord(long GenerationId, long? CorrectionId, ClaimSubmissionFacts Facts);

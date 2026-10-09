@@ -223,6 +223,81 @@ remain the next chunk. Exact correction permission/source-purpose and full curre
 queue/send compliance follow. Sequential SQLite evidence is not SQL race proof, vendor/payer
 certification, deployment or full R1/R2 closure.
 
+## Coordinated release and current subset compliance — local source October 9, 2026
+
+**Status:** implemented source; actual local/synthetic verification and limits are recorded in
+[working evidence](docs/readiness/work-evidence.md#2026-10-09--coordinated-claim-release-and-compliance).
+[DEC-0233](docs/decisions/current/2026-10-09-DEC-0233.md) supersedes the pending transaction/full
+current-release status in the earlier sequential checkpoint and proposal below. Historical test
+results remain historical; no source result changes sealed 1.3.38 readiness or deployment facts.
+
+`ClaimReleaseWriteScope` in Persistence acquires `Sati:ClaimRelease:{agencyId}` as the first
+transaction-owned exclusive SQL lock, with a 10-second admission wait. BillingPeriod and
+ServiceTime owners acquire it before their own narrower locks. Generation/correction, new queue,
+worker pre-Sending/result, reconciliation, mock transmission and manual/status/ERA receipt writes
+share that boundary. Relevant current-compliance writers (notes/amendments, form/release
+attestations, period promotion, policy/recovery, person/provider links and annual reconciliation)
+also enter admission. Current tracked source is reloaded after admission; advisory discovery is
+never a decision. Serializable reads protect the queried rows/ranges. This deliberately broad
+agency lock has no measured throughput/fair-wait guarantee; W8 remains separately open.
+
+Direct local/receipt operations own single-attempt execution. Receipt and worker entry points
+refuse a retrying outer scope before I/O. Endpoint writes retain the existing zero-retry filter;
+admission contention returns safe `claim_release_busy`, including GET lazy reconciliation without
+placing ordinary reads in the write execution scope. SqlClient command cancellation is normalized
+to caller cancellation only when the caller token is cancelled; no raw SQL inner payload is
+attached, and other provider failures propagate. Duplicate-write recovery rolls back and
+disposes the failed scope, clears tracking and revalidates in a fresh admitted transaction.
+
+Receipt processing first checks replay/no-op, authority/account/cursor and exact matching. It
+reserves a receipt identity, releases SQL, wraps with that identity's encryption binding, then
+re-enters admission and repeats all checks before receipt/effect/audit/cursor commit. Duplicate
+manual replay and stale feeds need no wrapping key. The worker resolves/preflights keys outside
+SQL, reloads the retained file/account/intent, commits Sending and releases SQL before upload.
+Actual upload evidence is wrapped outside SQL and committed under new admission. A receipt
+committed before Sending holds the successor with zero calls. Once Sending wins, later receipts
+cannot unsend it: retain both facts, never conceal or automatically replay the upload. A failed
+result commit leaves durable Sending for reconciliation.
+
+The API's retained release validator uses trusted stored agency scope and the validated immutable
+claim mapping, without constructing a human actor. New queue and immediate pre-Sending checks
+reuse current service-date `BillingExportGate`, exceptions/recovery, source status, form/release,
+provider/contact, form-work, snapshot and service-time checks. An original checks all its retained
+claims. Resubmit/Replace check only their selected persisted correction subset; an unrelated
+claim's new blocker cannot block that correction. Current physical standing/action/payer number
+and predecessor are checked again. Original/correction exact intent replay retains its durable
+result; it does not create another send.
+
+Void keeps its existing withdrawal purpose: loss of positive billability cannot prevent
+withdrawing the standing bill. Exact retained identity, agency/period, eligible standing action,
+F8 payer claim number/predecessor and amendment financial review remain mandatory. No correction
+creates new vendor/payer permission. Correction history now uses the same validated projection:
+Generated-only alternatives do not supersede the received claim; generated corrections remain
+pending; damaged physical history and uncertainty hold. GET options are advisory, and commands
+repeat the decision under admission.
+
+The private SQL acceptance observes actual transaction lock ownership for all nine history writer
+categories, and pauses real receipt/worker entry points in both orders. The intended negative
+proof detects premature history reads, rather than assuming ordinary SQL range locks allowed an
+extra upload. Additional key preparation tests observe SQL lock absence and mutate authority/feed
+cursors while wrapping. Rollback checks inject failure before commit; they are distinct from an
+ambiguous network/SQL commit loss. Existing lost-response/host-recreation tests cover committed
+replay. Local adapters share projection/rules and admitted fresh original/replay behavior; the
+transitional desktop does not gain a second dispatch/receipt scheduler.
+
+Acceptance mapping: R1-01/02/03/04/09 use actual generation, queue, synthetic worker and audited
+nonreceipt workflows; R1-05 retains exact result/intent/request-kind replay; R1-06 checks legitimate
+frequency 1/7/8 and current correction standing; R1-07 checks retained identity/damaged evidence;
+R1-08 checks late group and claim receipts plus both SQL receipt/Sending orders; R1-10 uses
+pre-commit rollback and durable-Sending restart, with existing joined lost-response replay.
+Current exact-subset/purpose checks cover R2 at queue and pre-Sending. The ledger owns exact runs
+and distinguishes initial setup failures, mutation proofs, broad suites and unrun permutations.
+
+No live clearinghouse/payer send, cloud/shared database access, migration, worker activation,
+deployment, release, legal compliance review or readiness reassessment occurred. Multi-host load,
+aggregate budgets, exhaustive failure/order permutations, full-service recovery and external
+certification remain with their existing agenda/evidence owners.
+
 ## Proposed original-release guard — October 9, 2026
 
 The independently implemented replay-kind repair is described in

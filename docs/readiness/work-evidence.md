@@ -1821,6 +1821,137 @@ full R2 as recorded in [the agenda](../../AGENDA.md#next-eligible-work).
 
 **Later reviewed release snapshot, if any:** none; no release invoked by this work.
 
+## 2026-10-09 — Coordinated claim release and compliance
+
+**Stable work ID and bounded slice:** SATI-BIL-001, common history/current-compliance admission,
+staged receipt wrapping and single-attempt ownership, exact retained-subset/action/purpose gates.
+Josh's current request continues adopted P1–P3. This is source work, not a DATT invocation.
+
+**Status and source/revision:** local source implementation on `codex/billing-original-release-design`
+after pushed sequential checkpoint `904572780789f59d3ac7cdd99db079282d4c9e38`. Final verification
+has passed; this chunk's commit/push follows this evidence update. The handoff records its resulting
+commit without a self-referential second ledger commit. Prior replay-kind `0080e2c` and sequential
+history `9045727` chunks were pushed to the approved Sati repository.
+
+**Changed behavior, ownership and canonical paths:** Persistence owns first agency transaction
+admission; narrower period/service scopes inherit it. API/local writers revalidate admitted facts.
+Receipt key preparation and upload run outside SQL; receipt bindings/authority/account/cursor are
+checked again. Current release checks use the retained selected claims and existing authoritative
+Contracts rules. Void preserves standing-bill withdrawal and financial review. Correction history
+uses validated delivery facts; unused renders no longer supersede physical submissions. GET
+options remain advisory. [The runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
+owns details, writer boundaries and R1/R2 mapping.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+- Earlier R2 gate mutation: `assessment-working/test-results/r2-retained-subset-proven-red.trx`
+  recorded **9 intended failures/4 positive passes** when current release checks were bypassed:
+  original form/status at queue/send, selected Resubmit/Replace form gates and late adjudication.
+  The bypass was restored before acceptance. An earlier approval-timestamp fixture failed an
+  assumption rather than the existing status policy; it was corrected and is not credited.
+- Private SQL `pwsh -NoProfile -File scripts/Test-IsolatedLocalDb.ps1 -BillingReleaseOnly`:
+  initial **11/11 passed** (`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_12_10_49_net10.0.trx`).
+  Common-lock-disabled mutation then produced **10 intended failures/1 pass** at actual ownership
+  and premature decision assertions (`...12_14_47...trx`); ordinary SQL range locks may still
+  prevent a duplicate upload, so this proves common admission/refresh rather than an extra send.
+- Expanded SQL **17/17 passed** (`...12_18_57...trx`). Restoring old inside-SQL wrapping placement
+  produced **6 intended lock-held failures/11 passes** (`...12_24_29...trx`). The repair releases
+  SQL before wrapping and repeats protected reads afterward.
+- Removing second-phase authority/cursor and outer-retry guards produced **6 intended failures/
+  14 passes** (`...12_34_38...trx`): manual stale actor incorrectly imported; status/ERA overwrote
+  the advanced cursor; three retrying callers incorrectly performed I/O. All mutations restored.
+- The unused-render correction test failed at expected OK/actual Conflict against the old built
+  history (`assessment-working/test-results/r2-unused-render-red/Joshu_LONGCHENPA_2026-10-09_12_37_58_net10.0.trx`).
+  Source now uses shared validated projection. Earlier focused API acceptance passed **62/62**
+  before later history/rollback additions (`assessment-working/test-results/r1-r2-coordination-green.trx`).
+- Complete private API suite: **1,243 passed/1 failed/0 skipped** in 31m55s,
+  `TestResults/ClaimMdPreparationFinalApi/Joshu_LONGCHENPA_2026-10-09_12_38_43_net10.0.trx`.
+  All **20** SQL release cases and the repaired unused-render correction passed. The sole failure
+  expected AwaitingFileCheck for a generated-only claim; current policy correctly returns NotSent.
+  The test is renamed `AGeneratedOnlyClaimOffersNoCorrection` and its expected state corrected,
+  preserving no-actions and attempted-correction refusal. Private instance cleanup passed.
+- Documentation structure and all **22 negative mutation proofs passed** after adding canonical
+  labels/index registration; initial missing agenda labels/decision index were repaired without
+  weakening the gate. Readiness against exact `904572780789f59d3ac7cdd99db079282d4c9e38` passed,
+  unchanged sealed score 22/41 hard blockers. Tracked whitespace check passed.
+- Final guard mutations: private targeted run recorded **3 intended failures/0 passes**,
+  `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_13_15_46_net10.0.trx`.
+  With BeginSending permission disabled, both rejected-999 and exact per-claim late receipts
+  allowed a second physical connector call (expected one/actual two). Without common admission,
+  the cancellation/resource-scope test failed at actual lock ownership. Mutations were restored
+  before acceptance; no mutation remains in Contracts or the production helpers. Cleanup passed.
+- First final targeted run: **28 passed/2 failed/0 skipped**,
+  `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_13_17_49_net10.0.trx`.
+  Receipt commit refusal uses the existing safe 503, not the test's assumed 500; the expected
+  response was corrected without removing record/audit/effect assertions. Actual SQL cancellation
+  surfaced a SqlException rather than caller cancellation. The helper now normalizes only
+  SqlException with an already-cancelled caller token to OperationCanceledException carrying
+  that token and no raw SQL inner payload; other provider failures still propagate.
+- The subsequent private check passed cancellation and all three API rollback cases (**4 passes**),
+  while caseload's real common-lock contention reproduced expected Conflict/actual server error
+  (**1 intended failure**), `...13_23_59...trx`. The write filter now maps known contention for
+  GET lazy reconciliation too, while leaving ordinary reads outside its zero-retry write scope.
+  Instance cleanup passed in both runs. Final acceptance includes the existing request-exception
+  redaction suite to verify this filter change preserves safe containment and incident execution.
+- Final private API acceptance **41/41 passed, 0 failed/skipped** in 7m52s,
+  `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_13_26_29_net10.0.trx`:
+  all **22 SQL release** cases, six commit/rollback/restart cases, both late-receipt variants,
+  the corrected generated-only status case and ten existing request-error redaction cases.
+  Cancellation retains the exact caller token, and real caseload contention returns the safe
+  claim_release_busy conflict. Instance cleanup passed. This resolves the broad run's sole
+  obsolete expectation and the two subsequently discovered admission error-handling defects;
+  no complete all-green 1,244-case rerun is claimed.
+- Private local SQL acceptance **6/6 passed, 0 failed/skipped** in 1m03s,
+  `TestResults/IsolatedSqlServer/Desktop/Joshu_LONGCHENPA_2026-10-09_13_38_10_net10.0.trx`.
+  This includes actual local simultaneous-create/move schedule protection after the common
+  first-lock change and the guarded local schema/migration helpers selected by DesktopOnly.
+  WPF/API/desktop-test Release builds completed with existing warnings, no errors. Cleanup passed.
+- Final local export/replay/session, formatter/parser and shared export/correction rules:
+  **99/99 passed, 0 failed/skipped** in 19s,
+  `assessment-working/test-results/r1-r2-local-final/Joshu_LONGCHENPA_2026-10-09_13_39_38_net10.0.trx`,
+  using the freshly built desktop output. No working database or live AI model was used.
+- Final canonical structure and all **22 negative mutation proofs passed** after selecting
+  SATI-WRK-001 (46 root documents, 28 scoped owners, 12 preserved snapshots, 11 active items,
+  454 legacy items, 218 imported/15 current decisions). Readiness against exact `9045727` full
+  baseline SHA above passed again: sealed 1.3.38 remains 22 with 41 hard blockers. Whitespace
+  passed; final structure/whitespace are rechecked after recording these results. No snapshot,
+  rubric, model/migration or route authorization inventory changed. The broad suite remains
+  recorded as one failed run; its corrected case passed final targeted acceptance. No complete
+  all-green rerun is claimed.
+
+**Failed/unrun checks, reason and verification limits:** initial new-test namespace/manifest/
+private-member compile failures are retained and are not guard proofs. Initial incorrect approval
+fixture is not credited. Each SQL wrapper creates a uniquely named private instance and cleans
+only that instance; completed runs above confirmed cleanup. No shared working/PHI database, cloud,
+real vendor or payer was accessed. Rollback interception is before commit, not an ambiguous commit
+loss or operating restore. Existing host/lost-response cases retain that separate scope. Exhaustive
+writer/order/fault permutations, sustained multi-host load and measured fair wait are unrun; do
+not read the R1 acceptance mapping as such evidence. No schema/model/migration change is present.
+
+**Relevant readiness criterion IDs and evidence class:** ID01/ID02/ID07/ID08 retained replay and
+billing release; MT01/MT02/MT05/MT10 trusted scope/admission; OP06 audit. Local source and synthetic
+SQLite/private SQL only. No independent operating, regulatory, payer or deployment conclusion;
+sealed 1.3.38 scores/rubrics remain unchanged.
+
+**Durable decisions, alternatives and supersession links:** [DEC-0233](../decisions/current/2026-10-09-DEC-0233.md)
+supersedes pending common-admission/current-release implementation status in DEC-0232 and the
+transaction review. DEC-0230 policy/DEC-0231 replay/DEC-0232 projection remain. Holding SQL over
+network wrapping, replaying uncertain uploads, trusting display or whole-period correction checks
+are rejected. Dated checkpoint evidence and sealed snapshots are preserved.
+
+**Remaining risks/blockers, dependencies and deferred work:** globally oldest missing-key queued
+preflight remains known-unsent and may starve later work; SATI-WRK-001 owns its reviewed durable
+policy. Agency-wide admission trades throughput for safety, with no capacity/fairness guarantee.
+General command protocols, duplicate-service identity across distinct notes, structural tenancy,
+complete recovery, certification and legal/operating evidence keep their owners. Correction
+purpose retains existing payer-number semantics, without certifying payer acceptance.
+
+**Next eligible stable ID and bounded slice:** SATI-WRK-001's local preflight poison-isolation
+policy/reproducer design, selected by the agenda after completed billing verification.
+No broader worker implementation or schema work is started by this billing request.
+
+**Later reviewed release snapshot, if any:** none; no release invoked or reassessed.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

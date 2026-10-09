@@ -59,6 +59,11 @@ authorization requirements.
 
 ## Explicit supersession
 
+Coordinated claim transactions, staged wrapping and current exact-subset release are recorded in
+[DEC-0233](docs/decisions/current/2026-10-09-DEC-0233.md). The
+[runbook](CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
+owns behavior and actual evidence limits, superseding pending implementation status below.
+
 Shared original delivery history and sequential admission are recorded in
 [DEC-0232](docs/decisions/current/2026-10-09-DEC-0232.md). The
 [runbook](CLAIMMD_SANDBOX_RUNBOOK.md#sequential-delivery-history-guard--local-source-october-9-2026)
@@ -72,13 +77,14 @@ owns behavior and evidence limits; full lifecycle and queue/send compliance rema
 
 The original-claim cross-mode history, generic rejection and queued-reservation policy is recorded
 in [DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md), following Josh's explicit adoption of
-P1–P3. The rule and common transaction boundary remain unimplemented; the
+P1–P3. Later implementation status belongs to DEC-0232/DEC-0233; the
 [billing owner](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026) records
 encryption/transaction preparation requirements and the bounded next source slice. Existing
 correction permissions, full R2/void-purpose review and operating authority remain unchanged.
 
 | Earlier statement | Later authority | Scope of supersession |
 |---|---|---|
+| DEC-0232 common admission/full current release and the transaction review wrapping placement were pending | [DEC-0233](docs/decisions/current/2026-10-09-DEC-0233.md) | Implemented admitted source decisions, staged encryption, current exact subset/action/purpose and private synthetic verification; earlier results remain dated evidence, and operating/certification/readiness authority is unchanged. |
 | October 9 billing design P1–P3 recommendations awaited a policy answer | [DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md) | Josh adopted the three product rules. This changes proposal status only; no implemented guard, SQL coordination or payer certification follows. |
 | Two health results retained caught exceptions; schema failures passed a raw exception to the logger | [DEC-0229](docs/decisions/current/2026-10-08-DEC-0229.md), [health logging owner](LOGGING_DESIGN.md#api-health-failures--source-october-8-2026) | Remove those logger/result payloads while retaining fixed Unhealthy status/descriptions, current cancellation and real validation. Startup and arbitrary other sinks remain separate. |
 | Incident aggregation began an explicit transaction without its own execution scope and allowed retrying outer callers | [DEC-0228](docs/decisions/current/2026-10-08-DEC-0228.md), [incident execution owner](LOGGING_DESIGN.md#api-incident-execution--source-october-8-2026) | Full zero-retry transaction ownership and early outer-retry refusal; current immediate-reference replay, safe envelopes and SQL query policy remain. |

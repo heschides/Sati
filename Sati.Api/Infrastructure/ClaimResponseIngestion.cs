@@ -1,4 +1,3 @@
-using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -8,6 +7,7 @@ using Sati.Api.Data;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Models.Billing;
+using Sati.Data;
 
 namespace Sati.Api.Infrastructure;
 
@@ -15,6 +15,8 @@ internal sealed class ClaimResponseRejected(string code, string message) : Excep
 {
     public string Code { get; } = code;
 }
+
+internal sealed record PreparedClaimResponse(Guid Id, int AgencyId, ProtectedValue Value);
 
 /// <summary>Matches retained outbound evidence, then commits one encrypted receipt and all effects atomically.</summary>
 internal sealed class ClaimResponseIngestion(
@@ -30,8 +32,12 @@ internal sealed class ClaimResponseIngestion(
         options.Value.ExpectedDatabaseName == "SatiApiTests";
 
     /// <summary>Claim.MD's ERA is real X12 835; reuse the same matching and financial effects as manual intake.</summary>
-    internal async Task<bool> ImportConnectorEraAsync(Guid accountId, string eraId, string expectedCursor,
-        string document, CancellationToken token)
+    internal Task<bool> ImportConnectorEraAsync(Guid accountId, string eraId, string expectedCursor,
+        string document, CancellationToken token) => ClaimReleaseWriteScope.ExecuteOnceAsync(db,
+            () => ImportConnectorEraCoreAsync(accountId, eraId, expectedCursor, document, token, null));
+
+    private async Task<bool> ImportConnectorEraCoreAsync(Guid accountId, string eraId, string expectedCursor,
+        string document, CancellationToken token, PreparedClaimResponse? prepared)
     {
         if (!IsEnabled || string.IsNullOrWhiteSpace(document) ||
             document.Length > MaximumDocumentCharacters ||
@@ -45,9 +51,12 @@ internal sealed class ClaimResponseIngestion(
         if (parsed.Envelope.Kind != ClaimResponseKind.RemittanceAdvice || !parsed.Envelope.IsTestInterchange)
             throw new ClaimResponseRejected("connector_era_invalid", "The connector accepts test 835 remittances only.");
 
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        var agencyId = await db.ClearinghouseAccounts.AsNoTracking().Where(row => row.Id == accountId)
+            .Select(row => (int?)row.AgencyId).SingleOrDefaultAsync(token);
+        if (agencyId is null) throw new ClaimResponseRejected("connector_account_unavailable", "The test account is unavailable.");
+        await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, agencyId.Value, token);
         var account = await db.ClearinghouseAccounts.AsNoTracking().SingleOrDefaultAsync(row =>
-            row.Id == accountId && row.IsEnabled && row.IsTest &&
+            row.Id == accountId && row.AgencyId == agencyId && row.IsEnabled && row.IsTest &&
             row.ConnectorKind == TradingPartnerKind.ClaimMd, token);
         if (account is null) throw new ClaimResponseRejected("connector_account_unavailable", "The test account is unavailable.");
         var checkpoint = await db.ClearinghouseFeedCheckpoints.SingleOrDefaultAsync(row =>
@@ -89,7 +98,7 @@ internal sealed class ClaimResponseIngestion(
 
         var receipt = new ClearinghouseResponseReceipt
         {
-            Id = Guid.NewGuid(), AgencyId = account.AgencyId, Source = ClearinghouseReceiptSource.Connector,
+            Id = prepared?.Id ?? Guid.NewGuid(), AgencyId = account.AgencyId, Source = ClearinghouseReceiptSource.Connector,
             AccountId = accountId, ConnectorKind = TradingPartnerKind.ClaimMd,
             FeedKind = ClearinghouseFeedKind.Era, ExternalArtifactId = "era:" + eraId,
             ContentType = "application/edi-x12", ConnectorVersion = "claimmd-api-1.19",
@@ -97,7 +106,19 @@ internal sealed class ClaimResponseIngestion(
             ParserVersion = ParserVersion, RawSha256 = rawHash, SemanticSha256 = semanticHash,
             IdentitySha256 = identityHash, PaymentIdentitySha256 = paymentHash
         };
-        var protectedValue = await protector.ProtectAsync(document, Binding(receipt), token);
+        if (prepared is null)
+        {
+            // Preparation may call Key Vault. Release SQL before wrapping, then repeat
+            // every account, cursor, duplicate, identity and matching check under admission.
+            await transaction.DisposeAsync();
+            db.ChangeTracker.Clear();
+            var value = await protector.ProtectAsync(document, Binding(receipt), token);
+            return await ImportConnectorEraCoreAsync(accountId, eraId, expectedCursor, document, token,
+                new PreparedClaimResponse(receipt.Id, receipt.AgencyId, value));
+        }
+        if (prepared.AgencyId != receipt.AgencyId)
+            throw new ClaimResponseRejected("connector_account_unavailable", "The test account changed during preparation.");
+        var protectedValue = prepared.Value;
         receipt.Ciphertext = protectedValue.Ciphertext;
         receipt.Nonce = protectedValue.Nonce;
         receipt.Tag = protectedValue.Tag;
@@ -128,9 +149,15 @@ internal sealed class ClaimResponseIngestion(
         return true;
     }
 
-    public async Task<ClaimResponseIngestResultDto> ImportAsync(string document, Actor actor,
+    public Task<ClaimResponseIngestResultDto> ImportAsync(string document, Actor actor,
         int? assertedPeriodId, CancellationToken cancellationToken,
-        ClearinghouseReceiptSource receiptSource = ClearinghouseReceiptSource.Manual)
+        ClearinghouseReceiptSource receiptSource = ClearinghouseReceiptSource.Manual) =>
+        ClaimReleaseWriteScope.ExecuteOnceAsync(db, () => ImportCoreAsync(document, actor, assertedPeriodId,
+            cancellationToken, receiptSource, null));
+
+    private async Task<ClaimResponseIngestResultDto> ImportCoreAsync(string document, Actor actor,
+        int? assertedPeriodId, CancellationToken cancellationToken,
+        ClearinghouseReceiptSource receiptSource, PreparedClaimResponse? prepared)
     {
         if (receiptSource is not (ClearinghouseReceiptSource.Manual or ClearinghouseReceiptSource.Mock))
             throw new ArgumentOutOfRangeException(nameof(receiptSource), "Automated connector imports require their own system-actor path.");
@@ -157,7 +184,9 @@ internal sealed class ClaimResponseIngestion(
             ? Hash(source + JsonSerializer.Serialize(new { advice.PaymentOriginatorId, advice.PaymentReference,
                 advice.PayeeId, advice.PayerId, advice.PaymentDate })) : null;
 
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+        if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+            throw new ClaimResponseRejected("forbidden", "The billing session is no longer current.");
         var duplicate = await FindReceiptAsync(actor.AgencyId, rawHash, semanticHash, cancellationToken);
         if (duplicate is not null)
             return Replay(duplicate, assertedPeriodId);
@@ -168,12 +197,22 @@ internal sealed class ClaimResponseIngestion(
         var matches = await MatchAsync(parsed, actor.AgencyId, assertedPeriodId, cancellationToken);
         var receipt = new ClearinghouseResponseReceipt
         {
-            Id = Guid.NewGuid(), AgencyId = actor.AgencyId, ActorUserId = actor.UserId, Source = receiptSource,
+            Id = prepared?.Id ?? Guid.NewGuid(), AgencyId = actor.AgencyId, ActorUserId = actor.UserId, Source = receiptSource,
             ReceivedAtUtc = DateTime.UtcNow, IsTest = parsed.Envelope.IsTestInterchange, Kind = parsed.Envelope.Kind,
             ParserVersion = ParserVersion, RawSha256 = rawHash, SemanticSha256 = semanticHash,
             IdentitySha256 = identityHash, PaymentIdentitySha256 = paymentHash
         };
-        var protectedValue = await protector.ProtectAsync(document, Binding(receipt), cancellationToken);
+        if (prepared is null)
+        {
+            await transaction.DisposeAsync();
+            db.ChangeTracker.Clear();
+            var value = await protector.ProtectAsync(document, Binding(receipt), cancellationToken);
+            return await ImportCoreAsync(document, actor, assertedPeriodId, cancellationToken, receiptSource,
+                new PreparedClaimResponse(receipt.Id, receipt.AgencyId, value));
+        }
+        if (prepared.AgencyId != receipt.AgencyId)
+            throw new ClaimResponseRejected("forbidden", "The billing session changed during preparation.");
+        var protectedValue = prepared.Value;
         receipt.Ciphertext = protectedValue.Ciphertext;
         receipt.Nonce = protectedValue.Nonce;
         receipt.Tag = protectedValue.Tag;
@@ -197,7 +236,11 @@ internal sealed class ClaimResponseIngestion(
         catch (DbUpdateException)
         {
             await transaction.RollbackAsync(cancellationToken);
+            await transaction.DisposeAsync();
             db.ChangeTracker.Clear();
+            await using var recovery = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken))
+                throw new ClaimResponseRejected("forbidden", "The billing session is no longer current.");
             var completed = await FindReceiptAsync(actor.AgencyId, rawHash, semanticHash, cancellationToken);
             if (completed is not null) return Replay(completed, assertedPeriodId);
             throw new ClaimResponseRejected("response_write_conflict", "The response could not be committed. No partial import was saved; retry the same file or ask an administrator to review the receipt history.");

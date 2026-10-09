@@ -43,7 +43,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
-| SATI-BIL-001 | export/replay and sequential physical-history guards implemented; all-writer R1/full R2 in progress | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [sequential delivery guard](CLAIMMD_SANDBOX_RUNBOOK.md#sequential-delivery-history-guard--local-source-october-9-2026), [transaction review](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026). Sequential source evidence does not close the SQL lifecycle or full send-gate work. |
+| SATI-BIL-001 | R1/R2 source implemented and locally verified; external evidence pending | Duplicate-claim lifecycle, common admission and current retained-subset/action/purpose gates; [billing architecture](docs/architecture/billing.md), [coordinated release owner](CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026), [working evidence](docs/readiness/work-evidence.md#2026-10-09--coordinated-claim-release-and-compliance). External certification and deployed operating evidence remain separate. |
 | SATI-SEC-001 | current request/incident/health repair sequence implemented and locally verified; broader sink/admission/security work open | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
 | SATI-GOV-001 | source implemented/runtime gated | Governance activation, approved policy periods and complete storage/recovery adapters; [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md). Runtime retention stays PolicyOnly. |
 | SATI-CLI-001 | evidence pending | External-device/accessibility/mixed-version/clean-install acceptance and supported client/server/schema compatibility; [Demo acceptance](DEMO_ACCEPTANCE.md), [readiness](docs/readiness/README.md). |
@@ -56,8 +56,10 @@ The bounded worker failure/deadline/discovery/cache repairs, billing residual ex
 request exception boundary, incident execution scope and two-check health redaction are locally
 implemented and verified. [Working evidence](docs/readiness/work-evidence.md) owns actual results,
 failed baselines and limits. This completes the current repair sequence, not the broader active
-agenda. Billing R1/full R2, worker budgets/fairness and general security/operational evidence remain
-future work.
+agenda. At that October 8 checkpoint, billing R1/full R2 and the broader work remained future
+work. The later [billing source completion](CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
+supersedes only that pending source status; worker budgets/fairness and general operating/security
+evidence remain open.
 
 The incident and health changes and Settings readiness display are included in audited checkpoint
 `61c6d04`, committed and pushed to the agenda branch after the completion handoff. Josh's valid October 8 `Invoke DATT!`
@@ -68,57 +70,39 @@ authorization requirements; no release outcome is established by this invocation
 
 ## Next eligible work
 
-**Next eligible item:** SATI-BIL-001
+**Next eligible item:** SATI-WRK-001
 
-**Eligibility:** Josh adopted P1–P3 ([DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md))
-and then explicitly requested duplicate-claim safeguards and compliance checks. R1-05 request-kind
-replay and shared sequential physical-history admission are implemented with fail-first API/local
-evidence. Common SQL coordination remains unproved. Follow
+**Eligibility:** SATI-BIL-001's duplicate lifecycle/current retained-subset checks are implemented
+and locally verified. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--coordinated-claim-release-and-compliance)
+owns the broad run's corrected expectation, actual mutation proofs, final private API/local/SQL
+results and limits. This closes the requested source sequence, without operating/certification,
+complete recovery or sealed-readiness closure. Follow
 [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** integrate common agency SQL transaction admission across generation, correction,
-queue, pre-Sending/outcome, reconciliation, mock transmission and manual/connector receipt writers.
-Refresh authoritative worker source after admission. Stage key wrapping outside decision locks
-while preserving no-key replay/no-op and revalidating bindings/identity/cursors/authority before
-commit. Establish single-attempt ownership for direct poller transaction paths, clean up failed
-transaction recovery and prove actual cross-writer SQL barriers in the private synthetic runner.
-The shared rule, retained-content/F8 projection and sequential main-path gates already exist.
+**Bounded slice:** review and document the known-unsent dispatch preflight poison-isolation
+policy, then build a bounded synthetic reproducer showing that a globally oldest missing-key
+Queued item can prevent later healthy work. Define durable due/backoff/hold/reopen behavior,
+ownership, admission order and required migration/rollback acceptance. Expected result is a
+reviewable policy and reproducible failure boundary; do not silently cancel due work, use a
+process-memory failed-ID list, implement broader fairness or add schema before its review.
 
-**Dependencies and owners:** read [the billing architecture](docs/architecture/billing.md),
-[the sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md),
-[payer requirements](PAYER_BILLING_REQUIREMENTS.md),
-[payer certification](PAYER_BILLING_CERTIFICATION.md),
-[regulatory posture](REGULATORY_CONCERNS.md),
-[the protocol baseline](docs/readiness/protocol-baseline.md),
-[the contingency owner](docs/readiness/multitenancy-contingencies.md) and
-[working evidence](docs/readiness/work-evidence.md). Revalidate original export, local `EdiService`,
-queue/worker, mock transmission, manual reconciliation, receipt ingestion, `ClaimCorrectionRules`
-and `LoadClaimHistoryAsync`. The transaction review revalidated them at documentation checkpoint
-`08fc36e`, with unchanged released application source. Read
-[the first implementation scope](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026)
-and its replay/account/legacy/recovery boundaries. Revalidate source again before editing.
+**Dependencies and owners:** the [worker handoff W8](BACKGROUND_WORKERS_HANDOFF.md#w8--tenant-workload-isolation-and-worker-fairness-significant-now-required-evidence-before-a-multi-agency-pilot)
+owns the blocker and missing durable policy. Read current worker/gate/key preflight/reset leases,
+[the coordinated billing owner](CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026),
+[worker architecture](docs/architecture/workers.md), [protocol baseline](docs/readiness/protocol-baseline.md),
+[operations](OPERATIONS.md) and [working evidence](docs/readiness/work-evidence.md).
+Preserve duplicate/correction/current-compliance gates, known-unsent versus Sending uncertainty,
+protected receipts, reset order, default-off operation and no physical upload replay.
 
-**Required outputs and completion evidence:** the canonical R1-01–R1-10 acceptance matrix requires
-fail-first tests through actual seams, legitimate correction/recovery/replay positives, unchanged
-retained bytes/effects and late-receipt precedence over nonreceipt. Test malformed/foreign scope,
-all-R accepted upload, generic rejection, modes/accounts and exact business identity. Independent
-positive histories replace shared-fixture lifecycle contamination. Prove all-writer admission with
-deterministic barriers using the guarded private synthetic SQL runner; SQLite/recovery branch
-tests are not SQL concurrency evidence. Preserve no-key replay/no-op and stage key wrapping
-outside decision transactions with protected revalidation.
-
-**Remaining authorized sequence:** full R2 follows lifecycle integration: trusted system-scoped
-current compliance checks for the exact retained original/correction subset at queue and before
-Sending, preserving the explicit standing-claim void purpose, amendment financial review and
-immutable history. Record the purpose decision and actual race/atomicity results before closure.
-
-**Boundaries and completion evidence:** reversible source changes, isolated synthetic tests and guarded private SQL proof;
-commit/push each verified significant chunk to the previously approved Sati repository. No cloud
-or working-data access, deployment/migration/publication, security setting, Production action or
-real provider call. Preserve sealed readiness/history and unrelated work. General fairness,
-structural tenancy, duplicate-service identity, recovery, logging sinks and external certification
-retain their separate owners. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--retained-edi-request-kind)
-records this slice's results; full lifecycle/send-gate acceptance is still required.
+**Boundaries and completion evidence:** reversible local policy/design and synthetic reproduction,
+with actual old/fixed or design-only limits recorded under SATI-WRK-001. Update canonical owners,
+agenda, decisions when needed, dated evidence and documentation checks. No current worker design
+work is started by the completed billing request. New schema, cloud/shared or real-data access,
+security settings, migration, deployment, publication, provider calls and release keep separate
+review/authorization. Commit/push verified significant chunks to the approved Sati repository;
+preserve unrelated work and sealed scores. Aggregate budgets/capacity, fair lane selection,
+structural tenancy, duplicate-service identity, general command protocols, full-service recovery
+and external certification retain their own acceptance owners.
 
 ## Preserved open-work inventory
 

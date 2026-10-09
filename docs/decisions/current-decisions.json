@@ -126,6 +126,15 @@
       "status": "accepted",
       "evidence": ["CLAIMMD_SANDBOX_RUNBOOK.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0233",
+      "date": "2026-10-09",
+      "title": "Coordinated claim release and current retained-subset compliance",
+      "path": "docs/decisions/current/2026-10-09-DEC-0233.md",
+      "status": "accepted",
+      "evidence": ["CLAIMMD_SANDBOX_RUNBOOK.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": ["DEC-0232"]
     }
   ]
 }

@@ -12,6 +12,20 @@ internal static class ApiClaimReleaseHistory
     {
         if (agencyId <= 0 || db.Database.CurrentTransaction is null)
             throw new InvalidOperationException("Claim release history requires trusted agency scope and an owned decision transaction.");
+        return await LoadCoreAsync(db, agencyId, candidateGenerationId, token);
+    }
+
+    // Display is advisory. Every command repeats the projection under owned admission.
+    public static Task<ClaimReleaseHistoryProjection> LoadForDisplayAsync(ApiDbContext db, int agencyId,
+        CancellationToken token)
+    {
+        if (agencyId <= 0) throw new ArgumentOutOfRangeException(nameof(agencyId));
+        return LoadCoreAsync(db, agencyId, null, token);
+    }
+
+    private static async Task<ClaimReleaseHistoryProjection> LoadCoreAsync(ApiDbContext db, int agencyId,
+        long? candidateGenerationId, CancellationToken token)
+    {
         var periods = await (from period in db.BillingPeriods.AsNoTracking()
             join owner in db.Users.AsNoTracking() on period.UserId equals owner.Id
             where owner.AgencyId == agencyId

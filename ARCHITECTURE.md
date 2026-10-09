@@ -47,9 +47,10 @@ incident persistence remain separate work.
 The shared Contracts `EdiReplayRules` owns retained EDI request identity for API and transitional
 local replay. [The billing boundary](docs/architecture/billing.md) links its implementation and
 evidence; lifecycle permission and dispatch compliance remain separate owners.
-Contracts `OriginalClaimReleaseRules` now owns sequential original delivery admission;
-Persistence owns its retained-history projection. Common all-writer SQL admission and full
-current dispatch compliance are still required.
+Contracts `OriginalClaimReleaseRules` owns original delivery admission; Persistence owns its
+validated history projection and common agency SQL admission. The API rechecks current exact
+retained-subset compliance and correction purpose before queue/Sending. Wrapping and uploads
+run outside SQL; source and private synthetic proof are linked from the billing owner.
 
 | Area | Current architecture reference | Canonical detailed policy/runbook |
 |---|---|---|

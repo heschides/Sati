@@ -285,7 +285,7 @@ public sealed class BillingCorrectionApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AClaimStillAwaitingThePayerOffersNoCorrection()
+    public async Task AGeneratedOnlyClaimOffersNoCorrection()
     {
         using var admin = await _factory.CreateAuthenticatedClientAsync("admin-two");
         var generation = await admin.PostAsJsonAsync($"/api/v1/billing/periods/{SubmittedPeriodId}/edi",
@@ -294,7 +294,7 @@ public sealed class BillingCorrectionApiTests : IAsyncLifetime
 
         var waiting = await ClaimAsync(admin);
 
-        Assert.Equal(nameof(ClaimLifecycleState.AwaitingFileCheck), waiting.State);
+        Assert.Equal(nameof(ClaimLifecycleState.NotSent), waiting.State);
         Assert.Empty(waiting.AllowedActions);
         Assert.Equal(HttpStatusCode.Conflict,
             (await CorrectAsync(admin, ClaimCorrectionAction.Resubmit, "Too early.")).StatusCode);

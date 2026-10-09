@@ -1,4 +1,3 @@
-using System.Data;
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +6,7 @@ using Sati.Api.Infrastructure;
 using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Models;
+using Sati.Data;
 
 namespace Sati.Api.Endpoints;
 
@@ -51,8 +51,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+            await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var person = await LoadReleasePersonAsync(
                 db, actor, personId, cancellationToken);
             if (person is null)
@@ -104,12 +104,13 @@ internal static partial class ApiEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var actor = Actor.From(principal);
+                await using var releaseWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+                if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
                 var person = await LoadReleasePersonAsync(
                     db, actor, personId, cancellationToken);
                 if (person is null)
                     return Results.NotFound();
-                await using var releaseWrite = await db.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable, cancellationToken);
+
                 var row = await LoadReleaseRowAsync(
                     db, actor.AgencyId, personId, obligationId, cancellationToken);
                 if (row is null)
@@ -215,6 +216,8 @@ internal static partial class ApiEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var actor = Actor.From(principal);
+                await using var sourceWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+                if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
                 if (await LoadReleasePersonAsync(db, actor, personId, cancellationToken) is null)
                     return Results.NotFound();
                 var row = await LoadReleaseRowAsync(
@@ -257,6 +260,7 @@ internal static partial class ApiEndpoints
                     "Person", personId,
                     ReleaseAuditMetadata(row, clock.Today, request.Reason));
                 await db.SaveChangesAsync(cancellationToken);
+                await sourceWrite.CommitAsync(cancellationToken);
                 return Results.Ok(ToReleaseDto(row, clock.Today));
             });
 
@@ -272,6 +276,8 @@ internal static partial class ApiEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var actor = Actor.From(principal);
+                await using var sourceWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+                if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
                 if (await LoadReleasePersonAsync(db, actor, personId, cancellationToken) is null)
                     return Results.NotFound();
                 var row = await LoadReleaseRowAsync(
@@ -304,6 +310,7 @@ internal static partial class ApiEndpoints
                     personId,
                     ReleaseAuditMetadata(row, request.WithdrawnOn, request.Reason));
                 await db.SaveChangesAsync(cancellationToken);
+                await sourceWrite.CommitAsync(cancellationToken);
                 return Results.Ok(ToReleaseDto(row, clock.Today));
             });
     }

@@ -2004,11 +2004,18 @@ internal static partial class ApiEndpoints
             // transitional Local Production service does, but under a serializable
             // transaction and the database uniqueness constraints so concurrent
             // caseload loads converge rather than duplicating a cycle.
-            var generationStrategy = db.Database.CreateExecutionStrategy();
-            await generationStrategy.ExecuteAsync(async () =>
+            var currentScope = true;
+            await ClaimReleaseWriteScope.ExecuteOnceAsync(db, async () =>
             {
-                await using var transaction = await db.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable, cancellationToken);
+                await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+                currentScope = await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken) &&
+                    await TenantAccess.CanAccessUserAsync(db, actor, targetUserId, cancellationToken);
+                if (!currentScope) return;
+                people = await db.People.AsNoTracking().Where(row => row.UserId == targetUserId &&
+                    row.AgencyId == actor.AgencyId && row.Status == 0).OrderBy(row => row.LastName).ThenBy(row => row.FirstName)
+                    .ToListAsync(cancellationToken);
+                ids = people.Select(row => row.Id).ToList();
+                await db.Entry(settings).ReloadAsync(cancellationToken);
                 var trackedForms = await db.Forms
                     .Where(x => ids.Contains(x.PersonId))
                     .ToListAsync(cancellationToken);
@@ -2066,6 +2073,7 @@ internal static partial class ApiEndpoints
                     await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
             });
+            if (!currentScope) return Results.Unauthorized();
 
             var forms = await db.Forms.AsNoTracking().Where(x => ids.Contains(x.PersonId)).ToListAsync(cancellationToken);
             // Caseload consumers need only the bounded scheduled-work window here.
@@ -2299,7 +2307,8 @@ internal static partial class ApiEndpoints
                 return Results.ValidationProblem(validation);
 
             var actor = Actor.From(principal);
-            await using var signatureChangeTransaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            await using var signatureChangeTransaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
             var person = await db.People.SingleOrDefaultAsync(
@@ -2396,6 +2405,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            await using var sourceWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var person = await db.People.SingleOrDefaultAsync(
                 candidate => candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
                 cancellationToken);
@@ -2450,6 +2461,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await sourceWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -2473,6 +2485,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            await using var sourceWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var person = await LoadAuditablePersonAsync(db, actor, personId, cancellationToken);
             if (person is null)
                 return Results.NotFound();
@@ -2523,6 +2537,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await sourceWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -3279,6 +3294,8 @@ internal static partial class ApiEndpoints
             if (errors.Count > 0) return Results.ValidationProblem(errors);
 
             var actor = Actor.From(principal);
+            await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
 
@@ -3286,8 +3303,6 @@ internal static partial class ApiEndpoints
                 db, actor.AgencyId, personId, request, editingLinkId: 0, cancellationToken);
             if (conflict is not null) return conflict;
 
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
             var link = new ServerPersonProvider
             {
                 PersonId = personId,
@@ -3316,11 +3331,12 @@ internal static partial class ApiEndpoints
             if (errors.Count > 0) return Results.ValidationProblem(errors);
 
             var actor = Actor.From(principal);
+            await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
 
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+
             var link = await db.PersonProviders.SingleOrDefaultAsync(
                 candidate => candidate.Id == linkId && candidate.PersonId == personId, cancellationToken);
             if (link is null) return Results.NotFound();
@@ -3378,6 +3394,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, cancellationToken))
                 return Results.NotFound();
 
@@ -3385,8 +3403,6 @@ internal static partial class ApiEndpoints
                 candidate => candidate.Id == linkId && candidate.PersonId == personId, cancellationToken);
             if (link is null) return Results.NotFound();
 
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
             var assignmentKey = ReleaseAssignmentResolution.AssignmentKey(link.Id);
             var releaseRows = await db.ReleaseObligations
                 .Where(item => item.PersonId == personId &&
@@ -5404,8 +5420,8 @@ internal static partial class ApiEndpoints
                 });
             }
 
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+            await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var settings = await GetOrCreateSettingsAsync(db, actor.AgencyId, cancellationToken);
             var existing = await db.BillingCompliancePolicyVersions.AsNoTracking()
                 .SingleOrDefaultAsync(version => version.VersionId == request.ChangeId, cancellationToken);
@@ -5487,6 +5503,8 @@ internal static partial class ApiEndpoints
             ApiClock clock, AuditTrail auditTrail, CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            await using var sourceWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             if (!actor.HasAdminPermissions) return Results.Forbid();
             if (request.AbandonedAfterDays <= 0 || request.ProductivityThreshold < 0 ||
                 request.BaseIncentive < 0 || request.PerUnitIncentive < 0 ||
@@ -5533,6 +5551,7 @@ internal static partial class ApiEndpoints
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
+                await sourceWrite.CommitAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -6592,6 +6611,8 @@ internal static partial class ApiEndpoints
             if (!isValidatedDemo && !isIsolatedTestHost)
                 return Results.NotFound();
 
+            await using var mockWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var period = await (from candidate in db.BillingPeriods.AsNoTracking().Include(value => value.Lines)
                                 join owner in db.Users.AsNoTracking() on candidate.UserId equals owner.Id
                                 where candidate.Id == periodId && owner.AgencyId == actor.AgencyId
@@ -6631,9 +6652,8 @@ internal static partial class ApiEndpoints
             }
 
             var alreadySubmitted = await db.BillingSubmissionEvents.AsNoTracking().AnyAsync(item =>
-                item.AgencyId == actor.AgencyId && item.BillingPeriodId == periodId &&
-                item.Stage >= BillingSubmissionStage.Transmitted &&
-                item.OccurredAtUtc >= generation.CreatedAtUtc,
+                item.AgencyId == actor.AgencyId && item.EdiGenerationId == generation.Id &&
+                item.Stage != BillingSubmissionStage.Generated,
                 cancellationToken);
             if (alreadySubmitted)
             {
@@ -6644,6 +6664,15 @@ internal static partial class ApiEndpoints
             }
 
             var receivedAt = DateTime.UtcNow;
+            var releaseHistory = await ApiClaimReleaseHistory.LoadAsync(db, actor.AgencyId, generation.Id, cancellationToken);
+            var retained = releaseHistory.Files.SingleOrDefault(row => row.File.Id == generation.Id);
+            if (retained is null || !releaseHistory.Complete ||
+                !generation.IsCorrection && !ApiClaimReleaseHistory.Evaluate(releaseHistory, periodId,
+                    retained.Claims.Select(row => row.NoteId).ToHashSet(), OriginalClaimReleaseOperation.Queue, generation.Id).Allowed)
+                return OriginalClaimReleaseHeld();
+            if (!await IsRetainedReleaseAllowedAsync(db, generation, releaseHistory, retained, cancellationToken))
+                return Results.Conflict(new ApiErrorDto("billing_release_blocked",
+                    "The retained claims no longer pass current release checks.", string.Empty));
             MockClearinghouseDocuments documents;
             try
             {
@@ -6675,6 +6704,8 @@ internal static partial class ApiEndpoints
             });
             auditTrail.Record(actor, AuditActions.BillingEdiTransmitted, "BillingPeriod", periodId);
             await db.SaveChangesAsync(cancellationToken);
+            await mockWrite.CommitAsync(cancellationToken);
+            await mockWrite.DisposeAsync();
 
             foreach (var document in new[]
                      {
@@ -6738,8 +6769,8 @@ internal static partial class ApiEndpoints
             if (!actor.HasAdminPermissions)
                 return Results.Forbid();
 
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+            await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var inputs = await LoadRecoveryInputsAsync(
                 db, actor.AgencyId, personId, cancellationToken);
             if (inputs is null)
@@ -8054,6 +8085,8 @@ internal static partial class ApiEndpoints
             CancellationToken cancellationToken) =>
         {
             var actor = Actor.From(principal);
+            await using var formWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var person = await db.People.AsNoTracking()
                 .SingleOrDefaultAsync(candidate =>
                     candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
@@ -8062,8 +8095,7 @@ internal static partial class ApiEndpoints
                 !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
 
-            await using var formWrite = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+
             var form = await db.Forms.SingleOrDefaultAsync(candidate =>
                 candidate.Id == request.FormId &&
                 candidate.PersonId == personId &&
@@ -8575,6 +8607,8 @@ internal static partial class ApiEndpoints
             }
 
             var actor = Actor.From(principal);
+            await using var formWrite = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, cancellationToken);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, cancellationToken)) return Results.Unauthorized();
             var person = await db.People.AsNoTracking()
                 .SingleOrDefaultAsync(candidate =>
                     candidate.Id == personId && candidate.AgencyId == actor.AgencyId,
@@ -8582,8 +8616,7 @@ internal static partial class ApiEndpoints
             if (person is null ||
                 !await TenantAccess.CanAccessPersonAsync(db, actor, person, cancellationToken))
                 return Results.NotFound();
-            await using var formWrite = await db.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
+
             var form = await db.Forms.SingleOrDefaultAsync(candidate =>
                 candidate.Id == request.FormId && candidate.PersonId == personId && candidate.Type == type,
                 cancellationToken);

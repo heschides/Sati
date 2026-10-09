@@ -17,35 +17,28 @@ applied. A matching stored exception cannot discard an unrelated remaining block
 owns this bounded source behavior and its release limits; [DEC-0226](../decisions/current/2026-10-08-DEC-0226.md)
 records the choice and rejected alternatives. Working evidence records actual verification.
 
-The October 8 assessment's server original/correction lifecycle (R1) and full current
-documentation/compliance recheck at queue and immediately before Sending (R2) remain open.
-This residual-error repair does not extract the exact retained claim subset for dispatch,
-classify physical send history or establish a correction/void release policy. Fresh generation
-keys are not business lifecycle permission. Fair scheduling must preserve these separate gates;
-formatter/parser tests do not certify vendor or payer acceptance.
+Original/correction lifecycle admission (assessment R1) and current retained-subset release
+checks (R2) are now implemented locally. Contracts owns `OriginalClaimReleaseRules`,
+`ClaimCorrectionRules`, `EdiReplayRules` and `BillingExportGate`; Persistence owns the common
+validated history projection and `ClaimReleaseWriteScope`. API adapters own trusted scope and
+current exact-subset validation. The transitional local service uses the same original rule,
+projection and admitted transaction rather than adding a local cloud/receipt scheduler.
 
-The [October 9 R1 design](../../CLAIMMD_SANDBOX_RUNBOOK.md#proposed-original-release-guard--october-9-2026)
-proposes one `OriginalClaimReleaseRules` Contracts owner, a shared retained-content projection,
-three admission points and a common SQL decision boundary. The rule/projection owners and
-sequential generation/queue/pre-Sending checks now exist; common all-writer locks remain pending.
-The [implemented delivery-history owner](../../CLAIMMD_SANDBOX_RUNBOOK.md#sequential-delivery-history-guard--local-source-october-9-2026)
-and [DEC-0232](../decisions/current/2026-10-09-DEC-0232.md) distinguish current behavior and evidence.
-Josh adopted cross-mode, generic rejection and queued-reservation policy in
-[DEC-0230](../decisions/current/2026-10-09-DEC-0230.md);
-Sequential fail-first cases have executed; private SQL coordination acceptance remains unexecuted. The design
-preserves the existing correction owner, safe result replay and late-receipt precedence. It does
-not close full R1/R2 or advance sealed readiness.
+The [coordinated release owner](../../CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
+and [DEC-0233](../decisions/current/2026-10-09-DEC-0233.md) own transaction order, wrapping outside
+SQL, refreshed decisions, single-attempt operation, safe recovery, late-receipt precedence and
+current correction purpose. Void preserves standing-bill withdrawal; Resubmit/Replace must pass
+current positive billability for their selected subset. GET options are advisory; commands enforce
+current facts inside admission. An unused render never becomes a received claim.
 
-The [transaction review](../../CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026)
-identifies all normal history writers, current local capability limits, failed-transaction recovery
-seams, poller execution ownership and Key Vault wrapping inside existing SQL transactions.
-The proposed no-network admission boundary requires staged encryption with protected revalidation
-and preserved duplicate/no-op behavior; it is not established by adding a lock. The first source
-slice now implements the shared `EdiReplayRules` request-identity owner for original/correction
-kind, period and mode, including duplicate-write recovery. The
-[replay owner](../../CLAIMMD_SANDBOX_RUNBOOK.md#retained-request-replay--local-source-october-9-2026)
-and [DEC-0231](../decisions/current/2026-10-09-DEC-0231.md) describe its bounded behavior and
-verification. Full lifecycle and transaction integration follow under their own acceptance.
+Josh's [adopted policy](../decisions/current/2026-10-09-DEC-0230.md),
+[request-kind replay](../decisions/current/2026-10-09-DEC-0231.md) and
+[shared projection](../decisions/current/2026-10-09-DEC-0232.md) remain authoritative.
+[Working evidence](../readiness/work-evidence.md#2026-10-09--coordinated-claim-release-and-compliance)
+records actual mutation proofs, private SQL barriers, rollback and suite results, including limits.
+The earlier proposal/review remains a dated design record explicitly superseded within these
+source boundaries. Fresh keys are not business lifecycle permission. No live payer/vendor,
+operating, capacity/fairness, complete-service recovery, legal or sealed-readiness closure follows.
 
 ## Canonical detailed owners
 

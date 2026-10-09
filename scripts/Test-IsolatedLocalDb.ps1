@@ -18,6 +18,8 @@
     pwsh -File scripts/Test-IsolatedLocalDb.ps1 -ClaimMdPreparationOnly
 .EXAMPLE
     pwsh -File scripts/Test-IsolatedLocalDb.ps1 -FullApi
+.EXAMPLE
+    pwsh -File scripts/Test-IsolatedLocalDb.ps1 -BillingReleaseOnly
 #>
 [CmdletBinding()]
 param(
@@ -29,13 +31,15 @@ param(
     [switch]$PayerBillingOnly,
     [switch]$RecordsGovernanceOnly,
     [switch]$AssessmentReviewOnly,
+    [switch]$BillingReleaseOnly,
+    [string]$BillingReleaseFilter = 'FullyQualifiedName~ClaimReleaseSql',
     [switch]$FullApi,
     [switch]$FullSolution
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-if (@(@($ApiOnly, $DesktopOnly, $NoteAbandonmentOnly, $ClaimMdPreparationOnly, $NoteAmendmentsOnly, $PayerBillingOnly, $RecordsGovernanceOnly, $AssessmentReviewOnly, $FullApi, $FullSolution) | Where-Object { $_ }).Count -gt 1) {
+if (@(@($ApiOnly, $DesktopOnly, $NoteAbandonmentOnly, $ClaimMdPreparationOnly, $NoteAmendmentsOnly, $PayerBillingOnly, $RecordsGovernanceOnly, $AssessmentReviewOnly, $BillingReleaseOnly, $FullApi, $FullSolution) | Where-Object { $_ }).Count -gt 1) {
     throw 'Choose at most one test-project filter.'
 }
 if ($env:OS -cne 'Windows_NT') { throw 'Isolated LocalDB tests require Windows.' }
@@ -92,7 +96,10 @@ try {
     }
 
     if (-not $DesktopOnly -and -not $FullSolution) {
-        $apiFilter = if ($AssessmentReviewOnly) {
+        $apiFilter = if ($BillingReleaseOnly) {
+            $BillingReleaseFilter
+        }
+        elseif ($AssessmentReviewOnly) {
             'FullyQualifiedName~AssessmentReviewSqlTests'
         }
         elseif ($RecordsGovernanceOnly) {
@@ -121,7 +128,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "API SQL test project failed (exit $LASTEXITCODE)." }
     }
 
-    if (-not $ApiOnly -and -not $NoteAbandonmentOnly -and -not $ClaimMdPreparationOnly -and -not $NoteAmendmentsOnly -and -not $PayerBillingOnly -and -not $RecordsGovernanceOnly -and -not $AssessmentReviewOnly -and -not $FullApi -and -not $FullSolution) {
+    if (-not $ApiOnly -and -not $NoteAbandonmentOnly -and -not $ClaimMdPreparationOnly -and -not $NoteAmendmentsOnly -and -not $PayerBillingOnly -and -not $RecordsGovernanceOnly -and -not $AssessmentReviewOnly -and -not $BillingReleaseOnly -and -not $FullApi -and -not $FullSolution) {
         $desktopFilter = 'FullyQualifiedName~LocalServiceTimeSqlServerTests|FullyQualifiedName~MigrationEffectAnalyzerAgainstLiveSchemaTests|FullyQualifiedName~WorkAgendaMigrationTests.SystemDataSqlClientSessionTempTableSurvivesParameterizedCommands|FullyQualifiedName~WorkAgendaMigrationTests.DuplicateRepairKeepsLowestExactRowCancelsSafeFanOutAndSkipsUnsafeGroups'
         $desktopArgs = @('test', $desktopProject, '--configuration', 'Release', '--filter', $desktopFilter,
             '--logger', 'trx', '--results-directory', (Join-Path $repository 'TestResults/IsolatedSqlServer/Desktop'),

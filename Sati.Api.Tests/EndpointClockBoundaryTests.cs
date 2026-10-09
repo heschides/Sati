@@ -49,6 +49,7 @@ public sealed class EndpointClockBoundaryTests
     public async Task GeneratedEdiUsesJuneThirtiethInIsaAndGs()
     {
         using var factory = CreateFactory();
+        // This is an unsent export/time-zone positive, not the seeded legacy received claim.
         using var biller = await factory.CreateAuthenticatedClientAsync("admin-two");
 
         using var response = await biller.PostAsJsonAsync("/api/v1/billing/periods/1202/edi",
@@ -68,7 +69,7 @@ public sealed class EndpointClockBoundaryTests
 
     private static SatiApiFactory CreateFactory() => new()
     {
-        ClockOverride = new FrozenTimeProvider(Instant)
+        ClockOverride = new FrozenTimeProvider(Instant), IncludeLegacyClaimEvidence = false
     };
 
     private sealed class FrozenTimeProvider(DateTimeOffset instant) : TimeProvider

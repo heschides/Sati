@@ -51,7 +51,7 @@ public sealed class NoteAmendmentApiTests
     [Fact]
     public async Task FinancialReplacementCarriesReviewedLineageAndKeepsOriginalFileAndClaim()
     {
-        await using var f = new SatiApiFactory(); using var b = await f.CreateAuthenticatedClientAsync("admin-two");
+        await using var f = new SatiApiFactory { IncludeLegacyClaimEvidence = false }; using var b = await f.CreateAuthenticatedClientAsync("admin-two");
         using(var generated = await b.PostAsJsonAsync("/api/v1/billing/periods/1202/edi",new GenerateEdiRequest(true,Guid.NewGuid().ToString("N")))) generated.EnsureSuccessStatusCode();
         using(var paid = await b.PostAsJsonAsync("/api/v1/billing/periods/1202/mock-clearinghouse",new MockClearinghouseRequest(MockClearinghouseScenario.DeniedMissingInformation))) paid.EnsureSuccessStatusCode();
         string originalLine, originalFile;

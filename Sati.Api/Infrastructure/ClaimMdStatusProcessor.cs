@@ -1,10 +1,10 @@
-using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Sati.Api.Data;
 using Sati.Contracts.V1;
 using Sati.Models.Billing;
+using Sati.Data;
 
 namespace Sati.Api.Infrastructure;
 
@@ -16,14 +16,21 @@ internal sealed class ClaimMdStatusProcessor(ApiDbContext db, EnvelopeProtector 
 {
     internal const string ParserVersion = "claimmd-api-status-1";
 
-    internal async Task<bool> ProcessAsync(Guid accountId, string expectedCursor,
-        ClaimMdStatusPage page, CancellationToken token)
+    internal Task<bool> ProcessAsync(Guid accountId, string expectedCursor,
+        ClaimMdStatusPage page, CancellationToken token) => ClaimReleaseWriteScope.ExecuteOnceAsync(db,
+            () => ProcessCoreAsync(accountId, expectedCursor, page, token, null));
+
+    private async Task<bool> ProcessCoreAsync(Guid accountId, string expectedCursor,
+        ClaimMdStatusPage page, CancellationToken token, PreparedClaimResponse? prepared)
     {
         if (expectedCursor.Length == 0 || page.Cursor.Length == 0 || page.Claims.Count == 0)
             return false;
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        var agencyId = await db.ClearinghouseAccounts.AsNoTracking().Where(row => row.Id == accountId)
+            .Select(row => (int?)row.AgencyId).SingleOrDefaultAsync(token);
+        if (agencyId is null) throw new InvalidOperationException("Claim.MD test account is unavailable.");
+        await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, agencyId.Value, token);
         var account = await db.ClearinghouseAccounts.AsNoTracking().SingleOrDefaultAsync(row =>
-            row.Id == accountId && row.IsEnabled && row.IsTest && row.ConnectorKind == TradingPartnerKind.ClaimMd, token);
+            row.Id == accountId && row.AgencyId == agencyId && row.IsEnabled && row.IsTest && row.ConnectorKind == TradingPartnerKind.ClaimMd, token);
         if (account is null) throw new InvalidOperationException("Claim.MD test account is unavailable.");
         var checkpoint = await db.ClearinghouseFeedCheckpoints.SingleOrDefaultAsync(row =>
             row.AccountId == accountId && row.FeedKind == ClearinghouseFeedKind.Status, token);
@@ -59,7 +66,7 @@ internal sealed class ClaimMdStatusProcessor(ApiDbContext db, EnvelopeProtector 
 
         var receipt = new ClearinghouseResponseReceipt
         {
-            Id = Guid.NewGuid(), AgencyId = account.AgencyId, Source = ClearinghouseReceiptSource.Connector,
+            Id = prepared?.Id ?? Guid.NewGuid(), AgencyId = account.AgencyId, Source = ClearinghouseReceiptSource.Connector,
             AccountId = account.Id, ConnectorKind = TradingPartnerKind.ClaimMd,
             FeedKind = ClearinghouseFeedKind.Status, ExternalArtifactId = "status:" + page.Cursor,
             ContentType = "application/xml", ConnectorVersion = "claimmd-api-1.19",
@@ -69,8 +76,17 @@ internal sealed class ClaimMdStatusProcessor(ApiDbContext db, EnvelopeProtector 
             SemanticSha256 = Hash($"ClaimMD|{account.Id:N}|status|{page.RawXml}"),
             IdentitySha256 = Hash($"ClaimMD|{account.Id:N}|status|{page.Cursor}")
         };
-        var protectedValue = await protector.ProtectAsync(page.RawXml,
-            ClaimResponseIngestion.Binding(receipt), token);
+        if (prepared is null)
+        {
+            await transaction.DisposeAsync();
+            db.ChangeTracker.Clear();
+            var value = await protector.ProtectAsync(page.RawXml, ClaimResponseIngestion.Binding(receipt), token);
+            return await ProcessCoreAsync(accountId, expectedCursor, page, token,
+                new PreparedClaimResponse(receipt.Id, receipt.AgencyId, value));
+        }
+        if (prepared.AgencyId != receipt.AgencyId)
+            throw new InvalidOperationException("Claim.MD test account changed during preparation.");
+        var protectedValue = prepared.Value;
         receipt.Ciphertext = protectedValue.Ciphertext;
         receipt.Nonce = protectedValue.Nonce;
         receipt.Tag = protectedValue.Tag;

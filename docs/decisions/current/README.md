@@ -18,9 +18,10 @@ Read the individual registered record for the decision and rejected alternatives
 | DEC-0227 | 2026-10-08 | [Contain escaping API request exceptions](2026-10-08-DEC-0227.md) | accepted |
 | DEC-0228 | 2026-10-08 | [Execute incident aggregation once](2026-10-08-DEC-0228.md) | accepted |
 | DEC-0229 | 2026-10-08 | [Remove raw exceptions from two health checks](2026-10-08-DEC-0229.md) | accepted |
-| DEC-0230 | 2026-10-09 | [Original-claim history, rejection and queued-reservation policy](2026-10-09-DEC-0230.md) | accepted; implementation pending |
+| DEC-0230 | 2026-10-09 | [Original-claim history, rejection and queued-reservation policy](2026-10-09-DEC-0230.md) | accepted; later implementation in DEC-0232/0233 |
 | DEC-0231 | 2026-10-09 | [Retained EDI replay includes request kind](2026-10-09-DEC-0231.md) | accepted; source implemented |
 | DEC-0232 | 2026-10-09 | [Shared original-claim delivery history admission](2026-10-09-DEC-0232.md) | accepted; sequential source implementation |
+| DEC-0233 | 2026-10-09 | [Coordinated claim release and current retained-subset compliance](2026-10-09-DEC-0233.md) | accepted; source implemented |
 
 Accepted decisions must retain their evidence and earlier rejected reasoning. A change to a
 decision creates a successor and supersession link; it does not rewrite the historical import.

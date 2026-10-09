@@ -7,6 +7,7 @@ using Sati.Api.Security;
 using Sati.Contracts.V1;
 using Sati.Forms;
 using Sati.Models;
+using Sati.Data;
 
 namespace Sati.Api.Endpoints;
 
@@ -64,8 +65,9 @@ internal static partial class ApiEndpoints
             CancellationToken ct) =>
         {
             // Keep authorization, medical-release attestation and artifact replacement in one snapshot.
-            await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
             var actor = Actor.From(principal);
+            await using var transaction = await ClaimReleaseWriteScope.BeginAsync(db, actor.AgencyId, ct);
+            if (!await TenantAccess.IsCurrentActorAsync(db, actor, ct)) return Results.Unauthorized();
             if (!await TenantAccess.OwnsPersonAsync(db, actor, personId, ct)) return Results.NotFound();
             var person = await db.People.AsNoTracking().SingleAsync(x => x.Id == personId, ct);
             var today = clock.Today;

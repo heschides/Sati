@@ -16,7 +16,7 @@ using Xunit;
 
 namespace Sati.Api.Tests;
 
-public sealed class ClearinghouseDispatchApiTests
+public sealed partial class ClearinghouseDispatchApiTests
 {
     [Theory]
     [InlineData("queued")]
@@ -79,8 +79,10 @@ public sealed class ClearinghouseDispatchApiTests
         Assert.Equal(1, connector.Calls);
     }
 
-    [Fact]
-    public async Task ExactLateReceiptDefeatsNonReceiptBeforeASuccessorCanUpload()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExactLateReceiptDefeatsNonReceiptBeforeASuccessorCanUpload(bool perClaim)
     {
         await using var fixture = await Fixture.CreateAsync();
         var first = await fixture.GenerateAsync(fixture.AccountId);
@@ -100,9 +102,10 @@ public sealed class ClearinghouseDispatchApiTests
         var successorId = fixture.GenerationId;
         (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
             new QueueClearinghouseDispatchRequest(successorId, fixture.AccountId))).EnsureSuccessStatusCode();
-        var late = MockClearinghouse.Respond(first.Content, MockClearinghouseScenario.SyntaxRejected, DateTime.UtcNow);
+        var late = MockClearinghouse.Respond(first.Content,
+            perClaim ? MockClearinghouseScenario.Accepted : MockClearinghouseScenario.SyntaxRejected, DateTime.UtcNow);
         (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/responses",
-            new ClaimResponseIngestRequest(late.FunctionalAcknowledgement!))).EnsureSuccessStatusCode();
+            new ClaimResponseIngestRequest(perClaim ? late.ClaimAcknowledgement! : late.FunctionalAcknowledgement!))).EnsureSuccessStatusCode();
         Assert.True(await fixture.Worker(connector).ProcessOneAsync(CancellationToken.None));
         Assert.Equal(1, connector.Calls);
         await using var db = fixture.Factory.OpenDatabase();
@@ -863,6 +866,7 @@ public sealed class ClearinghouseDispatchApiTests
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly SyntheticPipelineDatabase _database;
+        public SyntheticPipelineDatabase Database => _database;
         public SyntheticPipelineFactory Factory { get; }
         public HttpClient Biller { get; }
         public PipelineActors Actors { get; }
@@ -876,14 +880,16 @@ public sealed class ClearinghouseDispatchApiTests
             _database = database; Factory = factory; Biller = biller; Actors = actors; PeriodId = periodId;
         }
 
-        public static async Task<Fixture> CreateAsync(IDemoWorkerResetCoordination? coordination = null)
+        public static async Task<Fixture> CreateAsync(IDemoWorkerResetCoordination? coordination = null,
+            bool sqlServer = false, Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor? interceptor = null,
+            IKeyWrapper? keyWrapper = null)
         {
-            var database = new SyntheticPipelineDatabase();
+            var database = new SyntheticPipelineDatabase(sqlServer);
             await database.InitializeAsync();
-            var factory = new SyntheticPipelineFactory(database)
+            var factory = new SyntheticPipelineFactory(database, null, interceptor is null ? [] : [interceptor])
             {
                 EnableSyntheticDispatch = true, DisableDispatchWorker = true,
-                ResetCoordinationOverride = coordination
+                ResetCoordinationOverride = coordination, KeyWrapperOverride = keyWrapper
             };
             var actors = await factory.SeedAsync();
             var periodId = await JoinedBillingPipelineAcceptanceTests.PrepareSubmittedPeriodAsync(factory, actors);

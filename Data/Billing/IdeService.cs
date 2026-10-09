@@ -28,12 +28,18 @@ namespace Sati.Edi
 
         public async Task<string> GenerateAndSaveAsync(int billingPeriodId, bool isTest, string idempotencyKey)
         {
+            await using var context = _contextFactory.CreateDbContext();
+            return await ClaimReleaseWriteScope.ExecuteOnceAsync(context,
+                () => GenerateCoreAsync(context, billingPeriodId, isTest, idempotencyKey));
+        }
+
+        private async Task<string> GenerateCoreAsync(SatiContext context, int billingPeriodId, bool isTest, string idempotencyKey)
+        {
             if (!Guid.TryParse(idempotencyKey, out var parsedKey))
                 throw new ArgumentException("A valid EDI idempotency key is required.", nameof(idempotencyKey));
             var normalizedKey = parsedKey.ToString("N");
-            await using var context = _contextFactory.CreateDbContext();
-            await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             var actor = await LocalTenantAccess.EnsureSessionAsync(context, _sessionService);
+            await using var transaction = await ClaimReleaseWriteScope.BeginAsync(context, actor.AgencyId);
             if (!actor.HasBillingPermissions)
                 throw new UnauthorizedAccessException("Billing permission is required to generate EDI.");
 
@@ -111,7 +117,7 @@ namespace Sati.Edi
                 await transaction.RollbackAsync();
                 await transaction.DisposeAsync();
                 context.ChangeTracker.Clear();
-                await using var replayTransaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                await using var replayTransaction = await ClaimReleaseWriteScope.BeginAsync(context, actor.AgencyId);
                 await LoadExportablePeriodAsync(context, billingPeriodId, actor);
                 var completed = await context.EdiGenerations.AsNoTracking().SingleOrDefaultAsync(generation =>
                     generation.AgencyId == actor.AgencyId && generation.ActorUserId == actor.Id &&

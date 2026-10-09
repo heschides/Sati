@@ -25,6 +25,7 @@ public static class ServiceTimeWriteScope
         var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         try
         {
+            await ClaimReleaseWriteScope.AcquireAsync(context, agencyId, cancellationToken);
             if (context.Database.IsSqlServer())
             {
                 await using var command = context.Database.GetDbConnection().CreateCommand();

@@ -105,6 +105,18 @@ internal sealed class SyntheticPipelineDatabase : IAsyncDisposable
         return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
     }
 
+    public async Task<bool> HasGrantedClaimReleaseLockAsync()
+    {
+        if (!IsSqlServer) throw new InvalidOperationException("This assertion requires SQL Server.");
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM sys.dm_tran_locks WHERE resource_database_id = DB_ID() " +
+            "AND resource_type = 'APPLICATION' AND request_status = 'GRANT' " +
+            "AND resource_description LIKE '%Sati:ClaimRelease:%';";
+        return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_sqliteKeeper is not null) await _sqliteKeeper.DisposeAsync();
@@ -127,6 +139,7 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
     private readonly SyntheticPipelineDatabase _database;
     private readonly IInterceptor[] _interceptors;
     public TestKeyWrapper Vault { get; }
+    public IKeyWrapper? KeyWrapperOverride { get; set; }
     public bool EnableSyntheticDispatch { get; set; }
     public bool DisableDispatchWorker { get; set; }
     public IDemoWorkerResetCoordination? ResetCoordinationOverride { get; set; }
@@ -186,7 +199,7 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
             });
             services.AddScoped(provider => provider.GetRequiredService<IDbContextFactory<ApiDbContext>>().CreateDbContext());
             services.RemoveAll<IKeyWrapper>();
-            services.AddSingleton<IKeyWrapper>(Vault);
+            services.AddSingleton<IKeyWrapper>(KeyWrapperOverride ?? Vault);
             if (ResetCoordinationOverride is not null)
             {
                 services.RemoveAll<IDemoWorkerResetCoordination>();

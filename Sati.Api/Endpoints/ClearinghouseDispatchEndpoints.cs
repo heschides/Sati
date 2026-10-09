@@ -118,6 +118,9 @@ internal static partial class ApiEndpoints
                     retained.Claims.Select(row => row.NoteId).ToHashSet(), OriginalClaimReleaseOperation.Queue,
                     generation.Id).Allowed)
                 return OriginalClaimReleaseHeld();
+            if (!await IsRetainedReleaseAllowedAsync(db, generation, history, retained, token))
+                return Results.Conflict(new ApiErrorDto("billing_release_blocked",
+                    "The retained claims no longer pass current release checks. Review their compliance and correction history.", string.Empty));
             if (await db.BillingSubmissionEvents.AsNoTracking().AnyAsync(row =>
                     row.AgencyId == actor.AgencyId && row.EdiGenerationId == generation.Id &&
                     row.Stage >= BillingSubmissionStage.Transmitted, token))
@@ -154,7 +157,22 @@ internal static partial class ApiEndpoints
             }
             catch (DbUpdateException)
             {
+                await periodWrite.RollbackAsync(token);
+                await periodWrite.DisposeAsync();
                 db.ChangeTracker.Clear();
+                await using var recovery = await BillingPeriodWriteScope.BeginAsync(db,
+                    actor.AgencyId, periodKey.UserId, periodKey.Year, periodKey.Month, token);
+                if (!await TenantAccess.IsCurrentActorAsync(db, actor, token)) return Results.Unauthorized();
+                var retainedWinner = await (from file in db.EdiGenerations.AsNoTracking()
+                    join period in db.BillingPeriods.AsNoTracking() on file.BillingPeriodId equals period.Id
+                    join owner in db.Users.AsNoTracking() on period.UserId equals owner.Id
+                    where file.Id == request.EdiGenerationId && file.AgencyId == actor.AgencyId &&
+                        file.IsTest && period.Status == 1 && owner.AgencyId == actor.AgencyId select file).SingleOrDefaultAsync(token);
+                var currentAccount = await db.ClearinghouseAccounts.AsNoTracking().SingleOrDefaultAsync(row =>
+                    row.Id == request.AccountId && row.AgencyId == actor.AgencyId && row.IsEnabled && row.IsTest, token);
+                if (retainedWinner is null || currentAccount is null || !gate.CanUseAccount(currentAccount) ||
+                    !ClearinghouseAccountSelection.Matches(retainedWinner.Content, currentAccount, retainedWinner.BillingPeriodId))
+                    return Results.Conflict(new ApiErrorDto("dispatch_conflict", "The retained file or account changed. Refresh the dispatch list.", string.Empty));
                 existing = await db.ClearinghouseDispatches.AsNoTracking()
                     .SingleOrDefaultAsync(row => row.EdiGenerationId == generation.Id, token);
                 if (existing is not null && existing.AccountId == account.Id)

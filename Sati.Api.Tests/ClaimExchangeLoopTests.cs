@@ -14,16 +14,15 @@ namespace Sati.Api.Tests;
 /// nothing else. Every row behind the submission home, the denial worklist, and the
 /// deposit reconciliation screen came from a seed.
 /// </summary>
-[Collection(SatiApiCollection.Name)]
-public sealed class ClaimExchangeLoopTests
+public sealed class ClaimExchangeLoopTests : IAsyncLifetime
 {
     // Agency 2's submitted period, which has a claim line carrying the immutable snapshot
     // the 837P is generated from.
     private const int SubmittedPeriodId = 1202;
 
-    private readonly SatiApiFactory _factory;
-
-    public ClaimExchangeLoopTests(SatiApiFactory factory) => _factory = factory;
+    private readonly SatiApiFactory _factory = new() { IncludeLegacyClaimEvidence = false };
+    public Task InitializeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => _factory.DisposeAsync().AsTask();
 
     private static async Task<MockClearinghouseResultDto> RunAsync(
         HttpClient client, MockClearinghouseScenario scenario)
