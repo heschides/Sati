@@ -37,6 +37,9 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
 
     internal TimeProvider? ClockOverride { get; init; }
     internal DbCommandInterceptor? DatabaseCommandInterceptor { get; init; }
+    // Export positives require a claim with no prior delivery. The default seed
+    // deliberately includes legacy unscoped transport/payment evidence for queries.
+    internal bool IncludeLegacyClaimEvidence { get; init; } = true;
 
     /// <summary>
     /// The in-memory stand-in for this environment's Key Vault key. Exposed so a test
@@ -874,6 +877,8 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                         }
                     ]
                 });
+            if (IncludeLegacyClaimEvidence)
+            {
             db.BillingSubmissionEvents.AddRange(
                 new ServerBillingSubmissionEvent
                 {
@@ -914,6 +919,7 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                     PaymentReference = "SYN-EFT-TWO", Explanation = "Synthetic agency-two payment.",
                     IsSynthetic = true
                 });
+            }
             db.RemittanceDeposits.AddRange(
                 new ServerRemittanceDeposit
                 {

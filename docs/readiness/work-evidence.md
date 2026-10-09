@@ -1766,6 +1766,61 @@ General duplicate-service identity, fairness, recovery and certification retain 
 
 **Later reviewed release snapshot, if any:** none; sealed 1.3.38 remains unchanged.
 
+## 2026-10-09 — original delivery history
+
+**Stable work ID and bounded slice:** SATI-BIL-001 sequential original-generation, queue and
+pre-Sending safeguards under accepted P1–P3. Common SQL admission and full R2 follow separately.
+
+**Status and source/revision:** sequential source verified, based on pushed `0080e2c`.
+The completion handoff records the resulting commit; no sealed score or deployment changes.
+
+**Changed behavior, ownership and canonical paths:** the [sandbox runbook](../../CLAIMMD_SANDBOX_RUNBOOK.md#sequential-delivery-history-guard--local-source-october-9-2026)
+owns behavior. `OriginalClaimReleaseRules` owns permission; shared persistence projection/loaders
+validate retained control, CLM01, REF6R, account/D9, correction/F8, receipt and audited nonreceipt
+bindings. API/local adapters establish scope. Queued, uncertain and received histories hold fresh
+originals across modes/accounts; exact replay and Generated-only rendering remain. Late exact
+receipt overrides an earlier nonreceipt finding. Damaged physical history is held conservatively.
+Projection caps mark history incomplete; ciphertext and account secret references are excluded.
+
+**Actual tests/checks, commands, results and evidence locations:** fail-first API queue/late-receipt
+proof: `r1-history-proven-red.trx` expected Conflict/actual OK and expected one upload/actual two.
+Four fresh-generation cases reached expected Conflict/actual OK in
+`r1-history-generation-proven-red.trx`. Five corrupted-content/CLM01/REF6R/D9/historical-account
+cases reached the same unsafe assertion in `r1-history-damaged-proven-red.trx`. Three local
+recorded-delivery cases reached the intended missing-exception assertion in
+`r1-history-local-red.trx`. Each corresponding main-path guard was restored after the old-behavior
+run. TRX evidence resides in excluded `assessment-working/test-results/billing-safeguards/`.
+Expanded API dispatch/correction/export/joined-pipeline verification passed 74/74 before final
+projection hardening; local export/session/correction/parser verification passed 79/79.
+Final hardened API verification passed **75/75**, `r1-history-hardened-green.trx`, including the isolated tenant replay positive. Final local verification passed **70/70**, `r1-history-local-final-green.trx`. Documentation structure and all **22** negative proofs passed; readiness against exact baseline `0080e2c77a1c81e5b6e5c989072c00f98018891f` passed with unchanged sealed score 22 and 41 hard blockers. `git diff --cached --check` passed.
+
+**Failed/unrun checks, reason and verification limits:** initial account uniqueness, fixture
+enum/signature/nullable setup and an overlapping API-runner locked DLL error are not regression
+proof. The final conservative unscoped-event check exposed legacy received/uncertain histories
+in export-positive fixtures. Fresh unsent fixtures replace those histories; legacy query tests
+retain their default history. No IsTest bypass or weaker delivery policy was introduced.
+Recovery interception proves the duplicate-write branch, not a concurrent SQL race. Private SQL,
+all-writer admission, staging, full R2, vendor, deployment and migration checks are not yet run.
+
+**Relevant readiness criterion IDs and evidence class:** ID01/ID02 request replay, ID07 billing,
+MT01/MT02 trusted actor/agency scope and OP06 retained audit: local source and synthetic regression
+evidence only. No independent, operational, regulatory or vendor acceptance; sealed 1.3.38 unchanged.
+
+**Durable decisions, alternatives and supersession links:** [DEC-0232](../decisions/current/2026-10-09-DEC-0232.md)
+records shared history admission. It supersedes proposed status for those owners and sequential
+points only; DEC-0230 policy and DEC-0231 request identity remain. Skipping damaged history,
+namespace/mode bypasses and interpreting generic rejection as definitive nonreceipt are rejected.
+
+**Remaining risks/blockers, dependencies and deferred work:** common transaction admission across
+every history writer, protected authoritative refresh, key staging, direct poller execution and
+failed-transaction recovery remain. Full R2 must recheck exact retained subsets and correction
+standing/purpose at queue/send, preserving void withdrawal and amendment financial review.
+
+**Next eligible stable ID and bounded slice:** SATI-BIL-001 common SQL coordination, followed by
+full R2 as recorded in [the agenda](../../AGENDA.md#next-eligible-work).
+
+**Later reviewed release snapshot, if any:** none; no release invoked by this work.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

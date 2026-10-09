@@ -1108,10 +1108,11 @@ public sealed class TenantAuthorizationTests
     [Fact]
     public async Task RetryingEdiGenerationReplaysTheExactFileAndAuditsOnce()
     {
-        using var client = await _factory.CreateAuthenticatedClientAsync("admin-two");
+        await using var factory = new SatiApiFactory { IncludeLegacyClaimEvidence = false };
+        using var client = await factory.CreateAuthenticatedClientAsync("admin-two");
         var key = Guid.NewGuid().ToString("N");
-        var auditBefore = await _factory.GetAuditEventsAsync("billing-edi.generated");
-        var generatedEventsBefore = await _factory.GetGeneratedSubmissionEventCountAsync(1202);
+        var auditBefore = await factory.GetAuditEventsAsync("billing-edi.generated");
+        var generatedEventsBefore = await factory.GetGeneratedSubmissionEventCountAsync(1202);
 
         var firstResponse = await client.PostAsJsonAsync(
             "/api/v1/billing/periods/1202/edi",
@@ -1145,10 +1146,10 @@ public sealed class TenantAuthorizationTests
         Assert.Equal(HttpStatusCode.Conflict, reusedResponse.StatusCode);
         var reusedError = await reusedResponse.Content.ReadFromJsonAsync<ApiErrorDto>();
         Assert.Equal("idempotency_key_reused", reusedError!.Code);
-        Assert.Equal(1, await _factory.GetEdiGenerationCountAsync(key));
+        Assert.Equal(1, await factory.GetEdiGenerationCountAsync(key));
         Assert.Equal(generatedEventsBefore + 1,
-            await _factory.GetGeneratedSubmissionEventCountAsync(1202));
-        var auditAfter = await _factory.GetAuditEventsAsync("billing-edi.generated");
+            await factory.GetGeneratedSubmissionEventCountAsync(1202));
+        var auditAfter = await factory.GetAuditEventsAsync("billing-edi.generated");
         Assert.Equal(auditBefore.Count + 1, auditAfter.Count);
         Assert.Single(auditAfter, candidate => candidate.ResourceId == "1202");
     }

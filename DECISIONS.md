@@ -59,6 +59,11 @@ authorization requirements.
 
 ## Explicit supersession
 
+Shared original delivery history and sequential admission are recorded in
+[DEC-0232](docs/decisions/current/2026-10-09-DEC-0232.md). The
+[runbook](CLAIMMD_SANDBOX_RUNBOOK.md#sequential-delivery-history-guard--local-source-october-9-2026)
+distinguishes implemented source from pending all-writer SQL coordination and full R2.
+
 The shared retained EDI request identity is recorded in
 [DEC-0231](docs/decisions/current/2026-10-09-DEC-0231.md). Original/correction kind is checked
 alongside period/mode in API and transitional local replay, including recovery. The

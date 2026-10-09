@@ -180,19 +180,65 @@ encryption staging and exact retained-subset queue/send compliance are still the
 implementation. No migration, vendor call, deployed activation, payer certification or sealed
 readiness change follows from this slice.
 
+## Sequential delivery-history guard — local source October 9, 2026
+
+**SATI-BIL-001 / R1: shared rule/projection and sequential main-path admission implemented;
+all-writer coordination and full R2 remain open.** `OriginalClaimReleaseRules` in Contracts
+decides original generation, queue and immediately-before-Sending permission. The Persistence
+`OriginalClaimReleaseHistory` validates immutable files and projects delivery facts; its common
+loader reads accounts/dispatch/attempt/correction/receipt metadata. API/local adapters scope the
+distinct source models to the trusted agency. No new local transport/correction/intake writer
+or network DTO exposing EF entities is introduced.
+
+The adopted matrix below is applied across modes/accounts/namespaces at API/local fresh original
+generation, API new queue and worker admission. Generated-only remains eligible; exact result/
+intent replay preserves existing checks. A queued reservation, Sending/unknown or generic upload
+rejection prevents another original. Received files, including all-R accepted uploads and rejected
+acknowledgements, require eligible explicit correction lineage. A late exact receipt defeats a
+previous audited nonreceipt. A refused queued worker candidate is CancelledBeforeSend with safe
+`original_claim_release_held` and no attempt/upload. API refusals use that conflict code; local
+generation throws a safe retained-history exception without writing another file.
+
+Validation includes row/owner/note/person agency, retained mode/ISA/GS controls, exact CLM01,
+single canonical REF6R, unambiguous historical Claim.MD envelope/D9/account and correction links,
+frequency/F8/amount/predecessor. The parser exposes F8 and refuses duplicate F8 values. Historical
+accounts are read regardless of today's enabled flag. Exact receipt matches retain group/claim
+and connector-source provenance. Nonreceipt requires the existing exact reconciliation event and
+audit manifest, including dispatch/account/source/claim digest/revision/prior state, and cannot
+erase later receipt or transport uncertainty. Unscoped delivery events hold the known period;
+unknown scope holds the agency. Malformed unused Generated-only history is reported but proves
+no delivery; an invalid candidate is refused. No history row is silently skipped as clean.
+
+The projection caps each query at 10,000 rows, total retained content at 16 MiB characters and
+receipt matches before payload projection. A reached cap returns incomplete/held. These are
+local decision bounds, not full worker wall-time/fairness guarantees. Account secret references,
+encrypted response bodies and unrestricted remittance explanations are outside projection reads.
+Legacy local files with null row ControlNumber derive the validated retained envelope. Their
+unlinked Generated events and synthetic flags never establish transmission.
+
+[DEC-0232](docs/decisions/current/2026-10-09-DEC-0232.md) records the choice; [working evidence](docs/readiness/work-evidence.md#2026-10-09--original-delivery-history)
+owns actual fail-first/results. All-writer common SQL admission, worker authoritative source
+refresh, mock admission, encryption staging, poller execution scope and failed-transaction cleanup
+remain the next chunk. Exact correction permission/source-purpose and full current retained-subset
+queue/send compliance follow. Sequential SQLite evidence is not SQL race proof, vendor/payer
+certification, deployment or full R1/R2 closure.
+
 ## Proposed original-release guard — October 9, 2026
 
 The independently implemented replay-kind repair is described in
 [the retained request owner](#retained-request-replay--local-source-october-9-2026).
-The remaining projection, physical-history permission and transaction design below remain
-proposed until their acceptance is recorded.
+The [sequential delivery-history owner](#sequential-delivery-history-guard--local-source-october-9-2026)
+supersedes proposed status for the shared owners and main admission points. The following source
+inventory records the released baseline before that implementation; common SQL coordination and
+remaining acceptance stay proposed until their actual proof is recorded.
 
-**SATI-BIL-001 / assessment R1: product policy adopted; guard implementation and SQL proof pending.**
+**SATI-BIL-001 / assessment R1: adopted design baseline; sequential implementation linked above;
+SQL proof pending.**
 Source inspected at `de23bd175445b1caf5caee52ccc8870d021b88da` (released 1.3.38).
 This section owns the proposed fact contract, admission rule and fail-first acceptance plan.
 It changes no executable rule, route, schema, transport setting or readiness score. The
 [working evidence](docs/readiness/work-evidence.md#2026-10-09--billing-original-release-design)
-records the inspection and documentation checks. Full R2 and payer-held void purpose remain separate.
+records the original inspection and documentation checks. Full R2 and payer-held void purpose remain separate.
 
 ### What the current source proves
 
@@ -270,7 +316,8 @@ Projection requirements:
 ### Proposed fact and admission matrix
 
 The following matrix uses **Sati product policy adopted in
-[DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md)**, not payer findings. It is not yet enforced.
+[DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md)**, not payer findings. Main-path sequential
+admission now enforces it; all-writer SQL proof and the remaining acceptance are pending.
 Evaluate all mapped history, not the newest generation or dispatch state alone. Conflicting exact
 receipt/uncertainty evidence takes precedence over a known-unsent finding. A file containing several
 original claims releases only if every candidate claim is eligible; never silently omit a blocked

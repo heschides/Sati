@@ -52,6 +52,14 @@ namespace Sati.Edi
             if (previous is not null)
                 return await SaveFileAsync(previous.FileName, previous.Content);
 
+            var claimHistory = await LocalClaimReleaseHistory.LoadAsync(context, actor.AgencyId);
+            var release = OriginalClaimReleaseRules.Evaluate(billingPeriodId,
+                period.Lines.Select(line => line.NoteId).ToHashSet(), OriginalClaimReleaseOperation.Generate,
+                claimHistory.Facts, claimHistory.Defects, claimHistory.Complete);
+            if (!release.Allowed)
+                throw new InvalidOperationException("This claim has a queued, uncertain or received submission, or retained history needs review. Review its history before releasing another original.");
+
+
             foreach (var line in period.Lines)
                 await NoteAmendmentBilling.ValidateLineVersionAsync(context, actor.AgencyId, line.NoteId, line.AmendedNoteVersionId);
 

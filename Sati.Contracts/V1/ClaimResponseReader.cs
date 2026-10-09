@@ -91,6 +91,7 @@ public static class ClaimResponseReader
             Require(amount > 0m, "The retained claim charge must be positive.");
             var lines = new List<string>();
             string? remoteClaimId = null;
+            string? payerClaimControlNumber = null;
             for (var j = i + 1; j < document.Transaction.Count && document.Transaction[j][0] is not ("CLM" or "HL" or "SE"); j++)
             {
                 var detail = document.Transaction[j];
@@ -101,11 +102,17 @@ public static class ClaimResponseReader
                     Require(remoteClaimId is null, "A claim cannot contain two remote claim identities.");
                     remoteClaimId = Required(detail, 2, 80);
                 }
+                if (detail[0] == "REF" && detail.Length > 1 && detail[1] == "F8")
+                {
+                    Require(payerClaimControlNumber is null, "A claim cannot contain two standing payer claim identities.");
+                    payerClaimControlNumber = Required(detail, 2, 50);
+                }
             }
             var composite = segment.Length > 5 ? segment[5].Split(document.ComponentSeparator) : [];
             var frequency = composite.Length > 2 && composite[2].Length > 0 ? composite[2] : "1";
             Require(frequency is "1" or "7" or "8", "The retained claim frequency is unsupported.");
-            claims.Add(new(reference, amount, lines) { FrequencyCode = frequency, RemoteClaimId = remoteClaimId });
+            claims.Add(new(reference, amount, lines) { FrequencyCode = frequency, RemoteClaimId = remoteClaimId,
+                PayerClaimControlNumber = payerClaimControlNumber });
             Require(claims.Count <= 5000, "The retained submission contains too many claims.");
         }
         Require(claims.Count > 0, "The retained submission has no claim references.");

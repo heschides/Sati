@@ -43,7 +43,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
-| SATI-BIL-001 | export-error and replay-kind repairs implemented; physical-history R1/full queue/send R2 in progress | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [October 9 replay repair](CLAIMMD_SANDBOX_RUNBOOK.md#retained-request-replay--local-source-october-9-2026), [policy/review](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026). Replay source evidence does not close the lifecycle or full send-gate work. |
+| SATI-BIL-001 | export/replay and sequential physical-history guards implemented; all-writer R1/full R2 in progress | Assessment R1/R2 original/correction lifecycle and current compliance release gates; [billing architecture](docs/architecture/billing.md), [sequential delivery guard](CLAIMMD_SANDBOX_RUNBOOK.md#sequential-delivery-history-guard--local-source-october-9-2026), [transaction review](CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026). Sequential source evidence does not close the SQL lifecycle or full send-gate work. |
 | SATI-SEC-001 | current request/incident/health repair sequence implemented and locally verified; broader sink/admission/security work open | Authenticated expensive-operation/per-actor/IP/validated-agency budgets, distributed login guard, deployed least privilege/redaction and independent review; [logging owner](LOGGING_DESIGN.md), [security review](SECURITY_REVIEW_2026-09-10.md), [API audit](API_SECURITY_AUDIT.md). |
 | SATI-GOV-001 | source implemented/runtime gated | Governance activation, approved policy periods and complete storage/recovery adapters; [governance runbook](RECORDS_GOVERNANCE_RUNBOOK.md). Runtime retention stays PolicyOnly. |
 | SATI-CLI-001 | evidence pending | External-device/accessibility/mixed-version/clean-install acceptance and supported client/server/schema compatibility; [Demo acceptance](DEMO_ACCEPTANCE.md), [readiness](docs/readiness/README.md). |
@@ -71,18 +71,18 @@ authorization requirements; no release outcome is established by this invocation
 **Next eligible item:** SATI-BIL-001
 
 **Eligibility:** Josh adopted P1–P3 ([DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md))
-and then explicitly requested duplicate-claim safeguards and compliance checks. The transaction/
-writer review is source evidence; common SQL coordination remains unproved. R1-05 request-kind
-replay is implemented with fail-first API/local evidence. Follow
+and then explicitly requested duplicate-claim safeguards and compliance checks. R1-05 request-kind
+replay and shared sequential physical-history admission are implemented with fail-first API/local
+evidence. Common SQL coordination remains unproved. Follow
 [the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
 
-**Bounded slice:** implement the shared retained-content/history projection and
-`OriginalClaimReleaseRules` owner for trusted agency/NoteId claim identity and the adopted
-Generated/Queued/uncertain/received/nonreceipt matrix. Extend the shared parser to expose F8;
-validate original/correction links, controls, period/6R/D9 and receipt provenance. Preserve
-damaged physical/uncertain history as held/incomplete facts. Apply the decision at original
-generation, queue and immediately before Sending; introduce and prove common transaction
-admission across all history writers in a separately verified implementation chunk.
+**Bounded slice:** integrate common agency SQL transaction admission across generation, correction,
+queue, pre-Sending/outcome, reconciliation, mock transmission and manual/connector receipt writers.
+Refresh authoritative worker source after admission. Stage key wrapping outside decision locks
+while preserving no-key replay/no-op and revalidating bindings/identity/cursors/authority before
+commit. Establish single-attempt ownership for direct poller transaction paths, clean up failed
+transaction recovery and prove actual cross-writer SQL barriers in the private synthetic runner.
+The shared rule, retained-content/F8 projection and sequential main-path gates already exist.
 
 **Dependencies and owners:** read [the billing architecture](docs/architecture/billing.md),
 [the sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md),

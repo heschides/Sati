@@ -19,7 +19,7 @@ public sealed class BillingExportComplianceTests
     [InlineData(true)]
     public async Task RetainedFileCannotBeReplayedByARevokedOrDisabledSession(bool disabled)
     {
-        await using var factory = new SatiApiFactory();
+        await using var factory = new SatiApiFactory { IncludeLegacyClaimEvidence = false };
         using var client = await factory.CreateAuthenticatedClientAsync("admin-two");
         var key = Guid.NewGuid().ToString("N");
         (await ExportAsync(client, key)).EnsureSuccessStatusCode();
@@ -52,7 +52,7 @@ public sealed class BillingExportComplianceTests
     [InlineData("period-status", true)]
     public async Task ExportAndExactRetryRefuseChangedSourceWithoutChangingEvidence(string change, bool replay)
     {
-        await using var factory = new SatiApiFactory();
+        await using var factory = new SatiApiFactory { IncludeLegacyClaimEvidence = false };
         using var client = await factory.CreateAuthenticatedClientAsync("admin-two");
         var key = Guid.NewGuid().ToString("N");
         EdiFileDto? original = null;
@@ -137,7 +137,7 @@ public sealed class BillingExportComplianceTests
     [Fact]
     public async Task CompleteStoredExceptionPermitsExportAndRetryWithoutRebuildingFrozenInputs()
     {
-        await using var factory = new SatiApiFactory();
+        await using var factory = new SatiApiFactory { IncludeLegacyClaimEvidence = false };
         using var client = await factory.CreateAuthenticatedClientAsync("admin-two");
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
@@ -161,7 +161,7 @@ public sealed class BillingExportComplianceTests
     [InlineData(true)]
     public async Task RevokedUnselectedObligationBlocksExportAndReplayWithoutChangingRetainedEvidence(bool replay)
     {
-        await using var factory = new SatiApiFactory();
+        await using var factory = new SatiApiFactory { IncludeLegacyClaimEvidence = false };
         using var client = await factory.CreateAuthenticatedClientAsync("admin-two");
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
@@ -219,7 +219,7 @@ public sealed class BillingExportComplianceTests
     [Fact]
     public async Task ExactAdminRecoveryPermitsExportAndReplayOfTheFrozenClaim()
     {
-        await using var factory = new SatiApiFactory();
+        await using var factory = new SatiApiFactory { IncludeLegacyClaimEvidence = false };
         using var client = await factory.CreateAuthenticatedClientAsync("admin-two");
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
@@ -270,7 +270,7 @@ public sealed class BillingExportComplianceTests
     [Fact]
     public async Task RemovingAttestationAfterGenerationBlocksRetryAndLateCompletionDoesNotCureServiceGap()
     {
-        await using var factory = new SatiApiFactory();
+        await using var factory = new SatiApiFactory { IncludeLegacyClaimEvidence = false };
         using var client = await factory.CreateAuthenticatedClientAsync("admin-two");
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();

@@ -11,8 +11,7 @@ namespace Sati.Api.Tests;
 /// Recording the bank deposit behind a remittance, and correcting a claim after the payer
 /// answered: over HTTP, against the permanent ingestion path the mock clearinghouse feeds.
 /// </summary>
-[Collection(SatiApiCollection.Name)]
-public sealed class BillingCorrectionApiTests
+public sealed class BillingCorrectionApiTests : IAsyncLifetime
 {
     // Agency 2's submitted period and its single claim line (note 603, $33.25).
     private const int SubmittedPeriodId = 1202;
@@ -20,9 +19,11 @@ public sealed class BillingCorrectionApiTests
     // Agency 2's seeded remittance deposit: the report says $25.60; its legacy EFT column says $25.50.
     private const long SeededDepositId = 1702;
 
-    private readonly SatiApiFactory _factory;
-
-    public BillingCorrectionApiTests(SatiApiFactory factory) => _factory = factory;
+    // Each correction scenario is an independent legitimate lifecycle. Repeated
+    // raw originals for the shared fixture's already-paid claim are not a shortcut.
+    private readonly SatiApiFactory _factory = new() { IncludeLegacyClaimEvidence = false };
+    public Task InitializeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => _factory.DisposeAsync().AsTask();
 
     // -------------------------------------------------------------------------
     // Bank deposits
@@ -203,6 +204,19 @@ public sealed class BillingCorrectionApiTests
             new GenerateEdiRequest(true, originalKey));
         originalResponse.EnsureSuccessStatusCode();
         var originalFile = (await originalResponse.Content.ReadFromJsonAsync<EdiFileDto>())!;
+        if (duplicateWriteRecovery)
+        {
+            await using var initialDb = factory.OpenDatabase();
+            replayLookup.HideKeyOnce = originalKey;
+            replayLookup.HideControlOnce = (await initialDb.EdiGenerations.SingleAsync(x => x.IdempotencyKey == originalKey)).ControlNumber;
+            replayLookup.InjectKeyConflict = true;
+            var recovered = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/edi",
+                new GenerateEdiRequest(true, originalKey));
+            recovered.EnsureSuccessStatusCode();
+            Assert.Equal(originalFile, await recovered.Content.ReadFromJsonAsync<EdiFileDto>());
+            Assert.True(replayLookup.RecoveryLookupObserved);
+            Assert.Single(await initialDb.EdiGenerations.ToListAsync());
+        }
         (await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/mock-clearinghouse",
             new MockClearinghouseRequest(MockClearinghouseScenario.ClaimsRejected))).EnsureSuccessStatusCode();
 
@@ -244,12 +258,6 @@ public sealed class BillingCorrectionApiTests
 
         // Both wire files have frequency 1. The retained request kind, rather than the
         // wire frequency, must prevent replaying a correction through original export.
-        if (duplicateWriteRecovery)
-        {
-            replayLookup.HideKeyOnce = correctionKey;
-            replayLookup.HideControlOnce = correctionGeneration.ControlNumber;
-            replayLookup.InjectKeyConflict = true;
-        }
         var wrongKind = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/edi",
             new GenerateEdiRequest(true, correctionKey));
         Assert.Equal(HttpStatusCode.Conflict, wrongKind.StatusCode);
@@ -263,12 +271,6 @@ public sealed class BillingCorrectionApiTests
             new GenerateEdiRequest(true, correctionKey));
         correctionReplay.EnsureSuccessStatusCode();
         Assert.Equal(file, await correctionReplay.Content.ReadFromJsonAsync<EdiFileDto>());
-        if (duplicateWriteRecovery)
-        {
-            replayLookup.HideKeyOnce = originalKey;
-            replayLookup.HideControlOnce = (await db.EdiGenerations.SingleAsync(x => x.IdempotencyKey == originalKey)).ControlNumber;
-            replayLookup.InjectKeyConflict = true;
-        }
         var originalReplay = await biller.PostAsJsonAsync($"/api/v1/billing/periods/{periodId}/edi",
             new GenerateEdiRequest(true, originalKey));
         originalReplay.EnsureSuccessStatusCode();

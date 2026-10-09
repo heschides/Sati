@@ -7234,6 +7234,10 @@ internal static partial class ApiEndpoints
             if (previous is not null)
                 return ReplayEdiOrConflict(previous, periodId, request.IsTest, EdiRequestKind.Original, profile);
 
+            var claimHistory = await ApiClaimReleaseHistory.LoadAsync(db, actor.AgencyId, null, cancellationToken);
+            var originalRelease = ApiClaimReleaseHistory.Evaluate(claimHistory, periodId,
+                period.Lines.Select(line => line.NoteId).ToHashSet(), OriginalClaimReleaseOperation.Generate);
+            if (!originalRelease.Allowed) return OriginalClaimReleaseHeld();
             foreach (var line in period.Lines) await NoteAmendmentBilling.ValidateLineVersionAsync(db, actor.AgencyId, line.NoteId, line.AmendedNoteVersionId, cancellationToken);
             var generatedAt = clock.Now;
             var controlNumber = CreateEdiControlNumber(normalizedKey);
@@ -10351,6 +10355,11 @@ internal static partial class ApiEndpoints
                 "idempotency_key_reused",
                 "This retry key was already used for a different EDI request.",
                 string.Empty));
+
+    private static IResult OriginalClaimReleaseHeld() => Results.Conflict(new ApiErrorDto(
+        "original_claim_release_held",
+        "This claim has a queued, uncertain or received submission, or retained history needs review. Review its history and use an eligible correction or audited recovery before releasing another original.",
+        string.Empty));
 
     private static string CreateEdiControlNumber(string normalizedKey) =>
         (Convert.ToUInt32(normalizedKey[..8], 16) % 1_000_000_000)

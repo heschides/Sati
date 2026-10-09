@@ -117,6 +117,15 @@
       "status": "accepted",
       "evidence": ["CLAIMMD_SANDBOX_RUNBOOK.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0232",
+      "date": "2026-10-09",
+      "title": "Shared original-claim delivery history admission",
+      "path": "docs/decisions/current/2026-10-09-DEC-0232.md",
+      "status": "accepted",
+      "evidence": ["CLAIMMD_SANDBOX_RUNBOOK.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

@@ -90,6 +90,20 @@ internal sealed class ClearinghouseDispatchWorker(
         var ownerId = await db.BillingPeriods.AsNoTracking().Where(p => p.Id == generation.BillingPeriodId).Select(p => p.UserId).SingleAsync(token);
         await using (var schedule = await ServiceTimeWriteScope.BeginAsync(db, generation.AgencyId, ownerId, token))
         {
+            var history = await ApiClaimReleaseHistory.LoadAsync(db, dispatch.AgencyId, generation.Id, token);
+            var retained = history.Files.SingleOrDefault(row => row.File.Id == generation.Id);
+            if (!history.Complete || retained is null || history.Defects.Any(row => row.Code == "candidate_invalid") ||
+                !generation.IsCorrection && !ApiClaimReleaseHistory.Evaluate(history, generation.BillingPeriodId,
+                    retained.Claims.Select(row => row.NoteId).ToHashSet(), OriginalClaimReleaseOperation.BeginSending,
+                    generation.Id, dispatch.Id).Allowed)
+            {
+                dispatch.State = ClearinghouseDispatchState.CancelledBeforeSend;
+                dispatch.SafeErrorCode = "original_claim_release_held";
+                dispatch.Revision++;
+                try { await db.SaveChangesAsync(token); await schedule.CommitAsync(token); }
+                catch (DbUpdateConcurrencyException) { }
+                return true;
+            }
             try { await NoteAmendmentDispatchGuard.ValidateAsync(db, generation, token); }
             catch (NoteAmendmentWorkflowException)
             {

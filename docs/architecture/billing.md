@@ -26,12 +26,15 @@ formatter/parser tests do not certify vendor or payer acceptance.
 
 The [October 9 R1 design](../../CLAIMMD_SANDBOX_RUNBOOK.md#proposed-original-release-guard--october-9-2026)
 proposes one `OriginalClaimReleaseRules` Contracts owner, a shared retained-content projection,
-three admission points and a common SQL decision boundary. These owners and locks do not yet
-exist. Josh adopted cross-mode, generic rejection and queued-reservation policy in
+three admission points and a common SQL decision boundary. The rule/projection owners and
+sequential generation/queue/pre-Sending checks now exist; common all-writer locks remain pending.
+The [implemented delivery-history owner](../../CLAIMMD_SANDBOX_RUNBOOK.md#sequential-delivery-history-guard--local-source-october-9-2026)
+and [DEC-0232](../decisions/current/2026-10-09-DEC-0232.md) distinguish current behavior and evidence.
+Josh adopted cross-mode, generic rejection and queued-reservation policy in
 [DEC-0230](../decisions/current/2026-10-09-DEC-0230.md);
-deterministic fail-first and private SQL acceptance are specified but not executed. The design
+Sequential fail-first cases have executed; private SQL coordination acceptance remains unexecuted. The design
 preserves the existing correction owner, safe result replay and late-receipt precedence. It does
-not change implemented architecture, close R1/full R2 or advance sealed readiness.
+not close full R1/R2 or advance sealed readiness.
 
 The [transaction review](../../CLAIMMD_SANDBOX_RUNBOOK.md#transaction-boundary-review--october-9-2026)
 identifies all normal history writers, current local capability limits, failed-transaction recovery

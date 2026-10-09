@@ -110,6 +110,14 @@ internal static partial class ApiEndpoints
             if (!ClearinghouseAccountSelection.Matches(generation.Content, account, generation.BillingPeriodId))
                 return Results.Conflict(new ApiErrorDto("dispatch_profile_mismatch",
                     "The retained file does not match this test account and profile. Generate a new file for the selected account.", string.Empty));
+            var history = await ApiClaimReleaseHistory.LoadAsync(db, actor.AgencyId, generation.Id, token);
+            var retained = history.Files.SingleOrDefault(row => row.File.Id == generation.Id);
+            if (!history.Complete || retained is null || history.Defects.Any(row => row.Code == "candidate_invalid"))
+                return OriginalClaimReleaseHeld();
+            if (!generation.IsCorrection && !ApiClaimReleaseHistory.Evaluate(history, generation.BillingPeriodId,
+                    retained.Claims.Select(row => row.NoteId).ToHashSet(), OriginalClaimReleaseOperation.Queue,
+                    generation.Id).Allowed)
+                return OriginalClaimReleaseHeld();
             if (await db.BillingSubmissionEvents.AsNoTracking().AnyAsync(row =>
                     row.AgencyId == actor.AgencyId && row.EdiGenerationId == generation.Id &&
                     row.Stage >= BillingSubmissionStage.Transmitted, token))

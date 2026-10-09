@@ -18,6 +18,207 @@ namespace Sati.Api.Tests;
 
 public sealed class ClearinghouseDispatchApiTests
 {
+    [Theory]
+    [InlineData("queued")]
+    [InlineData("accepted")]
+    [InlineData("rejected")]
+    [InlineData("unknown")]
+    public async Task FreshOriginalKeyCannotBypassAnExistingClaimReservationOrSend(string history)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var key = Guid.NewGuid().ToString("N");
+        var file = await fixture.GenerateAsync(fixture.AccountId, key);
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(fixture.GenerationId, fixture.AccountId))).EnsureSuccessStatusCode();
+        var connector = new CountedOutcomeConnector(history switch
+        {
+            "accepted" => ClearinghouseAttemptOutcome.Accepted,
+            "rejected" => ClearinghouseAttemptOutcome.Rejected,
+            _ => ClearinghouseAttemptOutcome.OutcomeUnknown
+        });
+        if (history != "queued") Assert.True(await fixture.Worker(connector).ProcessOneAsync(CancellationToken.None));
+        await using var db = fixture.Factory.OpenDatabase();
+        var counts = (await db.EdiGenerations.CountAsync(), await db.ClearinghouseDispatches.CountAsync(),
+            await db.ClearinghouseDispatchAttempts.CountAsync(), await db.AuditEvents.CountAsync());
+        var otherAccount = await fixture.AddAccountAsync("OFFICEALLY", "", partner: TradingPartnerKind.OfficeAlly);
+        var fresh = await fixture.Biller.PostAsJsonAsync($"/api/v1/billing/periods/{fixture.PeriodId}/edi",
+            new GenerateEdiRequest(true, Guid.NewGuid().ToString("N")) { ClearinghouseAccountId = otherAccount });
+        Assert.Equal(HttpStatusCode.Conflict, fresh.StatusCode);
+        Assert.Equal("original_claim_release_held", (await fresh.Content.ReadFromJsonAsync<ApiErrorDto>())!.Code);
+        var productionMode = await fixture.Biller.PostAsJsonAsync($"/api/v1/billing/periods/{fixture.PeriodId}/edi",
+            new GenerateEdiRequest(false, Guid.NewGuid().ToString("N")));
+        Assert.Equal(HttpStatusCode.Conflict, productionMode.StatusCode);
+        var replay = await fixture.Biller.PostAsJsonAsync($"/api/v1/billing/periods/{fixture.PeriodId}/edi",
+            new GenerateEdiRequest(true, key) { ClearinghouseAccountId = fixture.AccountId });
+        replay.EnsureSuccessStatusCode();
+        Assert.Equal(file, await replay.Content.ReadFromJsonAsync<EdiFileDto>());
+        Assert.Equal(counts, (await db.EdiGenerations.CountAsync(), await db.ClearinghouseDispatches.CountAsync(),
+            await db.ClearinghouseDispatchAttempts.CountAsync(), await db.AuditEvents.CountAsync()));
+        Assert.Equal(history == "queued" ? 0 : 1, connector.Calls);
+    }
+
+    [Fact]
+    public async Task AnotherRetainedOriginalCannotQueueAfterTheFirstWasReceived()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.GenerateAsync(fixture.AccountId);
+        var firstId = fixture.GenerationId;
+        await fixture.GenerateAsync(fixture.AccountId);
+        var secondId = fixture.GenerationId;
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(firstId, fixture.AccountId))).EnsureSuccessStatusCode();
+        var connector = new CountedOutcomeConnector(ClearinghouseAttemptOutcome.Accepted);
+        Assert.True(await fixture.Worker(connector).ProcessOneAsync(CancellationToken.None));
+        var second = await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(secondId, fixture.AccountId));
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Equal("original_claim_release_held", (await second.Content.ReadFromJsonAsync<ApiErrorDto>())!.Code);
+        await using var db = fixture.Factory.OpenDatabase();
+        Assert.Single(await db.ClearinghouseDispatches.ToListAsync());
+        Assert.Single(await db.ClearinghouseDispatchAttempts.ToListAsync());
+        Assert.Equal(1, connector.Calls);
+    }
+
+    [Fact]
+    public async Task ExactLateReceiptDefeatsNonReceiptBeforeASuccessorCanUpload()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var first = await fixture.GenerateAsync(fixture.AccountId);
+        var firstId = fixture.GenerationId;
+        var queued = (await (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(firstId, fixture.AccountId)))
+            .Content.ReadFromJsonAsync<ClearinghouseDispatchDto>())!;
+        var connector = new CountedOutcomeConnector(ClearinghouseAttemptOutcome.OutcomeUnknown);
+        Assert.True(await fixture.Worker(connector).ProcessOneAsync(CancellationToken.None));
+        var path = $"/api/v1/admin/clearinghouse/dispatches/{queued.Id}/reconciliation";
+        var manifest = (await fixture.Biller.GetFromJsonAsync<ClaimMdReconciliationManifestDto>(path))!;
+        (await fixture.Biller.PostAsJsonAsync(path, new ReconcileClaimMdDispatchRequest(manifest.Revision,
+            manifest.AccountId, manifest.AccountNumber, manifest.EdiGenerationId, manifest.ContentSha256,
+            manifest.FileName, "ConfirmedNotReceived", "SupportCase", "CASE-123456", new string('C', 64),
+            DateTime.UtcNow, manifest.NotReceivedAttestation, null, null, null, null))).EnsureSuccessStatusCode();
+        await fixture.GenerateAsync(fixture.AccountId);
+        var successorId = fixture.GenerationId;
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(successorId, fixture.AccountId))).EnsureSuccessStatusCode();
+        var late = MockClearinghouse.Respond(first.Content, MockClearinghouseScenario.SyntaxRejected, DateTime.UtcNow);
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/responses",
+            new ClaimResponseIngestRequest(late.FunctionalAcknowledgement!))).EnsureSuccessStatusCode();
+        Assert.True(await fixture.Worker(connector).ProcessOneAsync(CancellationToken.None));
+        Assert.Equal(1, connector.Calls);
+        await using var db = fixture.Factory.OpenDatabase();
+        Assert.Equal(ClearinghouseDispatchState.ConfirmedNotReceived,
+            (await db.ClearinghouseDispatches.SingleAsync(x => x.EdiGenerationId == firstId)).State);
+        var held = await db.ClearinghouseDispatches.SingleAsync(x => x.EdiGenerationId == successorId);
+        Assert.Equal(ClearinghouseDispatchState.CancelledBeforeSend, held.State);
+        Assert.Equal("original_claim_release_held", held.SafeErrorCode);
+        Assert.Single(await db.ClearinghouseDispatchAttempts.ToListAsync());
+        Assert.Contains(await db.ClearinghouseResponseMatches.ToListAsync(), x => x.EdiGenerationId == firstId);
+    }
+
+    private sealed class CountedOutcomeConnector(ClearinghouseAttemptOutcome outcome) : IClearinghouseConnector
+    {
+        public int Calls { get; private set; }
+        public Task<ClearinghouseUploadResult> UploadAsync(ClearinghouseUpload upload, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            Calls++;
+            // Accepted with every claim rejected still proves upload receipt.
+            return Task.FromResult(new ClearinghouseUploadResult(outcome,
+                outcome == ClearinghouseAttemptOutcome.Accepted ? "SYNTHETIC-RECEIVED" : null,
+                null, 0, ClaimResponseReader.ReadSubmission(upload.Content).Claims.Count));
+        }
+    }
+
+    [Theory]
+    [InlineData("content")]
+    [InlineData("clm-period")]
+    [InlineData("ref6r")]
+    [InlineData("d9")]
+    public async Task DamagedReceivedHistoryCannotDisappearFromOriginalRelease(string damage)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var file = await fixture.GenerateAsync(fixture.AccountId);
+        var firstId = fixture.GenerationId;
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(firstId, fixture.AccountId))).EnsureSuccessStatusCode();
+        var connector = new CountedOutcomeConnector(ClearinghouseAttemptOutcome.Accepted);
+        Assert.True(await fixture.Worker(connector).ProcessOneAsync(CancellationToken.None));
+        var claim = ClaimResponseReader.ReadSubmission(file.Content).Claims[0];
+        var damaged = damage switch
+        {
+            "content" => "Synthetic deliberately damaged retained history",
+            "clm-period" => file.Content.Replace(claim.ClaimReference,
+                claim.ClaimReference.Replace($"-{fixture.PeriodId}-", $"-{fixture.PeriodId + 100}-"), StringComparison.Ordinal),
+            "ref6r" => file.Content.Replace($"REF*6R*{claim.ServiceLineReferences[0]}~", "REF*6R*2147483647~", StringComparison.Ordinal),
+            _ => file.Content.Replace("SATI1-TEST-", "SATI1-WRONG-", StringComparison.Ordinal)
+        };
+        Assert.NotEqual(file.Content, damaged);
+        await using var db = fixture.Factory.OpenDatabase();
+        // Inject legacy storage damage in this private synthetic fixture only. Ordinary
+        // SaveChanges cannot edit immutable retained generations.
+        await db.EdiGenerations.Where(row => row.Id == firstId).ExecuteUpdateAsync(update => update.SetProperty(row => row.Content, damaged));
+        var counts = (await db.EdiGenerations.CountAsync(), await db.ClearinghouseDispatchAttempts.CountAsync(), await db.AuditEvents.CountAsync());
+        var fresh = await fixture.Biller.PostAsJsonAsync($"/api/v1/billing/periods/{fixture.PeriodId}/edi",
+            new GenerateEdiRequest(true, Guid.NewGuid().ToString("N")) { ClearinghouseAccountId = fixture.AccountId });
+        Assert.Equal(HttpStatusCode.Conflict, fresh.StatusCode);
+        Assert.Equal("original_claim_release_held", (await fresh.Content.ReadFromJsonAsync<ApiErrorDto>())!.Code);
+        Assert.Equal(counts, (await db.EdiGenerations.CountAsync(), await db.ClearinghouseDispatchAttempts.CountAsync(), await db.AuditEvents.CountAsync()));
+        Assert.Equal(damaged, (await db.EdiGenerations.AsNoTracking().SingleAsync(row => row.Id == firstId)).Content);
+        Assert.Equal(1, connector.Calls);
+    }
+
+    [Fact]
+    public async Task HistoricalDisabledAccountAndChangedNamespaceDoNotEraseReceipt()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.GenerateAsync(fixture.AccountId);
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(fixture.GenerationId, fixture.AccountId))).EnsureSuccessStatusCode();
+        var connector = new CountedOutcomeConnector(ClearinghouseAttemptOutcome.Accepted);
+        Assert.True(await fixture.Worker(connector).ProcessOneAsync(CancellationToken.None));
+        await using var db = fixture.Factory.OpenDatabase();
+        var retired = await db.ClearinghouseAccounts.SingleAsync();
+        retired.IsEnabled = false;
+        retired.Revision++;
+        await db.SaveChangesAsync();
+        var successor = await fixture.AddAccountAsync("NEXTCMDTEST", "NEXT");
+        var fresh = await fixture.Biller.PostAsJsonAsync($"/api/v1/billing/periods/{fixture.PeriodId}/edi",
+            new GenerateEdiRequest(true, Guid.NewGuid().ToString("N")) { ClearinghouseAccountId = successor });
+        Assert.Equal(HttpStatusCode.Conflict, fresh.StatusCode);
+        Assert.Equal("original_claim_release_held", (await fresh.Content.ReadFromJsonAsync<ApiErrorDto>())!.Code);
+        Assert.Single(await db.EdiGenerations.ToListAsync());
+        Assert.Equal(1, connector.Calls);
+    }
+
+    [Fact]
+    public async Task LinkedFrequencyOneCorrectionStillQueuesAndSendsAfterARejectedAcknowledgement()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.GenerateAsync(fixture.AccountId);
+        (await fixture.Biller.PostAsJsonAsync($"/api/v1/billing/periods/{fixture.PeriodId}/mock-clearinghouse",
+            new MockClearinghouseRequest(MockClearinghouseScenario.SyntaxRejected))).EnsureSuccessStatusCode();
+        var claims = (await fixture.Biller.GetFromJsonAsync<List<BillingClaimStatusDto>>(
+            $"/api/v1/billing/periods/{fixture.PeriodId}/claims"))!;
+        foreach (var claim in claims)
+            (await fixture.Biller.PostAsJsonAsync($"/api/v1/billing/periods/{fixture.PeriodId}/corrections",
+                new CreateClaimCorrectionRequest(claim.ClaimLineId, ClaimCorrectionAction.Resubmit,
+                    "Corrected synthetic rejected-file inputs."))).EnsureSuccessStatusCode();
+        var generated = await fixture.Biller.PostAsJsonAsync($"/api/v1/billing/periods/{fixture.PeriodId}/corrections/edi",
+            new GenerateEdiRequest(true, Guid.NewGuid().ToString("N")) { ClearinghouseAccountId = fixture.AccountId });
+        generated.EnsureSuccessStatusCode();
+        var file = (await generated.Content.ReadFromJsonAsync<EdiFileDto>())!;
+        Assert.All(ClaimResponseReader.ReadSubmission(file.Content).Claims, claim => Assert.Equal("1", claim.FrequencyCode));
+        await using var db = fixture.Factory.OpenDatabase();
+        var correctionId = await db.EdiGenerations.Where(row => row.IsCorrection).Select(row => row.Id).SingleAsync();
+        (await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
+            new QueueClearinghouseDispatchRequest(correctionId, fixture.AccountId))).EnsureSuccessStatusCode();
+        var connector = new CountedOutcomeConnector(ClearinghouseAttemptOutcome.Accepted);
+        Assert.True(await fixture.Worker(connector).ProcessOneAsync(CancellationToken.None));
+        Assert.Equal(1, connector.Calls);
+        Assert.Equal(ClearinghouseDispatchState.AcceptedByClearinghouse, (await db.ClearinghouseDispatches.SingleAsync()).State);
+        Assert.Equal(claims.Count, await db.ClaimCorrectionSubmissions.CountAsync());
+    }
+
     [Fact]
     public async Task FeatureIsOffWithoutAnExplicitServerOptIn()
     {
@@ -109,9 +310,13 @@ public sealed class ClearinghouseDispatchApiTests
     {
         await using var fixture = await Fixture.CreateAsync();
         await fixture.GenerateAsync(fixture.AccountId);
+        var firstId = fixture.GenerationId;
+        // Both harmless files precede the first durable intent. Once reserved,
+        // generating the successor itself is correctly refused by the new guard.
+        await fixture.GenerateAsync(fixture.AccountId);
         using (var queued = await fixture.Biller.PostAsJsonAsync(
             "/api/v1/billing/clearinghouse/dispatches",
-            new QueueClearinghouseDispatchRequest(fixture.GenerationId, fixture.AccountId)))
+            new QueueClearinghouseDispatchRequest(firstId, fixture.AccountId)))
             Assert.Equal(HttpStatusCode.OK, queued.StatusCode);
         if (state != ClearinghouseDispatchState.Queued)
         {
@@ -127,7 +332,6 @@ public sealed class ClearinghouseDispatchApiTests
                 await db.SaveChangesAsync();
             }
         }
-        await fixture.GenerateAsync(fixture.AccountId);
         var response = await fixture.Biller.PostAsJsonAsync("/api/v1/billing/clearinghouse/dispatches",
             new QueueClearinghouseDispatchRequest(fixture.GenerationId, fixture.AccountId));
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);

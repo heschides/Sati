@@ -16,6 +16,45 @@ namespace Sati.Tests;
 public sealed class LocalBillingExportComplianceTests
 {
     [Theory]
+    [InlineData(BillingSubmissionStage.Transmitted, false)]
+    [InlineData(BillingSubmissionStage.TransportFailed, false)]
+    [InlineData(BillingSubmissionStage.Transmitted, true)]
+    public async Task RetainedLocalDeliveryHistoryBlocksAFreshKeyButPreservesExactReplay(BillingSubmissionStage stage, bool unscoped)
+    {
+        await using var fixture = await ExportFixture.CreateAsync();
+        var path = await fixture.ExportAsync();
+        var bytes = await File.ReadAllBytesAsync(path);
+        await using var db = fixture.Inner.Factory.CreateDbContext();
+        var retained = await db.EdiGenerations.SingleAsync();
+        Assert.Null(retained.ControlNumber); // Valid legacy local files derive the retained envelope identity.
+        db.BillingSubmissionEvents.Add(new BillingSubmissionEvent
+        {
+            AgencyId = retained.AgencyId, BillingPeriodId = retained.BillingPeriodId,
+            EdiGenerationId = unscoped ? null : retained.Id, Stage = stage, IsSynthetic = true
+        });
+        await db.SaveChangesAsync();
+        var counts = (await db.EdiGenerations.CountAsync(), await db.BillingSubmissionEvents.CountAsync(), await db.AuditEvents.CountAsync());
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.ExportAsync(Guid.NewGuid().ToString("N")));
+        Assert.Contains("retained history", refused.Message);
+        Assert.Equal(path, await fixture.ExportAsync());
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(path));
+        Assert.Equal(counts, (await db.EdiGenerations.CountAsync(), await db.BillingSubmissionEvents.CountAsync(), await db.AuditEvents.CountAsync()));
+    }
+
+    [Fact]
+    public async Task GeneratedOnlyLocalFilesAllowAnotherHarmlessRender()
+    {
+        await using var fixture = await ExportFixture.CreateAsync();
+        var first = await fixture.ExportAsync();
+        var second = await fixture.ExportAsync(Guid.NewGuid().ToString("N"));
+        Assert.NotEqual(first, second);
+        await using var db = fixture.Inner.Factory.CreateDbContext();
+        Assert.Equal(2, await db.EdiGenerations.CountAsync());
+        Assert.All(await db.BillingSubmissionEvents.ToListAsync(), row => Assert.Equal(BillingSubmissionStage.Generated, row.Stage));
+        Assert.Empty(await db.ClearinghouseDispatches.ToListAsync());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task RetainedOriginalReplaysThroughRecoveryAndRefusesChangedPeriodOrMode(bool duplicateWriteRecovery)
