@@ -32,13 +32,20 @@ evidence distinguish source storage replacement, tested retained cardinality and
 Rotation follows an enabled gate-acquired check; there is no new idle cleanup scheduler or
 measured memory bound. Current-day cardinality/churn and same-day removed-agency entries remain.
 
+The October 9 SATI-WRK-001 design slice adds a bounded two-agency/two-host missing-key failure
+reproducer and a proposed durable account readiness owner. [DEC-0234](../decisions/current/2026-10-09-DEC-0234.md)
+and [the canonical W8 proposal](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal)
+own its due/backoff/hold/reopen, lock staging and additive schema review. This is design and
+observed failure evidence; runtime selection and recovery remain unchanged pending approval.
+
 Remaining W8: current-day completion capacity, fair healthy-agency wait bounds, total
 operation/pass deadlines, per-account failure/dependency isolation, aggregate and tenant
 budgets, API admission and synthetic
 multi-host/load evidence. Agency IDs and a worker per agency do not by themselves isolate
-shared SQL or vendor capacity. The next agenda slice is the independent shared billing export
-residual-error gate; full queue/send lifecycle remains separate. Business-rule, route and
-persistence boundaries are unchanged by the worker slices.
+shared SQL or vendor capacity. [The agenda](../../AGENDA.md#next-eligible-work) owns the current
+next slice; the [billing owner](../../CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
+records completed R1/R2 source evidence separately. No new runtime owner or persistence boundary
+is established by the proposed worker design.
 
 ## Canonical detailed owners
 

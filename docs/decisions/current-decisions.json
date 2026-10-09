@@ -135,6 +135,15 @@
       "status": "accepted",
       "evidence": ["CLAIMMD_SANDBOX_RUNBOOK.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": ["DEC-0232"]
+    },
+    {
+      "id": "DEC-0234",
+      "date": "2026-10-09",
+      "title": "Known-unsent account preflight recovery proposal",
+      "path": "docs/decisions/current/2026-10-09-DEC-0234.md",
+      "status": "proposed",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

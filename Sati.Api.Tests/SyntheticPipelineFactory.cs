@@ -211,10 +211,10 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
 
     public ApiDbContext OpenDatabase() => new(_database.Options());
 
-    public async Task<PipelineActors> SeedAsync()
+    public async Task<PipelineActors> SeedAsync(string usernamePrefix = "")
     {
         await using var db = OpenDatabase();
-        db.DatabaseIdentities.Add(new ServerDatabaseIdentity
+        if (!await db.DatabaseIdentities.AnyAsync()) db.DatabaseIdentities.Add(new ServerDatabaseIdentity
         {
             // The API's current Demo identity/token contract also governs Testing.
             EnvironmentName = "Demo", InstanceId = Guid.NewGuid(), CreatedAtUtc = DateTime.UtcNow
@@ -255,7 +255,7 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
             var credential = verifier.Hash(Password);
             return new ServerUser
             {
-                AgencyId = agency.Id, Username = username, DisplayName = username, Role = role,
+                AgencyId = agency.Id, Username = usernamePrefix + username, DisplayName = usernamePrefix + username, Role = role,
                 Permissions = UserPermissionRules.FromLegacyRole(role),
                 PasswordHash = credential.Hash, Salt = credential.Salt
             };

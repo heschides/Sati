@@ -1952,6 +1952,100 @@ No broader worker implementation or schema work is started by this billing reque
 
 **Later reviewed release snapshot, if any:** none; no release invoked or reassessed.
 
+## 2026-10-09 — Missing-key dispatch isolation design
+
+**Stable work ID and bounded slice:** SATI-WRK-001, known-unsent missing-key policy/additive
+schema proposal and bounded synthetic failure reproduction. Josh explicitly requested proceeding
+with worker isolation after the billing source handoff.
+
+**Status and source/revision:** design/reproducer complete against
+`d69222f975ed4807edf4ed37c307ba5b9453b89b`; policy/schema approval and runtime implementation
+remain pending. No production worker, contract, persistence model, migration or route changes.
+This checkpoint's commit/push identifier will be supplied in the handoff after verification.
+
+**Changed behavior, ownership and canonical paths:** no scheduling behavior changed.
+[The W8 proposal](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal)
+owns concrete account disposition, 1/5/15/60-minute backoff with bounded delay, fifth-failure hold,
+scoped reopen, exact proposed fields, account/reset/common lock order, stale preparation checks,
+visibility/audit and migration/rollback acceptance. Proposed shared owners remain unimplemented.
+The synthetic pipeline helper can seed distinct prefixed agency identities in one private
+database, keeping one database identity; submitted-period assertions now scope the actual
+period/agency instead of relying on global fixture counts. Normal single-agency semantics remain.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+- Opt-in command: set process `SATI_RUN_DISPATCH_ISOLATION_REPRO=1`, then
+  `dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj --configuration Release --filter
+  FullyQualifiedName~MissingAccountKeyMustAllowHealthyAgencyByTheNextWorkerTurn --logger trx
+  --results-directory assessment-working/test-results/worker-isolation-design`; restore the
+  prior environment value in finally. No live credential resolver or HTTP exchange is used.
+- Actual boundary proof: **one intended failure, zero passes/skips**, reported duration 23s,
+  `assessment-working/test-results/worker-isolation-design/dispatch-isolation-design-boundary-red.trx`.
+  Two actual ProcessOneAsync calls through independently constructed API hosts selected A's
+  synthetic missing account reference twice. B was queued, zero physical fake-connector calls/
+  attempts/transmission events occurred, dispatch revisions and both retained files were unchanged.
+  Restoring only A's synthetic key then processed A and B once each, with two accepted dispatches,
+  two attempts and two transmission events. The final assertion failed only at B's declared
+  next-turn progress bound. This is observed failure evidence, not successful isolation.
+- Initial setup failures are retained separately: `dispatch-isolation-design-red.trx` used an
+  overlength synthetic claim namespace; `dispatch-isolation-design-proven-red.trx` attempted
+  changing immutable RequestedAtUtc. Both fixtures were corrected; neither is counted as a
+  starvation regression proof. The final fixture verifies stored order without changing intent.
+- Release test-project build passed with existing nullable/xUnit warnings and zero errors.
+  The opt-in reproducer is intentionally skipped in ordinary runs until the reviewed recovery
+  implementation promotes it to a normal regression.
+- Compatibility: **11 passed, zero failed, one deliberate reproducer skip** in 1m28s,
+  `assessment-working/test-results/worker-isolation-design/dispatch-isolation-design-compatibility.trx`.
+  Command used Release `--no-build` with the freshly built assembly and the filter joining
+  JoinedBillingPipelineAcceptanceTests, MissingSandboxKeyCannotTurnAnUnsentFileIntoAnUnknownUpload,
+  ConnectorExceptionIsUnknownAndIsNeverRetriedAutomatically and the new reproducer. All nine
+  joined pipeline/host-restart cases and both existing preflight/uncertainty cases passed.
+- Canonical documentation structure passed (46 root owners, 28 scoped owners, 12 preserved
+  snapshots, 11 active items, SATI-WRK-001 next, 454 legacy/218 imported/16 current decisions).
+  Release readiness/history comparison against the exact baseline SHA above passed: sealed
+  1.3.38 remains overall 22 with 41 hard blockers. Whitespace passed. All **22 negative
+  documentation mutation proofs passed** and their owned disposable fixture was cleaned.
+  Final structure/whitespace are rechecked after recording these results.
+
+**Failed/unrun checks, reason and verification limits:** no fixed guard exists and no green
+isolation claim is made. The owned in-memory SQLite database and synthetic vault/reset/dispatch
+lease replacements show sequential two-host selection and positive sendability, not real SQL
+multi-host exclusion, host-disposal recovery, due-time/backoff, stale-owner fencing, lock loss,
+schema/migration, sustained backlog/fairness or live provider behavior. Full solution/private SQL
+reruns are not required for this source-unchanged design checkpoint; the targeted compatibility
+run covers the changed fixture seam and existing preflight/uncertainty controls. No real data,
+shared/cloud database, deployed configuration, vendor/key service or release was accessed.
+
+**Relevant readiness criterion IDs and evidence class:** MT07/ID10 missing-key failure boundary;
+MT05 trusted account binding; MT10 proposed admission; OP06 proposed audit. Design and bounded
+synthetic failing evidence only, with positive controls. Sealed 1.3.38 readiness and rubrics remain
+unchanged; this proposal cannot close any complete operating criterion.
+
+**Durable decisions, alternatives and supersession links:** [DEC-0234](../decisions/current/2026-10-09-DEC-0234.md)
+is proposed, not accepted. Reject false unsent cancellation, process-memory skip lists,
+per-dispatch-only backoff, broad exception-as-nonreceipt classification and old active workers
+ignoring readiness. Immediate manual hold is an explicit alternative; proposed numeric defaults
+are not payer mandates. The proposal supersedes only the missing design status, not runtime
+implementation or earlier accepted R1/R2/uncertainty policy. D1–D4 remain unchanged.
+
+**Remaining risks/blockers, dependencies and deferred work:** worker handoff §8 requires Josh's
+schema approval. The concrete policy/additive source-schema proposal is ready for that review;
+no schema file is authored while pending. Per-account failure ownership must handle host-specific
+missing environment configuration without claiming a vendor outage. Shared wrapping faults,
+lease/fencing proof, default-off rollout, mixed-version rollback, explicit scoped reopening and
+actual durable due selection need implementation acceptance. Broader fairness/capacity/admission,
+general protocols, structural tenancy and deployed alerts keep their existing owners. The current
+hosted three-second idle SQL selection is an explicit cadence gap; the proposal does not authorize
+future no-user polling or claim a due-time delivery guarantee. Reviewed idle/wake integration is
+required before activation, separately from this missing-key source slice.
+
+**Next eligible stable ID and bounded slice:** SATI-WRK-001: review DEC-0234's policy and
+additive source schema, then implement the bounded missing-key account isolation after approval.
+Private synthetic schema tests/source migration authorization does not authorize changing an
+existing database, cloud settings, live credentials or publication.
+
+**Later reviewed release snapshot, if any:** none; no new release invoked or reassessed.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

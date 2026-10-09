@@ -143,11 +143,12 @@ public sealed class JoinedBillingPipelineAcceptanceTests
         Assert.Equal(remittance, plaintext);
     }
 
-    internal static async Task<int> PrepareSubmittedPeriodAsync(SyntheticPipelineFactory factory, PipelineActors actors)
+    internal static async Task<int> PrepareSubmittedPeriodAsync(SyntheticPipelineFactory factory, PipelineActors actors,
+        string usernamePrefix = "")
     {
-        using var author = await factory.SignInAsync("synthetic-author");
-        using var supervisor = await factory.SignInAsync("synthetic-supervisor");
-        using var biller = await factory.SignInAsync("synthetic-biller");
+        using var author = await factory.SignInAsync(usernamePrefix + "synthetic-author");
+        using var supervisor = await factory.SignInAsync(usernamePrefix + "synthetic-supervisor");
+        using var biller = await factory.SignInAsync(usernamePrefix + "synthetic-biller");
         int? periodId = null;
         var index = 0;
         foreach (var person in new[] { actors.FirstPersonId, actors.SecondPersonId })
@@ -181,9 +182,9 @@ public sealed class JoinedBillingPipelineAcceptanceTests
         using var lockPeriod = await biller.PostAsync($"/api/v1/billing/periods/{periodId}/submit", null);
         await RequireSuccessAsync(lockPeriod);
         await using var db = factory.OpenDatabase();
-        Assert.Equal(2, await db.ClaimLines.CountAsync());
-        Assert.Equal(1, (await db.BillingPeriods.SingleAsync()).Status);
-        Assert.Equal(2, await db.AuditEvents.CountAsync(x => x.Action == "note.approved"));
+        Assert.Equal(2, await db.ClaimLines.CountAsync(x => x.BillingPeriodId == periodId));
+        Assert.Equal(1, (await db.BillingPeriods.SingleAsync(x => x.Id == periodId)).Status);
+        Assert.Equal(2, await db.AuditEvents.CountAsync(x => x.AgencyId == actors.AgencyId && x.Action == "note.approved"));
         return periodId!.Value;
     }
 

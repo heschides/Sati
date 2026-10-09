@@ -59,6 +59,11 @@ authorization requirements.
 
 ## Explicit supersession
 
+The known-unsent account preflight recovery design is proposed in
+[DEC-0234](docs/decisions/current/2026-10-09-DEC-0234.md). [The worker owner](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal)
+contains the concrete policy/schema/acceptance proposal. Approval is pending; no worker recovery,
+schema or earlier accepted decision is changed by this design record.
+
 Coordinated claim transactions, staged wrapping and current exact-subset release are recorded in
 [DEC-0233](docs/decisions/current/2026-10-09-DEC-0233.md). The
 [runbook](CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)

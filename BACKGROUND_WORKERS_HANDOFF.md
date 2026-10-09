@@ -458,7 +458,7 @@ the number of removed agencies completed earlier the same day. The distinct 100-
 and 100-note sweep limits, finite-range membership caveats, global leases, atomic audits, fault
 classification, cancellation/disablement, default-off/hourly/no-idle-SQL and next-day rules remain.
 
-**Next eligible local work:** the agenda switches to SATI-BIL-001's shared `BillingExportGate`
+**Next eligible local work at the October 8 checkpoint:** the agenda switches to SATI-BIL-001's shared `BillingExportGate`
 residual-compliance-error repair. [The agenda](AGENDA.md#next-eligible-work) owns precise
 dependencies and fail-first acceptance. This does not close assessment R1 or full queue/pre-send
 R2. W8 total budgets, current-day capacity and fair wait/admission evidence remain later work.
@@ -472,6 +472,141 @@ state workaround. `CancelledBeforeSend` would discard temporarily blocked due wo
 process-memory failed-ID list would lose protection across restart/hosts. Local policy/design and
 reproduction can precede any separately approved schema work. Fair lane selection, API admission,
 aggregate capacity and live progress/alert evidence also remain open.
+
+#### October 9 — known-unsent dispatch isolation proposal
+
+**Status:** SATI-WRK-001 design and bounded failure reproduction; application scheduling is
+unchanged. [DEC-0234](docs/decisions/current/2026-10-09-DEC-0234.md) is proposed for Josh's review,
+not an accepted schema change. The later [billing completion](CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
+supersedes the October 8 pending R1/R2 source status only. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-design)
+owns actual reproduction, checks and remaining limits.
+
+**Failure boundary and conditional progress target.** The oldest Queued dispatch is selected
+without a due time or account failure disposition. Its valid configured account-key reference
+can resolve to no host key before Sending, so neither an upload nor an uncertain-send record is
+created. Repeating ProcessOneAsync, even through a second host, selects that same dispatch.
+For exactly two otherwise eligible agencies A/B, with A oldest and its key missing, the proposed
+bound is: after A's failure disposition commits, B is selected on the next successful worker
+turn while A is deferred. This counts turns, not seconds, and assumes available reset/dispatch/
+account leases, SQL and shared receipt keys. A sustained ready backlog, repeated lease contention,
+other failed accounts and shared outages need the broader fairness/budget work; no global bound
+is claimed here. A missing environment key is host configuration, not proof that the vendor
+or every host is unavailable. Account-wide deferral deliberately protects the lane across hosts;
+require consistent key configuration at activation and record this tradeoff during review.
+Deferred times are earliest eligibility, not a guaranteed timer delivery. The existing hosted
+loop's three-second idle SQL selection is a separate cadence gap: this design does not approve
+that as a future no-user polling strategy. No new wake ping or shorter SQL polling is allowed.
+Catch-up on host start/wake and a reviewed idle-wait/activity/due scheduling integration are
+activation requirements; numeric backoff does not establish idle capacity protection.
+
+**Proposed authoritative owner.** Contracts `ClearinghousePreflightRules` owns disposition,
+delay and reopening rules. Persistence owns the account readiness model/configuration shared by
+ApiDbContext and SatiContext; only the API worker and an authorized API command update it.
+The desktop does not gain a local scheduler or secret resolver. This is dispatch readiness,
+separate from physical delivery, claim adjudication, poller checkpoints and account enablement.
+
+**Recommended known-unsent recovery policy:**
+
+| Observed result | Proposed response |
+|---|---|
+| Typed missing key for a valid, unchanged account reference, before Sending and before any upload | Persist an account-scoped Deferred disposition and fixed `account_key_unavailable` code. Keep every dispatch Queued and its exact bytes/request identity intact. |
+| First through fourth committed failures in a recovery cycle | Earliest next probe is 1, 5, 15 and 60 minutes after the respective failure, plus deterministic 0–10 percent delay from account/cycle/failure identity. Persist the absolute UTC due time using TimeProvider. |
+| Fifth committed failure | Held, no automatic next probe. Preserve the due work until an agency administrator restores the key and explicitly reopens the account. |
+| Key restored during a deferred cycle | At the persisted due time, preflight again; successful preflight clears the failure cycle under admission and normal current release checks decide Sending. A successful key check alone is not billing approval. |
+| Caller cancellation, shared receipt wrapping/Key Vault failure, SQL/lease failure or unknown exception | Propagate; do not label it an account fault, consume an account failure count, or manufacture a send outcome. Shared dependency protection is separate work. |
+| Sending, OutcomeUnknown or actual upload evidence | Existing uncertainty/reconciliation rules only. A readiness command cannot put these back in Queued or authorize physical replay. |
+
+These numeric delays are proposed engineering defaults, not a payer rule or measured service
+objective. Missing environment configuration is the only newly classified fault in the first
+implementation: introduce a fixed typed result at `EnvironmentClaimMdSandboxKeySource`, never
+catch all InvalidOperationException or infer nonreceipt from a post-Sending connector failure.
+Invalid/changed profiles retain the existing source/refusal policy; shared wrapping failures must
+not be hidden behind account backoff. Do not use live vendor calls to probe readiness.
+
+**Concrete additive schema proposal — not generated or applied:** one
+`ClearinghouseDispatchReadiness` row per clearinghouse account, with primary key
+`(AgencyId, AccountId)` and restrictive composite foreign key to the existing account alternate
+key. Proposed fields are `Disposition` (Ready/Deferred/Held), `FailureCount` (0–5),
+`RecoveryCycleId` (GUID), `NextEligibleAtUtc` (nullable UTC), `LastFailureAtUtc`,
+`SafeFailureCode` (bounded fixed vocabulary), `ValidatedAccountRevision` and concurrency
+`Revision`. Missing row means Ready for an otherwise eligible existing account. CHECK constraints
+require Deferred to have a due time/count 1–4, Held to have count 5/no due time, and Ready to have
+count 0/no due time/no active failure code. Account identity cannot change. Retain failure history
+in append-only audits; do not store raw exceptions, keys, key references or claim bytes here.
+Add an eligibility index to readiness and review the existing dispatch index/query plan for
+`State, RequestedAtUtc, Id, AgencyId, AccountId`; no unbounded account/failed-ID materialization.
+No existing claim, dispatch enum, receipt, attempt or correction lineage is rewritten.
+
+**Admission, staging and stale work.** Discovery returns one globally oldest due Queued row,
+excluding Deferred-before-due and Held accounts through trusted same-agency joins. Recheck this
+after lease acquisition; a new queue cannot clear account backoff. Preserve shared reset first,
+exclusive dispatch second, then add a zero-wait session-owned account preflight lease
+`Sati.ClearinghousePreflight:{agencyId}:{accountId:N}`. The account lease excludes parallel probes
+of different queued rows for one failing account across hosts. Hold it through key preparation
+and the short final admission decision; release before the physical upload. Key resolution and
+receipt-key wrapping remain outside SQL transactions. ClaimReleaseWriteScope remains the first
+SQL decision lock, ahead of period/service locks where used. Reopen takes reset, account lease,
+then common admission and never waits for a dispatch lease; receipt processing needs no account
+lease. No reverse account/common acquisition is permitted.
+The account lease adds one open SQL session during preparation. Existing reset/dispatch session
+leases still hold connections over key/network work; this proposal establishes no aggregate
+connection, dependency-time or capacity bound. Measure and budget those separately under W8.
+
+A classified failed probe reloads the account, its revision/reference, readiness revision and
+dispatch under fresh common admission. Verify the exact retained candidate remains Queued,
+known-unsent and unchanged, with no attempt/physical receipt or transmission evidence, before
+committing readiness plus audit. Otherwise discard the stale disposition and let current release/
+reconciliation facts govern. Do not cancel a valid queued claim because a key is temporarily
+missing. Recheck the gate and caller token before decision work; failed/cancelled admission commits
+no success or deferred state. A lost failure-commit reply is resolved from readiness/revision,
+without an immediate extra probe. Lease loss stops stale writes before commit or upload; the
+implementation must supply provider proof rather than assuming an application lock is fencing.
+After successful preparation, reload the exact source/account/readiness and run all existing
+R1/R2, correction-purpose and financial-review guards before committing Sending. Single-attempt
+upload and result/receipt ordering from DEC-0233 remain unchanged.
+
+**Visibility and controlled reopening.** Extend the clearinghouse workspace with non-secret
+readiness, failure count, next due time and fixed reason per account, without changing the claim's
+Queued/financial status. Use text and accessible automation labels. Proposed same-agency Admin
+reopen command carries expected readiness and account revisions; actor/permissions are revalidated
+under admission. Resolve the current key and verify receipt protection outside SQL, then repeat
+authority, binding and revisions before atomically resetting Ready with an append-only human
+audit. Stale/repeated commands return a safe conflict with no second effect; clients refetch and
+review rather than blindly retry. Reopen only resumes ordinary evaluation of retained Queued
+work. It never creates a new original, changes bytes, clears delivery history or modifies
+Sending/OutcomeUnknown. Changing account configuration or adding a new queue is not an implicit
+reopen. Document the route in API_AUTHORIZATION and fixed defer/held/recovered/reopened audit
+actions in AUDIT_EVENTS when implemented. Worker audits use SystemActor.UserId; safe diagnostics
+contain IDs, counts, fixed code/job and exception type only. Alert activation stays separate.
+
+**Migration, rollout and rollback acceptance.** After approval, author only additive source
+migration/model changes and safe scripts using the controlled migration process. Prove apply
+from the prior schema, existing Ready-by-absence behavior, constraints, malformed/foreign writes
+and replay/history preservation in an owned private synthetic SQL instance. No working/cloud
+database is part of source approval. Disable dispatch on every old/new host during rollout;
+verify all active worker versions honor readiness before enabling transport. An old worker ignores
+this table, so mixed-version active dispatch and rolling back to it while Deferred/Held work
+exists are unsafe. Keep additive storage on rollback, pause dispatch and review readiness/queued
+work; do not drop unresolved scheduling evidence or transform it to CancelledBeforeSend.
+Reactivation requires owner-reviewed reconciliation, supported code/schema and unchanged
+uncertain-send quarantine. No infrastructure or release authority follows from this design.
+
+**Required fail-first and passing acceptance after approval:** promote the opt-in reproducer to
+an ordinary regression; A's first classified failure defers the entire account, B uploads exactly
+once on the next turn, A stays Queued with zero attempts, and retained bytes/effects remain scoped.
+With fake time prove exact due boundaries, four delays/jitter bounds, fifth-failure hold, same
+account multiple queued rows, successful deferred recovery and explicit reopen after restoration.
+Test host disposal/recreation, independently constructed SQL hosts, cancellation/disablement,
+actor/account/revision changes between preparation and commit, unavailable receipt keys,
+unknown/shared failures, failed readiness/audit commit and replay/repeated reopen conflicts.
+Use actual SQL barriers for per-account exclusion/reset/reconciliation, stale owners and lock
+cleanup. Preserve duplicate/compliance/void/late-receipt and Sending/OutcomeUnknown regression
+coverage. Private migration/constraint proof is distinct from deployed migration, sustained load,
+live vendor/quota evidence and general healthy-agency latency.
+
+**Concrete next step:** Josh reviews the proposed recovery policy and additive source schema;
+implementation is conditional on that approval under §8. This supersedes the missing proposal
+status in the blocker above, not its unimplemented runtime status or the broader W8 acceptance.
 
 **Problem.** Agency authorization and same-agency billing account/file linkage protect identity
 and record integrity. Agencies still share API CPU/memory, SQL/connection capacity, worker
