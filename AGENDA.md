@@ -76,7 +76,11 @@ authorization requirements; no release outcome is established by this invocation
 explicit approval is recorded in [DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md);
 [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
 owns behavior and [working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
-owns actual checks and limits. Existing/cloud database changes and activation remain separate.
+owns actual checks and limits. Later approved Demo migration/baseline/reset preparation is tracked
+in [working evidence](docs/readiness/work-evidence.md#2026-10-09--readiness-migration-runner-preparation),
+with observations and scope in [the environment inventory](DATABASE_ENVIRONMENTS.md#demo-readiness-migration-preflight--october-9-2026).
+A new release invocation and the prescribed rollout checks remain pending; dispatch activation
+remains separate. This preparation does not change the next-work design pointer.
 
 **Bounded slice:** design reviewed idle/wake/activity/due scheduling for dispatch before
 activation. Inventory current three-second idle SQL selection, host wake catch-up, earliest-due

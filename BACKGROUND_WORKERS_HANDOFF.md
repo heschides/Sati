@@ -521,11 +521,27 @@ newly deployed release. Earlier deployed observations remain in the environment 
 Migration `20261009183720_AddClearinghousePreflightReadiness` adds only the readiness table,
 composite account FK/state CHECK/eligibility index and global dispatch selection index. Missing
 row means Ready. Down refuses unresolved Deferred/Held rows with SQL 51044. Source generation
-uses `--synthetic-design`; no existing/shared/cloud database is authorized or migrated here.
+used `--synthetic-design`; that implementation's approval covered source/private synthetic
+verification only. The later bounded Demo migration/baseline/reset approval and observed preflight
+belong to [the environment inventory](DATABASE_ENVIRONMENTS.md#demo-readiness-migration-preflight--october-9-2026).
 Pause dispatch on every host for rollout/rollback. Old workers ignore readiness; mixed active
 versions are unsafe. Keep additive storage and audits during operational rollback, review queued/
 uncertain work, and verify compatible hosts before activation. Baseline/reset compatibility and
 actual deployed query plans require separate release preflight.
+
+The controlled runner is `scripts/Apply-ClearinghousePreflightReadinessMigration.ps1`, with reviewed
+SQL in its `.guarded.sql` companion. Run in Windows PowerShell 5.1. Its default preflight makes no
+persistent target changes; `-WhatIfOnly` rehearses within an outer rollback transaction and
+`-Apply` is the explicit mutation mode. The runner pins the Demo subscription/server/database and
+SQL hash. SQL validates the full predecessor migration-ID set and actual column, key, constraint
+and index semantics under the exclusive reset lock. Compatible untracked objects may be adopted;
+incompatible or missing tracked objects stop for investigation. Temporary local metadata is used
+to compare SQL Server's compiled CHECK expression. The original `.generated.sql` is a source
+artifact, not the controlled cloud execution path. Preparation/test status is recorded in
+[working evidence](docs/readiness/work-evidence.md#2026-10-09--readiness-migration-runner-preparation).
+Cloud rehearsal/apply/rerun still requires the approved release sequence and all-host dispatch
+pause; this runner never publishes an API, captures a baseline, queues a reset or changes a
+firewall rule. Keep dispatch disabled until its separate activation requirements are satisfied.
 
 [Working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
 owns actual fail-first, fake-time, private SQL, UI and suite results and limits.

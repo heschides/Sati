@@ -1,6 +1,6 @@
 # Data environments — authoritative dated inventory
 
-**Inventory owner:** this file. **Latest evidence date:** October 9, 2026 UTC (October 8 local).
+**Inventory owner:** this file. **Latest evidence date:** October 9, 2026 UTC and local.
 Assessment observations and subsequent bounded Demo release observations are dated below. Current release
 readiness belongs to [the readiness registry](docs/readiness/README.md). Historical deployment
 chronology is retained in [the original inventory](docs/archive/2026-10-08/DATABASE_ENVIRONMENTS.md).
@@ -175,7 +175,47 @@ Never refresh observations by querying a private database or changing infrastruc
 `20261009183720_AddClearinghousePreflightReadiness` is an additive source migration authored under
 Josh's explicit bounded approval. [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
 owns schema/rollout/rollback behavior; [working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
-owns private synthetic verification. This is not an observed migration of Demo, local working or
-cloud databases. No existing database was accessed or changed. A later authorized release must
+owns private synthetic verification. That source implementation did not migrate Demo, local
+working or cloud databases. No existing database was accessed or changed during that slice.
+A later authorized release must
 revalidate exact schema, synthetic baseline/reset compatibility and worker versions with dispatch
 paused; earlier 1.3.38 no-schema-delta observations remain dated facts for that release only.
+
+## Demo readiness migration preflight — October 9, 2026
+
+Josh subsequently approved the **Demo worker-readiness migration, reset-baseline replacement and
+one verification reset** after adding the temporary workstation rule himself. This approval does
+not invoke a new DATT release or authorize dispatch activation, Production access, or assistant-run
+firewall changes. [The working record](docs/readiness/work-evidence.md#2026-10-09--readiness-migration-runner-preparation)
+owns preparation checks and the remaining rollout sequence.
+
+At **20:33:32 UTC**, a token-authenticated, read-only metadata query against the pinned
+`sati-demo-satilogica-central.database.windows.net / SatiDemo` validated `DB_NAME()` and the
+`dbo.SatiDatabaseIdentity` Demo marker. It observed **128 migration IDs**, latest
+`20261007111016_AddAssessmentReviewCycles`; neither the readiness table nor its reset-baseline
+table existed. There were **92 baseline tables**. This first read checked count/latest, not yet
+the complete source-ID set or every existing schema object's semantics. It did not read clinical
+or financial record contents and made no database changes.
+
+At **20:42 UTC**, the locally verified controlled runner's `-PreflightOnly` mode passed against
+that same pinned target. It validated the complete source predecessor-ID set and existing
+prerequisite schema and reported `PREFLIGHT_PASSED_NO_PERSISTENT_TARGET_CHANGES`, migration
+already applied **false**, changes required **true**, persisted count **128**. Guarded SQL
+SHA-256 was `6E9C8AC1614FF2E9D38894786434E58E21D82484D210BA217C6C283E056FA1AA`.
+The runner acquired/released reset exclusion and rolled back its inspection transaction; no
+persistent target change, cloud DDL rehearsal, application or reset was performed.
+
+Bounded control-plane reads during this preflight observed the operator-created
+`datt-workstation-20261009` rule with matching start/end **72.95.106.10**, the API's expected
+environment/database values `Demo`/`SatiDemo`, and neither
+`Sati__EnableSyntheticClearinghouseDispatch` nor `Sati__EnableClaimMdSandboxTransport` present in
+its app settings. Source defaults for both flags are false; this projection alone does not prove
+every running host's effective configuration. SQL was Online with Local backup redundancy and
+an earliest restore timestamp of **2026-10-02T20:37:17.432226Z**. Recovery metadata is not a tested
+restore. Credentials and unrelated settings were not printed.
+
+The cloud schema, baseline and deployed API remain unchanged by these reads. Revalidate paused
+dispatch on all hosts, exact schema/history, recovery prerequisites and reset eligibility before
+the approved operation. After the matching API is healthy, capture the approved baseline and
+verify exactly one reset under the playbook; the user then removes the temporary rule and the
+assistant verifies absence. No new release invocation or reset outcome is recorded here yet.

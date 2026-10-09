@@ -2259,6 +2259,75 @@ due scheduling design, as specified in [the agenda](../../AGENDA.md#next-eligibl
 slice is not started by completion of the present approved worker isolation task.
 
 **Later reviewed release snapshot, if any:** none; sealed 1.3.38 and rubric versions unchanged.
+## 2026-10-09 — Readiness migration runner preparation
+
+**Stable work ID and bounded slice:** SATI-WRK-001, controlled Demo migration preparation for
+the completed missing-key isolation source. Starting source is
+`72338b8e740c337ea2fb6915a2ac11baf31a0239` on `codex/billing-original-release-design`.
+
+**Authority and status:** Josh explicitly approved the Demo worker-readiness migration,
+reset-baseline replacement and one verification reset after adding the temporary exact-IP rule.
+This later authorization is separate from DEC-0235's original source-only approval and does not
+change its account recovery policy. No new DATT invocation has been received in this slice.
+Local guarded-runner preparation is complete and verified; cloud migration, baseline replacement, reset,
+API publication and installer work have not been performed.
+
+**Changed behavior and ownership:** the source EF-generated idempotent script checks only
+migration history and is insufficient for the existing-schema checks required by
+[the release playbook](../../RELEASE_PLAYBOOK.md#6-demo-api-publication). A controlled PowerShell
+runner and guarded SQL now live under `scripts/Apply-ClearinghousePreflightReadinessMigration.*`.
+They verify exact predecessor IDs, marked database identity, actual schema semantics and exclusive
+reset/transaction ownership. Default preflight makes no persistent target changes; explicit
+`-WhatIfOnly` rehearses and rolls back; explicit `-Apply` commits and rechecks persisted state in
+a fresh inspection transaction. Existing compatible partial objects can be completed; incompatible
+or missing tracked objects are refused. Compiled CHECK comparison preserves Boolean grouping.
+The guarded SQL uses enforced LF bytes and a pinned SHA-256, so Git checkout newline conversion
+cannot invalidate the reviewed file. This does not change worker runtime policy, schema design,
+the original migration or the reset implementation. [W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+owns the controlled runner and rollout prerequisites.
+
+**Actual checks and evidence limits:** read-only pinned Demo identity/history/schema-presence
+and projected Azure configuration/recovery observations are recorded only in
+[the environment inventory](../../DATABASE_ENVIRONMENTS.md#demo-readiness-migration-preflight--october-9-2026).
+Independent local review found the existing baseline capture/restore dynamically includes the
+new table and migration history; no reset implementation change is indicated. Its scheduled-move
+and live/baseline external-clearinghouse guards must still pass; this source review does not
+establish live reset eligibility. The controlled cloud preflight also passed without persistent
+target changes, as recorded in that inventory.
+
+| Executed check | Actual result and evidence |
+|---|---|
+| Generated SQL identity regression | **1 expected failure**, `Assert.Throws: No exception was thrown`: the original generated script accepted a synthetic database marked Production. This used only an owned private fixture. TRX `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_16_40_44_net10.0.trx`. |
+| Generated SQL rejection batch | **7 expected failures, 0 passed/skipped**, 18 seconds: identity, same-count/latest substituted history, weakened CHECK, untrusted tenant FK, altered index, missing tracked schema and missing caller transaction all produced the intended no-exception assertion. Guarded setup remained intact while rejection candidates temporarily used generated SQL. TRX `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_16_42_59_net10.0.trx`. |
+| Final restored guarded SQL tests | **9 passed, 0 failed/skipped**, 22 seconds. `Sati.Api.Tests/ClearinghouseReadinessMigrationSqlTests.cs` verifies default inspection, rollback/apply/rerun, exact retained EDI/queued dispatch/Deferred readiness preservation, identity/history/schema refusal, compatible EF-generated partial schema, late history-write rollback and caller/reset transaction ownership. TRX `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_16_43_37_net10.0.trx`. All temporary fail-first loaders/hooks were removed. |
+| Runner and documentation | Windows PowerShell 5.1/current parser and mutually exclusive mode rejection passed; LF SQL hash matched the runner pin. Documentation structure and **22 negative mutation proofs** passed. Sealed release evidence/rubrics and unrelated user files were preserved. |
+
+SQL commands used `scripts/Test-IsolatedLocalDb.ps1 -BillingReleaseOnly -BillingReleaseFilter`
+with focused `ClearinghouseReadinessMigrationSqlTests` filters. Every created private LocalDB
+instance was stopped/deleted. An initial fixture setup failed because its synthetic account label
+exceeded the existing 15-character bound; the label was corrected and that failure is not counted
+as a security proof. The first guarded pass also passed all nine cases (28 seconds); the final
+pass above followed expanded fail-first evidence and restored source. API test builds passed;
+no broad worker/UI suite was repeated because runtime source did not change in this slice.
+
+The SQL proofs use isolated synthetic databases and establish bounded schema/history guards,
+not cloud restoration, vendor acceptance, worker activation or complete service operation.
+No cloud rollback rehearsal, migration apply/rerun, baseline capture, verification reset, API
+publication or installer acceptance has been performed in this preparation slice. Existing
+baseline external-evidence guards and all-host pause still require release-time verification.
+
+**Remaining sequence and risks:** revalidate all-host dispatch pause, exact schema/history,
+backup/rehearsal and reset eligibility. With a separately invoked release, run the approved
+rollback rehearsal/apply/idempotent rerun, publish the matching API, verify health, run compliance
+dry-run, replace the baseline with today's anchor, queue one reset and correlate completion.
+Do not replay a failed reset or remove storage to roll back the application. Firewall removal
+remains user-run. No real-data access, vendor call, worker activation or tested recovery is claimed.
+
+**Readiness and next work:** local runner evidence may support OP14 release procedure and MT10
+controlled schema changes only within its tested scope. Sealed 1.3.38 scores/rubrics remain
+unchanged. [The agenda](../../AGENDA.md#next-eligible-work) still points to SATI-WRK-001 idle/wake/
+activity/due scheduling design; this preparation does not start that separate work.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown
