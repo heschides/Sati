@@ -1059,6 +1059,361 @@ a version/test count. Full release build/tests, exact-source default push, Demo 
 installer acceptance/publication and final evidence remain pending. SATI-BIL-001 remains the
 future bounded fact/policy design pointer after release, not extra release implementation.
 
+## 2026-10-08 — 1.3.38 source release validation
+
+**Stable scope, status and source:** DATT release 1.3.38 packages the completed SATI-WRK-001,
+SATI-BIL-001 residual export and SATI-SEC-001 request/incident/health repairs, documentation
+governance and the Settings readiness display. Audited source checkpoint
+`61c6d0453b34d559886c5f4b28278552b46172fb` was committed/pushed to the agenda branch and
+fast-forwarded into local default `master`. Coordinated version owners, release notes and the
+reviewed report are prepared locally; source release commit/default push and publication remain
+pending at this validation record. No business behavior changed after the audited checkpoint.
+
+**Version/report ownership:** desktop/API version 1.3.38 and assembly/file 1.3.38.0, the three
+installer builder defaults, four Demo expectations, explicit desktop/API assertions, installer
+examples and ProductReleaseNotes agree. Carika is unchanged. The append helper accepted the
+reviewed 42-criterion snapshot in `readiness.json`, with source `61c6d04`, assessment October 8
+and unchanged rubric `2026-10-v1`. MT07, MT12, ID10 and OP14 move to Tested for the bounded
+recorded regressions/component acceptance; no criterion was promoted to Verified. Scores are
+overall 22.0%, multitenancy 25.0%, idempotency 26.8%, operations 14.3%; 41 hard launch checks
+remain open. The prior 1.3.37 snapshot and rubric retain their original semantics. Later live
+publication evidence belongs in the operational release record, not an edited shipped score.
+
+**Actual full gates:** source-only `scripts/Test-DattPreflight.ps1` passed with version/name/date
+agreement, 128 migrations and latest `20261007111016_AddAssessmentReviewCycles`;
+documentation structure and readiness integrity passed through that preflight.
+`dotnet build SatiLogica.slnx --configuration Release --no-restore --disable-build-servers -m:1
+-p:UseSharedCompilation=false -v minimal` passed, 18 existing warnings, zero errors, 69.13 seconds.
+Under the normal signed-in Windows profile, `scripts/Test-IsolatedLocalDb.ps1 -FullSolution`
+passed all five Release test projects with SQL tests enabled: desktop 3,017 passed / 1 initial
+opt-in model skip, API 1,197 passed, signatures 119, portal 8, Carika 4; zero failures.
+The owned LocalDB instance `SatiSqlTests_6becf25cca9f4f2c84df059c08e30af6` (17.0.4025.3) was
+stopped and deleted successfully. No shared LocalDB or personal working database was used.
+Fresh TRX files under `TestResults/BackgroundWorkersFullSql` have prefix
+`Joshu_LONGCHENPA_2026-10-08_19_16_`: Carika `11_net10.0`, signatures `11_net10.0[1]`,
+API `13_net10.0`, desktop `13_net10.0[1]`, portal `16_net10.0`, each suffixed `.trx`.
+
+**Optional model prerequisite and failed gate:** the sandbox's redirected application-data
+directory did not expose the real cached weights. Read-only normal-profile inspection found
+the configured Phi-4 mini CPU v5 catalog entry and matching model files under
+`%LOCALAPPDATA%/Sati/LocalAi/models`; the metadata marks that variant cached. The optional
+`LocalAiModelCompetenceTests` evaluation ran separately with
+`SATI_RUN_LOCAL_AI_MODEL_EVAL=1`, Release/no-build/no-restore, its three synthetic note inputs
+and new `artifacts/datt-1.3.38/test-results/local-ai-model-release.trx`. It failed one test in
+6 minutes 1 second: scenario 91001 completed, but scenario 91002's model plan violated the exact
+no-follow-up text requirement after both attempts. Shared validation rejected it and returned
+the fact-preserving baseline with its existing visible warning; the competence assertion failed.
+Scenario 91003 was not reached. The initial opt-in skip is not final acceptance of an available
+model gate. Source release push, packaging and publication are held while the model prompt is
+reviewed; authoritative validation and test assertions must not be weakened to clear the gate.
+
+**Embedded UI and helper acceptance:** the final 1.3.38 embedded parser/WPF filter passed 58,
+failed 0, skipped 0. TRX: `artifacts/datt-1.3.38/test-results/readiness-final-embedded.trx`.
+Root inspected all four PNGs in `readiness-final-qa`: the actual current score/change summary
+and synthetic ordinary, 620-pixel/enlarged and high-contrast views. Meters/text remained legible
+and wrapped; automation and non-color labels are exercised. This is synthetic component/render
+acceptance, not a human screen-reader or external-device attestation.
+Fresh independent helper acceptance passed documentation negative proofs 22/22, readiness
+checks 43/43, DATT preflight cases 9/9 and Node portal UI 9/9; records are in
+`artifacts/datt-1.3.38/helper-checks` (summary JSON and JSON/TAP outputs). Fresh installer helper
+cases passed 16/16: eight evidence/cleanup cases, seven embedded-prerequisite/signature cases
+and one process-provider guard suite; summary/logs have prefix
+`helper-checks-20261008T231937537Z-052e8a91b70446cf9b054b3d69d93e7b` in that release directory.
+These synthetic providers do not prove acceptance of installers that have not yet been built.
+
+**Evidence limits and next sequence:** existing nullable, SQL interpolation and xUnit analyzer
+warnings remain recorded rather than hidden. SQL provider evidence used a private LocalDB 17
+instance; it does not prove hosted SQL grants/load or installed LocalDB 16 runtime acceptance.
+The API package, live version/contract checks, both installer acceptances, exact distribution
+hashes and final evidence push are still pending. No cloud database migration, reset baseline,
+firewall, Production or PHI action is needed or authorized by this schema-neutral slice.
+Retained branches/worktree and preexisting assessment scratch exclusions remain as recorded above.
+After the model gate, revalidate documentation, fetch remote default, commit/push the verified
+source, then publish the Demo API before building/accepting/publishing installers. SATI-BIL-001
+remains the bounded future original-release fact/policy design pointer after DATT completion.
+
+## 2026-10-08 — DATT local-model prompt gate repair
+
+**Bounded slice and provenance:** an available cached-model release gate exposed a failure after
+the pre-prompt full-suite results above. The failed run used the formatter at audited checkpoint
+`61c6d04` with locally coordinated 1.3.38 metadata/report. Publication and source release push
+remain held. This is a bounded DATT gate repair, not broader AI feature work or authority to use
+working clinical data. The prior failed TRX is retained.
+
+**Completed source checkpoint and candidate refresh:** the verified local AI source checkpoint
+`bb2cef87ed64dd30e31bbe0cbbf41def9946bd87` contains exactly the formatter prompt/compact
+representation change, test-only bounded diagnostics and drafting-standard clarification in
+`Services/LocalAi/FoundryLocalCaseNoteFormatter.cs`, `Sati.Tests/LocalAiModelCompetenceTests.cs`
+and `AI_CASE_NOTE_RULES.md`. The checkpoint was committed and pushed to the agenda branch, with exact remote revision confirmed. Coordinated release-version, candidate-report and `Services/ProductReleaseNotes.cs`
+changes remain a separately reviewed, uncommitted post-checkpoint diff. They must not be
+represented as part of that three-file commit or as final build/installation/deployment acceptance.
+
+Only the unsealed 1.3.38 candidate and ignored reviewed draft had their raw `sourceRevision`
+field changed from `61c6d04` to the full `bb2cef87ed64dd30e31bbe0cbbf41def9946bd87` revision.
+The reviewed draft `artifacts/datt-1.3.38/readiness-reviewed.json` matches the candidate exactly;
+SHA-256 `9214900C692E1F198885712D54561A5E2AB577369E36ED4BB705D8D37C55D8C8`.
+The current `docs/readiness/readiness.json` SHA-256 is
+`132CB182D1EFE63CF45B5D6BE95DFD446888881D38410B171F1ADCAE40ED1C8C`.
+All 42 statuses, notes and evidence, scores, rubric and sealed 1.3.37 history remain unchanged.
+Independent review revalidated all 42 against the unchanged tenant, request/retry, billing,
+worker and operations controls: 3 blocked, 1 unknown, 11 planned, 17 implemented, 10 tested and
+none verified. The complete-log criterion OP06 remains blocked, native device/cancellation
+proof remains open, and local model acceptance establishes no deployment or whole-service
+assurance. No new score or rubric is justified by this representation/prompt/test-only change.
+The final post-refresh Release solution build passed with **18 existing warnings**, **zero errors**,
+in **83.45 seconds**. `Test-DattPreflight.ps1` passed; `Test-ReleaseReadiness.ps1`
+with `-BaselineRevision bb2cef87ed64dd30e31bbe0cbbf41def9946bd87` passed with
+`HistoryChecked=true`, unchanged scores and 41 open launch checks. The final embedded parser/WPF
+filter passed **58**, failed **0**, skipped **0**, in **3.773 seconds**; TRX:
+`artifacts/datt-1.3.38/test-results/readiness-post-model-embedded.trx`.
+Root inspected all four new PNGs in `artifacts/datt-1.3.38/readiness-post-model-qa` and confirmed
+correct scores/deltas, legible enlarged text and simulated high contrast. This is component/render
+acceptance, not human screen-reader or external-device evidence. The full final main-suite run was
+still using private instance `SatiSqlTests_a80b1e5942ff4c8bb64f05b1b2aa5336` at this update;
+its final counts and instance cleanup were not yet evidenced. Package, deployment and distribution
+acceptance remain pending and are not established by the source checkpoint or these local gates.
+
+**Observed failure and repair:** scenario 91002's final rejected plan failed the exact system
+no-follow-up text rule; rejected raw JSON was not retained, so a label prefix or paraphrase is
+an inferred explanation, not an observed reply. The original prompt invited polishing every
+baseline sentence. Initial and repair prompts now explicitly preserve the supplied system
+fallback object using `CaseNoteDraftRules` constants and distinguish `followUp.text` from the
+renderer-added section label. [The drafting standard](../../AI_CASE_NOTE_RULES.md) and
+[desktop ownership](../architecture/desktop.md) describe that existing boundary.
+The shared validator, baseline generation, warning behavior, two-attempt limit, consumer reset,
+actual model execution and competence assertions are unchanged. No returned field is rewritten,
+no warning is suppressed and no automatic successful baseline is forced. This clarifies the
+existing rule; it creates no new billing, persistence, route or authorization owner.
+
+**Actual post-repair controls:** Release desktop/test-project build passed with two existing
+SQL interpolation warnings, zero errors, 22.10 seconds. The existing CaseNoteDraftingTests,
+LocalAiConsumerIsolationTests and CaseNoteTemplateTests filter passed **54**, failed **0**,
+skipped **0**, including exact-fallback, explicit follow-up, grounded mixed-visit and isolation
+controls. TRX: `artifacts/datt-1.3.38/test-results/local-ai-prompt-grounding-controls.trx`.
+The first rerun of the unchanged three-scenario cached-model test after this prompt repair
+failed **1**, passed **0**, skipped **0** in **6 minutes 29 seconds**. TRX:
+`artifacts/datt-1.3.38/test-results/local-ai-model-prompt-repair.trx`. Scenario 91001 completed;
+during 91002 the formatter safely caught a `FoundryLocalException` and returned the baseline
+with its visible warning, causing the competence assertion to fail. Scenario 91003 was not
+reached. The original exact-sentinel failure in **6 minutes 1 second** remains retained in
+`artifacts/datt-1.3.38/test-results/local-ai-model-release.trx`. The native cause of the second
+failure is unknown; native log files and raw error contents have not been inspected for this
+record. At that stage, content-free diagnostics were in progress; the prompt repair was unaccepted and source release push, packaging and publication were held. The first failure supplies behavioral
+regression evidence; extra string-mirror tests would not demonstrate model obedience and were
+not added.
+
+**Bounded native diagnostics:** an opt-in test-only first-chance observer captures at most 16
+Foundry exception events per synthetic scenario and four inner exceptions per event. It emits
+bounded type names, HRESULT/typed numeric codes and fixed category flags; it retains no raw
+message, exception object, request, callback payload, stack or existing model log. The formatter
+and every competence assertion remain unchanged. Independent source review confirmed those
+limits; flags are text matches, not proof of a cause, and event counts are not inference attempts.
+The Release test-project build passed with nine existing xUnit analyzer warnings, zero errors,
+14.28 seconds. Running only synthetic scenario 91002 in a fresh process with
+`SATI_LOCAL_AI_EVAL_DIAGNOSTICS=1` failed **1**, passed **0**, skipped **0**, in 2 minutes
+18 seconds; TRX: `artifacts/datt-1.3.38/test-results/local-ai-visit-native-diagnostic.trx`.
+Three projected events were the same chat-command category, HRESULT -2146233088, with no
+inner exception or typed native code. All other captured allocation, context, provider,
+deserialization and callback markers were false. Consumer switching is not required to
+reproduce this failure. Cause remains unknown; metadata alone neither proves memory pressure
+nor excludes an unrecognized limit/runtime error. No unrelated process was stopped and no
+existing native log or working record was read. At that stage, further safe error-category diagnosis was pending.
+
+**Further bounded diagnostic results:** the structured projection run failed **1** in
+**2 minutes 15 seconds**; TRX:
+`artifacts/datt-1.3.38/test-results/local-ai-visit-structured-diagnostic.trx`.
+The native suffix projected as `InvalidJson`, and no fixed native cause-related phrase
+classifier matched. The later heuristic run failed **1** in **2 minutes 14 seconds**; TRX:
+`artifacts/datt-1.3.38/test-results/local-ai-visit-heuristic-diagnostic.trx`.
+It retained three events with identical projected metadata and no inner exception or typed
+native code. Only `CancelPhrase` matched; all other native heuristic flags were false. This is
+a phrase observation, not an observed cancellation source, deadline, timeout, memory or
+performance diagnosis. An unrecognized plain error or differently shaped error envelope remains
+possible. Raw native error content, existing model logs and SDK request/response payloads are
+not retained in the observer output or this record. Structured projection is bounded to
+32,768 UTF-16 characters after a fixed prefix and depth eight, with duplicate/unknown-key flags,
+fixed code labels and safe scalar metadata; these limits do not establish a product guarantee.
+
+**Current compact-representation repair and controls:** facts and the safe baseline are now
+serialized without JSON indentation. All keys, values, current-note facts, identifiers and
+quoted string content are retained. Initial and repair prompts request compact JSON; the final
+wording explicitly limits whitespace reduction to outside quoted strings. The aim is to reduce
+request/generation formatting work, without claiming a measured token saving, speedup or
+native-cancellation fix. The style standard, shared validators, baseline generation,
+`USE_SAFE_BASELINE` protocol, warnings, two-attempt cap, consumer reset, model/dependency,
+scenarios, input/output budgets and competence assertions are unchanged. No undocumented native
+timeout setting was added, returned field rewritten, warning suppressed or automatic successful
+baseline forced.
+
+The compact-source Release desktop/test-project build passed with **two existing EF SQL
+interpolation warnings**, **zero errors**, in **22.09 seconds**. The unchanged
+CaseNoteDraftingTests, LocalAiConsumerIsolationTests and CaseNoteTemplateTests filter passed
+**54**, failed **0**, skipped **0**, in **2 seconds**. TRX:
+`artifacts/datt-1.3.38/test-results/local-ai-compact-grounding-controls.trx`.
+These controls preceded the final outside-quoted-string wording clarification. The subsequent
+full unchanged three-scenario compact model gate failed **1**, passed **0**, skipped **0**, in
+**4 minutes 59 seconds**. TRX:
+`artifacts/datt-1.3.38/test-results/local-ai-model-compact-protocol.trx`.
+Scenario 91001 completed a safe draft; 91002 did not yield a valid draft plan after two attempts,
+with `ParsePlan` reporting invalid field `$`; 91003 was not reached. The first-chance observer
+recorded **zero** Foundry events in both reached scenarios. This run does not prove lasting
+resolution of native cancellation or device behavior. Rejected model response content was not
+retained; a quote-wrapped fallback token is a possible inference, not an observed response or
+established explanation of the root-field parse failure.
+
+**Current consistent-response protocol repair:** independent source review confirmed a concrete
+instruction conflict: the system required JSON only while the initial and repair user messages
+permitted the plain `USE_SAFE_BASELINE` signal. The earlier JSON-only wording already had this
+conflict; compacting did not introduce it. [The retained DEC-0042 record](../decisions/records/2026-08-22-DEC-0042.md)
+explicitly permits the exact signal as a successful safe deferral, with the deterministic baseline
+validated through the same shared rules. Runtime failures and invalid plans still expose warnings.
+The instruction conflict does not establish the cause of the native cancellation or parse failure.
+
+The system now consistently permits either a valid compact JSON plan or the exact unquoted
+`USE_SAFE_BASELINE` signal when uncertain. The initial user JSON tail is conditional (`Otherwise`),
+and repair requirements say `When returning JSON`. This aligns prompt wording with the existing
+protocol without forcing a deferral, postprocessing any returned field, adding accepted aliases or
+changing recognition, parsing, validation, warnings, two attempts, consumer/reset behavior,
+scenarios, budgets, model/dependency or test assertions. No new decision or native timeout is added.
+The Release desktop/test-project build passed with **two existing EF SQL interpolation warnings**,
+**zero errors**, in **20.37 seconds**. The unchanged full three-scenario real-model gate completed with **1 passed**, **0 failed**,
+**0 skipped**, in **4 minutes 14 seconds** (TRX duration `00:04:14.1902990`). TRX:
+`artifacts/datt-1.3.38/test-results/local-ai-model-consistent-protocol.trx`;
+SHA-256 `1A7362BD140D87C570AF108A2A2BA26B938BDADA1CDCD5B763B0680A97EC6D6A`.
+Independent TRX review confirmed the original 91001, 91002 and 91003 outputs in order, normal
+configured model/scenarios, preserved competence assertions and safe warning-free rendered drafts.
+The outputs preserve the supplied attribution/transport facts, selected visit controls and
+observation, exact `No follow-up was documented.` body, quotation/time and explicit follow-up.
+No raw rejected model response is inferred from those rendered outputs. The observer recorded
+zero observed/retained Foundry events and zero capture failures in every scenario.
+
+This accepts the bounded prompt/representation repair through the actual runtime on this device.
+The existing validated safe-deferral path remains permitted by DEC-0042; the passing gate does not
+require a prose rewrite or establish which raw response form produced a rendered baseline.
+Earlier failures and their evidence remain retained. The pass does not establish the cause of the
+native cancellation, an SDK deadline, immediate interruption or permanent device/runtime resolution.
+No readiness state, score, rubric, candidate source revision or sealed historical assessment is
+promoted or changed by this model result. The separate source checkpoint, candidate refresh, final build and embedded UI results are recorded above; complete main-suite, coordinated release-source, package and publication gates remain pending.
+
+Source inspection of the SDK's nonstreaming path found a cancellation token supplied to
+`Task.Run` before the native call. That does not prove immediate interruption after work has
+been scheduled or begun, and the native cancellation phrase does not identify which component
+requested it. Formal native cancellation and device evidence remain open under SATI-CLI-001;
+no new runtime cancellation or deadline guarantee is asserted.
+
+**Remaining evidence and readiness:** independent source review found all 42 existing assessment
+states/notes remain appropriate; there is no score or Verified promotion for a single-device
+model run. The verified local AI source checkpoint and unsealed candidate revision refresh are
+complete; the final build and embedded parser/WPF acceptance are now recorded above. Next,
+complete the full main-suite counts/private-instance cleanup proof, review the remaining
+uncommitted release-version/report/ProductReleaseNotes diff, then complete the separately gated
+coordinated release-source commit/default push, packaging, deployment and distribution acceptance.
+Those remaining outcomes are not implied by the AI source checkpoint, candidate refresh, model
+result or completed local build/UI gates. Preserve the sealed 1.3.37 snapshot
+and rubric. The pre-prompt full-suite result is not claimed as acceptance of changed inputs.
+The earlier prompt-rerun's passing 91001 baseline output repeated the explicit follow-up inside its narrative and
+final section; that grounded presentation repetition remains a future SATI-CLI-001 concern,
+separate from this fixed-field repair. No model quality/compliance or human-review guarantee
+is established by these synthetic samples. SATI-BIL-001 remains the next bounded design slice
+after release; existing independent deployment, recovery, fairness and broader billing gates stay open.
+
+## 2026-10-08 — Final release suite response-start timeout
+
+The post-refresh full solution run used the verified AI checkpoint plus the reviewed 1.3.38
+version/report/release-note diff and private synthetic SQL instance
+`SatiSqlTests_a80b1e5942ff4c8bb64f05b1b2aa5336`. Its API project reported
+`ApiExceptionRedactionTests.FailureAfterResponseStartsDoesNotExposeRawExceptionThroughHosting`
+failed with `TimeoutException` at line 125. The test waited for the probe's `Ready` signal
+for 15 seconds; that signal follows the probe's response write/start and precedes the injected
+exception. The reported test duration was about 66 seconds, including setup and cleanup.
+This does not locate the delay or establish a production redaction failure.
+
+The full run completed with desktop **3,017 passed and one initial model skip**, API **1,196
+passed and one failed**, signatures **119 passed**, portal **8 passed**, and Carika **4 passed**.
+Overall this run had **4,344 passed, one failed and one initial skip**; the model skip has separate
+unchanged actual-model acceptance above. TRXs are retained under
+`TestResults/BackgroundWorkersFullSql/Joshu_LONGCHENPA_2026-10-08_20_28_*.trx`, with the API
+record ending `_27_net10.0.trx` and desktop `_28_net10.0.trx`. The private instance was stopped
+and deleted even though the full solution command exited 1. The API test assembly used by the
+failed run had SHA-256 `E2B60640C58A18577ED58523822D1AB61D3A88C2A41050348A854F8D25630230`.
+
+Publication remains held.
+Independent source review found that the wait does not distinguish early request completion,
+fault or cancellation from a delayed probe. A bounded test-only diagnostic/handshake repair
+adds only fixed phase/counter/task-state diagnostics on timeout and rethrows the same failure;
+the 15-second limits, security assertions, injected exception and behavior remain unchanged.
+The affected boundary tests and then the full API project will run separately from the already
+completed desktop project. Normal-profile process metadata showed two substantial test hosts
+and about 1.3 GiB free physical memory during the parallel run; that is context, not proof of
+the delay's cause. No unrelated application or process was stopped. No production change,
+longer timeout or weakened security assertion is justified by this observation.
+Earlier passing suites and the actual AI acceptance remain
+retained with their own source/configuration boundaries. The diagnostic API test-project Release
+build passed with six existing warnings, zero errors, in 13.39 seconds. The unchanged ten-case
+request-boundary filter passed **10**, failed **0**, skipped **0**, in **1 minute 52 seconds**;
+`artifacts/datt-1.3.38/test-results/api-response-start-diagnostic.trx`. The previously failing
+started-response case passed in 10.925 seconds including setup. Its test assembly SHA-256 is
+`5C3584E26A4DC616A18026E2BAFCF2BFA1F19CF2D22A11E29949B4A137083086`.
+This is passing scoped acceptance, not an established cause or permanent timing fix.
+
+Read-only [TestHost 10.0.10 source inspection](https://raw.githubusercontent.com/dotnet/aspnetcore/v10.0.10/src/Hosting/TestHost/src/HttpContextBuilder.cs)
+confirms asynchronous request dispatch through the thread pool. Its
+[response writer](https://raw.githubusercontent.com/dotnet/aspnetcore/v10.0.10/src/Hosting/TestHost/src/ResponseBodyPipeWriter.cs)
+can return headers before a body flush completes; successful headers therefore do not replace
+the required readiness signal. These vendor facts do not establish the observed timeout's cause.
+The full API project rerun alone, with fresh private instance
+`SatiSqlTests_d727553cd8df4d0a8bc5006f295a8667`, also reported a pre-probe readiness timeout:
+`RequestAbortedCancellationOrIoFailurePreservesCancellationWithoutAnIncident(ioFailure: True)`
+at line 203, before caller cancellation and the injected exception. The case took about 71 seconds
+including setup/cleanup. This rerun used the diagnostic test assembly above; its cancellation
+case did not yet have the new phase output. After verifying the exact workspace executable,
+creation time and API test-runner parent, only its already failing test host was stopped to avoid
+finishing another known-red run. The retained result is **aborted**, not complete: **1,183 passed,
+one failed, zero skipped, 1,184 reported** in 8m19s; the missing cases are not credited.
+TRX: `TestResults/ClaimMdPreparationFinalApi/Joshu_LONGCHENPA_2026-10-08_20_46_44_net10.0.trx`.
+The owning script still stopped and deleted only its private instance before exiting 1.
+
+The fixture now has its own nonparallel xUnit collection. It observes a process-wide
+`DiagnosticListener` and uses a test factory that sets process environment values; unrelated
+parallel fixture activity is not part of this boundary test's intended acceptance. This bounded
+test-isolation repair retains all cases, 15-second guards, security assertions and deliberate
+concurrency inside the separate SQL regressions. The underlying timeout cause is still unconfirmed;
+there is no production timing, redaction or whole-service fix claim. Publication remains held until
+the final isolated fixture and complete API project pass and private-instance cleanup succeeds.
+Independent comparison found all 83 assertions, five 15-second guards and eight security/sink
+helper lines unchanged and in the same order. Timeout projection contains only fixed labels,
+counts, booleans, elapsed time and task states; it rethrows the failure without raw payloads.
+The patch is a reviewed release-scope test-only diff after application checkpoint `bb2cef8`; it does
+not change an application control or justify a readiness promotion.
+
+The frozen isolation patch's Release API test-project build passed with **six existing warnings,
+zero errors**, in **8.24 seconds**. A separate read-only comparison confirmed all 83 assertions,
+five existing 15-second guards, failure injections, cancellation barriers and cleanup behavior
+remain intact. Its unique nonparallel collection changes this fixture's scheduling only; the
+WPF project excludes this test source. Audited application revision `bb2cef8` therefore remains
+the report's source reference, with this reviewed release-scope diff recorded explicitly.
+Source-only 1.3.38 preflight and readiness/history checks passed again; scores and sealed history
+are unchanged. A fresh complete API run uses private synthetic instance
+`SatiSqlTests_c63ff867c7c64cc9957b424638e5273d`; acceptance and cleanup remain pending.
+
+**Final affected-gate acceptance:** that complete API run subsequently exited **0**, with
+**1,197 passed, zero failed, zero skipped**, reported test duration **6m36s**. All ten
+`ApiExceptionRedactionTests` cases passed in the complete suite. The owning script stopped and
+deleted the exact private instance above. Retained TRX:
+`TestResults/ClaimMdPreparationFinalApi/Joshu_LONGCHENPA_2026-10-08_20_59_04_net10.0.trx`,
+SHA-256 `944021762F49C872CA6152A909003AECA8E9CF79B518896A0779E64973BD0BBD`;
+API test assembly SHA-256 `BF4CC98F5B92530844CC9AF378CB788236D0E54EBCC635EE166714588F168837`.
+Together with the unchanged passing desktop/signatures/portal/Carika inputs above, all five
+main projects now have acceptance: **4,345 passed**. The desktop's initial model skip is covered
+separately by the unchanged three-scenario actual-model gate (**one passed**, zero failed/skipped).
+The final embedded parser/WPF **58 passed** and four inspected renders remain valid because no
+application/report input changed after their run. Earlier failures/aborted records remain
+historical evidence; the observed acceptance does not identify their cause or promise a permanent
+timing fix. Independent review confirmed all coordinated version owners and user release notes,
+and the unchanged 42 readiness assessments. Source commit/default push, API publication,
+installer build/acceptance and distribution remain pending; this paragraph supersedes the
+earlier publication hold after the affected gate passed.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

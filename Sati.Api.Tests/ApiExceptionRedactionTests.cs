@@ -20,6 +20,7 @@ using Xunit.Abstractions;
 
 namespace Sati.Api.Tests;
 
+[Collection(ApiExceptionRedactionCollection.Name)]
 public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
 {
     [Fact]
@@ -120,14 +121,24 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
             HttpCompletionOption.ResponseHeadersRead, cleanup.Token);
         HttpResponseMessage? response = null;
         Exception? clientFailure = null;
+        var waitStage = "ready";
+        var waitElapsed = Stopwatch.StartNew();
         try
         {
             await harness.Probe.Ready.Task.WaitAsync(TimeSpan.FromSeconds(15));
             Assert.True(harness.Probe.ResponseStarted);
+            waitStage = "headers";
             response = await request.WaitAsync(TimeSpan.FromSeconds(15));
             harness.Probe.Release.TrySetResult();
+            waitStage = "body";
             clientFailure = await Record.ExceptionAsync(() => response.Content.ReadAsStringAsync(cleanup.Token));
+            waitStage = "hosting-stop";
             await harness.Diagnostics.WaitForStopAsync();
+        }
+        catch (TimeoutException)
+        {
+            WriteSafeProbeTimeout(harness, request, "started-response", waitStage, waitElapsed);
+            throw;
         }
         finally
         {
@@ -176,13 +187,22 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
         using var cleanup = new CancellationTokenSource();
         var request = harness.Client.GetAsync(harness.Probe.Path, cleanup.Token);
         HttpResponseMessage? response = null;
+        var waitStage = "ready";
+        var waitElapsed = Stopwatch.StartNew();
         try
         {
             await harness.Probe.Ready.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            waitStage = "abort-and-response";
             harness.Probe.RequestAbort.Cancel();
             response = await request.WaitAsync(TimeSpan.FromSeconds(15));
             Assert.Equal(499, (int)response.StatusCode);
+            waitStage = "hosting-stop";
             await harness.Diagnostics.WaitForStopAsync();
+        }
+        catch (TimeoutException)
+        {
+            WriteSafeProbeTimeout(harness, request, ioFailure ? "cancelled-io" : "cancelled-operation", waitStage, waitElapsed);
+            throw;
         }
         finally
         {
@@ -196,6 +216,24 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
         Assert.Empty(await harness.IncidentsAsync());
         Assert.DoesNotContain(harness.Logs.Entries, entry => entry.Level >= LogLevel.Error);
         AssertSafeObservedSinks(harness);
+    }
+
+    private void WriteSafeProbeTimeout(BoundaryHarness harness, Task request, string scenario,
+        string stage, Stopwatch elapsed)
+    {
+        // Shape/progress only: preserve the timeout and never print response, logs or tokens.
+        try
+        {
+            var probe = harness.Probe;
+            output.WriteLine($"Boundary probe timeout: scenario={scenario}; stage={stage}; elapsedMs={elapsed.ElapsedMilliseconds}; " +
+                $"Entered={probe.Entered}; Thrown={probe.Thrown}; ResponseStarted={probe.ResponseStarted}; " +
+                $"PrefixWriteStarted={probe.PrefixWriteStarted}; PrefixWriteCompleted={probe.PrefixWriteCompleted}; " +
+                $"ResponseStartCalled={probe.ResponseStartCalled}; ResponseStartCompleted={probe.ResponseStartCompleted}; " +
+                $"ReadyStatus={probe.Ready.Task.Status}; RequestStatus={request.Status}; " +
+                $"RequestCompleted={request.IsCompleted}; RequestFaulted={request.IsFaulted}; RequestCanceled={request.IsCanceled}; " +
+                $"DiagnosticsStarts={harness.Diagnostics.Starts}; DiagnosticsStops={harness.Diagnostics.Stops}.");
+        }
+        catch { /* Diagnostic output failure must not replace the original timeout. */ }
     }
 
     [Fact]
@@ -395,6 +433,10 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
         private int _entered;
         private int _thrown;
         private int _writes;
+        private int _prefixWriteStarted;
+        private int _prefixWriteCompleted;
+        private int _responseStartCalled;
+        private int _responseStartCompleted;
         public string Path { get; } = $"/api/v1/synthetic-boundary-{Guid.NewGuid():N}";
         public string NarrativeSentinel { get; } = $"SYNTHETIC_NARRATIVE_{Guid.NewGuid():N}";
         public string SecretSentinel { get; } = $"SYNTHETIC_SECRET_{Guid.NewGuid():N}";
@@ -409,6 +451,10 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
         public int Entered => Volatile.Read(ref _entered);
         public int Thrown => Volatile.Read(ref _thrown);
         public int WriteAttempts => Volatile.Read(ref _writes);
+        public bool PrefixWriteStarted => Volatile.Read(ref _prefixWriteStarted) != 0;
+        public bool PrefixWriteCompleted => Volatile.Read(ref _prefixWriteCompleted) != 0;
+        public bool ResponseStartCalled => Volatile.Read(ref _responseStartCalled) != 0;
+        public bool ResponseStartCompleted => Volatile.Read(ref _responseStartCompleted) != 0;
         public CancellationTokenSource RequestAbort { get; } = new();
         public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -434,8 +480,12 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
             }
             if (mode == FailureMode.StartedResponse)
             {
+                Interlocked.Exchange(ref _prefixWriteStarted, 1);
                 await context.Response.WriteAsync("synthetic-started-prefix");
+                Interlocked.Exchange(ref _prefixWriteCompleted, 1);
+                Interlocked.Exchange(ref _responseStartCalled, 1);
                 await context.Response.StartAsync();
+                Interlocked.Exchange(ref _responseStartCompleted, 1);
                 ResponseStarted = context.Response.HasStarted;
                 Ready.TrySetResult();
                 await Release.Task.WaitAsync(context.RequestAborted);
@@ -612,4 +662,12 @@ public sealed class ApiExceptionRedactionTests(ITestOutputHelper output)
             foreach (var subscription in _subscriptions) subscription.Dispose();
         }
     }
+}
+
+// Hosting diagnostics are process-wide and these private factories set process configuration.
+// Isolate their pre-probe handshake from unrelated fixture startup without changing its deadline.
+[CollectionDefinition(ApiExceptionRedactionCollection.Name, DisableParallelization = true)]
+public sealed class ApiExceptionRedactionCollection
+{
+    public const string Name = "API escaping exception boundary isolation";
 }

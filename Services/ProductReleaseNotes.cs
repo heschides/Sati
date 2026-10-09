@@ -6,11 +6,43 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Scratchpad formatting and assessment review";
-    public const string ReleaseDate = "October 7, 2026";
+    public const string ReleaseName = "Readiness evidence and service safeguards";
+    public const string ReleaseDate = "October 8, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Review release readiness in Settings",
+            [
+                "Settings Release notes includes a dated readiness report with separate assessments for keeping agencies apart, handling repeated requests, and overall operational readiness.",
+                "Reviewed results, known gaps, next steps, and changes from the preceding release stay visible. A readiness score does not approve Production use or certify regulatory compliance."
+            ]),
+        new(
+            "Make background maintenance more resilient",
+            [
+                "Demo note maintenance can continue with other agencies after certain recoverable failures, while failed work remains due and successful same-day work is skipped.",
+                "Agency discovery uses smaller batches and completion tracking is refreshed each day. These safeguards do not guarantee a processing deadline.",
+                "Claim.MD sandbox requests apply a deadline while reading response bodies. A timeout does not prove that an upload was not received."
+            ]),
+        new(
+            "Keep outstanding billing requirements blocking exports",
+            [
+                "A stored billing exception cannot waive other outstanding compliance errors. Those errors still block export and replay of a retained file.",
+                "Original-claim release policy and the full eligibility check immediately before transmission still need further work; real transmission activation remains a separate review."
+            ]),
+        new(
+            "Make service failures safer to investigate",
+            [
+                "Unexpected API request failures show a general message and a reference for follow-up. Errors after a response has started are contained without exposing the raw exception.",
+                "The two readiness checks keep reporting service failure while omitting raw exception details from their results. Operational incident recording avoids automatically replaying database writes.",
+                "These repairs cover those specific error paths. Startup, database-provider, and other diagnostic paths still need separate review."
+            ]),
+        new(
+            "Keep local note drafting grounded",
+            [
+                "Local AI drafting receives consistent instructions for its checked draft format and for using the supplied facts when a rewrite is uncertain.",
+                "When no follow-up is documented, the draft retains that exact statement. Every draft still requires your review and acceptance."
+            ]),
         new(
             "Format your scratchpad and track numbered tasks",
             [

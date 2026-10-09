@@ -4,6 +4,27 @@
 authorization. Read the topic owner and [readiness registry](docs/readiness/README.md) before work.
 Historical completions/releases remain in the [byte-preserved agenda](docs/archive/2026-10-08/AGENDA.md).
 
+## Release 1.3.38 — readiness evidence and service safeguards
+
+**Status:** DATT authorized October 8, 2026; final source, embedded build/UI and automated
+acceptance gates passed, including the actual cached-model gate and complete isolated API suite.
+Source release commit/push and publication are next. This release covers
+the completed bounded worker, billing-export and request/incident/health repair sequence, the
+Settings readiness display and canonical documentation/evidence gates. Broader billing lifecycle,
+worker fairness/budgets, tenancy, recovery and independent launch review remain open.
+
+| Gate | Current evidence / remaining work |
+|---|---|
+| Source audit | Audited repair checkpoint `61c6d0453b34d559886c5f4b28278552b46172fb` committed and pushed to the agenda branch. Local default `master` fast-forwarded to it. Verified local AI protocol checkpoint `bb2cef87ed64dd30e31bbe0cbbf41def9946bd87` follows it; coordinated version/report release commit and default push pending. |
+| Schema | No persistence migration/model, API Data or reset-baseline delta against fetched released default. No cloud migration, capture, reset or firewall action required or performed. |
+| Readiness | Unsealed reviewed 1.3.38 candidate uses audited application source `bb2cef8`; independent review confirms the later test-only fixture diff changes no assessed control. All 42 criteria reviewed, unchanged rubric/history, overall 22.0%, agency separation 25.0%, repeat-request handling 26.8%, operations 14.3%; 41 launch checks remain open. Final embedded parser/WPF 58 passed and all four renders inspected. |
+| Automated gates | Final full Release build passed with 18 existing warnings and zero errors. Main-project acceptance: desktop 3,017, API 1,197, signatures 119, portal 8 and Carika 4 passed (4,345 total). The desktop's one initial model skip was separately exercised: the unchanged actual-model gate passed all three original scenarios (one test, zero failed/skipped, 4m14s). Final complete API acceptance passed 1,197, failed 0, skipped 0 in 6m36s, including all ten boundary cases; private SQL cleanup passed. Earlier failed/aborted runs remain retained. All privacy assertions and time limits remain unchanged; fixture isolation changes no application control and establishes no earlier timeout cause. Final embedded parser/WPF 58, documentation negative proofs 22, readiness helper 43, preflight helper 9, portal UI 9 and synthetic installer helpers 16 passed. [Model evidence](docs/readiness/work-evidence.md#2026-10-08--datt-local-model-prompt-gate-repair) and [final API acceptance](docs/readiness/work-evidence.md#2026-10-08--final-release-suite-response-start-timeout) own results and limits. |
+| Demo API | Existing 1.3.37 preflight healthy with matching contract, recorded by [the environment inventory](DATABASE_ENVIRONMENTS.md#demo-api-release-preflight--october-8-2026-230345-utc). New package/hash/deployment/version/health verification pending after source gates and exact default push. |
+| Installers | Required packaging tools and signed Microsoft LocalDB prerequisite present. Candidate filenames absent. Demo five-launch and Local isolated acceptance/cleanup, final sizes/hashes pending after matching API verification. |
+| Distribution | Both exact playbook destinations exist/readable; actual publication/hash verification pending after both acceptance gates. No alternate path or overwrite authorized. |
+| Branches/worktree | Agenda branch source fast-forwarded into local master. Older background-worker/Claude branches and detached 1.3.31 worktree retained because active/retention intent is uncertain. No deletion, force, stash or reset. Preexisting assessment helper/TRX scratch retained and excluded. |
+| Final evidence | Final evidence commit/default push and remote equality pending. [Working evidence](docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation) records actual checks, retained rollback package, source provenance and limits. |
+
 ## Release 1.3.37 — source version reference
 
 This heading preserves the release-preflight lookup. Exact release outcomes, commands, hashes and
@@ -36,9 +57,9 @@ failed baselines and limits. This completes the current repair sequence, not the
 agenda. Billing R1/full R2, worker budgets/fairness and general security/operational evidence remain
 future work.
 
-The incident and health changes remain uncommitted; `3393a45` is the last completed commit/push
-in this sequence. The completion handoff was followed by Josh's valid October 8 `Invoke DATT!`
-invocation, which now authorizes the bounded release actions in
+The incident and health changes and Settings readiness display are included in audited checkpoint
+`61c6d04`, committed and pushed to the agenda branch after the completion handoff. Josh's valid October 8 `Invoke DATT!`
+invocation now authorizes the bounded release actions in
 [the release playbook](RELEASE_PLAYBOOK.md), subject to its gates. These repairs added no schema
 migration. Cloud database changes, security settings and Production actions retain their separate
 authorization requirements; no release outcome is established by this invocation.

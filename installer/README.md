@@ -33,8 +33,8 @@ Validate the LocalDB install payload without touching the normal installation:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
     .\scripts\Test-LocalInstaller.ps1 `
-    -InstallerPath .\artifacts\SatiLocalInstaller\SatiLocalSetup-1.3.37.exe `
-    -EvidencePath .\TestResults\datt-1.3.37-local-installer-acceptance.json
+    -InstallerPath .\artifacts\SatiLocalInstaller\SatiLocalSetup-1.3.38.exe `
+    -EvidencePath .\TestResults\datt-1.3.38-local-installer-acceptance.json
 ```
 
 On a clean workstation, the combined installer requests elevation only when LocalDB is absent. Sati
@@ -69,9 +69,9 @@ Run the isolated installation and launch acceptance test from the repository roo
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
     .\scripts\Test-DemoInstaller.ps1 `
-    -InstallerPath .\artifacts\SatiDemoInstaller\SatiDemoSetup-1.3.37.exe `
+    -InstallerPath .\artifacts\SatiDemoInstaller\SatiDemoSetup-1.3.38.exe `
     -LaunchIterations 5 `
-    -EvidencePath .\TestResults\datt-1.3.37-demo-installer-acceptance.json
+    -EvidencePath .\TestResults\datt-1.3.38-demo-installer-acceptance.json
 ```
 
 The acceptance test requires each packaged launch to remain responsive, accept a normal window-close

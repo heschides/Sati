@@ -1719,6 +1719,813 @@
           "notes": "This retrospective baseline starts release tracking; no earlier snapshot exists. This baseline does not count a readiness display or independent accessibility/readiness review as previously shipped."
         }
       ]
+    },
+    {
+      "release": "1.3.38",
+      "assessedAt": "2026-10-08",
+      "sourceRevision": "bb2cef87ed64dd30e31bbe0cbbf41def9946bd87",
+      "rubricVersion": "2026-10-v1",
+      "summary": "This release's local checks show better handling of a failed agency's background work, stalled clearinghouse responses, day-to-day worker records, billing export checks, and request, incident and health errors. The new Settings view explains the recorded evidence and remaining work. These are bounded tests, not proof of a ready cloud service. Another original claim and complete checks immediately before sending still need repair; complete activity records and safe logs, fair agency turns, recovery and independent review remain open. Cloud Production is not deployed. Installation and publication acceptance is recorded separately in the release record; this assessment alone does not establish deployed operation.",
+      "nextSteps": [
+        "Agree the original-claim rules using recorded receipt and uncertainty history, then enforce them in one shared rule. Complete the current billing checks for the exact claims immediately before sending.",
+        "Prove that a busy, failing or newly added agency cannot delay another agency indefinitely. Limit incoming expensive work, waiting work and each background pass.",
+        "Check every screen, file, saved result and export for agency separation. Complete ordinary action records and review every enabled error-log channel, including startup and database diagnostics.",
+        "Practice full-service recovery, reconciliation of later and external actions, alert delivery and acknowledgment, and safe rollback using approved synthetic data.",
+        "Establish approved agency and account lifecycle, deployed permissions, stronger sign-in controls, retention and vendor-use agreements. Measure the intended host under competing-agency load and obtain independent review.",
+        "Obtain human accessibility and independent readiness review. Review each later release's installation and publication evidence separately, while keeping cloud Production and real provider activation gated; a score alone does not permit launch."
+      ],
+      "assessments": [
+        {
+          "criterionId": "MT01",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Security/TenantAccess.cs:10-90,101-157"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:140,347,361-362"
+            }
+          ],
+          "notes": "The retained October 8 architecture review records checks of the caller's current agency and permissions. These protections remain in the reviewed software. Independent review and checks of the deployed sign-in setup are still needed; the old test record is not a new deployed acceptance run."
+        },
+        {
+          "criterionId": "MT02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:136-140"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "The October 8 architecture review records agency restrictions for many actions. Current targeted billing and incident tests preserve their agency boundaries. A complete inventory and independent checks of every search, download, export and action affecting many records remain unfinished."
+        },
+        {
+          "criterionId": "MT03",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138"
+            }
+          ],
+          "notes": "The October 8 architecture review records some requirements that linked records belong to the same agency. Complete protection against inconsistent ownership, direct database changes and overly powerful database access remains unfinished. This release adds no new storage model or migration."
+        },
+        {
+          "criterionId": "MT04",
+          "status": "unknown",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138,307-313"
+            }
+          ],
+          "notes": "The October 8 baseline still has no complete evidence inventory for agency separation across files, saved search results, temporary copies, exports and information left on the screen. Check existing stores and record unavailable features; the new note-worker completion cache is only a bounded piece of this inventory."
+        },
+        {
+          "criterionId": "MT05",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchGate.cs:44-100"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,347,366-367"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            }
+          ],
+          "notes": "The retained October 8 architecture-review tests reject the wrong clearinghouse account and track different response feeds separately. Current focused connector and receipt controls preserve those protections using synthetic accounts. Actual account routing, credential rotation and provider acceptance remain unverified."
+        },
+        {
+          "criterionId": "MT06",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:55-58"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-agency-discovery-pages"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-completion-cache-day-lifecycle"
+            }
+          ],
+          "notes": "The October 8 baseline's fair-turn requirement remains planned. Note-worker discovery now finds agencies in groups of at most 100 and retires prior-day completion entries, but total work and waiting time are not bounded. Clearinghouse selection still uses the oldest queued file across agencies; no measured maximum wait for a healthy agency is established."
+        },
+        {
+          "criterionId": "MT07",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs:132-145"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:102-108,204-208"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-agency-failure-continuation"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            }
+          ],
+          "notes": "October 8 failure tests show that a recoverable note-sweep failure rolls back that agency's change and allows a healthy agency to continue, with a later safe retry. Real-connector tests also stop a stalled response at the 45-second exchange deadline and hold an uncertain upload without repeating it. This is bounded local acceptance: clearinghouse preflight failures, per-agency backoff, full-pass limits and live isolation still need work."
+        },
+        {
+          "criterionId": "MT08",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "SECURITY_REVIEW_2026-09-10.md"
+            },
+            {
+              "kind": "source",
+              "reference": "SECURITY_AUDIT_2026-09-03.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-agency-discovery-pages"
+            }
+          ],
+          "notes": "The October 8 architecture review records some incoming-data limits. Bounded note-worker discovery and response deadlines do not limit an agency's incoming expensive requests or all waiting work. Controls for how much work each agency can submit or leave waiting, and tests under competing-agency load, remain planned."
+        },
+        {
+          "criterionId": "MT09",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs:16-32"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347-357"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            }
+          ],
+          "notes": "The retained October 8 database tests show that separate hosts share one clearinghouse request limit. Current portable deadline controls preserve coordination and cleanup, but they do not repeat the earlier database proof or establish fair turns, actual provider account limits or live capacity."
+        },
+        {
+          "criterionId": "MT10",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs:20-69"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-agency-failure-continuation"
+            }
+          ],
+          "notes": "The retained October 8 database evidence covers selected cross-host reset, send and scan coordination. A later guarded private-database run passed the two note-sweep exclusion and reset-refusal controls; those results are recorded separately from the portable tests. Complete shared-work limits, interrupted-worker replacement and protection against a stale worker returning remain unfinished; no live-host guarantee is claimed."
+        },
+        {
+          "criterionId": "MT11",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:363-364,384"
+            }
+          ],
+          "notes": "The October 8 architecture review did not measure ordinary staff response time while another agency runs costly reports or background work. The local paging, cache and deadline repairs do not establish response-time targets under shared load. Define the intended load and measure it."
+        },
+        {
+          "criterionId": "MT12",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentSweep.cs:31-47"
+            },
+            {
+              "kind": "source",
+              "reference": "platform/SatiLogica.Contracts/TenantClock.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-completion-cache-day-lifecycle"
+            }
+          ],
+          "notes": "Shared rules retain the supported business-date policy and each agency's note settings recorded in the October 8 review. New deterministic tests prove that prior-day completion entries are retired, completed agencies are skipped that day, failed agencies can recover, and later days run again. Complete two-agency settings-change, daylight-saving, ownership-change and stale-screen acceptance remains unfinished. Changes during the same day and limits on current-day completion records remain open."
+        },
+        {
+          "criterionId": "MT13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:384,404"
+            }
+          ],
+          "notes": "The October 8 baseline's procedures to create, change, close and recover customer agencies remain unestablished for an approved cloud Production service. No live agency lifecycle, retention or recovery exercise was performed for this assessment."
+        },
+        {
+          "criterionId": "MT14",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Security/TenantAccess.cs:146-155"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:134,399"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiExceptionBoundaryMiddleware.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/IncidentAggregator.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-escaping-request-exception-boundary"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "The October 8 architecture review records a separate support account restricted to a small set of actions. Current request and incident controls preserve agency-scoped support references and refuse inappropriate cross-agency or administrative changes. These local controls do not establish complete privileged-action evidence, deployed support permissions, emergency access or independent cross-agency review."
+        },
+        {
+          "criterionId": "ID01",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,202,365,405"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            }
+          ],
+          "notes": "The October 8 architecture review records repeat recognition for selected billing and chat actions. Ordinary note creation still lacks a lasting request identity, so a lost reply can leave a repeat uncertain. The current export repair preserves existing request recognition without completing the full mutation inventory."
+        },
+        {
+          "criterionId": "ID02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:198,202,365-367"
+            }
+          ],
+          "notes": "The October 8 architecture review records specific claim, file and receipt uniqueness protections. Complete protection against separate hosts repeating every changing operation at the same time, including a lost commit reply and restart, remains unestablished. No broader once-only guarantee is added by this release."
+        },
+        {
+          "criterionId": "ID03",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:212"
+            },
+            {
+              "kind": "sql",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:349-357,363-364"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,361"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "The retained October 8 database tests show that selected schedule and billing changes reject stale updates and keep related work together. Current note, billing and incident tests add bounded rollback and preserved-record controls using synthetic data. They do not cover every workflow, simultaneous database change or heavy-load condition."
+        },
+        {
+          "criterionId": "ID04",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:190,227,295-305,400"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "The October 8 architecture review records selected saved background requests and action records. Current note and billing tests preserve their existing atomic records; incident tests prove the bounded incident transaction. Complete official-action records and durable saved intent before every external effect remain unfinished."
+        },
+        {
+          "criterionId": "ID05",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:61-71,221-225"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Signatures/SignatureMailWorker.cs:94-129"
+            }
+          ],
+          "notes": "The October 8 architecture review records selected send and mail workers' exclusive permission to act. This release does not establish the complete permission-expiry, replaced-worker, cancellation and stale-holder acceptance matrix. External effects must not be treated as safely repeatable merely because a local lease expired."
+        },
+        {
+          "criterionId": "ID06",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:111-190"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,366"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            }
+          ],
+          "notes": "The retained October 8 tests hold uncertain clearinghouse sends for investigation. New real-connector tests observe one physical upload, deadline cancellation while the caller remains active, a retained unknown outcome and no automatic second upload. The earlier database evidence remains separately dated. Real provider investigation, restart and reconciliation acceptance are still needed; a timeout does not prove that the provider received nothing."
+        },
+        {
+          "criterionId": "ID07",
+          "status": "blocked",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:198,398"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/billing.md"
+            },
+            {
+              "kind": "source",
+              "reference": "AGENDA.md#next-eligible-work"
+            }
+          ],
+          "notes": "The October 8 assessment found a missing server rule: a fresh request key can create another original claim after earlier acceptance. This remains blocked. The next work is bounded fact and policy design covering recorded receipts, uncertainty, confirmed nonreceipt, corrections and malformed history; it is not an implemented guard. Rules for history from different sending modes and rejected claims, shared enforcement and simultaneous database tests are still required before real billing sends."
+        },
+        {
+          "criterionId": "ID08",
+          "status": "blocked",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:200,398"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Contracts/V1/BillingExportGate.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/billing.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            }
+          ],
+          "notes": "October 8 fail-first tests now prove that an export and its exact replay are refused when an unrelated required approval is revoked, while retained files and records stay unchanged. The shared gate preserves all remaining compliance errors already identified by the export checks; valid exact exceptions and approved recovery still work. This prerequisite does not close the blocker: queueing and the moment before sending still need the full current eligibility check for the exact retained claim set, correction and void-purpose rules, and simultaneous-change tests."
+        },
+        {
+          "criterionId": "ID09",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api.Tests/ClaimMdStatusProcessorTests.cs:21-157"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,367"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            }
+          ],
+          "notes": "The retained October 8 architecture-review tests cover repeated receipts, related updates and feed tracking, including wrong-account refusal. Current focused receipt controls preserve those behaviors. Actual provider completeness, all supported formats, concurrent delivery and live recovery remain outside that evidence."
+        },
+        {
+          "criterionId": "ID10",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs:205-219"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Program.cs:147"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/IncidentAggregator.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "October 8 local tests prove a bounded response wait without automatically repeating an uncertain upload. Incident-recording tests also prove a single attempt, no automatic repeat after a failed save or lost confirmation, cancellation cleanup and refusal of a caller that would automatically repeat the write. A complete operation-specific retry policy, full-operation deadlines, shared budgets, throttling, outage recovery and live acceptance remain unfinished."
+        },
+        {
+          "criterionId": "ID11",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Signatures/SignatureMailWorker.cs:94-143,161-260"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_VALIDATION.md"
+            }
+          ],
+          "notes": "The October 8 architecture review records signature-mail request state, waits and attempt limits. This release does not complete interruption, replaced-worker or retry-limit acceptance for every delivery path, and does not prove actual provider delivery or recovery."
+        },
+        {
+          "criterionId": "ID12",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiOptions.cs:42-43"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:286,404"
+            }
+          ],
+          "notes": "The October 8 architecture review records retention settings for some repeat identities. Their relationship to late responses, old backups, restored requests and differing client versions remains unestablished. This release changes no repeat-identity lifetime policy."
+        },
+        {
+          "criterionId": "ID13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:286,397"
+            }
+          ],
+          "notes": "The October 8 baseline still has no completed full-service recovery drill that reconciles external effects, valid later records and identities used to recognize repeats. Local transaction and uncertainty tests are not a restore or rollback exercise."
+        },
+        {
+          "criterionId": "ID14",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:202,307,403"
+            },
+            {
+              "kind": "source",
+              "reference": "BACKGROUND_WORKERS_HANDOFF.md"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiExceptionBoundaryMiddleware.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/IncidentAggregator.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-escaping-request-exception-boundary"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "The October 8 architecture review records selected stale-update errors and safe support references. New actual request-pipeline tests preserve generic failure responses, a safe correlation reference, cancellation behavior and scoped incident recording without raw error details. Lost note replies, submitting after a failed save, request-key preservation, queued-versus-completed states and mixed client versions still have separate gaps."
+        },
+        {
+          "criterionId": "OP01",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:381-386"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation"
+            }
+          ],
+          "notes": "Cloud Production remains undeployed, as recorded in the October 8 baseline. Dated Demo preflight observations and the owner's personal local PHI store do not establish an approved service for multiple agencies. A Demo or desktop release does not change this Production gate."
+        },
+        {
+          "criterionId": "OP02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138,313,399"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_VALIDATION.md:134-175"
+            }
+          ],
+          "notes": "The October 8 architecture review records service identities and a limited portal-permission rehearsal. Actual deployed database, key, file, log and network permissions, denied-access probes and secret rotation are not independently proven. No new deployed-principal acceptance is claimed."
+        },
+        {
+          "criterionId": "OP03",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383,388,399"
+            }
+          ],
+          "notes": "The October 8 architecture review and current targeted tests are internal evidence. Independent review of agency access, enabled surfaces and actual deployed protections remains required. Review by the coding agents does not satisfy this independent-acceptance criterion."
+        },
+        {
+          "criterionId": "OP04",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:274,286,397"
+            },
+            {
+              "kind": "source",
+              "reference": "scripts/Invoke-DemoRestoreVerification.ps1"
+            }
+          ],
+          "notes": "The October 8 architecture review records a guarded Demo restore script and procedure. Complete usable-service recovery, switch-over, agreed recovery targets and reconciliation of later records and external actions remain unrehearsed. No restore was run for this assessment."
+        },
+        {
+          "criterionId": "OP05",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "BACKGROUND_WORKERS_HANDOFF.md"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:313-315,402"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "The October 8 architecture review records watchdog source and alert scripts but missing planned rules and no established alert delivery. Current incident persistence tests repair a local recording path; they do not show an independent monitor detects missing work or reaches an owner who acknowledges and escalates an alert."
+        },
+        {
+          "criterionId": "OP06",
+          "status": "blocked",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:295-313,400-401"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiExceptionBoundaryMiddleware.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/IncidentAggregator.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/SchemaDriftHealthCheck.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/DatabaseIdentityValidator.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "LOGGING_DESIGN.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-escaping-request-exception-boundary"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-two-check-health-redaction-and-repair-sequence-handoff"
+            }
+          ],
+          "notes": "October 8 fail-first and passing tests repair escaping request errors, single-attempt incident recording and the two registered health checks without exposing their original error details. Ordinary note-action records are still incomplete. Startup SQL warnings, separate database/provider diagnostic channels, callbacks and the complete enabled log-store inventory remain unreviewed or unsafe. Keep this criterion blocked: these bounded repairs do not establish complete safe logging, retention, access or PHI-hosting assurance."
+        },
+        {
+          "criterionId": "OP07",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383-384,402"
+            }
+          ],
+          "notes": "The October 8 baseline still has no completed agency-level exercise of shared-service failure, safe reduced service, owner notification, acknowledgment and recovery. Synthetic exception and cancellation tests are not an incident-response rehearsal."
+        },
+        {
+          "criterionId": "OP08",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:245,403,409"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation"
+            }
+          ],
+          "notes": "The October 8 architecture review records retained prior packages and controlled migration procedures. Current preflight found no migration added by these repairs. Installation and publication acceptance is recorded separately for each release; this assessment does not establish the full supported app/server/database matrix, interrupted-update recovery or a complete safe rollback rehearsal."
+        },
+        {
+          "criterionId": "OP09",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:404"
+            }
+          ],
+          "notes": "The October 8 architecture review records selected preservation controls and written policies. Actual retention, holds, backup and file preservation, agency closure, recovery and export procedures remain incomplete. No real-data or deployed retention acceptance was performed."
+        },
+        {
+          "criterionId": "OP10",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:17,262-270,313,384"
+            },
+            {
+              "kind": "source",
+              "reference": "DATABASE_ENVIRONMENTS.md"
+            }
+          ],
+          "notes": "The October 8 architecture review and current dated inventory describe Demo hosting only. Local fixtures do not measure intended Production capacity, costly competing agencies, tail latency, overload, faults or recovery on the intended host. Those measurements remain future work."
+        },
+        {
+          "criterionId": "OP11",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:245,373,409"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation"
+            }
+          ],
+          "notes": "The October 8 architecture review records manual release and deployment controls. Current preflight verifies selected tools, source inputs and prerequisite provenance. Package and installation acceptance is recorded separately for each release; complete dependency, setting, grant and interrupted-installation repair assurance remains unfinished."
+        },
+        {
+          "criterionId": "OP12",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:128-140,383,404"
+            }
+          ],
+          "notes": "The October 8 architecture review records current account checks that revoke old access after selected changes. Required stronger sign-in controls, shared abuse limits, privileged-session recovery, actual offboarding and deployed identity acceptance remain unestablished."
+        },
+        {
+          "criterionId": "OP13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,383,398"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_GUIDE.md"
+            }
+          ],
+          "notes": "The October 8 baseline's server billing sends remain test-only and vendor/payer acceptance remains unestablished. Signature and email use also need their separately approved checks and agreements. Local connector and delivery tests do not authorize real provider or PHI use."
+        },
+        {
+          "criterionId": "OP14",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383,388,507"
+            },
+            {
+              "kind": "source",
+              "reference": "Services/ReleaseReadiness.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Views/ReleaseReadinessPanel.xaml"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/readiness-method.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--documentation-consolidation-and-standing-workflow"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation"
+            }
+          ],
+          "notes": "The October 8 baseline and rubric are preserved. Fresh local source tests passed all 58 readiness/parser/render cases, and four rendered previews were inspected, including enlarged text and simulated high contrast. The assessment uses the audited software checkpoint; following release-number/report changes and additional current-version, installation and publication checks are recorded separately in the release record. Human accessibility and independent readiness review remain incomplete. No historical score was rewritten and no launch gate is opened."
+        }
+      ]
     }
   ]
 }
