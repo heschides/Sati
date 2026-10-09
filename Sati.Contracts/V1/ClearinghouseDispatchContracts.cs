@@ -1,7 +1,16 @@
 namespace Sati.Contracts.V1;
 
 /// <summary>Non-secret account choice shown to billing staff; configuration remains API-owned.</summary>
-public sealed record ClearinghouseAccountOptionDto(Guid Id, string Partner, string Label);
+public sealed record ClearinghouseAccountOptionDto(Guid Id, string Partner, string Label)
+{
+    public ClearinghouseAccountReadinessDto? Readiness { get; init; }
+}
+
+public sealed record ClearinghouseAccountReadinessDto(Guid AccountId, long AccountRevision,
+    long ReadinessRevision, string Disposition, int FailureCount, DateTime? NextEligibleAtUtc,
+    string? SafeFailureCode);
+
+public sealed record ReopenClearinghousePreflightRequest(long ExpectedReadinessRevision, long ExpectedAccountRevision);
 
 public sealed record ClearinghouseGenerationDto(
     long Id, int BillingPeriodId, string FileName, DateTime GeneratedAtUtc,

@@ -318,7 +318,13 @@
                     <Button Content="Refresh dispatch status" Style="{StaticResource SmallButton}"
                             Command="{Binding RefreshClearinghouseDispatchCommand}"
                             AutomationProperties.Name="Refresh test dispatch status" />
+                    <Button Content="Reopen account after key restoration" Style="{StaticResource SmallButton}"
+                            Command="{Binding ReopenClearinghousePreflightCommand}" Margin="10,0,0,0"
+                            AutomationProperties.Name="Administrator reopen account after restoring its key" />
                 </WrapPanel>
+                <TextBlock Text="{Binding DispatchReadinessMessage}" TextWrapping="Wrap" Margin="0,6,0,0"
+                           AutomationProperties.Name="Selected account dispatch readiness"
+                           AutomationProperties.LiveSetting="Polite" />
                 <TextBlock Text="{Binding DispatchAvailabilityMessage}"
                            AutomationProperties.LiveSetting="Polite"
                            FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"

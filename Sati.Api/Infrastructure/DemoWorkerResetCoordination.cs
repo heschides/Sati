@@ -11,6 +11,19 @@ internal interface IDemoWorkerResetCoordination
         CancellationToken token);
     Task<T> RunDispatchAsync<T>(Guid dispatchId, Func<CancellationToken, Task<T>> operation,
         T unavailableResult, CancellationToken token);
+    Task<T> RunAccountPreflightAsync<T>(int agencyId, Guid accountId,
+        Func<IAccountPreflightLease, CancellationToken, Task<T>> operation, T unavailableResult,
+        CancellationToken token);
+}
+
+internal interface IAccountPreflightLease
+{
+    Task VerifyAsync(CancellationToken token);
+}
+
+internal sealed class UncoordinatedAccountPreflightLease : IAccountPreflightLease
+{
+    public Task VerifyAsync(CancellationToken token) { token.ThrowIfCancellationRequested(); return Task.CompletedTask; }
 }
 
 internal sealed class SqlDemoWorkerResetCoordination(
@@ -19,19 +32,29 @@ internal sealed class SqlDemoWorkerResetCoordination(
 {
     public Task<T> RunAsync<T>(Func<CancellationToken, Task<T>> operation, T unavailableResult,
         CancellationToken token) => RunWithLeaseAsync(DemoResetLease.Resource, "Shared",
-            operation, unavailableResult, token);
+            (_, heldToken) => operation(heldToken), unavailableResult, token);
 
     // The caller already holds the outer shared reset lease (HTTP middleware or RunAsync).
     // This prevents a human reconciliation from declaring absence while an upload is in flight.
     public Task<T> RunDispatchAsync<T>(Guid dispatchId, Func<CancellationToken, Task<T>> operation,
         T unavailableResult, CancellationToken token) => RunWithLeaseAsync(
-            $"Sati.ClearinghouseDispatch:{dispatchId:N}", "Exclusive", operation, unavailableResult, token);
+            $"Sati.ClearinghouseDispatch:{dispatchId:N}", "Exclusive",
+            (_, heldToken) => operation(heldToken), unavailableResult, token);
+
+    public Task<T> RunAccountPreflightAsync<T>(int agencyId, Guid accountId,
+        Func<IAccountPreflightLease, CancellationToken, Task<T>> operation, T unavailableResult,
+        CancellationToken token)
+    {
+        if (agencyId <= 0 || accountId == Guid.Empty) throw new ArgumentException("Invalid account preflight scope.");
+        return RunWithLeaseAsync($"Sati.ClearinghousePreflight:{agencyId}:{accountId:N}", "Exclusive",
+            operation, unavailableResult, token);
+    }
 
     private async Task<T> RunWithLeaseAsync<T>(string resourceName, string mode,
-        Func<CancellationToken, Task<T>> operation, T unavailableResult, CancellationToken token)
+        Func<IAccountPreflightLease, CancellationToken, Task<T>> operation, T unavailableResult, CancellationToken token)
     {
         if (options.Value.ExpectedEnvironment != "Demo" || options.Value.ExpectedDatabaseName != "SatiDemo")
-            return await operation(token);
+            return await operation(new UncoordinatedAccountPreflightLease(), token);
 
         await using var db = await contexts.CreateDbContextAsync(token);
         if (!db.Database.IsSqlServer())
@@ -55,7 +78,7 @@ internal sealed class SqlDemoWorkerResetCoordination(
         if (result < 0)
             throw new InvalidOperationException("Demo worker reset lease could not be acquired.");
 
-        try { return await operation(token); }
+        try { return await operation(new SessionLease(db, resourceName, mode), token); }
         finally
         {
             await using var release = db.Database.GetDbConnection().CreateCommand();
@@ -66,6 +89,21 @@ internal sealed class SqlDemoWorkerResetCoordination(
             parameter.Value = resourceName;
             release.Parameters.Add(parameter);
             await release.ExecuteNonQueryAsync(CancellationToken.None);
+        }
+    }
+
+    private sealed class SessionLease(ApiDbContext db, string resourceName, string mode) : IAccountPreflightLease
+    {
+        public async Task VerifyAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            await using var command = db.Database.GetDbConnection().CreateCommand();
+            command.CommandText = "SELECT APPLOCK_MODE('public', @resource, 'Session');";
+            command.CommandTimeout = 5;
+            var resource = command.CreateParameter(); resource.ParameterName = "@resource";
+            resource.Value = resourceName; command.Parameters.Add(resource);
+            if (await command.ExecuteScalarAsync(token) is not string current || current != mode)
+                throw new InvalidOperationException("The account preflight lease was lost.");
         }
     }
 }

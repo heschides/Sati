@@ -616,6 +616,11 @@ public sealed class CloudBillingService(CloudApiClient api) : IBillingService
     public bool SupportsMockClearinghouse => true;
     public bool SupportsResponseImport => true;
     public bool SupportsClearinghouseDispatch => true;
+    public Task<ClearinghouseAccountReadinessDto> ReopenClearinghousePreflightAsync(
+        AgencyActor actor, Guid accountId, ReopenClearinghousePreflightRequest request,
+        CancellationToken cancellationToken = default) =>
+        api.PostWithCapturedSessionAsync<ReopenClearinghousePreflightRequest, ClearinghouseAccountReadinessDto>(
+            $"/api/v1/admin/clearinghouse/accounts/{accountId}/preflight/reopen", request, cancellationToken);
     public Task<ClearinghouseWorkspaceDto> GetClearinghouseWorkspaceAsync(
         AgencyActor actor, CancellationToken cancellationToken = default) =>
         api.GetAsync<ClearinghouseWorkspaceDto>("/api/v1/billing/clearinghouse", cancellationToken);

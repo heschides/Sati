@@ -39,7 +39,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | Stable ID | Status | Work and acceptance owner |
 |---|---|---|
 | SATI-TEN-001 | planned | Structural tenant owners/composite constraints and shared/database-per-tenant/hybrid decision; [architecture](docs/architecture/identity.md), [structural review](SATI_STRUCTURAL_REVIEW_2026-09-28.md). Preserve current caseload/capability checks. |
-| SATI-WRK-001 | partial; earlier worker slices implemented; missing-key design/reproducer complete, policy/schema review pending | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [isolation proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal), [working evidence](docs/readiness/work-evidence.md). |
+| SATI-WRK-001 | partial; bounded missing-key readiness/recovery source implemented; broader W8 pending | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [isolation proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal), [working evidence](docs/readiness/work-evidence.md). |
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
@@ -72,42 +72,31 @@ authorization requirements; no release outcome is established by this invocation
 
 **Next eligible item:** SATI-WRK-001
 
-**Eligibility:** Josh requested worker isolation for queued claims with missing keys. The local
-policy/schema proposal and bounded two-agency/two-host reproduction are complete; implementation
-depends on review of [DEC-0234](docs/decisions/current/2026-10-09-DEC-0234.md) under worker handoff §8.
-[Working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-design)
-records the actual starvation failure, restored-key positive control and verification limits.
-The requested billing source sequence remains complete, without operating/certification,
-complete recovery or sealed-readiness closure. Follow
-[the standing workflow](AGENTS.md#standing-work-and-documentation-upkeep).
+**Eligibility:** the approved missing-key account isolation source slice is complete. Josh's
+explicit approval is recorded in [DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md);
+[W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+owns behavior and [working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
+owns actual checks and limits. Existing/cloud database changes and activation remain separate.
 
-**Bounded slice:** review the concrete account readiness policy and additive schema proposal.
-After approval, implement only known-unsent account preflight due/backoff/hold/reopen, its API
-visibility/authorized command and additive source migration/model files; promote the opt-in red
-reproducer to an ordinary regression. Expected result is B's next-turn progress after A's durable
-deferral, with truthful Queued state, current release guards, actual private SQL ownership and
-fake-time recovery proof. Do not silently cancel due work, use a process-memory failed-ID list,
-implement broader fairness or author schema before approval. No approval is inferred from the
-elapsed time or this next pointer.
+**Bounded slice:** design reviewed idle/wake/activity/due scheduling for dispatch before
+activation. Inventory current three-second idle SQL selection, host wake catch-up, earliest-due
+eligibility and available trusted activity signals; propose a bounded wait policy and acceptance.
+Do not add wake pings, a second scheduler, shorter polling, live load or cloud changes. Numeric
+backoff alone does not establish idle capacity protection. Implementation of a new runtime
+cadence requires review of the concrete policy and satisfied D1–D4 dependencies. Broader fair
+lane selection, global/tenant budgets, API admission, sustained-load proof and owner-run alerts
+remain open. This pointer does not start that larger slice in the current task.
 
-**Dependencies and owners:** the [worker handoff W8](BACKGROUND_WORKERS_HANDOFF.md#w8--tenant-workload-isolation-and-worker-fairness-significant-now-required-evidence-before-a-multi-agency-pilot)
-owns the blocker and concrete proposed policy. Read current worker/gate/key preflight/reset leases,
-[the coordinated billing owner](CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026),
-[worker architecture](docs/architecture/workers.md), [protocol baseline](docs/readiness/protocol-baseline.md),
-[operations](OPERATIONS.md) and [working evidence](docs/readiness/work-evidence.md).
-Preserve duplicate/correction/current-compliance gates, known-unsent versus Sending uncertainty,
-protected receipts, reset order, default-off operation and no physical upload replay.
+**Dependencies and owners:** [W8](BACKGROUND_WORKERS_HANDOFF.md), D1–D4,
+[operations](OPERATIONS.md), trusted activity sources and supported host/schema versions.
+The concrete idle-wait policy must be reviewed before runtime changes. Schema, cloud settings,
+live provider work and release actions retain separate authorization.
 
-**Boundaries and completion evidence:** current local design/reproduction is completed; proposed
-implementation/source schema approval remains pending. Record actual old/fixed and design-only
-limits under SATI-WRK-001; update canonical owners, agenda, decisions, working evidence and docs
-checks after each significant chunk. Any approval of source migration files/private synthetic
-schema proof does not authorize migrating an existing database. Cloud/shared or real-data access,
-security settings, existing-database migration, deployment, publication, provider calls and release
-keep separate authorization. Commit/push verified significant chunks to the approved Sati repository;
-preserve unrelated work and sealed scores. Aggregate budgets/capacity, fair lane selection,
-structural tenancy, duplicate-service identity, general command protocols, full-service recovery
-and external certification retain their own acceptance owners.
+**Boundaries and completion evidence:** source/design inventory and a concrete scheduling
+proposal with fake-time acceptance, no-user idle SQL budget and startup/wake catch-up cases.
+Record actual/unrun evidence in the working ledger; follow
+[standing upkeep](AGENTS.md#standing-work-and-documentation-upkeep). This does not close W8
+capacity/fairness or change a sealed readiness score.
 
 ## Preserved open-work inventory
 

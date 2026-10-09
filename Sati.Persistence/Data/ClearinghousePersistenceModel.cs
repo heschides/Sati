@@ -29,6 +29,28 @@ public static class ClearinghousePersistenceModel
             entity.HasOne<TAgency>().WithMany().HasForeignKey(x => x.AgencyId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        model.Entity<ClearinghouseDispatchReadiness>(entity =>
+        {
+            entity.ToTable("ClearinghouseDispatchReadiness", table => table.HasCheckConstraint(
+                "CK_ClearinghouseDispatchReadiness_State",
+                "[AgencyId] > 0 AND [Revision] > 0 AND [ValidatedAccountRevision] >= 0 AND (" +
+                "([Disposition] = 1 AND [FailureCount] = 0 AND [RecoveryCycleId] = '00000000-0000-0000-0000-000000000000' " +
+                "AND [NextEligibleAtUtc] IS NULL AND [LastFailureAtUtc] IS NULL AND [SafeFailureCode] IS NULL) OR " +
+                "([Disposition] = 2 AND [FailureCount] BETWEEN 1 AND 4 AND [RecoveryCycleId] <> '00000000-0000-0000-0000-000000000000' " +
+                "AND [NextEligibleAtUtc] IS NOT NULL AND [LastFailureAtUtc] IS NOT NULL AND [NextEligibleAtUtc] > [LastFailureAtUtc] " +
+                "AND [SafeFailureCode] IS NOT NULL AND [SafeFailureCode] = 'account_key_unavailable') OR " +
+                "([Disposition] = 3 AND [FailureCount] = 5 AND [RecoveryCycleId] <> '00000000-0000-0000-0000-000000000000' " +
+                "AND [NextEligibleAtUtc] IS NULL AND [LastFailureAtUtc] IS NOT NULL " +
+                "AND [SafeFailureCode] IS NOT NULL AND [SafeFailureCode] = 'account_key_unavailable'))"));
+            entity.HasKey(x => new { x.AgencyId, x.AccountId });
+            entity.Property(x => x.SafeFailureCode).HasMaxLength(40);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.Disposition, x.NextEligibleAtUtc });
+            entity.HasOne<ClearinghouseAccount>().WithMany()
+                .HasForeignKey(x => new { x.AgencyId, x.AccountId })
+                .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
         model.Entity<ClearinghouseDispatch>(entity =>
         {
             entity.ToTable("ClearinghouseDispatches");
@@ -38,6 +60,8 @@ public static class ClearinghousePersistenceModel
             entity.Property(x => x.Revision).IsConcurrencyToken();
             entity.HasIndex(x => x.EdiGenerationId).IsUnique();
             entity.HasIndex(x => new { x.AgencyId, x.State, x.RequestedAtUtc });
+            entity.HasIndex(x => new { x.State, x.RequestedAtUtc, x.Id })
+                .IncludeProperties(x => new { x.AgencyId, x.AccountId });
             entity.HasOne<ClearinghouseAccount>().WithMany()
                 .HasForeignKey(x => new { x.AgencyId, x.AccountId })
                 .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
@@ -122,6 +146,20 @@ public static class ClearinghousePersistenceModel
 
     public static void ProtectWrites(ChangeTracker tracker)
     {
+        foreach (var entry in tracker.Entries<ClearinghouseDispatchReadiness>())
+        {
+            if (entry.State == EntityState.Deleted)
+                throw new InvalidOperationException("Account preflight recovery cannot be deleted to bypass a hold.");
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var row = entry.Entity;
+            ClearinghousePreflightRules.Validate(row.Snapshot());
+            if (row.AgencyId <= 0 || row.AccountId == Guid.Empty || row.ValidatedAccountRevision < 0 ||
+                entry.State == EntityState.Added && row.Revision != 1 ||
+                entry.State == EntityState.Modified && (entry.Property(x => x.AgencyId).IsModified ||
+                    entry.Property(x => x.AccountId).IsModified || row.Revision !=
+                    entry.OriginalValues.GetValue<long>(nameof(ClearinghouseDispatchReadiness.Revision)) + 1))
+                throw new InvalidOperationException("Account preflight updates require immutable scope and a new revision.");
+        }
         foreach (var entry in tracker.Entries<ClearinghouseAccount>().Where(x => x.State == EntityState.Added))
         {
             var account = entry.Entity;

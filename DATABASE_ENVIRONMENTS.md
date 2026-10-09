@@ -169,3 +169,13 @@ Record environment, observation time, bounded source, observed value and what wa
 Replace the current table with dated evidence while retaining the previous observation in history.
 Other current documents link here; do not repeat SKU, quota, pause, grants or alert-deployment facts.
 Never refresh observations by querying a private database or changing infrastructure as doc upkeep.
+
+## Pending source schema — October 9, 2026 worker readiness
+
+`20261009183720_AddClearinghousePreflightReadiness` is an additive source migration authored under
+Josh's explicit bounded approval. [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+owns schema/rollout/rollback behavior; [working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
+owns private synthetic verification. This is not an observed migration of Demo, local working or
+cloud databases. No existing database was accessed or changed. A later authorized release must
+revalidate exact schema, synthetic baseline/reset compatibility and worker versions with dispatch
+paused; earlier 1.3.38 no-schema-delta observations remain dated facts for that release only.

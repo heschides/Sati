@@ -53,8 +53,7 @@ internal static class RenderedViews
             // Compiled XAML resolves a bare clr-namespace against the assembly it is
             // compiled into. Parsed at runtime from the test assembly it would resolve
             // against this one, so every Sati namespace is named explicitly.
-            markup = Regex.Replace(markup, @"clr-namespace:(Sati[\w.]*)(?=""|;)",
-                "clr-namespace:$1;assembly=Sati");
+            markup = QualifyDesktopNamespaces(markup);
 
             // Handlers and the window icon live in the code-behind and the app's own
             // resources; neither changes a colour or an automation name.
@@ -87,6 +86,10 @@ internal static class RenderedViews
             return null;
         }
     }
+
+    internal static string QualifyDesktopNamespaces(string markup) =>
+        Regex.Replace(markup, @"clr-namespace:(Sati[\w.]*)(?=""|;)",
+            "clr-namespace:$1;assembly=Sati");
 
     /// <summary>
     /// XAML namespace lookup only scans assemblies already loaded, and nothing in

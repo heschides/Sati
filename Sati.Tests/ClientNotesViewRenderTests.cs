@@ -49,7 +49,7 @@ public sealed class ClientNotesViewRenderTests
                 15, person.Id, null, NoteType.Visit);
             model.SelectedPersonNotes.Add(note);
             var view = new ClientsView { DataContext = model };
-            WpfUiHarness.Realize(view, 1500, 1000);
+            WpfUiHarness.RealizePendingContent(view, 1500, 1000);
 
             var tabs = WpfUiHarness.FindByAutomationName<TabControl>(
                 view, "Consumer record sections");
@@ -94,14 +94,14 @@ public sealed class ClientNotesViewRenderTests
 
             // The consumer roster and section rail consume most of a narrow window.
             // Both the editor and list must remain reachable instead of clipping.
-            WpfUiHarness.Realize(view, 900, 1000);
+            WpfUiHarness.RealizePendingContent(view, 900, 1000);
             var workspace = WpfUiHarness.FindByAutomationName<ScrollViewer>(
                 view, "Consumer notes workspace");
             Assert.Equal(Visibility.Visible,
                 workspace.ComputedHorizontalScrollBarVisibility);
             Assert.True(workspace.ScrollableWidth > 0);
             workspace.ScrollToRightEnd();
-            view.UpdateLayout();
+            WpfUiHarness.RealizePendingContent(view, 900, 1000);
             Assert.True(workspace.HorizontalOffset > 0);
         });
     }

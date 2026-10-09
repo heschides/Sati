@@ -90,6 +90,7 @@ namespace Sati.ViewModels.Billing
         [ObservableProperty] private string dispatchAvailabilityMessage =
             "Server-managed test dispatch is not enabled for this connection.";
         [ObservableProperty] private ClearinghouseAccountOptionDto? selectedDispatchAccount;
+        [ObservableProperty] private bool isReopeningPreflight;
         [ObservableProperty] private ClearinghouseGenerationDto? selectedDispatchGeneration;
         [ObservableProperty] private bool isTestMode = true;
         [ObservableProperty] private DateTime? rangeStart;
@@ -144,8 +145,18 @@ namespace Sati.ViewModels.Billing
             !IsGenerating && !IsImportingResponse && _sessionService.CurrentUser?.HasBillingPermissions == true;
         public bool ShowsMockClearinghouse => _billingService.SupportsMockClearinghouse;
         public bool ShowsAutomatedDispatch => _billingService.SupportsClearinghouseDispatch;
+        public bool CanReopenPreflight => IsDispatchEnabled && !IsGenerating && !IsImportingResponse &&
+            !IsQueueingDispatch && !IsReopeningPreflight && _sessionService.CurrentUser?.HasAdminPermissions == true &&
+            SelectedDispatchAccount?.Readiness is { ReadinessRevision: > 0, Disposition: "Deferred" or "Held" };
+        public string DispatchReadinessMessage => SelectedDispatchAccount?.Readiness is { } readiness
+            ? readiness.Disposition switch
+            {
+                "Deferred" => $"Account deferred after {readiness.FailureCount} missing-key check(s). Earliest retry: {readiness.NextEligibleAtUtc:u}. Queued files are retained.",
+                "Held" => "Account held after five missing-key checks. An administrator must restore the key and reopen queued work.",
+                _ => "Account ready for ordinary release checks."
+            } : string.Empty;
         public bool CanQueueDispatch => IsDispatchEnabled && IsTestMode && !IsGenerating &&
-            !IsImportingResponse && !IsQueueingDispatch &&
+            !IsImportingResponse && !IsQueueingDispatch && !IsReopeningPreflight &&
             _sessionService.CurrentUser?.HasBillingPermissions == true &&
             SelectedDispatchAccount is { } account && SelectedDispatchGeneration is { } generation &&
             generation.MatchingAccountId == account.Id && generation.DispatchState is null;
@@ -369,6 +380,7 @@ namespace Sati.ViewModels.Billing
         }
 
         partial void OnIsQueueingDispatchChanged(bool value) => NotifyDispatchStateChanged();
+        partial void OnIsReopeningPreflightChanged(bool value) => NotifyDispatchStateChanged();
         partial void OnIsDispatchEnabledChanged(bool value) => NotifyDispatchStateChanged();
         partial void OnSelectedDispatchAccountChanged(ClearinghouseAccountOptionDto? value)
         {
@@ -721,6 +733,37 @@ namespace Sati.ViewModels.Billing
 
         private bool CanQueueSelectedDispatch() => CanQueueDispatch;
 
+        private bool CanReopenSelectedPreflight() => CanReopenPreflight;
+
+        [RelayCommand(CanExecute = nameof(CanReopenSelectedPreflight))]
+        private async Task ReopenClearinghousePreflight()
+        {
+            if (!CanReopenPreflight || SelectedDispatchAccount is not { Readiness: { } readiness } account) return;
+            var user = _sessionService.CurrentUser;
+            var request = _dispatchLoads.Begin();
+            IsReopeningPreflight = true;
+            bool IsCurrent() => _dispatchLoads.IsCurrent(request) &&
+                ReferenceEquals(_sessionService.CurrentUser, user) && SelectedDispatchAccount?.Id == account.Id;
+            try
+            {
+                await _billingService.ReopenClearinghousePreflightAsync(CurrentActor(), account.Id,
+                    new(readiness.ReadinessRevision, readiness.AccountRevision));
+                if (!IsCurrent()) return;
+                StatusMessage = "Account reopened. Retained queued files still require ordinary release checks.";
+                await RefreshDispatchWorkspaceAsync();
+            }
+            catch (Exception)
+            {
+                if (!IsCurrent()) return;
+                StatusMessage = "Account recovery could not be confirmed. Refresh and review before trying again.";
+                await RefreshDispatchWorkspaceAsync();
+            }
+            finally
+            {
+                if (ReferenceEquals(_sessionService.CurrentUser, user)) IsReopeningPreflight = false;
+            }
+        }
+
         [RelayCommand(CanExecute = nameof(CanQueueSelectedDispatch))]
         private async Task QueueClearinghouseDispatch()
         {
@@ -911,6 +954,9 @@ namespace Sati.ViewModels.Billing
 
         private void NotifyDispatchStateChanged()
         {
+            OnPropertyChanged(nameof(CanReopenPreflight));
+            OnPropertyChanged(nameof(DispatchReadinessMessage));
+            ReopenClearinghousePreflightCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(CanQueueDispatch));
             QueueClearinghouseDispatchCommand.NotifyCanExecuteChanged();
         }
@@ -924,6 +970,7 @@ namespace Sati.ViewModels.Billing
             _accountLoads.Invalidate();
             _dispatchLoads.Invalidate();
             IsQueueingDispatch = false;
+            IsReopeningPreflight = false;
             IsDispatchEnabled = false;
             DispatchAvailabilityMessage = "Server-managed test dispatch is not enabled for this connection.";
             SelectedDispatchAccount = null;

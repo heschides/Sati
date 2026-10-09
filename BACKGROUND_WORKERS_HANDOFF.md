@@ -463,8 +463,8 @@ residual-compliance-error repair. [The agenda](AGENDA.md#next-eligible-work) own
 dependencies and fail-first acceptance. This does not close assessment R1 or full queue/pre-send
 R2. W8 total budgets, current-day capacity and fair wait/admission evidence remain later work.
 
-**Dispatch poison isolation blocker:** the globally oldest Queued dispatch can still be selected
-repeatedly after a missing-key preflight failure, before any send. Existing acceptance correctly
+**Dispatch poison isolation blocker at the earlier checkpoint:** the globally oldest Queued dispatch could be selected
+repeatedly after a missing-key preflight failure, before any send. Earlier acceptance correctly
 leaves it Queued with no attempt or unknown-send evidence. The current model has no durable
 preflight due/backoff/hold/reopen owner. Implementing that isolation needs a reviewed known-unsent
 recovery policy and additive schema proposal under §8; it is not eligible as a silent local
@@ -473,9 +473,69 @@ process-memory failed-ID list would lose protection across restart/hosts. Local 
 reproduction can precede any separately approved schema work. Fair lane selection, API admission,
 aggregate capacity and live progress/alert evidence also remain open.
 
+The approved bounded implementation below supersedes this missing recovery owner/source status;
+the listed broader W8 work remains open.
+
 #### October 9 — known-unsent dispatch isolation proposal
 
-**Status:** SATI-WRK-001 design and bounded failure reproduction; application scheduling is
+The proposal below is retained as the reviewed design. Josh's subsequent explicit **Approved**
+accepts its policy and additive source schema under §8; [DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md)
+supersedes only its pending approval/implementation status. Current behavior is recorded below.
+
+#### October 9 — known-unsent dispatch isolation implementation
+
+**Status:** bounded local source implementation and complete project-suite verification finished;
+activation and deployment remain pending. Actual results and prior failures are owned by the
+linked working evidence below, not a new sealed release assessment.
+Contracts `ClearinghousePreflightRules` owns validated Ready/Deferred/Held state, four persisted
+1/5/15/60-minute delays plus stable 0–10% delay, fifth-failure hold and reopening eligibility.
+Persistence owns `ClearinghouseDispatchReadiness` and its shared model guards. The API worker
+classifies only typed missing environment account keys before Sending; it commits readiness and
+a fixed system audit together under common admission. Queued intent, revision, bytes and upload
+history are retained. Discovery excludes the whole deferred/held account; no process skip list
+or local desktop scheduler exists. Successful due preparation clears the cycle only with normal
+current release validation. Cancellation, shared wrapping, SQL/lease and unclassified faults do
+not consume account failures. Sending/OutcomeUnknown remain subject to existing reconciliation.
+
+The bounded A/B target is next successful worker turn after A's deferral commits, under the
+prerequisites in the reviewed proposal. This is not a global fairness or latency bound. The
+account session lease is zero-wait and precedes common SQL admission. It spans preparation and
+the short decision, ends before upload, and is checked before decision writes and commit.
+Reset/dispatch leases and single-attempt physical upload remain. Session ownership checks detect
+observed lease loss; they are not an atomic external fencing token and do not prove arbitrary
+network-partition exactly-once delivery. Common admission and retained Sending state remain
+essential. Key preparation runs outside SQL transactions.
+
+`GET /billing/clearinghouse` returns same-agency safe readiness facts and current account/readiness
+revisions. `POST /admin/clearinghouse/accounts/{accountId}/preflight/reopen` requires current
+same-agency Administration, an enabled test gate, exact expected revisions and restored key/
+receipt protection. Actor, full account binding and revisions are checked again under admission.
+It atomically clears readiness with a human audit, changes no dispatch and sends nothing.
+Repeated/stale commands conflict; clients refresh and review. WPF shows text status and an
+accessible Admin recovery command through CloudBillingService with captured session identity.
+
+`ApiSurface` declares the recovery route and readiness contract; source fingerprint is
+`D30D44631876` (269 routes, 70 named shapes). This is a source compatibility boundary, not a
+newly deployed release. Earlier deployed observations remain in the environment inventory.
+
+Migration `20261009183720_AddClearinghousePreflightReadiness` adds only the readiness table,
+composite account FK/state CHECK/eligibility index and global dispatch selection index. Missing
+row means Ready. Down refuses unresolved Deferred/Held rows with SQL 51044. Source generation
+uses `--synthetic-design`; no existing/shared/cloud database is authorized or migrated here.
+Pause dispatch on every host for rollout/rollback. Old workers ignore readiness; mixed active
+versions are unsafe. Keep additive storage and audits during operational rollback, review queued/
+uncertain work, and verify compatible hosts before activation. Baseline/reset compatibility and
+actual deployed query plans require separate release preflight.
+
+[Working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
+owns actual fail-first, fake-time, private SQL, UI and suite results and limits.
+Remaining W8 includes reviewed idle/wake scheduling (the existing three-second idle loop is
+unchanged), fairness under sustained backlog/contention, aggregate sessions/dependency budgets,
+API admission, configuration consistency and owner-run operational/alert evidence.
+
+#### October 9 — retained isolation proposal detail
+
+**Reviewed proposal status before acceptance:** SATI-WRK-001 design and bounded failure reproduction; application scheduling is
 unchanged. [DEC-0234](docs/decisions/current/2026-10-09-DEC-0234.md) is proposed for Josh's review,
 not an accepted schema change. The later [billing completion](CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
 supersedes the October 8 pending R1/R2 source status only. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-design)

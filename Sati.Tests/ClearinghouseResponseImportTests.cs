@@ -92,6 +92,46 @@ public sealed class ClearinghouseResponseImportTests
     }
 
     [Fact]
+    public void PreflightRecoveryRendersSafeTextAndAnAdminCommand()
+    {
+        WpfUiHarness.Run(() =>
+        {
+            var session = new SessionService(); session.SetUser(Biller());
+            var vm = new BillingSubmissionsViewModel(new BillingStub { DispatchSupported = true }, new EdiStub(), session);
+            var accountId = Guid.NewGuid();
+            vm.IsDispatchEnabled = true;
+            vm.SelectedDispatchAccount = new(accountId, "ClaimMd", "Synthetic account")
+            { Readiness = new(accountId, 2, 5, "Held", 5, null, "account_key_unavailable") };
+            var view = new Sati.Views.Billing.BillingSubmissionsView { DataContext = vm };
+            WpfUiHarness.Realize(view, 1100, 1000);
+            var button = WpfUiHarness.FindByAutomationName<System.Windows.Controls.Button>(view,
+                "Administrator reopen account after restoring its key");
+            Assert.Same(vm.ReopenClearinghousePreflightCommand, button.Command);
+            Assert.True(button.IsEnabled); Assert.Contains("held", vm.DispatchReadinessMessage);
+            session.SetUser(User.Create(8, "billing-only", "Synthetic Billing", "hash", "salt", UserRole.Finance, null, 1));
+            Assert.False(vm.CanReopenPreflight);
+            Assert.False(vm.ReopenClearinghousePreflightCommand.CanExecute(null));
+        });
+    }
+
+    [Fact]
+    public async Task PreflightRecoveryCannotPublishIntoANewSession()
+    {
+        var session = new SessionService(); session.SetUser(Biller());
+        var pending = new TaskCompletionSource<ClearinghouseAccountReadinessDto>();
+        var billing = new BillingStub { DispatchSupported = true, Reopen = () => pending.Task };
+        var vm = new BillingSubmissionsViewModel(billing, new EdiStub(), session);
+        var id = Guid.NewGuid(); vm.IsDispatchEnabled = true;
+        vm.SelectedDispatchAccount = new(id, "ClaimMd", "Synthetic")
+        { Readiness = new(id, 2, 1, "Deferred", 1, DateTime.UtcNow.AddMinutes(1), "account_key_unavailable") };
+        var operation = vm.ReopenClearinghousePreflightCommand.ExecuteAsync(null);
+        Assert.Equal(new ReopenClearinghousePreflightRequest(1, 2), billing.ReopenRequest);
+        vm.ClearForAccountSwitch(); session.SetUser(Biller(8));
+        pending.SetResult(new(id, 2, 2, "Ready", 0, null, null)); await operation;
+        Assert.Null(vm.StatusMessage); Assert.False(vm.IsReopeningPreflight); Assert.Empty(vm.DispatchAccounts);
+    }
+
+    [Fact]
     public async Task AChosenFileNeverPostsAfterTheAccountChanges()
     {
         var session = new SessionService(); session.SetUser(Biller());
@@ -231,6 +271,11 @@ public sealed class ClearinghouseResponseImportTests
         public bool SupportsResponseImport => true;
         public bool DispatchSupported { get; init; }
         public bool SupportsClearinghouseDispatch => DispatchSupported;
+        public Func<Task<ClearinghouseAccountReadinessDto>> Reopen { get; init; } = () => throw new NotSupportedException();
+        public ReopenClearinghousePreflightRequest? ReopenRequest { get; private set; }
+        public Task<ClearinghouseAccountReadinessDto> ReopenClearinghousePreflightAsync(AgencyActor actor, Guid accountId,
+            ReopenClearinghousePreflightRequest request, CancellationToken cancellationToken = default)
+        { ReopenRequest = request; return Reopen(); }
         public Func<Task<ClearinghouseWorkspaceDto>> DispatchWorkspace { get; init; } = () =>
             Task.FromResult(new ClearinghouseWorkspaceDto(false, "Disabled", [], [], []));
         public Task<ClearinghouseWorkspaceDto> GetClearinghouseWorkspaceAsync(

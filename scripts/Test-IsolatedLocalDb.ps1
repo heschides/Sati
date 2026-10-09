@@ -20,6 +20,9 @@
     pwsh -File scripts/Test-IsolatedLocalDb.ps1 -FullApi
 .EXAMPLE
     pwsh -File scripts/Test-IsolatedLocalDb.ps1 -BillingReleaseOnly
+.EXAMPLE
+    pwsh -File scripts/Test-IsolatedLocalDb.ps1 -FullDesktop -NoBuild
+    Uses already-built Release test binaries; build the changed project first.
 #>
 [CmdletBinding()]
 param(
@@ -34,12 +37,14 @@ param(
     [switch]$BillingReleaseOnly,
     [string]$BillingReleaseFilter = 'FullyQualifiedName~ClaimReleaseSql',
     [switch]$FullApi,
-    [switch]$FullSolution
+    [switch]$FullSolution,
+    [switch]$FullDesktop,
+    [switch]$NoBuild
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-if (@(@($ApiOnly, $DesktopOnly, $NoteAbandonmentOnly, $ClaimMdPreparationOnly, $NoteAmendmentsOnly, $PayerBillingOnly, $RecordsGovernanceOnly, $AssessmentReviewOnly, $BillingReleaseOnly, $FullApi, $FullSolution) | Where-Object { $_ }).Count -gt 1) {
+if (@(@($ApiOnly, $DesktopOnly, $NoteAbandonmentOnly, $ClaimMdPreparationOnly, $NoteAmendmentsOnly, $PayerBillingOnly, $RecordsGovernanceOnly, $AssessmentReviewOnly, $BillingReleaseOnly, $FullApi, $FullSolution, $FullDesktop) | Where-Object { $_ }).Count -gt 1) {
     throw 'Choose at most one test-project filter.'
 }
 if ($env:OS -cne 'Windows_NT') { throw 'Isolated LocalDB tests require Windows.' }
@@ -91,11 +96,12 @@ try {
             '--configuration', 'Release', '--no-restore', '--logger', 'trx',
             '--results-directory', (Join-Path $repository 'TestResults/BackgroundWorkersFullSql'),
             '-v', 'minimal')
+        if ($NoBuild) { $solutionArgs += '--no-build' }
         & dotnet @solutionArgs
         if ($LASTEXITCODE -ne 0) { throw "Full solution test run failed (exit $LASTEXITCODE)." }
     }
 
-    if (-not $DesktopOnly -and -not $FullSolution) {
+    if (-not $DesktopOnly -and -not $FullSolution -and -not $FullDesktop) {
         $apiFilter = if ($BillingReleaseOnly) {
             $BillingReleaseFilter
         }
@@ -121,6 +127,7 @@ try {
             'FullyQualifiedName~NoteAmendmentMigrationSqlTests|FullyQualifiedName~JoinedBillingPipeline|FullyQualifiedName~ServiceTimeSqlServerConcurrencyTests|FullyQualifiedName~BillingSubmissionSqlServerConcurrencyTests|FullyQualifiedName~ClaimMdSandboxCoordinationTests|FullyQualifiedName~SyntheticPipelineSafetyTests|FullyQualifiedName~DemoWatchdogSchemaTests.WatchdogSelectsCompileAgainstIsolatedSqlServerSchema|FullyQualifiedName~NoteAbandonmentWorkerTests.DemoResetExclusiveLeasePreventsWorkerSweep|FullyQualifiedName~NoteAbandonmentWorkerTests.SeparateApiHostsCannotSweepAtTheSameTime|FullyQualifiedName~DemoWorkerResetCoordinationTests'
         }
         $apiArgs = @('test', $apiProject, '--configuration', 'Release')
+        if ($NoBuild) { $apiArgs += @('--no-build', '--no-restore') }
         if (-not $FullApi) { $apiArgs += @('--filter', $apiFilter) }
         $apiResults = if ($FullApi) { 'TestResults/ClaimMdPreparationFinalApi' } else { 'TestResults/IsolatedSqlServer/Api' }
         $apiArgs += @('--logger', 'trx', '--results-directory', (Join-Path $repository $apiResults), '-v', 'minimal')
@@ -130,9 +137,11 @@ try {
 
     if (-not $ApiOnly -and -not $NoteAbandonmentOnly -and -not $ClaimMdPreparationOnly -and -not $NoteAmendmentsOnly -and -not $PayerBillingOnly -and -not $RecordsGovernanceOnly -and -not $AssessmentReviewOnly -and -not $BillingReleaseOnly -and -not $FullApi -and -not $FullSolution) {
         $desktopFilter = 'FullyQualifiedName~LocalServiceTimeSqlServerTests|FullyQualifiedName~MigrationEffectAnalyzerAgainstLiveSchemaTests|FullyQualifiedName~WorkAgendaMigrationTests.SystemDataSqlClientSessionTempTableSurvivesParameterizedCommands|FullyQualifiedName~WorkAgendaMigrationTests.DuplicateRepairKeepsLowestExactRowCancelsSafeFanOutAndSkipsUnsafeGroups'
-        $desktopArgs = @('test', $desktopProject, '--configuration', 'Release', '--filter', $desktopFilter,
-            '--logger', 'trx', '--results-directory', (Join-Path $repository 'TestResults/IsolatedSqlServer/Desktop'),
-            '-v', 'minimal')
+        $desktopArgs = @('test', $desktopProject, '--configuration', 'Release')
+        if ($NoBuild) { $desktopArgs += @('--no-build', '--no-restore') }
+        if (-not $FullDesktop) { $desktopArgs += @('--filter', $desktopFilter) }
+        $desktopResults = if ($FullDesktop) { 'TestResults/BackgroundWorkersFinalDesktopSql' } else { 'TestResults/IsolatedSqlServer/Desktop' }
+        $desktopArgs += @('--logger', 'trx', '--results-directory', (Join-Path $repository $desktopResults), '-v', 'minimal')
         & dotnet @desktopArgs
         if ($LASTEXITCODE -ne 0) { throw "Desktop SQL test project failed (exit $LASTEXITCODE)." }
     }

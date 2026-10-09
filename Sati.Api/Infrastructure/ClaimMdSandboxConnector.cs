@@ -15,6 +15,9 @@ internal interface IClaimMdSandboxKeySource
     string Resolve(string? reference);
 }
 
+internal sealed class ClaimMdAccountKeyUnavailableException() : InvalidOperationException(
+    "The Claim.MD sandbox account key is unavailable to this API host.");
+
 internal sealed class EnvironmentClaimMdSandboxKeySource : IClaimMdSandboxKeySource
 {
     internal static bool IsValidReference(string? reference) =>
@@ -28,7 +31,7 @@ internal sealed class EnvironmentClaimMdSandboxKeySource : IClaimMdSandboxKeySou
             throw new InvalidOperationException("The Claim.MD sandbox secret reference is invalid.");
         var key = Environment.GetEnvironmentVariable(reference!);
         if (string.IsNullOrWhiteSpace(key))
-            throw new InvalidOperationException("The Claim.MD sandbox key is unavailable to this API host.");
+            throw new ClaimMdAccountKeyUnavailableException();
         return key;
     }
 }

@@ -15,13 +15,16 @@ namespace Sati.Api.Tests;
 
 public sealed partial class ClearinghouseDispatchApiTests
 {
-    // Deliberately red design reproducer, outside normal acceptance. Promote to an
-    // ordinary regression only with the reviewed durable recovery implementation.
-    [DispatchIsolationReproducerFact]
-    [Trait("Category", "DispatchIsolationDesignReproducer")]
-    public async Task MissingAccountKeyMustAllowHealthyAgencyByTheNextWorkerTurn()
+    // Retained failing boundary from DEC-0234; now an ordinary acceptance regression.
+    [Fact]
+    public Task MissingAccountKeyMustAllowHealthyAgencyByTheNextWorkerTurn() => VerifyMissingKeyIsolationAsync(false);
+
+    [SqlServerFact]
+    public Task ClaimReleaseSqlMissingKeyAllowsHealthyAgencyAndDurableDueRecovery() => VerifyMissingKeyIsolationAsync(true);
+
+    private static async Task VerifyMissingKeyIsolationAsync(bool sqlServer)
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(sqlServer: sqlServer);
         const string missingReference = "CLAIMMD_SANDBOX_KEY_ISOLATION_A";
         const string healthyReference = "CLAIMMD_SANDBOX_KEY_ISOLATION_B";
         await using (var db = fixture.Factory.OpenDatabase())
@@ -78,60 +81,82 @@ public sealed partial class ClearinghouseDispatchApiTests
         }
         var keys = new IsolationKeySource(missingReference, healthyReference);
         var connector = new IsolationRecordingConnector();
-        var firstWorker = CreateIsolationWorker(fixture.Factory, keys, connector);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => firstWorker.ProcessOneAsync(CancellationToken.None));
+        var clock = new PreflightTestClock();
+        var firstWorker = CreateIsolationWorker(fixture.Factory, keys, connector, clock,
+            sqlServer ? SqlPreflightCoordination(fixture.Factory) : null);
+        Assert.True(await firstWorker.ProcessOneAsync(CancellationToken.None));
 
-        // Independently constructed host, same owned in-memory database and synthetic
-        // vault. Leases are test stand-ins: this is not SQL multi-host concurrency proof.
+        // Independent host, same owned database/vault. Only the SQL variant proves
+        // provider session ownership; the SQLite variant uses lease stand-ins.
         await using var secondHost = new SyntheticPipelineFactory(fixture.Database, fixture.Factory.Vault)
             { EnableSyntheticDispatch = true, DisableDispatchWorker = true };
-        var secondWorker = CreateIsolationWorker(secondHost, keys, connector);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => secondWorker.ProcessOneAsync(CancellationToken.None));
-        bool healthyAgencyProgressed;
+        var secondWorker = CreateIsolationWorker(secondHost, keys, connector, clock,
+            sqlServer ? SqlPreflightCoordination(secondHost) : null);
+        Assert.True(await secondWorker.ProcessOneAsync(CancellationToken.None));
+        DateTime nextEligible;
         await using (var db = secondHost.OpenDatabase())
         {
             var first = await db.ClearinghouseDispatches.SingleAsync(x => x.Id == firstDispatchId);
             var other = await db.ClearinghouseDispatches.SingleAsync(x => x.Id == otherDispatchId);
-            healthyAgencyProgressed = other.State == ClearinghouseDispatchState.AcceptedByClearinghouse;
             Assert.Equal(ClearinghouseDispatchState.Queued, first.State);
-            Assert.Equal(ClearinghouseDispatchState.Queued, other.State);
-            Assert.Equal(firstRevision, first.Revision); Assert.Equal(otherRevision, other.Revision);
-            Assert.Empty(await db.ClearinghouseDispatchAttempts.ToListAsync());
-            Assert.Empty(await db.BillingSubmissionEvents.Where(x => x.Stage == BillingSubmissionStage.Transmitted).ToListAsync());
+            Assert.Equal(ClearinghouseDispatchState.AcceptedByClearinghouse, other.State);
+            Assert.Equal(firstRevision, first.Revision); Assert.Equal(otherRevision + 2, other.Revision);
+            var attempt = Assert.Single(await db.ClearinghouseDispatchAttempts.ToListAsync());
+            Assert.Equal(otherDispatchId, attempt.DispatchId);
+            var transmission = Assert.Single(await db.BillingSubmissionEvents.Where(x => x.Stage == BillingSubmissionStage.Transmitted).ToListAsync());
+            Assert.Equal(otherActors.AgencyId, transmission.AgencyId);
+            var readiness = await db.ClearinghouseDispatchReadiness.SingleAsync();
+            Assert.Equal(fixture.Actors.AgencyId, readiness.AgencyId);
+            Assert.Equal(1, readiness.FailureCount);
+            Assert.Equal(ClearinghousePreflightDisposition.Deferred, readiness.Disposition);
+            nextEligible = readiness.NextEligibleAtUtc!.Value;
             Assert.Equal(firstFile.Content, (await db.EdiGenerations.SingleAsync(x => x.Id == fixture.GenerationId)).Content);
             Assert.Equal(otherFile.Content, (await db.EdiGenerations.SingleAsync(x => x.Id == otherGenerationId)).Content);
         }
-        Assert.Empty(connector.Dispatches);
-        Assert.Equal(new[] { missingReference, missingReference }, keys.ResolvedReferences);
+        Assert.Equal(new[] { otherDispatchId }, connector.Dispatches);
+        Assert.Equal(new[] { missingReference, healthyReference }, keys.ResolvedReferences);
 
         // Positive control: neither B's identity nor current compliance caused the
         // failure. Restore only A's synthetic key; both retained files can send once.
+        await secondHost.DisposeAsync();
+        await using var restartedHost = new SyntheticPipelineFactory(fixture.Database, fixture.Factory.Vault)
+            { EnableSyntheticDispatch = true, DisableDispatchWorker = true };
+        var restartedWorker = CreateIsolationWorker(restartedHost, keys, connector, clock,
+            sqlServer ? SqlPreflightCoordination(restartedHost) : null);
         keys.MissingKeyRestored = true;
-        Assert.True(await secondWorker.ProcessOneAsync(CancellationToken.None));
-        Assert.True(await secondWorker.ProcessOneAsync(CancellationToken.None));
-        Assert.Equal(new[] { firstDispatchId, otherDispatchId }, connector.Dispatches);
-        await using (var db = secondHost.OpenDatabase())
+        Assert.False(await restartedWorker.ProcessOneAsync(CancellationToken.None));
+        clock.SetUtc(nextEligible.AddTicks(-1));
+        Assert.False(await restartedWorker.ProcessOneAsync(CancellationToken.None));
+        clock.SetUtc(nextEligible);
+        Assert.True(await restartedWorker.ProcessOneAsync(CancellationToken.None));
+        Assert.False(await restartedWorker.ProcessOneAsync(CancellationToken.None));
+        Assert.Equal(new[] { otherDispatchId, firstDispatchId }, connector.Dispatches);
+        await using (var db = restartedHost.OpenDatabase())
         {
             Assert.All(await db.ClearinghouseDispatches.ToListAsync(), row =>
                 Assert.Equal(ClearinghouseDispatchState.AcceptedByClearinghouse, row.State));
             Assert.Equal(2, await db.ClearinghouseDispatchAttempts.CountAsync());
             Assert.Equal(2, await db.BillingSubmissionEvents.CountAsync(x => x.Stage == BillingSubmissionStage.Transmitted));
+            Assert.Equal(ClearinghousePreflightDisposition.Ready,
+                (await db.ClearinghouseDispatchReadiness.SingleAsync()).Disposition);
         }
-        Assert.True(healthyAgencyProgressed,
-            "Healthy agency B received no turn: both bounded worker calls selected A's missing key; " +
-            "zero uploads occurred before restoring A. Durable account isolation is not implemented.");
     }
 
+    private static SqlDemoWorkerResetCoordination SqlPreflightCoordination(SyntheticPipelineFactory factory) => new(
+        factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(),
+        Options.Create(new SatiApiOptions { ExpectedEnvironment = "Demo", ExpectedDatabaseName = "SatiDemo" }));
+
     private static ClearinghouseDispatchWorker CreateIsolationWorker(SyntheticPipelineFactory factory,
-        IClaimMdSandboxKeySource keys, IClearinghouseConnector connector) => new(
+        IClaimMdSandboxKeySource keys, IClearinghouseConnector connector, TimeProvider? clock = null,
+        IDemoWorkerResetCoordination? coordination = null) => new(
         factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
         new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
         {
             ExpectedEnvironment = "Testing", ExpectedDatabaseName = "SatiApiTests",
             EnableClaimMdSandboxTransport = true
         }), factory.Services.GetRequiredService<IHostEnvironment>()),
-        factory.Services.GetRequiredService<EnvelopeProtector>(), keys, new TestDemoWorkerResetCoordination(),
-        factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>());
+        factory.Services.GetRequiredService<EnvelopeProtector>(), keys, coordination ?? new TestDemoWorkerResetCoordination(),
+        factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), clock ?? TimeProvider.System);
 
     private sealed class IsolationKeySource(string missingReference, string healthyReference) : IClaimMdSandboxKeySource
     {
@@ -142,7 +167,7 @@ public sealed partial class ClearinghouseDispatchApiTests
             Assert.True(reference == missingReference || reference == healthyReference);
             ResolvedReferences.Add(reference!);
             if (reference == missingReference && !MissingKeyRestored)
-                throw new InvalidOperationException("Synthetic account key unavailable.");
+                throw new ClaimMdAccountKeyUnavailableException();
             return "SYNTHETIC_ONLY_KEY";
         }
     }
@@ -157,14 +182,11 @@ public sealed partial class ClearinghouseDispatchApiTests
             return _inner.UploadAsync(upload, token);
         }
     }
-}
 
-public sealed class DispatchIsolationReproducerFactAttribute : FactAttribute
-{
-    public DispatchIsolationReproducerFactAttribute()
+    private sealed class PreflightTestClock : TimeProvider
     {
-        if (Environment.GetEnvironmentVariable("SATI_RUN_DISPATCH_ISOLATION_REPRO") != "1")
-            Skip = "Deliberately red design reproducer; opt in with SATI_RUN_DISPATCH_ISOLATION_REPRO=1. " +
-                "See BACKGROUND_WORKERS_HANDOFF.md's known-unsent isolation proposal.";
+        private DateTime _now = DateTime.UtcNow;
+        public override DateTimeOffset GetUtcNow() => new(_now, TimeSpan.Zero);
+        public void SetUtc(DateTime now) => _now = DateTime.SpecifyKind(now, DateTimeKind.Utc);
     }
 }

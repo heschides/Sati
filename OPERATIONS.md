@@ -604,3 +604,20 @@ or authorize deletion. Apply only a separately authorized controlled migration/r
 runtime purge, obtain agency/legal policy approvals, implement/review complete adapters and
 recovery references, rehearse restore (prompt 17), appoint owners/alerts and review a runtime gate.
 RECORDS_GOVERNANCE_RUNBOOK.md supplies implementation, synthetic evidence and activation steps.
+
+## Missing-key queued dispatch recovery — source October 9, 2026
+
+[W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+owns the approved readiness policy and evidence limits. Billing sees Deferred/Held account text,
+counts and earliest UTC retry; the dispatch remains Queued. After restoring the server account
+key, an agency Admin refreshes the current account/readiness revisions and reopens once. The API
+verifies key/receipt protection and current authority before resetting readiness. A conflict or
+unconfirmed reply requires refresh/review; reopening is not transmission or billing approval.
+Shared wrapping/SQL/lease faults require their dependency response, not repeated account resets.
+
+Pause dispatch on every host for additive migration or rollback; verify compatible workers honor
+readiness before enabling. Old workers ignore account holds. Preserve storage/audits and reconcile
+queued and uncertain work during operational rollback; Down refuses unresolved scheduling state.
+The existing idle loop, aggregate connection budget, configuration consistency, live notification
+owner/receipt and deployed query plans remain activation blockers, separately from source proof.
+No existing database migration or alert activation was performed by this source task.

@@ -144,6 +144,15 @@
       "status": "proposed",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0235",
+      "date": "2026-10-09",
+      "title": "Durable known-unsent account readiness and controlled recovery",
+      "path": "docs/decisions/current/2026-10-09-DEC-0235.md",
+      "status": "accepted",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": ["DEC-0234"]
     }
   ]
 }

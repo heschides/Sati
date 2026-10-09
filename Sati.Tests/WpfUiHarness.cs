@@ -2,8 +2,10 @@ using Sati.Views;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Xml.Linq;
 
 namespace Sati.Tests;
 
@@ -19,8 +21,9 @@ namespace Sati.Tests;
 /// owner, created lazily and never shut down, removes that entirely. The thread is
 /// a background thread, so it does not hold the process open.
 /// <para>
-/// <c>App.OnStartup</c> never runs: the harness does not call <c>Run()</c>, so no
-/// generic host, database connection, or window is built. A test that needs
+/// WPF queues <c>OnStartup</c> from its constructor, even without <c>Run()</c>.
+/// The harness overrides that callback so no production startup, generic host,
+/// database connection, or login window is built. A test that needs
 /// <c>App.Services</c> supplies its own host through <see cref="RunWithHost"/>.
 /// </para>
 /// <para>
@@ -110,6 +113,18 @@ internal static class WpfUiHarness
         Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
     }
 
+    /// <summary>
+    /// Finishes content created by a tab selection or queued scroll command before
+    /// its geometry and bindings are inspected. Opt in only for those interactions.
+    /// </summary>
+    internal static void RealizePendingContent(FrameworkElement element, double width, double height)
+    {
+        Realize(element, width, height);
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+        Realize(element, width, height);
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+    }
+
     /// <summary>The first descendant of that type carrying that automation name.</summary>
     internal static T FindByAutomationName<T>(DependencyObject root, string name)
         where T : DependencyObject
@@ -148,11 +163,11 @@ internal static class WpfUiHarness
             {
                 try
                 {
-                    // InitializeComponent loads Application.Resources — the theme
-                    // dictionaries, converters, fonts, and every named style the
-                    // views resolve with StaticResource.
-                    _application = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-                    _application.InitializeComponent();
+                    // Read the canonical Application.Resources without compiled
+                    // App code-behind: LoadComponent requires the root object's
+                    // assembly to match, so it cannot initialize a test subclass.
+                    _application = new HarnessApplication { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                    _application.Resources = LoadApplicationResources();
                     _dispatcher = Dispatcher.CurrentDispatcher;
                 }
                 catch (Exception exception)
@@ -183,5 +198,29 @@ internal static class WpfUiHarness
 
             return _dispatcher!;
         }
+    }
+
+    private static ResourceDictionary LoadApplicationResources()
+    {
+        var source = XDocument.Load(Path.Combine(RenderedViews.RepositoryRoot(), "App.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var resources = new XElement(source.Root!.Element(presentation + "Application.Resources")!
+            .Elements().Single());
+        foreach (var declaration in source.Root.Attributes().Where(attribute => attribute.IsNamespaceDeclaration))
+            resources.SetAttributeValue(declaration.Name, declaration.Value);
+        using var markup = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(
+            RenderedViews.QualifyDesktopNamespaces(resources.ToString())));
+        return (ResourceDictionary)XamlReader.Load(markup, new ParserContext
+        {
+            BaseUri = new Uri("pack://application:,,,/Sati;component/App.xaml", UriKind.Absolute)
+        });
+    }
+
+    private sealed class HarnessApplication : App
+    {
+        // Application's constructor posts startup to this dispatcher. Calling
+        // App.OnStartup would acquire the user's single-instance guard and launch
+        // the environment/login workflow, regardless of whether Run was called.
+        protected override void OnStartup(StartupEventArgs e) { }
     }
 }

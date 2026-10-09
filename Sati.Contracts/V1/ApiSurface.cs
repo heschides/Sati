@@ -134,7 +134,8 @@ public static class ApiSurface
         "service-day-inclusion-review-v1",
         "synthetic-clearinghouse-dispatch-v1",
         "claimmd-test-account-onboarding-v1",
-        "claimmd-manual-reconciliation-v1"
+        "claimmd-manual-reconciliation-v1",
+        "clearinghouse-account-readiness-v1:expectedReadinessRevision,expectedAccountRevision;queued-intent-preserved;admin-reopen"
     ];
 
     /// <summary>
@@ -273,6 +274,7 @@ public static class ApiSurface
         "GET /health/version",
         "POST /api/v1/admin/audit-export.csv",
         "POST /api/v1/admin/clearinghouse/claimmd-test-accounts",
+        "POST /api/v1/admin/clearinghouse/accounts/{accountId:guid}/preflight/reopen",
         "POST /api/v1/admin/clearinghouse/dispatches/{dispatchId:guid}/reconciliation",
         "POST /api/v1/admin/consumers/{personId:int}/delete-in-window",
         "POST /api/v1/admin/demo/reset",

@@ -30,8 +30,14 @@ The API's Claim.MD connector owns the HTTP I/O deadline; client registration del
 configuration to that owner. [Background execution](docs/architecture/workers.md) and the
 [sandbox runbook](CLAIMMD_SANDBOX_RUNBOOK.md) describe its component boundary and evidence limits.
 The [worker isolation proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal)
-defines durable account preflight recovery for review; its synthetic failure reproducer does not
-establish an implemented scheduler or schema boundary.
+retains its reviewed design. The [implemented W8 boundary](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+adds shared Contracts readiness rules, Persistence account state and API-owned due/hold/reopen.
+WPF uses safe DTOs and an authorized HTTP command; no desktop scheduler or key resolver is added.
+Source migration and local verification do not establish deployed activation or broader fairness.
+
+The [desktop test boundary](docs/architecture/desktop.md) explicitly suppresses production
+startup while loading canonical UI resources; omitting Application.Run does not suppress the
+startup callback queued by WPF construction. Fixture hosts remain explicitly supplied.
 
 The API's constructor-injected request exception boundary owns containment and safe failure
 responses before downstream middleware exceptions reach hosting. [The identity boundary](docs/architecture/identity.md)

@@ -32,20 +32,20 @@ evidence distinguish source storage replacement, tested retained cardinality and
 Rotation follows an enabled gate-acquired check; there is no new idle cleanup scheduler or
 measured memory bound. Current-day cardinality/churn and same-day removed-agency entries remain.
 
-The October 9 SATI-WRK-001 design slice adds a bounded two-agency/two-host missing-key failure
-reproducer and a proposed durable account readiness owner. [DEC-0234](../decisions/current/2026-10-09-DEC-0234.md)
-and [the canonical W8 proposal](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal)
-own its due/backoff/hold/reopen, lock staging and additive schema review. This is design and
-observed failure evidence; runtime selection and recovery remain unchanged pending approval.
+The October 9 approved missing-key slice adds Contracts readiness rules, shared Persistence
+account state and API-owned due/hold/reopen. [DEC-0235](../decisions/current/2026-10-09-DEC-0235.md)
+and [W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+own exact recovery, staging, account session ownership, safe API/UI and additive source migration.
+[Working evidence](../readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
+distinguishes fake-time/source tests from private SQL ownership and operating evidence.
 
-Remaining W8: current-day completion capacity, fair healthy-agency wait bounds, total
-operation/pass deadlines, per-account failure/dependency isolation, aggregate and tenant
-budgets, API admission and synthetic
-multi-host/load evidence. Agency IDs and a worker per agency do not by themselves isolate
-shared SQL or vendor capacity. [The agenda](../../AGENDA.md#next-eligible-work) owns the current
-next slice; the [billing owner](../../CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
-records completed R1/R2 source evidence separately. No new runtime owner or persistence boundary
-is established by the proposed worker design.
+Remaining W8: reviewed idle/wake integration (the three-second idle loop is unchanged), sustained
+fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant
+sessions and dependency budgets, API admission and synthetic load/live owner evidence. Account
+leases and missing-key deferral do not establish complete shared-dependency isolation or global
+latency bounds. [The agenda](../../AGENDA.md#next-eligible-work) owns the next bounded slice;
+[billing release admission](../../CLAIMMD_SANDBOX_RUNBOOK.md#coordinated-release-and-current-subset-compliance--local-source-october-9-2026)
+remains authoritative. No existing/cloud migration or activation is established by source checks.
 
 ## Canonical detailed owners
 

@@ -2046,6 +2046,219 @@ existing database, cloud settings, live credentials or publication.
 
 **Later reviewed release snapshot, if any:** none; no new release invoked or reassessed.
 
+## 2026-10-09 — Missing-key dispatch isolation implementation
+
+**Stable work ID and bounded slice:** SATI-WRK-001, approved known-unsent account readiness,
+due/backoff/hold, scoped recovery/API/UI and additive source migration.
+
+**Status and source/revision:** implementation on `codex/billing-original-release-design` after
+`0b6c9506f145627ff22c4748cd225eee3a849d63`; final commit is reported in the handoff. Josh's explicit
+Approved accepts the reviewed DEC-0234 policy and additive source files/private synthetic SQL
+checks. Existing/cloud databases, live keys/vendor calls, infrastructure and publication remain
+outside this source approval. Preexisting Sati.csproj formatting and assessment scratch preserved.
+
+**Changed behavior, ownership and canonical paths:**
+[W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+owns Contracts readiness, shared Persistence state/guards, API discovery/preparation/account lease,
+current release admission, atomic system/human audits and safe captured-session desktop recovery.
+[API authorization](../../API_AUTHORIZATION.md), [audits](../../AUDIT_EVENTS.md) and
+[operations](../../OPERATIONS.md#missing-key-queued-dispatch-recovery--source-october-9-2026)
+record their changed boundaries. Source migration `20261009183720_AddClearinghousePreflightReadiness`
+adds one table and indexes; Down refuses unresolved scheduling state (SQL 51044). No existing
+schema/model/delivery rows are rewritten and no existing database was migrated.
+
+**Actual tests/checks, commands, results and evidence locations:** source generation used
+`dotnet ef migrations add AddClearinghousePreflightReadiness --project Sati.Persistence
+--startup-project Sati.Persistence --context SatiContext -- --synthetic-design`, successful with
+no database connection. Release targeted API checks in
+`assessment-working/test-results/worker-preflight/`:
+
+- `preflight-core-first-green.trx`: 8 passed, including promoted two-agency starvation regression,
+  deterministic delay/state rules and truthful missing-key dispatch state. Earlier actual
+  starvation failure is retained in the [design evidence](#2026-10-09--missing-key-dispatch-isolation-design).
+- `preflight-reopen-route-baseline.trx`: 3 failed as expected before route/GET readiness existed
+  (404/no readiness), demonstrating missing behavior; this is not security proof.
+- `preflight-api-green.trx`: 14 passed covering cycle, exact due boundary, hold, cancellation,
+  shared/unknown faults, rollback, visibility and recovery.
+- `preflight-authority-first-green.trx`: 4 passed/1 failed. The account-change fixture attempted
+  an EF update without the required account revision and received 500; corrected the negative
+  fixture to a deliberate direct synthetic stale-binding mutation. This was not an application
+  recovery failure. Earlier compile attempt used a nonexistent protector interface; corrected
+  to the existing constructor-injected EnvelopeProtector before any tests ran.
+- `preflight-guards-removed-red.trx`: 3 expected failures when Admin/current-actor/full-binding
+  guards were temporarily removed; restored immediately in finally. Assertions observed unsafe
+  503/200 results rather than expected 403/401/409. These demonstrate the authorization and stale
+  binding checks, unlike an absent-route baseline.
+- `preflight-complete-green.trx`: 21 passed/0 failed/skipped with restored guards, including lost
+  lease stand-ins, uncertain-send quarantine and safe payloads. Later hold-reopen/SQL/UI/suite
+  checks and documentation gates are recorded below after completion.
+
+- Private SQL selection run: **26 passed, 0 failed/skipped**, 2m35s,
+  `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_14_41_35_net10.0.trx`.
+  Includes four new preflight cases and 22 existing admitted-release cases selected by the broad
+  filter. New checks prove two-host A/B progression and persisted due recovery; same-account
+  preparation excludes another host while another account can take its lease; key wrapping has
+  no common decision lock; actual SQL session lease loss is detected, cancellation releases
+  ownership; exact additive Down/Up retains bytes, absent readiness is empty, state/FK CHECKs
+  reject malformed/foreign raw inserts, deletion is refused, and unresolved rollback throws
+  51044. This rehearses the additive change against the owned API fixture schema with the new
+  table/index removed first, not a cloud migration or a complete historical SQL-chain replay.
+- SQL negative proofs: the 14:45:35 TRX records 3 failures after account exclusion, observed
+  session verification and rollback guards were removed. Account exclusion failed at unsafe
+  same-account entry and rollback failed because no exception was thrown. The lease-loss case
+  instead hit a fixture null because bypassed acquisition created no tracked lease context;
+  that is not counted as ownership proof. The isolated 14:46:49 attempt removed only verification
+  but its assertion was masked by release cleanup. Moved synthetic lease reacquisition into
+  finally, then `Joshu_LONGCHENPA_2026-10-09_14_49_28_net10.0.trx` failed exactly because no lost-
+  ownership exception was thrown. All mutations were restored and every owned instance cleaned.
+- Desktop **2 passed**, `preflight-desktop-green.trx`: real WPF accessible recovery button/text,
+  Admin capability and current revision capture, and stale-session completion suppression.
+- Source migration script generated successfully via `dotnet ef migrations script` with prior/
+  new IDs, idempotence and `--synthetic-design`; artifact
+  `scripts/Apply-ClearinghousePreflightReadinessMigration.generated.sql` is source-only, unexecuted.
+- Migration chain symbolic replay: **129 migrations, 91 tables, 1154 columns, 0 problems**.
+  Documentation structure passed and all **22 negative mutation proofs passed**. Readiness
+  history comparison against `0b6c9506f145627ff22c4748cd225eee3a849d63` passed, sealed 1.3.38
+  remains overall 22 with 41 hard blockers. Final whitespace passed.
+- Initial full Release solution run (`scripts/Test-IsolatedLocalDb.ps1 -FullSolution`): API
+  **1278 passed/2 failed/0 skipped**, 24m24s, desktop **3022 passed/5 failed/1 configured-local-AI
+  skip**, 9m27s; signatures **119**, portal **8** and Carika **4** passed. API evidence is
+  `TestResults/BackgroundWorkersFullSql/Joshu_LONGCHENPA_2026-10-09_14_50_59_net10.0.trx` and
+  desktop evidence is `...14_51_10...trx`. Owned private instance cleanup passed. No worker
+  regression failed. The migration boundary test retained its prior count of 128; updated to
+  129 and asserted the new migration ID. Two ApiSurface checks caught the undeclared recovery
+  route and stale fingerprint. Added the exact route and named readiness shape; source
+  fingerprint is D30D44631876, 269 routes/70 shapes. No deployed inventory or sealed release
+  fingerprint was changed.
+- Desktop focused rebuilt recheck **25 passed/0 failed/skipped**,
+  `preflight-desktop-suite-recheck.trx`: migration boundary, complete Chat and ConsumerNotes
+  render classes and billing response/recovery UI. The full run's four geometry failures
+  (ConsumerNotes grid width and three Chat message layouts) did not recur in isolation. The
+  headless WpfUiHarness drained queued binding/template work after its only layout pass;
+  the first attempted repair finished layout after that pump so newly created/invalidated
+  children were measured before geometry assertions. Assertions and product views were
+  unchanged; the timing cause was an inference rather than an isolated causal reproduction.
+  Post-repair focused recheck also **25 passed/0 failed/skipped**, 3s,
+  `preflight-desktop-layout-settled.trx`. These overlap the earlier 25 cases; they are not 50
+  distinct tests. Final full-solution results follow after completion.
+- Final focused API/private SQL selection **32 passed/0 failed/skipped**, 1m49s,
+  `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_15_18_48_net10.0.trx`.
+  Rebuilt latest source and included API surface, Contracts rules, all Preflight API cases,
+  ordinary A/B regression and four new SQL cases. The strengthened workspace fixture includes
+  a real foreign readiness row, and durable due recovery disposes and recreates the second API
+  host before retry. Held Admin reopening, stale missing-key preparation, lost ownership,
+  no false attempts and exact due boundary all passed. Private instance cleanup passed.
+  Full solution acceptance follows after these corrections.
+- The next full solution run's desktop result was **3025 passed/2 failed/1 local-AI skip**,
+  9m43s, `TestResults/BackgroundWorkersFullSql/Joshu_LONGCHENPA_2026-10-09_15_20_58_net10.0.trx`.
+  Earlier geometry assertions now passed; the remaining failures were the queued ConsumerNotes
+  scroll offset and one narrow Chat composer binding. Complete API **1280 passed/0 failed/skipped**,
+  23m33s, `TestResults/BackgroundWorkersFullSql/Joshu_LONGCHENPA_2026-10-09_15_20_57_net10.0.trx`.
+  Signatures **119**, portal **8** and Carika **4** passed; private cleanup passed. The full
+  command retained failure status for the two desktop checks. A separate no-build selection
+  of all 60 WPF harness classes (435 expected
+  cases) instead hit WPF DeferredAppResourceReference during theme switching and aborted:
+  **143 passed/1 failed/144 reported**, `preflight-whole-ui-baseline.trx`. Unexecuted cases are
+  not credited. A second broad helper attempt drained through ApplicationIdle before/after
+  layout; its complete desktop run still aborted in the same WPF resource method while
+  changing themes: **2644 passed/1 failed/1 skipped/2646 reported**, 2m07s,
+  `TestResults/BackgroundWorkersFinalDesktopSql/Joshu_LONGCHENPA_2026-10-09_15_42_29_net10.0.trx`.
+  Missing cases are not credited; private cleanup passed. Reject the broad default-helper
+  change. Restore existing Realize behavior and opt in to RealizePendingContent only in the
+  Chat selected-pane and ConsumerNotes selection/scroll fixtures. Preserve geometry,
+  accessibility and permission assertions; add current CanCompose to distinguish permission
+  from binding state. No product views/rules changed during this test repair. The framework
+  failure's exact internal cause remains unproven; narrowed acceptance follows below.
+- Rebuilt only the desktop test project with `--no-restore -m:1
+  -p:BuildProjectReferences=false`: **0 errors/9 existing warnings**. The active API binaries
+  were not rebuilt. The private SQL driver now offers `-FullDesktop` for the complete desktop
+  project and explicit `-NoBuild` for already-built Release artifacts; its owned instance,
+  mode-exclusion and cleanup guards remain. The full desktop rerun uses freshly built tests
+  with those options and a distinct owned SQL instance. Final acceptance credits complete
+  solution-project results plus the affected desktop's complete rerun, retaining the failed
+  full command rather than presenting that command as green.
+- With the original default Realize restored, the theme/selection recheck still aborted:
+  **40 passed/1 failed/41 reported**, `preflight-selection-and-theme-recheck.trx`.
+  All reported cases belonged to ThemeLegibilityTests; none had reached the opt-in pending-
+  content helper. Thus the broad helper was not established as the theme crash's cause.
+  Separate narrowed selection/Chat/billing recovery checks **24 passed/0 failed/skipped**,
+  `preflight-pending-content-focused.trx`, with permission and geometry assertions retained.
+- Theme-fixture experiment materialized all dictionary entries before repeated replacement.
+  That also eagerly loaded an unrelated legacy icon whose relative URI does not resolve in
+  the test host. Cancelled the known-failed experiment; no complete count/TRX is credited.
+  Narrowed materialization to palette keys ending Brush/Color, including the restored original
+  palette. This is a test-only initialization change; it does not catch framework exceptions,
+  skip themes or change contrast assertions. Rebuilt desktop tests **0 errors/9 existing
+  warnings** and started complete private-SQL desktop acceptance. Its actual result follows.
+- That palette experiment failed complete desktop acceptance: **2804 passed/223 failed/1
+  local-AI skip**, 2m23s, `TestResults/BackgroundWorkersFinalDesktopSql/
+  Joshu_LONGCHENPA_2026-10-09_15_54_46_net10.0.trx`; owned cleanup passed. Application.Current
+  became null during the Woodfords theme swap, followed by shutdown/resource failures throughout
+  the remaining UI cases. Reverted palette materialization completely; no ThemeLegibilityTests
+  change remains. These cascading failures are not 223 independently demonstrated product defects.
+- Identified the actual startup isolation defect: the harness constructed App and assumed that
+  not calling Application.Run suppressed App.OnStartup. WPF's constructor instead queues that
+  callback at Send priority ([framework source](https://raw.githubusercontent.com/dotnet/wpf/main/src/Microsoft.DotNet.Wpf/src/PresentationFramework/System/Windows/Application.cs)).
+  Production startup registers failure handlers and tries the workstation single-instance guard;
+  an existing installed Sati can cause the test application's shutdown before any environment
+  selection. Earlier claims that the old harness could not run startup are withdrawn. No working
+  database access was intentionally performed or observed; the old harness's startup boundary
+  was not safe by construction and is not credited as such.
+- The corrected test-only HarnessApplication overrides startup. It reads canonical App.xaml's
+  Application.Resources with the desktop pack base URI; compiled LoadComponent cannot populate
+  a subclass from the test assembly. Shared namespace qualification remains owned by RenderedViews.
+  Initial compiled-loader attempt **15 passed/10 failed**,
+  `preflight-startup-isolation-and-ui-green.trx`; the first root-object assembly mismatch caused
+  later singleton creation errors. One intervening XmlReader/ParserContext overload compile
+  attempt failed before running tests; changed to the supported Stream overload. Corrected
+  startup/resources and UI recheck **25 passed/0 failed/skipped**,
+  `preflight-startup-isolation-resources-green.trx`. The new runtime check pumps through idle,
+  asserts a live application/resources, no host, no single-instance ownership and no registered
+  production failure handlers. Production startup was not deliberately re-enabled for a new
+  negative run because doing so would reintroduce the unsafe workstation/login path.
+- Final complete rebuilt desktop/private-SQL acceptance **3028 passed/0 failed/1 configured
+  local-AI skip**, 10m54s, `TestResults/BackgroundWorkersFinalDesktopSql/
+  Joshu_LONGCHENPA_2026-10-09_16_01_38_net10.0.trx`; owned instance stop/delete passed. Together
+  with the complete API **1280 passed**, signatures **119**, portal **8** and Carika **4**
+  from the earlier full run, every solution test project has a complete passing result for
+  the final applicable source. Only desktop fixture/documentation changes followed that API
+  run. This does not turn either earlier failed full-solution command into a green command.
+  Final documentation structure and whitespace checks passed; all 22 documentation negative
+  proofs and sealed-readiness history checks passed. No sealed score or release was changed.
+
+**Failed/unrun checks, reason and verification limits:** no working/shared/cloud database access
+was requested or intentionally performed; the old harness's unsafe startup assumption and its
+correction are recorded above. No real account key, provider transport, live alert, PHI query,
+deployment or installer/release test was performed. SQLite fixtures/lease stand-ins do not
+establish SQL concurrency; the private SQL checks above establish only their bounded provider
+cases. Complete project-suite verification is finished with the one configured local-AI skip
+retained. No global fairness, aggregate
+connection/dependency budget, external fencing/exactly-once guarantee, query-plan/load measurement,
+idle-wake policy approval or operating readiness follows from targeted green counts.
+
+**Relevant readiness criterion IDs and evidence class:** MT07/ID10 missing-key isolation,
+MT01/MT02/MT05 trusted scope/account binding, MT10 admitted changes and OP06 atomic audit.
+These are source/private synthetic evidence and explicit limits, not amended sealed scores.
+
+**Durable decisions, alternatives and supersession links:**
+[DEC-0235](../decisions/current/2026-10-09-DEC-0235.md) accepts and supersedes only DEC-0234's pending
+review/source status, preserving the draft reasoning and dated red reproducer. Cancellation,
+shared outages and unknown failures propagate; account recovery cannot replay uncertain sends.
+Rejected cancelling temporarily blocked queued work, memory skip lists, per-dispatch-only backoff,
+implicit configuration reopen and mixed active old/new workers. D1–D4 and DEC-0233 remain.
+
+**Remaining risks/blockers, dependencies and deferred work:** separate authority/preflight is
+required for existing-database migration and release, synthetic reset baseline compatibility,
+compatible paused-host rollout, consistent key configuration, idle/wake integration and activation.
+Sustained-backlog/contention fairness, API admission, aggregate SQL/network budgets and operating
+alert/progress/recovery evidence remain W8 work. The unchanged three-second hosted idle selection
+is an explicit activation cadence gap; no wake ping or shorter polling was added.
+
+**Next eligible stable ID and bounded slice:** SATI-WRK-001, reviewed dispatch idle/wake/activity/
+due scheduling design, as specified in [the agenda](../../AGENDA.md#next-eligible-work). That new
+slice is not started by completion of the present approved worker isolation task.
+
+**Later reviewed release snapshot, if any:** none; sealed 1.3.38 and rubric versions unchanged.
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

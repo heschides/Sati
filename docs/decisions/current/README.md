@@ -22,7 +22,8 @@ Read the individual registered record for the decision and rejected alternatives
 | DEC-0231 | 2026-10-09 | [Retained EDI replay includes request kind](2026-10-09-DEC-0231.md) | accepted; source implemented |
 | DEC-0232 | 2026-10-09 | [Shared original-claim delivery history admission](2026-10-09-DEC-0232.md) | accepted; sequential source implementation |
 | DEC-0233 | 2026-10-09 | [Coordinated claim release and current retained-subset compliance](2026-10-09-DEC-0233.md) | accepted; source implemented |
-| DEC-0234 | 2026-10-09 | [Known-unsent account preflight recovery proposal](2026-10-09-DEC-0234.md) | proposed; policy/schema review pending |
+| DEC-0234 | 2026-10-09 | [Known-unsent account preflight recovery proposal](2026-10-09-DEC-0234.md) | retained proposal; pending status superseded by DEC-0235 |
+| DEC-0235 | 2026-10-09 | [Durable known-unsent account readiness and controlled recovery](2026-10-09-DEC-0235.md) | accepted; bounded source implementation |
 
 Accepted decisions must retain their evidence and earlier rejected reasoning. A change to a
 decision creates a successor and supersession link; it does not rewrite the historical import.

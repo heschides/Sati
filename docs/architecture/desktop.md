@@ -6,6 +6,14 @@ Implemented: constructor injection, awaited navigation/workflow writes, LatestRe
 
 Presentation privacy/shielding cannot grant authority or retract released data. Durable bounded breadcrumbs support crash investigation; they do not establish a stack-overflow cause. Workload projection and query pressure fixes remain measurable backlog items.
 
+The October 9 test harness owns a separate STA application that explicitly overrides startup.
+It loads canonical App.xaml resources through the shared RenderedViews namespace adapter;
+only RunWithHost may install a fixture service host. WPF queues startup during construction,
+so omitting Application.Run alone does not prevent the production single-instance/login path.
+Selection and queued-scroll fixtures opt in to finishing pending layout; the default realization
+behavior and UI/permission assertions remain. The [working evidence](../readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
+records the failed attempts, startup correction, actual suite results and verification limits.
+
 Local case-note drafting uses current-contact facts and the shared `CaseNoteDraftRules` validator.
 Initial and repair prompts distinguish the JSON follow-up body from the renderer's section label
 and require the supplied system no-follow-up object to remain exact. Facts and the safe baseline

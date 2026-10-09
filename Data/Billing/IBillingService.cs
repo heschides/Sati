@@ -17,6 +17,11 @@ namespace Sati.Data.Billing
             Task.FromException<ClaimLine>(new NotSupportedException("Payer preparation is unavailable."));
         bool SupportsResponseImport => false;
         bool SupportsClearinghouseDispatch => false;
+        Task<ClearinghouseAccountReadinessDto> ReopenClearinghousePreflightAsync(
+            AgencyActor actor, Guid accountId, ReopenClearinghousePreflightRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<ClearinghouseAccountReadinessDto>(new NotSupportedException(
+                "Account recovery requires an API connection."));
         Task<ClearinghouseWorkspaceDto> GetClearinghouseWorkspaceAsync(
             AgencyActor actor, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ClearinghouseWorkspaceDto(false,

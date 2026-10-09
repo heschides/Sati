@@ -14,6 +14,7 @@ internal static partial class ApiEndpoints
 {
     private static void MapClearinghouseDispatch(RouteGroupBuilder api)
     {
+        MapClearinghousePreflight(api);
         api.MapGet("/billing/clearinghouse", async Task<IResult> (
             ClaimsPrincipal principal, ApiDbContext db, ClearinghouseDispatchGate gate,
             CancellationToken token) =>
@@ -29,6 +30,10 @@ internal static partial class ApiEndpoints
                 .Where(row => row.AgencyId == actor.AgencyId && row.IsEnabled && row.IsTest)
                 .OrderBy(row => row.ConnectorKind).ToListAsync(token);
             accounts = accounts.Where(gate.CanUseAccount).ToList();
+            var accountIds = accounts.Select(row => row.Id).ToArray();
+            var readiness = await db.ClearinghouseDispatchReadiness.AsNoTracking()
+                .Where(row => row.AgencyId == actor.AgencyId && accountIds.Contains(row.AccountId))
+                .ToDictionaryAsync(row => row.AccountId, token);
             var dispatches = await db.ClearinghouseDispatches.AsNoTracking()
                 .Where(row => row.AgencyId == actor.AgencyId)
                 .OrderByDescending(row => row.RequestedAtUtc).ThenByDescending(row => row.Id)
@@ -60,7 +65,8 @@ internal static partial class ApiEndpoints
                         : "Synthetic server dispatch is enabled. Queued files are sent only to the fake connector.",
                 accounts.Select(row => new ClearinghouseAccountOptionDto(row.Id,
                     row.ConnectorKind.ToString(), row.ConnectorKind == TradingPartnerKind.ClaimMd
-                        ? "Claim.MD test profile" : "Office Ally test profile")).ToList(),
+                        ? "Claim.MD test profile" : "Office Ally test profile")
+                    { Readiness = ToReadinessDto(row, readiness.GetValueOrDefault(row.Id)) }).ToList(),
                 candidates, dispatches.Select(ToDispatchDto).ToList()));
         });
 

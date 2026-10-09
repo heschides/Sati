@@ -55,6 +55,15 @@ for content; the audit event is only its activity index.
 
 ## Recorded actions
 
+`billing-clearinghouse.preflight-deferred`, `preflight-held` and `preflight-recovered` use that
+same `billing-clearinghouse.` prefix and SystemActor.UserId (0). They commit with account
+readiness, retaining only account/cycle IDs, count, UTC due time, fixed failure code, revision
+and fixed actor/job labels. `billing-clearinghouse.preflight-reopened` uses the authenticated
+Admin and request correlation, with account ID and expected/resulting readiness/account revisions.
+No action contains key references, raw exceptions, claim bytes or vendor payloads. Failed/stale
+reopening creates no success audit. [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+owns the workflow; readiness is separate from delivery evidence.
+
 `consumer.providers.reordered` records the authenticated actor, agency and Person
 pointer with ordered current assignment IDs only. Local and API paths commit it
 with SortOrder changes in one transaction. No names, roles, relationship dates,

@@ -140,6 +140,7 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
     private readonly IInterceptor[] _interceptors;
     public TestKeyWrapper Vault { get; }
     public IKeyWrapper? KeyWrapperOverride { get; set; }
+    public IClaimMdSandboxKeySource? ClaimMdKeySourceOverride { get; set; }
     public bool EnableSyntheticDispatch { get; set; }
     public bool DisableDispatchWorker { get; set; }
     public IDemoWorkerResetCoordination? ResetCoordinationOverride { get; set; }
@@ -200,6 +201,11 @@ internal sealed class SyntheticPipelineFactory : WebApplicationFactory<Program>
             services.AddScoped(provider => provider.GetRequiredService<IDbContextFactory<ApiDbContext>>().CreateDbContext());
             services.RemoveAll<IKeyWrapper>();
             services.AddSingleton<IKeyWrapper>(KeyWrapperOverride ?? Vault);
+            if (ClaimMdKeySourceOverride is not null)
+            {
+                services.RemoveAll<IClaimMdSandboxKeySource>();
+                services.AddSingleton(ClaimMdKeySourceOverride);
+            }
             if (ResetCoordinationOverride is not null)
             {
                 services.RemoveAll<IDemoWorkerResetCoordination>();

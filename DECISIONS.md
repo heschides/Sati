@@ -10,6 +10,11 @@ current-decision collection. New decisions never change the immutable import's c
 
 ## Governing boundaries
 
+Accepted account readiness, scoped recovery and additive source migration are recorded in
+[DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md), explicitly superseding DEC-0234's pending
+approval/implementation status. [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+owns current behavior; earlier proposal and failure evidence remain retained.
+
 The authoritative assistant/product constraints remain in [AGENTS.md](AGENTS.md). Architecture
 ownership is in [ARCHITECTURE.md](ARCHITECTURE.md), runtime policy/runbooks in their topic owners,
 current observed environment facts in [DATABASE_ENVIRONMENTS.md](DATABASE_ENVIRONMENTS.md), and
@@ -61,8 +66,8 @@ authorization requirements.
 
 The known-unsent account preflight recovery design is proposed in
 [DEC-0234](docs/decisions/current/2026-10-09-DEC-0234.md). [The worker owner](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-proposal)
-contains the concrete policy/schema/acceptance proposal. Approval is pending; no worker recovery,
-schema or earlier accepted decision is changed by this design record.
+contains the retained concrete policy/schema/acceptance proposal. DEC-0235 supersedes its pending
+review status after explicit approval; the earlier reasoning and failure evidence remain preserved.
 
 Coordinated claim transactions, staged wrapping and current exact-subset release are recorded in
 [DEC-0233](docs/decisions/current/2026-10-09-DEC-0233.md). The
@@ -89,6 +94,7 @@ correction permissions, full R2/void-purpose review and operating authority rema
 
 | Earlier statement | Later authority | Scope of supersession |
 |---|---|---|
+| DEC-0234 awaited recovery policy/schema approval and left selection unchanged | [DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md) | Explicit approval and bounded source implementation; existing-database migration, activation, broader W8 and sealed readiness remain separate. |
 | DEC-0232 common admission/full current release and the transaction review wrapping placement were pending | [DEC-0233](docs/decisions/current/2026-10-09-DEC-0233.md) | Implemented admitted source decisions, staged encryption, current exact subset/action/purpose and private synthetic verification; earlier results remain dated evidence, and operating/certification/readiness authority is unchanged. |
 | October 9 billing design P1–P3 recommendations awaited a policy answer | [DEC-0230](docs/decisions/current/2026-10-09-DEC-0230.md) | Josh adopted the three product rules. This changes proposal status only; no implemented guard, SQL coordination or payer certification follows. |
 | Two health results retained caught exceptions; schema failures passed a raw exception to the logger | [DEC-0229](docs/decisions/current/2026-10-08-DEC-0229.md), [health logging owner](LOGGING_DESIGN.md#api-health-failures--source-october-8-2026) | Remove those logger/result payloads while retaining fixed Unhealthy status/descriptions, current cancellation and real validation. Startup and arbitrary other sinks remain separate. |

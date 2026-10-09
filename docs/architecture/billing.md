@@ -49,3 +49,9 @@ operating, capacity/fairness, complete-service recovery, legal or sealed-readine
 Original feature rationale and source references are retained in the
 [pre-consolidation architecture snapshot](../archive/2026-10-08/ARCHITECTURE.md).
 [Architecture index](../../ARCHITECTURE.md) · [Readiness evidence](../readiness/README.md)
+
+Account preparation readiness is separate from physical delivery and claim lifecycle.
+[W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation)
+owns the approved shared readiness rules, persistence and authorized recovery route. Missing
+keys defer Queued work without clearing reservations or creating send evidence; restoration
+resumes ordinary R1/R2 checks, and Sending/OutcomeUnknown require existing reconciliation.

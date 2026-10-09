@@ -409,7 +409,7 @@ public sealed partial class ClearinghouseDispatchApiTests
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(),
             connector, gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
             keys, new TestDemoWorkerResetCoordination(),
-            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>());
+            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System);
         using var caller = new CancellationTokenSource();
         var processing = worker.ProcessOneAsync(caller.Token);
         try
@@ -500,13 +500,15 @@ public sealed partial class ClearinghouseDispatchApiTests
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(),
             connector, gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
             new MissingKeySource(), new TestDemoWorkerResetCoordination(),
-            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => worker.ProcessOneAsync(CancellationToken.None));
+            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System);
+        Assert.True(await worker.ProcessOneAsync(CancellationToken.None));
         Assert.Equal(0, connector.Calls);
         await using var saved = fixture.Factory.OpenDatabase();
         Assert.Equal(ClearinghouseDispatchState.Queued,
             (await saved.ClearinghouseDispatches.SingleAsync()).State);
         Assert.Empty(await saved.ClearinghouseDispatchAttempts.ToListAsync());
+        Assert.Equal(ClearinghousePreflightDisposition.Deferred,
+            (await saved.ClearinghouseDispatchReadiness.SingleAsync()).Disposition);
     }
 
     [Fact]
@@ -756,7 +758,7 @@ public sealed partial class ClearinghouseDispatchApiTests
 
     private sealed class MissingKeySource : IClaimMdSandboxKeySource
     {
-        public string Resolve(string? reference) => throw new InvalidOperationException("No test key provisioned.");
+        public string Resolve(string? reference) => throw new ClaimMdAccountKeyUnavailableException();
     }
 
     private sealed class EvidenceConnector : IClearinghouseConnector
@@ -882,14 +884,15 @@ public sealed partial class ClearinghouseDispatchApiTests
 
         public static async Task<Fixture> CreateAsync(IDemoWorkerResetCoordination? coordination = null,
             bool sqlServer = false, Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor? interceptor = null,
-            IKeyWrapper? keyWrapper = null)
+            IKeyWrapper? keyWrapper = null, IClaimMdSandboxKeySource? keySource = null)
         {
             var database = new SyntheticPipelineDatabase(sqlServer);
             await database.InitializeAsync();
             var factory = new SyntheticPipelineFactory(database, null, interceptor is null ? [] : [interceptor])
             {
                 EnableSyntheticDispatch = true, DisableDispatchWorker = true,
-                ResetCoordinationOverride = coordination, KeyWrapperOverride = keyWrapper
+                ResetCoordinationOverride = coordination, KeyWrapperOverride = keyWrapper,
+                ClaimMdKeySourceOverride = keySource
             };
             var actors = await factory.SeedAsync();
             var periodId = await JoinedBillingPipelineAcceptanceTests.PrepareSubmittedPeriodAsync(factory, actors);
@@ -944,7 +947,7 @@ public sealed partial class ClearinghouseDispatchApiTests
             Factory.Services.GetRequiredService<EnvelopeProtector>(),
             Factory.Services.GetRequiredService<IClaimMdSandboxKeySource>(),
             resetCoordination ?? new TestDemoWorkerResetCoordination(),
-            Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>());
+            Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System);
 
         public async ValueTask DisposeAsync()
         {

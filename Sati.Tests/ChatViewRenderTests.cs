@@ -29,7 +29,7 @@ public sealed class ChatViewRenderTests
             fixture.Service.Page = (_, after) => Task.FromResult(new Sati.Contracts.V1.ChatPageDto([], after, false, after));
             fixture.ViewModel.SelectedRoom = fixture.ViewModel.Rooms[0];
             var view = new ChatPanelView { DataContext = fixture.ViewModel };
-            WpfUiHarness.Realize(view, width, height);
+            WpfUiHarness.RealizePendingContent(view, width, height);
             // The dock lists every room; the tab strip lists the ones opened from it.
             // Selecting a room is what opens its tab, so one selection drives both.
             var rooms = WpfUiHarness.FindByAutomationName<ListBox>(view, "Chat rooms");
@@ -54,7 +54,9 @@ public sealed class ChatViewRenderTests
             Assert.Contains("Morgan Avery Example", fixture.ViewModel.RoomNotice);
             Assert.Contains("record 37", fixture.ViewModel.RoomNotice);
             Assert.Equal(4000, compose.MaxLength);
-            Assert.True(compose.IsEnabled);
+            Assert.True(fixture.ViewModel.CanCompose);
+            Assert.True(compose.IsEnabled,
+                "The settled composer binding must reflect the current room's compose permission.");
             Assert.True(compose.Focusable);
             Assert.True(System.Windows.Input.KeyboardNavigation.GetIsTabStop(compose));
             Assert.True(compose.ActualWidth > 200);
