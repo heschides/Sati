@@ -6,7 +6,8 @@ Historical completions/releases remain in the [byte-preserved agenda](docs/archi
 
 ## Release 1.3.39 — billing release and account recovery safeguards
 
-**Status:** October 9 DATT release audit in progress. Bounded Demo migration, baseline replacement
+**Status:** October 9 DATT rollout waiting for the working application to close: source and Demo migration/API/reset verified;
+installer acceptance/distribution await working-app close; operator firewall removal verified. Bounded Demo migration, baseline replacement
 and one verification reset are separately approved; workstation access is operator-managed.
 Completed billing/worker source and controlled migration preparation fast-forwarded into local
 `master` at `6a5c6497aab7c4f761d6aef5194087475c00424d`. Older branches/worktree remain retained
@@ -15,12 +16,12 @@ assessment scratch files are preserved. Dispatch activation and broader W8 work 
 
 | Gate | Evidence / remaining work |
 |---|---|
-| Source and readiness | Version 1.3.39 coordinated; all 42 criteria reviewed and current embedded WPF report verified; prior sealed reports/rubric unchanged. |
+| Source and readiness | Source release `6fbfeb65730697d4e0244a551fca736f5a3e82a1` pushed and remote equality verified. Version 1.3.39 coordinated; all 42 criteria reviewed and current embedded WPF report verified; prior sealed reports/rubric unchanged. |
 | Build and tests | Complete Release build passed; final desktop 3,028, API 1,289, signatures 119, portal 8 and Carika 4 passed. Actual cached-model test passed all three scenarios (3m08s); 4,449 accepted cases, zero unresolved failures/skips. Retained failed run and bounded fixture repair are in the working ledger. |
-| Demo schema and reset | Revalidated exact 128-migration predecessor and live/baseline reset guards without persistent changes. Approved rollback rehearsal, apply/rerun, matching API, compliance dry-run, baseline replacement and one correlated reset remain pending. |
-| API and installers | Publication, exact deployed bytes/health/contract, both installer acceptance and distribution pending. |
+| Demo schema and reset | Revalidated exact 128-migration predecessor and live/baseline reset guards without persistent changes. Approved rehearsal/apply/rerun, matching API, zero-change compliance dry-run and baseline replacement passed; single request `d851db02-81c6-4559-ab9c-e15ea880bddd` has completed audit and correlated Function compliance marker. Environment inventory owns exact deployed facts; operator firewall removal verified. |
+| API and installers | API deployment `943c4d4f09154180b32f33fe20a57338`, all 70 exact file hashes and health/version/contract verified. Both installers built; isolated acceptance awaits working-app close, distribution pending. |
 | Local schema uptake | Known LONGCHENPA installed Local Sati is 1.3.38.0 at preflight; next-launch migration belongs to desktop and is not run by this release audit. Other machine inventory requested; unknown versions will remain explicit. |
-| Final evidence | Deployment, migration/reset and artifact results plus final evidence commit/push pending. |
+| Final evidence | Operational rollout checkpoint preserves verified migration/API/reset, firewall absence and both build hashes. Acceptance/distribution and the one closing evidence commit/push remain pending; release is incomplete. |
 
 ## Release 1.3.38 — readiness evidence and service safeguards
 

@@ -2393,14 +2393,67 @@ Grounding/privacy assertions, scenario inputs and limits were unchanged. Final d
 project cases total **4,449**, with no unresolved failure or skip; overlapping focused runs are
 not added to that total. Source preflight passed again after evidence updates.
 
-**Next sequence and limits:** finish complete applicable project tests, exercise the available
-cached-model gate and inspect current readiness renders, then commit/push source and verify exact
-remote equality. Rehearse/apply/rerun the approved Demo migration with dispatch disabled; publish
-the matching API; verify exact known bytes, health/version/contract; run compliance dry-run;
-capture today's baseline; queue one reset and correlate audit/log completion. Only then accept
-and distribute both new installers. The user removes the workstation rule afterward. Final
-evidence/default push and machine-uptake record are still pending. No complete release, cloud
-migration/reset outcome, real transmission or independent readiness is claimed here yet.
+**Pushed source and controlled rollout:** the ordinary source commit
+`6fbfeb65730697d4e0244a551fca736f5a3e82a1` was pushed to default master and exact remote equality
+confirmed. The three version fields were staged separately from retained desktop-project
+formatting; scratch files were excluded. The reviewed migration passed rollback rehearsal,
+application and idempotent rerun (`artifacts/datt-1.3.39/migration-rehearsal.log`,
+`migration-apply.json`, `migration-rerun.json`). Two preliminary Windows PowerShell/Azure CLI
+query-quoting failures occurred before the runner began; no mutation occurred on those attempts.
+The corrected settings inspection succeeded with unrelated settings held only in memory.
+
+API package `artifacts/SatiApi-1.3.39-fx-x86.zip`: **11,914,909 bytes**, SHA-256
+`ED56F687601B26D986893AF26900929DCD3E3260B4872ECB46CD8E8C7D3247C6`, exactly **70** safe reviewed
+paths, API assembly/file version 1.3.39.0 and no packaged private configuration. The one upload
+returned 202 and completed successfully; read-only verification matched all 70 exact deployed
+lengths/hashes with stable real deployment identity around the reads and health checks.
+`artifacts/datt-1.3.39/api-package.json`, `api-deployment.json` and
+`api-deployment-verification.json` retain independent create-new evidence and UTC/offset timestamps.
+Known-byte comparisons do not prove absence of extra files or disambiguate an identical deployment
+by another publisher. [The environment inventory](../../DATABASE_ENVIRONMENTS.md#1339-controlled-demo-rollout--october-9-2026)
+owns deployed identity, schema, defaults and current reset/baseline observations. The earlier healthy
+API package and deployment were retained; no rollback, App Service/control-plane security change
+or Production action was attempted. The explicitly approved baseline helper reasserted its pinned
+SQL procedure/baseline permissions as part of capture. This later hosting evidence does not rewrite the sealed readiness assessment.
+
+Current-source compliance-tool build passed with zero warnings/errors. Its Demo **check-only** run
+reported zero planned changes and zero unexpected blockers (`compliance-tool-build.log`,
+`compliance-dry-run.log`). Approved capture passed (`baseline-capture.log`, `baseline-state.json`).
+Exactly one approved reset was accepted (`reset-queue.json`); an early metadata read timed out
+while it was active, and the early marker query returned no completion. Neither early observation was
+completion/failure evidence; no reset replay occurred. The later exact request audit completed
+successfully (`reset-audit-observation-2.json`), and corrected fixed-marker matching correlated
+completion with `DEMO_COMPLIANCE_HISTORY_COMPLETE` in the same Function operation
+(`reset-marker-verification.json`). The initial starts-with predicate missed the Function log
+prefix; matching the fixed text plus exact request and operation ID supplied the actual proof.
+Public post-reset health/version passed (`post-reset-health.json`, HealthOnly; no authenticated
+or live-account checks were claimed).
+
+**Installer generation and pending acceptance:** both builders completed from the verified release
+inputs; private Demo configuration checks and Local integrated-security configuration gate passed.
+Demo `artifacts/SatiDemoInstaller/SatiDemoSetup-1.3.39.exe`: **104,583,168 bytes**, SHA-256
+`B7E18B675B53C0B024E09162183DEE0E4B3A9EE9A9ECEF1FE6051D4AA99FFCEB`.
+Local `artifacts/SatiLocalInstaller/SatiLocalSetup-1.3.39.exe`: **206,932,521 bytes**, SHA-256
+`07F3850B46315537405C584770BFE8B6D7930DB14E8BFFF396AAE6A2E3BADF10`.
+Build logs are `artifacts/datt-1.3.39/demo-installer-build.log` and `local-installer-build.log`.
+The first Demo acceptance attempt stopped at its all-Sati-closed precondition before creating
+an isolated install; the installed working Sati was open. Josh was asked to save/close it.
+Its process/session/database were left untouched. Artifact bytes were not changed or rebuilt.
+
+**Operator follow-up and checks:** Josh reported the temporary rule was down. A successful
+read-only exact-rule listing returned zero matches; absence is verified in
+`artifacts/datt-1.3.39/firewall-removal-verification.json`. The assistant changed no firewall
+setting. Final documentation structure and **22 negative proofs passed**
+(`documentation-negative-final.json`); preflight/report/history checks passed after rollout notes.
+The installed working Sati process remained present after firewall removal; the outstanding
+save/close request is the remaining acceptance prerequisite.
+
+**Next sequence and limits:** run both
+exact installer acceptance gates sequentially once the working app is closed, then publish only
+their accepted EXEs/checksums. The operational checkpoint records the completed rollout and the
+remaining app-close prerequisite. Structure/negative checks passed; acceptance/distribution and
+one closing evidence/default push remain pending. No complete release, installed Local uptake, real
+transmission or independent readiness is claimed yet.
 
 ## Entry template for the next significant portion
 

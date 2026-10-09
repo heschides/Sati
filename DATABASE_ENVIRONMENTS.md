@@ -236,3 +236,38 @@ installer distribution is not evidence that a machine was updated. Other Local m
 known versions have been requested from Josh and are presently **unknown**, not assumed current.
 No working database or clinical record was queried. [The release working record](docs/readiness/work-evidence.md#2026-10-09--datt-1339-release-audit)
 owns gates and pending deployment/reset outcomes.
+
+## 1.3.39 controlled Demo rollout — October 9, 2026
+
+The separately approved guarded migration passed its rollback rehearsal at 128 migrations,
+committed `20261009183720_AddClearinghousePreflightReadiness`, and passed a second `-Apply`
+as `IDEMPOTENCY_VERIFIED` at **129 migrations**. Exact guarded SQL SHA-256 remained
+`6E9C8AC1614FF2E9D38894786434E58E21D82484D210BA217C6C283E056FA1AA`. The API's two dispatch
+settings were absent immediately before application; their source defaults remain false.
+No dispatch activation, cloud Production change or Local working-database migration occurred.
+
+The matching Demo API from pushed source `6fbfeb65730697d4e0244a551fca736f5a3e82a1` completed
+deployment **`943c4d4f09154180b32f33fe20a57338`** at **21:16:31.4177673 UTC**. Public liveness,
+readiness and version all returned HTTP 200: `live`, `Healthy`, release **1.3.39**, contract
+**`D30D44631876`**. All 70 reviewed deployed file lengths/hashes matched the accepted package,
+with the same completed active deployment before/after the reads. Matching known files does
+not prove absence of extra files or distinguish another publisher deploying identical bytes.
+The prior healthy 1.3.38 package/deployment remains retained.
+
+The current-source compliance dry run checked 177 synthetic clients: **zero changes**, zero
+unexpected current/historical billing blockers, retained teaching exceptions and two known
+missing-effective-date teaching cases. The approved capture reported
+`DEMO_FULL_RESET_BASELINE_CAPTURED`; metadata observed **93 baseline tables**, anchor
+**2026-10-09**, captured **21:17:49.7796694 UTC**. Exactly one verification reset was accepted
+HTTP 202 at **21:18:53 UTC**, request **`d851db02-81c6-4559-ab9c-e15ea880bddd`**, actor 1006.
+The exact request recorded **`demo.reset.completed` at 21:22:48.1941896 UTC**, with no matching
+failed event. The same `ResetDemoWorker` operation **`91bb7a0e059b1b35b4aabb958bacbdf2`** logged
+`DEMO_COMPLIANCE_HISTORY_COMPLETE` at **21:22:48.1745044 UTC**, followed by the request-specific
+completion at **21:22:48.208553 UTC**. Reset metadata retained 129 migrations, 93 baseline tables
+and today's anchor/application date. Public health/version was Healthy at **21:25:33 UTC**.
+An early read-only metadata observation timed out during the reset. Initial log queries required
+a prefix correction before correlation; the final match uses the fixed completion text, exact
+request and same nonempty operation ID. No reset replay was attempted. Josh confirmed removal; a successful read-only exact-rule listing returned **zero matches**.
+The temporary `datt-workstation-20261009` rule is **absent**, verified without a settings change
+by the assistant. `artifacts/datt-1.3.39/firewall-removal-verification.json` records the target
+and successful absence evidence.
