@@ -1,7 +1,7 @@
 # Data environments — authoritative dated inventory
 
-**Inventory owner:** this file. **Latest evidence date:** October 8, 2026. Read-only assessment
-observations are dated below; this consolidation made no cloud/database call. Current release
+**Inventory owner:** this file. **Latest evidence date:** October 9, 2026 UTC (October 8 local).
+Assessment observations and subsequent bounded Demo release observations are dated below. Current release
 readiness belongs to [the readiness registry](docs/readiness/README.md). Historical deployment
 chronology is retained in [the original inventory](docs/archive/2026-10-08/DATABASE_ENVIRONMENTS.md).
 
@@ -35,6 +35,30 @@ vendor acceptance or complete service operation. No token, application setting o
 was printed, and no resource, database or security setting was changed. The reviewed candidate
 diff against fetched `origin/master` adds no persistence migration/model or reset-baseline change;
 no Demo migration or baseline replacement is required by this release slice.
+
+## Demo API 1.3.38 publication — October 9, 2026, 01:24:01 UTC
+
+The existing `rg-sati-demo / sati-demo-api-satilogica` App Service serves release **1.3.38**
+from pushed source `a50a4df611439f2354f02426e8b5d404297b8ab4`, contract `D33428799A40`
+(268 routes, 69 contract shapes). Public `/health/live`, `/health/ready` and `/health/version`
+returned HTTP **200**, respectively `live`, `Healthy` and the expected product/version/contract.
+Active OneDeploy deployment `d824f423082542b597a94e303981d1bc` has status **4**, complete **true**;
+raw UTC start `2026-10-09T01:10:50.1523236Z`, end `2026-10-09T01:10:52.0586455Z`.
+
+The new API ZIP is `artifacts/SatiApi-1.3.38-fx-x86.zip`, **11,831,567 bytes**, **70 entries**,
+SHA-256 `D7AD47030ED82D864FB6925E153E78CDFA41EEE65C08B08A9408349CDF983CC2`.
+Exactly one upload received HTTP 202. The initial verifier incorrectly followed a temporary
+deployment ID and stopped on its later 404; a separate read-only verification pinned the real
+completed ID, matched all 70 known deployed file lengths/hashes to the reviewed ZIP, and checked
+stable deployment identity around the file and public-health checks. Original failed evidence
+is retained. Full verification evidence and its limits are recorded in
+[the working ledger](docs/readiness/work-evidence.md#2026-10-08--1338-demo-api-publication-and-verification).
+
+No schema/model/reset-baseline delta was present. No database access, migration, capture, reset,
+firewall or other setting change was performed. The prior known-healthy package/deployment is
+retained. These observations establish this Demo API publication and known package bytes;
+they do not establish worker completion, current SQL grants, recovery or independent client
+acceptance. Post-packaging hosting evidence does not revise the sealed 1.3.38 readiness score.
 
 ## What `SatiProduction` is
 

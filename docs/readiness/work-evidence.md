@@ -1414,6 +1414,141 @@ and the unchanged 42 readiness assessments. Source commit/default push, API publ
 installer build/acceptance and distribution remain pending; this paragraph supersedes the
 earlier publication hold after the affected gate passed.
 
+## 2026-10-08 — 1.3.38 Demo API publication and verification
+
+**Scope and source:** DATT release of source `a50a4df611439f2354f02426e8b5d404297b8ab4`,
+committed and pushed to default `master` after fresh fetch, staged review and whitespace checks.
+Remote equality and clean tracked source were confirmed before generating the new package.
+[The environment inventory](../../DATABASE_ENVIRONMENTS.md#demo-api-1338-publication--october-9-2026-012401-utc)
+owns current deployment facts. This dated working record does not revise the sealed readiness report.
+
+**Actual packaging/publication:** the reviewed helper
+`artifacts/datt-1.3.38/Publish-VerifiedDemoApi.ps1`, SHA-256
+`38D701AED16D4C5987E322B9340F4D9503735613E134E10158BE6869A75E60E6`,
+built the package from clean pushed source with matching 1.3.38.0 assembly/file version,
+framework-dependent .NET 10 x86 configuration, expected contract and safe 70-entry inventory.
+The package record `artifacts/datt-1.3.38/api-package.json` is Passed=true, SHA-256
+`6C39E5A75AAD0DEB5E4B6E7CC87BD44CD8EA55037DEE5485C8AB3DBCE2AE0BE4`.
+No private desktop configuration or reusable credential was packaged; the two manual WebJob
+files matched tracked source and were not executed.
+
+**Retained failure and bounded recovery:** exactly one direct Kudu upload was accepted HTTP 202
+at `2026-10-09T01:10:48.2021564Z`. The original verifier prematurely bound `temp-5a7af6c2`,
+then received 404 after that temporary record was removed. Its original record remains
+Passed=false: `artifacts/datt-1.3.38/api-deployment.json`, SHA-256
+`0952C9E581B7A235E2E64AAADF29BF11B7D639F41CB61275B46B610AD1ED798C`.
+Its temporary-record UTC projection was also four hours late because a parsed DateTime was
+converted through a display string. Neither failure establishes a failed deployment.
+[Kudu source](https://github.com/projectkudu/kudu/blob/master/Kudu.Core/Deployment/DeploymentManager.cs)
+confirms temporary records are removed; its async publication response is meant to be polled
+until a completed real record is available. Raw explicit-zone timestamp strings are preserved
+in the corrected verification.
+
+A separately reviewed GET-only verifier initially stopped locally before any Azure request:
+an unsuppressed `WaitForExitAsync` result contaminated native-command output. Its failed
+CreateNew record, `api-deployment-verification.json`, is retained, SHA-256
+`1081C3F0F430FB9D193E8569D7B86092B9595C5C179488A603A57600C5DE23B1`.
+Suppressing that void-task result was confirmed against four local Git checks; only that
+suppression, fixed stage labels and a new evidence filename changed. Independent reconstruction
+confirmed all prior safety controls remained identical. The corrected verifier
+`artifacts/datt-1.3.38/Verify-AcceptedDemoApi.ps1` has SHA-256
+`723213B47A51B85125D7B29B62FAED4B56705BB54154E3A408E954B93E8C4F87`;
+AST parsing passed, and it contains no upload, settings, database, firewall or rollback action.
+
+**Acceptance:** corrected verification exited 0 in **26.865 seconds**. It pinned the completed
+OneDeploy record, checked the same active real ID before and after all 70 known file reads,
+matched each byte length/SHA-256 to the reviewed ZIP, and checked all three fixed public paths.
+Requests were GET-only on fixed hosts/paths, redirects disabled, responses capped at 16 MiB,
+per-exchange deadlines at most 35 seconds within a shared eight-minute limit. Bearers and raw
+responses stayed in memory; no token, exception payload or protected record was printed.
+New record: `artifacts/datt-1.3.38/api-deployment-verification-2.json`, Passed=true,
+SHA-256 `1203E3E803D1CE4DF3DB37C6F3F5FE4DA06630BCCF77CD64C258FCE73A9FD8F0`.
+The earlier failed records and both package hashes were unchanged. No second upload, rollback,
+database/migration/reset/baseline or security-setting action occurred.
+
+**Limits and next step:** matching known files does not establish absence of unknown files or
+uniquely distinguish another publisher deploying identical bytes. This is bounded Demo hosting
+evidence, not worker operation, SQL grants, recovery, independent device acceptance or Production
+readiness. Scores and prior rubric/snapshots remain immutable. Installer build, both isolated
+acceptance/cleanup gates, exact distribution and final evidence commit/push remain pending.
+The future agenda pointer remains SATI-BIL-001 after DATT; no billing design work is selected here.
+
+## 2026-10-08 — 1.3.38 installer acceptance and distribution
+
+**Scope/source:** DATT packaging from pushed source `a50a4df611439f2354f02426e8b5d404297b8ab4`,
+after matching Demo API acceptance. Later changes are operational Markdown evidence/guidance;
+no compiled source, embedded readiness report, rubric or artifact byte was changed. Builder
+outputs and versioned checksum paths were absent before generation; the durable LocalDB MSI
+again had a valid Microsoft signature and the pinned SHA-256
+`224D483992EF60368DAC70CEA174DCFAF43A3CA06ADA331C67DC6119A26490F6`.
+
+| Artifact | Absolute build path | Bytes | SHA-256 |
+|---|---|---|---|
+| Demo | `C:\Users\Joshu\source\repos\heschides\Sati\artifacts\SatiDemoInstaller\SatiDemoSetup-1.3.38.exe` | 104,542,208 | `A83823443BC4E5390169F5D7C9E1F1234C8A551EE0214881DBA3B3443C65C052` |
+| Local | `C:\Users\Joshu\source\repos\heschides\Sati\artifacts\SatiLocalInstaller\SatiLocalSetup-1.3.38.exe` | 206,872,617 | `5D01641720FFC97EB5864CDB98C5D505C034052DBCD8AFB4F7012000B031F958` |
+
+**Actual build/acceptance:** both standard builder commands exited 0. The two previously known
+EF1002 warnings appeared during each desktop publish; no build error occurred. Owned build
+directories were cleaned. The exact Demo installer passed five 15-second responsive sign-in
+launches, each with a normal close and exit 0, exact installed version **1.3.38.0**, and owned
+file cleanup. No authentication, working-data access or unrelated application shutdown was used.
+Record: `TestResults/datt-1.3.38-demo-installer-acceptance.json`, Passed=true/CleanupPassed=true,
+SHA-256 `8AB541BBDE7ADD76424D04DED8925EADB3BCD935466C99821D304E4D49F36CEE`.
+
+The first Local acceptance was mistakenly started alongside Demo acceptance. Its bootstrap
+returned **2** while an owned Demo test window was open; both installers intentionally reject
+either `Sati` or `Sati.Demo` running. That failed run still cleaned its isolated files and wrote
+no acceptance record. After all five Demo windows closed and no Sati process remained, the
+unchanged Local artifact passed in **8.49 seconds**: exact **1.3.38.0**, embedded Microsoft
+LocalDB signature, `SatiProduction` mapping and Windows integrated security, with owned cleanup.
+No MSI installation or working database launch was performed. Record:
+`TestResults/datt-1.3.38-local-installer-acceptance.json`, Passed=true/CleanupPassed=true,
+SHA-256 `20874B585903ECBA2BB3F21A12605F23D5D4E6690B78CEA995984F5653C2DB41`.
+The refusal was a verification sequencing error, not a reason to change or rebuild the installer.
+
+**Distribution:** reviewed helper `artifacts/datt-1.3.38/Publish-AcceptedInstallers.ps1`, SHA-256
+`1AC13F3FDB638C08F47754C5B4AB8E6130BC47E383BF492D3C6759B5DCF79838`, exited 0. It validated
+both acceptance records before writing, copied to unique temporary siblings with CreateNew,
+matched hashes, renamed without overwrite and verified all four final files. No other payload
+was published. Exact destinations:
+
+- `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop\SatiLocalSetup-1.3.38.exe`
+- `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop\SatiLocalSetup-1.3.38.exe.sha256`
+- `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files\SatiDemoSetup-1.3.38.exe`
+- `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files\SatiDemoSetup-1.3.38.exe.sha256`
+
+Final EXE sizes/hashes equal the table above. Local checksum: **93 bytes**, SHA-256
+`9FE210F29075FF507AFA21185FB0E2EA191C4DFADED8AEB36EE7EA4439A4615E`;
+Demo checksum: **92 bytes**, SHA-256
+`F62A527038404B0391957DA1D7638B262E7859C8A64F4E940B7D69A10ECA1295`.
+`artifacts/datt-1.3.38/distribution-evidence.json` records Passed=true/four Published outcomes,
+captured `2026-10-09T01:31:46.9039960Z`, with both acceptance record hashes.
+Its SHA-256 is `C7E53FFDCBA5D93473E45A4B8BD5741B37092B9F7D7D36DB3BF44ECC87A1E4F7`.
+
+**Readiness and limits:** all release source/test/packaging/hosting/acceptance/distribution gates
+now have their bounded evidence. This machine's acceptance is not an independent clean external
+device or human accessibility attestation. Installer wrappers are not assumed code-signed from
+the embedded Microsoft MSI signature. Final filesystem publication is not a cloud-sync receipt.
+No schema/database migration, capture/reset, security-setting or Production action occurred.
+No branch, worktree, prior artifact or unrelated assessment scratch was deleted. Sealed 1.3.38
+scores and historical rubrics remain unchanged; broader cloud launch and agenda work remain open.
+The release playbook now records correct Kudu temporary-ID polling and timestamp handling without
+expanding authority. Final documentation structure passed: 46 root owners, 28 scoped owners,
+12 preserved snapshots, 11 active items, all 454 legacy open items, 218 imported and 11 new
+decision records, next pointer SATI-BIL-001. All **22 negative mutation proofs passed** and their
+owned disposable fixture was cleaned. Fresh records:
+`artifacts/datt-1.3.38/helper-checks/documentation-structure-final-6e919677ba4f402ea3c0056110c35c9d.json`,
+SHA-256 `9C9047F06BB5A27DBA49A3238020172769F84310C8B49B6B19D0F37D54304EC8`;
+`artifacts/datt-1.3.38/helper-checks/documentation-negative-final-c27a9321473842f9afa8704ac442888e.json`,
+SHA-256 `E3EE8207B076E4F35BB8C828452966072F1FD864292FB9F9020018A920FB9EC8`.
+Final source preflight and readiness/history comparison against source release `a50a4df` passed;
+all scores and 41 remaining launch checks are unchanged. Application/report inputs stayed
+unchanged, so passing build/model/test/UI/package/acceptance evidence is reused without redundant
+runs. This is the closing evidence record; its commit identifier is supplied in the release
+handoff after push and exact default-branch confirmation rather than inserted by another
+self-referential ledger commit. The concrete next agenda slice is SATI-BIL-001's bounded R1
+fact/policy design after release completion, with its existing decision and authorization boundaries.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

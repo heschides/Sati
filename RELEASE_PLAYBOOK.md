@@ -338,6 +338,30 @@ After publication, verify:
 - `/health/version` product and release version; and
 - client/API contract revision parity.
 
+For asynchronous Kudu publication, HTTP 202 records acceptance, not completed deployment.
+Temporary `temp-*` and `pending` status records are not permanent deployment identifiers. Keep
+polling the accepted status URI, normally `/api/deployments/latest`, until a real, completed,
+active deployment is identified. Do not replay an accepted upload to recover from a polling
+failure. Kudu reserves `latest` for polling through completion and deletes temporary records;
+see its [async controller](https://github.com/projectkudu/kudu/blob/master/Kudu.Services/Deployment/PushDeploymentController.cs)
+and [temporary-deployment owner](https://github.com/projectkudu/kudu/blob/master/Kudu.Core/Deployment/DeploymentManager.cs#L337-L365).
+
+Preserve deployment timestamps as ISO 8601 values with their UTC marker or explicit offset.
+PowerShell 7.5 or later can use `ConvertFrom-Json -DateKind String` before explicit invariant
+parsing and UTC normalization. If a reader produces `DateTime` or `DateTimeOffset` objects,
+handle those typed values directly rather than reparsing their display strings, which can lose
+the original offset and precision. See the [PowerShell date-conversion guidance](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertfrom-json?view=powershell-7.5#-datekind).
+
+If polling fails after acceptance, retain that failed evidence. A separate read-only verifier may
+write new evidence with `CreateNew`, preserving the original upload record. Tie verification to
+the fixed Demo resource, pushed source, reviewed ZIP hash and real deployment identifier; check
+that the completed active identifier remains stable around file and public health checks. When
+checking deployed bytes, GET only the reviewed package's exact known paths and compare their byte
+lengths and SHA-256 hashes; [Kudu's VFS API](https://github.com/projectkudu/kudu/wiki/REST-API#vfs)
+supports those file reads. Record the limits: matching known files does not establish absence of
+extra files, and timestamps plus matching bytes cannot distinguish another publisher deploying
+identical bytes. No additional upload or rollback is implied by read-only verification.
+
 Retain the prior known-healthy API package and deployment information. If verification fails, stop
 downstream work and report the failure. Do not improvise a Production deployment or an unapproved
 database action. Ask before redeploying a rollback package unless prior instructions explicitly
