@@ -30,6 +30,8 @@ Read the individual registered record for the decision and rejected alternatives
 | DEC-0239 | 2026-10-09 | [Hierarchical dispatch fairness proposal](2026-10-09-DEC-0239.md) | retained proposal; pending adoption superseded by DEC-0240 |
 | DEC-0240 | 2026-10-09 | [Hierarchical dispatch fairness adoption](2026-10-09-DEC-0240.md) | accepted; bounded 1.3.2 source implementation/acceptance complete |
 
+| DEC-0241 | 2026-10-09 | [Bounded hierarchical polling turns](2026-10-09-DEC-0241.md) | accepted local design; source implementation pending |
+
 Accepted decisions must retain their evidence and earlier rejected reasoning. A change to a
 decision creates a successor and supersession link; it does not rewrite the historical import.
 [The imported decision index](../README.md) remains available for earlier records.

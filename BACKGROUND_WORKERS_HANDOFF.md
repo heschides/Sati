@@ -607,6 +607,103 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 9 — polling fairness design — task 1.3.3.1
+
+**Status:** main source/design review complete; local policy selected under Josh's October 9
+continued-work approval in [DEC-0241](docs/decisions/current/2026-10-09-DEC-0241.md).
+Implementation and its tests are separate numbered chunks. No operating acceptance is established.
+
+**Captured source:** `38ab061e321eb70170909b09027d7cb47e314b41`, main `master` checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`. No uncommitted application inputs are included.
+Preexisting project formatting and assessment scratch are preserved and excluded. Resource
+inventory 1.4.1 remains with the second thread; this review covers polling selection only.
+
+| Source owner / symbol | Enforced behavior at captured source | Gap relevant to this design |
+|---|---|---|
+| [ClaimMdSandboxPoller](Sati.Api/Infrastructure/ClaimMdSandboxPoller.cs), `PollAccountsAsync` | Enabled test Claim.MD accounts with nonnull secret references, ordered by account ID; per-feed exceptions contained with content-free logs; caller cancellation propagated. | Entire account list materialized; no agency-first rotation, durable position or total feed-offer cap. A failing/slow early feed delays later work. |
+| Same owner, `PollStatusAsync` | Account/agency/Status checkpoint lookup; initialized ASCII-digit cursor required before HTTP; one response page. | DbContext survives HTTP; no independent scheduling pivot. Missing cursor is not permission to initialize one. |
+| Same owner, `PollEraAsync` | Complete listing: maximum 20 pages, each at most 100 entries; duplicates/reversed or nonadvancing IDs refused; full page 20 refuses before downloading. Numeric ascending artifact order. | Up to 1,999 downloads and receipt commits per feed visit; later account opportunities depend on draining them. No whole-feed deadline. |
+| [Coordination](Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs), `PollOnceAsync` / `RequestAsync` | Database-shared zero-wait session-exclusive poller lease; vendor lease shared with uploads spans one-second pacing and exchange, with 120-second acquisition budget. | Poller/reset connections survive the pass. Vendor lease is not an agency quota; actual provider capacity is unverified. |
+| [Reset coordination](Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs), `RunAsync` | Shared reset exclusion acquired before polling; held through reads, external work and evidence. | Keep order/exclusion; no narrowing or new reset policy in this slice. |
+| [Connector](Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs) | Fixed host, server-only key resolution, 16 MiB response cap, 45-second cooperative headers/body deadline after admission. ERA page size 100; status is byte-bounded, without a separate row-count cap. | Admission, sync parsing, key wrapping and cleanup not covered by HTTP deadline; a pass has no elapsed-time bound. |
+| [Status processor](Sati.Api/Infrastructure/ClaimMdStatusProcessor.cs) / [ERA ingestion](Sati.Api/Infrastructure/ClaimResponseIngestion.cs) | Zero-retry authoritative writes under agency claim-release admission; current account/cursor/matching rechecks; wrapping outside decision transaction then revalidation; encrypted receipt/effects/checkpoint commit together. Stale expected cursor refuses; ERA duplicate/payment conflict requires review. | These retained business/receipt owners must not store scheduling completion or skip failed artifacts. |
+| [Feed model](Sati.Persistence/Models/Billing/ClearinghouseFeedCheckpoint.cs) / [shared configuration](Sati.Persistence/Data/ClearinghousePersistenceModel.cs) | Independent account/feed cursors, revision concurrency and immutable provenance; Status and ERA only scheduled. | Modifications feed remains unscheduled. Scheduling pivots must have separate revisions and cannot reset these cursors. |
+| `ExecuteAsync` / [gate](Sati.Api/Infrastructure/ClearinghouseDispatchGate.cs) | Default-off, exact synthetic identity plus real sandbox opt-in and synthetic-dispatch exclusion; startup pass then five-minute delay after each pass. | No new keep-alive, timer Function or shortened idle polling. Dispatch activity policy does not govern this poller. |
+
+**Selected bounded policy.** Keep the existing outer reset → global poller admission. Within a
+pass make at most **100 offers**, tracking at most 100 checkpoint IDs locally so each feed is
+visited at most once in that pass. Each offer uses a short constructor-injected selector with
+one transaction-exclusive zero-wait SQL lock, ReadCommitted and a named zero-retry execution
+scope. Only 0/1 grants ownership, -1 is shared contention, other results fail closed; verify
+ownership before returning Empty or committing an offer. Release its transaction/context before
+key resolution, HTTP, wrapping or receipt work. The global poller lease still protects external
+same-feed work; the selector lock/transaction protects durable scheduling state, not receipt effects.
+
+Select the next greater eligible agency ID and wrap once, then next greater account in that
+agency using provider GUID ordering and wrap once, then next Status/ERA feed and wrap once.
+Persist a seeded singleton last-agency row, an agency-scoped last-account row and an account-
+scoped last-feed row with their own revisions. Each query projects one candidate, with at most
+2 agency + 2 account + 2 feed probes and 3 pivot reads/writes; no full account list or tenant map.
+A missing global seed/unsupported provider fails closed. Strict Testing SQLite is a transactional
+stand-in only. Candidate predicates retain enabled/test/Claim.MD/nonnull-reference account rules
+and require an existing nonnull 1–20-character Status/ERA cursor. Validate ASCII digits and the
+fresh account/agency/feed binding before any HTTP; damaged cursor/reference or stale account
+spends an offer and makes no request. Do not infer dispatch readiness from a poll failure.
+
+A status offer retrieves/processes one complete response page. An ERA offer first validates all
+listing pages within the existing 20 × 100 bounds, then downloads/imports **only the numerically
+oldest artifact**. On its next offer re-list from the last committed receipt cursor. Never move
+to a later ERA after a failure or use a listing high-water ID as a receipt cursor. This trades
+repeat listing cost for retained ordering and bounded artifact work; vendor totals still need
+budget/operating evidence. Empty or invalid feeds do not advance business checkpoints. Advance
+scheduling pivots before feed work, so a malformed or missing-key feed cannot monopolize selection
+on a later pass or restart. A crash after the offer may repeat a read later, with receipt ownership
+and expected-cursor checks retaining authority. Upload states/replay rules are unchanged.
+
+Keep the five-minute hosted delay after each bounded pass, global vendor admission and existing
+per-feed containment. Selection/discovery/shared coordination errors stop the pass; content-free
+logging preserves existing unknown feed containment but does not classify it as an account fault.
+Stop cancellation immediately. Recheck the feature gate before each offer/request; no new expiry,
+automatic key recovery, weights, worker concurrency, account quotas or cadence shortening.
+
+**Conditional opportunity.** For a stable finite continually offered cohort of A agencies, at most
+K eligible accounts in a chosen agency and F ≤ 2 feeds in a chosen account, hierarchical committed
+rotation gives that agency an opportunity within A offers, the account within A × K and its feed
+within A × K × F. These are offer counts across permitted turns; local already-visited exclusions
+only remove candidates for the current pass. Restart preserves pivots but not exclusions.
+Membership changes, a stalled operation, host suspension, shared admission/cancellation/failed
+selection commits and gates invalidate any elapsed-time inference. A scheduling opportunity is
+not successful ingestion or bounded wall time. The 100-offer cap limits per-pass bookkeeping and
+selection count; it does not bound query cost, SQL sessions, response memory, dependency time,
+number of passes or metadata cardinality. No measured capacity or cross-host resource quota.
+
+**Schema/operations dependencies.** Add three scheduling tables in the shared Persistence model,
+scoped immutable keys/revision guards, restrict agency/account relationships and selection indexes;
+source migration seeds only the singleton. Do not change existing business revisions, retained
+receipts or checkpoints. Refuse Down after any scheduling position advanced. Existing database
+apply, rollback/runbook, reset baseline coverage and compatible all-host rollout remain separately
+controlled. A host with missing state must refuse selection, not restart FIFO or repair schema.
+The current dispatch source migration 130 is not evidence of polling schema uptake.
+
+**Deterministic acceptance plan.** Task 1.3.3.2 first proves that two valid ERA artifacts no longer
+drain in one visit, and that out-of-order listing pages still select the oldest with no cursor
+advance on failure; retain unfixed failure. Task 1.3.3.3 proves agency/account/feed opportunity
+bounds with many A accounts and sustained A backlog, invalid/missing-key A versus healthy B,
+100-distinct-feed cap, reset/feature-disable/cancellation before HTTP, no checkpoint movement from
+selection, and stale account/checkpoint refusal. Reader observers assert projection bounds and
+absence of all-account materialization; deliberate always-first-agency/account/feed mutants must
+fail. Existing `ClaimMdStatusProcessorTests`, `ClaimMdSandboxConnectorTests`, onboarding and
+`ClaimReleasePreparationSqlTests` supply receipt/wrapping/deadline seams. Private SQL proves two
+independent hosts, lock return/ownership loss, rollback, restart position, scope/revision conflicts,
+provider GUID ordering, no duplicate active feed and additive migration/guarded Down. Run relevant
+billing/reset/connector regressions. No test claim substitutes for vendor/load or deployed evidence.
+
+**Alternatives and later work:** flat account turns reward agencies with more accounts; draining
+ERA recreates the bottleneck; process-only pivots lose restart position; receipt/dispatch-state
+reuse mixes owners; dedicated agency workers or narrowed vendor quotas lack supporting evidence.
+Resource budget 1.4, combined load 1.6 and monitoring 1.7 remain open. Link the reviewed second-thread
+1.4.1 results when available. This section does not adopt its matrix or take its next assignment.
+
 #### October 9 — dispatch fairness implementation — task 1.3.2
 
 **Status:** task 1.3.2 source implementation and main acceptance/integration complete; unreleased

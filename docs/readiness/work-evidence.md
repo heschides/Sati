@@ -1,5 +1,36 @@
 # Working evidence ledger
 
+## 2026-10-09 — SATI-WRK-001 1.3.3.1 polling fairness design
+
+**Source/ownership:** main `master`, starting commit
+`38ab061e321eb70170909b09027d7cb47e314b41`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; no included uncommitted application inputs.
+`Sati.csproj` formatting and existing assessment scratch remain excluded/preserved. Main owns
+polling design/adoption/integration; the second thread retains 1.4.1 and its worktree.
+
+**Review:** read current AGENTS, architecture, decisions, agenda, governance, W8/D1–D4,
+operations/regulatory posture, sandbox and worker owners. Traced account discovery, per-feed
+cursors, all-page ERA discovery, connector key/deadline/admission, reset/poller session locks,
+status processor/ERA encrypted effects and shared checkpoint guards. Read polling/receipt,
+onboarding, coordination and staged claim-release test seams. W8 records exact enforced facts
+and selected controls; DEC-0241 records continued-work authority, alternatives and limits.
+
+**Deliverable:** agency/account/feed rotation separated from immutable receipt cursors; one
+status page or oldest ERA per offer, bounded 100 distinct offers/pass, preserved five-minute
+cadence/vendor/reset coordination; additive source scheduling state and deterministic acceptance
+plan. No measured capacity, whole-operation deadline, vendor quota verification, source runtime
+change, existing database or external service access, benchmark, deployment or activation.
+No sealed readiness/rubric/release evidence changed. Resource inventory is not integrated here.
+
+**Checks:** documentation structure passed (23 current decisions); all 22 negative mutation
+proofs passed; documentation whitespace passed. Exact Git comparison of the nine captured
+polling/runtime/model input files against `38ab061` found no source drift. No application tests
+were required for this design; the following implementation chunk starts its own fail-first run.
+
+**Next:** 1.3.3.2 implements the bounded ERA artifact quantum with fail-first evidence, then
+1.3.3.3 adds persisted selection/bounded pass under DEC-0241. Existing-database migration apply,
+reset baseline and all-host rollout/activation retain separate operational review and authority.
+
 This canonical ledger records significant work between release assessments. Entries are dated
 working evidence; they do not alter [sealed release snapshots](readiness.json), immutable rubrics,
 activation state or regulatory conclusions. Follow [the standing workflow](../../AGENTS.md#standing-work-and-documentation-upkeep)

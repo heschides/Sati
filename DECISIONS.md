@@ -10,6 +10,11 @@ current-decision collection. New decisions never change the immutable import's c
 
 ## Governing boundaries
 
+The main thread selected [bounded hierarchical polling turns](docs/decisions/current/2026-10-09-DEC-0241.md)
+under Josh's continued-work authority. [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--polling-fairness-design--task-1331)
+owns the source-grounded design, alternatives and conditional bounds. Local source/synthetic work
+is split into tasks 1.3.3.2–1.3.3.3; existing database operations and activation remain separate.
+
 Task 1.3.1's hierarchical dispatch fairness and additive scheduling-metadata/index design is
 adopted in [DEC-0240](docs/decisions/current/2026-10-09-DEC-0240.md), after explicit approval of
 the retained [DEC-0239 proposal](docs/decisions/current/2026-10-09-DEC-0239.md).
