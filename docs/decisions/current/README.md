@@ -31,6 +31,7 @@ Read the individual registered record for the decision and rejected alternatives
 | DEC-0240 | 2026-10-09 | [Hierarchical dispatch fairness adoption](2026-10-09-DEC-0240.md) | accepted; bounded 1.3.2 source implementation/acceptance complete |
 
 | DEC-0241 | 2026-10-09 | [Bounded hierarchical polling turns](2026-10-09-DEC-0241.md) | accepted; bounded source acceptance complete, unreleased |
+| DEC-0242 | 2026-10-09 | [Shared SQL admission prerequisites](2026-10-09-DEC-0242.md) | proposed; reviewed contract, backend/values unresolved |
 
 Accepted decisions must retain their evidence and earlier rejected reasoning. A change to a
 decision creates a successor and supersession link; it does not rewrite the historical import.

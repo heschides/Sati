@@ -607,6 +607,226 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 9 — shared SQL/session admission design task 1.4.2
+**Main review — October 9, source `9132a59`:** task 1.4.2 is complete as a reviewed/integrated
+proposal. The retained investigator text below describes its original handoff state and source.
+[DEC-0242](docs/decisions/current/2026-10-09-DEC-0242.md) registers the proposal with **proposed**
+status; no backend, numerical budget or runtime admission policy is adopted. The accounting,
+protected classes, no-SQL waiting, conservative nested cost, uncertainty and fencing requirements
+are useful planning constraints. Fixed slots are a candidate only: intended-host exclusivity,
+restart/rolling overlap, complete enrollment, external consumers and pooled sessions are unproved.
+Configuration identity or a process lease alone cannot justify reusing unresolved SQL credits.
+
+Current dispatch/polling corrections are in [the integrated inventory](#october-9--resource-limit-inventory-task-141).
+Polling discovery is now bounded/durable, but reset/poller sessions still span multiple agency
+feeds. Its new selector does not satisfy this proposal's dispose-before-agency-admission contract.
+Dispatch selection is short, but initial reset/discovery still needs enrolled unscoped admission;
+none of the selectors supplies shared resource credits. Note review preserves pass/cache gaps.
+Signature hosted reset participation and mail's claim-before-capacity are prerequisites; package
+and mail revocation transaction spans must remain accounted until a replacement safety proof.
+
+**Disposition:** preserve the proposed vector/accounting and eight deterministic acceptance
+families. Defer backend/value adoption and runtime implementation pending an explicit bounded
+hosting/consumer/cost/enrollment review; no arbitrary defaults or global-cap claim. Independent
+signature fairness/source-safety design can proceed as task 1.3.3.5 while those requirements remain
+open. This review did not run application tests, access an existing database or change hosting.
+
+**Retained investigator proposal:**
+
+**Status:** proposed; awaiting main-thread review and policy adoption. Josh explicitly assigned
+SATI-WRK-001 **1.4.2** to this second investigation thread. This is a documentation contract,
+not an implemented limiter or accepted architectural decision. The preceding
+[1.4.1 inventory](#october-9--resource-limit-inventory-task-141) remains awaiting review;
+[dated working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-task-142-shared-sqlsession-admission-design)
+owns this proposal's exact source identity, input capture, checks and limits. Main 1.3.1 owns fair
+selection; 1.3.3 owns broader worker turns, 1.5 owns API workload integration and 1.6 owns combined
+acceptance. No host count, connection allowance, provider quota or latency is measured here.
+
+**Accounting contract — recommended for review.** Count a **checked-out SQL connection** from
+the beginning of an open attempt until verified close/disposal completes, including connection
+establishment, application-lock wait/hold, transaction, provider wait and cleanup. Count explicitly
+opened lease connections separately from EF contexts: an idle context is not a checked-out
+connection, and several nested owners may open connections at once. Reserve an operation's
+conservative maximum simultaneous count, K, before its first open; retries/replacement connections
+must fit K, including any unresolved previous open. A connection that cannot be confirmed closed
+keeps its credit charged. This bounds enrolled concurrent connection use; it does not bound
+SQL commands, query cost, duration, idle pooled physical sessions or all database clients.
+
+Returning a connection to a pool does not prove the server's physical session disconnected.
+If physical-session protection is also required, adopt a separate P envelope for the sum of pool
+maxima across every process/connection-string/identity pool, nonpooled connections, administration
+and reserved external consumers. Pool configuration/rotation/rolling overlap must be inventoried
+without exposing credentials. A per-process pool maximum or agency lock cannot establish a
+deployment-wide P. No explicit pool envelope is present in the inspected source.
+
+| Proposed symbol/unit | Required invariant and ownership |
+|---|---|
+| C: total concurrent checked-out connection envelope for one exact environment/database target | C = I + B + R + E. I is protected interactive capacity, B is worker capacity, R is separately protected reset/recovery/control-plane capacity, E is a conservative external-consumer allowance. Sum of enrolled reservations plus E must not exceed C. Unknown/unbounded outside consumers prevent claiming a database-wide cap. Demo/Production never share an admission namespace or credits. |
+| K: one operation's maximum simultaneous connections | Includes outer reset/record/account/provider sessions, selection/business contexts when open, transaction/commit and cleanup. Whole-operation reservation persists across non-SQL phases and cannot be expanded by a nested owner. An operation with unknown K is ineligible for the promised cap until audited; observed minimum lease count is not K. |
+| A: aggregate worker allowance for one validated agency | Weighted reservations for that agency across hosts/workers do not exceed A, within B. Account-specific exclusion remains separate; an account ID supplies no extra capacity. Interactive per-agency limits require 1.5 design and cannot be impersonated by worker calls. |
+| Q, Q_a and M: total pending admission entries, entries for an agency and active agency bookkeeping entries | Finite registered limits; count waiting calls and queued metadata, not durable business rows. No new dictionary entry after M is reached; remove an entry only when it has no waiter or live reservation. Q_a constrains one agency's queued demand; over-limit attempts return a bounded busy result. |
+| D_admit: admission wait deadline | Monotonic injected time, linked caller cancellation and gate checks. No database connection, transaction, blob/payload or business lease while waiting for resource admission. Expiry removes the waiter exactly once. A finite wait is not a guarantee of eventual service. |
+| P and dependency budgets | Physical pool/session, SQL-command/work, CPU/memory, key/storage/mail/vendor concurrency/rate and whole-operation time need distinct owners/limits. Holding K bounds concurrent SQL use during a dependency stall, not the stall or provider quota. Adopt their values and acceptance in later bounded 1.4 work. |
+
+**One logical admission owner, proposed API contract.** Use constructor injection of a server
+infrastructure owner (suggested name `IWorkloadAdmission`, not an existing interface). It accepts
+an exact target, compatible configuration epoch, workload class, stored/validated agency or
+explicit unscoped-discovery class, and a registered operation kind with fixed K. K and class are
+server-owned metadata; callers cannot lower cost, call themselves interactive/recovery, supply
+an arbitrary target or acquire multiple account shares. Authoritative eligibility/billing rules
+remain in Contracts and their current persistence owners.
+
+A grant atomically accounts for the whole K in total, class and agency bounds; otherwise the call
+waits in its bounded queue or returns typed `Busy`, `WaitExpired`, `Cancelled`,
+`Disabled` or `ConfigurationUnavailable`. Grant-versus-cancel races have one terminal owner.
+The disposable reservation carries an opaque owner/generation and tracks nested SQL opens.
+Children consume its remaining connection credits; they never reacquire the outer budget.
+Opening K+1 is refused before opening SQL. Releasing twice is harmless; release before verified
+disposal is refused/quarantined. Retrying an uncertain admission request uses the same identity
+to recover its grant, not create another. A failed/unknown close or stale owner cannot donate
+credits to a replacement operation.
+
+Workers use **try-admission with no parked waiter by default**; a denial leaves durable work due
+and releases discovery/selection state. Existing bounded scheduler opportunities may retry;
+denial does not create a faster SQL loop, renew dispatch activity, count a missing-key failure,
+clear readiness or mutate Queued/Sending/provider outcome. An interactive waiting policy may
+use finite Q/D_admit under 1.5 review. Business queue length, fairness/continuation and client
+retry/rate limits remain separate; resource admission alone cannot promise queue drain or F turns.
+
+**Cross-host mechanism and alternatives.** Recommend **fixed process-slot envelopes** as the
+first implementation candidate, with no borrowing or automatic reassignment. This is conservative
+and avoids a per-admission SQL coordinator connection or an idle coordination heartbeat.
+A reviewed finite slot manifest gives each permitted process incarnation h a C_h, I_h, B_h,
+R_h, A_h, Q_h, Q_ah and M_h. Enforce:
+
+- each C_h = I_h + B_h + R_h, with no borrowing between classes;
+- sum(C_h) + E <= C; sum(B_h) <= B; sum(I_h) <= I; sum(R_h) <= R;
+- for every agency, sum(A_h) <= A, with agency reservations also charged to B_h;
+- sum(Q_h) <= Q, sum(Q_ah) <= Q_a and sum(M_h) <= M.
+
+One atomic local allocator enforces each slot's vector; all workers and enrolled API opens use
+it. Slot counts include scale-out, multiple processes on a host, rolling overlap and old versions.
+One process-local semaphore per worker or multiplying a per-host limit by an observed host count
+is insufficient. Startup must have exclusive, enforceable ownership of a non-reused slot and
+the agreed epoch **before any protected SQL open**, including startup/health/authentication.
+A token in configuration alone cannot enforce exclusivity. Main integration must choose and prove
+the slot ownership/fencing mechanism against the intended hosting model; none exists in this
+proposal or inspected source. If the platform cannot enforce a finite set of exclusive slots,
+this candidate cannot claim cross-host limits or proceed to activation.
+
+Fixed allocations strand idle credits and divide an agency's allowance among hosts. If K does
+not fit a slot or no positive compatible A_h is available, route eligible work to a reviewed
+slot or deny it; do not round shares up or silently borrow. They provide safety caps, not global
+work conservation or fairness across hosts. Main 1.3.1/1.3.3 must account for placement and these
+conditions when defining progress.
+
+An alternative is an **external strongly consistent admission coordinator** atomically granting
+total/class/agency credits and bounded waiter slots, outside the protected business SQL pool.
+It can share unused capacity dynamically, but adds availability, authorization, state-size,
+idempotency and recovery dependencies. Its own connections/CPU must be independently bounded.
+A coordinator outage rejects new grants; an unknown grant/release stays charged. Automatic lease
+expiry does not prove old SQL connections or provider work stopped: reclaimed credits require
+verified owner fencing and closure, otherwise safety wins over capacity recovery. Reviewing a new
+service/deployment needs separate authority. Neither Redis-like TTL counters nor a lease clock
+alone establish that proof.
+
+Using **SQL as the budget coordinator** requires a reserved, bounded control-plane open before
+the business grant and explicit connection accounting. Existing sp_getapplock waiters already
+open SQL before admission; reusing them as a free C limiter is circular. A durable SQL ledger
+would also need atomic accounting, bounded queues and stale-owner proof. It is an alternative,
+not selected here. Independent worker semaphores, pools per agency and resource-key proliferation
+are rejected as substitutes: none alone caps shared target use. Main review must adopt a backend
+and numbers in a registered decision before implementation; this subsection changes no boundary.
+
+**Admission and existing safety order.** Perform a bounded discovery read under its own unscoped
+class reservation when the agency is not yet known. Close/dispose it and every discovery lease,
+then request the complete agency operation reservation. A discovered ID is only a hint:
+reacquire current reset/record/account/agency decision owners and revalidate scope, eligibility,
+revision, gate and caller cancellation before any effect. Never hold a discovery connection or
+SQL lock while awaiting another resource reservation, and never upgrade a partial reservation
+inside a transaction. Two-phase discovery requires main fairness/safety review and source changes;
+it is not a claim that present global selections already obey A.
+
+Within a granted operation, retain the current lock order: Demo reset first; dispatch then account
+preflight for dispatch; common serializable claim-release agency lock first within its decision
+transaction before narrower decision locks. Reopen retains reset → account → agency and never
+waits for a dispatch lock. Note reset precedes its sweep lock on their same connection. Provider
+serialization remains authoritative. Existing SQL/provider lock waiting happens **inside charged K**;
+it is distinct from the no-SQL resource admission queue. Do not shorten required safety spans
+or change the existing Claim.MD 120-second wait to make a capacity assertion.
+
+Reserve capacity needed to finish an irreversible attempt at initial grant, including protection,
+evidence writes/rollback and cleanup. Cancellation/disablement stops new attempts, not their
+accounting or necessary outcome retention. Release credits only after inner transactions,
+commands and connections finish/dispose, followed by outer leases; admission release is last.
+No deadline or budget rejection justifies upload replay, evidence loss, incorrect cursor advance,
+premature mail completion or changing a revocation decision.
+
+| Current source path | Required integration boundary and preserved safety |
+|---|---|
+| [Dispatch](Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs), ProcessTurnAsync / PrepareUnderAccountLeaseAsync / UploadAndRetainAsync; [schedule](Sati.Api/Infrastructure/ClearinghouseDispatchSchedule.cs) | Separate bounded unscoped candidate discovery from the reviewed 1.3.1 agency turn; reopen/revalidate under current owners. Cost preparation and upload/evidence phases, including reset + dispatch + account or provider connections and independently open business contexts. Three explicit leases during HTTP are a lower-bound fact, not an adopted K. Grant must cover required post-Sending CancellationToken.None protection/retention before allowing Sending. Busy maps to a distinct scheduling outcome, preserves intent and cannot renew activity. |
+| [Polling](Sati.Api/Infrastructure/ClaimMdSandboxPoller.cs), PollOnceAsync / PollAccountsAsync; [provider admission](Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs) | Current reset and poller sessions span unpaged discovery and all accounts. A conservative global pass cap is possible, but does not implement agency shares. Before per-agency admission, 1.3.3/later finite-pass design must review paged account/feed continuation and safe lease release/reacquisition. Never await A while holding the global pass's SQL leases. Preserve request serialization, account/feed binding and atomic cursor/effects; no provider calls or cursor effects on denial. |
+| [Notes](Sati.Api/Infrastructure/NoteAbandonmentWorker.cs), RunDueAsync / SqlNoteAbandonmentCoordination | runGate precedes one connection carrying reset + sweep locks across discovery/all agencies; sweep transactions add separately checked-out connections. A pass reservation can cap concurrent SQL but cannot claim fair per-agency service. Review bounded turns/continuation and global-lock scope before agency grants; denied/partial work cannot mark allCompletedOn or failed agencies complete. Preserve revision/audit transaction, completed-day zero-SQL behavior, next-day eligibility and default-off gating. |
+| [Signature processing](Sati.Api/Infrastructure/SignatureProcessingService.cs), ProjectCompliance / PreparePackages; [package worker](Sati.Signatures/SignatureCompletionWorker.cs) | Admit discovery separately and each stored-agency item before its owned transaction. Package transaction spans blob/PDF/key work, so reserve that connection for the entire span; nested opens must fit audited K. Preserve immutable/idempotent package evidence and retained orphan review. Resolve the hosted service's missing shared-reset participation as a separate safety dependency; no live reset race is asserted and no transaction shortening is authorized here. |
+| [Signature mail](Sati.Signatures/SignatureMailWorker.cs), ClaimAsync / PrepareSubmissionAsync / SubmitAsync / StoreAsync | Avoid claiming a row or incrementing an attempt just to wait for resource capacity; a reviewed stored-agency candidate hint and subsequent conditional claim are needed. Reserve before durable five-minute lease/operation-ID work. Keep final serializable revocation checks and send span, stable GUID, stale-owner checks and later GET-only recovery. Cancellation/unknown release cannot free credits while the sender/SQL is unresolved; denial must not consume the five-attempt budget. |
+| [API registration/middleware](Sati.Api/Program.cs), [stored actor filter](Sati.Api/Security/TenantAccess.cs), [Demo mutation lease](Sati.Api/Infrastructure/DemoMutationLeaseMiddleware.cs) and outside consumers | Current mutation middleware opens a direct connection before endpoint stored-actor validation. Use bounded unscoped interactive/authentication admission before that open; a JWT/caller agency cannot authorize agency accounting. Later validated endpoint work needs reviewed nonblocking transition or release/reacquire/revalidation, never nested waiting under reset. Protect I without allowing expensive jobs to misclassify themselves. GET/health/startup, portal, reset/Function/watchdog and provider users must be enrolled or separately bounded in E/R/P. API routes/status/quotas are 1.5 work, not added here. |
+
+**Failure, restart and configuration semantics.** Gate/identity/epoch checks precede admission
+and repeat immediately before protected work. Never fall back to unbounded execution on missing
+configuration, unknown cost, slot contention or coordination error. A disabled feature keeps
+existing uncertainty/evidence handling and charged in-flight work until disposal. Cooperative
+D_admit expiry owns waiting only; phase/connect/command/provider/evidence/cleanup deadlines need
+separate later design. A hung operation may retain capacity indefinitely; this proposal cannot
+promise wall-clock availability or forcible safe interruption.
+
+Host shutdown removes pending waiters, drains admitted work under current uncertainty rules and
+keeps unresolved credits/slot ownership quarantined. A restart, partition, clock jump or expired
+mail lease cannot make the old process's SQL/session accounting reusable. Fencing must stop all
+old opens and establish closure before slot reuse; logical generation rejection alone does not
+close a physical session. If that proof is unavailable, operator recovery is required and the
+envelope loses availability, not safety. Operator action/schema/cloud changes remain separately
+authorized. Reset needs its own protected R reservation before exclusive reset admission; it
+cannot bypass C or deadlock by waiting for capacity held by its own nested owners.
+
+One versioned configuration defines target, slot manifest, operation costs, queues, class/agency
+shares and compatibility. Mixed unbudgeted hosts invalidate an aggregate claim. Reducing a limit
+below live allocations stops new grants until draining proves compliance; it does not revoke
+safety-critical work or label the lower cap already met. Pool/identity rotation overlaps count
+both old and new pools under P. No heartbeat/poll of SQL is added while Demo is dormant (D2);
+recovery verification and hosting/backend choice must respect that boundary.
+
+Content-free bounded metrics later report reservation/open/waiter counts by workload, busy reason,
+wait age, unresolved cleanup and configuration epoch; agency visibility remains authorized and
+bookkeeping bounded. No payloads, narratives, keys, connection strings or full provider errors.
+Alert destination/receipt and operational acceptance stay with D1, operations and 1.7.
+
+**Deterministic acceptance plan — proposed, not executed here.** Register positive symbolic
+budgets and audited costs, use barriers/fake time, and retain an unfixed-code failure for each new
+runtime guard. Existing context factories, SQL command/connection interceptors, injected
+coordination, dispatch fake-time tests and package/mail mocks are seams from 1.4.1; the admission
+owner, slot controller, universal open accounting and hosted signature clock seam do not exist yet.
+
+| Case | Required assertions and dependency |
+|---|---|
+| Weighted grants and nested opens | Two independent slot allocators grant differing K up to sum(C_h); next grant opens no SQL. All partial-vector failures roll back total/class/agency counts; K+1 child open fails before provider open. Count open attempts, outer leases, business transactions and concurrent retries separately. After verified disposal exactly the released weight is available; duplicate release cannot inflate it. |
+| Interactive and agency boundaries | Fill B/B_h and A/A_h across hosts using two agencies; I remains available to an authorized interactive operation fitting I_h. Caller account/agency/class spoofing cannot gain a grant. A's rejected attempt changes no counters; B can acquire when its agency and shared class limits permit. Agency maxima are not minimum reservations for every agency. Fair progress is conditional on adopted 1.3.1/1.3.3 placement/turn policy; no arbitrary elapsed-time or global F assertion. |
+| Finite pending state | At Q/Q_a/M boundaries reject the next entry without connection, payload retention or new map growth. Barrier a grant/cancel race and exact D_admit fake-time expiry: one outcome, no abandoned count or duplicate grant. Worker try-admission parks no waiter; queue removal and idle-map eviction preserve outstanding ownership. |
+| Failure at every acquisition/disposal step | Fault connection establishment, app-lock acquisition, transaction commit/rollback, command/connection disposal and outer release. Confirm charged maximum and uncertainty retention; unknown close quarantines credit. Stalled cleanup cannot produce a replacement open exceeding C. No new work consumes protected I/R to bypass B. |
+| Restart/partition/rolling overlap | Old and new hosts compete for the same slot/epoch; the newcomer performs zero protected opens until fencing/closure is proved. Expire control/mail leases and jump wall time while old SQL is barrier-held: no capacity credit is reclaimed. Coordinator unknown grant/release is idempotently recovered or retained; mismatch/missing configuration rejects new work. |
+| Worker safety on busy/cancellation | Before Sending/claim, denial changes no readiness failure, mail attempt, cursor, completion cache or immutable evidence. After physical-send initiation or committed provider GUID, cancellation preserves upload uncertainty and GET-only mail recovery, never a second POST. Barrier staff revocation at final send preserves ordering; poll effects/cursor and note writes/audits commit together or neither. |
+| Complete consumer/physical accounting | Instrument factory and direct middleware opens across hosts, including auth, health, recovery and outside consumers. Verify unscoped discovery disposes before agency admission and current scope is rechecked. Separately inventory pool keys/maxima and rolling/credential overlap for P; logical mock counts cannot prove physical-server sessions or E. Actual SQL/host observations need separate disposable/intended-host authority. |
+| Idle and overload recovery | At dispatch inactivity/completed note day, no admission timer triggers SQL. Release capacity then exercise only an existing eligible wake/turn; work remains due without faster polling. Adopted fair selection and resource admission jointly preserve healthy B, scoped diagnostics and cleanup while A fails. Numeric latency/load acceptance is later 1.6 evidence. |
+
+**Review order and next bounded step.** Main integration first reconciles 1.4.1/this proposal with
+current source and 1.3.1, then reviews the logical unit/reserves and fixed-slot versus external
+coordinator tradeoff. Resolve exclusive slot enforcement, complete consumer/cost inventory and
+signature/reset safety before backend adoption. Define polling/note/mail turn prerequisites and
+API 1.5 ownership; obtain separately authorized hosting/pool/provider facts before choosing numbers.
+Record the adopted choice in an unused registered DEC record through main integration. The next
+bounded slice is **admission-contract/backend adoption review**, followed by a separately assigned
+single-owner implementation with fail-first synthetic proofs. This does not activate another
+numbered task, alter the main pointer, migrate/deploy or declare 1.4 complete.
+
 #### October 9 — resource-limit inventory task 1.4.1
 **Main integration review — October 9, source `72cec51`:** task 1.4.1 is complete for
 source/documentation inventory integration. The investigator text below is a retained dated

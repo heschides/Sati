@@ -1,5 +1,10 @@
 # Sati — Decision index and supersession
 
+The main-reviewed resource admission proposal remains proposed in
+[DEC-0242](docs/decisions/current/2026-10-09-DEC-0242.md). Accounting, hosting/fencing, complete
+consumer costs and budget values must precede backend/runtime adoption; source fairness does
+not establish a global resource cap.
+
 The [dated record index](docs/decisions/README.md) preserves every original second-level decision
 section and its reasoning under stable `DEC-` IDs. [The full original](docs/archive/2026-10-08/DECISIONS.md)
 is byte-preserved. Dated observations are not current deployment facts. Retained records must be

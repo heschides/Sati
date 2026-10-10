@@ -207,6 +207,15 @@
       "status": "accepted",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0242",
+      "date": "2026-10-09",
+      "title": "Shared SQL admission prerequisites",
+      "path": "docs/decisions/current/2026-10-09-DEC-0242.md",
+      "status": "proposed",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

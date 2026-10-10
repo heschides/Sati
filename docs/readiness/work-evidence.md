@@ -1,5 +1,36 @@
 # Working evidence ledger
 
+## 2026-10-09 — SATI-WRK-001 1.4.2 main admission proposal review
+
+**Identity/authority:** main `master` at `9132a590a6cb78ff818bc328e4ae05aa022aa737`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; continued-work authority. Investigation source
+identity/input capture is retained in its original entry: dedicated c3a1 worktree, base `40e091b`,
+unchanged 550-source digest. Task 1.4.1 main review records nine modified/eight added main source
+paths; no later runtime delta. Human assignment for 1.4.2 was explicit in that chat, not an
+autonomous transfer of the main pointer. No messages sent or edits made to the other checkout.
+
+**Change/review:** extracted only 1.4.2's W8 proposed contract and dated ledger entry; reconciled
+its main assignment/definition and source correction. Registered unused DEC-0242 with proposed
+status. Conservative checked-out/nested-open accounting, protected class/agency/queue vectors,
+no-SQL waiting, retained uncertainty and last release are useful planning inputs. Fixed slots
+cannot claim a cross-host cap without enforceable exclusivity/fencing/closure and rolling overlap;
+external/SQL coordinators retain their cost and availability alternatives. No backend or numeric
+limit is adopted. Current polling is bounded/durable but still holds multi-agency outer sessions,
+so it does not meet dispose-before-agency-resource-admission by merely adding the selector.
+Signature reset/claim-before-capacity and API auth/middleware enrollment remain explicit dependencies.
+
+**Verification:** read the complete proposal/evidence, rechecked current selector/session lifetimes
+and unchanged note/signature processing/package/mail source. Eight acceptance families remain
+proposed, not executed. Documentation structure, all 22 negative proofs and whitespace passed
+for this documentation chunk; original investigation results remain historical. No application test/build,
+database, real-data access, vendor/cloud call, benchmark, capacity measurement, infrastructure,
+runtime policy, deployment, activation or sealed release/rubric/score change.
+
+**Status/next:** reviewed proposal integration complete, resource implementation/adoption open.
+Missing hosting/fencing, complete enrolled consumers/costs, pool/external envelope and values are
+genuine prerequisites for a global limit. Independent task 1.3.3.5 signature fairness/source-safety
+design is next; no pending budget default is silently invented.
+
 ## 2026-10-09 — SATI-WRK-001 1.4.1 main inventory integration
 
 **Identity/authority:** main `master` at `72cec51180ce77f4e81d4ae842ac6207465800bb`, checkout
@@ -3258,6 +3289,126 @@ C/A/Q acceptance before implementation. This recommendation does not add or acti
 task or move the main pointer from **1.3.1**.
 
 **Later reviewed release snapshot, if any:** none; working investigation evidence only.
+
+## 2026-10-09 — SATI-WRK-001 task 1.4.2 shared SQL/session admission design
+
+**Stable work ID and bounded slice:** SATI-WRK-001 **1.4.2**, explicitly assigned by Josh
+("Yes, you can take 1.4.2") after a clarification describing documentation-only shared SQL/session
+admission design. Scope: cross-host and agency bounds, bounded waiters, protected interactive
+capacity, safety order and proposed deterministic acceptance; no runtime implementation.
+
+**Status and source/revision:** proposed; awaiting main review/adoption/integration, not complete
+on the main branch. Starting and current HEAD: `40e091bae9bd0f5de9bc89e39209cf3e17449ccc`,
+detached dedicated worktree `C:\Users\Joshu\.codex\worktrees\c3a1\Sati`.
+The second investigation role and worktree identify this assignment; no separate app thread ID
+was available. The checkout already contained current coordination/governance, scheduling/recovery
+owners and the 1.4.1 handoff. Task 1.4.2 had no pre-existing definition/row; Josh's explicit
+assignment supplied scope, and its bounded definition/assignment was recorded before designing.
+Required source inputs were present. No checkout setup, copy, fetch or main-worktree edit.
+
+Included uncommitted inputs are the same root/canonical documentation, six API source files and
+seven test-source files individually listed in the
+[1.4.1 input capture](#2026-10-09--sati-wrk-001-task-141-resource-limit-inventory), plus its
+uncommitted W8 inventory, assignment row and working-evidence entry. DEC-0237/DEC-0238 and new
+DispatchSchedule/SchedulingTests/FactorySessionTests are included untracked inputs. These
+remain their original owners' work and are not this task's implementation. Pre-existing
+Sati.csproj formatting and assessment-working items were preserved; assessment files were
+not inspected as data or used as evidence. Startup git status matched that handoff.
+
+At start, 1,108 protected source/test/documentation/script files outside the three editable
+owners had SHA-256 aggregate
+`0a9ea64aa02c67e1948b39acd03bcfeb3352bd8db56cb6fe4fe1d84614c930e4`.
+The 550-source identity retained from 1.4.1 is
+`50e79f193461becc2d5e5b15e9773bd05d62f7650dae8ffec5bfccf4c18f07f3`;
+final checks must revalidate it. Aggregate method: sorted unique Git-relative paths, each followed
+by ":" and its uppercase byte SHA-256, joined with LF and UTF-8 SHA-256. Protected enumeration
+covers AGENTS/AGENDA/ARCHITECTURE/DECISIONS/OPERATIONS/BACKGROUND owners, docs, API and tests,
+Contracts, Persistence, Signatures/tests, scripts and Sati.csproj, excluding only AGENDA.md,
+BACKGROUND_WORKERS_HANDOFF.md and docs/readiness/work-evidence.md.
+
+Pre-task owner byte hashes (including the preserved 1.4.1 handoff) were:
+
+- AGENDA.md: `B1A3A58F053878FA1A0ED73D42F4BE8572906150B45396A6D19D47E277930221`.
+- BACKGROUND_WORKERS_HANDOFF.md: `2D14CB97DC3125017FC1AF6AC037C3B04ECFF1C3E8BB4961A1E3139CF141E318`.
+- docs/readiness/work-evidence.md: `B37B597BD5A2D7BD5AD074CBE96452F9C85B5BABFFCC3BD849367050BB569881`.
+
+**Changed behavior, ownership and canonical paths:** documentation only.
+[Task-owned W8 proposal](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--shared-sqlsession-admission-design-task-142)
+defines checked-out connection accounting, full-operation weighted reservation, C/I/B/R/E/A/K/Q/M
+bounds, typed denial and finite wait contracts. It recommends fixed exclusive process-slot
+allocations without borrowing/reassignment as the first candidate; missing enforceable slot
+ownership/closure proof is an explicit adoption/activation dependency. External strongly
+consistent coordination and bounded SQL control-plane alternatives retain their tradeoffs.
+A physical pool/session envelope P is separate: pool return or permit expiry cannot establish
+physical closure. Current record/account/global locks are integrity controls, not shared capacity
+reservations. The five-path integration matrix preserves reset, claim-release, upload uncertainty,
+atomic cursor/audits, immutable packages and mail revocation/GUID recovery. Eight proposed
+acceptance groups cover weighted opens, reserves, bounded pending state, faults, restarts,
+worker safety, complete consumer/physical accounting and idle behavior.
+
+AGENDA adds only the 1.4.2 outline entry, explicit assignment row and four-field bounded definition;
+its row is awaiting review. Other task states and the main pointer 1.3.1 stay preserved. This ledger
+entry records this task's evidence. No existing 1.4.1 subsection or sealed evidence was amended.
+
+**Actual tests/checks, commands, results and evidence locations:** source/owner inspection
+and input-presence verification completed. scripts/Test-DocumentationStructure.ps1 passed:
+46 root pages, 28 scoped owners, 12 immutable snapshots, 11 active items, 454 legacy items,
+218 imported and 20 current decision records; main pointer remains SATI-WRK-001 task 1.3.1.
+scripts/Test-DocumentationStructureChecks.ps1 passed all 22 disposable-fixture negative cases;
+owned fixtures were cleaned up. Both ran locally with bundled pwsh, -NoProfile. Whole-worktree
+git diff --check passed. SHA-256 checks returned the same 1,108 protected-file and 550-source
+digests and unchanged HEAD. A read-only main-checkout comparison of those 550 source paths found
+zero missing files or differences after CRLF/LF normalization; this compares captured content,
+not main-thread integration or a main commit identity. Removing only 1.4.2's new W8 subsection,
+agenda outline/row/definition and this entry reconstructs all three pre-task owner hashes above,
+proving prior 1.4.1 and all other sections/entries preserved. Final structure/whitespace/scope
+checks were repeated after recording results. This ledger and local command outputs own the
+documentation-only evidence; no extra report artifact was created.
+
+Source reading revalidated lease opens/lifetimes, middleware before stored-actor filter,
+provider/agency lock order, current scheduling/recovery and package/mail transaction spans.
+No runtime policy or acceptance test was exercised; proposed cases are expressly future work.
+
+**Failed/unrun checks, reason and verification limits:** a guessed standalone ValidatedActorFilter.cs
+path did not exist; rg located the actual filter in Security/TenantAccess.cs and it was read.
+One whole-owner JSON capture was truncated and could not be parsed; the compact baseline hash/status
+capture succeeded, and no truncated content was used for an edit. Broad searches/read output were
+trimmed; relevant owners were read in bounded follow-ups. These are inspection-tool limits, not
+application failures. No application build/test suite, database/real data, benchmark/heavy test,
+network/vendor/cloud call, process modification, agent launch, commit/push/deployment or activation.
+Current host/slot/pool/provider quota facts, external-consumer envelope, safe closure/fencing,
+numeric costs/limits, throughput, memory and latency are unverified.
+
+**Relevant readiness criterion IDs and evidence class:** source-grounded design/documentation,
+relevant to MT06/MT07 fairness/isolation dependencies, MT09 shared capacity, MT10 cross-host safety,
+MT11 interactive response, ID05/ID10/ID11 uncertainty/retry/signature integrity and OP05/OP10
+operating/owner evidence in rubric 2026-10-v1. No criterion satisfaction, sealed score, release
+snapshot or compliance finding is claimed.
+
+**Durable decisions, alternatives and supersession links:** no accepted or registered new
+decision; main review owns later backend/value adoption and registration with an unused DEC ID.
+The proposal and alternatives remain proposed in the assigned W8 subsection.
+DEC-0238 coordination, DEC-0237 scheduling, DEC-0235 recovery, billing/signature safety owners
+and D1–D4 remain governing; nothing is superseded. This assignment authorizes neither a new
+admission service nor a cloud/host setting change.
+
+**Remaining risks/blockers, dependencies and deferred work:** main must review/integrate 1.4.1
+and this captured design against current source, alongside 1.3.1. Fixed allocations require
+exclusive non-reused process slots and may strand capacity; automatic partition/lease recovery
+cannot release unresolved SQL credits. Complete consumer/open accounting and numeric K/P/E
+need later bounded inventory/authorized observations. Poll/note multi-agency passes and mail
+claim-before-budget need reviewed bounded-turn discovery/continuation under 1.3.3/later 1.4;
+signature hosted reset participation needs safety review. API 1.5, dependency quotas/deadlines,
+synthetic 1.6 and operational 1.7 remain separate. Main integration should extract only this
+task's subsection, 1.4.2 agenda registration/row and this entry, preserving inherited inputs.
+
+**Next eligible stable ID and bounded slice:** recommend main **SATI-WRK-001 admission-contract/
+backend adoption review**, reconciling inventory/fairness/safety, choosing counted resources,
+reserves and enforceable slot/controller ownership before registering a decision. A subsequent
+single-owner runtime implementation requires explicit assignment and fail-first proofs. No
+unassigned task is started and the main **1.3.1** pointer is unchanged.
+
+**Later reviewed release snapshot, if any:** none; working design evidence only.
 
 ## Entry template for the next significant portion
 
