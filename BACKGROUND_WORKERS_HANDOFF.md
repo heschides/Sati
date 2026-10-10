@@ -607,6 +607,58 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — API workload admission inventory — task 1.5.1
+
+**Status:** bounded main source-family review complete. Coordinate with SATI-SEC-001 rather than
+create another security owner. [B11](SECURITY_REVIEW_2026-09-10.md#b11--medium-authenticated-workload-remains-insufficiently-bounded)
+remains a source-supported common-admission gap. This review does not assert every route unbounded:
+there are useful per-operation limits below. It also does not cost every route or measure capacity.
+Base `d0e8fedcbb5f0291beb5efc73ebdddba7e58abf6`; [consumer enrollment](#october-10--shared-sql-consumer-enrollment-inventory--task-149)
+owns adjacent SQL consumers and the distinction between contexts, checkout and physical pools.
+
+| Family / source | Existing enforced scope and bounds | Remaining admission/cost boundary and test seam |
+|---|---|---|
+| [API pipeline](Sati.Api/Program.cs), [route group](Sati.Api/Endpoints/ApiEndpoints.cs), [actor filter](Sati.Api/Security/TenantAccess.cs) | Routing/authentication/rate limiter/authorization precede mutation lease and endpoint filters. Actor filter revalidates stored identity/database instance before endpoint continuation; write filter establishes zero-retry execution scope. | No registered global/actor/validated-agency concurrency/finite queue or request-timeout policy in inspected API source. JSON route parameters can be bound before endpoint filters, so a filter-only design does not bound parse/deserialize work. Mutation lease already holds raw SQL before filters on protected writes. Budget waiting must precede checkout while identity validation still gets its own bounded allowance. Existing factory/interceptor/authorization tests are seams. |
+| Login and [chat](Sati.Api/Endpoints/ChatEndpoints.cs) | Process-local login fixed window 120/minute, queue zero; chat-post 30/minute per claimed name identifier, queue zero. Stored actor validation still governs chat effects. [Stream](Sati.Api/Endpoints/ChatStreamEndpoints.cs) bounds notices/subscriptions and revalidates via short contexts. | Rate/time windows count arrivals, not overlapping expensive operations or cross-host aggregate use. Chat rate partition precedes stored identity filter, so it is not proof of current stored agency ownership. Sign-in CPU/SQL and validation bootstrap need separate abuse/admission classes. Existing chat/session/boundary tests support revocation/cancellation/overload cases; distributed login state is SATI-SEC-001 work. |
+| Note create/update in [API endpoints](Sati.Api/Endpoints/ApiEndpoints.cs) | `ValidateNote` caps narrative at 1,000,000 characters, validates schedule/activity/status; service-time write scope and stored person/agency checks govern authoritative transaction/effects. | Character validation follows JSON binding. Repeated accepted large narratives, version/audit writes and schedule contention have no common concurrency/storage-growth budget. Preserve timeline, immutable/amendment and retry owners rather than substituting a capacity lock for record admission. Existing note schedule/concurrency/amendment tests and save barriers are seams. |
+| Journal/reminders, scratchpad and assessment document in [API endpoints](Sati.Api/Endpoints/ApiEndpoints.cs) | Reminder entry cap 4,000 characters via [JournalEntry](Sati.Contracts/V1/JournalEntry.cs); scratchpad cap 1,000,000 characters; assessment document cap 4,000,000 characters then JSON parse. Stored caseload/author/feature checks and version/concurrency owners remain authoritative. | Whole-journal PUT has no analogous endpoint character cap in inspected owner. Bounds on one entry do not bound accumulated journal/history, repeated versions or scratchpad-history materialization. Assessment parsing occurs before its author/feature query, after group identity validation. Changing record-size/retention/product policy needs a defined successor, not an arbitrary truncation. Journal/assessment/paging synthetic tests and lifecycle interceptors are seams. |
+| Audit CSV and person-history PDF in [API endpoints](Sati.Api/Endpoints/ApiEndpoints.cs) | Admin/stored agency scope; audit CSV caps interval at 366 days, reason 10–250 characters and rows at 10,000; sanitization/no-cache/audit remain separate controls. Person-history PDF materializes that person's agency-scoped versions and invokes synchronous generator. | CSV allocates rows/string/UTF-8 bytes; one bounded export can still overlap many exports. Person history has no row/page limit in inspected query; synchronous PDF generation is not interrupted simply by a request token. Do not silently discard official history; define paging/streaming/export behavior and CPU/byte reservation. Existing audit/CSV/person-lifecycle/privacy tests are seams. |
+| Supervisor review in [API endpoints](Sati.Api/Endpoints/ApiEndpoints.cs), [page rule](Sati.Contracts/V1/NoteReviewRules.cs) | Stored supervisor/caseload scope; page query takes page-size+1, returns page size 10 with descending ID cursor/ceiling; search input trimmed to 200 characters. | Dependent forms/attestations/contact/compliance queries are not bounded solely by ten notes; old non-page endpoint also exists. Query cancellation and returned row caps do not prove query cost/SQL checkout or starvation bounds. [NoteReviewPagingTests](Sati.Api.Tests/NoteReviewPagingTests.cs) cover current cursor behavior; add dependency-count and saturation barriers later. |
+| Billing generation/export/compliance in [billing owner](Sati.Api/Endpoints/ApiEndpoints.BillingExport.cs) and [API endpoints](Sati.Api/Endpoints/ApiEndpoints.cs) | Stored billing permissions/current identity, admitted serializable scope, immutable retained claims/current source/compliance and duplicate-release rules. Inputs/outputs are financial records, not capacity admission tokens. | Period lines, note/person/forms/approval facts and per-day checks can grow; a request's period ID does not bound its retained work. Preserve exact replay/unknown-send/correction/compliance rules under overload. [BillingExportComplianceTests](Sati.Api.Tests/BillingExportComplianceTests.cs), joined pipeline and SQL race tests provide seams. No record-count limit or global capacity adopted here. |
+| Billing response ingestion: [wire gate](Sati.Api/Program.cs), [ingestion](Sati.Api/Infrastructure/ClaimResponseIngestion.cs), [parser](Sati.Contracts/V1/X12Document.cs) | Before binding, matching POST response paths set body maximum `MaximumDocumentCharacters*6+1024`, reject declared oversize 413 and set writable server size feature. Decoded X12 cap 2*1024*1024 characters, max 25,000 segments; ingestion's generation candidate query takes 501 before enforcing its current boundary. Receipt/matching/cursor/effect transactions remain authoritative. | Escaped JSON wire bytes, decoded characters, segment complexity, candidate count and concurrent receipts are different budgets. In-memory hosts/non-writable features are not deployed transport enforcement. Preserve all-or-nothing cursor/receipt effects and current parser subset; failed capacity must not masquerade as accepted financial evidence. Parser, receipt/privacy and actual connector synthetic tests supply seams. |
+| API/public signature: [workflow](Sati.Signatures/SignatureWorkflow.cs), [transport](Sati.Signatures/AzureSignatureProviders.cs), [portal](Sati.Portal/Program.cs) | Original PDF cap 15 MiB; package/blob transport bounds and declared/streamed byte checks remain separate; request/event lists take 200. Workflow serializable transactions can span blob/key/PDF operations. Public portal has IP 120/minute and PIN 12/minute, zero rate queue, separate feature/identity/service registration. | Byte caps do not bound PDF CPU, rendering concurrency, key/blob/mail quota or elapsed whole operation. Portal rate is process-local and separate from API budgets. Preserve stored signer/session/revocation/immutable evidence and uncertain-mail recovery; do not release protective transaction early to make a limit look smaller. Existing signature/portal synthetic provider and lifetime barriers are seams. |
+| Health, incidents, reset and operational tools | See [adjacent consumer inventory](#october-10--shared-sql-consumer-enrollment-inventory--task-149); separate startup/observation/recovery consumers and parent-child overlap. | Reserve these explicitly rather than letting ordinary traffic starve recovery or recursively record denied requests. Health identity failure must remain Unhealthy, not become an admission success. Existing redaction/incident/reset/private SQL tests supply seams; deployed load and provider failure remain unproved. |
+
+**Proposed deterministic acceptance for the next implementation:**
+
+1. Assert pipeline ordering through registered routes: transport/pre-auth size/abuse admission,
+   bounded stored-identity validation, trusted actor/agency admission, then reset/record decisions.
+   Spoofed/foreign/revoked scope cannot earn another agency's capacity or reach business work.
+2. Hold synthetic dependencies at barriers, fill ordinary permits/waiters, and verify next request
+   returns a fixed overload contract without business SQL opens, parser work or effects. Cancellation
+   removes the waiter; finite wait expiration is distinct from failed authorization/record conflict.
+3. Multiple caller/host instances share one declared envelope; same actor across routes cannot
+   evade aggregate limits. A saturated agency cannot starve healthy agency/interactive reserve.
+   Do not claim this from per-process rate windows or a single-test-host semaphore.
+4. Exercise declared/chunked/escaped JSON, decoded X12 and segment/candidate boundaries separately.
+   Preserve exact existing maximum acceptance and safe refusal; verify no partial receipt/cursor.
+5. Preserve record replay, audit atomicity, immutable snapshots and external-send uncertainty when
+   admission/cancellation occurs before versus after a decision or provider request. Never auto-retry
+   an ambiguous send/commit merely because a permit expired.
+6. Under synthetic saturation, health/incident/reset classes retain their adopted allowance without
+   recursive admission/deadlock or unrestricted error payloads. Observe raw/context/child overlap,
+   slow dependencies and last-release/uncertainty accounting, not only normal callbacks.
+7. Cost cases distinguish row/byte/CPU/dependency/SQL envelopes. Document-count or narrative caps
+   do not count physical pool sessions. Slow PDF CPU and provider cleanup need their own bounded
+   mechanisms and evidence before promising a whole-request deadline.
+
+These cases are proposed, not run in this documentation-only task. **Next adoption dependency:**
+intended host overlap/fencing, enrollment/closure/pool facts and interactive response/worker/recovery
+objectives must be chosen before backend/numeric policy; Josh's questions are pending. DEC-0242
+remains proposed. A conservative arbitrary limiter would still omit raw/portal/Function consumers
+and could deny essential record/recovery work. [Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-151-api-workload-admission-inventory)
+owns source identity/checks/limits; historical release evidence and legal/deployment status unchanged.
+
 #### October 10 — mutation admission-result hardening — task 1.4.11
 
 **Status:** bounded main source acceptance complete; 171 focused cases passed, unreleased. The raw

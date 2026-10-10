@@ -112,7 +112,7 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.3.3.2** | [Bounded ERA feed quantum](#1332--bounded-era-feed-quantum) | Complete for source verification/main integration; 35 local regressions passed; unreleased. |
 | **1.3.3.3** | [Durable polling selection](#1333--durable-polling-selection) | Complete for bounded source verification/main integration; 119 tests passed, unreleased. |
 | **1.3.3.4** | [Note-maintenance fairness review](#1334--note-maintenance-fairness-review) | Complete for bounded source review; 35 existing tests passed; crash/membership/capacity gaps retained. |
-| **1.4** | Resource limits: bound shared connections, concurrency and operation times | Open; includes global/agency budgets, bounded queued work, dependency quotas and measured hosting choices. |
+| **1.4** | Resource limits: bound shared connections, concurrency and operation times | Open; worker intervals and adjacent consumers reviewed, strict API lock results repaired. Backend/values require host/closure/enrollment facts and operating objectives. |
 | **1.4.1** | [Resource-limit inventory](#141--resource-limit-inventory) | Complete for main-reviewed source/documentation integration; current-source corrections in W8; no adopted limiter. |
 | **1.4.2** | [Shared SQL/session admission design](#142--shared-sqlsession-admission-design) | Complete for main-reviewed proposal integration; DEC-0242 remains proposed, backend/value adoption open. |
 | **1.3.3.5** | [Signature fairness design](#1335--signature-fairness-design) | Complete for main source/design integration; DEC-0243 selects bounded local implementation. |
@@ -128,7 +128,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4.10** | [Onboarding admission-result hardening](#1410--onboarding-admission-result-hardening) | Complete; 126 focused cases passed, unreleased; no budget policy. |
 | **1.4.11** | [Mutation admission-result hardening](#1411--mutation-admission-result-hardening) | Complete; 171 focused cases passed, unreleased. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
-| **1.5.1** | [API workload admission inventory](#151--api-workload-admission-inventory) | Ready; bounded source review, no numeric/runtime policy. |
+| **1.5.1** | [API workload admission inventory](#151--api-workload-admission-inventory) | Complete; bounded source-family review, no numeric/runtime policy. |
+| **1.5.2** | [Shared admission adoption prerequisites](#152--shared-admission-adoption-prerequisites) | Blocked; intended host topology/service targets pending, enrollment/closure proof required. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
 
@@ -168,7 +169,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.9 — Shared SQL consumer enrollment inventory** | Complete; main source/documentation acceptance | Main integration thread / main integration thread | Base `a447d0f`; bounded adjacent consumer census complete; host/closure/values remain open. | Its W8 subsection, agenda assignment/definition and dated evidence only. No runtime/schema/test changes or external/database access. |
 | **1.4.10 — Onboarding admission-result hardening** | Complete; bounded main source acceptance | Main integration thread / main integration thread | Eight fail-first failures; 126 focused cases passed with private SQL collision/replay proof. | Onboarding coordinator, narrow actual-call synthetic ADO tests, W8/agenda/evidence. No schema, budget, release or data changes. |
 | **1.4.11 — Mutation admission-result hardening** | Complete; bounded main source acceptance | Main integration thread / main integration thread | Nine fail-first failures; final 171 focused cases passed, including reset and exception/health boundaries. | Middleware raw-connection constructor seam/result guard, narrow actual-call synthetic tests, W8/agenda/evidence. Preserve target/exemptions/lock order and response. |
-| **1.5.1 — API workload admission inventory** | Ready; assigned source review after predecessor | Main integration thread / main integration thread | Completed adjacent-consumer inventory/current guard repairs; SATI-SEC-001 and proposed DEC-0242. | Its W8 subsection, main agenda/assignment and dated evidence only; no application/schema/test changes or external/data access. |
+| **1.5.1 — API workload admission inventory** | Complete; bounded main source/documentation acceptance | Main integration thread / main integration thread | Base `d0e8fed`; representative route/pipeline/limits and proposed deterministic cases reviewed; no measured capacity. | Its W8 subsection, main agenda/assignment and dated evidence only; no application/schema/test changes or external/data access. |
+| **1.5.2 — Shared admission adoption prerequisites** | Blocked; decisions/facts needed before implementation | Main integration thread / main integration thread | Josh's intended host/overlap and response/reserve targets pending; complete enrollment/pool/closure/fencing costs still required by DEC-0242. | Main adoption/prerequisite W8/agenda/evidence only until a concrete successor is assigned. No arbitrary runtime/backend/value adoption. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -237,7 +239,13 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.5.1 — API workload admission inventory**.
+**Next numbered task:** **1.5.2 — Shared admission adoption prerequisites** (blocked).
+The bounded local worker source/connection and adjacent API lock repair slices are complete and
+pushed, with implementation/test limits retained in W8/evidence. The next budget implementation
+requires intended hosting and interactive/worker/recovery objectives, plus enrollment/closure
+evidence; questions are pending with Josh. Broad continued-work approval supplies authority to
+continue safe local work, but does not supply these missing operational facts or select capacity.
+No other currently defined incomplete bounded source task has satisfied these dependencies.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -672,6 +680,29 @@ actual source checks and proposed deterministic acceptance, documentation struct
 whitespace checks and dated evidence. Only W8 subsection, agenda and evidence edits. No runtime/
 schema/test changes, existing database, real data, external calls, load/benchmark, deployment,
 numeric capacity adoption or sealed evidence changes. Commit/push reviewed docs; main integrates.
+
+### 1.5.2 — Shared admission adoption prerequisites
+
+**Eligibility:** blocked. 1.4.2/1.4.3/1.4.9/1.5.1 define the contract, observed normal worker costs,
+adjacent enrollment gaps and API acceptance candidates. Intended exclusive versus overlapping
+hosts and interactive response/worker/recovery objectives have been requested; no answer yet.
+Normal logical SQL cleanup is not complete provider-failure/pool/fencing evidence.
+
+**Bounded slice:** once decisions/facts arrive, reconcile the proposed DEC-0242 admission contract
+and assign one next proof/design slice with a declared hosting/enrollment envelope. Identify owner
+exclusivity or consistent controller, cost/uncertainty debt, validation/interactive/worker/recovery
+reserves, finite waiters/overload contract and dependency/physical-pool envelopes. Backend/value
+adoption and runtime implementation need a concrete reviewed successor, not arbitrary defaults.
+
+**Dependencies and owners:** Josh's intended deployment and operating targets; canonical dated
+environment inventory/operations, SATI-SEC-001 and proposed DEC-0242. Raw middleware, portal,
+Function/children, health/startup, tooling and outside consumers must be enrolled or explicitly
+excluded by an enforceable boundary. Preserve identity/record/reset/uncertainty owners.
+
+**Boundaries and completion evidence:** record selected or still-missing decisions/facts, scope a
+single deterministic proof/design successor, run documentation checks and retain dated evidence.
+This prerequisite status does not authorize release, migration, cloud/security changes, real data,
+benchmark or runtime activation. Current unrelated work and sealed release evidence stay preserved.
 
 ## Preserved open-work inventory
 

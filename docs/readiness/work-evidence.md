@@ -1,5 +1,43 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.5.1 API workload admission inventory
+
+**Identity/authority:** main `master` base `d0e8fedcbb5f0291beb5efc73ebdddba7e58abf6`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit bounded main assignment under continued
+Agenda approval after 1.4.11 acceptance. Coordination/governance, W8/security/pipeline/identity,
+record/logging/recovery and proposed DEC-0242 owners consulted. Included own active assignment;
+unrelated project/assessment inputs preserved/excluded, no other checkout/process/agent used.
+
+**Source identity:** 212 tracked `.cs` files under Sati.Api/Sati.Contracts/Sati.Signatures/Sati.Portal;
+sorted unique Git-relative `path:UPPERCASE-byte-SHA256` lines joined LF, UTF-8 SHA256 aggregate
+`43289066CCA1691BC34533F869EE0137D6A2166378E392B24DBAF1F0060C38EA`.
+This identifies current inspected source inputs, not exhaustive route costs or measured throughput.
+
+**Result/owners:** its [W8 family matrix](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--api-workload-admission-inventory--task-151)
+maps pipeline/model-binding order; login/chat rates; notes, journals/scratchpad/assessment,
+CSV/PDF/review/billing/response/signature and observation/recovery controls. Existing byte/character/
+row/parser/rate limits are distinguished from missing cross-host/actor/validated-agency concurrency,
+waiter, dependency and whole-operation budgets. Mutation lease precedes endpoint filters; a
+filter-only queue would already retain SQL and may miss binding work. Seven proposed deterministic
+acceptance groups preserve identity/record/replay/financial/recovery boundaries. B11 remains open;
+no new policy/record limit or source behavior implemented. Only W8, main agenda and this ledger changed.
+
+**Checks:** bounded source review/search; documentation structure (46 root/28 scoped/25 current
+decisions), all 22 negative proofs, whitespace and final 212-file source digest recheck passed.
+Unrelated Sati.csproj input byte hash remains
+`85EC2A57DDBDD8FBF1F8A86453F85A2D9786E24CE1AE1AF097DB42D22395AFD1`
+after removing only the previously committed TestResults exclusion line; its 9-add/4-delete
+formatting diff and assessment scratch remain unstaged. No application tests/builds, database
+queries, external calls, load test or benchmark run for this docs-only slice. Acceptance cases
+are proposed, not passed tests. MT09/OP10 working planning evidence; sealed rubric/scores unchanged.
+
+**Next/blocker:** 1.5.2 is blocked on intended host overlap/exclusivity and response/reserve objectives
+requested from Josh, plus remaining enrollment/physical pool/provider-failure closure/fencing
+proof. Broad approval does not supply missing facts or numerical policy. DEC-0242 remains proposed.
+The currently defined worker/API local repair slices are complete; no guessed capacity limiter,
+deployment/activation, real-data access or existing database apply. Other agenda priorities retain
+their own planning/operating/review dependencies; this is not whole-project or release completion.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.11 mutation admission-result hardening
 
 **Identity/authority:** main `master` base `11b2ab2f4634010624863590970e14c41948e96e`, checkout
