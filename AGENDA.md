@@ -131,7 +131,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.5.1** | [API workload admission inventory](#151--api-workload-admission-inventory) | Complete; bounded source-family review, no numeric/runtime policy. |
 | **1.5.2** | [Shared admission adoption prerequisites](#152--shared-admission-adoption-prerequisites) | Complete for direction/assignment; operating adoption remains separate. |
 | **1.5.3** | [Shared accounting candidate and deterministic limits](#153--shared-accounting-candidate-and-deterministic-limits) | Complete for unregistered candidate/main acceptance; 182 focused cases passed, no live limiter/capacity adoption. |
-| **1.5.4** | [Durable controller recovery and retirement proposal](#154--durable-controller-recovery-and-retirement-proposal) | Ready after 1.5.3 acceptance; local protocol proposal, no backend provisioning. |
+| **1.5.4** | [Durable controller recovery and retirement proposal](#154--durable-controller-recovery-and-retirement-proposal) | Complete for reviewed proposal; protocol tests/backend/fencing remain separate. |
+| **1.5.5** | [Terminal retirement reference tests](#155--terminal-retirement-reference-tests) | Ready after 1.5.4 proposal acceptance; no durable backend or activation. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
 
@@ -174,7 +175,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.5.1 — API workload admission inventory** | Complete; bounded main source/documentation acceptance | Main integration thread / main integration thread | Base `d0e8fed`; representative route/pipeline/limits and proposed deterministic cases reviewed; no measured capacity. | Its W8 subsection, main agenda/assignment and dated evidence only; no application/schema/test changes or external/data access. |
 | **1.5.2 — Shared admission adoption prerequisites** | Complete; direction and successor assignment | Main integration thread / main integration thread | Josh's October 10 direction; DEC-0244 and dated W8/evidence. | Direction/assignment accepted; backend/numbers/enrollment remain unadopted for operation. |
 | **1.5.3 — Shared accounting candidate and deterministic limits** | Complete; unregistered candidate/main acceptance | Main integration thread / main integration thread | Base `18ba76a`; 182 focused cases/guard mutations and dated W8/evidence. | Model-only guarantees; no DI/route/workflow/schema or operating capacity adoption. |
-| **1.5.4 — Durable controller recovery and retirement proposal** | Ready; assigned main protocol proposal | Main integration thread / main integration thread | 1.5.3 restored-source acceptance, DEC-0244 and enrollment inventories. | W8 protocol subsection, proposed decision/index if needed, agenda/evidence. No runtime activation, DB/schema/cloud changes or real-data access. |
+| **1.5.4 — Durable controller recovery and retirement proposal** | Complete; main-reviewed proposal | Main integration thread / main integration thread | Base `73b3aaf`; W8/DEC-0245 and dated evidence/checks. | Proposal only; backend, fencing, transport values and actual-call enrollment remain unadopted/unverified. |
+| **1.5.5 — Terminal retirement reference tests** | Ready; assigned main reference tests | Main integration thread / main integration thread | 1.5.4 proposal closure; DEC-0245, 1.5.3 candidate and current W8. | Unregistered reference model/fake store and deterministic tests, W8/architecture/agenda/evidence. No DI/route/workflow/schema, backend/DB/cloud/real-data access. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -243,10 +245,11 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.5.4 — Durable controller recovery and retirement proposal**.
+**Next numbered task:** **1.5.5 — Terminal retirement reference tests**.
 Josh selected overlapping instances and daily casework/recovery priority on October 10 and
 authorized proposed technical limits/tests. Direction 1.5.2 and unregistered candidate tests 1.5.3
-are complete. 1.5.4 specifies durable recovery/retirement. Real backend/enrollment/closure/pool facts remain integration
+are complete. 1.5.4's reviewed proposal assigns 1.5.5 retirement reference tests.
+Real backend/enrollment/closure/pool facts remain integration
 and activation prerequisites; they do not prevent candidate source tests.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
@@ -759,6 +762,30 @@ dated evidence and documentation structure/negative/whitespace checks. Docs/prop
 runtime registration, new infrastructure, existing database/schema/data access, cloud/security
 change, release/deployment, benchmark or sealed evidence change. Later implementation/enrollment
 gets its own assignment; this proposal requires no new product choice already supplied by Josh.
+
+**Result:** [W8 proposal](BACKGROUND_WORKERS_HANDOFF.md#october-10--durable-controller-protocol-proposal--task-154),
+proposed DEC-0245 and [dated evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-154-durable-controller-protocol-proposal)
+complete the bounded protocol review. Structure, 22 negative proofs and whitespace passed;
+no application/database/provider tests or backend adoption. Main 1.5.5 assigned.
+
+### 1.5.5 — Terminal retirement reference tests
+
+**Eligibility:** after 1.5.4 proposal/main review and documentation acceptance. DEC-0244 authorizes
+proposed-limit reference tests; DEC-0245 remains proposed for operation. Main owns this slice.
+
+**Bounded slice:** test normal terminal retirement/high-water rejection with 16 bounded owner
+identities, 128 retained requests and exact slot/generation/request sequence. Use an injected
+synthetic compare/commit/response-loss store seam, never claim disk durability. Include over-128
+sequential completions, delayed replay after retirement, live/uncertain holes, fingerprint conflict,
+wrong target/epoch, old generations, competing commits, lost response, client restart preserving
+the same fake state and numeric overflow. Positive terminal retirement only; no automatic slot
+reuse, epoch reset or uncertain-debt reconciliation. Preserve shared cost/profile ownership.
+
+**Acceptance/boundaries:** deterministic tests and meaningful guard mutation failures, exact source
+restoration, source identity and canonical evidence/architecture/agenda, structure/negative/
+whitespace checks. Unregistered reference model only; no DI/routes/workflows/schema, actual backend
+service/DB/real data/cloud calls, benchmark, release/deploy or sealed evidence change. Real storage,
+bounded transport/fencing and actual-call enrollment need separately defined acceptance successors.
 
 ## Preserved open-work inventory
 

@@ -1,5 +1,9 @@
 # Sati — Decision index and supersession
 
+[DEC-0245](docs/decisions/current/2026-10-10-DEC-0245.md) proposes bounded durable-controller
+identity/terminal retirement and recovery semantics. It selects a reference-test successor;
+backend, transport limits and physical owner fencing remain unadopted/unverified for operation.
+
 [DEC-0244](docs/decisions/current/2026-10-10-DEC-0244.md) records Josh's overlapping-instance and
 daily casework/recovery priority. Its unregistered accounting candidate and synthetic limit tests
 do not adopt operating capacity/backend. It supersedes DEC-0242's fixed-slot-first recommendation

@@ -607,6 +607,101 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — durable controller protocol proposal — task 1.5.4
+
+**Status:** main-reviewed **proposal**, not operating adoption; [DEC-0245](docs/decisions/current/2026-10-10-DEC-0245.md).
+Main base `73b3aaf`, same checkout; source/model 1.5.3 accepted. Proposed contract below resolves
+the candidate's bounded terminal-record stop without deleting live debt. It still needs reference
+tests and real backend/fencing/enrollment acceptance. No current workflow uses this protocol.
+
+**State-store contract:** one exact environment/resource target has one authoritative profile,
+epoch and monotonically increasing version. An injected store must atomically compare the entire
+expected version and commit grants, identities, phase, child evidence, counters and retirement
+floors together. The ack identifies a positively durable committed result. Concurrent losers get
+bounded conflict/busy, not an unbounded retry loop; lost/ambiguous responses retry the exact
+request. No protected open starts from an unconfirmed grant. Durability here is a requirement,
+not a measured property or something `lock`/an in-memory object establishes.
+
+Prefer a **separate independently budgeted durable service/resource** as backend class. Required
+proofs: atomic competing writers, committed response replay, authoritative restart state,
+incompatible/stale writer refusal, bounded state/transport/storage work and quarantine on lost or
+restored state. No vendor/SDK is selected. A different database on the same protected SQL capacity
+does not remove circular admission. Its own pools, storage journal/log retention, CPU, availability
+and authenticated/unauthenticated ingress need separate caps before deployment. Existing deployment
+facts remain solely in DATABASE_ENVIRONMENTS.md; no new service or topology is claimed.
+
+**Proposed bounded identity/retirement state:** begin reference tests with **16 owner identity
+slots**, **128 retained requests** and **16 child attempts/request**. Slots supply no per-host
+business credit: all owners share the four protected class/agency vectors from 1.5.3. Each slot
+stores authenticated process-incarnation binding, generation, last issued sequence and retired
+sequence floor. Target epoch identities never repeat/revert; numeric versions/sequences/generations
+never wrap. Exhaustion denies registration or mutation.
+Registration and every change are committed before acknowledgement. New unknown incarnations need
+an empty registered slot; inability to prove old-owner shutdown does not permit slot reuse.
+
+| Transition / fault | Proposed required result |
+|---|---|
+| New request | Exact active target/epoch/slot/generation/incarnation, server catalogue and validated scope. Next sequence accepted atomically; out-of-order/conflicting calls get typed refusal. No caller cost/class or unknown-K enrollment. |
+| Grant/busy/cancel | Grant durable before positive ack. A never-granted denial may commit a terminal sequence only if bounded state/floor permits; otherwise refusal consumes no sequence and exact retry is required. No SQL/effect. Cancellation/timeout after possible commit leaves unknown reservation charged until exact replay/confirmed cleanup. No expiry refund. |
+| Lost response | Same slot/generation/sequence and fingerprint returns the same committed result without another charge. Grant replay is not permission to rerun business effects; existing idempotency/uncertainty owners still decide that. |
+| Nested open/close/release | Each open attempt recorded before opening and charged inside whole K; repeated ack cannot open twice. Unknown provider close retains debit. Outer release needs no live children/no uncertainty. Child registration is bookkeeping, not a new global reservation. |
+| Terminal retirement | Advance a slot's floor only over contiguous confirmed terminal sequences, atomically deleting fingerprints/closed-child rows. Every sequence at/below floor returns `Retired`, no grant/effects regardless of fingerprint. Live/uncertain holes block advancement; full rows refuse new grants. |
+| Old owner / slot reuse | Stale generation/nonce cannot mutate current reservations. Generation refusal fences controller calls only. Before refunding debt/reusing a slot, independently prove owner cannot resume admitted opens and checked-out SQL attempts are closed. Heartbeat/expiry/cancel/process disappearance is insufficient. |
+| Ordinary controller restart | Read positively authoritative committed state; preserve profile/epochs/floors/debt. Recreating an empty reference model is unsafe. Unknown in-flight commits replay against retained state. |
+| Lost state / older backup / changed epoch | Quarantine new grants. Restored floors/versions may forget grants; copying totals into a fresh epoch cannot prove safety. Reopening needs external owner fencing, closure and reviewed new authority/epoch. Rollback detection/actual fencing remain unproved. |
+
+Retirement rejects old controller requests after their exact result is removed; it does not
+erase/redefine clinical, signature or financial evidence. Audit/retention owners stay intact.
+Controller state contains minimal scope/operation and opaque identities, no narratives,
+credentials, payload or real-data test copies. Unretired holes can still exhaust the bounded
+store: this proposal provides safe normal retirement, not guaranteed failure recovery.
+
+**Controller transport proposal:** finite authenticated calls, no resource wait-list/parked SQL,
+bounded payload and monotonic linked deadline. Start later reference acceptance with **one in-flight
+control call per owner**, **4 KiB command envelope** and **250 ms cooperative call deadline**;
+these are proposed tests, not current endpoint limits or network/whole-request guarantees. Deadlines
+never erase committed grants; positive ack after cancellation cannot enter business SQL.
+Authentication/ingress/replica placement must enforce aggregate transport promises without business
+SQL first. Replica-local semaphores alone cannot prove them. Recovery/observation need protected
+control access; controller loss refuses new ordinary grants and retains debt. Values and external
+recovery authentication remain unadopted for operation.
+
+**Enrollment order / source dependencies:**
+
+1. Trusted configuration/cheap non-SQL ingress bounds precede stored identity reads. Reserve
+   validation K globally before its SQL; derive agency/role from stored validation, never token
+   agency claims. [Program](Sati.Api/Program.cs) currently installs
+   [mutation middleware](Sati.Api/Infrastructure/DemoMutationLeaseMiddleware.cs) before
+   [stored actor endpoint filtering](Sati.Api/Security/TenantAccess.cs): a later filter already
+   holds SQL. Reordering/wrapping requires separate actual-call safety tests.
+2. After positively closing validation, reserve complete server-known operation K and validated
+   agency share before reset/account/transaction SQL. Preserve current lock order/integrity spans.
+   Binding/bytes/CPU limits remain distinct; SQL profile is not a payload/latency budget. Unknown-K
+   routes remain unenrolled. No partial reservation upgrade inside a transaction.
+3. Worker discovery/selection needs explicit unscoped background catalogue entry/K; close every
+   selection connection before scoped admission. Selected rows are hints requiring current
+   gate/tenant/revision revalidation. Denial leaves business work due; selection pivots/offer
+   counting retain their fairness owner. No new hot SQL retry loop.
+4. Parent/child tools, portal, startup/health, reset/watchdog and raw opens in 1.4.9/1.5.1 must
+   enroll or have enforceable exclusion/allowance. Children cannot invent another share; delegated
+   opens retain parent reservation. Physical pools/external E remain separate unknowns; the
+   model's 32 is not a database-wide cap.
+
+**Deterministic successor 1.5.5:** an unregistered retirement/state-store reference model with
+injected synthetic commit/response-loss seam. Cases: over 128 sequential terminal requests retain
+bounded rows; live/uncertain holes prevent unsafe retirement; delayed retired replay cannot re-grant;
+fingerprint conflicts/old generations do nothing; competing compare/commit writers yield one
+reservation; committed-but-lost responses replay once; pre-commit failure has no debit, unknown
+commit has no open; restarting a client over the same retained fake store preserves debt/floors.
+Sequence/version overflow and wrong target/epoch refuse before state change. No automatic
+slot/epoch reset or debt reconciliation API until real fencing evidence exists.
+
+Cases are **proposed**, not passed tests. Fake-store/client restart cannot prove disk durability,
+replica consistency, vendor failover, transport bounds, SQL death or rollback detection. Enforceable
+fencing/concrete backend proof remain operating blockers, not a new missing product choice from
+Josh. [Dated evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-154-durable-controller-protocol-proposal)
+records actual checks; no runtime/schema/database/external changes here.
+
 #### October 10 — shared accounting candidate — task 1.5.3
 
 **Source scope:** main base `18ba76a`, same main checkout; task 1.5.3's explicitly assigned

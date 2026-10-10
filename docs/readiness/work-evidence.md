@@ -1,5 +1,35 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.5.4 durable controller protocol proposal
+
+**Identity/authority:** main `master` base `73b3aafe9457b5c61f2a838046709941d44e5954`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; 1.5.3 accepted, explicit main 1.5.4 assignment under
+Josh's multiple-instance, daily/recovery, proposed-limit/test direction. Unrelated project and
+assessment inputs preserved/excluded; no another checkout/agent/process touched.
+
+**Source grounding/result:** reviewed current candidate/profile/terminal stop and its 50-case
+acceptance; Program's mutation middleware before TenantAccess stored actor filter; canonical
+W8 1.4.2/lifetime/enrollment/API inventories and operations/architecture/governance/decisions.
+The [W8 protocol](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--durable-controller-protocol-proposal--task-154)
+and proposed DEC-0245 define atomic authoritative state, bounded identity slots and terminal
+sequence floors, retained uncertainty, response loss/restart versus lost-state quarantine, separate
+backend capacity and enrollment order. No concrete vendor/store implementation/fencing mechanism
+is adopted. Proposed transport values/16 bookkeeping slots are not operating limits or fixed
+per-host business credit allocations. Main 1.5.5 reference-test successor explicitly assigned.
+
+**Checks:** documentation structure passed (46 root/28 scoped/27 decisions), all 22 negative proofs
+and whitespace passed. No new application tests,
+builds, databases, provider/real data, external services or capacity measurements for this docs-only
+proposal. 1.5.3's 182 tests remain its earlier evidence; protocol acceptance cases here are proposed.
+MT09/OP10 planning evidence only. Runtime authorization/clinical/signature/financial/reset ownership,
+current deployments and sealed releases/scores unchanged.
+
+**Limits/next:** 1.5.5 tests bounded normal terminal retirement with a fake store; it cannot establish
+disk durability, split-brain/rollback recovery or real SQL fencing. An uncertain sequence hole/old
+owner can still exhaust the bounded store; automatic expiry/refund stays prohibited. Production
+backend, enrollment, physical pools, dependency/load and external recovery proofs remain later
+operating work. No new missing product decision is requested from Josh for the local successor.
+
 ## 2026-10-10 — SATI-WRK-001 1.5.3 shared accounting candidate
 
 **Identity/authority:** main `master` base `18ba76a953e4a36f35f209575b3ab2484b01b260`, checkout
