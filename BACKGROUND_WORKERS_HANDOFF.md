@@ -607,6 +607,43 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — polling-worker connection-lifetime evidence — task 1.4.8
+
+**Status:** bounded test-only main acceptance complete; six new and 153 focused cases passed; runtime
+unchanged. [Polling lifetime cases](Sati.Api.Tests/PollingWorkerConnectionLifetimeTests.cs) run
+real selection, reset/global-poller/vendor SQL coordination, status processing and scoped ERA
+ingestion against owned synthetic SQL, with synthetic retained claims/keys and intercepted HTTP.
+Component Demo gates agree; scoped ingestion retains its existing Testing fixture gate. The
+physical database is uniquely test-owned; no deployed identity or actual vendor is consulted.
+Optional fixture SQL/interceptor/key registration preserves existing defaults; setup/evidence
+are separate from tracked worker intervals.
+
+Normal operation peak is three logical connections. Reset/poller sessions remain through the
+pass; selector/fresh read, request/pacing and receipt transactions each add one in successive
+intervals. Both status and ERA dispose decision SQL before receipt wrapping (two retained), then
+repeat matching/cursor/identity checks under a new decision transaction (three). Scoped ERA
+ingestion and audit share the current scoped context, adding no fourth connection. Receipts,
+acknowledgement/remittance effects and independent cursor/receipt references commit together.
+The accounting matrix's wrapping interval is clarified accordingly.
+
+Status wrapping failure leaves its cursor/evidence untouched while ERA completes; a later pass
+completes status. ERA artifact HTTP failure preserves committed status and leaves ERA due for
+later completion. Caller cancellation at HTTP leaves both feeds/effects untouched and closes
+all owned connections; a fresh pass completes both. Repeated normal passes add no receipts or
+outcomes. An extra SQL context at HTTP raises the interval to four, makes a three-connection
+assertion fail, then closes. A second independent poller briefly reaches **five combined**
+connections (first reset/poller/vendor plus second reset/poller admission), then returns zero
+without entering HTTP/discovery/receipt work and releases its connections. First caller proceeds
+with correct effects. Per-operation three therefore cannot be used as an aggregate global cap.
+
+All tested actual SQL cleanup succeeded; zero tracked held connections remain at pass end.
+This is logical synthetic interval evidence, not physical pooling/failed-session fencing,
+failure-safe K, total wait/operation deadlines, measured capacity or deployed acceptance. No
+application/schema/order/quota/gate/business change or actual provider call.
+[Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-148-polling-worker-connection-lifetime-evidence)
+owns actual checks and limits. Next local slice is the adjacent shared-consumer enrollment
+inventory; backend/value adoption still needs complete consumer/host/closure facts and objectives.
+
 #### October 10 — dispatch-worker connection-lifetime evidence — task 1.4.7
 
 **Status:** bounded test-only main acceptance complete; 110 focused cases passed, runtime
@@ -760,7 +797,7 @@ unknown prior connections cannot be credited as closed just because a scope exit
 | Hosted operation / cited owners | Retained sessions and overlapping SQL intervals | Source arithmetic / boundary to preserve |
 |---|---|---|
 | [Dispatch](Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs), `ProcessUnderResetLeaseAsync`, `PrepareUnderAccountLeaseAsync`, `UploadAndRetainAsync`; [coordination](Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs), `RunWithLeaseAsync`; [write scope](Sati.Persistence/Data/ClaimReleaseWriteScope.cs), `BeginAsync` | Shared reset uses one factory context/open session. Selector adds one transient connection and disposes before fresh dispatch lookup. Dispatch and account admission each open a different context/session. Preflight SQL/decision transaction uses the dispatch business context alongside all three retained sessions. Compliance/history helpers receive that same context. Account admission and decision transaction finish before upload. Vendor request admission then uses a separate session, followed by response wrapping and a later evidence transaction on the business context. | Selection/read **2**; key/wrapping preflight **3**; preflight SQL reads/missing-key decision **4**; coordinated upload **3** (reset + dispatch + vendor, no decision transaction); response wrapping **2**; evidence transaction **3**. Enumerated normal maximum **4**. Do not add account and vendor sessions as simultaneous: they belong to different intervals. Retain reset/dispatch through uncertainty/evidence/cleanup. Post-send work uses CancellationToken.None in places and is not bounded by the caller's exchange deadline. |
-| [Polling](Sati.Api/Infrastructure/ClaimMdSandboxPoller.cs), `PollOnceAsync`, `ReadFeedAsync`, `PollStatusAsync`, `PollEraAsync`; [coordination](Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs), `PollOnceAsync`, `RequestAsync`; [selector](Sati.Api/Infrastructure/ClearinghousePollSelector.cs) | Reset and global poller each retain one separate session through the pass. Selector/fresh feed read adds one transient context connection. Vendor admission retains a third session during pacing/HTTP; it disposes before status receipt context or ERA ingestion scope. Status processor receives one context; ERA's scoped [ingestion](Sati.Api/Infrastructure/ClaimResponseIngestion.cs) and AuditTrail share the scoped context registration in [Program](Sati.Api/Program.cs). Receipt transaction and wrapping use it. | Discovery/selection/read, vendor exchange and receipt processing each **3**, in successive intervals. Enumerated normal maximum **3**, not reset + poller + vendor + receipt = 4. Outer two sessions also remain through between-feed delays. Current feed/pass counts do not supply elapsed-time or shared resource admission. |
+| [Polling](Sati.Api/Infrastructure/ClaimMdSandboxPoller.cs), `PollOnceAsync`, `ReadFeedAsync`, `PollStatusAsync`, `PollEraAsync`; [coordination](Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs), `PollOnceAsync`, `RequestAsync`; [selector](Sati.Api/Infrastructure/ClearinghousePollSelector.cs) | Reset and global poller each retain one separate session through the pass. Selector/fresh feed read adds one transient context connection. Vendor admission retains a third session during pacing/HTTP; it disposes before status receipt context or ERA ingestion scope. Status processor receives one context; ERA's scoped [ingestion](Sati.Api/Infrastructure/ClaimResponseIngestion.cs) and AuditTrail share the scoped context registration in [Program](Sati.Api/Program.cs). Receipt transaction uses it; decision disposal precedes wrapping, which retains only reset/poller sessions. | Discovery/selection/read, vendor exchange and receipt processing each **3**, in successive intervals. Enumerated normal maximum **3**, not reset + poller + vendor + receipt = 4. Outer two sessions also remain through between-feed delays. Current feed/pass counts do not supply elapsed-time or shared resource admission. |
 | [Note coordination/worker](Sati.Api/Infrastructure/NoteAbandonmentWorker.cs), `RunOnceAsync`, `RunDueAsync`; [sweep](Sati.Api/Infrastructure/NoteAbandonmentSweep.cs), `RunAsync` | One explicitly opened coordination connection owns both shared reset and exclusive sweep locks. Agency discovery temporarily opens its separate context. The strategy context only constructs an execution strategy; each retry attempt creates a fresh sweep context/transaction. Discovery commands finish before each sweep, although the discovery context object remains in scope. | Discovery or sweep **2** (one coordination + one active EF connection), not three from counting lock names or idle strategy/discovery contexts. Enumerated normal maximum **2**, conditional on completed implicit closes and sequential retry disposal. One entire agency pass retains the coordination session; the pass and current-day cache remain unbounded in total cost. No SQL opens on disabled/completed-day fast path. |
 | [Signature host/selector](Sati.Api/Infrastructure/SignatureProcessingService.cs), `RunOnceAsync`, `ProcessOfferAsync`; [projection](Sati.Api/Infrastructure/SignatureComplianceProjectionService.cs), `ProjectCompletionAsync`; [package](Sati.Signatures/SignatureCompletionWorker.cs), `BuildAsync` | Each item callback retains one reset session. The short selector's separate context disposes before fresh scoped eligibility and processor context. Projection/package run on that one processor context. Package transaction spans original blob, synchronous PDF, write-once blob, invitation unwrap and receipt protection. | Selector/read/transaction **2**. Enumerated normal maximum **2**; selector and processor connections do not overlap. Package dependency/CPU work retains both reset and transaction connections. Three sequential phases and ten offers each are neither concurrent-host limits nor CPU/dependency deadlines. Reset disposes before the next offer/timer wait. |
 | [Signature mail](Sati.Signatures/SignatureMailWorker.cs), `ProcessCandidateAsync`, `ClaimAsync`, `PrepareSubmissionAsync`, `SubmitAsync`, `CompleteAsync`, under the hosted item callback | Reset session remains open. Durable row lease/operation GUID is business evidence, not another SQL session. Claim/preparation/final send/completion transactions use the same processor context, sequentially. Final revocation validation intentionally retains its transaction through POST. Existing-GUID GET recovery happens after claim/owned reads, outside that transaction, before completion. | Claim/final POST/completion **2**; ordinary unwrap/GET interval **1** retained reset connection if preceding implicit reads/transaction have closed. Enumerated normal maximum **2**. Preserve final send transaction, five-minute row lease, five-attempt cap and GET-only recovery; a resource wait after claim would waste lease time and may violate the proposed admission order. |

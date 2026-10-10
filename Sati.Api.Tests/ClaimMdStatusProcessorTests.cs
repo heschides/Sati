@@ -328,6 +328,7 @@ public sealed partial class ClaimMdStatusProcessorTests
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly SyntheticPipelineDatabase _database;
+        public SyntheticPipelineDatabase Database => _database;
         public SyntheticPipelineFactory Factory { get; }
         public EnvelopeProtector Protector { get; }
         public Guid AccountId { get; }
@@ -341,16 +342,17 @@ public sealed partial class ClaimMdStatusProcessorTests
             _database = database; Factory = factory; AccountId = accountId;
             ClaimReference = claimReference; RemoteClaimId = remoteClaimId;
             GenerationContent = generationContent;
-            Protector = new EnvelopeProtector(factory.Vault);
+            Protector = factory.Services.GetRequiredService<EnvelopeProtector>();
         }
 
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(bool sqlServer = false,
+            Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[]? interceptors = null, IKeyWrapper? keyWrapper = null)
         {
-            var database = new SyntheticPipelineDatabase();
+            var database = new SyntheticPipelineDatabase(sqlServer);
             await database.InitializeAsync();
-            var factory = new SyntheticPipelineFactory(database)
+            var factory = new SyntheticPipelineFactory(database, null, interceptors ?? [])
             {
-                EnableSyntheticDispatch = true, DisableDispatchWorker = true
+                EnableSyntheticDispatch = true, DisableDispatchWorker = true, KeyWrapperOverride = keyWrapper
             };
             var actors = await factory.SeedAsync();
             var periodId = await JoinedBillingPipelineAcceptanceTests.PrepareSubmittedPeriodAsync(factory, actors);

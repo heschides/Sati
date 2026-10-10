@@ -123,7 +123,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4.5** | [Note-worker connection-lifetime evidence](#145--note-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 139 focused cases and final six passed, no resource policy. |
 | **1.4.6** | [Signature-worker connection-lifetime evidence](#146--signature-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 228 focused cases passed, no runtime policy. |
 | **1.4.7** | [Dispatch-worker connection-lifetime evidence](#147--dispatch-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 110 focused cases passed, no runtime policy. |
-| **1.4.8** | [Polling-worker connection-lifetime evidence](#148--polling-worker-connection-lifetime-evidence) | Ready after 1.4.7 closure; synthetic SQL/HTTP/receipt evidence, no runtime policy. |
+| **1.4.8** | [Polling-worker connection-lifetime evidence](#148--polling-worker-connection-lifetime-evidence) | Complete; six new and 153 focused cases passed, no runtime policy. |
+| **1.4.9** | [Shared SQL consumer enrollment inventory](#149--shared-sql-consumer-enrollment-inventory) | Ready; source-only census and prerequisites, no runtime policy. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
@@ -160,7 +161,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.5 — Note-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | 139 focused cases, final six and adverse extra-held control passed; actual provider-failure/pooling costs remain unproved. | Test-only shared connection event tracker and note lifetime acceptance, W8/agenda/dated evidence. No runtime/schema/budget change. |
 | **1.4.6 — Signature-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | Six dependency/adverse cases and final 228 focused cases passed; physical/failure-safe costs remain open. | Test-only fixture/provider/barrier seams and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
 | **1.4.7 — Dispatch-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | Five new boundary cases and final 110 focused cases passed; per-interval accounting clarified, physical/failure-safe costs open. | Test-only fixture/key/transport/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
-| **1.4.8 — Polling-worker connection-lifetime evidence** | Ready; assigned to main after 1.4.7 closure | Main integration thread / main integration thread | Current polling/receipt/ERA quantum/reset owners; accepted shared probe and prior worker evidence. | Test-only fixture/wrapping/HTTP/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
+| **1.4.8 — Polling-worker connection-lifetime evidence** | Complete; test-only main acceptance | Main integration thread / main integration thread | Current polling/receipt/ERA quantum/reset owners; source `dd4df9e` and accepted shared probe. | Test-only fixture/wrapping/HTTP/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
+| **1.4.9 — Shared SQL consumer enrollment inventory** | Ready; assigned source review | Main integration thread / main integration thread | Completed worker lifetime evidence and proposed DEC-0242; inspect adjacent consumers before backend adoption. | Its W8 subsection, agenda assignment/definition and dated evidence only. No runtime/schema/test changes or external/database access. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -229,7 +231,7 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.4.8 — Polling-worker connection-lifetime evidence**.
+**Next numbered task:** **1.4.9 — Shared SQL consumer enrollment inventory**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -573,6 +575,29 @@ documentation structure/negative/whitespace and dated evidence. Tests only; no r
 existing DB, real data, actual vendor/cloud/security call, benchmark, activation or sealed evidence
 change. Logical successful intervals do not establish physical/failure-safe K, complete enrollment,
 global capacity or deployed operating acceptance. Commit/push verified tests/docs.
+
+### 1.4.9 — Shared SQL consumer enrollment inventory
+
+**Eligibility:** worker connection intervals have bounded synthetic evidence. DEC-0242 still
+requires enrollment of adjacent SQL consumers before a global budget or backend can be adopted.
+Explicit main source-review assignment under continued Agenda authority; start after 1.4.8 closure.
+
+**Bounded slice:** map API pipeline/route/service contexts, raw ADO owners, startup/health,
+signature portal, reset/watchdog/compliance/seed and migration/operator/desktop paths. Distinguish
+same-database candidates from separate local consumers, source gates from observed deployment,
+and context creation from connection checkout. Identify acquisition order, scope, dependency
+spans, bypasses and existing test seams. Prioritize deterministic follow-up acceptance and
+missing host/closure/enrollment/objective facts without inventing capacity or runtime policy.
+
+**Dependencies and owners:** current API identity/authorization, reset/recovery, operations,
+deployment inventory and scheduling owners; DEC-0242 remains proposed. Preserve record admission,
+tenant authorization and existing real-data/infrastructure boundaries.
+
+**Boundaries and completion evidence:** source-grounded matrix, current source identity, explicit
+unknowns and next bounded step; documentation structure, negative and whitespace checks. Edit
+only its W8 subsection, main agenda/status and dated evidence. No application/schema/test code,
+database/data access, external calls, benchmark, deployment or sealed evidence changes. Commit/push
+reviewed documentation under existing repository approval.
 
 ## Preserved open-work inventory
 

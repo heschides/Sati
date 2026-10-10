@@ -1,5 +1,38 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.8 polling-worker connection-lifetime evidence
+
+**Identity/authority:** main `master` base `dd4df9ea511241bce43294e6699abadc22839a44`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit main test-only assignment under continued
+Agenda approval. Current coordination/task/governance, poll/receipt/ERA quantum/reset/claim owners
+present and reviewed; regulatory synthetic/records/claim boundaries consulted. Included input:
+own active row; unrelated project formatting/assessment scratch preserved/excluded. No other
+checkout/process touched, agent launched or actual provider/account/data used.
+
+**Result:** actual worker/selector/coordinators, status processor and scoped ERA ingestion/audit
+on synthetic retained claims with intercepted actual connector HTTP and synthetic key wrapping.
+Normal peak 3; wrapping 2 after decision disposal; receipt save 3. ERA shares scoped context/audit.
+Faults preserve independent cursors/effects, healthy feed/later progress and no replay duplicates;
+cancellation rolls back without cursor/effect advance. Extra SQL connection makes HTTP's 3-held
+assertion fail at 4. Independent contending poller adds two admission connections, combined peak
+5, enters no HTTP and unwinds while first progresses. Owned pass cleanup leaves held zero.
+Test fixture defaults retained with optional SQL/interceptor/key arguments; no runtime policy.
+
+**Actual checks:** first build used wrong remittance DbSet name, corrected before execution.
+Release API/test build passed with existing warnings. Six new cases **passed, zero failed/skipped**,
+1m43s, `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_44_27_net10.0.trx`;
+owned `SatiSqlTests_3fe7b4b927fc4aaf807920cb66d0cca5` stopped/deleted by wrapper. Final focused regressions **153 passed, zero failed/skipped**, 2m33s,
+TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_46_59_net10.0.trx;
+owned SatiSqlTests_aff57a31e380472c933cbe955258cbda stopped/deleted. Documentation structure
+(46 root/28 scoped/25 current decisions), all 22 negative proofs and whitespace passed. No full API/desktop/
+load claim, no benchmark or measured capacity. Actual cleanup success does not prove physical
+pool eviction or provider-failure/reconnect closure/fencing; no failure-safe K/global admission.
+
+**Limits/next step:** no real/application data, actual HTTP/key service, existing DB apply,
+hosting/security, activation or sealed evidence changed. Component labels do not establish live
+identity/startup acceptance. DEC-0242 remains proposed. Next bounded local slice: adjacent SQL
+consumer enrollment inventory and remaining host/closure/objective prerequisites for adoption.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.7 dispatch-worker connection-lifetime evidence
 
 **Identity/authority:** main `master` base `7b1ca854bcfac75a3adf849fa3872fac38f7c3d1`, checkout
