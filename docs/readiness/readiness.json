@@ -3502,6 +3502,1038 @@
           "notes": "All earlier sealed snapshots and rubric bytes remain unchanged. This new 42-criterion review uses audited source 6a5c6497aab7c4f761d6aef5194087475c00424d and its dated fail-first/private SQL evidence, plus coordinated release-number/readiness UI edits to be validated before publication. Two previously blocked billing controls now earn only bounded tested credit. Human accessibility and independent readiness assurance remain incomplete."
         }
       ]
+    },
+    {
+      "release": "1.3.40",
+      "assessedAt": "2026-10-10",
+      "sourceRevision": "97b56392ba06b6b89bd6f290ecd52ff8a8aa37d6",
+      "rubricVersion": "2026-10-v1",
+      "summary": "Background sending, receipt checks and signature work now have tested scheduling turns and safer cancellation and reset coordination. Shared capacity limits and multi-instance load acceptance are still unfinished. This is a Demo and Local release, not approval for a cloud Production service.",
+      "nextSteps": [
+        "Implement and prove a durable shared capacity controller with complete worker and request participation.",
+        "Measure daily casework and recovery under representative multi-instance load and failures.",
+        "Complete operating recovery, notification, external-provider and independent security acceptance."
+      ],
+      "assessments": [
+        {
+          "criterionId": "MT01",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Security/TenantAccess.cs:10-90,101-157"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:140,347,361-362"
+            }
+          ],
+          "notes": "October 10 source review: Current stored identity and permission checks remain unchanged. New scheduling signals follow validated handlers. Retained route acceptance supports the tested stage; deployed sign-in and independent review remain incomplete."
+        },
+        {
+          "criterionId": "MT02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:136-140"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "October 10 source review: Selectors bind agency and account before offering work; processors retain their authoritative scope checks. Complete cross-agency route, export and derived-query coverage remains incomplete."
+        },
+        {
+          "criterionId": "MT03",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Three additive migrations introduce bounded scheduling metadata with agency/account relationships and state constraints. Existing ownership protections remain; this does not settle the complete structural tenancy strategy or deployed-principal acceptance."
+        },
+        {
+          "criterionId": "MT04",
+          "status": "unknown",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138,307-313"
+            }
+          ],
+          "notes": "October 10 source review: No complete file, cache, search, export and screen-state inventory or acceptance was added. The worker bookkeeping models do not establish secondary-store tenant isolation."
+        },
+        {
+          "criterionId": "MT05",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchGate.cs:44-100"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,347,366-367"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Polling offers use agency/account/feed identity and a unique feed checkpoint index; receipt and file processors retain their existing binding checks. Synthetic and private SQL evidence remains bounded; actual provider routing and certification are unverified."
+        },
+        {
+          "criterionId": "MT06",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:55-58"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-agency-discovery-pages"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-completion-cache-day-lifecycle"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/workers.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-132-dispatch-fairness-implementation"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-1333-durable-polling-selection"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-1337-durable-signature-selection"
+            }
+          ],
+          "notes": "October 10 source review: Dispatch, polling and signature selection now retain hierarchical scheduling positions. Recorded synthetic and private SQL tests cover bounded offers, backlog, restart, contention and rollback. Credit is limited to those selection controls: note-maintenance fairness, whole-turn deadlines and intended-host service-time bounds remain open."
+        },
+        {
+          "criterionId": "MT07",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs:132-145"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:102-108,204-208"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-agency-failure-continuation"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/workers.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-implementation"
+            }
+          ],
+          "notes": "October 10 source review: Missing-key isolation, note-failure continuation and connector deadlines remain tested. Dispatch idle/wake pacing and bounded polling/signature offers add local safeguards. Shared failures, whole-operation deadlines and live failure-isolation acceptance remain incomplete."
+        },
+        {
+          "criterionId": "MT08",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "SECURITY_REVIEW_2026-09-10.md"
+            },
+            {
+              "kind": "source",
+              "reference": "SECURITY_AUDIT_2026-09-03.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-agency-discovery-pages"
+            }
+          ],
+          "notes": "October 10 source review: The API workload inventory identifies expensive paths and proposed protected classes. The accounting candidate is unregistered and enrolls no real consumer. Shared agency/actor admission and overload acceptance remain planned."
+        },
+        {
+          "criterionId": "MT09",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs:16-32"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347-357"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            }
+          ],
+          "notes": "October 10 source review: Existing SQL vendor serialization remains supported by retained provider tests. New accounting and retirement candidates test only an in-memory reference protocol. They enforce no deployment-wide capacity budget; provider quotas, durable authority and complete consumer enrollment remain open."
+        },
+        {
+          "criterionId": "MT10",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs:20-69"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-agency-failure-continuation"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/workers.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-1337-durable-signature-selection"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-144-session-admission-result-hardening"
+            }
+          ],
+          "notes": "October 10 source review: Independent private SQL selector tests cover durable turn serialization, restart positions, contention and reset participation. Connection-lifetime and admission-result tests supplement them. General stale-owner fencing and shared resource ceilings remain incomplete; retain the implemented overall stage."
+        },
+        {
+          "criterionId": "MT11",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:363-364,384"
+            }
+          ],
+          "notes": "October 10 source review: Daily casework and recovery priority is adopted as direction. The two-second goal has not been measured, and no runtime reserve is installed. Define representative workloads and a durable controller before multi-instance latency acceptance."
+        },
+        {
+          "criterionId": "MT12",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentSweep.cs:31-47"
+            },
+            {
+              "kind": "source",
+              "reference": "platform/SatiLogica.Contracts/TenantClock.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/NoteAbandonmentWorker.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-note-worker-completion-cache-day-lifecycle"
+            }
+          ],
+          "notes": "October 10 source review: Shared business-date and agency-setting owners remain unchanged. Retained rollover and completion-cache tests support their bounded tested stage. Full settings-change, daylight-saving and stale-projection acceptance remains incomplete."
+        },
+        {
+          "criterionId": "MT13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:384,404"
+            }
+          ],
+          "notes": "October 10 source review: No completed agency provisioning, transfer, closure or recovery lifecycle was added. Those procedures and independent operating acceptance remain planned."
+        },
+        {
+          "criterionId": "MT14",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Security/TenantAccess.cs:146-155"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:134,399"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiExceptionBoundaryMiddleware.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/IncidentAggregator.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-escaping-request-exception-boundary"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "October 10 source review: Separate support identity and existing capability checks remain in place. This release adds no complete deployed privilege, emergency access or accountable administration acceptance."
+        },
+        {
+          "criterionId": "ID01",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,202,365,405"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Retained file identity and fingerprint owners are unchanged. Scheduler positions identify offers, not business commands. General durable request identity, including ordinary note creation, remains incomplete."
+        },
+        {
+          "criterionId": "ID02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:198,202,365-367"
+            }
+          ],
+          "notes": "October 10 source review: Existing targeted uniqueness and transaction protections remain. Fake-store accounting tests do not establish durable multi-host replay safety for application commands; complete lost-commit and restart coverage remains open."
+        },
+        {
+          "criterionId": "ID03",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:212"
+            },
+            {
+              "kind": "sql",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:349-357,363-364"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,361"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Selectors commit scheduling metadata in short single-attempt transactions without changing business evidence. Retained billing and new private SQL selector rollback tests support bounded acceptance; complete workflow concurrency coverage remains unfinished."
+        },
+        {
+          "criterionId": "ID04",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:190,227,295-305,400"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Existing durable claim intent and signature outbox owners remain authoritative. Selection commits only offers before processing. Complete durable intent and required official-action evidence across every external path remain incomplete."
+        },
+        {
+          "criterionId": "ID05",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:61-71,221-225"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Signatures/SignatureMailWorker.cs:94-129"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Observed SQL ownership checks and zero-retry selection scopes refuse known lost ownership. Connection cleanup is tested in named paths. This does not establish external fencing or complete stale-process replacement safety."
+        },
+        {
+          "criterionId": "ID06",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs:111-190"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,366"
+            },
+            {
+              "kind": "sql",
+              "reference": "assessment-working/test-execution.md"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            }
+          ],
+          "notes": "October 10 source review: Sending and uncertain-upload holds remain unchanged; no new retry bypass is introduced. Retained connector deadline and lost-response evidence supports bounded tests. Live provider reconciliation remains unverified."
+        },
+        {
+          "criterionId": "ID07",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:198,398"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/billing.md"
+            },
+            {
+              "kind": "source",
+              "reference": "AGENDA.md#next-eligible-work"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Original-claim safeguards across accounts, modes and queued reservations remain unchanged. Prior fail-first and private SQL acceptance remains relevant; scheduling changes do not authorize a second original. Vendor duplicate-policy certification remains outstanding."
+        },
+        {
+          "criterionId": "ID08",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:200,398"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Contracts/V1/BillingExportGate.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/billing.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-bil-001-authoritative-residual-export-errors"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Current exact-subset compliance and correction-purpose checks still own queue and send decisions after an offer. Prior race and refusal evidence remains relevant. Complete operating-policy acceptance and real transmission approval remain outstanding."
+        },
+        {
+          "criterionId": "ID09",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api.Tests/ClaimMdStatusProcessorTests.cs:21-157"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:347,367"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/workers.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-1332-bounded-era-feed-quantum"
+            }
+          ],
+          "notes": "October 10 source review: Bounded polling processes one oldest ERA while preserving atomic receipt effects and independent checkpoints. Recorded rollback, replay and SQL selector tests support the bounded stage; complete vendor-format and live recovery acceptance remains open."
+        },
+        {
+          "criterionId": "ID10",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs:205-219"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Program.cs:147"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ClaimMdSandboxConnector.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/IncidentAggregator.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-wrk-001-claimmd-http-exchange-deadline"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/architecture/workers.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-implementation"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-148-polling-worker-connection-lifetime-evidence"
+            }
+          ],
+          "notes": "October 10 source review: Dispatch uses tested activity windows and cooldowns; pending work does not create perpetual idle polling. Admission cancellation and resource disposal have focused evidence. Whole-operation retry budgets, shared throttling and live recovery remain incomplete."
+        },
+        {
+          "criterionId": "ID11",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Signatures/SignatureMailWorker.cs:94-143,161-260"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_VALIDATION.md"
+            }
+          ],
+          "notes": "October 10 source review: Signature phases now use durable offers, reset coordination and fresh processing scopes. Existing mail lease, provider operation, revocation and immutable evidence owners remain. Full delivery ambiguity and intended-provider recovery acceptance remain incomplete; keep the implemented stage."
+        },
+        {
+          "criterionId": "ID12",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiOptions.cs:42-43"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:286,404"
+            }
+          ],
+          "notes": "October 10 source review: The unregistered retirement candidate retains uncertain holes and rejects retired sequence replay in a fake store. It does not set application replay lifetimes, survive real authority loss or complete mixed-version and restored-history acceptance."
+        },
+        {
+          "criterionId": "ID13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:286,397"
+            }
+          ],
+          "notes": "October 10 source review: No full-service recovery drill reconciling later records and external effects was performed. A transaction rollback or Demo template reset does not establish this requirement."
+        },
+        {
+          "criterionId": "ID14",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:202,307,403"
+            },
+            {
+              "kind": "source",
+              "reference": "BACKGROUND_WORKERS_HANDOFF.md"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiExceptionBoundaryMiddleware.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/IncidentAggregator.cs"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-escaping-request-exception-boundary"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Existing scoped recovery responses and revision-conflict behavior remain unchanged. New internal selection outcomes do not establish general lost-reply or mixed-client mutation semantics."
+        },
+        {
+          "criterionId": "OP01",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:381-386"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation"
+            }
+          ],
+          "notes": "October 10 source review: Cloud Production remains undeployed. Demo and the personal Local PHI store remain distinct, and this release does not establish an approved multi-agency Production service."
+        },
+        {
+          "criterionId": "OP02",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:138,313,399"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_VALIDATION.md:134-175"
+            }
+          ],
+          "notes": "October 10 source review: Current Demo settings were inspected only for release preparation. No new least-privilege, secret-rotation or denied-access acceptance was completed. Operator-managed temporary SQL access is separately tracked."
+        },
+        {
+          "criterionId": "OP03",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383,388,399"
+            }
+          ],
+          "notes": "October 10 source review: Internal coding-agent source review found no blocking defect in the bounded retirement model. It does not satisfy independent security or deployed-tenant assurance; that work remains planned."
+        },
+        {
+          "criterionId": "OP04",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:274,286,397"
+            },
+            {
+              "kind": "source",
+              "reference": "scripts/Invoke-DemoRestoreVerification.ps1"
+            }
+          ],
+          "notes": "October 10 source review: No approved complete-service restore, cutover or measured recovery-target drill was performed. Existing recovery procedures remain preparation, not completed operating evidence."
+        },
+        {
+          "criterionId": "OP05",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "BACKGROUND_WORKERS_HANDOFF.md"
+            },
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:313-315,402"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            }
+          ],
+          "notes": "October 10 source review: Existing watchdog and incident mechanisms remain. The release does not prove missing-work detection reaches an accountable person or close notification, escalation and starvation-monitoring gaps."
+        },
+        {
+          "criterionId": "OP06",
+          "status": "blocked",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:295-313,400-401"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/ApiExceptionBoundaryMiddleware.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/IncidentAggregator.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/SchemaDriftHealthCheck.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Sati.Api/Infrastructure/DatabaseIdentityValidator.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "LOGGING_DESIGN.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-escaping-request-exception-boundary"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-incident-single-attempt-execution"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--sati-sec-001-two-check-health-redaction-and-repair-sequence-handoff"
+            }
+          ],
+          "notes": "October 10 source review: Prior exception-boundary, incident transaction and health redaction repairs remain bounded. Complete official-action coverage and all enabled diagnostic sinks remain unreviewed or unsafe. Keep this criterion blocked."
+        },
+        {
+          "criterionId": "OP07",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383-384,402"
+            }
+          ],
+          "notes": "October 10 source review: No agency incident-response or shared-outage exercise was performed. Local failure tests do not establish notification, acknowledgment, continuity or operational recovery."
+        },
+        {
+          "criterionId": "OP08",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:245,403,409"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: The earlier 1.3.39 controlled Demo migration/reset and installer acceptance are recorded operating evidence. This release adds three scheduling migrations; controlled guards and release acceptance are pending at this assessment. Complete mixed-version and service rollback rehearsal remains open."
+        },
+        {
+          "criterionId": "OP09",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:404"
+            }
+          ],
+          "notes": "October 10 source review: No retention, holds, secondary-store preservation or agency-closure policy was newly approved or operationally exercised. Existing partial controls retain only their implemented stage."
+        },
+        {
+          "criterionId": "OP10",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:17,262-270,313,384"
+            },
+            {
+              "kind": "source",
+              "reference": "DATABASE_ENVIRONMENTS.md"
+            }
+          ],
+          "notes": "October 10 source review: The proposed numeric budget profile and retirement model have synthetic tests, not measured capacity. Representative sustained, burst, fault, multi-instance and recovery workloads on intended hosting remain untested."
+        },
+        {
+          "criterionId": "OP11",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:245,373,409"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "sql",
+              "reference": "docs/readiness/work-evidence.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: Earlier release artifacts and their exact publication acceptance remain recorded. The current version, builders and release notes are coordinated for new acceptance. Complete configuration, dependency and interrupted-update assurance remains open."
+        },
+        {
+          "criterionId": "OP12",
+          "status": "implemented",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:128-140,383,404"
+            }
+          ],
+          "notes": "October 10 source review: Current security-version and account checks remain unchanged. Distributed abuse limits, stronger privileged identity controls and complete deployed account recovery/offboarding acceptance remain incomplete."
+        },
+        {
+          "criterionId": "OP13",
+          "status": "planned",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:194,383,398"
+            },
+            {
+              "kind": "source",
+              "reference": "SIGNATURE_PORTAL_GUIDE.md"
+            }
+          ],
+          "notes": "October 10 source review: No new provider, payer, agency or real-use approval is established. Existing synthetic Demo signature settings are observed, not newly authorized activation or certification."
+        },
+        {
+          "criterionId": "OP14",
+          "status": "tested",
+          "evidence": [
+            {
+              "kind": "source",
+              "reference": "reports/SATI_ARCHITECTURE_ENGINEERING_ASSESSMENT_2026-10-08.md:383,388,507"
+            },
+            {
+              "kind": "source",
+              "reference": "Services/ReleaseReadiness.cs"
+            },
+            {
+              "kind": "source",
+              "reference": "Views/ReleaseReadinessPanel.xaml"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/readiness-method.md"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--documentation-consolidation-and-standing-workflow"
+            },
+            {
+              "kind": "synthetic",
+              "reference": "docs/readiness/work-evidence.md#2026-10-08--datt-preflight-and-audited-source-checkpoint-preparation"
+            },
+            {
+              "kind": "source",
+              "reference": "docs/readiness/work-evidence.md"
+            }
+          ],
+          "notes": "October 10 source review: All 42 criteria were reviewed against audited source 97b56392ba06b6b89bd6f290ecd52ff8a8aa37d6 and its retained dated evidence, plus the coordinated release edits. Historical snapshots and rubric are preserved. New fairness credit is bounded to executed component selection tests; independent review and human accessibility acceptance remain open."
+        }
+      ]
     }
   ]
 }

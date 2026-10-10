@@ -169,6 +169,10 @@ internal static class ProjectGraphReader
             var directory = pending.Pop();
             foreach (var child in Directory.EnumerateDirectories(directory))
             {
+                // Retained release evidence can contain complete source snapshots.
+                // Exclude only the repository's output root, not a nested source folder.
+                if (directory == fullRoot && Path.GetFileName(child).Equals("TestResults", StringComparison.OrdinalIgnoreCase))
+                    continue;
                 if (!ExcludedDirectories.Contains(Path.GetFileName(child)))
                     pending.Push(child);
             }

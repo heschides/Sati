@@ -14,6 +14,12 @@ Selection and queued-scroll fixtures opt in to finishing pending layout; the def
 behavior and UI/permission assertions remain. The [working evidence](../readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
 records the failed attempts, startup correction, actual suite results and verification limits.
 
+The project-graph test reader excludes the repository-root `TestResults` output directory,
+which can retain complete source snapshots as evidence. Nested source directories with that
+name remain subject to project/reference validation; no manifest entries or evidence files are
+removed. This matches the desktop build's existing output exclusion without hiding new source
+projects. Release acceptance is recorded in the working ledger.
+
 Local case-note drafting uses current-contact facts and the shared `CaseNoteDraftRules` validator.
 Initial and repair prompts distinguish the JSON follow-up body from the renderer's section label
 and require the supplied system no-follow-up object to remain exact. Facts and the safe baseline

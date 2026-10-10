@@ -295,3 +295,42 @@ does not update the working installation: LONGCHENPA's last observed installed L
 **1.3.38.0**; other machines remain unknown. Upgraded desktop next-launch migration is still the
 Local owner's responsibility. [The dated working ledger](docs/readiness/work-evidence.md#2026-10-09--1339-installer-acceptance-and-distribution)
 owns commands, earlier refusal and gate limits. No working database or real claim was exercised.
+
+## 1.3.40 preflight observations — October 10, 2026
+
+After Josh approved the three Demo database operations, an identity-validated metadata-only
+read at **2026-10-10T12:48:35Z** confirmed **129 migrations**, latest
+`20261009183720_AddClearinghousePreflightReadiness`, and **93 baseline tables**. The baseline
+anchor remains October 9; `LastAppliedAsOfDate` is October 10. Eligible synthetic reset Admin
+1006/agency 2 remains present. Read-only API configuration showed signature Enabled,
+WorkersEnabled and EmailEnabled true, no deployment slots, and exact SatiDemo/Demo identity.
+Clearinghouse dispatch/transport and note-worker opt-ins were absent (default false).
+These observations require a controlled compatible-worker rollout; no setting or schema was
+changed by this read. Local working databases were not accessed. Safe metadata evidence:
+`artifacts/datt-1.3.40/database-preflight.json`.
+
+After private acceptance of all sixteen guard cases, the exact pinned rotation runner's
+`-PreflightOnly` check passed against Demo: 129 persisted migrations, changes required and no
+persistent target changes. Evidence: `artifacts/datt-1.3.40/rotation-demo-preflight.json`.
+Rollback rehearsal, application and idempotent rerun remain pending the release gates.
+
+Read-only public checks returned HTTP 200 for Demo liveness (`live`), readiness (`Healthy`) and
+version (`Sati.Api`, **1.3.39**, contract **D30D44631876**). No new API publication occurred.
+The last reviewed database application remains the 1.3.39 record above; the later authorized
+metadata-only SQL read confirms its current history. Source migrations 130–132 are pending controlled
+review/application, not assumed present from public health.
+
+Josh reported creating **datt-workstation-1340-20261010**. Read-only Azure verification confirmed
+both bounds equal the freshly observed workstation public IPv4 **72.95.106.10**, on the exact Demo
+server/resource group and subscription. The preexisting allow-list also contains API and
+`sati-demo-refresh-outbound-*` entries. No firewall or other security setting was changed by the
+assistant. The operator must remove this exact temporary rule after the approved migration,
+baseline capture and reset verification, and absence must be verified.
+
+On **LONGCHENPA**, the installed Local executable at
+`C:\Users\Joshu\AppData\Local\Programs\SatiLogica\Sati\Sati.exe` reports file version **1.3.39.0**;
+the uninstall registration agrees at **1.3.39**. This supersedes the earlier machine-version
+observation only. No working application launch or Local database query was performed, so exact
+Local schema uptake is unverified. Other Local machines/versions have been requested and remain
+unknown. The old Demo uninstall registration still reports **1.2.17**; its executable was not
+validated and it is not evidence of the current cloud API version.

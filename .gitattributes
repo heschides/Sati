@@ -4,6 +4,7 @@
 * text=auto
 scripts/Apply-PayerBillingMigration.guarded.sql text eol=lf
 scripts/Apply-ClearinghousePreflightReadinessMigration.guarded.sql text eol=lf
+scripts/Apply-WorkerRotationMigrations.guarded.sql text eol=lf
 # Preserve captured historical bytes, including deliberately mixed original line endings.
 docs/archive/** -text -whitespace
 docs/decisions/records/** -text -whitespace

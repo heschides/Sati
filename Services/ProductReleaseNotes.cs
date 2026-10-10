@@ -6,11 +6,30 @@ public sealed record ReleaseNoteSection(
 
 public static class ProductReleaseNotes
 {
-    public const string ReleaseName = "Billing release and account recovery safeguards";
-    public const string ReleaseDate = "October 9, 2026";
+    public const string ReleaseName = "Worker scheduling and admission safeguards";
+    public const string ReleaseDate = "October 10, 2026";
 
     public static IReadOnlyList<ReleaseNoteSection> Sections { get; } =
     [
+        new(
+            "Give background work more predictable turns",
+            [
+                "Sending, receipt checks, and signature processing retain their scheduling position so eligible agencies and accounts can take turns across restarts.",
+                "Dispatch waits when there is no work to do and wakes for eligible activity. Existing approval, evidence, and uncertain-send safeguards remain in force.",
+                "These changes do not establish a guaranteed completion time or activate external sending."
+            ]),
+        new(
+            "Protect work during resets and cancelled waits",
+            [
+                "Signature processing coordinates with Demo resets, and background operations refuse work when database admission fails or cancellation has already occurred.",
+                "Tests check that database connections are released on the reviewed failure and cancellation paths."
+            ]),
+        new(
+            "Keep capacity work visible",
+            [
+                "The readiness report records the completed scheduling checks and the remaining work to protect daily casework when several service instances are busy.",
+                "Shared capacity controls are still being developed. Tested design models do not yet enforce live service limits."
+            ]),
         new(
             "Protect original claims across sending accounts",
             [

@@ -1,5 +1,148 @@
 # Working evidence ledger
 
+## 2026-10-10 — DATT 1.3.40 source validation
+
+**Scope and identity:** main `master` at audited `97b56392ba06b6b89bd6f290ecd52ff8a8aa37d6`,
+with coordinated uncommitted 1.3.40 project/builder/readiness/assertion/release-note edits.
+Unrelated desktop-project formatting and assessment scratch are preserved. Josh approved the
+three controlled Demo operations; this entry records preparation, not their completion.
+
+**Preparation and review:** all 42 readiness criteria reviewed; only MT06 advances from planned
+to tested for the recorded bounded selection acceptance. Shared-budget candidates remain
+unregistered and non-enforcing. Prior snapshots/rubric remain unchanged. Supplemental internal
+review by `/root/migration_preflight_review` found no material defect in the new snapshot,
+release notes or narrow project-scan correction; this is not independent security acceptance.
+The same agent delivered only three new rotation migration guard/test files from dedicated
+`C:/Users/Joshu/.codex/worktrees/datt-1340-guards/Sati`, base `97b5639`, no uncommitted inputs.
+Main reviewed and imported them byte-identically, with a new LF hash rule. SQL SHA-256:
+`2D856F4BCCBD1C78321EB3991AC52DA07540CF0C8DE25997581583606B5B69CF`.
+Initial private SQL execution passed 15 of 16 cases. The duplicate-checkpoint fixture failed
+before exercising its guard because the SQL column `Cursor` was unquoted; main corrected the
+two fixture inserts to `[Cursor]`. Guard script bytes and all assertions remain unchanged.
+Retained failure: `artifacts/datt-1.3.40/rotation-guard-tests.log`. The focused rerun then reached
+the guard-removal comparison and exposed an empty SQL BEGIN/END block in the mutation helper.
+Main added a harmless PRINT statement in removed blocks so comparisons exercise absent guards
+instead of invalid SQL. The second failed run is retained in `rotation-duplicate-corrected.log`.
+Guard script bytes remain unchanged. Final API acceptance passed all **1,648** discovered cases,
+zero failed/skipped, across seven sequential private-instance batches. Exact discovery/result-name
+coverage passed (`artifacts/datt-1.3.40/api-complete-coverage.json`). All sixteen rotation migration
+cases passed, including seven in-memory guard-removal comparisons. Every batch's owned SQL
+instance was stopped and deleted successfully. These prove synthetic SQL behavior, not Demo
+application or deployment-wide capacity.
+
+**Actual checks and initial failure:** source-only DATT consistency passed for version 1.3.40,
+132 migrations and latest signature rotation. Full Release solution build passed with 18 existing
+warnings and zero errors (`artifacts/datt-1.3.40/build.log`). Initial full private-SQL desktop run
+found `RepositoryProjectGraphTests` treating the preserved root `TestResults` source snapshot as
+unlisted projects. The test-only reader now excludes that exact output root; two focused cases
+retain detection of nested/unlisted source projects. Initial failed evidence is retained in
+`artifacts/datt-1.3.40/desktop-tests.log` (3,027 passed, one failed, one optional model skip).
+Integrated full solution rebuild passed with 15 existing warnings and zero errors; the focused
+project-graph suite passed all 19 cases. A subsequent API test-only build passed with six existing
+warnings after the fixture correction. A mistaken `Sati.sln` build command was refused because
+that file does not exist; the actual `SatiLogica.slnx` build above passed. Corrected full desktop
+acceptance passed **3,030** enabled cases, failed zero, with the one actual-model gate skipped in
+that invocation (`desktop-corrected.log`, 7m45s). Its private SQL instance cleanup passed. The
+unchanged actual-model gate then passed one test covering all three original synthetic scenarios,
+zero failed/skipped, in 3m16s (`actual-model.log`); no scenario override was set. Signatures passed
+119, portal 8 and Carika 4, each with zero failures/skips. Their logs are named after the projects
+under `artifacts/datt-1.3.40`, with TRXs under `TestResults/datt-1.3.40-*`. Combined acceptance is
+**4,810 unique cases**, zero unresolved failures/skips. The desktop's initial model skip is covered
+by the separate actual execution, not counted as an additional case.
+
+All 22 documentation negative cases passed. The four generated readiness renders were inspected:
+the embedded 1.3.40 baseline, synthetic default, larger-text narrow layout and high contrast.
+The actual report shows 25.6% overall, 28.6% agency separation and 33.9% repeat-request evidence,
+one hard blocker and 41 open launch checks. These are evidence scores, not capacity measurements.
+
+**Release-run observation:** the complete API inventory is split into seven sequential batches
+with exact discovery/result-name coverage checked at the end. The second batch took 14m24s and
+passed all 235 cases. During that run free workstation memory was observed below 1 GB; this does
+not establish the cause of its duration. A metadata-only probe of the exact owned private SQL
+instance found no blocked user query at that moment. Microsoft `dotnet-stack` 10.0.750501 was
+installed only under ignored release artifacts and sampled owned testhost 44024; the snapshot
+showed a dispatch-test fixture starting an API host and compiling endpoint delegates. It is
+not a heap dump, benchmark or capacity claim. A second snapshot was refused because that process
+had already completed; no other process was sampled. Initial logs and the stack snapshot remain
+under `artifacts/datt-1.3.40`. Prepared release helpers passed PowerShell parsing; main corrected
+their temporary-file cleanup regex from the prior version to the exact 1.3.40 prefix.
+
+**Controlled rollout preparation:** internal review confirmed deployed signature options are
+startup-bound and the old worker does not participate in the current reset exclusion. The
+functional pause therefore requires all possible API worker processes to be replaced after the
+false setting is read back, before migration. Review caught an overly early timestamp boundary;
+main moved it after setting readback and immediately before the explicit restart request.
+The consuming check requires fresh/stable instance evidence, a worker on every observed instance,
+valid UTC dates, preserved other reviewed flags, expected release/contract and no retained old
+process identity. Missing SCM flags are conservatively treated as possible API workers; invalid
+nonnull types are refused. Thirteen local synthetic checks passed, including an in-memory script
+mutation that accepts the same unsafe process start under the earlier boundary. No heap dump or
+cloud operation was performed by those checks. Exact helpers/evidence are retained under ignored
+release artifacts; restoration returns only WorkersEnabled to its observed original true value.
+The actual guarded Demo preflight also passed at 129 migrations without persistent changes;
+[the environment owner](../../DATABASE_ENVIRONMENTS.md#1340-preflight-observations--october-10-2026)
+records that observation. Migration, pause, baseline/reset and publication remain pending.
+
+**Limits and next:** no Demo mutation/publication or new installer has occurred. The environment
+owner records the authorized read-only 129-migration starting state. Source tests and private
+migration acceptance are complete. Next: final source checks, commit/push and controlled rollout;
+final source/evidence commits
+and exact artifact acceptance remain required. This working record changes no sealed release.
+
+## 2026-10-10 — DATT 1.3.40 release preflight
+
+**Approval continuation:** Josh explicitly replied “Approved for all three,” approving the
+controlled Demo migrations, baseline replacement and one verification reset requested below.
+Rechecked exact workstation rule start/end and current public IPv4: both `72.95.106.10`.
+Fetched default remains `a1485e2`; source remains `97b5639`. This supersedes the pending database
+authority checkpoint below only. Additional migration guard/test source is assigned to
+`/root/migration_preflight_review` in dedicated `datt-1340-guards/Sati` worktree at the same base,
+with no uncommitted inputs; main owns review/integration and cloud execution. Existing other
+worktrees, unrelated formatting and assessment scratch remain preserved.
+
+**Authority/source:** exact DATT invocation received October 10; entire release playbook read.
+Main checkout `C:/Users/Joshu/source/repos/heschides/Sati`, local `master` at
+`97b56392ba06b6b89bd6f290ecd52ff8a8aa37d6`. Fetch and remote HEAD query confirm default `master`
+at `a1485e29f311fb210f1b10ceb74f39cf0ae64c9b`; local is one ordinary commit ahead. The agenda remote
+branch already contains the local tip. All listed branch tips are ancestors/equal; retain them
+because activity/retention is uncertain. Dedicated detached worktrees are preserved.
+
+**Scope/preflight:** current source version remains 1.3.39; intended patch release is 1.3.40.
+Reviewed the three additive rotation migrations (dispatch, polling, signature): seven tables,
+six indexes, initial scheduling metadata and guarded rollback requirements. Unique feed-index
+creation must refuse conflicting duplicates, never silently clean them. Controlled guard runner/
+SQL preparation, private synthetic acceptance, full release source/test/readiness review and
+package gates remain pending. Earlier component test results do not substitute for this release.
+No existing 1.3.40-named file was found under artifacts; all four exact distribution installer/
+checksum paths are absent and resolve beneath the approved documents root. Recheck before final
+publication. `artifacts/Prerequisites/SqlLocalDB.msi` is 63,508,480 bytes with Valid Authenticode and
+Microsoft Corporation signer. Packaging must verify the exact selected prerequisite again.
+
+**Preserved inputs/observations:** unrelated `Sati.csproj` BOM/whitespace/layout edits and
+assessment scratch remain excluded. Firewall helper source was reviewed for exact Demo target,
+IPv4 validation, nonzero CLI refusal, existing-rule refusal, exact created bounds and verified
+removal. The user added the rule; its exact bounds, public health and installed Local version
+observations belong to [the environment owner](../../DATABASE_ENVIRONMENTS.md#1340-preflight-observations--october-10-2026).
+An initial PowerShell display selected the installed-file table columns and omitted later health
+fields; those responses were not claimed as evidence. Repeated read-only checks emitted explicit
+JSON and showed all three HTTP 200 results. An initial path search used a nonexistent publisher
+name and unsupported wildcard path; file discovery corrected it without modifying files.
+
+**Pending authority:** requested approval for controlled SatiDemo rollback rehearsal/application/
+idempotency, baseline replacement and one verification reset; the operator's rule-up report does
+not grant that database approval. Local machine inventory is also requested; unknown machines
+remain unknown. No build/version bump/commit/database operation/deployment/activation has occurred
+during preflight. Documentation structure passed (46 root/28 scoped/27 current decisions), all 22
+negative mutation proofs passed and whitespace passed. Sealed readiness snapshots are unchanged.
+Read-only reviewer `/root/release_retirement_review` completed task 1.5.5's source review at
+`97b5639`, with no edits or test/database/process actions. Main reviewed the report: no blocking
+bookkeeping defect or runtime registration/caller was found. The competing-client test can run
+serially despite its start barrier; the stale-slot test targets an empty rather than a populated
+other-owner slot. Stronger deterministic competing-read and cross-owner/global-cap cases remain
+pending final acceptance review; the existing 23 cases are not claimed to prove those stronger
+conditions. Resume the release build/database sequence only after database authorization arrives;
+the temporary firewall rule remains the operator's responsibility.
+
 ## 2026-10-10 — SATI-WRK-001 1.5.5 terminal-retirement reference tests
 
 **Identity/authority:** main `master`, source base `a1485e29f311fb210f1b10ceb74f39cf0ae64c9b`,

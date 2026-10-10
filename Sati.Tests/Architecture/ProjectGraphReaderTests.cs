@@ -4,6 +4,29 @@ namespace Sati.Tests.Architecture;
 
 public sealed class ProjectGraphReaderTests
 {
+    [Theory]
+    [InlineData("TestResults", false)]
+    [InlineData("src/TestResults", true)]
+    public void IgnoresOnlyTheRootTestEvidenceDirectory(string folder, bool shouldDiscover)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"sati-project-graph-{Guid.NewGuid():N}");
+        try
+        {
+            var evidence = Path.Combine(root, folder, "snapshot");
+            Directory.CreateDirectory(evidence);
+            File.WriteAllText(Path.Combine(evidence, "Unlisted.csproj"), "<Project />");
+            var observed = ProjectGraphReader.ReadProjectTree(root);
+            if (shouldDiscover)
+                Assert.Single(ProjectGraphGuard.Check([], observed), diagnostic => diagnostic.Code == "UnlistedProject");
+            else
+                Assert.Empty(observed);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void NormalizesRelativeProjectReference()
     {

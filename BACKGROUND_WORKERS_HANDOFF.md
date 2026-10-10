@@ -727,6 +727,14 @@ records initial failures and final checks. Next: 1.6 multi-host/load verificatio
 on a reviewed durable authority, consumer enrollment/fencing and a defined synthetic workload;
 the fake shared store cannot establish an operating limit.
 
+DATT 1.3.40 read-only source review at `97b5639` found no blocking defect in this bookkeeping
+scope and no runtime caller/registration beyond the focused tests. Two coverage limits remain:
+the competing-client start barrier does not force equal-version reads, and the stale-slot case
+targets an empty slot rather than another populated owner. Stronger deterministic compare/commit
+interleaving and cross-owner/global-record-cap cases are pending release acceptance review. Existing
+green counts do not establish those stronger claims; [release preflight evidence](docs/readiness/work-evidence.md#2026-10-10--datt-1340-release-preflight)
+records the review without a new test execution.
+
 #### October 10 — shared accounting candidate — task 1.5.3
 
 **Source scope:** main base `18ba76a`, same main checkout; task 1.5.3's explicitly assigned
