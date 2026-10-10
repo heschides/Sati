@@ -607,6 +607,26 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — onboarding admission-result hardening — task 1.4.10
+
+**Status:** bounded source/main acceptance complete; 126 focused cases passed, unreleased. The onboarding
+[transaction coordinator](Sati.Api/Infrastructure/ClaimMdOnboardingCoordination.cs) now uses
+`SqlSessionAdmission` for the same documented Int32 result contract: 0/1 admit, -1 busy,
+unconfirmed/coercible/other results fail, and caller cancellation is checked immediately after
+the scalar result. Despite the shared guard's existing session name, onboarding retains its
+transaction-owned lock on the caller's context: no session release or extra connection is added.
+The serializable collision/audit/tenant/reset route behavior is unchanged.
+
+[Actual-call synthetic tests](Sati.Api.Tests/OnboardingAdmissionResultTests.cs) exercise malformed
+results, exact success/contention, cancellation following success/busy/null, command failure and
+missing transaction. They verify original transaction attached to the command, zero-wait/10-second
+command settings, no coordinator disposal/rollback, caller rollback and eventual context cleanup.
+The existing ADO fixture now captures command evidence; existing worker cases retain their paths.
+Pre-fix 14 cases produced eight failures/six passes, establishing a meaningful regression.
+Synthetic ADO does not simulate SqlClient/backend failure or prove physical session closure.
+Mutation middleware remains a separate gap. [Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-1410-onboarding-admission-result-hardening)
+owns actual runs and limits. Next bounded slice is its raw-connection seam and strict result repair.
+
 #### October 10 — shared SQL consumer enrollment inventory — task 1.4.9
 
 **Status:** main source review complete; enrollment prerequisites identified, no resource backend

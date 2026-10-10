@@ -125,7 +125,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4.7** | [Dispatch-worker connection-lifetime evidence](#147--dispatch-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 110 focused cases passed, no runtime policy. |
 | **1.4.8** | [Polling-worker connection-lifetime evidence](#148--polling-worker-connection-lifetime-evidence) | Complete; six new and 153 focused cases passed, no runtime policy. |
 | **1.4.9** | [Shared SQL consumer enrollment inventory](#149--shared-sql-consumer-enrollment-inventory) | Complete; bounded source-family census, no live enrollment/capacity claim. |
-| **1.4.10** | [Onboarding admission-result hardening](#1410--onboarding-admission-result-hardening) | Ready; strict scalar/cancellation repair, no resource-budget policy. |
+| **1.4.10** | [Onboarding admission-result hardening](#1410--onboarding-admission-result-hardening) | Complete; 126 focused cases passed, unreleased; no budget policy. |
+| **1.4.11** | [Mutation admission-result hardening](#1411--mutation-admission-result-hardening) | Ready after 1.4.10; raw-connection seam and strict result repair. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
@@ -164,7 +165,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.7 — Dispatch-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | Five new boundary cases and final 110 focused cases passed; per-interval accounting clarified, physical/failure-safe costs open. | Test-only fixture/key/transport/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
 | **1.4.8 — Polling-worker connection-lifetime evidence** | Complete; test-only main acceptance | Main integration thread / main integration thread | Current polling/receipt/ERA quantum/reset owners; source `dd4df9e` and accepted shared probe. | Test-only fixture/wrapping/HTTP/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
 | **1.4.9 — Shared SQL consumer enrollment inventory** | Complete; main source/documentation acceptance | Main integration thread / main integration thread | Base `a447d0f`; bounded adjacent consumer census complete; host/closure/values remain open. | Its W8 subsection, agenda assignment/definition and dated evidence only. No runtime/schema/test changes or external/database access. |
-| **1.4.10 — Onboarding admission-result hardening** | Ready; assigned source repair | Main integration thread / main integration thread | Current onboarding transaction/collision owner and accepted strict result guard; inventory found conversion gap. | Onboarding coordinator, narrow actual-call synthetic ADO tests, W8/agenda/evidence. No schema, budget, release or data changes. |
+| **1.4.10 — Onboarding admission-result hardening** | Complete; bounded main source acceptance | Main integration thread / main integration thread | Eight fail-first failures; 126 focused cases passed with private SQL collision/replay proof. | Onboarding coordinator, narrow actual-call synthetic ADO tests, W8/agenda/evidence. No schema, budget, release or data changes. |
+| **1.4.11 — Mutation admission-result hardening** | Ready; assigned source repair after predecessor | Main integration thread / main integration thread | Accepted strict guard, current raw mutation reset owner, completed onboarding repair. | Middleware raw-connection constructor seam/result guard, narrow actual-call synthetic tests, W8/agenda/evidence. Preserve target/exemptions/lock order and response. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -233,7 +235,7 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.4.10 — Onboarding admission-result hardening**.
+**Next numbered task:** **1.4.11 — Mutation admission-result hardening**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -622,6 +624,30 @@ actual-call cases, pre-fix failures, transaction ownership/cleanup and existing 
 acceptance; documentation structure, negative and whitespace checks. No schema, existing database,
 real data, actual vendor/cloud/security, deployment, benchmark or sealed evidence changes. Commit
 and push verified source/tests/docs under existing authority; main owns integration.
+
+### 1.4.11 — Mutation admission-result hardening
+
+**Eligibility:** 1.4.9 found a separate raw mutation lock conversion gap; finish 1.4.10 before
+starting this explicit main repair. Reuse accepted strict scalar guard without changing reset
+exclusion, business permission, resource budgets or source target mapping.
+
+**Bounded slice:** add constructor-injected internal synthetic connection seam with the public
+middleware constructor retaining the exact configured raw SqlClient path. Test actual middleware
+with unfixed scalar conversion, then reject all unconfirmed results and post-scalar cancellation.
+Preserve GET/HEAD/reset/non-Demo/non-SQL exemptions, zero-wait shared session reset lock,
+known-contention 503 payload, confirmed lock release even when cancellation/next throws, and
+owned connection disposal. No extra connection, session policy or runtime budget adoption.
+
+**Dependencies and owners:** SqlSessionAdmission, Demo mutation/reset/exception boundary, current
+configured database scope and existing fixture/ADO seams. Known -1 is contention; unexpected
+negative/failure results fail safely rather than masquerading as normal busy. No bypass of actor
+validation or existing authorizations; retain command/dependency ownership.
+
+**Boundaries and completion evidence:** actual-call malformed/result/cancellation/next/command/
+release failure and exemptions, fail-first evidence, focused middleware/reset/onboarding/guard
+checks and documentation structure/negative/whitespace. Synthetic fixtures and owned private SQL
+only; no schema, existing database, real data, provider/cloud/security, release/activation,
+benchmark or sealed evidence changes. Commit/push verified chunk; main owns integration.
 
 ## Preserved open-work inventory
 

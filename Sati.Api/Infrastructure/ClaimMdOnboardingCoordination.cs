@@ -27,10 +27,9 @@ internal static class ClaimMdOnboardingCoordination
         resource.ParameterName = "@resource";
         resource.Value = Resource;
         command.Parameters.Add(resource);
-        var result = Convert.ToInt32(await command.ExecuteScalarAsync(token));
-        if (result == -1) return false;
-        if (result < 0)
-            throw new InvalidOperationException("Claim.MD onboarding coordination is unavailable.");
-        return true;
+        var result = await command.ExecuteScalarAsync(token);
+        // Admission evidence is identical for transaction and session locks. The
+        // caller's transaction still owns release, including on cancellation.
+        return SqlSessionAdmission.OwnsLease(result, token);
     }
 }

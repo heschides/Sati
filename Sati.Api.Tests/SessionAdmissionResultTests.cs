@@ -12,7 +12,7 @@ namespace Sati.Api.Tests;
 
 // Exercises the production coordinators with SQL-provider identity and synthetic ADO results.
 // Open/commands never reach a server; this is not a SqlClient fault or capacity simulation.
-public sealed class SessionAdmissionResultTests
+public sealed partial class SessionAdmissionResultTests
 {
     public static TheoryData<string, string> InvalidResults()
     {
@@ -209,6 +209,9 @@ public sealed class SessionAdmissionResultTests
         public Action? AfterTargetScalar { get; set; }
         public bool ScalarFailure { get; set; }
         public bool ReleaseFailure { get; set; }
+        public DbTransaction? LastCommandTransaction { get; private set; }
+        public int LastCommandTimeout { get; private set; }
+        public string LastCommandText { get; private set; } = "";
         public List<string> AcquiredResources { get; } = [];
         public List<string> ReleasedResources { get; } = [];
         public List<CancellationToken> ReleaseTokens { get; } = [];
@@ -240,6 +243,9 @@ public sealed class SessionAdmissionResultTests
             public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken)
             {
                 Assert.Contains("sp_getapplock", CommandText, StringComparison.Ordinal);
+                connection.LastCommandTransaction = DbTransaction;
+                connection.LastCommandTimeout = CommandTimeout;
+                connection.LastCommandText = CommandText;
                 connection.AcquiredResources.Add((string)parameters["@resource"].Value!);
                 if (++connection.scalarCalls != connection.target) return Task.FromResult<object?>(0);
                 if (connection.ScalarFailure) throw new SyntheticCommandException();

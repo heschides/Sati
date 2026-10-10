@@ -1,5 +1,38 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.10 onboarding admission-result hardening
+
+**Identity/authority:** main `master` base `14687812e623376a1f1b457eb530bc762f9d9483`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit bounded main assignment under continued
+Agenda approval. Current onboarding, reset/tenant/collision/audit owners and strict guard reviewed.
+Included own active assignment only; unrelated project formatting/assessment scratch preserved.
+No other checkout/process/agent, existing database, real data, vendor or cloud access.
+
+**Result/owners:** coordinator reuses strict scalar guard with post-result caller cancellation.
+Int32 0/1 admit; -1 remains busy; malformed results fail. Existing caller serializable transaction
+continues to own lock release/rollback; no session lock/release, extra connection, schema, budget
+or business-policy change. Actual-call synthetic ADO tests capture transaction/command ownership
+and settings, rejection/cancellation/command-failure and caller cleanup. Only coordinator, narrow
+test fixture/new cases, W8 subsection, agenda and this working evidence changed.
+
+**Actual fail-first evidence:** Release API/tests build passed with existing warnings. Unfixed
+coordinator, 14 new cases: **8 failed, 6 passed, zero skipped**, 1s,
+`TestResults/onboarding-admission-2026-10-10/unfixed/Joshu_LONGCHENPA_2026-10-10_02_01_03_net10.0.trx`.
+Five malformed cases failed (including DBNull's wrong exception); three post-scalar cancellation
+cases failed. Exact 0/1/-1, command failure, missing transaction and unsupported negative rejection
+already passed. Fixed guard suite **112 passed, zero failed/skipped**, 5s,
+`TestResults/onboarding-admission-2026-10-10/fixed/Joshu_LONGCHENPA_2026-10-10_02_01_22_net10.0.trx`.
+Focused private SQL **126 passed, zero failed/skipped**, 32s,
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_02_02_06_net10.0.trx`;
+owned `SatiSqlTests_064ad9fa4f7b401aa9c9d70a7537a519` stopped/deleted. Structure and whitespace
+passed; all 22 negative proofs passed. No full suite/load claim.
+
+**Limits/next:** synthetic ADO never opens a server and is not a provider-fault/capacity proof.
+Existing two-host SQL collision/replay test supplies complementary acceptance, not a global
+resource budget or closure/fencing guarantee. DEC-0242 remains proposed; no activation/deployment,
+sealed readiness change or existing schema apply. MT09 planning evidence only. Next bounded
+slice: mutation middleware raw-connection seam and strict result repair with fail-first cases.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.9 shared SQL consumer enrollment inventory
 
 **Identity/authority:** main `master`, base `a447d0f395097dfa6ddb648f03c1233414ac3679`, checkout
