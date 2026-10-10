@@ -1,5 +1,61 @@
 # Working evidence ledger
 
+## 2026-10-10 — DATT 1.3.40 controlled rollout
+
+**Source and authority:** release source `77809373aae2864225638ffcf0693b4eb58c5f5d` is committed
+and pushed to `master`; exact remote equality was verified. Only verified release files and the
+three desktop version lines were staged. Unrelated desktop-project formatting and assessment
+scratch remain untouched. Josh's separate all-three approval covers the Demo migration, baseline
+replacement and one reset; DATT covers the release publication and installer work.
+
+**Gates:** 4,810 accepted cases are detailed below. Closing source consistency, documentation
+structure, all 22 negative proofs and staged whitespace checks passed. Supplemental read-only
+source review found no material version/guard/snapshot defect and confirmed exact 132-migration
+history, unchanged earlier readiness snapshots/rubric and the pinned SQL hash. It did not rerun
+tests or establish live operation. All source logs remain under `artifacts/datt-1.3.40`.
+
+**Operations:** after verified all-instance worker pause, the guarded runner's `-WhatIfOnly`,
+`-Apply` and second `-Apply` all passed. The pushed-source API package passed its 70-file manifest,
+version, contract and private-payload checks. Publication was attempted once; completed/active
+deployment, public health and a separate read-only deployed-file comparison passed. The new
+API's worker pause was revalidated. The file comparison covers the 70 expected package paths;
+unknown deployed files were not inspected. [The environment owner](../../DATABASE_ENVIRONMENTS.md#1340-rollout-observations--october-10-2026)
+records exact source/package/deployment/schema/worker and baseline facts.
+
+The compliance tool build passed with zero warnings/errors. Its `--demo SatiDemo` check omitted
+`--apply` and held the SQL token only in the child environment, restored afterward. Baseline
+capture passed; a local DateTime/string assertion was corrected against saved metadata without
+repeating the capture. The single reset completed with its matching audit event and correlated
+compliance-completion trace (`reset-status-second.json`, `reset-correlated-markers-fourth.json`).
+The first status query timed out; its safe failure record and the first three empty telemetry
+observations remain retained. No reset was retried. Read-only review bounded historical compliance
+claims to the checked 180-day window and file verification to known paths. Worker restoration
+passed its readback/restart/fresh-process check. Final public health passed after correcting the
+local reader's JSON assumption for the plain-text readiness endpoint. Read-only Azure inspection
+confirmed temporary firewall-rule absence; the assistant performed no firewall change.
+
+**Installers:** sequential Demo and Local builds passed with the existing EF1002 warning retained.
+The selected 63,508,480-byte LocalDB prerequisite had a valid Microsoft signature. Demo acceptance
+passed five responsive launches, normal closes, exact installed version and cleanup. Local
+acceptance passed exact version, embedded prerequisite signature, integrated-security configuration
+and cleanup; no working Local database was opened. Both JSON gates under
+`TestResults/datt-1.3.40-{demo,local}-installer-acceptance.json` report `Passed` and `CleanupPassed`.
+The publication helper consumed those exact hashes and published four new installer/checksum
+files without overwrite, verified against their sources. The environment owner above records
+paths, sizes, hashes and unchanged working-installation status. Cloud sync and external-machine
+acceptance remain unverified. Closing documentation structure, all 22 negative proofs, source
+consistency and whitespace checks passed (`documentation-closeout.log`,
+`documentation-negative-closeout.log`, `source-preflight-closeout.log`). Supplemental read-only
+evidence review found no material discrepancy in the completed rollout and artifact records.
+This prose-only closing record is the final evidence-commit input. Application, readiness snapshot
+and package inputs are unchanged from the accepted source; no rebuild or repeated application
+test/installer acceptance is required. Commit/push and exact remote equality are checked after
+creating the closing commit and reported in the handoff; all operational release gates are complete.
+
+Release artifacts and operational JSON/logs remain under `artifacts/datt-1.3.40`; no working Production data was used.
+These observations do not modify the sealed 1.3.40 readiness snapshot or establish deployment-wide
+capacity, durable admission enforcement, external-device acceptance or cloud Production readiness.
+
 ## 2026-10-10 — DATT 1.3.40 source validation
 
 **Scope and identity:** main `master` at audited `97b56392ba06b6b89bd6f290ecd52ff8a8aa37d6`,

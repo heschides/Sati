@@ -6,21 +6,23 @@ Historical completions/releases remain in the [byte-preserved agenda](docs/archi
 
 ## Release 1.3.40 — worker scheduling and admission safeguards
 
-**Status:** October 10 DATT preflight started at source `97b56392ba06b6b89bd6f290ecd52ff8a8aa37d6`;
-Josh separately approved all three Demo operations: controlled migrations, baseline replacement
-and one verification reset. Release preparation is active; database application/publication remain
-pending validation. The operator added the release-specific workstation
-rule; exact bounds were verified read-only. [The environment inventory](DATABASE_ENVIRONMENTS.md#1340-preflight-observations--october-10-2026)
-owns current access, health and Local version observations.
+**Status:** October 10 DATT release gates complete: verified source, Demo migration/API/reset,
+both installer acceptance/distribution gates, worker restoration and temporary-rule absence.
+Josh separately approved the three Demo operations: controlled migrations, baseline replacement
+and one verification reset. Source `7780937` is committed/pushed. Closing documentation structure,
+all 22 negative proofs, source consistency and whitespace checks passed. This record supplies
+the evidence for the closing documentation commit; its push and remote equality are verified
+after committing and reported in the release handoff.
+[The environment inventory](DATABASE_ENVIRONMENTS.md#1340-rollout-observations--october-10-2026)
+owns current deployment, access, health and Local version observations.
 
 The source adds dispatch, polling and signature rotation migrations (130–132): seven scheduling
-tables and six indexes. Controlled application requires reviewed existence/semantics guards,
-rollback rehearsal, apply and idempotent rerun, then the matching Demo API, compliance dry run,
+tables and six indexes. Controlled application used reviewed existence/semantics guards,
+rollback-only rehearsal, apply and idempotent rerun, then the matching Demo API, compliance dry run,
 approved baseline replacement and one verified reset. Duplicate feed keys or incompatible existing
-schema must stop application. Worker activation and resource-limit backend adoption are separate.
+schema remain refusal conditions. Worker activation and resource-limit backend adoption are separate.
 
-Fetched remote default remains `master` at `a1485e2`; local `master` is one commit ahead and the
-approved agenda remote branch contains that tip. Retain older branches/worktrees because retention
+Release source `7780937` is present on local and remote `master`. Retain older branches/worktrees because retention
 or activity is uncertain. Preserve unrelated `Sati.csproj` formatting and assessment scratch.
 The coordinated 1.3.40 source/readiness review and Release build pass. Complete API acceptance
 passed 1,648 cases with exact discovered coverage and no skips/failures; corrected desktop passed
@@ -34,8 +36,8 @@ Migration-preparation assignment for 1.3.2/1.3.3.3/1.3.3.7: main owns integratio
 source in `C:/Users/Joshu/.codex/worktrees/datt-1340-guards/Sati`, based on `97b5639` with no
 uncommitted inputs. Main reviewed and integrated the three guard/test files, corrected only two
 test-fixture defects, and verified all 16 private SQL cases plus seven guard-removal comparisons.
-This preparation assignment is complete for local source acceptance; cloud application is pending.
-The actual Demo guard preflight passed without persistent changes. No runtime policy adoption.
+This preparation assignment is complete for local source acceptance and main integration.
+Controlled Demo rollback-only rehearsal, application and idempotent rerun passed. No runtime policy adoption.
 
 ## Release 1.3.39 — billing release and account recovery safeguards
 

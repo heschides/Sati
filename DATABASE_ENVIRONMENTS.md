@@ -334,3 +334,74 @@ observation only. No working application launch or Local database query was perf
 Local schema uptake is unverified. Other Local machines/versions have been requested and remain
 unknown. The old Demo uninstall registration still reports **1.2.17**; its executable was not
 validated and it is not evidence of the current cloud API version.
+
+## 1.3.40 rollout observations — October 10, 2026
+
+This supersedes the pending rollout status above. Release source
+`77809373aae2864225638ffcf0693b4eb58c5f5d` was pushed to `master`. At the exact existing Demo
+resource, signature WorkersEnabled was temporarily set from true to false and read back before
+the explicit restart at **13:39:38 UTC**. Fresh stable instance/process metadata verified that
+every potential API process started after that boundary; missing SCM flags were treated as
+potential API processes. Other reviewed feature/identity flags were unchanged. This is
+configuration/process evidence, not a measured worker-progress or capacity result.
+
+The pinned worker-rotation guard passed rollback rehearsal with **129** migrations preserved,
+applied migrations 130–132, and passed a fresh idempotent rerun with **132** migrations and no
+remaining changes. Latest is `20261010042710_AddSignatureWorkRotation`. The same transaction
+guards validate seven new scheduling tables, constraints/indexes and seed state; no Production
+database was accessed. Evidence is in `artifacts/datt-1.3.40/rotation-demo-{rollback,apply,idempotency}.json`.
+
+Demo API **1.3.40**, contract **D30D44631876**, is active in deployment
+**2c159e6dffba4382b882f86c44874e6e**, completed **13:41:42 UTC**. One upload received HTTP 202;
+completion/active identity and public liveness/readiness/version HTTP 200 were subsequently
+verified. ZIP `artifacts/SatiApi-1.3.40-fx-x86.zip` is **12,021,242 bytes**, SHA-256
+`7862D20CCD8585117E84B0B2945AC5936E922703433F8D5774D5573ECA490390`.
+Separate read-only verification matched all **70 expected package files** by hash,
+with stable deployment identity; unknown deployed files were not inspected. The previous release
+package remains retained. A second
+instance/process/configuration check confirmed workers still paused under the new API.
+
+The read-only compliance check found **zero planned changes**, zero unexpected current blockers
+or unexpected blockers for notes checked from the **last 180 days**; retained teaching cases and
+two missing-effective-date cases were left alone. Approved baseline capture returned
+`DEMO_FULL_RESET_BASELINE_CAPTURED`, with
+**100 baseline tables**, anchor **October 10**, captured **13:43:21 UTC**. The first local metadata
+assertion compared an automatically parsed DateTime to a string wildcard and refused; explicit
+date comparison against the same saved metadata passed. No capture was repeated.
+Exactly one reset request **d3f09ff6-fb01-473e-b273-6e80825c3f67** received HTTP 202 at **13:44:36 UTC**.
+Its `demo.reset.completed` audit event is recorded at **13:48:10.0172662 UTC**. The matching
+completion trace at **13:48:10.0287956 UTC** and `DEMO_COMPLIANCE_HISTORY_COMPLETE` at
+**13:48:09.9989731 UTC** share operation **8da1f0860943c7a6d067dd8b25dd160f**. The first SQL status
+read timed out during the run; a later read succeeded. Three telemetry reads were empty before
+the fourth returned the correlated markers. No reset retry occurred.
+
+Signature WorkersEnabled was restored to its original **true** value, verified by readback, then
+the API was explicitly restarted at **13:50:52 UTC**. Fresh metadata at **13:52:20 UTC** confirmed
+one stable instance and all potential API processes started after the restoration boundary;
+other reviewed flags remained unchanged. Public liveness/readiness/version passed again at
+**13:52:42 UTC**. An extra local health reader initially treated the plain-text readiness body as
+JSON and refused; the corrected reader validated each endpoint's actual format. This was a
+verification-helper error, not an API failure. Successful read-only Azure inspection at
+**13:53:05 UTC** verified **datt-workstation-1340-20261010 is absent**. The assistant did not change
+the firewall. No further workstation SQL access is required for this release.
+
+Both new installers passed their isolated acceptance gates and cleanup on **LONGCHENPA**:
+Demo ran five responsive launches/normal closes at **1.3.40.0**; Local verified **1.3.40.0**,
+integrated-security configuration and the exact embedded Microsoft-signed LocalDB prerequisite.
+No working Local database was opened. The accepted installers and checksum sidecars were
+published without overwrite at **13:52:49 UTC**, with destination hashes matching source:
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `SatiLocalSetup-1.3.40.exe` | 206,976,553 | `a9c92c67e7ce4334434d4b9d587894f5522c6a093e124f139b07f8c68e768a6c` |
+| Local `.exe.sha256` | 93 | `4dd0246374d27f5af3457f8c86dfd9b92357e4fdb3c78680f694edaffa8095b0` |
+| `SatiDemoSetup-1.3.40.exe` | 104,640,512 | `fe832e0ef95c2460384d280a02046c6bfa9a42b2c80ca0582bcfbb71cd52931c` |
+| Demo `.exe.sha256` | 92 | `6ea4d088ac4938cb9597083b42550d37a59e75f645603f228bf6bec26a0b51cf` |
+
+Sources are under `artifacts/SatiLocalInstaller` and `artifacts/SatiDemoInstaller`. Exact Local
+destination is `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\Sati Desktop`;
+Demo destination is `C:\Users\SatiLogica\RobinBradleyAMS\SatiLogica - Documents\SatiLogica Demo Files`.
+`artifacts/datt-1.3.40/distribution-evidence.json` records all four paths/hashes and acceptance
+record hashes. Local installed version above remains **1.3.39.0**; distributing this installer
+does not update the working installation or establish Local schema uptake. Other Local machines,
+external-device acceptance and completion of cloud sync remain unverified.
