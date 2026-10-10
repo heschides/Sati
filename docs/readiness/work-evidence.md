@@ -1,5 +1,43 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.9 shared SQL consumer enrollment inventory
+
+**Identity/authority:** main `master`, base `a447d0f395097dfa6ddb648f03c1233414ac3679`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit main source-review assignment under continued
+Agenda approval. Coordination/governance, architecture/decisions, W8, operations, reset/recovery,
+identity and regulatory owners consulted. Only included uncommitted input was the active assignment;
+unrelated Sati.csproj formatting/assessment scratch preserved and excluded. No other checkout,
+agent, process, database, private settings, real data or external service accessed.
+
+**Source identity:** 746 tracked `.cs`/`.ps1`/`.json` source/tool files under Sati.Api, Sati.Portal,
+Sati.Signatures, Sati.Persistence, Data, Sati.DemoRefresh, tools/SatiComplianceSeed, scripts and
+App.xaml.cs; appsettings/local.settings excluded. Sorted unique Git-relative `path:UPPERCASE-byte-
+SHA256` lines joined with LF, UTF-8 SHA256 aggregate
+`7E75741AE848ACCA066D7F810BBC17C4CD86136A3504E64D25A1662EF76772BC`.
+Digest identifies source inputs, not an assertion that every route was costed or every tool run.
+Initial guessed seed/startup paths did not exist; tracked owners were located under tools and
+Data/App.xaml.cs before findings. No missing required source input remained.
+
+**Result/ownership:** its [W8 matrix](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--shared-sql-consumer-enrollment-inventory--task-149)
+maps pipeline/identity/write scopes, raw mutation/onboarding locks, startup/health, incident/chat,
+portal/workflow, reset parent and seed children, watchdog, operator/migration and separate local
+desktop owners. Clarifies raw identity ADO open versus EF interception, context versus checkout,
+process-local rates/stripes versus global concurrency and parent/child dependency overlap. Numeric
+lock conversions in adjacent API owners remain outside 1.4.4; onboarding repair is next bounded
+slice. Only W8 subsection, main agenda/status/definition and this evidence changed.
+
+**Checks:** source review/search only; application tests/builds, database queries, capacity probes
+and external calls not run. Documentation structure and all 22 negative proofs passed.
+Whitespace and final source digest recheck passed with the same 746-file aggregate. This is
+working source evidence for MT09/OP10 planning,
+not a new sealed readiness assessment or proof of live enrollment, capacity or HIPAA compliance.
+
+**Decisions/limits/next:** DEC-0242 remains proposed; no backend, budget values or host topology
+adopted. Actual pools/principals/replicas, external SQL clients, closure/fencing, restart overlap and
+interactive/worker/recovery objectives remain dependencies. Do not infer them from historical SKU
+or a process token. Next **1.4.10**, strict onboarding admission-result repair and actual-call
+fail-first acceptance; raw mutation seam/hardening and API workload admission remain separate.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.8 polling-worker connection-lifetime evidence
 
 **Identity/authority:** main `master` base `dd4df9ea511241bce43294e6699abadc22839a44`, checkout

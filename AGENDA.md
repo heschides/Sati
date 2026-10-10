@@ -124,7 +124,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4.6** | [Signature-worker connection-lifetime evidence](#146--signature-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 228 focused cases passed, no runtime policy. |
 | **1.4.7** | [Dispatch-worker connection-lifetime evidence](#147--dispatch-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 110 focused cases passed, no runtime policy. |
 | **1.4.8** | [Polling-worker connection-lifetime evidence](#148--polling-worker-connection-lifetime-evidence) | Complete; six new and 153 focused cases passed, no runtime policy. |
-| **1.4.9** | [Shared SQL consumer enrollment inventory](#149--shared-sql-consumer-enrollment-inventory) | Ready; source-only census and prerequisites, no runtime policy. |
+| **1.4.9** | [Shared SQL consumer enrollment inventory](#149--shared-sql-consumer-enrollment-inventory) | Complete; bounded source-family census, no live enrollment/capacity claim. |
+| **1.4.10** | [Onboarding admission-result hardening](#1410--onboarding-admission-result-hardening) | Ready; strict scalar/cancellation repair, no resource-budget policy. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
@@ -162,7 +163,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.6 — Signature-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | Six dependency/adverse cases and final 228 focused cases passed; physical/failure-safe costs remain open. | Test-only fixture/provider/barrier seams and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
 | **1.4.7 — Dispatch-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | Five new boundary cases and final 110 focused cases passed; per-interval accounting clarified, physical/failure-safe costs open. | Test-only fixture/key/transport/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
 | **1.4.8 — Polling-worker connection-lifetime evidence** | Complete; test-only main acceptance | Main integration thread / main integration thread | Current polling/receipt/ERA quantum/reset owners; source `dd4df9e` and accepted shared probe. | Test-only fixture/wrapping/HTTP/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
-| **1.4.9 — Shared SQL consumer enrollment inventory** | Ready; assigned source review | Main integration thread / main integration thread | Completed worker lifetime evidence and proposed DEC-0242; inspect adjacent consumers before backend adoption. | Its W8 subsection, agenda assignment/definition and dated evidence only. No runtime/schema/test changes or external/database access. |
+| **1.4.9 — Shared SQL consumer enrollment inventory** | Complete; main source/documentation acceptance | Main integration thread / main integration thread | Base `a447d0f`; bounded adjacent consumer census complete; host/closure/values remain open. | Its W8 subsection, agenda assignment/definition and dated evidence only. No runtime/schema/test changes or external/database access. |
+| **1.4.10 — Onboarding admission-result hardening** | Ready; assigned source repair | Main integration thread / main integration thread | Current onboarding transaction/collision owner and accepted strict result guard; inventory found conversion gap. | Onboarding coordinator, narrow actual-call synthetic ADO tests, W8/agenda/evidence. No schema, budget, release or data changes. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -231,7 +233,7 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.4.9 — Shared SQL consumer enrollment inventory**.
+**Next numbered task:** **1.4.10 — Onboarding admission-result hardening**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -598,6 +600,28 @@ unknowns and next bounded step; documentation structure, negative and whitespace
 only its W8 subsection, main agenda/status and dated evidence. No application/schema/test code,
 database/data access, external calls, benchmark, deployment or sealed evidence changes. Commit/push
 reviewed documentation under existing repository approval.
+
+### 1.4.10 — Onboarding admission-result hardening
+
+**Eligibility:** completed 1.4.9 found `Convert.ToInt32` accepts unconfirmed/coercible onboarding
+lock results. The shared strict admission guard is accepted and worker-tested; use a bounded main
+repair assignment, preserving existing onboarding behavior for confirmed results.
+
+**Bounded slice:** exact integer 0/1 admit, -1 stays busy, all other scalar shapes fail safely.
+Recheck caller cancellation after scalar before continuation. Keep serializable transaction-owned
+lock on caller context; no added session lock/release or resource policy. Extend synthetic ADO
+actual-call seam and prove regression fails before repair, then verify focused onboarding/guard
+regressions with synthetic fixtures and owned private SQL only.
+
+**Dependencies and owners:** current onboarding route, collision/audit/tenant/reset boundaries,
+SqlSessionAdmission, proposed DEC-0242. Mutation middleware gap is separate; no claimed repair
+there. Preserve unrelated checkout work and transaction disposal ownership.
+
+**Boundaries and completion evidence:** malformed/valid/contention/cancellation/command-failure
+actual-call cases, pre-fix failures, transaction ownership/cleanup and existing two-host collision
+acceptance; documentation structure, negative and whitespace checks. No schema, existing database,
+real data, actual vendor/cloud/security, deployment, benchmark or sealed evidence changes. Commit
+and push verified source/tests/docs under existing authority; main owns integration.
 
 ## Preserved open-work inventory
 
