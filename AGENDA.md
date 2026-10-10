@@ -113,7 +113,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.3.3.3** | [Durable polling selection](#1333--durable-polling-selection) | Complete for bounded source verification/main integration; 119 tests passed, unreleased. |
 | **1.3.3.4** | [Note-maintenance fairness review](#1334--note-maintenance-fairness-review) | Complete for bounded source review; 35 existing tests passed; crash/membership/capacity gaps retained. |
 | **1.4** | Resource limits: bound shared connections, concurrency and operation times | Open; includes global/agency budgets, bounded queued work, dependency quotas and measured hosting choices. |
-| **1.4.1** | [Resource-limit inventory](#141--resource-limit-inventory) | Ready for explicit parallel assignment; source review and documentation only, with policy/implementation deferred. |
+| **1.4.1** | [Resource-limit inventory](#141--resource-limit-inventory) | Complete for main-reviewed source/documentation integration; current-source corrections in W8; no adopted limiter. |
+| **1.4.2** | [Shared SQL/session admission design](#142--shared-sqlsession-admission-design) | Awaiting main review; proposed investigation handoff separately assigned by Josh. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
@@ -140,7 +141,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.3.3.2 — Bounded ERA feed quantum** | Complete; 35 local tests passed, unreleased | Main integration thread / main thread | DEC-0241; preserve all-page discovery and receipt effects. May accompany source-only 1.4.1. | Poller ERA quantum, relevant fail-first tests, canonical topic/agenda/evidence. |
 | **1.3.3.3 — Durable polling selection** | Complete for source verification/main integration; 119 passed, unreleased | Main integration thread / main thread | DEC-0241, ERA quantum acceptance and current reset/receipt owners. | API selector/pass, shared scheduling metadata/source migration, relevant tests and canonical docs/evidence; synthetic fixtures only. |
 | **1.3.3.4 — Note-maintenance fairness review** | Complete; 35 existing tests passed | Main integration thread / main thread | Existing note batch/discovery/cache/failure policy; completed polling slice. | Its W8 review, assignment/status and dated evidence; focused existing synthetic tests. No runtime policy change without a defined successor. |
-| **1.4.1 — Resource-limit inventory** | Ready; explicitly assigned by Josh to the second thread; startup verification pending here | Second investigation thread/worktree created by Josh; actual identity to be recorded there / main thread | Captured current source and existing W8/operations rules; may accompany 1.3.1. Actual fair-selection policy is an input to later budget design, not a prerequisite for inventory. | Its own W8 resource-limit inventory subsection, this assignment row and a dated ledger entry in its dedicated worktree. No runtime source edits. |
+| **1.4.1 — Resource-limit inventory** | Complete for main-reviewed documentation integration | Investigation chat `01a12363-741d-79b0-8b4d-dc2f7e7c5a1b`, `C:/Users/Joshu/.codex/worktrees/c3a1/Sati`, base `40e091b` / main thread | Captured source digest verified; current dispatch/polling drift reconciled against main `72cec51`. | Only its W8 inventory/assignment/evidence extracted; inherited changes and dedicated checkout preserved. No runtime source edits. |
+| **1.4.2 — Shared SQL/session admission design** | Awaiting main review | Same investigation chat/worktree, separately assigned by Josh / main thread | Task 1.4.1 captured inventory; main source reconciliation and hosting/accounting decisions precede adoption. | Its W8 proposed design, assignment definition/row and dated evidence only; main owns integration/adoption. No implemented limiter or capacity claim. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -182,11 +184,34 @@ database access, benchmarks, real data, vendor calls, hosting/security changes, 
 push or dispatch activation are authorized by this assignment. Findings establish no measured
 capacity, latency, operating guarantee or sealed readiness-score change.
 
+### 1.4.2 — Shared SQL/session admission design
+
+**Eligibility:** Josh separately assigned the second investigation chat after its 1.4.1 handoff.
+Its proposed documentation contract is awaiting main review; 1.4.1 is now integrated with current
+dispatch/polling corrections. That assignment does not transfer the main queue to the second chat.
+
+**Bounded slice:** review/integrate the proposed connection accounting, cross-host/agency bounds,
+bounded waiters, interactive/recovery reserve, order and failure/restart contract for the five
+inventoried paths. Compare coordination alternatives using symbolic limits. Preserve proposed
+status until a reviewed choice is adopted; separate safe local source follow-ups from missing
+hosting/exclusivity, numeric limits and operational evidence.
+
+**Dependencies and owners:** W8 inventory and proposed admission contract, D1–D4, existing reset,
+scheduling/recovery, external uncertainty, signature revocation/evidence and API 1.5/combined 1.6
+owners. Main integration reconciles current source and owns adopted policy; actual hosting and
+quota facts remain with their canonical operational owners.
+
+**Boundaries and completion evidence:** concrete main review, source identity/drift, selected or
+deferred decisions/alternatives, deterministic acceptance plan, documentation/negative/whitespace
+checks and dated evidence. Documentation review only; no application/schema/test-code changes,
+database, real data, benchmark, external call, runtime limiter, numeric capacity promise,
+deployment or sealed evidence change. Extract only assigned sections; preserve the other checkout.
+
 ## Next eligible work
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.4.1 — Resource-limit inventory, main review/integration**.
+**Next numbered task:** **1.4.2 — Shared SQL/session admission design, main review/integration**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 

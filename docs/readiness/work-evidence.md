@@ -1,5 +1,42 @@
 # Working evidence ledger
 
+## 2026-10-09 — SATI-WRK-001 1.4.1 main inventory integration
+
+**Identity/authority:** main `master` at `72cec51180ce77f4e81d4ae842ac6207465800bb`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`. Josh authorized continued Agenda progression.
+Read-only handoff from investigation chat `01a12363-741d-79b0-8b4d-dc2f7e7c5a1b`, dedicated
+`C:/Users/Joshu/.codex/worktrees/c3a1/Sati`, detached base/current
+`40e091bae9bd0f5de9bc89e39209cf3e17449ccc`. Its included uncommitted source/documentation
+inputs remain listed in the retained investigator entry; none were copied wholesale or merged.
+
+**Review/change:** verified the investigator's exact **550-file** public source digest
+`50E79F193461BECC2D5E5B15E9773BD05D62F7650DAE8FFEC5BFCCF4C18F07F3` remains unchanged.
+Normalized main comparison finds nine modified existing source paths and eight added paths,
+all dispatch/poll selector/model/migration integration. Note/signature and dependency owners
+are unchanged. Actual path list is retained in ignored
+`TestResults/polling-fairness-2026-10-09/resource-handoff-drift.json`; secondary owner hashes in
+`secondary-handoff-docs.json`. Extracted only the task 1.4.1 W8 subsection and dated evidence,
+reconciled its assignment row in main, and registered separately human-assigned task 1.4.2 for
+main review. The second checkout, processes, inherited edits and main user changes are untouched.
+
+The baseline matrix is explicitly dated. Its current-source addendum links durable dispatch and
+poll selection, bounded polling offers, disposed discovery reads, one ERA artifact and K ≤ 1.
+Original awaiting-review/source assertions remain historical handoff text, superseded for current
+status by this review. Shared session/waiter/connection and signature transaction-span findings
+remain source-grounded; proposed controls/acceptance cases are not adopted policies or tests.
+
+**Checks/evidence:** source identity and required-input review passed; inspected current selectors,
+worker admissions, reset/vendor leases, note and signature processing/package/mail owners.
+Documentation structure, all 22 negative proofs and whitespace passed for this chunk.
+Investigator's prior 22-negative/structure checks remain its dated evidence, not this run.
+No application build/test, database, real-data access, benchmark, vendor/cloud call, deployment,
+limiter adoption, measured capacity or sealed score/rubric change occurred in this integration.
+
+**Status/next:** 1.4.1 inventory is complete for main review/integration; wider resource limits
+remain open. Review task 1.4.2's symbolic admission proposal next, including unresolved process
+slot exclusivity/fencing, pool/external-consumer envelope and required runtime enrollment. Do not
+turn recommendations into a global-cap claim. Signature fairness remains a separate bounded task.
+
 ## 2026-10-09 — SATI-WRK-001 1.3.3.4 note-maintenance fairness review
 
 **Identity/authority:** main checkout `C:/Users/Joshu/source/repos/heschides/Sati`, `master`
@@ -3090,6 +3127,137 @@ define/start 1.3.2's bounded implementation with the planned fail-first and priv
 The agenda owns ordering; the second thread continues only its separate 1.4.1 assignment.
 
 **Later reviewed release snapshot, if any:** none; working design evidence only.
+
+## 2026-10-09 — SATI-WRK-001 task 1.4.1 resource-limit inventory
+
+**Stable work ID and bounded slice:** SATI-WRK-001 **1.4.1**, explicitly assigned by Josh to
+this second investigation thread. Source/documentation inventory of dispatch, polling, note
+abandonment, signature processing and signature mail; no runtime-policy implementation.
+Main fairness design 1.3.1 and integration remain with the main thread.
+
+**Status and source/revision:** awaiting review; not integrated or broader W8 complete.
+Starting and current HEAD: `40e091bae9bd0f5de9bc89e39209cf3e17449ccc`, detached, dedicated
+worktree `C:\Users\Joshu\.codex\worktrees\c3a1\Sati`.
+App thread identifier was not separately available; the worktree and explicit assignment identify
+this handoff. The checkout already contained the current AGENTS coordination rules, DEC-0238,
+task 1.4.1, approved recovery owners and the uncommitted DEC-0237 idle/wake implementation,
+including its final admission-time activity recheck. Required inputs were present; no setup copy,
+checkout/reset/stash/merge, external fetch or missing-input workaround was performed.
+
+Included uncommitted source/documentation/test inputs at start (preserved, not authored by this
+inventory) were:
+
+- Root/canonical docs: AGENTS.md, AGENDA.md, ARCHITECTURE.md, BACKGROUND_WORKERS_HANDOFF.md,
+  DECISIONS.md, OPERATIONS.md, docs/architecture/workers.md, docs/decisions/current-decisions.json,
+  docs/decisions/current/README.md, docs/readiness/work-evidence.md and the untracked
+  docs/decisions/current/2026-10-09-DEC-0237.md / 2026-10-09-DEC-0238.md.
+- API source: Sati.Api/Endpoints/ApiEndpoints.cs, ClearinghouseDispatchEndpoints.cs and
+  ClearinghousePreflightEndpoints.cs; Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs;
+  Sati.Api/Program.cs and untracked Sati.Api/Infrastructure/ClearinghouseDispatchSchedule.cs.
+- Test-source inputs: Sati.Api.Tests/ClaimMdSandboxConnectorTests.cs, ClearinghouseDispatchApiTests.cs,
+  ClearinghouseDispatchIsolationReproducerTests.cs, ClearinghousePreflightApiTests.cs,
+  SatiApiFactory.cs and untracked ClearinghouseDispatchSchedulingTests.cs / SatiApiFactorySessionTests.cs.
+
+Pre-existing Sati.csproj formatting and untracked assessment-working firewall/assessment/result
+items also remained in this worktree; they were not inventory evidence, read as data, edited or
+integrated. Git status was recorded before work; nothing was staged, committed or pushed.
+Other worker/dependency owners were already tracked at the base plus those listed inputs.
+
+**Source identity and drift method:** byte SHA-256 inventory of 550 tracked/untracked `.cs`
+files under Sati.Api, Sati.Contracts, Sati.Persistence and Sati.Signatures:
+`50e79f193461becc2d5e5b15e9773bd05d62f7650dae8ffec5bfccf4c18f07f3`.
+Digest input is sorted unique Git repository-relative paths, each `path:UPPERCASE-file-SHA256`,
+joined with LF, then UTF-8 SHA-256. This identifies the inspected working source, not only HEAD.
+Before edits, source contents matched the main checkout across all 550 files after CRLF/LF
+normalization; raw byte differences were line endings, not missing scheduling/recovery inputs.
+The read-only comparison did not change the main checkout or its processes. Review must recheck
+main source drift at integration rather than treating a copied worktree as current forever.
+
+A broader preservation baseline covered 1,108 tracked/untracked public source/test/docs/script
+files excluding the three edit owners, including Sati.csproj; digest:
+`0a9ea64aa02c67e1948b39acd03bcfeb3352bd8db56cb6fe4fe1d84614c930e4`.
+Original owner byte hashes, before this task's own inserts/row update:
+
+| Owner | Original SHA-256 |
+|---|---|
+| AGENDA.md | `90442C9D29103825EB96218357ADA83056F783859B23CD86271892F11F0C660A` |
+| BACKGROUND_WORKERS_HANDOFF.md | `9E47EB9450A166E1EAFAA9A35F5E02A0E323250319DEAB2460654A9914F0FB92` |
+| docs/readiness/work-evidence.md | `8CDFA79A3844AA82ECF7383DAF758814A78CD65B9E371A33A6F257D2FEE180E4` |
+
+**Changed behavior, ownership and canonical paths:** no application behavior changed. Only
+[the task-owned W8 inventory](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--resource-limit-inventory-task-141),
+the 1.4.1 parallel assignment row in AGENDA.md and this dated entry were edited. Other W8 sections,
+agenda ordering/main pointer, decisions, existing ledger entries and sealed release/rubric evidence
+remain preserved. Matrix columns cover trusted scope/selection, admission/connection lifetime,
+concurrency/queue/quota and lifecycle/gates; enforced source limits are distinguished from gaps.
+Prioritized dependency review and eight deterministic acceptance groups are proposed for later
+budget work, not adopted policies or new test results.
+
+**Findings and implications:** local pacing, one-row/batch selection, record/account leases and
+shared vendor serialization do not supply a deployment-wide SQL/session/concurrency budget.
+Claim.MD waiters open connections before lock admission; dispatch/polling retain outer sessions
+through dependency work. Polling account discovery is unpaged, and account/pass work has no total
+budget. Notes have bounded query/batch sizes and prior-day cache rotation, but no total pass or
+current-day cache ceiling. Signature packages hold a transaction across storage/rendering/key
+work; mail's final transaction intentionally protects revocation ordering across submission.
+Signature hosted reset participation was not found in the inspected service and requires
+integration review, not a claim that a live reset race occurred. Preserve those safety invariants
+while designing resource admission/deadlines. Numeric provider quota/hosting/pool capacity,
+intended-host latency and live service behavior remain unverified.
+
+**Actual tests/checks, commands, results and evidence locations:** source/owner/test-seam reading
+and input-presence verification completed. Test-DocumentationStructure.ps1 passed: 46 root
+pages, 28 scoped owners, 12 unchanged snapshots, 11 active items, 454 legacy items, 218 imported
+and 20 current decision records; the single main pointer remains SATI-WRK-001 task 1.3.1.
+Test-DocumentationStructureChecks.ps1 passed all 22 disposable-fixture rejection cases; its
+owned temporary fixtures were cleaned up. git diff --check passed for the three documentation
+owners. Final source/preservation digest check returned the same 550-source and 1,108-protected
+file digests and unchanged HEAD; read-only main comparison again found zero source-content
+differences after CRLF/LF normalization. Removing only this task's subsection, row change and
+entry reconstructs all three original owner hashes above, proving other sections/entries were
+preserved. Checks ran locally with the bundled PowerShell runtime; this ledger and local command
+results own the documentation-only evidence, with no separate report artifact.
+
+**Failed/unrun checks, reason and verification limits:** exploratory searches initially used
+nonexistent guessed paths or PowerShell wildcard arguments; rg reported those missing paths.
+Discovery located the actual owners (ClaimReleaseWriteScope under Persistence/Data, SignatureRules
+in Contracts/V1/Signatures.cs, and reset under Sati.DemoRefresh/Shared); no required source gap
+remained. Two manifest-output parsing attempts failed because command output yielded/truncated;
+the bounded digest command completed successfully and supplied the hashes above. One overlong
+scope-check command exceeded the Windows command-line limit; the shortened anchored check
+successfully reconstructed all three original hashes. These were inspection-tool failures, not
+application/test failures. No application build/test suite,
+database query, real-data access, benchmark, vendor/cloud/network call, worker activation,
+process modification, agent launch, commit, push or deployment was performed. Existing test
+files/results are seams or prior evidence, not newly run acceptance or measured capacity here.
+
+**Relevant readiness criterion IDs and evidence class:** source inventory and documentation only,
+relevant to MT06/MT07 fair turns and failure isolation, MT09 shared capacity, MT10 cross-host
+coordination, MT11 interactive response, ID05/ID10/ID11 fencing and safe retry/signature delivery,
+and OP05/OP10 owner alerts and intended-host acceptance in rubric 2026-10-v1. No criterion
+satisfaction, readiness score or sealed rubric/release snapshot change claimed.
+
+**Durable decisions, alternatives and supersession links:** no new decision/adoption/supersession.
+[DEC-0238](../decisions/current/2026-10-09-DEC-0238.md) coordinates this assignment; DEC-0237
+scheduling, DEC-0235 recovery and W8 D1–D4 remain governing. Proposed resource controls await main
+review and later explicit policy adoption; local semaphores or separate worker-per-agency
+deployment are not substitutes for shared dependency admission.
+
+**Remaining risks/blockers, dependencies and deferred work:** main integration must review the
+matrix against its current source and reconcile overlap with 1.3.1/1.3.3. Future budget design
+depends on a clear resource accounting model and reviewed fairness/safety boundary. Pool/host/
+provider quota facts and load evidence require separately authorized work. Broader 1.4/1.5/1.6
+runtime design, implementation and acceptance remain open. Main integration should extract only
+the 1.4.1 subsection, assignment row and this entry; the inherited uncommitted inputs belong to
+their existing work owners. No scope transfer or next-task claim.
+
+**Next eligible stable ID and bounded slice:** recommend main review/integration of **1.4.1**,
+then a separately assigned **1.4 shared SQL/session admission design**: define cross-host and
+agency allowances, bounded waiters, interactive reserve, lock/order ownership and deterministic
+C/A/Q acceptance before implementation. This recommendation does not add or activate a numbered
+task or move the main pointer from **1.3.1**.
+
+**Later reviewed release snapshot, if any:** none; working investigation evidence only.
 
 ## Entry template for the next significant portion
 
