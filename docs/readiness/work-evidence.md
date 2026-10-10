@@ -1,5 +1,98 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.3.3.7 durable signature selection
+
+**Identity/authority:** main `master` base `e4f315bfcf15c101aeeb403c25f830b911bec905`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; DEC-0243 and continued-work local source/synthetic
+authority. Starting included input: own active Agenda row. Unrelated Sati.csproj formatting and
+assessment scratch are preserved/excluded. No other checkout/process changed. Source ownership
+is shared full-server scheduling metadata, API selector/host/query reuse and scoped shared mail;
+source migration, tests and canonical W8/architecture/decision/agenda/evidence accompany them.
+
+**Status:** bounded source/main acceptance complete, unreleased. W8 owns changed behavior/limits; no rollout or readiness
+score claimed. Original damaged projection failed across two independently recreated hosts with
+no healthy B projection: **1 failed**, 2 seconds,
+`TestResults/signature-fairness-2026-10-10/projection-unfixed/Joshu_LONGCHENPA_2026-10-10_00_18_35_net10.0.trx`.
+First fixed **1 passed**, `projection-first-fixed`. First expanded run had two fixture compile
+errors (incorrect projection DbSet name); corrected to the mapped entity set. Then **18 passed,
+1 failed**, 5 seconds, `local-selection/...00_26_54...trx`. Diagnostic package test **1 failed**,
+2 seconds, `package-diagnostic/...00_27_46...trx`: synthetic invitation used base64url while the
+real owner requires 64 hexadecimal characters. Corrected only fixture token; removed diagnostic
+fallback. Corrected local cases **19 passed, 0 failed/skipped**, 7 seconds,
+`local-corrected/Joshu_LONGCHENPA_2026-10-10_00_28_43_net10.0.trx`.
+
+First combined private SQL/signature API/projection/persistence/host acceptance **109 passed,
+0 failed/skipped**, 27 seconds,
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_00_29_09_net10.0.trx`;
+owned `SatiSqlTests_1e73ade4983d4ea49997e544dfcde0ed` stopped/deleted. Five new SQL cases exercise
+phase-scoped contention/disposal, real lost ownership on selected/empty lanes, failed/pre-commit
+and committed/post-acknowledgment uncertainty without replay, fresh-connection agency/item ordering,
+additive Up/unused Down/re-Up/used Down refusal and scoped FK rejection. Local cases exercise
+damaged projection and package B progress, phase-independent agency/item restart, ten distinct
+offers and continuation, visited exclusions/empty position preservation, optimistic metadata,
+mail current scope/due/lease/completion and existing-GUID-only recovery. Prior hosted/reset cases
+now read selector metadata under the same exclusion; shared discovery fault stops the pass.
+
+**Further actual verification:** always-first-agency and always-first-item mutants each **3 failed**,
+2 seconds (`agency-mutant/...00_29_59...trx`, `item-mutant/...00_30_11...trx`). Removing ownership
+verification **1 failed**, 6 seconds, real SQL release before selection returned without the
+required exception (`TestResults/IsolatedSqlServer/Api/...00_31_13...trx`); owned
+`SatiSqlTests_32f6f14aa0d34b40a433f86f12f854c9` cleaned. Removing mail scope filter **4 failed**,
+2 seconds (`mail-scope-mutant/...00_31_38...trx`). Exact source bytes restored in finally blocks.
+Release build passed (six existing test warnings, zero errors). Shared signatures **119 passed**,
+5 seconds (`shared-signatures/...00_32_35...trx`); portal **8 passed**, 5 seconds
+(`portal/...00_32_52...trx`), no failed/skipped cases.
+
+The monolithic full API run was intentionally interrupted after **17m47s** under observed
+workstation memory pressure (~0.4 GiB available, testhost ~3.2 GiB working set). Its TRX records
+**1,376 passed, zero failed/skipped** but the run is **aborted**, not a completed green suite:
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_00_32_07_net10.0.trx`.
+Only verified owned testhost PID 36560/path/parent chain was stopped; owned
+`SatiSqlTests_81e0e848f35c435bab8bb47410debbae` stopped/deleted by wrapper cleanup. Available
+memory returned to ~4 GiB. No unrelated process was stopped. The 381 MiB TRX must be streamed
+for follow-up case inspection; materializing it with PowerShell XML also consumes excessive memory.
+
+Current compiled discovery listed **1,404 cases**, SQL opt-in enabled for discovery only. Two
+new cancellation/outer-retry cases and one expanded three-phase SQL ordering case were not covered
+by the earlier compiled run. The 27 unfinished/expanded method filters selected exactly **29
+cases**, all **passed**, 1m12s, no skips:
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_00_53_14_net10.0.trx`;
+owned `SatiSqlTests_a470d1b56cf547799f0465526e632c41` stopped/deleted. Streaming reconciliation
+by stable test ID (latest result retained) and ordinal display-name multiplicity matches every
+discovered case: **1,404 recorded passes**, one intentionally repeated expanded case. This is
+complete inventory coverage across runs; it does not prove one completed monolithic run or
+collection teardown under that interrupted process. All **111 signature cases** are included.
+Artifacts: `TestResults/signature-fairness-2026-10-10/api-test-inventory.txt`,
+`api-remaining.filter.txt`, `partial-case-identities.json`, `api-inventory-coverage.json` and
+`selection-application-source.json`. All 13 application-source hashes were retained throughout.
+
+Migration 132 generated with `--synthetic-design`; symbolic 132-migration chain reports 98
+tables/1,177 columns and zero problems; EF reports no pending model change. Final documentation
+structure, all **22 negative mutation proofs**, working and staged whitespace checks passed after
+the desktop build prerequisite.
+
+Desktop persistence-boundary verification initially could not compile: an older retained
+`TestResults/worker-idle-wake-2026-10-09/staged-snapshot` was included by WPF default globs,
+producing duplicate source/XAML definitions. Added only `DefaultItemExcludes` for `TestResults/**`
+to the root project. MSBuild item inventories prove all non-TestResults items remain identical:
+Compile 1,981→487, Page 261→130, ApplicationDefinition 1→1, EmbeddedResource 3→2,
+None 8,331→7,298. Evidence files were not moved/deleted. Removing the owned added line reproduces
+the original user project bytes (including BOM/formatting), SHA-256
+`85EC2A57DDBDD8FBF1F8A86453F85A2D9786E24CE1AE1AF097DB42D22395AFD1`.
+The first byte verifier incorrectly stripped the BOM; raw-byte comparison corrected that check.
+Only the owned one-line hunk is staged; original 9 insertions/4 deletions remain unstaged.
+With build contamination removed, the original chain test **1 failed**, expected 130/actual 132,
+140 ms (`desktop-chain-unfixed/...01_00_53...trx`). Updated expected count and explicitly checked
+both new migration IDs and shared scheduling-entity assembly ownership. **1 passed**, 22 ms,
+`desktop-chain-fixed/Joshu_LONGCHENPA_2026-10-10_01_01_44_net10.0.trx`; Release desktop/test build
+passed with existing warnings. Logs and exact before/after item JSON remain under the task's
+TestResults evidence folder. No private settings were copied or application started.
+
+No full desktop/application-model/benchmark/load or live acceptance is claimed. All providers and
+records are synthetic and owned. Source migration generation did not open a database. No existing schema
+apply, baseline, real data, vendor call, capacity measurement, hosting, activation or release.
+Resource admission DEC-0242 remains proposed; signature external reset retention remains open.
+
 ## 2026-10-10 — SATI-WRK-001 1.3.3.6 signature reset and hosted boundary
 
 **Identity/authority:** main `master` base `bbfb1b05083d024caf88534778764e3bb8a30cea`, checkout

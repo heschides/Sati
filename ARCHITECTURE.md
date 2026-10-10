@@ -54,15 +54,20 @@ bounded feed offers and one oldest ERA replace full account/ERA draining. Source
 generation and synthetic verification are separate from existing database rollout/activation.
 
 The selected [signature-worker design](BACKGROUND_WORKERS_HANDOFF.md#october-10--signature-fairness-design--task-1335)
-now has its [reset/timing/gate source boundary](BACKGROUND_WORKERS_HANDOFF.md#october-10--signature-reset-and-hosted-boundary--task-1336);
-independent Persistence scheduling metadata and API phase/agency/item selection remain pending.
-Clinical projection,
+now has its [reset/timing/gate source boundary](BACKGROUND_WORKERS_HANDOFF.md#october-10--signature-reset-and-hosted-boundary--task-1336)
+and [durable selection](BACKGROUND_WORKERS_HANDOFF.md#october-10--durable-signature-selection--task-1337).
+One Persistence scheduling owner maps independent phase/agency/item positions to full-server
+contexts only. The API selector commits short zero-retry offers before fresh scoped processing;
+each item holds shared reset through processor cleanup. Clinical projection,
 immutable package, outbox lease/GUID/revocation and restricted portal owners remain authoritative.
 This plan supplies no deployed activation, shared capacity or safe external baseline-reset claim.
 
 The [desktop test boundary](docs/architecture/desktop.md) explicitly suppresses production
 startup while loading canonical UI resources; omitting Application.Run does not suppress the
 startup callback queued by WPF construction. Fixture hosts remain explicitly supplied.
+The desktop project's default item glob excludes `TestResults/**`; retained evidence/source
+snapshots cannot become compiled code, XAML or default content. This exclusion preserves the
+actual application items and evidence files; it does not remove snapshots or alter startup.
 
 The API's constructor-injected request exception boundary owns containment and safe failure
 responses before downstream middleware exceptions reach hosting. [The identity boundary](docs/architecture/identity.md)

@@ -39,6 +39,17 @@ public sealed class SignaturePersistenceTests
         Assert.NotNull(a.FindEntityType(typeof(SignatureComplianceProjection)));
         Assert.NotNull(b.FindEntityType(typeof(SignatureComplianceProjection)));
         Assert.Null(narrow.FindEntityType(typeof(SignatureComplianceProjection)));
+        foreach (var type in new[] { typeof(SignatureWorkRotation), typeof(SignatureAgencyWorkRotation) })
+        {
+            Assert.Equal(Describe(a.FindEntityType(type)!), Describe(b.FindEntityType(type)!));
+            Assert.Null(narrow.FindEntityType(type));
+        }
+        foreach (var type in new[] { typeof(SignatureCompletion), typeof(SignatureOutbox) })
+        {
+            Assert.Contains(a.FindEntityType(type)!.GetIndexes(), x => x.Properties.Select(p => p.Name).SequenceEqual(new[] { "AgencyId", "Id" }));
+            Assert.Contains(b.FindEntityType(type)!.GetIndexes(), x => x.Properties.Select(p => p.Name).SequenceEqual(new[] { "AgencyId", "Id" }));
+            Assert.DoesNotContain(narrow.FindEntityType(type)!.GetIndexes(), x => x.Properties.Select(p => p.Name).SequenceEqual(new[] { "AgencyId", "Id" }));
+        }
         Assert.DoesNotContain(narrow.GetEntityTypes(), entity => entity.GetTableName() is "People" or "Users" or "Notes" or "AuditEvents" or "DocumentArtifacts");
         Assert.Equal("SignatureSourceDocuments", narrow.FindEntityType(typeof(SignatureSourceDocument))!.GetViewName());
         Assert.Equal("SignatureDatabaseEnvironment", narrow.FindEntityType(typeof(SignatureDatabaseEnvironment))!.GetViewName());

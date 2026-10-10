@@ -11,13 +11,15 @@ public sealed class SignatureCompletionWorker(SignatureFeature feature, ISignatu
     public async Task<bool> ProcessNextAsync(DbContext db, CancellationToken ct = default)
     {
         feature.RequireEnabled();
-        var id = await db.Set<SignatureCompletion>().AsNoTracking()
-            .Where(x => !db.Set<SignaturePackage>().Any(p => p.CompletionId == x.Id))
+        var id = await EligibleCandidates(db)
             .OrderBy(x => x.Id).Select(x => (int?)x.Id).FirstOrDefaultAsync(ct);
         if (id is null) return false;
         await BuildAsync(db, id.Value, ct);
         return true;
     }
+
+    public static IQueryable<SignatureCompletion> EligibleCandidates(DbContext db) =>
+        db.Set<SignatureCompletion>().AsNoTracking().Where(x => !db.Set<SignaturePackage>().Any(p => p.CompletionId == x.Id));
 
     public async Task<SignaturePackage> BuildAsync(DbContext db, int completionId, CancellationToken ct = default)
     {

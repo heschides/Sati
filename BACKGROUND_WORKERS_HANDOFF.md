@@ -607,6 +607,65 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — durable signature selection — task 1.3.3.7
+
+**Status:** bounded source implementation, verification and main integration complete, unreleased. This section supersedes
+the earlier signature global/process-only selection, missing hosted-reset participation and
+whole-pass reset descriptions for current source. Historical inventory/design observations below
+retain their original capture meaning.
+[DEC-0243](docs/decisions/current/2026-10-10-DEC-0243.md) owns the adopted bounded policy.
+
+[SignatureWorkSelector](Sati.Api/Infrastructure/SignatureWorkSelector.cs) rotates eligible stored
+agencies first, then record IDs within each agency and phase. Three seeded phase positions and
+agency/phase positions are retained by
+[one Persistence owner](Sati.Persistence/Data/SignatureWorkPersistenceModel.cs) in the API/full
+contexts; restricted portal maps neither table. Positive scope, immutable keys, retained rows,
+checked revision increments and optimistic concurrency protect metadata. Positions are scheduling
+offers, never clinical effects, package evidence, mail leases, attempts or delivery. Source migration
+`20261010042710_AddSignatureWorkRotation` adds two tables, three seeds and nonunique agency/ID
+selection indexes; it removes no existing index/column. Down refuses used/missing seed positions
+or retained agency positions with error 51047 before any drop. No existing schema was applied.
+
+Each selection uses a fresh short context, named zero-retry strategy and SQL ReadCommitted
+transaction with zero-wait exclusive transaction lock `Sati.Signatures.WorkSelection:{phase}`.
+Strict 0/1 ownership, cancellation precedence, current gates and verified retained lock precede
+Selected/Empty; contention ends the hosted pass. Selection performs at most six scalar/entity
+queries and writes at most two position rows per offer, but neither plan cost nor database size
+is bounded. Failed/ambiguous commit propagates without replay; restart follows the actual stored
+position. A committed offer can survive without processing its record. Explicit Testing SQLite
+is the synthetic alternative; other non-SQL providers and retrying outer scopes are refused.
+
+[Hosted processing](Sati.Api/Infrastructure/SignatureProcessingService.cs) retains ordered
+projection/package/mail phases, ten distinct offers per phase, ten-second first tick and default-off
+exact Demo/Testing gate. One bounded visited set per phase excludes already offered IDs. Each offer
+holds shared Demo reset admission through selection, fresh scoped eligibility, the authoritative
+processor and cleanup; selection is disposed before blob/key/render/mail processing. Shared reads
+or selector failures stop the pass; non-cancellation per-record processor faults remain contained
+with content-free kind/agency/item/type warnings. Cancellation always propagates.
+
+Projection/package candidate queries reuse their existing owners. Existing clinical projection,
+immutable evidence, write-once blobs/orphans, receipt protection and serializable transactions
+remain authoritative. Mail's scoped entry conditionally rechecks the selected agency/ID, current
+due time, completion and lease under its existing claim transaction. Invitation/Receipt share one
+agency lane. Eligible-ID rotation replaces global due-time priority; it does not alter the five
+attempt cap, five-minute lease, stable GUID, GET-only recovery, suppression, revocation or stale
+owner rules. Selector metadata never increments those attempts or changes business revisions.
+
+**Verification/limits:** 111 signature API/projection/persistence/host/selection cases passed;
+all 1,404 API inventory cases have recorded passes across the interrupted large run and completed
+remaining-case run, with exact multiplicities reconciled. The interrupted run is not a completed
+green suite. Shared signatures 119 and restricted portal 8 passed, with no failed/skipped cases.
+Agency/item, SQL ownership and mail-scope mutants failed as expected; exact source was restored.
+Migration chain/model parity, documentation structure/22 negative proofs and whitespace passed.
+Actual fail-first and passing evidence is recorded in the
+[working ledger](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-1337-durable-signature-selection).
+Conditional agency/record offers require finite eligible membership and completed selector/pass
+calls; they are not elapsed-time, throughput, aggregate connection, dependency quota or inbox
+delivery guarantees. Missing keys/slow dependencies, PDF CPU/cancellation, resource admission,
+note restart/membership, later-reset external signature retention and operating activation remain
+open. No real data, provider call, cloud/security change, existing database apply, deployment,
+activation or sealed release evidence change.
+
 #### October 10 — signature reset and hosted boundary — task 1.3.3.6
 
 **Status:** bounded source implementation, verification and main integration complete, unreleased. The API

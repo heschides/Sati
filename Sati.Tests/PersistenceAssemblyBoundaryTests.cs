@@ -15,6 +15,8 @@ public sealed class PersistenceAssemblyBoundaryTests
 
         Assert.Equal("Sati.Persistence", persistenceAssembly.GetName().Name);
         Assert.Same(persistenceAssembly, typeof(Person).Assembly);
+        Assert.Same(persistenceAssembly, typeof(Sati.Models.SignatureWorkRotation).Assembly);
+        Assert.Same(persistenceAssembly, typeof(Sati.Models.SignatureAgencyWorkRotation).Assembly);
         Assert.Equal(
             ".NETCoreApp,Version=v10.0",
             persistenceAssembly.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName);
@@ -35,7 +37,9 @@ public sealed class PersistenceAssemblyBoundaryTests
             .Where(id => id is not null)
             .ToList();
 
-        Assert.Equal(130, migrationIds.Count);
+        Assert.Equal(132, migrationIds.Count);
+        Assert.Contains("20261010042710_AddSignatureWorkRotation", migrationIds);
+        Assert.Contains("20261010032625_AddClearinghousePollRotation", migrationIds);
         Assert.Contains("20261010021210_AddClearinghouseDispatchRotation", migrationIds);
         Assert.Contains("20261009183720_AddClearinghousePreflightReadiness", migrationIds);
         Assert.Contains("20261007111016_AddAssessmentReviewCycles", migrationIds);

@@ -20,12 +20,24 @@ public sealed class SignatureMailWorker(SignatureFeature feature, SignatureOptio
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
     private sealed record Lease(long RowId, Guid Id, bool Exhausted);
 
-    public async Task<bool> ProcessNextAsync(DbContext db, CancellationToken ct = default)
+    public Task<bool> ProcessNextAsync(DbContext db, CancellationToken ct = default) => ProcessAsync(db, null, null, ct);
+
+    public Task<bool> ProcessCandidateAsync(DbContext db, int agencyId, long outboxId, CancellationToken ct = default)
+    {
+        if (agencyId <= 0 || outboxId <= 0) throw new ArgumentOutOfRangeException(nameof(outboxId));
+        return ProcessAsync(db, agencyId, outboxId, ct);
+    }
+
+    public static IQueryable<SignatureOutbox> EligibleCandidates(DbContext db, DateTime nowUtc) =>
+        db.Set<SignatureOutbox>().Where(x => x.CompletedAtUtc == null && x.NextAttemptAtUtc <= nowUtc &&
+            (x.LeaseUntilUtc == null || x.LeaseUntilUtc <= nowUtc));
+
+    private async Task<bool> ProcessAsync(DbContext db, int? agencyId, long? outboxId, CancellationToken ct)
     {
         feature.RequireEnabled();
         if (db.Database.CurrentTransaction is not null || db.ChangeTracker.HasChanges())
             throw new InvalidOperationException("Mail preparation requires its own clean, short-lived database context.");
-        var lease = await ClaimAsync(db, ct);
+        var lease = await ClaimAsync(db, agencyId, outboxId, ct);
         if (lease is null) return false;
         var pollAttempted = false;
         try
@@ -91,16 +103,16 @@ public sealed class SignatureMailWorker(SignatureFeature feature, SignatureOptio
         }
     }
 
-    private async Task<Lease?> ClaimAsync(DbContext db, CancellationToken ct)
+    private async Task<Lease?> ClaimAsync(DbContext db, int? agencyId, long? outboxId, CancellationToken ct)
     {
         db.ChangeTracker.Clear();
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         try
         {
             var now = Now;
-            var row = await db.Set<SignatureOutbox>().Where(x => x.CompletedAtUtc == null && x.NextAttemptAtUtc <= now &&
-                    (x.LeaseUntilUtc == null || x.LeaseUntilUtc <= now))
-                .OrderBy(x => x.NextAttemptAtUtc).ThenBy(x => x.Id).FirstOrDefaultAsync(ct);
+            var eligible = EligibleCandidates(db, now);
+            if (outboxId is not null) eligible = eligible.Where(x => x.Id == outboxId && x.AgencyId == agencyId);
+            var row = await eligible.OrderBy(x => x.NextAttemptAtUtc).ThenBy(x => x.Id).FirstOrDefaultAsync(ct);
             if (row is null) { await transaction.CommitAsync(ct); return null; }
             row.LeaseId = Guid.NewGuid();
             row.LeaseUntilUtc = now.Add(LeaseDuration);

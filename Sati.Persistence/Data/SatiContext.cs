@@ -30,6 +30,8 @@ namespace Sati.Data
         public DbSet<SignatureCompletion> SignatureCompletions => Set<SignatureCompletion>();
         public DbSet<SignaturePackage> SignaturePackages => Set<SignaturePackage>();
         public DbSet<SignatureOutbox> SignatureOutbox => Set<SignatureOutbox>();
+        public DbSet<SignatureWorkRotation> SignatureWorkRotation => Set<SignatureWorkRotation>();
+        public DbSet<SignatureAgencyWorkRotation> SignatureAgencyWorkRotation => Set<SignatureAgencyWorkRotation>();
         public DbSet<SignatureSourceDocument> SignatureSourceDocuments => Set<SignatureSourceDocument>();
         public DbSet<SignatureDatabaseEnvironment> SignatureDatabaseEnvironment => Set<SignatureDatabaseEnvironment>();
         public DbSet<DocumentTemplate> DocumentTemplates { get; set; }
@@ -146,6 +148,7 @@ namespace Sati.Data
             if (ChangeTracker.Entries<EdiGeneration>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
                 throw new InvalidOperationException("Generated EDI records are immutable.");
             SignaturePersistenceModel.ProtectWrites(ChangeTracker);
+            SignatureWorkPersistenceModel.ProtectWrites(ChangeTracker);
             SignaturePersistenceModel.ProtectDocumentArtifacts<DocumentArtifact>(ChangeTracker);
             ChatPersistenceModel.ProtectWrites<ChatRoom, ChatRoomMember, ChatMessage, ChatChange, ChatReadMarker>(ChangeTracker);
             if (ChangeTracker.Entries<CheckRequest>().Any(entry =>
@@ -190,6 +193,7 @@ namespace Sati.Data
             ClearinghousePersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration>(modelBuilder);
             BillingCorrectionPersistenceModel.Configure<Agency, User, BillingPeriod, EdiGeneration, ClaimLine, RemittanceDeposit>(modelBuilder);
             SignaturePersistenceModel.Configure(modelBuilder);
+            SignatureWorkPersistenceModel.Configure<Agency>(modelBuilder);
             SignaturePersistenceModel.ConfigureClinicalRelationships<DocumentArtifact, Agency, User, Person, PersonContact, FormAttestation>(modelBuilder);
             ChatPersistenceModel.Configure<ChatRoom, ChatRoomMember, ChatMessage, ChatChange, ChatReadMarker,
                 Agency, User, Person>(modelBuilder);

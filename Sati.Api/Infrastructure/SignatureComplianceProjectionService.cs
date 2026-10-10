@@ -16,7 +16,14 @@ internal sealed class SignatureComplianceProjectionService(ApiClock clock)
         ApiDbContext db,
         CancellationToken cancellationToken = default)
     {
-        var completionId = await (
+        var completionId = await EligibleCandidates(db).OrderBy(x => x.Id)
+            .Select(x => (int?)x.Id).FirstOrDefaultAsync(cancellationToken);
+        if (completionId is null) return false;
+        await ProjectCompletionAsync(db, completionId.Value, cancellationToken);
+        return true;
+    }
+
+    internal static IQueryable<SignatureCompletion> EligibleCandidates(ApiDbContext db) =>
                 from completion in db.SignatureCompletions.AsNoTracking()
                 join frozen in db.FrozenSignatureDocuments.AsNoTracking()
                     on new { completion.AgencyId, Id = completion.FrozenDocumentId }
@@ -43,16 +50,7 @@ internal sealed class SignatureComplianceProjectionService(ApiClock clock)
                           obligation.AgencyId == artifact.AgencyId &&
                           obligation.PersonId == artifact.PersonId &&
                           obligation.TargetEffectiveDate == artifact.CycleStart)))
-                orderby completion.Id
-                select (int?)completion.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (completionId is null)
-            return false;
-
-        await ProjectCompletionAsync(db, completionId.Value, cancellationToken);
-        return true;
-    }
+                select completion;
 
     public async Task<SignatureComplianceProjection?> ProjectCompletionAsync(
         ApiDbContext db,

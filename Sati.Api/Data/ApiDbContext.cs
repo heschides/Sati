@@ -27,6 +27,8 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<SignatureCompletion> SignatureCompletions => Set<SignatureCompletion>();
     public DbSet<SignaturePackage> SignaturePackages => Set<SignaturePackage>();
     public DbSet<SignatureOutbox> SignatureOutbox => Set<SignatureOutbox>();
+    public DbSet<SignatureWorkRotation> SignatureWorkRotation => Set<SignatureWorkRotation>();
+    public DbSet<SignatureAgencyWorkRotation> SignatureAgencyWorkRotation => Set<SignatureAgencyWorkRotation>();
     public DbSet<SignatureSourceDocument> SignatureSourceDocuments => Set<SignatureSourceDocument>();
     public DbSet<SignatureDatabaseEnvironment> SignatureDatabaseEnvironment => Set<SignatureDatabaseEnvironment>();
     public DbSet<ServerDocumentTemplate> DocumentTemplates => Set<ServerDocumentTemplate>();
@@ -113,6 +115,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
             entity.Property(x => x.EnvironmentName).HasMaxLength(20);
         });
         SignaturePersistenceModel.Configure(modelBuilder);
+        SignatureWorkPersistenceModel.Configure<ServerAgency>(modelBuilder);
         SignaturePersistenceModel.ConfigureClinicalRelationships<ServerDocumentArtifact, ServerAgency, ServerUser, ServerPerson, ServerPersonContact, ServerFormAttestation>(modelBuilder);
         ChatPersistenceModel.Configure<ServerChatRoom, ServerChatRoomMember, ServerChatMessage, ServerChatChange,
             ServerChatReadMarker, ServerAgency, ServerUser, ServerPerson>(modelBuilder);
@@ -862,6 +865,7 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
         if (ChangeTracker.Entries<ServerEdiGeneration>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Generated EDI records are immutable.");
         SignaturePersistenceModel.ProtectWrites(ChangeTracker);
+        SignatureWorkPersistenceModel.ProtectWrites(ChangeTracker);
         SignaturePersistenceModel.ProtectDocumentArtifacts<ServerDocumentArtifact>(ChangeTracker);
         ChatPersistenceModel.ProtectWrites<ServerChatRoom, ServerChatRoomMember, ServerChatMessage, ServerChatChange,
             ServerChatReadMarker>(ChangeTracker);

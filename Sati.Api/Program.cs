@@ -85,6 +85,8 @@ builder.Services.AddSingleton<SignatureOutboxProtector>();
 builder.Services.AddScoped<SignatureStaffRuntime>();
 builder.Services.AddSingleton<SignaturePackageBuilder>();
 builder.Services.AddSingleton<SignatureComplianceProjectionService>();
+builder.Services.AddSingleton<SignatureWorkerGate>();
+builder.Services.AddSingleton<SignatureWorkSelector>();
 builder.Services.AddSingleton<SignatureCompletionWorker>();
 builder.Services.AddSingleton<SignatureMailWorker>();
 // Hosted services start in registration order. Validate the database identity

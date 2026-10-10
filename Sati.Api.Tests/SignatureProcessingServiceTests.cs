@@ -165,7 +165,7 @@ public sealed class SignatureProcessingServiceTests
         f.Probe.Armed = true;
         try { await worker.RunOnceAsync(CancellationToken.None); Assert.Equal(0, f.Probe.Reads); }
         finally { await ReleaseAsync(reset); }
-        await worker.RunOnceAsync(CancellationToken.None); Assert.Equal(3, f.Probe.Reads);
+        await worker.RunOnceAsync(CancellationToken.None); Assert.Equal(6, f.Probe.Reads);
         Assert.True(await ExclusiveAsync(reset) >= 0); await ReleaseAsync(reset);
     }
 
@@ -197,6 +197,7 @@ public sealed class SignatureProcessingServiceTests
         }
         finally { release.TrySetResult(); }
         if (exit == "cancel") await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pass);
+        else if (exit == "fault") await Assert.ThrowsAsync<InvalidOperationException>(() => pass);
         else await pass;
         Assert.True(await ExclusiveAsync(reset) >= 0); await ReleaseAsync(reset);
         f.Probe.Before = null;
@@ -274,6 +275,8 @@ public sealed class SignatureProcessingServiceTests
             services.AddSingleton<SignatureCompletionWorker>();
             services.AddSingleton<SignatureMailWorker>();
             services.AddSingleton<SignatureComplianceProjectionService>();
+            services.AddSingleton<SignatureWorkerGate>();
+            services.AddSingleton<SignatureWorkSelector>();
             services.AddSingleton<Microsoft.Extensions.Logging.ILogger<SignatureProcessingService>>(NullLogger<SignatureProcessingService>.Instance);
             services.AddSingleton<SignatureProcessingService>();
             return services.BuildServiceProvider();
