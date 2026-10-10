@@ -1,5 +1,41 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.11 mutation admission-result hardening
+
+**Identity/authority:** main `master` base `11b2ab2f4634010624863590970e14c41948e96e`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit bounded main assignment under continued
+Agenda approval. Current mutation/reset/exception/pipeline/guard owners reviewed. Included only
+own active assignment; unrelated project formatting/assessment scratch preserved. No other
+checkout/process/agent, existing database, real data, vendor or cloud access.
+
+**Result/owners:** middleware uses strict scalar and post-result cancellation guard; confirmed
+locks release before owned connection disposal even on cancellation/downstream failure. Exact
+busy response, public raw SqlClient/configured target, exemptions and reset admission order
+preserved. Internal constructor-injected connection seam and generic parameters permit actual
+middleware/ADO tests; no new DI service/route, schema, runtime budget or business authority.
+Changed owners: middleware, narrow new tests, W8 subsection, agenda and this evidence. Earlier
+1.4.9 gap is superseded only for this owner; physical closure/fencing/global limits stay unproved.
+
+**Fail-first:** Release API/tests built with existing warnings. With only the connection seam/
+generic parameters added and old conversion unchanged, 20 actual-call cases **9 failed, 11 passed,
+zero skipped**, 1s,
+`TestResults/mutation-admission-2026-10-10/unfixed/Joshu_LONGCHENPA_2026-10-10_02_04_53_net10.0.trx`.
+Six malformed-result and three post-scalar cancellation cases failed. Valid results/busy payload,
+downstream/command/release failures and exemptions already passed. This preserves unfixed
+decision logic, not byte-identical pre-seam middleware. Fixed guard suite **132 passed, zero
+failed/skipped**, 5s,
+`TestResults/mutation-admission-2026-10-10/fixed/Joshu_LONGCHENPA_2026-10-10_02_05_29_net10.0.trx`.
+Focused private SQL **171 passed, zero failed/skipped**, 1m09s,
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_02_06_01_net10.0.trx`;
+owned `SatiSqlTests_29eba8dfa4ea4be8a2714d277a8b130e` stopped/deleted. Structure/whitespace passed;
+all 22 negative proofs passed. No full-suite/load/capacity claim.
+
+**Limits/next:** synthetic ADO never opens a server; provider-close failures/pool reuse/global
+capacity/complete enrollment remain unverified. No real data/provider, existing schema apply,
+activation/deployment or sealed score changed. DEC-0242 remains proposed; MT09 planning evidence.
+Next independent local slice: API workload admission inventory under 1.5, linked to SATI-SEC-001.
+Host topology and response/reserve objectives requested from Josh; no values guessed.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.10 onboarding admission-result hardening
 
 **Identity/authority:** main `master` base `14687812e623376a1f1b457eb530bc762f9d9483`, checkout

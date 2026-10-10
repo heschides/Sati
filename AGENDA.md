@@ -126,8 +126,9 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4.8** | [Polling-worker connection-lifetime evidence](#148--polling-worker-connection-lifetime-evidence) | Complete; six new and 153 focused cases passed, no runtime policy. |
 | **1.4.9** | [Shared SQL consumer enrollment inventory](#149--shared-sql-consumer-enrollment-inventory) | Complete; bounded source-family census, no live enrollment/capacity claim. |
 | **1.4.10** | [Onboarding admission-result hardening](#1410--onboarding-admission-result-hardening) | Complete; 126 focused cases passed, unreleased; no budget policy. |
-| **1.4.11** | [Mutation admission-result hardening](#1411--mutation-admission-result-hardening) | Ready after 1.4.10; raw-connection seam and strict result repair. |
+| **1.4.11** | [Mutation admission-result hardening](#1411--mutation-admission-result-hardening) | Complete; 171 focused cases passed, unreleased. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
+| **1.5.1** | [API workload admission inventory](#151--api-workload-admission-inventory) | Ready; bounded source review, no numeric/runtime policy. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
 
@@ -166,7 +167,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.8 — Polling-worker connection-lifetime evidence** | Complete; test-only main acceptance | Main integration thread / main integration thread | Current polling/receipt/ERA quantum/reset owners; source `dd4df9e` and accepted shared probe. | Test-only fixture/wrapping/HTTP/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
 | **1.4.9 — Shared SQL consumer enrollment inventory** | Complete; main source/documentation acceptance | Main integration thread / main integration thread | Base `a447d0f`; bounded adjacent consumer census complete; host/closure/values remain open. | Its W8 subsection, agenda assignment/definition and dated evidence only. No runtime/schema/test changes or external/database access. |
 | **1.4.10 — Onboarding admission-result hardening** | Complete; bounded main source acceptance | Main integration thread / main integration thread | Eight fail-first failures; 126 focused cases passed with private SQL collision/replay proof. | Onboarding coordinator, narrow actual-call synthetic ADO tests, W8/agenda/evidence. No schema, budget, release or data changes. |
-| **1.4.11 — Mutation admission-result hardening** | Ready; assigned source repair after predecessor | Main integration thread / main integration thread | Accepted strict guard, current raw mutation reset owner, completed onboarding repair. | Middleware raw-connection constructor seam/result guard, narrow actual-call synthetic tests, W8/agenda/evidence. Preserve target/exemptions/lock order and response. |
+| **1.4.11 — Mutation admission-result hardening** | Complete; bounded main source acceptance | Main integration thread / main integration thread | Nine fail-first failures; final 171 focused cases passed, including reset and exception/health boundaries. | Middleware raw-connection constructor seam/result guard, narrow actual-call synthetic tests, W8/agenda/evidence. Preserve target/exemptions/lock order and response. |
+| **1.5.1 — API workload admission inventory** | Ready; assigned source review after predecessor | Main integration thread / main integration thread | Completed adjacent-consumer inventory/current guard repairs; SATI-SEC-001 and proposed DEC-0242. | Its W8 subsection, main agenda/assignment and dated evidence only; no application/schema/test changes or external/data access. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -235,7 +237,7 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.4.11 — Mutation admission-result hardening**.
+**Next numbered task:** **1.5.1 — API workload admission inventory**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -648,6 +650,28 @@ release failure and exemptions, fail-first evidence, focused middleware/reset/on
 checks and documentation structure/negative/whitespace. Synthetic fixtures and owned private SQL
 only; no schema, existing database, real data, provider/cloud/security, release/activation,
 benchmark or sealed evidence changes. Commit/push verified chunk; main owns integration.
+
+### 1.5.1 — API workload admission inventory
+
+**Eligibility:** 1.4.9 identified API enrollment dependencies; complete 1.4.11 before starting
+this explicit main source-review assignment. Host/budget choices are pending but do not prevent
+an independent source inventory of current API controls and deterministic future acceptance.
+
+**Bounded slice:** map authentication/pipeline order and representative expensive route families,
+current rate/body/parser/page/item controls, transaction/dependency spans and missing agency/actor/
+global concurrency/queue/deadline protections. Separate request bytes, stored rows, CPU/dependency
+work and SQL checkout; identify test seams and prioritized acceptance without claiming exhaustive
+route costs. Link existing security findings and propose next bounded adoption requirements.
+
+**Dependencies and owners:** SATI-SEC-001, existing identity/tenant/replay/record rules, DEC-0242,
+W8 consumer inventory and logging/recovery owners. Validated stored actor/agency remains authority;
+reserve validation capacity before a trustworthy actor exists. Preserve current response contracts.
+
+**Boundaries and completion evidence:** source-grounded family matrix, current identity/limits,
+actual source checks and proposed deterministic acceptance, documentation structure/negative/
+whitespace checks and dated evidence. Only W8 subsection, agenda and evidence edits. No runtime/
+schema/test changes, existing database, real data, external calls, load/benchmark, deployment,
+numeric capacity adoption or sealed evidence changes. Commit/push reviewed docs; main integrates.
 
 ## Preserved open-work inventory
 

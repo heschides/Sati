@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Sati.Api.Data;
@@ -11,8 +12,20 @@ internal static class DemoResetLease
     internal const string Resource = "SatiDemo.FullReset";
 }
 
-internal sealed class DemoMutationLeaseMiddleware(RequestDelegate next)
+internal sealed class DemoMutationLeaseMiddleware
 {
+    private readonly RequestDelegate next;
+    private readonly Func<string, DbConnection> connectionFactory;
+
+    public DemoMutationLeaseMiddleware(RequestDelegate next)
+        : this(next, connectionString => new SqlConnection(connectionString)) { }
+
+    internal DemoMutationLeaseMiddleware(RequestDelegate next, Func<string, DbConnection> connectionFactory)
+    {
+        this.next = next;
+        this.connectionFactory = connectionFactory;
+    }
+
     public async Task InvokeAsync(
         HttpContext context,
         IConfiguration configuration,
@@ -30,7 +43,7 @@ internal sealed class DemoMutationLeaseMiddleware(RequestDelegate next)
         }
 
         var connectionString = configuration.GetConnectionString("SatiDemo")!;
-        await using var connection = new SqlConnection(connectionString);
+        await using var connection = connectionFactory(connectionString);
         await connection.OpenAsync(context.RequestAborted);
         await using var command = connection.CreateCommand();
         command.CommandText = """
@@ -39,25 +52,36 @@ internal sealed class DemoMutationLeaseMiddleware(RequestDelegate next)
                 @LockMode=N'Shared', @LockOwner=N'Session', @LockTimeout=0;
             SELECT @result;
             """;
-        command.Parameters.AddWithValue("@resource", DemoResetLease.Resource);
-        var result = Convert.ToInt32(await command.ExecuteScalarAsync(context.RequestAborted));
-        if (result < 0)
+        var resource = command.CreateParameter();
+        resource.ParameterName = "@resource";
+        resource.Value = DemoResetLease.Resource;
+        command.Parameters.Add(resource);
+        var result = await command.ExecuteScalarAsync(context.RequestAborted);
+        try
         {
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new ApiErrorDto(
-                "demo_reset_in_progress",
-                "The Demo is being restored. Sign in again in a few minutes.",
-                context.TraceIdentifier), context.RequestAborted);
-            return;
+            if (!SqlSessionAdmission.OwnsLease(result, context.RequestAborted))
+            {
+                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                await context.Response.WriteAsJsonAsync(new ApiErrorDto(
+                    "demo_reset_in_progress",
+                    "The Demo is being restored. Sign in again in a few minutes.",
+                    context.TraceIdentifier), context.RequestAborted);
+                return;
+            }
+            await next(context);
         }
-
-        try { await next(context); }
         finally
         {
-            await using var release = connection.CreateCommand();
-            release.CommandText = "EXEC sys.sp_releaseapplock @Resource=@resource, @LockOwner=N'Session';";
-            release.Parameters.AddWithValue("@resource", DemoResetLease.Resource);
-            await release.ExecuteNonQueryAsync(CancellationToken.None);
+            if (SqlSessionAdmission.ConfirmedAcquired(result))
+            {
+                await using var release = connection.CreateCommand();
+                release.CommandText = "EXEC sys.sp_releaseapplock @Resource=@resource, @LockOwner=N'Session';";
+                var releaseResource = release.CreateParameter();
+                releaseResource.ParameterName = "@resource";
+                releaseResource.Value = DemoResetLease.Resource;
+                release.Parameters.Add(releaseResource);
+                await release.ExecuteNonQueryAsync(CancellationToken.None);
+            }
         }
     }
 }

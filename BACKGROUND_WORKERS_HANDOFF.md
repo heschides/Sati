@@ -607,6 +607,27 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — mutation admission-result hardening — task 1.4.11
+
+**Status:** bounded main source acceptance complete; 171 focused cases passed, unreleased. The raw
+[mutation middleware](Sati.Api/Infrastructure/DemoMutationLeaseMiddleware.cs) now rejects
+unconfirmed/coercible/unsupported lock results and rechecks caller cancellation before `next`.
+Exact Int32 0/1 admit; -1 retains the existing 503 `demo_reset_in_progress` response. Unexpected
+negative results fail safely through the existing exception boundary. A confirmed lock is released
+with `CancellationToken.None` even if cancellation or downstream work throws; owned raw connection
+disposal still follows, including after command/release failure. Unknown results earn no admission.
+
+The public constructor retains the same named configuration/raw SqlClient target. An internal
+constructor-injected connection factory permits [actual-call synthetic ADO tests](Sati.Api.Tests/MutationAdmissionResultTests.cs);
+generic parameter construction changes no SQL lock resource/mode/owner/order. GET/HEAD, reset
+route, non-Demo and non-SQL exemptions remain unchanged. No route, schema, pooling/admission budget
+or business authority changed. The seam was inserted with old conversion intact before testing:
+20 cases produced nine failures/11 passes, demonstrating the unfixed decision behavior. This is
+not a byte-identical original middleware run or real provider-failure proof. Tests also cover
+downstream/command/release failure, exact busy payload and exemptions. [Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-1411-mutation-admission-result-hardening)
+owns runs/limits. Earlier 1.4.9 conversion findings are superseded only for onboarding/mutation
+by 1.4.10/1.4.11; PowerShell, physical pools and global resource policies remain separate.
+
 #### October 10 — onboarding admission-result hardening — task 1.4.10
 
 **Status:** bounded source/main acceptance complete; 126 focused cases passed, unreleased. The onboarding
