@@ -607,6 +607,40 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — dispatch-worker connection-lifetime evidence — task 1.4.7
+
+**Status:** bounded test-only main acceptance complete; 110 focused cases passed, runtime
+unchanged. [Dispatch lifetime cases](Sati.Api.Tests/DispatchWorkerConnectionLifetimeTests.cs)
+run real durable selection, reset/dispatch/account admission, current billing compliance and
+Sending/evidence writes against owned synthetic SQL. The actual Claim.MD connector uses real SQL
+vendor coordination and an intercepted HTTP handler; key/wrapping providers are synthetic.
+Component Demo gates agree; no deployed identity, actual upload or external account is used.
+Optional test-fixture interceptors preserve existing defaults; setup/evidence are excluded.
+
+Normal per-operation peak is four logical connections. SQL preflight reads and Sending decision
+overlap reset/dispatch/account sessions; this clarifies the accounting matrix's preflight interval.
+Key resolution and receipt preflight wrapping retain three without a business SQL transaction.
+Account lease/decision disposal precede vendor admission: the intercepted upload sees three
+(reset/dispatch/vendor), not four from adding account too. Response wrapping sees two; evidence
+save sees three with an uncancelled token and an owned transaction. Normal acceptance retains
+exact file/attempt/response identity without implying payer acceptance or payment.
+
+Known missing key leaves Queued with durable due/failure evidence and no physical attempt;
+preflight cancellation leaves Queued without attempt or HTTP. Both close owned connections and
+can peak at four during SQL reads before key resolution. Intercepted upload cancellation occurs
+after Sending: one OutcomeUnknown attempt is retained under existing uncancelled cleanup, and
+a later worker pass cannot resend. An extra held SQL context at the upload boundary makes the
+three-connection assertion fail (four held) and then restores three/zero. This illustrates why
+whole-operation maximum alone would miss a mistaken phase overlap.
+
+These cases establish logical intervals and successful owned cleanup, not physical pool eviction,
+arbitrary failed-provider/session closure, continuous fencing, failure-safe reservation K,
+aggregate capacity, latency or deployed operation. Real record admission/uncertainty remains
+unchanged; no application/schema/business policy or actual vendor call.
+[Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-147-dispatch-worker-connection-lifetime-evidence)
+owns fixture failures/corrections and actual checks. Next local slice is equivalent polling HTTP,
+receipt wrapping/commit and independent-call evidence before broader enrollment/admission adoption.
+
 #### October 10 — signature-worker connection-lifetime evidence — task 1.4.6
 
 **Status:** bounded test-only main acceptance complete; 228 focused cases passed; runtime
@@ -725,7 +759,7 @@ unknown prior connections cannot be credited as closed just because a scope exit
 
 | Hosted operation / cited owners | Retained sessions and overlapping SQL intervals | Source arithmetic / boundary to preserve |
 |---|---|---|
-| [Dispatch](Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs), `ProcessUnderResetLeaseAsync`, `PrepareUnderAccountLeaseAsync`, `UploadAndRetainAsync`; [coordination](Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs), `RunWithLeaseAsync`; [write scope](Sati.Persistence/Data/ClaimReleaseWriteScope.cs), `BeginAsync` | Shared reset uses one factory context/open session. Selector adds one transient connection and disposes before fresh dispatch lookup. Dispatch and account admission each open a different context/session. Preflight SQL/decision transaction uses the dispatch business context alongside all three retained sessions. Compliance/history helpers receive that same context. Account admission and decision transaction finish before upload. Vendor request admission then uses a separate session, followed by response wrapping and a later evidence transaction on the business context. | Selection/read **2**; key/wrapping preflight **3**; preflight/missing-key decision **4**; coordinated upload **3** (reset + dispatch + vendor, no decision transaction); response wrapping **2**; evidence transaction **3**. Enumerated normal maximum **4**. Do not add account and vendor sessions as simultaneous: they belong to different intervals. Retain reset/dispatch through uncertainty/evidence/cleanup. Post-send work uses CancellationToken.None in places and is not bounded by the caller's exchange deadline. |
+| [Dispatch](Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs), `ProcessUnderResetLeaseAsync`, `PrepareUnderAccountLeaseAsync`, `UploadAndRetainAsync`; [coordination](Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs), `RunWithLeaseAsync`; [write scope](Sati.Persistence/Data/ClaimReleaseWriteScope.cs), `BeginAsync` | Shared reset uses one factory context/open session. Selector adds one transient connection and disposes before fresh dispatch lookup. Dispatch and account admission each open a different context/session. Preflight SQL/decision transaction uses the dispatch business context alongside all three retained sessions. Compliance/history helpers receive that same context. Account admission and decision transaction finish before upload. Vendor request admission then uses a separate session, followed by response wrapping and a later evidence transaction on the business context. | Selection/read **2**; key/wrapping preflight **3**; preflight SQL reads/missing-key decision **4**; coordinated upload **3** (reset + dispatch + vendor, no decision transaction); response wrapping **2**; evidence transaction **3**. Enumerated normal maximum **4**. Do not add account and vendor sessions as simultaneous: they belong to different intervals. Retain reset/dispatch through uncertainty/evidence/cleanup. Post-send work uses CancellationToken.None in places and is not bounded by the caller's exchange deadline. |
 | [Polling](Sati.Api/Infrastructure/ClaimMdSandboxPoller.cs), `PollOnceAsync`, `ReadFeedAsync`, `PollStatusAsync`, `PollEraAsync`; [coordination](Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs), `PollOnceAsync`, `RequestAsync`; [selector](Sati.Api/Infrastructure/ClearinghousePollSelector.cs) | Reset and global poller each retain one separate session through the pass. Selector/fresh feed read adds one transient context connection. Vendor admission retains a third session during pacing/HTTP; it disposes before status receipt context or ERA ingestion scope. Status processor receives one context; ERA's scoped [ingestion](Sati.Api/Infrastructure/ClaimResponseIngestion.cs) and AuditTrail share the scoped context registration in [Program](Sati.Api/Program.cs). Receipt transaction and wrapping use it. | Discovery/selection/read, vendor exchange and receipt processing each **3**, in successive intervals. Enumerated normal maximum **3**, not reset + poller + vendor + receipt = 4. Outer two sessions also remain through between-feed delays. Current feed/pass counts do not supply elapsed-time or shared resource admission. |
 | [Note coordination/worker](Sati.Api/Infrastructure/NoteAbandonmentWorker.cs), `RunOnceAsync`, `RunDueAsync`; [sweep](Sati.Api/Infrastructure/NoteAbandonmentSweep.cs), `RunAsync` | One explicitly opened coordination connection owns both shared reset and exclusive sweep locks. Agency discovery temporarily opens its separate context. The strategy context only constructs an execution strategy; each retry attempt creates a fresh sweep context/transaction. Discovery commands finish before each sweep, although the discovery context object remains in scope. | Discovery or sweep **2** (one coordination + one active EF connection), not three from counting lock names or idle strategy/discovery contexts. Enumerated normal maximum **2**, conditional on completed implicit closes and sequential retry disposal. One entire agency pass retains the coordination session; the pass and current-day cache remain unbounded in total cost. No SQL opens on disabled/completed-day fast path. |
 | [Signature host/selector](Sati.Api/Infrastructure/SignatureProcessingService.cs), `RunOnceAsync`, `ProcessOfferAsync`; [projection](Sati.Api/Infrastructure/SignatureComplianceProjectionService.cs), `ProjectCompletionAsync`; [package](Sati.Signatures/SignatureCompletionWorker.cs), `BuildAsync` | Each item callback retains one reset session. The short selector's separate context disposes before fresh scoped eligibility and processor context. Projection/package run on that one processor context. Package transaction spans original blob, synchronous PDF, write-once blob, invitation unwrap and receipt protection. | Selector/read/transaction **2**. Enumerated normal maximum **2**; selector and processor connections do not overlap. Package dependency/CPU work retains both reset and transaction connections. Three sequential phases and ten offers each are neither concurrent-host limits nor CPU/dependency deadlines. Reset disposes before the next offer/timer wait. |

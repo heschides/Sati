@@ -122,7 +122,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4.4** | [Session admission result hardening](#144--session-admission-result-hardening) | Complete for bounded source/main acceptance; 162 focused cases passed, unreleased. |
 | **1.4.5** | [Note-worker connection-lifetime evidence](#145--note-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 139 focused cases and final six passed, no resource policy. |
 | **1.4.6** | [Signature-worker connection-lifetime evidence](#146--signature-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 228 focused cases passed, no runtime policy. |
-| **1.4.7** | [Dispatch-worker connection-lifetime evidence](#147--dispatch-worker-connection-lifetime-evidence) | Ready after 1.4.6 closure; synthetic SQL/transport barriers, no runtime policy. |
+| **1.4.7** | [Dispatch-worker connection-lifetime evidence](#147--dispatch-worker-connection-lifetime-evidence) | Complete for bounded test/main acceptance; 110 focused cases passed, no runtime policy. |
+| **1.4.8** | [Polling-worker connection-lifetime evidence](#148--polling-worker-connection-lifetime-evidence) | Ready after 1.4.7 closure; synthetic SQL/HTTP/receipt evidence, no runtime policy. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
@@ -158,7 +159,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.4 — Session admission result hardening** | Complete; source verification/main integration, unreleased | Main integration thread / main integration thread | 47 fail-first failures; final 162 focused/private SQL cases passed; resource budget/fencing remain open. | API session coordinators and narrow shared result owner, actual-call-path synthetic tests, canonical topic/agenda/evidence. No schema/admission-budget change. |
 | **1.4.5 — Note-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | 139 focused cases, final six and adverse extra-held control passed; actual provider-failure/pooling costs remain unproved. | Test-only shared connection event tracker and note lifetime acceptance, W8/agenda/dated evidence. No runtime/schema/budget change. |
 | **1.4.6 — Signature-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | Six dependency/adverse cases and final 228 focused cases passed; physical/failure-safe costs remain open. | Test-only fixture/provider/barrier seams and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
-| **1.4.7 — Dispatch-worker connection-lifetime evidence** | Ready; assigned to main after 1.4.6 closure | Main integration thread / main integration thread | Current dispatch selection, account preflight/uncertainty/compliance owners; logical connection probe. | Test-only fixture/key/transport/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
+| **1.4.7 — Dispatch-worker connection-lifetime evidence** | Complete; test-only source/main acceptance | Main integration thread / main integration thread | Five new boundary cases and final 110 focused cases passed; per-interval accounting clarified, physical/failure-safe costs open. | Test-only fixture/key/transport/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
+| **1.4.8 — Polling-worker connection-lifetime evidence** | Ready; assigned to main after 1.4.7 closure | Main integration thread / main integration thread | Current polling/receipt/ERA quantum/reset owners; accepted shared probe and prior worker evidence. | Test-only fixture/wrapping/HTTP/save barriers and lifetime cases, W8/agenda/evidence. No app/schema/admission policy change. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -227,7 +229,7 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.4.7 — Dispatch-worker connection-lifetime evidence**.
+**Next numbered task:** **1.4.8 — Polling-worker connection-lifetime evidence**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -547,6 +549,30 @@ focused regressions, documentation structure/negative/whitespace and dated evide
 no runtime/schema/business policy, existing DB, real data, vendor/cloud/security, benchmark,
 activation or sealed evidence change. Logical intervals do not establish physical/failure-safe
 K, host/global capacity or deployed acceptance. Commit/push verified tests/docs.
+
+### 1.4.8 — Polling-worker connection-lifetime evidence
+
+**Eligibility:** completed 1.4.7 leaves polling's normal intervals and receipt scope/cleanup proof
+as the remaining worker connection-cost acceptance slice. Explicit main test-only assignment,
+start after closure; no resource backend/value adoption follows.
+
+**Bounded slice:** run actual poller/selector, SQL reset/global-poller/vendor coordination,
+status receipt processor and scoped ERA ingestion with synthetic retained claim evidence and
+intercepted connector HTTP. Observe request/pacing, receipt wrapping outside decision SQL,
+receipt/cursor/audit transactions and independent-caller contention. Verify no cursor/effect
+advance on dependency failure/cancellation, healthy feed/later progress and no replay duplicates.
+Use deterministic barriers/adverse extra-held control and distinguish confirmed logical cleanup.
+
+**Dependencies and owners:** W8 accounting, DEC-0241, current independent receipt cursors,
+bounded ERA quantum, claim release and external evidence/reset owners. Only owned synthetic SQL;
+source scopes/transactions/order/gates/retry/quotas remain unchanged.
+
+**Boundaries and completion evidence:** actual callback/transaction/HTTP and wrapping observations,
+persisted receipt/outcome/cursor evidence, independent-call/adverse control, focused regressions,
+documentation structure/negative/whitespace and dated evidence. Tests only; no runtime/schema,
+existing DB, real data, actual vendor/cloud/security call, benchmark, activation or sealed evidence
+change. Logical successful intervals do not establish physical/failure-safe K, complete enrollment,
+global capacity or deployed operating acceptance. Commit/push verified tests/docs.
 
 ## Preserved open-work inventory
 

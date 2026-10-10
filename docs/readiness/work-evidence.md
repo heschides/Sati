@@ -1,5 +1,44 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.7 dispatch-worker connection-lifetime evidence
+
+**Identity/authority:** main `master` base `7b1ca854bcfac75a3adf849fa3872fac38f7c3d1`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit main test-only assignment under continued
+Agenda approval. Current coordination/task/governance, dispatch selection, account preflight,
+compliance/uncertainty/deadline sources present and reviewed. Included input: own active row;
+unrelated project formatting/assessment scratch preserved/excluded. No other checkout/process
+touched, agent launched or external account/data used.
+
+**Result:** actual worker/selector/reset/dispatch/account/vendor coordination and current
+record decisions with synthetic keys/wrapping and intercepted actual connector HTTP. Observed
+preflight SQL/Sending 4, key/preflight wrapping 3, upload 3, response wrapping 2, evidence commit 3.
+Normal accepted identity/attempt/protected response, missing-key due/failure, preflight cancellation
+and post-Sending unknown/no-resend evidence asserted alongside zero held after cleanup. Extra
+upload connection makes phase's three-connection assertion fail despite fitting the operation's
+four-connection maximum; then closes. Matrix clarifies preflight SQL read overlap, not a new
+capacity bound. Test-fixture optional interceptor default preserved; no app/schema policy changed.
+
+**Actual checks:** first build omitted selector TimeProvider, corrected before execution. First
+five cases all failed on fixture's one-claim assumption before worker entry (generated file has
+two), 23 seconds, `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_37_47_net10.0.trx`.
+Synthetic acknowledgement corrected to include all retained claims. Next **4 passed, 1 failed**,
+41 seconds, `...01_38_33...trx`: preflight-cancel peak expected 3 but reads before key already
+overlap three leases, so actual 4. Corrected expectation and source accounting wording; all other
+boundary/effect cases passed. Final focused run **110 passed, zero failed/skipped**, 53 seconds,
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_39_13_net10.0.trx`;
+owned `SatiSqlTests_242d31322aa74e8fa8df38af3e63b8a6` stopped/deleted. Covers five new cases,
+existing private missing-key recovery, reset/manual resolution, request/poll coordination and 98
+admission cases. Earlier failed instances also cleaned. Release build passed, existing warnings.
+Documentation structure passed (46 root documents, 28 scoped owners, 25 current decisions), all
+22 negative mutation proofs passed, and working/staged whitespace checks passed at closure;
+no full API/desktop/load claim.
+
+**Limits/next step:** no actual HTTP send, key service, real/application data, existing DB apply,
+hosting/security, benchmark, activation or sealed evidence changed. Synthetic unknown/accepted
+evidence establishes neither payer acceptance/payment nor deployed operation. Successful logical
+cleanup is not physical pool/failure-fencing/K/global capacity proof. Next bounded local slice:
+polling dependency/receipt lifetime evidence, then shared-consumer enrollment before DEC-0242 adoption.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.6 signature-worker connection-lifetime evidence
 
 **Identity/authority:** main `master` base `c05c865888fe09ef50a791a3f64b56a258366ab4`, checkout

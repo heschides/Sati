@@ -888,11 +888,14 @@ public sealed partial class ClearinghouseDispatchApiTests
 
         public static async Task<Fixture> CreateAsync(IDemoWorkerResetCoordination? coordination = null,
             bool sqlServer = false, Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor? interceptor = null,
-            IKeyWrapper? keyWrapper = null, IClaimMdSandboxKeySource? keySource = null)
+            IKeyWrapper? keyWrapper = null, IClaimMdSandboxKeySource? keySource = null,
+            Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[]? additionalInterceptors = null)
         {
             var database = new SyntheticPipelineDatabase(sqlServer);
             await database.InitializeAsync();
-            var factory = new SyntheticPipelineFactory(database, null, interceptor is null ? [] : [interceptor])
+            var hooks = (interceptor is null ? Array.Empty<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>() : [interceptor])
+                .Concat(additionalInterceptors ?? []).ToArray();
+            var factory = new SyntheticPipelineFactory(database, null, hooks)
             {
                 EnableSyntheticDispatch = true, DisableDispatchWorker = true,
                 ResetCoordinationOverride = coordination, KeyWrapperOverride = keyWrapper,
