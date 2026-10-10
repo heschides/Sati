@@ -47,6 +47,12 @@ short zero-retry SQL transaction disposes before existing send admission and ext
 Offers change scheduling position only. Known lane skips preserve normal activity pacing;
 shared barriers retain cooldown. Acceptance is recorded separately from migration/deployment.
 
+Task 1.3.3.3's [polling boundary](BACKGROUND_WORKERS_HANDOFF.md#october-9--durable-polling-selection--task-1333)
+uses independent Persistence scheduling pivots and a constructor-injected short API selector.
+Reset/poller/vendor admission and authoritative receipt/cursor effects retain their owners;
+bounded feed offers and one oldest ERA replace full account/ERA draining. Source migration
+generation and synthetic verification are separate from existing database rollout/activation.
+
 The [desktop test boundary](docs/architecture/desktop.md) explicitly suppresses production
 startup while loading canonical UI resources; omitting Application.Run does not suppress the
 startup callback queued by WPF construction. Fixture hosts remain explicitly supplied.

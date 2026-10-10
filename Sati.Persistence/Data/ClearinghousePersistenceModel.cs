@@ -12,6 +12,30 @@ public static class ClearinghousePersistenceModel
     {
         model.Entity<TGeneration>().HasAlternateKey("AgencyId", "Id");
 
+        model.Entity<ClearinghousePollRotation>(entity =>
+        {
+            entity.ToTable("ClearinghousePollRotation", table => table.HasCheckConstraint(
+                "CK_ClearinghousePollRotation_Scope", "[Id] = 1 AND [Revision] > 0 AND ([LastAgencyId] IS NULL OR [LastAgencyId] > 0)"));
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Revision).IsConcurrencyToken(); entity.HasData(new ClearinghousePollRotation());
+        });
+        model.Entity<ClearinghouseAgencyPollRotation>(entity =>
+        {
+            entity.ToTable("ClearinghouseAgencyPollRotation", table => table.HasCheckConstraint(
+                "CK_ClearinghouseAgencyPollRotation_Scope", "[AgencyId] > 0 AND [Revision] > 0"));
+            entity.HasKey(x => x.AgencyId); entity.Property(x => x.AgencyId).ValueGeneratedNever();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasOne<TAgency>().WithMany().HasForeignKey(x => x.AgencyId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<ClearinghouseAccountPollRotation>(entity =>
+        {
+            entity.ToTable("ClearinghouseAccountPollRotation", table => table.HasCheckConstraint(
+                "CK_ClearinghouseAccountPollRotation_Scope", "[AgencyId] > 0 AND [Revision] > 0 AND ([LastFeedKind] IS NULL OR [LastFeedKind] IN (1,2))"));
+            entity.HasKey(x => new { x.AgencyId, x.AccountId }); entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasOne<ClearinghouseAccount>().WithMany().HasForeignKey(x => new { x.AgencyId, x.AccountId })
+                .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
         model.Entity<ClearinghouseDispatchRotation>(entity =>
         {
             entity.ToTable("ClearinghouseDispatchRotation", table => table.HasCheckConstraint(
@@ -37,6 +61,7 @@ public static class ClearinghousePersistenceModel
                 "CK_ClearinghouseAccounts_ClaimMdProfile",
                 "[ConnectorKind] <> 2 OR ([ClaimNamespace] IS NOT NULL AND [TradingPartnerProfileVersion] > 0)"));
             entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.AgencyId, x.IsEnabled, x.IsTest, x.ConnectorKind, x.Id });
             entity.HasAlternateKey(x => new { x.AgencyId, x.Id });
             entity.Property(x => x.ExternalAccountNumber).HasMaxLength(80);
             entity.Property(x => x.ClaimNamespace).HasMaxLength(8);
@@ -119,6 +144,8 @@ public static class ClearinghousePersistenceModel
             entity.Property(x => x.Cursor).HasMaxLength(256);
             entity.Property(x => x.Revision).IsConcurrencyToken();
             entity.HasIndex(x => new { x.AccountId, x.FeedKind }).IsUnique();
+            entity.HasIndex(x => new { x.AgencyId, x.AccountId });
+            entity.HasIndex(x => new { x.AgencyId, x.AccountId, x.FeedKind }).IsUnique();
             entity.HasOne<ClearinghouseAccount>().WithMany()
                 .HasForeignKey(x => new { x.AgencyId, x.AccountId })
                 .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
@@ -169,6 +196,39 @@ public static class ClearinghousePersistenceModel
 
     public static void ProtectWrites(ChangeTracker tracker)
     {
+        foreach (var entry in tracker.Entries<ClearinghousePollRotation>())
+        {
+            if (entry.State == EntityState.Deleted) throw new InvalidOperationException("Polling position cannot be deleted to restart scheduling.");
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var row = entry.Entity;
+            if (row.Id != ClearinghousePollRotation.SingletonId || row.LastAgencyId is <= 0 ||
+                entry.State == EntityState.Added && row.Revision != 1 ||
+                entry.State == EntityState.Modified && (entry.Property(x => x.Id).IsModified ||
+                    row.Revision != checked(entry.OriginalValues.GetValue<long>(nameof(row.Revision)) + 1)))
+                throw new InvalidOperationException("Polling position requires its fixed scope and a new revision.");
+        }
+        foreach (var entry in tracker.Entries<ClearinghouseAgencyPollRotation>())
+        {
+            if (entry.State == EntityState.Deleted) throw new InvalidOperationException("Agency polling position cannot be deleted.");
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var row = entry.Entity;
+            if (row.AgencyId <= 0 || entry.State == EntityState.Added && row.Revision != 1 ||
+                entry.State == EntityState.Modified && (entry.Property(x => x.AgencyId).IsModified ||
+                    row.Revision != checked(entry.OriginalValues.GetValue<long>(nameof(row.Revision)) + 1)))
+                throw new InvalidOperationException("Agency polling position requires immutable scope and a new revision.");
+        }
+        foreach (var entry in tracker.Entries<ClearinghouseAccountPollRotation>())
+        {
+            if (entry.State == EntityState.Deleted) throw new InvalidOperationException("Account polling position cannot be deleted.");
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var row = entry.Entity;
+            if (row.AgencyId <= 0 || row.AccountId == Guid.Empty ||
+                row.LastFeedKind is not (null or ClearinghouseFeedKind.Status or ClearinghouseFeedKind.Era) ||
+                entry.State == EntityState.Added && row.Revision != 1 ||
+                entry.State == EntityState.Modified && (entry.Property(x => x.AgencyId).IsModified || entry.Property(x => x.AccountId).IsModified ||
+                    row.Revision != checked(entry.OriginalValues.GetValue<long>(nameof(row.Revision)) + 1)))
+                throw new InvalidOperationException("Account polling position requires immutable scope, a supported feed and a new revision.");
+        }
         foreach (var entry in tracker.Entries<ClearinghouseDispatchRotation>())
         {
             if (entry.State == EntityState.Deleted)

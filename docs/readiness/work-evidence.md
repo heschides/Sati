@@ -1,5 +1,66 @@
 # Working evidence ledger
 
+## 2026-10-09 — SATI-WRK-001 1.3.3.3 durable polling selection
+
+**Identity:** base `e443623116f6d89014709271c1c62654467abc79`, main `master`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`. The included uncommitted input was the main-owned
+agency-opportunity regression used for fail-first work; no second-thread or user source inputs.
+Preexisting `Sati.csproj` formatting and assessment scratch remain excluded. DEC-0241 selects
+bounded local policy under continued-work authority; main owns source/test/docs/integration.
+
+**Change:** separate persisted agency/account/feed scheduling metadata; short zero-retry SQL
+selector and strict lease result/ownership; 100-distinct-feed pass; fresh scoped account/checkpoint
+read disposed before HTTP; one status page/oldest ERA per offer; preserved default-off gate,
+reset/poller/vendor coordination, receipt effects and five-minute hosted cadence. Source migration
+`20261010032625_AddClearinghousePollRotation` is additive migration 131 with guarded used Down.
+Neither dispatch migration 130 nor polling 131 was applied to an existing database or deployed.
+
+| Actual proof / command | Result and retained evidence |
+|---|---|
+| `dotnet test ... --filter FullyQualifiedName~PollingAgencyOpportunity` against original account traversal | **1 failed**: A:Status/A:Era/B:Status/B:Era instead of A:Status/B:Status/A:Era/B:Era. TRX `TestResults/polling-fairness-2026-10-09/rotation-unfixed/Joshu_LONGCHENPA_2026-10-09_23_22_21_net10.0.trx`. |
+| First fixed poller/receipt run | **12 passed, 0 failed/skipped**, 34 seconds; `rotation-first/Joshu_LONGCHENPA_2026-10-09_23_25_22_net10.0.trx`. |
+| Selector model/query/restart/scoped metadata/replacement local tests before later lock-value cases | **6 passed**, 2 seconds; `selector-final-local/Joshu_LONGCHENPA_2026-10-09_23_30_49_net10.0.trx`. |
+| Lock-value classifier + 106-feed/100-offer cap across two passes | **9 passed**, 4 seconds; `pass-cap/Joshu_LONGCHENPA_2026-10-09_23_32_52_net10.0.trx`. No HTTP for damaged cursors, no receipt/cursor movement. |
+| Runtime missing-key, cancellation, disablement, stale account after committed offer, fake-time 45-second stalled status versus healthy B | **5 passed**, 17 seconds; `stop-boundaries/Joshu_LONGCHENPA_2026-10-09_23_36_00_net10.0.trx`. Uses actual poller/connector with synthetic handlers; no vendor access. |
+| Always-first-agency and always-first-feed mutants, each with deterministic 24-offer test | Each **1 failed**, zero passed/skipped. TRXs under `mutant-always-first-agency` and `mutant-always-first-feed`, 23:34:07/23:34:17. Exact source bytes restored. |
+| Private SQL 6-case pass after correcting fixtures | **6 passed**, 16 seconds; `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_23_32_12_net10.0.trx`. Instance `SatiSqlTests_36216ce2f3b949dca319f776bca68a66` stopped/deleted. Covers provider ordering/current account replacement, persisted rotation, zero-wait shared selection/disposal, real lost lock on Selected/Empty, commit-before/after failure without retry, additive Up/unused Down and 51046 used refusal. |
+| Removing real selector ownership validation | Private SQL lost-lease regression **1 failed** (no exception), proving guard sensitivity. TRX 23:37:18 under `TestResults/IsolatedSqlServer/Api`; own instance `SatiSqlTests_2494b3d7ac164b65bc368aa1213fd8ce` stopped/deleted; exact source restored. |
+| `dotnet ef migrations has-pending-model-changes --project Sati.Persistence --startup-project Sati.Persistence --context SatiContext --configuration Release --no-build -- --synthetic-design` | Passed: no model changes since generated migration; no database accessed. |
+| `scripts/Test-MigrationChain.ps1 -MigrationsPath Sati.Persistence/Migrations` | **131 migrations, 96 tables, 1170 columns, 0 symbolic problems**. This is symbolic source replay, not whole-chain SQL apply. |
+
+**Failures corrected and retained:** the first selector fixture attempted three enabled test
+Claim.MD accounts in one agency and failed the existing filtered uniqueness rule (**5 setup
+failures**). Preserved that rule, corrected fixture to one active account plus disabled candidates,
+and tested supported replacement; current K ≤ 1. No generic multiple-active-account proof claimed.
+First SQL pass had **3 failed/3 passed**: migration SQL generation omitted the model, raw ADO
+commands bypassed EF interceptor hooks, and a fixture query used a retrying provider while holding
+an explicit transaction. Corrected only test setup: supply model, inject actual lease loss on an
+EF candidate query, classify synthetic lock values separately, and read verification via a fresh
+context. Instance `SatiSqlTests_cad622796df14efe9654305a100a1707` stopped/deleted. Initial compilation
+also rejected mutation of init-only options; test replaces immutable option objects. EF scaffolding
+initially removed a checkpoint FK index; retained it explicitly and regenerated the owned source
+migration, without changing an existing database or unrelated files.
+
+**Final acceptance:** late lock-result cancellation precedence regression **2 failed** before
+the front cancellation guard, TRX `cancellation-unfixed/Joshu_LONGCHENPA_2026-10-09_23_43_13_net10.0.trx`.
+Final Release build passed with one existing nullable warning and no errors. Combined polling,
+connector, onboarding, model, claim-release, reset and coordination acceptance then passed
+**119 tests, 0 failed/skipped**, 4m04s; TRX
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_23_43_30_net10.0.trx`.
+Owned instance `SatiSqlTests_e08df0bb48a64885aa9dd25b6529cf82` stopped/deleted.
+The earlier 117-case combined run was preliminary, before that guard. Starting a rebuild while
+that owned testhost held its assembly caused MSB3027/3021 after ten retries; waited for completion,
+then rebuilt successfully. No other thread/process stopped or modified. Documentation structure,
+all **22 negative proofs**, whitespace and source/schema diff review passed. Hash review preserves
+the excluded user project; source manifest is retained under the ignored task evidence directory.
+
+**Limits/next:** no throughput, whole-operation/pass deadline, aggregate sessions/quotas, measured
+memory/capacity, deployment, actual vendor response, live reset/alert or compliance acceptance.
+Existing reset/poller/vendor session locks span external work and arbitrary connection-loss safety
+is not established. No real data/existing database, cloud, security, schema apply, activation or
+sealed evidence/score change. Next main bounded fairness review is note-maintenance task 1.3.3.4;
+1.4.1 stays with the second thread and has not been integrated.
+
 ## 2026-10-09 — SATI-WRK-001 1.3.3.2 bounded ERA feed quantum
 
 **Identity/ownership:** base `4a5e530c1f10e094cdf374af4faad7cba4ab8c1b`, main `master`, same

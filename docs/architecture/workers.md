@@ -54,6 +54,12 @@ The source migration is additive; known local lane skips use normal pacing while
 retain cooldown. Conditional offer bounds remain distinct from dependency deadlines, measured
 capacity and operating acceptance; the ledger owns actual verification status.
 
+Task 1.3.3.3 adds [durable polling selection](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--durable-polling-selection--task-1333)
+under [DEC-0241](../decisions/current/2026-10-09-DEC-0241.md): separate scheduling metadata,
+bounded 100-distinct-feed passes and one oldest ERA per offer. Existing account uniqueness,
+independent receipt checkpoints and reset/poller/vendor coordination remain. Source/synthetic
+acceptance establishes no migration uptake, deployed activation or whole-operation/capacity bound.
+
 Remaining W8: sustained
 fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant
 sessions and dependency budgets, API admission and synthetic load/live owner evidence. Account

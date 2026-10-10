@@ -51,7 +51,7 @@ public sealed partial class ClaimMdStatusProcessorTests
         var poller = new ClaimMdSandboxPoller(
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
             fixture.Factory.Services.GetRequiredService<IServiceScopeFactory>(), gate, fixture.Protector,
-            new TestClaimMdCoordination(), new TestDemoWorkerResetCoordination(), NullLogger<ClaimMdSandboxPoller>.Instance);
+            new TestClaimMdCoordination(), new TestDemoWorkerResetCoordination(), NullLogger<ClaimMdSandboxPoller>.Instance, TestPollSelector(fixture.Factory));
 
         var processed = await poller.PollOnceAsync(CancellationToken.None);
         Assert.Equal(["20"], downloads);

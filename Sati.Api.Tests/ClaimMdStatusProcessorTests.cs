@@ -209,7 +209,7 @@ public sealed partial class ClaimMdStatusProcessorTests
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
             fixture.Factory.Services.GetRequiredService<IServiceScopeFactory>(), gate,
             fixture.Protector, new TestClaimMdCoordination(), new TestDemoWorkerResetCoordination(),
-            NullLogger<ClaimMdSandboxPoller>.Instance);
+            NullLogger<ClaimMdSandboxPoller>.Instance, TestPollSelector(fixture.Factory));
 
         Assert.Equal(0, await poller.PollOnceAsync(CancellationToken.None));
         Assert.Equal([1, 2], listedPages);
@@ -255,7 +255,7 @@ public sealed partial class ClaimMdStatusProcessorTests
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
             fixture.Factory.Services.GetRequiredService<IServiceScopeFactory>(), gate,
             fixture.Protector, new TestClaimMdCoordination(), new TestDemoWorkerResetCoordination(),
-            NullLogger<ClaimMdSandboxPoller>.Instance);
+            NullLogger<ClaimMdSandboxPoller>.Instance, TestPollSelector(fixture.Factory));
 
         Assert.Equal(0, await poller.PollOnceAsync(CancellationToken.None));
         Assert.Equal(0, requests);
@@ -294,7 +294,7 @@ public sealed partial class ClaimMdStatusProcessorTests
         var poller = new ClaimMdSandboxPoller(
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
             fixture.Factory.Services.GetRequiredService<IServiceScopeFactory>(), gate,
-            fixture.Protector, new TestClaimMdCoordination(), reset, NullLogger<ClaimMdSandboxPoller>.Instance);
+            fixture.Protector, new TestClaimMdCoordination(), reset, NullLogger<ClaimMdSandboxPoller>.Instance, TestPollSelector(fixture.Factory));
 
         Assert.Equal(0, await poller.PollOnceAsync(CancellationToken.None));
         Assert.Equal(1, reset.Calls);

@@ -607,6 +607,68 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 9 — durable polling selection — task 1.3.3.3
+
+**Status:** bounded source implementation, verification and main integration complete under DEC-0241; unreleased.
+The constructor-injected [ClearinghousePollSelector](Sati.Api/Infrastructure/ClearinghousePollSelector.cs)
+now owns a short zero-retry transaction under the existing outer reset/poller leases. Three
+Persistence scheduling rows retain agency/account/feed pivots independently of account business
+revisions and response checkpoint receipts. Selection advances an offer before work; strict SQL
+ownership and scoped revisions prevent an uncommitted/lost-lease offer from being returned.
+Known selection contention stops the pass; it is not an account failure.
+
+`ClaimMdSandboxPoller` no longer materializes every account. A pass admits at most 100 offers,
+with at most 100 locally visited checkpoint IDs. Candidate queries select one scoped agency,
+account and Status/ERA checkpoint with next-greater/wrap probes. Fresh enabled/test/account/feed
+binding and ASCII-digit cursor are rechecked in a disposed read context before HTTP. Missing key
+or malformed feed consumes its position while later healthy agencies can run. Selection/read
+infrastructure failures stop the pass outside feed containment; cancellation propagates. Feature
+checks precede further offers and ERA requests. Existing default-off identity gates, reset/poller/
+vendor leases, one-second pacing and five-minute hosted post-pass delay remain.
+
+**Inventory correction:** the existing filtered unique account index permits **one enabled test
+Claim.MD account per agency**. The first design's many-active-account test fixture violated that
+rule and failed during setup; the rule is retained. Current K is therefore at most 1, F at most 2.
+Account pivots remain independent of business state to handle replacement/stale position; tests
+exercise supported disable/replace rather than dropping uniqueness. General future multi-account
+weight/order proof is not established. The design's general A × K × F count is conditional;
+current source acceptance uses the actual constrained cohort and account replacement.
+
+The shared model adds singleton/agency/account scheduling tables with seed, scope checks,
+revision tokens, immutable scope/deletion guards and restrict relationships. Existing account
+uniqueness/checkpoint indexes remain; new agency/account/feed and eligibility indexes are additive.
+Source migration **20261010032625_AddClearinghousePollRotation** is migration 131; Up preserves
+existing columns/indexes/receipts/cursors. Down refuses with 51046 after any scheduling position
+advanced or state is inconsistent. Source generation/synthetic schema acceptance changes no
+existing database. Migration 130/131 apply, reviewed rollback, compatible all-host rollout and
+reset-baseline coverage remain separate operational work; the readiness-129 apply helper cannot
+apply these migrations. Neither schema nor transport activation is established here.
+
+**Actual evidence:** the original agency-opportunity test failed with A:Status/A:Era before
+B:Status; fixed ordering is A:Status/B:Status/A:Era/B:Era. Tests cover 24 durable offers across
+recreated selectors, unchanged receipt/checkpoint/account business revisions, visited-feed exclusion,
+replacement, gate/cancellation/missing seed, scoped writes/concurrency, preserved model/index rules,
+100 offers among 106 damaged feeds with zero HTTP and preserved checkpoints, missing-key A versus
+B, deadline-stalled A versus B, stale account after offer and immediate stop boundaries.
+Always-first-agency/feed mutants each failed; removed SQL ownership validation failed a real
+private SQL lease-loss test. Exact source bytes were restored before final builds.
+
+Private SQL acceptance covers serialization/disposal, persisted restart, supported account
+replacement, lost ownership for Selected/Empty, pre/post commit failures without execution replay,
+additive Up/fresh Down and refusal after use. Early fixture/hook failures are retained in working
+evidence rather than counted as runtime proof. Existing receipt/wrapping/reset/vendor-budget
+regressions passed with the final combined source: **119 passed, 0 failed/skipped** in a newly
+owned private SQL instance. Cancellation precedence also failed twice before its guard fix.
+Documentation structure, all 22 negative proofs and whitespace passed. Detailed results belong to
+[the ledger](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-1333-durable-polling-selection).
+
+**Limits:** per-feed/page work and offer/query materialization are bounded; full dependency/pass
+elapsed time, response memory, aggregate sessions/quotas, actual vendor behavior, live reset,
+load/capacity and alert delivery remain unverified. Reset/poller/vendor connections still span
+external work. Existing session coordination does not prove safety after arbitrary connection
+loss. No cloud, real-data, deployment, release, schema apply or sealed readiness change. The next
+main fairness slice reviews note-maintenance opportunities before selecting implementation;
+second-thread 1.4.1 remains independently assigned and unintegrated.
 #### October 9 — bounded ERA feed quantum — task 1.3.3.2
 
 **Status:** bounded source implementation/verification complete under DEC-0241; unreleased.
@@ -684,6 +746,10 @@ logging preserves existing unknown feed containment but does not classify it as 
 Stop cancellation immediately. Recheck the feature gate before each offer/request; no new expiry,
 automatic key recovery, weights, worker concurrency, account quotas or cadence shortening.
 
+**Account cohort clarification (implementation review):** the existing filtered unique index
+allows at most one enabled test Claim.MD account per agency. K is currently at most 1;
+multi-account fixtures must not bypass that invariant. Account replacement remains supported.
+
 **Conditional opportunity.** For a stable finite continually offered cohort of A agencies, at most
 K eligible accounts in a chosen agency and F ≤ 2 feeds in a chosen account, hierarchical committed
 rotation gives that agency an opportunity within A offers, the account within A × K and its feed
@@ -706,10 +772,10 @@ The current dispatch source migration 130 is not evidence of polling schema upta
 **Deterministic acceptance plan.** Task 1.3.3.2 first proves that two valid ERA artifacts no longer
 drain in one visit, and that out-of-order listing pages still select the oldest with no cursor
 advance on failure; retain unfixed failure. Task 1.3.3.3 proves agency/account/feed opportunity
-bounds with many A accounts and sustained A backlog, invalid/missing-key A versus healthy B,
+bounds with sustained A backlog and supported account replacement, invalid/missing-key A versus healthy B,
 100-distinct-feed cap, reset/feature-disable/cancellation before HTTP, no checkpoint movement from
 selection, and stale account/checkpoint refusal. Reader observers assert projection bounds and
-absence of all-account materialization; deliberate always-first-agency/account/feed mutants must
+absence of all-account materialization; deliberate always-first-agency/feed and stale-account-selection mutants must
 fail. Existing `ClaimMdStatusProcessorTests`, `ClaimMdSandboxConnectorTests`, onboarding and
 `ClaimReleasePreparationSqlTests` supply receipt/wrapping/deadline seams. Private SQL proves two
 independent hosts, lock return/ownership loss, rollback, restart position, scope/revision conflicts,
@@ -1264,7 +1330,8 @@ isolate shared SQL, key/storage/mail services, or vendor quotas.
 | Clearinghouse integrity | Same-agency account/generation links, retained dispatch intent, per-dispatch leases, independent feed cursors and uncertain-send quarantine exist. `ClaimMdSandboxCoordination` intentionally coordinates a global request budget and one poller across hosts; rate safety does not establish agency fairness. |
 | Resource and operations backlog | `AGENDA.md` already tracks summary projections for fat loading, distributed sign-in guard state, watchdog activation and restore evidence. SATI-SEC-010 in `SECURITY_AUDIT_2026-09-03.md` already proposed request/parser limits and per-actor/IP rate/concurrency partitions with bounded queues. `SECURITY_REVIEW_2026-09-10.md` B11 records body/X12 limits implemented, with expensive-operation per-user limits still a platform gap. Recheck current source. Validated agency admission, worker starvation and interactive-latency acceptance need explicit coverage. |
 
-**Source paths to reproduce before claiming a fix:**
+**Source paths from the original W8 diagnosis:** the dated implementation sections above
+own subsequent corrections; this list retains the starting failure/selection hypotheses.
 
 - `Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs` selects the globally oldest Queued
   dispatch and awaits upload. Secret/key preflight failure before Sending can leave that row

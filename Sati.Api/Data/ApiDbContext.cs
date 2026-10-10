@@ -63,6 +63,9 @@ internal sealed class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbC
     public DbSet<ClearinghouseDispatchReadiness> ClearinghouseDispatchReadiness => Set<ClearinghouseDispatchReadiness>();
     public DbSet<ClearinghouseDispatchRotation> ClearinghouseDispatchRotation => Set<ClearinghouseDispatchRotation>();
     public DbSet<ClearinghouseAgencyDispatchRotation> ClearinghouseAgencyDispatchRotation => Set<ClearinghouseAgencyDispatchRotation>();
+    public DbSet<ClearinghousePollRotation> ClearinghousePollRotation => Set<ClearinghousePollRotation>();
+    public DbSet<ClearinghouseAgencyPollRotation> ClearinghouseAgencyPollRotation => Set<ClearinghouseAgencyPollRotation>();
+    public DbSet<ClearinghouseAccountPollRotation> ClearinghouseAccountPollRotation => Set<ClearinghouseAccountPollRotation>();
     public DbSet<ClearinghouseDispatchAttempt> ClearinghouseDispatchAttempts => Set<ClearinghouseDispatchAttempt>();
     public DbSet<ClearinghouseFeedCheckpoint> ClearinghouseFeedCheckpoints => Set<ClearinghouseFeedCheckpoint>();
     public DbSet<ClearinghouseResponseReceipt> ClearinghouseResponseReceipts => Set<ClearinghouseResponseReceipt>();

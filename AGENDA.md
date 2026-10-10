@@ -110,7 +110,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.3.3** | Fairness in polling, note maintenance and signature work | Remaining broader W8 scope; preserve each worker's existing safety owner and define bounded tasks before implementation. |
 | **1.3.3.1** | [Polling fairness design](#1331--polling-fairness-design) | Complete for source/design integration; DEC-0241 selects bounded local policy under continued-work authority. |
 | **1.3.3.2** | [Bounded ERA feed quantum](#1332--bounded-era-feed-quantum) | Complete for source verification/main integration; 35 local regressions passed; unreleased. |
-| **1.3.3.3** | [Durable polling selection](#1333--durable-polling-selection) | Ready after 1.3.3.2; main implementation/synthetic verification. |
+| **1.3.3.3** | [Durable polling selection](#1333--durable-polling-selection) | Complete for bounded source verification/main integration; 119 tests passed, unreleased. |
+| **1.3.3.4** | [Note-maintenance fairness review](#1334--note-maintenance-fairness-review) | Ready; verify existing bounded agency opportunities before selecting further implementation. |
 | **1.4** | Resource limits: bound shared connections, concurrency and operation times | Open; includes global/agency budgets, bounded queued work, dependency quotas and measured hosting choices. |
 | **1.4.1** | [Resource-limit inventory](#141--resource-limit-inventory) | Ready for explicit parallel assignment; source review and documentation only, with policy/implementation deferred. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
@@ -137,7 +138,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.3.2 — Dispatch fairness implementation** | Complete for bounded source verification/main integration; unreleased | Main integration thread / main thread | DEC-0240; final API 1,330 and persistence boundary 1 passed. Source migration only; operating/combined load limits retained. Independent 1.4.1 remains source-only. | Selector/worker/scheduling owner, shared cursor model/source migration, relevant tests and canonical behavior/evidence. |
 | **1.3.3.1 — Polling fairness design** | Complete; main design integrated under continued-work approval | Main integration thread / main thread | Completed dispatch slice and current polling safety/source owners; source-only proposal may accompany 1.4.1 without taking its matrix. | Its W8 polling proposal, proposed decision/registry, global agenda ordering and dated evidence; no runtime/schema/test edits. |
 | **1.3.3.2 — Bounded ERA feed quantum** | Complete; 35 local tests passed, unreleased | Main integration thread / main thread | DEC-0241; preserve all-page discovery and receipt effects. May accompany source-only 1.4.1. | Poller ERA quantum, relevant fail-first tests, canonical topic/agenda/evidence. |
-| **1.3.3.3 — Durable polling selection** | Ready after 1.3.3.2 | Main integration thread / main thread | DEC-0241, ERA quantum acceptance and current reset/receipt owners. | API selector/pass, shared scheduling metadata/source migration, relevant tests and canonical docs/evidence; synthetic fixtures only. |
+| **1.3.3.3 — Durable polling selection** | Complete for source verification/main integration; 119 passed, unreleased | Main integration thread / main thread | DEC-0241, ERA quantum acceptance and current reset/receipt owners. | API selector/pass, shared scheduling metadata/source migration, relevant tests and canonical docs/evidence; synthetic fixtures only. |
+| **1.3.3.4 — Note-maintenance fairness review** | Ready | Main integration thread / main thread | Existing note batch/discovery/cache/failure policy; completed polling slice. | Its W8 review, assignment/status and dated evidence; focused existing synthetic tests. No runtime policy change without a defined successor. |
 | **1.4.1 — Resource-limit inventory** | Ready; explicitly assigned by Josh to the second thread; startup verification pending here | Second investigation thread/worktree created by Josh; actual identity to be recorded there / main thread | Captured current source and existing W8/operations rules; may accompany 1.3.1. Actual fair-selection policy is an input to later budget design, not a prerequisite for inventory. | Its own W8 resource-limit inventory subsection, this assignment row and a dated ledger entry in its dedicated worktree. No runtime source edits. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
@@ -184,7 +186,7 @@ capacity, latency, operating guarantee or sealed readiness-score change.
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.3.3.3 — Durable polling selection**.
+**Next numbered task:** **1.3.3.4 — Note-maintenance fairness review**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -315,6 +317,25 @@ restart/rollback/scope/provider tests; both shared EF models and source migratio
 appropriate regressions and documentation checks; record actual outcomes/limits before integration.
 Only newly owned synthetic database tests/source migration generation; no existing database apply,
 real data, vendor call, hosting/security settings, activation or release. Commit/push verified chunks.
+### 1.3.3.4 — Note-maintenance fairness review
+
+**Eligibility:** bounded polling source acceptance is complete. Existing note maintenance already
+limits each due agency to one 100-note batch per sweep; review that behavior before adding policy.
+
+**Bounded slice:** source-grounded review of agency opportunity, discovery membership, completion
+cache and restart behavior; run the existing focused note-worker acceptance with owned synthetic
+SQL fixtures. Distinguish stable-pass opportunities from elapsed-time, crash/restart and capacity
+gaps. Define the next bounded fairness task rather than treating passing tests as broader closure.
+
+**Dependencies and owners:** DEC-0222–DEC-0225, W8 note maintenance, shared reset/sweep leases,
+authoritative abandonment rules and scheduling/recovery owners. Resource investigation remains
+independently owned until main review/integration.
+
+**Boundaries and completion evidence:** canonical W8 finding, actual targeted results and limits,
+agenda/evidence reconciliation and documentation/negative/whitespace checks. Source review and
+existing synthetic tests only; preserve business policy, runtime/schema/test code, deployment,
+real data, external calls and sealed release evidence. Commit/push verified documentation chunk.
+
 ## Preserved open-work inventory
 
 [Legacy open-item registry](docs/backlog/legacy-open-items.md) contains **454** original
