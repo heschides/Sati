@@ -116,8 +116,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4.1** | [Resource-limit inventory](#141--resource-limit-inventory) | Complete for main-reviewed source/documentation integration; current-source corrections in W8; no adopted limiter. |
 | **1.4.2** | [Shared SQL/session admission design](#142--shared-sqlsession-admission-design) | Complete for main-reviewed proposal integration; DEC-0242 remains proposed, backend/value adoption open. |
 | **1.3.3.5** | [Signature fairness design](#1335--signature-fairness-design) | Complete for main source/design integration; DEC-0243 selects bounded local implementation. |
-| **1.3.3.6** | [Signature reset and hosted boundary](#1336--signature-reset-and-hosted-boundary) | Ready; fail-first reset/timing/gate acceptance before changing selection. |
-| **1.3.3.7** | [Durable signature selection](#1337--durable-signature-selection) | Blocked pending 1.3.3.6 acceptance; selected local source design. |
+| **1.3.3.6** | [Signature reset and hosted boundary](#1336--signature-reset-and-hosted-boundary) | Complete for bounded source/main acceptance; 89 tests passed, unreleased. |
+| **1.3.3.7** | [Durable signature selection](#1337--durable-signature-selection) | Ready after 1.3.3.6 acceptance; selected local source design. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
@@ -147,8 +147,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.1 — Resource-limit inventory** | Complete for main-reviewed documentation integration | Investigation chat `01a12363-741d-79b0-8b4d-dc2f7e7c5a1b`, `C:/Users/Joshu/.codex/worktrees/c3a1/Sati`, base `40e091b` / main thread | Captured source digest verified; current dispatch/polling drift reconciled against main `72cec51`. | Only its W8 inventory/assignment/evidence extracted; inherited changes and dedicated checkout preserved. No runtime source edits. |
 | **1.4.2 — Shared SQL/session admission design** | Complete for main-reviewed proposal integration; adoption remains open | Same investigation chat/worktree, separately assigned by Josh / main thread | Current source corrections retained; DEC-0242 proposed; backend/enrollment/cost/value/fencing prerequisites unresolved. | Only its W8 proposal/assignment/evidence extracted; main review/decision registration. No implemented limiter or capacity claim. |
 | **1.3.3.5 — Signature fairness design** | Complete; DEC-0243 selected local direction | Main integration thread / main thread | Integrated resource inventory/proposal; signature reset, projection/package/mail and revocation/recovery owners. | Its W8 source/design, decision, assignment/global ordering and dated evidence; no runtime edits in design. |
-| **1.3.3.6 — Signature reset and hosted boundary** | Ready | Main integration thread / main thread | DEC-0243; existing reset coordination and signature processing/identity/uncertainty owners. | Hosted service seam/timing/reset/gates, fail-first synthetic tests, canonical behavior/evidence; no schema or selection policy change. |
-| **1.3.3.7 — Durable signature selection** | Blocked pending 1.3.3.6 acceptance | Main integration thread / main thread | DEC-0243; shared reset/timing acceptance; preserved authoritative projection/package/mail semantics. | API selector/host scan, shared scheduling metadata/source migration, projection-query reuse and scoped mail claim, synthetic tests and canonical docs. |
+| **1.3.3.6 — Signature reset and hosted boundary** | Complete for source verification/main integration; 89 passed, unreleased | Main integration thread / main thread | DEC-0243; existing reset coordination and signature processing/identity/uncertainty owners. | Hosted service seam/timing/reset/gates, fail-first synthetic tests, canonical behavior/evidence; no schema or selection policy change. |
+| **1.3.3.7 — Durable signature selection** | Ready | Main integration thread / main thread | DEC-0243; shared reset/timing acceptance; preserved authoritative projection/package/mail semantics. | API selector/host scan, shared scheduling metadata/source migration, projection-query reuse and scoped mail claim, synthetic tests and canonical docs. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -217,7 +217,7 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.3.3.6 — Signature reset and hosted boundary**.
+**Next numbered task:** **1.3.3.7 — Durable signature selection**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 

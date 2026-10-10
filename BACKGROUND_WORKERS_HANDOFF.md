@@ -607,6 +607,44 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — signature reset and hosted boundary — task 1.3.3.6
+
+**Status:** bounded source implementation, verification and main integration complete, unreleased. The API
+[SignatureProcessingService](Sati.Api/Infrastructure/SignatureProcessingService.cs) now owns an
+internal pass, injected ten-second PeriodicTimer and shared Demo reset admission around the whole
+existing pass. First tick, phase order, ten-item counts, process package cursor and authoritative
+projection/package/mail selection/effects remain. This slice changes no schema or fairness policy.
+
+Before admission and inside the callback, cancellation wins and the feature/WorkersEnabled and
+signature/API target mappings are checked. Configured Demo requires the existing SQL coordination;
+explicit Testing uses its supplied stand-in. Recheck before later phases, package discovery/items
+and each projection/mail attempt. Gate changes stop later work while in-flight processors retain
+their current cleanup, immutable evidence and uncertain-mail behavior. The pass rejects a retrying
+outer execution scope before admission, so its new seam cannot replay the entire external scan.
+Unavailable reset does no discovery; cancellation racing that result propagates. Shared reset
+failure reaches the hosted fixed-message/type-only warning; existing phase/item containment stays.
+
+The original hosted scan regression failed after its real first tick: discovery was observed
+instead of reset admission. With the boundary it passed. The outer-replay regression also failed
+before the guard. New deterministic tests cover flags, target mismatch, gates changing during
+admission/after projection, cancellation, explicit Demo/non-SQL refusal and exact injected timer.
+Private SQL barriers cover exclusive reset preventing all three phase reads and a shared lease
+spanning discovery until success/cancellation/contained fault, followed by release/reentry.
+Final combined signature API/projection/persistence/reset/boundary acceptance passed **89 tests,
+0 failed/skipped** in a fresh private SQL instance. One timer-registration fixture race was
+corrected using an explicit barrier; no application change was needed. Documentation structure,
+22 negative proofs and whitespace passed. Exact results and failures belong to
+[working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-1336-signature-reset-and-hosted-boundary).
+
+**Limits:** reset uses an explicitly open session through this whole pass; total callback/
+connection/cleanup time is not bounded, and arbitrary session-loss fencing remains unproved.
+Cooperating exclusion does not protect retained external signature/mail data from a later baseline
+restore. Existing guard covers external clearinghouse state; signature retention/reconciliation
+must be reviewed before operating activation/reset with external signature use. No live reset,
+real data, external send, database apply, deployment or sealed evidence change. After acceptance,
+1.3.3.7 replaces selection and refines reset to each complete item callback; resource admission,
+whole-operation limits and operating proof remain separate.
+
 #### October 10 — signature fairness design — task 1.3.3.5
 
 **Status:** source/design complete; main selects bounded local direction under continued-work

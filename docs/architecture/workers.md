@@ -60,6 +60,11 @@ bounded 100-distinct-feed passes and one oldest ERA per offer. Existing account 
 independent receipt checkpoints and reset/poller/vendor coordination remain. Source/synthetic
 acceptance establishes no migration uptake, deployed activation or whole-operation/capacity bound.
 
+Task 1.3.3.6 adds the [signature hosted reset boundary](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--signature-reset-and-hosted-boundary--task-1336):
+an injected first-tick timer/pass seam, matching target/gate checks and shared Demo reset exclusion
+through the existing pass. Selection/business effects remain with their owners; outer retry replay
+is refused. Durable signature fairness and external-reset retention remain separate work.
+
 Remaining W8: sustained
 fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant
 sessions and dependency budgets, API admission and synthetic load/live owner evidence. Account

@@ -32,7 +32,7 @@ Read the individual registered record for the decision and rejected alternatives
 
 | DEC-0241 | 2026-10-09 | [Bounded hierarchical polling turns](2026-10-09-DEC-0241.md) | accepted; bounded source acceptance complete, unreleased |
 | DEC-0242 | 2026-10-09 | [Shared SQL admission prerequisites](2026-10-09-DEC-0242.md) | proposed; reviewed contract, backend/values unresolved |
-| DEC-0243 | 2026-10-10 | [Bounded durable signature-worker turns](2026-10-10-DEC-0243.md) | accepted local source direction; implementation pending |
+| DEC-0243 | 2026-10-10 | [Bounded durable signature-worker turns](2026-10-10-DEC-0243.md) | accepted; reset boundary accepted, durable selection pending |
 
 Accepted decisions must retain their evidence and earlier rejected reasoning. A change to a
 decision creates a successor and supersession link; it does not rewrite the historical import.

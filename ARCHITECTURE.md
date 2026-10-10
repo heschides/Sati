@@ -54,8 +54,9 @@ bounded feed offers and one oldest ERA replace full account/ERA draining. Source
 generation and synthetic verification are separate from existing database rollout/activation.
 
 The selected [signature-worker design](BACKGROUND_WORKERS_HANDOFF.md#october-10--signature-fairness-design--task-1335)
-is local work pending implementation: shared reset/timing/gate boundary first, then independent
-Persistence scheduling metadata and API phase/agency/item selection. Clinical projection,
+now has its [reset/timing/gate source boundary](BACKGROUND_WORKERS_HANDOFF.md#october-10--signature-reset-and-hosted-boundary--task-1336);
+independent Persistence scheduling metadata and API phase/agency/item selection remain pending.
+Clinical projection,
 immutable package, outbox lease/GUID/revocation and restricted portal owners remain authoritative.
 This plan supplies no deployed activation, shared capacity or safe external baseline-reset claim.
 

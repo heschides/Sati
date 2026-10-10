@@ -1,5 +1,55 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.3.3.6 signature reset and hosted boundary
+
+**Identity/authority:** main `master` base `bbfb1b05083d024caf88534778764e3bb8a30cea`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; DEC-0243 and continued-work source/synthetic authority.
+Included uncommitted input: main-owned active assignment/status. Preserved unrelated project
+formatting/assessment scratch; no other checkout/process changed. New source edits are hosted
+boundary and its tests; canonical architecture/W8/agenda/evidence accompany them.
+
+**Change:** internal pass, injected ten-second first-tick timer, existing shared Demo reset across
+the unchanged three-phase pass, repeated feature/worker/matching-target/cancellation checks and
+no retrying outer scope. No selection policy/schema/business processor changed. Full pass still
+holds one reset session; durable selector/item-scoped evolution belongs to successor 1.3.3.7.
+
+**Actual proof so far:** original `SignatureProcessingService.cs` was unchanged for the first
+hosted regression (SHA-256 `2C7BD316BA0CAEBCA972F293D126F2A76EE1813B322E49A05238A9CF5DD0BBB5`).
+`HostedSignatureDiscoveryCannotRunWhenResetAdmissionIsDenied` **1 failed**, 11 seconds, observing
+a real hosted discovery before any reset admission; TRX
+`TestResults/signature-fairness-2026-10-10/reset-unfixed/Joshu_LONGCHENPA_2026-10-10_00_07_34_net10.0.trx`.
+After the boundary, **1 passed**, 11 seconds, `reset-first-fixed/...00_08_25...trx`.
+New pass replay guard regression **1 failed** before guard (no expected exception),
+`replay-unfixed/Joshu_LONGCHENPA_2026-10-10_00_10_09_net10.0.trx`.
+Final Release build passed with one existing nullable warning, no errors. First combined signature
+API/projection/persistence/new boundary/reset run: **88 passed, 1 failed, 0 skipped**, 27 seconds,
+TRX `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_00_10_50_net10.0.trx`.
+Timer test assumed StartAsync completed timer registration; fixed only the fixture with an
+explicit TimeProvider registration barrier. Focused timer **1 passed**, 1 second,
+`timer-fixed/Joshu_LONGCHENPA_2026-10-10_00_12_24_net10.0.trx`.
+Final combined run **89 passed, 0 failed/skipped**, 26 seconds, TRX
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_00_12_48_net10.0.trx`.
+Both owned instances `SatiSqlTests_83d5405cea5945508f5e87164a8e757c` and
+`SatiSqlTests_f7c0b297fe3846ed95a02940ba43bb02` stopped/deleted.
+All 17 new boundary cases, including four private SQL cases, passed. Source diff/DI ownership
+review, documentation structure, 22 negative proofs and whitespace passed; no schema delta.
+Removing only the target-mapping guard caused both mismatch regressions to **fail**,
+`identity-mutant/Joshu_LONGCHENPA_2026-10-10_00_14_46_net10.0.trx`; exact owned source bytes restored
+in finally, rebuilt, and both **passed**, `identity-restored/...00_14_57...trx`. The restored
+source matches the 89-case accepted source; the mutant-only unused-parameter warning is absent.
+
+**Fixture failures corrected:** first compile supplied ApiClock without its required API options;
+registered its real DI constructor. Later tests tried assigning init-only API options (**four
+compiler errors**); replace the immutable fixture object before registration and alter the mutable
+signature mapping for during-admission mismatch instead. No application behavior was changed to
+make fixture setup pass. Existing nullable/xUnit warnings remain separate from new failures.
+
+**Limits/next:** no arbitrary connection-loss proof, capacity/pass deadline, actual provider/mail,
+external-reset retention, operating activation or whole-service recovery. Shared reset prevents
+a concurrent cooperating baseline replacement while held, not later erasure/reconciliation of
+external signature/mail evidence. No schema/existing database/real-data/cloud/security/deploy/
+release or sealed readiness change. Next 1.3.3.7 waits for this targeted acceptance and docs gates.
+
 ## 2026-10-10 — SATI-WRK-001 1.3.3.5 signature fairness design
 
 **Identity/authority:** main `master` at `e175a73e80068983846e39cfdd28016de197ff12`, checkout
