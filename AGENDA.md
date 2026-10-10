@@ -129,7 +129,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4.11** | [Mutation admission-result hardening](#1411--mutation-admission-result-hardening) | Complete; 171 focused cases passed, unreleased. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.5.1** | [API workload admission inventory](#151--api-workload-admission-inventory) | Complete; bounded source-family review, no numeric/runtime policy. |
-| **1.5.2** | [Shared admission adoption prerequisites](#152--shared-admission-adoption-prerequisites) | Blocked; intended host topology/service targets pending, enrollment/closure proof required. |
+| **1.5.2** | [Shared admission adoption prerequisites](#152--shared-admission-adoption-prerequisites) | Complete for direction/assignment; operating adoption remains separate. |
+| **1.5.3** | [Shared accounting candidate and deterministic limits](#153--shared-accounting-candidate-and-deterministic-limits) | Ready; source candidate/model tests, no live limiter/capacity adoption. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
 
@@ -170,7 +171,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.10 — Onboarding admission-result hardening** | Complete; bounded main source acceptance | Main integration thread / main integration thread | Eight fail-first failures; 126 focused cases passed with private SQL collision/replay proof. | Onboarding coordinator, narrow actual-call synthetic ADO tests, W8/agenda/evidence. No schema, budget, release or data changes. |
 | **1.4.11 — Mutation admission-result hardening** | Complete; bounded main source acceptance | Main integration thread / main integration thread | Nine fail-first failures; final 171 focused cases passed, including reset and exception/health boundaries. | Middleware raw-connection constructor seam/result guard, narrow actual-call synthetic tests, W8/agenda/evidence. Preserve target/exemptions/lock order and response. |
 | **1.5.1 — API workload admission inventory** | Complete; bounded main source/documentation acceptance | Main integration thread / main integration thread | Base `d0e8fed`; representative route/pipeline/limits and proposed deterministic cases reviewed; no measured capacity. | Its W8 subsection, main agenda/assignment and dated evidence only; no application/schema/test changes or external/data access. |
-| **1.5.2 — Shared admission adoption prerequisites** | Blocked; decisions/facts needed before implementation | Main integration thread / main integration thread | Josh's intended host/overlap and response/reserve targets pending; complete enrollment/pool/closure/fencing costs still required by DEC-0242. | Main adoption/prerequisite W8/agenda/evidence only until a concrete successor is assigned. No arbitrary runtime/backend/value adoption. |
+| **1.5.2 — Shared admission adoption prerequisites** | Complete; direction and successor assignment | Main integration thread / main integration thread | Josh's October 10 direction; DEC-0244 and dated W8/evidence. | Direction/assignment accepted; backend/numbers/enrollment remain unadopted for operation. |
+| **1.5.3 — Shared accounting candidate and deterministic limits** | Ready; assigned main source/test candidate | Main integration thread / main integration thread | DEC-0244/current W8 inventories; start after 1.5.2 closure. | Unregistered API candidate, focused deterministic tests, canonical W8/architecture/agenda/evidence. No DI/route/workflow/schema or existing DB/cloud/data access. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -239,13 +241,11 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.5.2 — Shared admission adoption prerequisites** (blocked).
-The bounded local worker source/connection and adjacent API lock repair slices are complete and
-pushed, with implementation/test limits retained in W8/evidence. The next budget implementation
-requires intended hosting and interactive/worker/recovery objectives, plus enrollment/closure
-evidence; questions are pending with Josh. Broad continued-work approval supplies authority to
-continue safe local work, but does not supply these missing operational facts or select capacity.
-No other currently defined incomplete bounded source task has satisfied these dependencies.
+**Next numbered task:** **1.5.3 — Shared accounting candidate and deterministic limits**.
+Josh selected overlapping instances and daily casework/recovery priority on October 10 and
+authorized proposed technical limits/tests. Direction/assignment chunk 1.5.2 is closed; 1.5.3
+tests a shared accounting candidate. Real backend/enrollment/closure/pool facts remain integration
+and activation prerequisites; they do not prevent candidate source tests.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -683,12 +683,11 @@ numeric capacity adoption or sealed evidence changes. Commit/push reviewed docs;
 
 ### 1.5.2 — Shared admission adoption prerequisites
 
-**Eligibility:** blocked. 1.4.2/1.4.3/1.4.9/1.5.1 define the contract, observed normal worker costs,
-adjacent enrollment gaps and API acceptance candidates. Intended exclusive versus overlapping
-hosts and interactive response/worker/recovery objectives have been requested; no answer yet.
-Normal logical SQL cleanup is not complete provider-failure/pool/fencing evidence.
+**Eligibility:** Josh supplied overlapping-instance and daily casework/recovery direction and
+authority to propose/test technical limits on October 10. Current costs/inventories support a
+source-only candidate; deployment/session closure/enrollment facts still gate operating adoption.
 
-**Bounded slice:** once decisions/facts arrive, reconcile the proposed DEC-0242 admission contract
+**Bounded slice:** reconcile the proposed DEC-0242 admission contract with the selected direction
 and assign one next proof/design slice with a declared hosting/enrollment envelope. Identify owner
 exclusivity or consistent controller, cost/uncertainty debt, validation/interactive/worker/recovery
 reserves, finite waiters/overload contract and dependency/physical-pool envelopes. Backend/value
@@ -703,6 +702,33 @@ excluded by an enforceable boundary. Preserve identity/record/reset/uncertainty 
 single deterministic proof/design successor, run documentation checks and retain dated evidence.
 This prerequisite status does not authorize release, migration, cloud/security changes, real data,
 benchmark or runtime activation. Current unrelated work and sealed release evidence stay preserved.
+
+**Result:** [W8 direction](BACKGROUND_WORKERS_HANDOFF.md#october-10--overlapping-host-budget-direction--task-152),
+DEC-0244 and [dated evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-152-overlapping-host-budget-direction)
+close direction/assignment only. Multiple hosts and protected daily/recovery capacity selected;
+main 1.5.3 assigned. Numeric operating budgets, backend and enrollment remain later prerequisites.
+
+### 1.5.3 — Shared accounting candidate and deterministic limits
+
+**Eligibility:** after 1.5.2 direction/decision closure; Josh explicitly authorized proposed limits
+and tests. Present hosting is not capacity proof.
+
+**Bounded slice:** implement an unregistered server accounting candidate for one atomic shared
+controller model, server-owned costs, protected class/agency shares, exact target/epoch/request/
+incarnation and non-expiring uncertainty debt. Synthetic profile: 32 logical credits split daily
+12/recovery 8/background 8/validation 4; scoped agency cap 4 per class, zero parked waiters,
+128 retained admission/replay records and 16 child connection identities per grant. Test overlap,
+saturation/reserves, replay/conflict, cancellation, nested opens/confirmed closure, crash/restart
+and bounded metadata. Mutate core guards to prove the adversarial tests detect weakened logic.
+
+**Dependencies and owners:** DEC-0244/DEC-0242 and W8/identity/reset/record/uncertainty owners.
+No caller-controlled class/cost, lease-expiry credit reuse or inner reacquisition. A shared
+in-memory model is not a distributed backend or live enforcement.
+
+**Boundaries and completion evidence:** deterministic tests/mutation failures, source identity,
+canonical ownership/evidence and structure/negative/whitespace checks. No DI/route/workflow changes,
+schema, runtime activation, existing DB, real data, external/cloud/service calls, benchmark or
+sealed evidence changes. Main integrates/commits/pushes verified chunk; backend/enrollment is separate.
 
 ## Preserved open-work inventory
 

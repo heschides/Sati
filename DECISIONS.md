@@ -1,5 +1,10 @@
 # Sati — Decision index and supersession
 
+[DEC-0244](docs/decisions/current/2026-10-10-DEC-0244.md) records Josh's overlapping-instance and
+daily casework/recovery priority. Its unregistered accounting candidate and synthetic limit tests
+do not adopt operating capacity/backend. It supersedes DEC-0242's fixed-slot-first recommendation
+only; accounting/enrollment/closure/fencing requirements remain.
+
 [DEC-0243](docs/decisions/current/2026-10-10-DEC-0243.md) selects bounded local signature-worker
 reset/timing and durable phase/agency/item turn work. Implementation and operating acceptance
 remain separate; signature evidence, revocation and uncertain-mail recovery retain their owners.

@@ -607,6 +607,39 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — overlapping-host budget direction — task 1.5.2
+
+Josh's October 10 direction selects multiple overlapping instances and daily casework/recovery
+priority, and authorizes proposed technical limits/tests. [DEC-0244](docs/decisions/current/2026-10-10-DEC-0244.md)
+records this direction; DEC-0242's accounting/closure/enrollment requirements remain. This closes
+the direction/assignment prerequisite, not operating adoption. Main base `148b4b7`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; unrelated project/assessment inputs remain excluded.
+
+Task 1.5.3 will test one atomic shared accounting model with server-owned operation costs and
+protected shares: **32 logical SQL credits**, daily **12**, recovery **8**, background **8** and
+validation **4**; validated agency maximum **4 per class**; **zero parked admission waiters**;
+**128 retained request/replay records**, **16 child identities per grant**. No share borrowing.
+These are deliberately small synthetic parameters, not measured capacity, connection-pool
+settings or deployed quotas. Normal worker observations motivate provisional costs (dispatch 4,
+poll 3, note/signature 2); failure-safe costs and all route costs still require integration proof.
+Daily reads/writes start at 1/2, export/reset at 4, validation/health at 1, recovery repair at 2.
+A proposed ordinary-casework response goal of **two seconds** awaits representative load testing;
+instant accounting tests cannot establish it.
+
+Try-admission precedes protected opens in the candidate contract. Exact target/epoch/request and
+owner incarnation bind each grant; replay must not double charge, replacement owners cannot reuse
+old credit, and uncertain closure retains the whole reservation indefinitely. Bounded metadata
+must stop new grants rather than evict replay/debt unsafely. Test independent simulated hosts,
+class/agency saturation, cancellation, outage, premature release and nested-open violations, with
+deliberately weakened guards to demonstrate useful failures. No actual route or worker is enrolled.
+
+A strongly consistent durable controller still needs a concrete reviewed backend. Fixed host
+slots are not the first candidate because exclusive slot ownership is unenforced. Business SQL
+cannot be an uncharged coordinator whose waiting connections already consume its envelope.
+The unregistered in-memory candidate is a transition model only: durable restart/disaster behavior,
+fencing, all pools/consumers, identity ordering, dependency/CPU quotas and safe metadata retirement
+remain separate design/acceptance work. See [dated direction evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-152-overlapping-host-budget-direction).
+
 #### October 10 — API workload admission inventory — task 1.5.1
 
 **Status:** bounded main source-family review complete. Coordinate with SATI-SEC-001 rather than

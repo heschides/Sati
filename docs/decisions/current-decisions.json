@@ -225,6 +225,15 @@
       "status": "accepted",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0244",
+      "date": "2026-10-10",
+      "title": "Overlapping hosts and protected workload candidate",
+      "path": "docs/decisions/current/2026-10-10-DEC-0244.md",
+      "status": "accepted",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": ["DEC-0242"]
     }
   ]
 }

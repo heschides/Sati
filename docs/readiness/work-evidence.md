@@ -1,5 +1,26 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.5.2 overlapping-host budget direction
+
+**Identity/authority:** main `master` base `148b4b707a75039dcc922d70ca8cc28a9f55c1b9`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`. Josh selected multiple instances, daily casework and
+recovery priority, and proposed technical-limit tests. Unrelated Sati.csproj formatting and
+assessment scratch remain excluded; no other checkout/process/agent used.
+
+**Result:** [W8 direction](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--overlapping-host-budget-direction--task-152)
+and accepted-direction DEC-0244 resolve the host/priority question and assign main task 1.5.3.
+Numeric profile, response goal and actual durable backend remain proposed/unverified. DEC-0242
+safety, enrollment, closure/fencing and operating acceptance prerequisites remain intact.
+Changed W8, agenda, decision record/registry/index and this ledger; no runtime behavior changed.
+
+**Checks:** documentation structure passed (46 root/28 scoped/26 current decisions), all 22 negative
+proofs passed, and whitespace check passed for this chunk.
+No application tests, databases, external service calls or capacity measurements performed.
+MT09/OP10 planning evidence only; no sealed readiness score, release, deployment or migration change.
+
+**Next:** 1.5.3 unregistered shared accounting candidate and deterministic/mutation acceptance.
+Live enforcement, durable backend, physical pools and load evidence require later bounded work.
+
 ## 2026-10-10 — SATI-WRK-001 1.5.1 API workload admission inventory
 
 **Identity/authority:** main `master` base `d0e8fedcbb5f0291beb5efc73ebdddba7e58abf6`, checkout
