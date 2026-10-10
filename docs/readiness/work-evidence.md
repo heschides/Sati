@@ -2687,6 +2687,89 @@ the current pointer and authority. Release/migration/publication remain separate
 
 **Later reviewed release snapshot:** none; working evidence only, unreleased source.
 
+## 2026-10-09 — SATI-WRK-001 numbered agenda breakdown
+
+**Scope and authority:** Josh requested that AGENDA.md adopt the numbered outline explained in
+the side conversation. Documentation-only update: stable parent ID SATI-WRK-001, work packages
+1.1–1.7 and fairness tasks 1.3.1–1.3.3. The next eligible task is explicitly named
+**1.3.1 — Dispatch fairness design**; implemented idle/wake scheduling remains **1.2**, with its
+actual acceptance tracked in its existing evidence record. Existing scope, decisions, status,
+authorization boundaries and topic owners are preserved. Historical release records and sealed
+readiness/rubric snapshots are unchanged. No application work or Git index changes are included.
+
+**Documentation format:** the four task fields explain eligibility, scope, dependencies and
+completion criteria. Existing validator-required field labels remain, with plain-language
+equivalents alongside them; they describe one numbered task. The numbering is a tracking aid,
+not a new stable-ID registry or an automatic implementation/deployment authorization.
+
+**Verification:** documentation structure passed, all 22 disposable-fixture negative checks
+passed, and the whitespace check passed for this documentation edit. No application test run
+is required because no application behavior or checker implementation changes.
+
+**Next step:** use the fixed numbers in subsequent task descriptions/status updates. Preserve the
+main thread's in-progress scheduling verification and its separate source/Git/release authority.
+Working evidence supports documentation traceability only; no readiness score changes.
+
+## 2026-10-09 — SATI-WRK-001 concurrent thread workflow
+
+**Stable work ID and bounded slice:** SATI-WRK-001; Josh requested documentation of concurrent
+thread coordination in AGENTS.md and AGENDA.md plus a starter prompt. Documentation only;
+resource-limit inventory task 1.4.1 is defined but not executed or assigned to a created thread.
+
+**Status and source/revision:** workflow documented locally; documentation checks passed. Starting HEAD
+was `40e091bae9bd0f5de9bc89e39209cf3e17449ccc` on master; existing staged main-thread changes and
+unstaged numbered-agenda edits were retained. This entry records no application acceptance,
+Git index update, commit, push, new worktree/thread or main-thread process interaction.
+
+**Later main-thread integration checkpoint:** the main thread reviewed the coordination rules,
+numbered agenda, DEC-0238 registry/index and evidence after completing scheduling source commit
+`d05312a`. Task 1.2's bounded source/acceptance status is reconciled with its actual evidence;
+deployment and activation remain open. Josh reports creating a dedicated second worktree and
+submitting the explicit 1.4.1 assignment there. Its identity, source inputs and startup result
+are not verified here; the main thread neither executes that inventory nor changes its checkout.
+Final structure, all 22 negative proofs, preflight/history and whitespace gates passed for the
+combined documentation. Ordinary commit/push uses the separate standing user authorization;
+the handoff identifies the resulting checkpoint without a self-referential ledger commit.
+
+**Changed behavior, ownership and canonical paths:** AGENTS.md owns coordination; AGENDA.md owns
+assignments/status/dependencies while preserving the single main SATI-WRK-001 next pointer and
+1.3.1 fairness-design task. A second investigation thread may be explicitly assigned 1.4.1 in a
+dedicated worktree. Its source matrix belongs in a distinct W8 subsection; its own row and ledger
+changes await main integration. Two threads is the initial planning convention, not a configured
+limit. Main integration owns shared policy adoption and combined verification.
+
+**Actual tests/checks, commands, results and evidence locations:**
+`scripts/Test-DocumentationStructure.ps1` passed (20 current decision records, 11 active items,
+unchanged single SATI-WRK-001 pointer); `scripts/Test-DocumentationStructureChecks.ps1` passed
+all 22 disposable negative cases. `git diff --check` passed for the six modified tracked files;
+the new decision passed a direct trailing-whitespace/final-newline check. An initial new-file
+wrapper incorrectly treated `git diff --no-index --check`'s difference exit status 1 as failure;
+there was no whitespace diagnostic, and the separate direct check resolved that wrapper result.
+
+**Failed/unrun checks, reason and verification limits:** no application tests, load measurements,
+database queries or resource inventory performed; only task definitions and workflow changed.
+Actual thread IDs/assignment, future baseline/source inputs and combined runtime acceptance
+remain unverified until the respective authorized task runs.
+
+**Relevant readiness criterion IDs and evidence class:** documentation/workflow evidence only;
+no MT/OP criterion satisfaction or sealed release/rubric score changes asserted.
+
+**Durable decisions, alternatives and supersession links:** [DEC-0238](../decisions/current/2026-10-09-DEC-0238.md)
+records adopted coordination and rejected shared-checkout/duplicate-queue approaches. No prior
+decision is superseded; existing D1–D4, source acceptance and runtime/release authority remain.
+
+**Remaining risks/blockers, dependencies and deferred work:** worktrees do not isolate databases,
+machine resources or design decisions. Explicit assignments, captured uncommitted inputs,
+ownership and sequential integration are required. Secondary output remains awaiting review
+until integrated; source drift can require rechecking findings. No automatic thread creation or
+cross-thread messaging permission is inferred.
+
+**Next eligible stable ID and bounded slice:** main queue remains SATI-WRK-001 task 1.3.1 dispatch
+fairness design; 1.4.1 resource-limit inventory is ready for explicit second-thread assignment.
+The delivered starter prompt will authorize that bounded investigation when Josh submits it.
+
+**Later reviewed release snapshot, if any:** none; documentation working evidence only.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

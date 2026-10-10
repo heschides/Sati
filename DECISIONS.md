@@ -10,6 +10,12 @@ current-decision collection. New decisions never change the immutable import's c
 
 ## Governing boundaries
 
+The two-thread planning convention and bounded parallel-assignment workflow are accepted in
+[DEC-0238](docs/decisions/current/2026-10-09-DEC-0238.md). [AGENTS.md](AGENTS.md#concurrent-thread-coordination)
+owns coordination rules; [AGENDA.md](AGENDA.md#parallel-work-assignments) owns assignments and
+dependencies. No thread launch, runtime policy adoption or release authority follows from this
+documentation decision.
+
 The bounded dispatch idle/wake/activity/due policy is adopted and implemented locally in
 [DEC-0237](docs/decisions/current/2026-10-09-DEC-0237.md), superseding DEC-0236's pending status.
 [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-implementation) owns source behavior

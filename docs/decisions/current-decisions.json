@@ -171,6 +171,15 @@
       "status": "accepted",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": ["DEC-0236"]
+    },
+    {
+      "id": "DEC-0238",
+      "date": "2026-10-09",
+      "title": "Bounded concurrent thread coordination",
+      "path": "docs/decisions/current/2026-10-09-DEC-0238.md",
+      "status": "accepted",
+      "evidence": ["AGENTS.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

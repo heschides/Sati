@@ -209,6 +209,55 @@ Preserve historical snapshots. Run `scripts/Test-DocumentationStructure.ps1` and
 mutation checks before completing documentation or release work. These rules do not expand user
 authorization, DATT, migration, infrastructure or real-data permissions.
 
+## Concurrent thread coordination
+
+[AGENDA.md](AGENDA.md#parallel-work-assignments) owns task status, dependencies, assignments and
+parallel eligibility. This section owns the coordination rules; [DEC-0238](docs/decisions/current/2026-10-09-DEC-0238.md)
+records the choice and alternatives. Start with two active working threads: one main integration
+thread and one bounded investigation/review thread. This is a planning convention, not a Codex
+setting or product limit. Josh can explicitly change the arrangement.
+
+1. **Assign before starting.** Each working thread needs an explicitly assigned stable parent ID
+   and outline task number, deliverable, dependencies, allowed edits, completion criteria and
+   integration owner. Use ready, active, blocked, awaiting review and complete as task states;
+   distinguish source implementation, verification, integration and deployment. A ready row is
+   available for assignment, not evidence that a thread has started. Do not launch additional
+   threads, subagents or automations merely because this policy exists.
+2. **Keep one main queue.** The single Next eligible item pointer belongs to the main thread.
+   An explicitly assigned parallel thread follows only its own task, not that pointer or another
+   thread's backlog. If its dependency fails or scope overlaps, record the blocker and hand off
+   the question; do not select another assignment autonomously. Do not duplicate active tasks.
+3. **Isolate editing.** Use a dedicated worktree for each additional writing thread. Record its
+   starting commit, branch/worktree path and any included uncommitted source/documentation inputs.
+   Establish those inputs before review; do not assume a new checkout contains current local
+   changes. Preserve unrelated changes and never switch, reset, stash, merge into or edit another
+   active thread's checkout. No copying of PHI, private settings or credentials for setup.
+4. **Agree on ownership.** Assign shared components and documentation sections explicitly.
+   Parallel threads update only their assigned topic section, assignment row and dated working
+   evidence in their own worktrees. The main thread owns global agenda ordering, adoption of
+   architectural/product policies, shared ownership changes and integration. Recommendations do
+   not authorize changing runtime policy; follow existing review/adoption requirements.
+5. **Respect dependencies and shared resources.** Independent source inventories/reviews may run
+   together. Implementation waits for adopted designs and required predecessor acceptance.
+   Worktrees isolate files, not databases, ports, CPU, memory or external quotas. Coordinate heavy
+   builds/private-instance tests; do not terminate another thread's processes or use a shared
+   database without its existing authority. Resource contention can make more threads slower.
+6. **Hand off concrete results.** Report the task number, base/current source identity, changed
+   files/sections, findings and recommendations, actual checks and failures, unverified limits,
+   conflicts/dependencies and the next bounded step. An assigned thread marks its deliverable
+   awaiting review; it cannot claim main-branch integration or broader item completion. Durable
+   proposed decisions retain proposed status until adopted, with unused registered decision IDs.
+7. **Integrate one chunk at a time.** The main thread reviews against current source, resolves
+   overlaps, reconciles canonical topic/agenda/evidence changes and runs checks appropriate to
+   the combined result. Recheck findings that changed since the task's baseline. Only then mark
+   the bounded task complete with evidence. This policy does not authorize commits, pushes,
+   release actions, migrations, deployment, cloud/security settings or real-data access; existing
+   explicit authorization and DATT boundaries remain in force.
+
+The standing next-work invocation below remains the main queue procedure. An assigned parallel
+task takes precedence over generic next-work wording in that thread; the main pointer is not a
+second assignment. Use fixed outline numbers in status reports so Josh can track each task.
+
 ## Standing work and documentation upkeep
 
 After each significant portion of work, update the canonical documentation thoroughly before

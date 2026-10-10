@@ -26,6 +26,7 @@ Read the individual registered record for the decision and rejected alternatives
 | DEC-0235 | 2026-10-09 | [Durable known-unsent account readiness and controlled recovery](2026-10-09-DEC-0235.md) | accepted; bounded source implementation |
 | DEC-0236 | 2026-10-09 | [Activity-bounded Demo dispatch scheduling proposal](2026-10-09-DEC-0236.md) | retained proposal; pending status superseded by DEC-0237 |
 | DEC-0237 | 2026-10-09 | [Activity-bounded Demo dispatch scheduling adoption](2026-10-09-DEC-0237.md) | accepted; bounded local source implementation |
+| DEC-0238 | 2026-10-09 | [Bounded concurrent thread coordination](2026-10-09-DEC-0238.md) | accepted; documentation workflow only |
 
 Accepted decisions must retain their evidence and earlier rejected reasoning. A change to a
 decision creates a successor and supersession link; it does not rewrite the historical import.
