@@ -1,5 +1,35 @@
 # Working evidence ledger
 
+## 2026-10-09 — SATI-WRK-001 1.3.3.2 bounded ERA feed quantum
+
+**Identity/ownership:** base `4a5e530c1f10e094cdf374af4faad7cba4ab8c1b`, main `master`, same
+main checkout; preexisting project formatting and assessment scratch excluded. Main owns
+poller ERA quantum/test/topic/agenda/evidence. Second-thread 1.4.1 remains untouched.
+
+**Fail-first:** `dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj --configuration Release
+--no-restore --filter FullyQualifiedName~PollingEraOfferImportsOnlyOldest --logger trx
+--results-directory TestResults/polling-fairness-2026-10-09/unfixed-download-proof -v minimal`:
+**1 failed, 0 passed/skipped** against original runtime. Observed downloads `[20,21]` instead
+of `[20]`; retained TRX `Joshu_LONGCHENPA_2026-10-09_23_19_27_net10.0.trx`.
+The first run checked count before downloads and failed 0 versus 1 because the old feed lost its
+returned count after the second payment conflict; reordered assertions give direct quantum proof.
+Both failures retained; no fixture/runtime failure silently relabeled as a passing test.
+
+**Fixed:** same project/config with filter
+`FullyQualifiedName~ClaimMdStatusProcessorTests|FullyQualifiedName~ClaimMdSandboxConnectorTests|FullyQualifiedName~ClaimMdOnboardingTests&FullyQualifiedName!~Sql`:
+**35 passed, 0 failed/skipped**, 32 seconds. TRX
+`TestResults/polling-fairness-2026-10-09/era-fixed/Joshu_LONGCHENPA_2026-10-09_23_19_49_net10.0.trx`.
+Checks one oldest download/receipt/deposit, retained ERA cursor and untouched Status cursor;
+existing multi-page/nonascending discovery, missing/damaged cursor, reset exclusion, matching/
+atomicity/replay, onboarding and cooperative exchange-deadline cases retained. Preexisting nullable
+and xUnit analyzer build warnings remain. No SQL/application capacity or external vendor proof.
+
+**Checks:** documentation structure passed, all 22 negative mutation proofs passed, and
+whitespace checks passed. Source/test diff is confined to the ERA quantum and its regression.
+No source migration, existing/shared/working database, real data, vendor, hosting/security change,
+release or activation. Sealed evidence unchanged. Repeat listing overhead and remaining complete
+account discovery/pass bounds are explicit gaps; next main slice is 1.3.3.3.
+
 ## 2026-10-09 — SATI-WRK-001 1.3.3.1 polling fairness design
 
 **Source/ownership:** main `master`, starting commit

@@ -99,22 +99,20 @@ internal sealed class ClaimMdSandboxPoller(
             if (pageNumber == 20)
                 throw new InvalidOperationException("Claim.MD ERA listing exceeds the bounded polling batch.");
         }
-        var processed = 0;
-        foreach (var era in eras.OrderBy(row => decimal.Parse(row.EraId,
-                     System.Globalization.CultureInfo.InvariantCulture)))
-        {
-            if (decimal.Parse(era.EraId, System.Globalization.CultureInfo.InvariantCulture) <=
-                decimal.Parse(cursor, System.Globalization.CultureInfo.InvariantCulture))
-                throw new InvalidOperationException("Claim.MD ERA pagination did not advance.");
-            await Task.Delay(TimeSpan.FromSeconds(1), token);
-            var x12 = await connector.GetEra835Async(account.SecretReference, era.EraId, token);
-            await using var scope = scopes.CreateAsyncScope();
-            var intake = scope.ServiceProvider.GetRequiredService<ClaimResponseIngestion>();
-            if (!await intake.ImportConnectorEraAsync(account.Id, era.EraId, cursor, x12, token)) break;
-            cursor = era.EraId;
-            processed++;
-        }
-        return processed;
+        // Listing order is not guaranteed. Validate the complete bounded listing, then
+        // spend this feed's turn on just its oldest artifact. The next visit re-lists
+        // from the committed receipt cursor; scheduling must never skip a failed ERA.
+        var oldest = eras.OrderBy(row => decimal.Parse(row.EraId,
+            System.Globalization.CultureInfo.InvariantCulture)).FirstOrDefault();
+        if (oldest is null) return 0;
+        if (decimal.Parse(oldest.EraId, System.Globalization.CultureInfo.InvariantCulture) <=
+            decimal.Parse(cursor, System.Globalization.CultureInfo.InvariantCulture))
+            throw new InvalidOperationException("Claim.MD ERA pagination did not advance.");
+        await Task.Delay(TimeSpan.FromSeconds(1), token);
+        var x12 = await connector.GetEra835Async(account.SecretReference, oldest.EraId, token);
+        await using var scope = scopes.CreateAsyncScope();
+        var intake = scope.ServiceProvider.GetRequiredService<ClaimResponseIngestion>();
+        return await intake.ImportConnectorEraAsync(account.Id, oldest.EraId, cursor, x12, token) ? 1 : 0;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

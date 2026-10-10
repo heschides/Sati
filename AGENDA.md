@@ -109,7 +109,7 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.3.2** | [Dispatch fairness implementation and tests](#132--dispatch-fairness-implementation-and-tests) | Complete for bounded source verification/main integration; unreleased. Full API 1,330 and shared persistence boundary 1 passed, zero failed/skipped; [evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-132-dispatch-fairness-implementation) owns failures/limits. |
 | **1.3.3** | Fairness in polling, note maintenance and signature work | Remaining broader W8 scope; preserve each worker's existing safety owner and define bounded tasks before implementation. |
 | **1.3.3.1** | [Polling fairness design](#1331--polling-fairness-design) | Complete for source/design integration; DEC-0241 selects bounded local policy under continued-work authority. |
-| **1.3.3.2** | [Bounded ERA feed quantum](#1332--bounded-era-feed-quantum) | Ready; next main implementation/test chunk under DEC-0241. |
+| **1.3.3.2** | [Bounded ERA feed quantum](#1332--bounded-era-feed-quantum) | Complete for source verification/main integration; 35 local regressions passed; unreleased. |
 | **1.3.3.3** | [Durable polling selection](#1333--durable-polling-selection) | Ready after 1.3.3.2; main implementation/synthetic verification. |
 | **1.4** | Resource limits: bound shared connections, concurrency and operation times | Open; includes global/agency budgets, bounded queued work, dependency quotas and measured hosting choices. |
 | **1.4.1** | [Resource-limit inventory](#141--resource-limit-inventory) | Ready for explicit parallel assignment; source review and documentation only, with policy/implementation deferred. |
@@ -136,7 +136,7 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.3.1 — Dispatch fairness design** | Complete; policy and additive source-schema adopted by explicit approval | Main integration thread / main thread | Retained design/evidence at `acf638b`; DEC-0240 records approval and scoped supersession. | Fairness design section, adoption decision and integration. |
 | **1.3.2 — Dispatch fairness implementation** | Complete for bounded source verification/main integration; unreleased | Main integration thread / main thread | DEC-0240; final API 1,330 and persistence boundary 1 passed. Source migration only; operating/combined load limits retained. Independent 1.4.1 remains source-only. | Selector/worker/scheduling owner, shared cursor model/source migration, relevant tests and canonical behavior/evidence. |
 | **1.3.3.1 — Polling fairness design** | Complete; main design integrated under continued-work approval | Main integration thread / main thread | Completed dispatch slice and current polling safety/source owners; source-only proposal may accompany 1.4.1 without taking its matrix. | Its W8 polling proposal, proposed decision/registry, global agenda ordering and dated evidence; no runtime/schema/test edits. |
-| **1.3.3.2 — Bounded ERA feed quantum** | Ready | Main integration thread / main thread | DEC-0241; preserve all-page discovery and receipt effects. May accompany source-only 1.4.1. | Poller ERA quantum, relevant fail-first tests, canonical topic/agenda/evidence. |
+| **1.3.3.2 — Bounded ERA feed quantum** | Complete; 35 local tests passed, unreleased | Main integration thread / main thread | DEC-0241; preserve all-page discovery and receipt effects. May accompany source-only 1.4.1. | Poller ERA quantum, relevant fail-first tests, canonical topic/agenda/evidence. |
 | **1.3.3.3 — Durable polling selection** | Ready after 1.3.3.2 | Main integration thread / main thread | DEC-0241, ERA quantum acceptance and current reset/receipt owners. | API selector/pass, shared scheduling metadata/source migration, relevant tests and canonical docs/evidence; synthetic fixtures only. |
 | **1.4.1 — Resource-limit inventory** | Ready; explicitly assigned by Josh to the second thread; startup verification pending here | Second investigation thread/worktree created by Josh; actual identity to be recorded there / main thread | Captured current source and existing W8/operations rules; may accompany 1.3.1. Actual fair-selection policy is an input to later budget design, not a prerequisite for inventory. | Its own W8 resource-limit inventory subsection, this assignment row and a dated ledger entry in its dedicated worktree. No runtime source edits. |
 
@@ -184,7 +184,7 @@ capacity, latency, operating guarantee or sealed readiness-score change.
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.3.3.2 — Bounded ERA feed quantum**.
+**Next numbered task:** **1.3.3.3 — Durable polling selection**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 

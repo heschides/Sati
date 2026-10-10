@@ -607,6 +607,24 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 9 — bounded ERA feed quantum — task 1.3.3.2
+
+**Status:** bounded source implementation/verification complete under DEC-0241; unreleased.
+`ClaimMdSandboxPoller.PollEraAsync` retains every existing listing-page, duplicate and cursor
+check, then processes only the numerically oldest artifact. Later artifacts stay available from
+the last committed receipt cursor on the next visit. Empty/failed/stale imports advance no cursor;
+receipt/effects and ordering remain owned by existing ingestion. No schema, gate, cadence, vendor
+admission or reset change. Account discovery/agency-feed rotation remain task 1.3.3.3.
+
+The two-artifact regression failed against `4a5e530` with downloads `[20, 21]` instead of `[20]`;
+the first receipt had committed before the second download/payment conflict. The fixed regression
+asserts one download, one receipt/deposit, ERA cursor 20, untouched Status cursor and processed
+count 1. Existing out-of-order multi-page discovery, uninitialized cursors, reset, status/ERA
+atomicity, onboarding and HTTP deadline tests passed in a **35-test** local run, zero failed/skipped.
+[Working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-1332-bounded-era-feed-quantum)
+records exact commands/failures/limits. No vendor call, live data, existing database, capacity
+measurement, deployment, activation or sealed score change. Re-listing later work costs additional
+listing requests; budgets and actual vendor behavior remain unverified.
 #### October 9 — polling fairness design — task 1.3.3.1
 
 **Status:** main source/design review complete; local policy selected under Josh's October 9

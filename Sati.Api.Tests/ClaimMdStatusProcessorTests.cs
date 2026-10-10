@@ -15,7 +15,7 @@ using Xunit;
 
 namespace Sati.Api.Tests;
 
-public sealed class ClaimMdStatusProcessorTests
+public sealed partial class ClaimMdStatusProcessorTests
 {
     [Fact]
     public async Task StatusReceiptOutcomesAndCursorCommitTogetherAndReplayAddsNothing()
