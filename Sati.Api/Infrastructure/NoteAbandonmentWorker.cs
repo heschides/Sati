@@ -76,11 +76,14 @@ internal sealed class SqlNoteAbandonmentCoordination(
         modeParameter.ParameterName = "@mode";
         modeParameter.Value = mode;
         command.Parameters.Add(modeParameter);
-        var result = Convert.ToInt32(await command.ExecuteScalarAsync(token));
-        if (result == -1) return false;
-        if (result < 0)
-            throw new InvalidOperationException("Note abandonment coordination lock was not acquired.");
-        return true;
+        var result = await command.ExecuteScalarAsync(token);
+        try { return SqlSessionAdmission.OwnsLease(result, token); }
+        catch
+        {
+            // RunOnceAsync has not yet received success/recorded this lock for its finally.
+            if (SqlSessionAdmission.ConfirmedAcquired(result)) await ReleaseAsync(db, resource);
+            throw;
+        }
     }
 
     private static async Task ReleaseAsync(ApiDbContext db, string resource)

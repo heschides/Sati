@@ -62,8 +62,16 @@ acceptance establishes no migration uptake, deployed activation or whole-operati
 
 Task 1.3.3.6 adds the [signature hosted reset boundary](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--signature-reset-and-hosted-boundary--task-1336):
 an injected first-tick timer/pass seam, matching target/gate checks and shared Demo reset exclusion
-through the existing pass. Selection/business effects remain with their owners; outer retry replay
-is refused. Durable signature fairness and external-reset retention remain separate work.
+through each current item offer. Task 1.3.3.7's
+[durable signature selection](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--durable-signature-selection--task-1337)
+supersedes the earlier whole-pass reset scope with sequential per-offer scopes and phase/agency/item
+positions. Selection/business effects remain with their owners; outer retry replay is refused.
+External-reset retention and operating acceptance remain separate work.
+
+Task 1.4.4's [session result guard](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--session-admission-result-hardening--task-144)
+owns strict acquisition outcomes and cancellation-before-callback for current SQL worker coordinators.
+The [connection-cost review](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--worker-connection-cost-review--task-143)
+distinguishes conditional normal connection spans from unverified cleanup/failure-safe costs.
 
 Remaining W8: sustained
 fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant

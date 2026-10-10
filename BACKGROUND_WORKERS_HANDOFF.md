@@ -607,6 +607,33 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — session admission result hardening — task 1.4.4
+
+**Status:** bounded source/main acceptance complete; 162 focused cases passed, unreleased. The API's
+[SqlSessionAdmission](Sati.Api/Infrastructure/SqlSessionAdmission.cs) owns strict interpretation
+for existing [Demo reset/dispatch/account](Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs),
+[Claim.MD request/poll](Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs) and
+[note sweep](Sati.Api/Infrastructure/NoteAbandonmentWorker.cs) session coordinators. Only Int32
+0/1 confirms acquisition; Int32 -1 retains each owner's existing contention outcome. Missing,
+coercible and other results fail closed with a fixed exception. Cancellation observed after
+scalar completion wins before callback admission. A confirmed lock is explicitly released with
+an uncancelled cleanup token even when that validation throws; note's earlier reset lock also
+unwinds when sweep admission fails. Owned context disposal still runs if release fails.
+
+This addresses dependency 1 in the [connection-cost review](#october-10--worker-connection-cost-review--task-143)
+only at the admission-result boundary. Lock names/modes/order, waits, pacing, current gates and
+record business rules remain with their existing owners. It does not establish continuous
+mid-callback ownership/fencing, physical-session closure after ambiguous provider failures,
+failure-safe reservation costs or resource admission. Malformed outcomes are synthetic faults,
+not an observed SQL incident. DEC-0242 remains proposed.
+
+[Actual-call-path tests](Sati.Api.Tests/SessionAdmissionResultTests.cs) use an owned synthetic
+ADO connection with SQL-provider identity and no server/network access. They observe callback,
+known-lock release order and connection disposal for all seven admission paths. They do not
+simulate SqlClient pooling/session loss. [Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-144-session-admission-result-hardening)
+owns fail-first and actual acceptance results. Next local slice is note-worker connection-lifetime
+instrumentation with real synthetic SQL transactions, preserving note/audit effects.
+
 #### October 10 — worker connection-cost review — task 1.4.3
 
 **Status:** main source accounting review complete; no admission backend/value adopted. Base

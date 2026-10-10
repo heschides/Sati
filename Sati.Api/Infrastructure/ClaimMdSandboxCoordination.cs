@@ -35,6 +35,7 @@ internal sealed class SqlClaimMdSandboxCoordination(IDbContextFactory<ApiDbConte
     private async Task<ApplicationLease?> AcquireAsync(string resource, int timeoutMs, CancellationToken token)
     {
         var db = await contexts.CreateDbContextAsync(token);
+        ApplicationLease? acquiredLease = null;
         try
         {
             if (!db.Database.IsSqlServer())
@@ -53,21 +54,23 @@ internal sealed class SqlClaimMdSandboxCoordination(IDbContextFactory<ApiDbConte
             timeoutParameter.ParameterName = "@timeout";
             timeoutParameter.Value = timeoutMs;
             command.Parameters.Add(timeoutParameter);
-            var result = Convert.ToInt32(await command.ExecuteScalarAsync(token));
-            if (result < 0)
+            var result = await command.ExecuteScalarAsync(token);
+            if (SqlSessionAdmission.ConfirmedAcquired(result)) acquiredLease = new ApplicationLease(db, resource);
+            if (!SqlSessionAdmission.OwnsLease(result, token))
             {
-                if (timeoutMs == 0 && result == -1)
+                if (timeoutMs == 0)
                 {
                     await db.DisposeAsync();
                     return null; // another host owns the poll
                 }
                 throw new InvalidOperationException("Claim.MD sandbox coordination lock was not acquired.");
             }
-            return new ApplicationLease(db, resource);
+            return acquiredLease!;
         }
         catch
         {
-            await db.DisposeAsync();
+            if (acquiredLease is not null) await acquiredLease.DisposeAsync();
+            else await db.DisposeAsync();
             throw;
         }
     }

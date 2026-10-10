@@ -73,22 +73,25 @@ internal sealed class SqlDemoWorkerResetCoordination(
         lockMode.ParameterName = "@mode";
         lockMode.Value = mode;
         command.Parameters.Add(lockMode);
-        var result = Convert.ToInt32(await command.ExecuteScalarAsync(token));
-        if (result == -1) return unavailableResult;
-        if (result < 0)
-            throw new InvalidOperationException("Demo worker reset lease could not be acquired.");
-
-        try { return await operation(new SessionLease(db, resourceName, mode), token); }
+        var result = await command.ExecuteScalarAsync(token);
+        try
+        {
+            if (!SqlSessionAdmission.OwnsLease(result, token)) return unavailableResult;
+            return await operation(new SessionLease(db, resourceName, mode), token);
+        }
         finally
         {
-            await using var release = db.Database.GetDbConnection().CreateCommand();
-            release.CommandText = "EXEC sys.sp_releaseapplock @Resource = @resource, @LockOwner = 'Session';";
-            release.CommandTimeout = 5;
-            var parameter = release.CreateParameter();
-            parameter.ParameterName = "@resource";
-            parameter.Value = resourceName;
-            release.Parameters.Add(parameter);
-            await release.ExecuteNonQueryAsync(CancellationToken.None);
+            if (SqlSessionAdmission.ConfirmedAcquired(result))
+            {
+                await using var release = db.Database.GetDbConnection().CreateCommand();
+                release.CommandText = "EXEC sys.sp_releaseapplock @Resource = @resource, @LockOwner = 'Session';";
+                release.CommandTimeout = 5;
+                var parameter = release.CreateParameter();
+                parameter.ParameterName = "@resource";
+                parameter.Value = resourceName;
+                release.Parameters.Add(parameter);
+                await release.ExecuteNonQueryAsync(CancellationToken.None);
+            }
         }
     }
 

@@ -6,6 +6,10 @@ boundaries from planned work. Deployment observations belong only to
 [the readiness registry](docs/readiness/README.md). Historical feature/release paragraphs are
 retained in the [architecture snapshot](docs/archive/2026-10-08/ARCHITECTURE.md).
 
+The API's [session admission result guard](BACKGROUND_WORKERS_HANDOFF.md#october-10--session-admission-result-hardening--task-144)
+centralizes strict SQL lock outcomes and cancellation-before-callback checks for existing worker
+coordinators. This local guard establishes neither a shared resource budget nor continuous fencing.
+
 ## Operating boundaries
 
 Synthetic Demo: WPF ViewModel → feature interface → Cloud HTTP service → Sati.Api → shared

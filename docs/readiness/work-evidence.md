@@ -1,5 +1,56 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.4 session admission result hardening
+
+**Identity/authority:** main `master` base `f51dd5165214b5167b30019b35ba4a3d7ec699fd`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit main assignment under continued Agenda
+approval. Required coordination/task/source owners present. Included uncommitted input: own active
+assignment row only; unrelated project formatting/assessment scratch excluded and preserved.
+No other checkout/process edited or agent launched. Existing session coordinators, reset, note,
+billing/polling and strict selector owners reviewed; no business/schema policy adopted.
+
+**Change:** one API result owner requires exact Int32 0/1/-1 and checks caller cancellation before
+admission. Three coordinator owners use it without changing modes/order/waits/gates/pacing.
+Cleanup is arranged before cancellation validation can throw after a confirmed acquisition;
+note unwinds an earlier reset lock and connection disposal runs even on release failure. Fixed
+malformed-result exception does not expose SQL payload. No API route/contract/schema changed.
+The workers architecture page also corrects its superseded whole-pass signature scope by linking
+the already implemented 1.3.3.7 owner. That is documentation reconciliation, not another behavior.
+
+**Actual verification:** first test build had two fixture compile errors (nested primary-constructor
+parameter access), corrected before fail-first. Unfixed actual coordinator paths: **48 failed,
+50 passed, zero skipped, 98 total**, 9 seconds, retained
+`TestResults/session-admission-2026-10-10/unfixed/Joshu_LONGCHENPA_2026-10-10_01_17_38_net10.0.trx`.
+Null/string/long/undocumented-positive results admitted callbacks; cancellation races admitted
+callbacks in six paths (request pacing already observed cancellation). DBNull also demonstrated
+inconsistent exception type; known negative rejection already worked. That first fixture expected
+no release in the cancellation-after-acquisition case; this was wrong for request pacing, which
+already cancelled and released its known lock. Corrected the expectation to require release of
+all confirmed acquisitions. Rechecked all unchanged baseline coordinators with final tests:
+**47 failed, 51 passed, zero skipped**, 9 seconds,
+`TestResults/session-admission-2026-10-10/unfixed-confirmed/Joshu_LONGCHENPA_2026-10-10_01_21_14_net10.0.trx`.
+Only own three source files were temporarily restored from baseline; exact working bytes restored
+in finally, with no other checkout/process affected. Fixed: **98 passed,
+zero failed/skipped**, 5 seconds,
+`TestResults/session-admission-2026-10-10/fixed/Joshu_LONGCHENPA_2026-10-10_01_18_48_net10.0.trx`.
+Cases cover seven paths, strict outcomes, cancellation/malformed precedence, release order,
+callback/command/release failures and owned disposal. Synthetic ADO never reaches a server and
+does not model pooling/session loss. Release API/test build passed; existing warnings retained.
+Final focused/private SQL run: **162 passed, zero failed/skipped**, 49 seconds,
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_21_56_net10.0.trx`;
+owned `SatiSqlTests_143b7693ecd0485b9884557653ce62d9` stopped/deleted by wrapper. Covers final 98
+new cases plus current reset/dispatch/manual-resolution, cross-host request/poll pacing, note
+worker and poll/signature SQL selector regressions. Earlier fixed private run also passed 162
+in 44 seconds, `...01_19_22...trx`, owned instance cleaned. No full API/desktop/load claim.
+Documentation structure passed (46 root documents, 28 scoped owners, 25 current decisions);
+all 22 negative mutation proofs passed; working/staged whitespace checks passed at closure.
+
+**Limits/next step:** no real data, provider call, existing database apply, hosting/security,
+deployment/activation, measured capacity, global limiter or sealed readiness change. Continuous
+fencing, ambiguous cleanup and resource reservation remain unproved; DEC-0242 stays proposed.
+Next bounded local step: note-worker connection-lifetime evidence using private synthetic SQL,
+then the other enumerated owners; preserve protective transactions and record/provider evidence.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.3 worker connection-cost review
 
 **Identity/authority:** main `master` base `1802717a105dc8daa3cd4b9077e5000eec14de56`, checkout
