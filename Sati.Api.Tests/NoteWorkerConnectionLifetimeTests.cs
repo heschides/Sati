@@ -29,11 +29,15 @@ public sealed class NoteWorkerConnectionLifetimeTests
         probe.Observe(connection, "opened");
         probe.Observe(connection, "disposing");
         Assert.Equal(1, probe.Held);
+        Assert.Throws<InvalidOperationException>(() => probe.ResetEvidence());
         Assert.Equal(1, probe.Peak);
         Assert.Equal(2, probe.Attempts);
         probe.Observe(connection, "disposed");
         Assert.Equal(0, probe.Held);
         Assert.Equal(1, probe.SeenConnections);
+        probe.ResetEvidence();
+        Assert.Equal(0, probe.SeenConnections);
+        Assert.Equal(0, probe.Attempts);
     }
 
     [SqlServerFact]

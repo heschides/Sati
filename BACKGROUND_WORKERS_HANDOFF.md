@@ -607,6 +607,41 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — signature-worker connection-lifetime evidence — task 1.4.6
+
+**Status:** bounded test-only main acceptance complete; 228 focused cases passed; runtime
+unchanged. [Lifetime cases](Sati.Api.Tests/SignatureWorkerConnectionLifetimeTests.cs) run the
+actual hosted selector, projection, package and mail owners with real session reset coordination
+against owned synthetic SQL. Demo component gates match each other; the physical test database
+remains uniquely named, with no deployed startup/identity assertion or external provider call.
+Synthetic provider wrappers and the [shared probe](Sati.Api.Tests/WorkerConnectionProbe.cs)
+observe operations; setup/evidence use separate boundaries and the probe refuses to reset while
+any connection is held. Optional test-fixture registration overrides preserve existing defaults.
+
+Normal full-pass peak is two logical connections: reset plus selector or fresh business work.
+Projection audit/attestation saves occur inside a business transaction; selector disposal prevents
+overlap. Original blob read, write-once package blob, invitation unwrap and receipt protection
+each observe two, preserving the package transaction across dependencies. A blob fault rolls
+back package/receipt while retaining the already committed projection; later fresh host completes
+one package/event. Cancellation at blob read stops mail, rolls back package and closes owned
+connections. The host's existing per-record failure and cancellation behavior is unchanged.
+
+Mail payload unwrap observes reset alone (one); final POST observes reset plus retained
+revocation-validation transaction (two). The synthetic POST callback's cancellation preserves
+the committed GUID/lease and no completed outcome. After lease expiry a fresh host uses GET-only
+with that GUID and reset alone, then commits completion: no second POST. GET result is synthetic
+provider status, not recipient delivery. All normal/fault/cancel cases finish with zero tracked
+held connections; an intentionally extra held SQL context at package read raises the interval to
+three and makes the two-connection assertion fail, then cleans up and preserves package effects.
+
+These are logical connection/dependency intervals with successful actual SQL cleanup, not
+physical pool eviction, arbitrary provider-session loss, fencing, failure-safe reservation K,
+global admission, capacity/latency or deployed evidence. Immutable blob orphan/recovery and
+existing five-minute/five-attempt/GUID mail rules retain their owners. No protective transaction
+was shortened and no app/schema/business policy changed. [Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-146-signature-worker-connection-lifetime-evidence)
+owns actual checks. Next bounded local slice is dispatch lifetime evidence before polling and
+broader consumer enrollment/backend adoption.
+
 #### October 10 — note-worker connection-lifetime evidence — task 1.4.5
 
 **Status:** bounded test-only main acceptance complete; 139 focused cases and final six passed,

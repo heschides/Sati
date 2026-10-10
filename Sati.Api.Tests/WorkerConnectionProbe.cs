@@ -22,6 +22,15 @@ internal sealed class WorkerConnectionProbe : DbConnectionInterceptor
     internal int AttemptedConnections { get { lock (sync) return attempted.Count; } }
     internal string[] Events { get { lock (sync) return events.ToArray(); } }
 
+    internal void ResetEvidence()
+    {
+        lock (sync)
+        {
+            if (held.Count != 0) throw new InvalidOperationException("Cannot discard held connection evidence.");
+            identities.Clear(); attempted.Clear(); events.Clear(); peak = 0; attempts = 0;
+        }
+    }
+
     internal void Observe(DbConnection connection, string kind)
     {
         lock (sync)

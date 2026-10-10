@@ -1,5 +1,44 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.6 signature-worker connection-lifetime evidence
+
+**Identity/authority:** main `master` base `c05c865888fe09ef50a791a3f64b56a258366ab4`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit main test-only assignment under continued
+Agenda approval. Current coordination/task/governance and signature/reset/projection/package/mail
+sources present and reviewed. Included input: own active row; unrelated project formatting and
+assessment scratch excluded/preserved. No other checkout/process touched or agent launched.
+
+**Result:** real hosted phase/selection/processing with real SQL reset lease and synthetic
+blob/key/mail providers. Component Demo gates agree; physical database remains test-owned and
+uniquely named, no deployed identity claim. Test-only optional service registration and probe
+reset guard preserve original fixture defaults. Normal peak two, no selector/business overlap;
+projection, package blob/key barriers and final mail POST retain transaction connections.
+Mail unwrap and existing-GUID GET retain reset only. Package fault/cancel verify rollback,
+projection retention, later single-package completion and no premature mail. Cancelled synthetic
+POST entry preserves GUID/lease; fresh host after expiry GETs exactly that GUID without another
+POST, completes status/attempt/lease evidence. Extra held SQL connection makes two-connection
+assertion fail; actual cleanup restores two/zero and package evidence remains valid.
+
+**Actual verification:** first build failed on a fixture's wrong ServerForm field name; corrected
+to CompletedDate before execution. Release API/test build passed with existing warnings.
+Six new cases **passed, zero failed/skipped**, 21 seconds,
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_32_22_net10.0.trx`;
+owned `SatiSqlTests_3bfd654c8b234e3e92499a54aae7c6bb` stopped/deleted by wrapper.
+Final focused signature/note-probe/admission regression **228 passed, zero failed/skipped**,
+26 seconds, `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_33_09_net10.0.trx`;
+owned `SatiSqlTests_7fecf496ac0e4517b6503c1bfc58bedc` stopped/deleted. No full API/desktop/load
+claim. Final probe reset/debt guard case passed (1, zero failed/skipped), 15 ms,
+`TestResults/signature-lifetime-2026-10-10/probe-reset/Joshu_LONGCHENPA_2026-10-10_01_35_14_net10.0.trx`.
+Documentation structure passed (46 root documents, 28 scoped owners, 25 current decisions), all
+22 negative proofs passed, and working/staged whitespace checks passed at closure.
+
+**Limits/next step:** tests only, no runtime/schema/business policy, actual mail/blob/key service,
+real/application data, existing database apply, hosting/security, benchmark, activation or sealed
+evidence change. Synthetic provider status does not establish recipient delivery. Successful
+logical close/dispose does not establish physical pool eviction or arbitrary failure/reconnect
+fencing/K/global capacity. DEC-0242 remains proposed. Next bounded slice: dispatch connection
+lifetimes, then polling and complete shared-consumer enrollment before admission adoption.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.5 note-worker connection-lifetime evidence
 
 **Identity/authority:** main `master` base `c897b7bc053c6813d847583a5daa16d40907b838`, checkout

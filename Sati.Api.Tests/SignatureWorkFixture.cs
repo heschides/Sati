@@ -130,7 +130,7 @@ internal sealed class SignatureWorkFixture(bool sql, IInterceptor[] hooks) : IAs
         return new(agency, completion.Id, request.Id, form.Id, mail.Id, frozen.BlobPath);
     }
 
-    internal ServiceProvider Services()
+    internal ServiceProvider Services(Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IDbContextFactory<ApiDbContext>>(Factory()); services.AddSingleton<TimeProvider>(Clock);
@@ -142,7 +142,7 @@ internal sealed class SignatureWorkFixture(bool sql, IInterceptor[] hooks) : IAs
         services.AddSingleton<SignatureMailWorker>(); services.AddSingleton<SignatureComplianceProjectionService>();
         services.AddSingleton<SignatureWorkerGate>(); services.AddSingleton<SignatureWorkSelector>();
         services.AddSingleton<Microsoft.Extensions.Logging.ILogger<SignatureProcessingService>>(NullLogger<SignatureProcessingService>.Instance);
-        services.AddSingleton<SignatureProcessingService>(); return services.BuildServiceProvider();
+        services.AddSingleton<SignatureProcessingService>(); configure?.Invoke(services); return services.BuildServiceProvider();
     }
     public ValueTask DisposeAsync() => Database.DisposeAsync();
     private static string Hash(byte[] value) => Convert.ToHexString(SHA256.HashData(value));
