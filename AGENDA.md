@@ -130,7 +130,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.5.1** | [API workload admission inventory](#151--api-workload-admission-inventory) | Complete; bounded source-family review, no numeric/runtime policy. |
 | **1.5.2** | [Shared admission adoption prerequisites](#152--shared-admission-adoption-prerequisites) | Complete for direction/assignment; operating adoption remains separate. |
-| **1.5.3** | [Shared accounting candidate and deterministic limits](#153--shared-accounting-candidate-and-deterministic-limits) | Ready; source candidate/model tests, no live limiter/capacity adoption. |
+| **1.5.3** | [Shared accounting candidate and deterministic limits](#153--shared-accounting-candidate-and-deterministic-limits) | Complete for unregistered candidate/main acceptance; 182 focused cases passed, no live limiter/capacity adoption. |
+| **1.5.4** | [Durable controller recovery and retirement proposal](#154--durable-controller-recovery-and-retirement-proposal) | Ready after 1.5.3 acceptance; local protocol proposal, no backend provisioning. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
 
@@ -172,7 +173,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.4.11 — Mutation admission-result hardening** | Complete; bounded main source acceptance | Main integration thread / main integration thread | Nine fail-first failures; final 171 focused cases passed, including reset and exception/health boundaries. | Middleware raw-connection constructor seam/result guard, narrow actual-call synthetic tests, W8/agenda/evidence. Preserve target/exemptions/lock order and response. |
 | **1.5.1 — API workload admission inventory** | Complete; bounded main source/documentation acceptance | Main integration thread / main integration thread | Base `d0e8fed`; representative route/pipeline/limits and proposed deterministic cases reviewed; no measured capacity. | Its W8 subsection, main agenda/assignment and dated evidence only; no application/schema/test changes or external/data access. |
 | **1.5.2 — Shared admission adoption prerequisites** | Complete; direction and successor assignment | Main integration thread / main integration thread | Josh's October 10 direction; DEC-0244 and dated W8/evidence. | Direction/assignment accepted; backend/numbers/enrollment remain unadopted for operation. |
-| **1.5.3 — Shared accounting candidate and deterministic limits** | Ready; assigned main source/test candidate | Main integration thread / main integration thread | DEC-0244/current W8 inventories; start after 1.5.2 closure. | Unregistered API candidate, focused deterministic tests, canonical W8/architecture/agenda/evidence. No DI/route/workflow/schema or existing DB/cloud/data access. |
+| **1.5.3 — Shared accounting candidate and deterministic limits** | Complete; unregistered candidate/main acceptance | Main integration thread / main integration thread | Base `18ba76a`; 182 focused cases/guard mutations and dated W8/evidence. | Model-only guarantees; no DI/route/workflow/schema or operating capacity adoption. |
+| **1.5.4 — Durable controller recovery and retirement proposal** | Ready; assigned main protocol proposal | Main integration thread / main integration thread | 1.5.3 restored-source acceptance, DEC-0244 and enrollment inventories. | W8 protocol subsection, proposed decision/index if needed, agenda/evidence. No runtime activation, DB/schema/cloud changes or real-data access. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -241,10 +243,10 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.5.3 — Shared accounting candidate and deterministic limits**.
+**Next numbered task:** **1.5.4 — Durable controller recovery and retirement proposal**.
 Josh selected overlapping instances and daily casework/recovery priority on October 10 and
-authorized proposed technical limits/tests. Direction/assignment chunk 1.5.2 is closed; 1.5.3
-tests a shared accounting candidate. Real backend/enrollment/closure/pool facts remain integration
+authorized proposed technical limits/tests. Direction 1.5.2 and unregistered candidate tests 1.5.3
+are complete. 1.5.4 specifies durable recovery/retirement. Real backend/enrollment/closure/pool facts remain integration
 and activation prerequisites; they do not prevent candidate source tests.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
@@ -729,6 +731,34 @@ in-memory model is not a distributed backend or live enforcement.
 canonical ownership/evidence and structure/negative/whitespace checks. No DI/route/workflow changes,
 schema, runtime activation, existing DB, real data, external/cloud/service calls, benchmark or
 sealed evidence changes. Main integrates/commits/pushes verified chunk; backend/enrollment is separate.
+
+**Result:** [W8 model](BACKGROUND_WORKERS_HANDOFF.md#october-10--shared-accounting-candidate--task-153)
+and [dated evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-153-shared-accounting-candidate):
+182 focused cases passed, four weakened guard variants detected, source restored exactly and
+documentation gates passed. Candidate only; no running workflow or operating budget changed.
+
+### 1.5.4 — Durable controller recovery and retirement proposal
+
+**Eligibility:** after 1.5.3 source/model acceptance. Josh authorized multiple-instance design and
+daily/recovery priority; numeric operating adoption remains separate. Main owns this proposal.
+
+**Bounded slice:** specify a concrete durable admission/recovery/retirement protocol and backend
+selection requirements. Model lost responses, duplicate/conflicting requests, controller restart,
+old-owner debt, stale releases, terminal replay retirement and target/epoch fencing. Define finite
+controller-call admission/deadlines and protected recovery access; identify enrollment ordering
+before identity/mutation SQL and expensive work. Independent model copies cannot serve as a
+deployment budget. Do not reclaim live debt based only on clocks or disappearance of a process.
+
+**Dependencies/owners:** DEC-0244/DEC-0242; W8 candidate/lifetime and API/adjacent consumer
+inventories; operations/security/identity/reset/record/uncertainty owners. Physical pools, outside
+consumers and failure-safe costs remain integration prerequisites. If a concrete backend cannot
+satisfy closure/restore/fencing, retain a proposed alternative and exact proof gap, not adoption.
+
+**Boundaries/acceptance:** source-grounded protocol/failure matrix, bounded deterministic successor,
+dated evidence and documentation structure/negative/whitespace checks. Docs/proposal only: no
+runtime registration, new infrastructure, existing database/schema/data access, cloud/security
+change, release/deployment, benchmark or sealed evidence change. Later implementation/enrollment
+gets its own assignment; this proposal requires no new product choice already supplied by Josh.
 
 ## Preserved open-work inventory
 

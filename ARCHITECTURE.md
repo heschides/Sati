@@ -10,6 +10,11 @@ The API's [session admission result guard](BACKGROUND_WORKERS_HANDOFF.md#october
 centralizes strict SQL lock outcomes and cancellation-before-callback checks for existing worker
 coordinators. This local guard establishes neither a shared resource budget nor continuous fencing.
 
+The API now also contains an unregistered
+[shared accounting candidate](BACKGROUND_WORKERS_HANDOFF.md#october-10--shared-accounting-candidate--task-153)
+for DEC-0244's multiple-instance/protected-workload direction. It is a tested atomic reference
+model, with no route/worker integration or durable backend; operating budgets remain proposed.
+
 ## Operating boundaries
 
 Synthetic Demo: WPF ViewModel → feature interface → Cloud HTTP service → Sati.Api → shared

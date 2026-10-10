@@ -607,6 +607,46 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — shared accounting candidate — task 1.5.3
+
+**Source scope:** main base `18ba76a`, same main checkout; task 1.5.3's explicitly assigned
+unregistered source/model tests. [SharedWorkloadBudgetCandidate](Sati.Api/Infrastructure/SharedWorkloadBudgetCandidate.cs)
+is an internal API reference model, never registered/called by routes, workers, startup or middleware.
+[Deterministic tests](Sati.Api.Tests/SharedWorkloadBudgetCandidateTests.cs) use synthetic identities
+and independent owner incarnations sharing **one model object**. Independent model copies would
+multiply capacity and lose crash debt; this is not a durable distributed controller.
+
+The [1.5.2 profile](#october-10--overlapping-host-budget-direction--task-152) and DEC-0244 own
+proposed values/cost rationale. These tests establish the model's transitions, not runtime resource
+limits, SQL-provider closure, deployment-wide capacity, dependency quotas or latency. No policy
+activation, route authorization/record rule, application workflow or schema changed.
+
+| Candidate mechanism | Enforced inside this model | Integration/operating gap |
+|---|---|---|
+| Protected classes | Default daily 12/recovery 8/background 8/validation 4; aggregate 32, no borrowing. One agency max 4 **per class**, not across all classes. Representative 16/32/64-credit profiles exercised. | Actual routes need trusted class/scope binding, checked cost and validation placement. No preemption, time fairness or eventual service proof. |
+| Whole reservation | Catalogue alone supplies operation class/cost; nested attempts cannot exceed K, including failed/uncertain opens. Inner closes leave full K charged until outer release. | Provisional normal-path K is not verified failure-safe K. No SQL adapter consumes it; existing reset/account/revocation/transaction owners remain authoritative. |
+| Exact identity/replay | Exact target/epoch/request/incarnation fingerprint; one grant nonce, replay without double debit. Conflicting/stale handles cannot change another grant. Released replay stays terminal. | Process identity/scope is synthetic already-validated input. No authentication, distributed response-loss or business-request idempotency implementation. |
+| Debt/cleanup | Release refuses outstanding children and all uncertain grants, even with zero children. No TTL, replacement-owner reclaim, epoch rotation or unfenced reconciliation. Cancellation after grant cannot free credit. | A child-close call is synthetic positive evidence; provider exceptions/dispose attempts are not proof. Controller memory loss is unsafe; real fencing/recovery remains open. |
+| Bounded state | Default 128 retained accepted requests, including terminal replay, and 16 child **attempt** identities per grant (2,048 retained children total). A closed child ID cannot authorize another open; a reused connection object needs a new attempt ID. Full metadata refuses new grants. | Deliberate service stop after 128 distinct completed grants without a retirement protocol. Safe retirement is mandatory before activation; this is not an operating default. |
+| Admission/outage | Try-admission returns typed denial; no resource wait-list, connection open or business callback in the candidate. Outage refuses grants/child changes/release while retaining state. | The local mutex models atomic serialization; it does not bound controller-call/HTTP concurrency, mutex delay, network timeout or waiting upstream. Zero resource waiters is not a whole-request deadline. |
+
+**Acceptance:** final restored-source 182 focused cases passed (50 candidate/132 existing synthetic
+SQL admission), zero failed/skipped, five seconds. Documentation structure, 22 negative proofs
+and whitespace passed. Four deliberately
+weakened guard variants were exercised: class-cap removal, uncertainty-release removal,
+nested-cost removal and request-fingerprint removal (4/2/11/3 expected assertion failures across
+five targeted runs). These are mutations of a new candidate,
+not evidence of an existing live-system bug. The source is restored exactly after each sequence.
+The [dated ledger](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-153-shared-accounting-candidate)
+records exact counts, initial build failure, TRX and hashes. The 32-credit profile covers modeled
+classes only: outside consumers/physical pools remain unbounded and are not a hidden allowance.
+
+**Next bounded step:** 1.5.4 durable controller/recovery/retirement protocol proposal, including
+failure and response-loss transitions, bounded controller calls and an enforceable consumer
+enrollment order. Prioritize daily casework and recovery; preserve no-credit-reuse uncertainty.
+Backend adoption/implementation and actual-call integration require their own concrete reviewed
+slice. No database, real data, external service, benchmark or sealed release evidence used here.
+
 #### October 10 — overlapping-host budget direction — task 1.5.2
 
 Josh's October 10 direction selects multiple overlapping instances and daily casework/recovery

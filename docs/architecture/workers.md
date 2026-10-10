@@ -73,6 +73,13 @@ owns strict acquisition outcomes and cancellation-before-callback for current SQ
 The [connection-cost review](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--worker-connection-cost-review--task-143)
 distinguishes conditional normal connection spans from unverified cleanup/failure-safe costs.
 
+Task 1.5.3 adds an **unregistered reference model** in API infrastructure for
+[shared workload accounting](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--shared-accounting-candidate--task-153)
+under DEC-0244. Synthetic independent owners share one atomic state model; protected classes,
+exact replay and retained uncertainty debt have deterministic tests. There is no DI registration,
+route/worker enrollment or actual distributed backend. Bounded terminal records deliberately stop
+new work until a safe retirement protocol exists. Numeric profiles remain proposed test parameters.
+
 Remaining W8: sustained
 fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant
 sessions and dependency budgets, API admission and synthetic load/live owner evidence. Account

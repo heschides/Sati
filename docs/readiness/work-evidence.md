@@ -1,5 +1,47 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.5.3 shared accounting candidate
+
+**Identity/authority:** main `master` base `18ba76a953e4a36f35f209575b3ab2484b01b260`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; main assignment and Josh's explicit multiple-instance,
+daily/recovery and proposed-limit test direction in DEC-0244. Included own assignment edit;
+unrelated project formatting/assessment scratch preserved/excluded. No other checkout/agent or
+process modified. Current coordination/governance and W8/architecture/decisions/operations/
+security/identity/reset/record/recovery owners consulted.
+
+**Result:** [W8 candidate matrix](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--shared-accounting-candidate--task-153)
+owns model guarantees/gaps. New internal unregistered API accounting class and focused tests;
+no DI registration, middleware/route/workflow/schema change. One shared atomic object models
+overlapping incarnations. It protects proposed classes/agency caps, catalogue K, exact identity,
+replay, non-expiring uncertainty and bounded retained metadata. No authority or operating global
+limit is established. Safe retirement/controller recovery is mandatory before activation.
+
+**Checks:** restored-source focused run **182 passed, zero failed/skipped**, five seconds: 50 new
+candidate cases and 132 existing synthetic SQL admission cases. TRX:
+`TestResults/budget-candidate-2026-10-10/final/Joshu_LONGCHENPA_2026-10-10_07_48_54_net10.0.trx`.
+Documentation structure (46 root/28 scoped/26 decisions), all 22 negative proofs and whitespace
+passed. Existing API CS8602 and six test warnings remain; candidate adds no final warnings.
+Initial 46-case candidate pass preceded final additions; then 48/49 passed with one null-profile
+assertion failure because an incremental build reused the earlier API assembly after a source
+edit during compilation. Forced timestamp/rebuild resolved it; 49/49 passed (68 ms). No source
+changes during subsequent builds/mutations. Four deliberately weakened candidate guard variants
+produced expected assertion failures: class cap 4/4, uncertainty release 1/1 plus a separate
+zero-outstanding-child case 1/1, nested cost 11/11, fingerprint 3/3. TRX below
+`TestResults/budget-candidate-2026-10-10/mutations/{class-cap,uncertain-release,uncertain-no-children,nested-cost,fingerprint}`.
+All failed for assertion mismatches, not compilation/discovery failure. Exact byte restoration
+passed; final build used the restored candidate. Byte SHA256:
+candidate `239880356618A7E7A2397117101AD86115A9898EABE50944F6E3E4DB0748102D`;
+tests `4B68580341EB37DCC585E8C948AE3B6E75392E5AF0A3025683D40A7421320E68`.
+These are synthetic model mutations, not provider failure tests or proof of an unfixed runtime bug.
+
+**Limits/next:** no databases, PHI, external services, dependency quotas, benchmark or load/capacity
+measurement. Simulated controller outage is not loss/restart of a durable backend. Identity input
+is not authentication; close confirmation is not SQL closure/fencing evidence. No elapsed response
+goal, fairness under arrivals or whole-request/call deadline established. Full metadata deliberately
+denies work after 128 completed distinct requests; operating retirement/recovery remains required.
+MT09/OP10 working source/test evidence only; sealed releases/scores unchanged. Main next 1.5.4
+is the concrete durable controller/recovery/retirement and enrollment protocol proposal.
+
 ## 2026-10-10 — SATI-WRK-001 1.5.2 overlapping-host budget direction
 
 **Identity/authority:** main `master` base `148b4b707a75039dcc922d70ca8cc28a9f55c1b9`, checkout
