@@ -1,5 +1,43 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.3.3.5 signature fairness design
+
+**Identity/authority:** main `master` at `e175a73e80068983846e39cfdd28016de197ff12`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`. Included uncommitted input: main-owned active task
+1.3.3.5 assignment/status only; no runtime source change. Preserved project formatting and
+assessment scratch. Josh authorized continued Agenda progression/local implementation choices;
+main selects the concrete direction in accepted DEC-0243, without claiming separate detail review.
+
+**Source review/findings:** required governance, architecture/decisions, W8/integrated inventory,
+admission proposal, operations/reset and regulatory/signature owners read. Current hosted scan
+does not join Demo reset, checks flags only at tick start, and uses a system timer. Projection can
+repeat a damaged global head, package position is process-local, mail globally orders due rows.
+Read current candidate eligibility, immutable projection/package/receipt, outbox due/lease/attempt/
+operation/revocation owners and restricted portal mapping. No current defect/exploit or vendor
+behavior was inferred from historical test totals. Guessed standalone paths/wildcards failed;
+rg discovery found SignatureInfrastructure/SignatureStaffInfrastructure and actual reset owners.
+
+**Selected source design:** preserve ordered three phases, ten offers per phase and first-tick
+ten-second cadence. Separate durable per-phase agency and in-agency ID position, bounded visited
+items, short strict SQL selector and fresh scoped authoritative processing. Mail's due eligibility
+remains, while eligible-ID rotation changes scheduling priority explicitly. Add reset/timer/gate
+acceptance first (1.3.3.6), then source metadata/selector/shared projection query/scoped mail claim
+(1.3.3.7). Portal capability/business evidence do not expand. W8 owns complete design, alternatives,
+conditional A/A×N opportunities and deterministic implementation acceptance plan.
+
+**Actual checks/evidence:** source/documentation review only; no application build/test, database,
+existing apply, real data, vendor/cloud call, benchmark, runtime code/schema/test edit or activation.
+Documentation structure, all 22 negative proofs and whitespace passed for design closure.
+Registered unused DEC-0243 and next bounded tasks; proposed cases are not test results. No sealed
+release/rubric/score update or measured capacity/elapsed-time/delivery claim.
+
+**Limits/next:** external dependency/CPU/whole-pass time, multi-host aggregate quotas, purpose
+reserve, note crash/membership, shared admission backend/values/enrollment and operating evidence
+remain open. Shared reset participation does not make a later baseline restoration safe for
+externally signed/sent data; guard/reconciliation/activation need separate review. Next bounded
+task is 1.3.3.6 reset/hosted acceptance, then 1.3.3.7 on passing prerequisite. Other checkout and
+processes remain untouched.
+
 ## 2026-10-09 — SATI-WRK-001 1.4.2 main admission proposal review
 
 **Identity/authority:** main `master` at `9132a590a6cb78ff818bc328e4ae05aa022aa737`, checkout

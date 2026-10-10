@@ -1,5 +1,9 @@
 # Sati — Decision index and supersession
 
+[DEC-0243](docs/decisions/current/2026-10-10-DEC-0243.md) selects bounded local signature-worker
+reset/timing and durable phase/agency/item turn work. Implementation and operating acceptance
+remain separate; signature evidence, revocation and uncertain-mail recovery retain their owners.
+
 The main-reviewed resource admission proposal remains proposed in
 [DEC-0242](docs/decisions/current/2026-10-09-DEC-0242.md). Accounting, hosting/fencing, complete
 consumer costs and budget values must precede backend/runtime adoption; source fairness does

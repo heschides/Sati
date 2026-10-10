@@ -607,6 +607,103 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — signature fairness design — task 1.3.3.5
+
+**Status:** source/design complete; main selects bounded local direction under continued-work
+authority in [DEC-0243](docs/decisions/current/2026-10-10-DEC-0243.md). No runtime/schema/test
+change in this design. Baseline is main `e175a73`; source inputs are present, with only the
+main-owned active assignment/status update uncommitted. Resource tasks 1.4.1/1.4.2 are integrated
+inputs; DEC-0242 remains proposed and supplies no shared capacity credit.
+
+**Source inventory and safety boundaries.**
+
+| Path/owner | Current selection and failure/restart behavior | Preserved boundary / required change |
+|---|---|---|
+| [Hosted scan](Sati.Api/Infrastructure/SignatureProcessingService.cs) | System-time ten-second PeriodicTimer; first scan waits for a tick. Feature/WorkersEnabled checked once at tick start. Up to ten projections, then ten package IDs, then ten mail calls, sequentially. No shared Demo worker reset dependency. | Preserve cadence, default-off exact Demo/Testing identity and phase order/count. Add injected timer/pass seam and checks before later work. Join reset before discovery/processing; no work when reset is unavailable. This supplies exclusion during the held callback, not retention/recovery after a later reset. |
+| [Projection](Sati.Api/Infrastructure/SignatureComplianceProjectionService.cs) | Globally first eligible unprojected completion ID, with exact frozen/artifact mapping and form/release target existence. Failure escapes the phase; next tick can select the same damaged head. No scan cursor. | Share the existing candidate query through its current owner, avoiding a second eligibility copy. Fairly offer a stored agency/item, then current scoped eligibility and ProjectCompletionAsync recheck. Preserve serializable immutable projection/attestation effects, clinical ownership and withdrawal rules. |
+| [Package](Sati.Signatures/SignatureCompletionWorker.cs), hosted PreparePackages | At most ten globally ordered IDs above process lastCompletion. Position advances before Build; wraps to zero on an empty higher range. Restart resets position. | Preserve BuildAsync idempotency, selected episode/hash checks, write-once blob, protected receipt and orphan review. Separate durable scheduling position replaces process-only scan; no new package receipt/delivery fact. Transaction spans blob/key/rendering work and remains a resource/deadline gap. |
+| [Mail](Sati.Signatures/SignatureMailWorker.cs) | Earliest due uncompleted row by NextAttemptAtUtc/Id; claim serializable, five-minute committed lease, five counted attempts. Stable operation GUID, GET-only recovery, final revocation read-lock span and stale-owner predicates. | Selector only offers an eligible stored agency/outbox hint. Add an explicitly scoped candidate-processing entry that conditionally claims that same due row, preserving existing legacy entry and one mail claim owner. No attempt increment, operation or payload write in selection. Preserve expiry/due/lease checks, suppression, integrity, terminal states, retry dates and no uncertain re-POST. |
+| [Persistence](Sati.Persistence/Data/SignaturePersistenceModel.cs), API/full context; [reset](Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs) | Immutable signature evidence/revision guards and composite scope; portal has its own restricted SignatureDbContext. Reset bypasses its SQL path outside exact Demo API configuration. Baseline restore deletes/replaces rows after exclusive reset. | Add scheduling metadata only to full server models, not portal contracts/permissions. Require matching signature/API environment mappings before hosted SQL. Reset participation does not prove a later baseline restore can safely erase external signature/mail evidence; review that operating guard before activation. |
+
+**Selected local design.** Keep the three phases and their existing maximum **10 offers each**
+per tick/pass (at most 30 total). Within each phase, use agency-first durable round robin, then
+durable ascending record-ID rotation inside the selected agency. At most ten locally visited
+item IDs per phase prevents the same damaged item from consuming the entire pass. Next-greater
+then wrap uses scalar/one-item projections; no whole roster/candidate materialization. Advance
+the scheduling offer before processing. Missing/stale/ineligible work spends that offer and is
+rechecked under its authoritative processor rather than treated as success.
+
+Three seeded phase positions and one agency/phase item position per participating pair are
+separate from completion, package, clinical attestation and outbox revisions. Proposed source
+entities: SignatureWorkRotation (phase key, nullable LastAgencyId, positive Revision) and
+SignatureAgencyWorkRotation (agency/phase key, nullable positive LastItemId, positive Revision).
+Use immutable scope/deletion/revision guards, positive agency/phase checks, scoped relationships,
+additive agency/ID selection indexes and a source migration with refusal of used-position Down.
+Map through one shared Persistence scheduling owner to API/full contexts. Portal maps no new
+metadata and gains no clinical/mail capability. Selection does not mutate business rows.
+
+One constructor-injected API selector owns a short named zero-retry transaction with zero-wait
+transaction application lock per phase. Strict 0/1 ownership, cancellation precedence and verified
+ownership precede committed Selected/Empty results; no outer retrying execution scope. Dispose
+the selector context/transaction before processor/storage/key/mail work. Known selector contention
+or unavailable reset ends the pass; shared discovery/selection failures reach the hosted safe
+boundary. Existing per-item non-cancellation processing containment remains bounded and content-free;
+no new immediate retry. A committed offer surviving uncertain return may skip an item without
+performing it; it is scheduling evidence only. Existing processors revalidate before effects.
+
+Each item holds the existing shared Demo reset exclusion across selection, fresh scope/eligibility,
+processor dependency calls and evidence commit/cleanup. Do not await a future agency resource
+grant inside it. First prove reset participation with the existing pass, then move to item-scoped
+callbacks with selector integration. Feature/worker/identity/cancellation checks occur before
+admission, after admission and before each subsequent offer/callback; already initiated mail
+keeps current cancellation/uncertainty rules. Known reset contention consumes no scheduling
+position, mail attempt or business effect. Testing stand-ins stay explicit; configured Demo
+requires SQL Server. Reject mismatched signature/API target mappings before discovery.
+
+**Ordering change and alternatives:** phases retain order, quantum and cadence. Projection/package
+item IDs retain their natural order with durable wrap; mail still requires its due timestamp,
+but rotates eligible record IDs within an agency instead of globally prioritizing the oldest due
+timestamp. This is an explicit scheduling choice; due/attempt/recovery rules remain unchanged.
+Invitation/Receipt share the same lane; stable finite item rotation prevents one eligible item
+being selected forever but gives no separately reserved purpose quota. Flat global record order,
+process-only cursors and repeating a damaged projection head are rejected. Immediate retry,
+parallel external phases, narrowed revocation locks and new provider quotas are outside this slice.
+
+**Conditional opportunities:** with A stable eligible agencies and N stable eligible items in a
+phase/agency, successful shared selection offers an agency within A phase offers and its item
+within A × N phase offers, provided gates remain enabled, prior work terminates, leases become
+available and participating hosts use the compatible selector. Visited-item exclusions and
+changing eligibility/churn weaken a frozen-cohort bound; no wall-time or delivery guarantee.
+Mail availability is conditional on due/lease status, not permission to resend. Phase count is
+bounded; dependency SQL/blob/key/render/sender time and multi-host aggregate execution remain
+unbounded. Metadata cardinality, physical sessions, provider starts and total memory are not
+measured or limited by this design. A stalled package can still delay later mail phases.
+
+**Bounded implementation sequence and deterministic acceptance.**
+
+1. **1.3.3.6 reset/hosted boundary:** extract a pass seam without changing selection, inject
+   PeriodicTimer's TimeProvider, join existing reset coordination and recheck gates/cancellation.
+   Fail-first real hosted/pass tests prove discovery formerly ran despite denied/exclusive reset;
+   barrier tests prove reset cannot acquire during callbacks and is available after success/fault/
+   cancellation. No arbitrary sleeps, actual mail or shared database; use fresh synthetic fixtures.
+2. **1.3.3.7 durable signature selection:** implement both metadata/source migration and selector,
+   share projection eligibility, add scoped mail claim entry and replace process cursor/global
+   scans. Retain fail-first damaged-head/agency/restart ordering and cancellation/gate tests.
+   Use actual processing owners with synthetic blob/key/mail providers; verify business revision,
+   projection/audit, package/receipt and provider GUID behavior rather than counts alone.
+3. Private SQL proves phase serialization, scope/order, lost ownership, pre/post-commit uncertainty
+   without execution replay, migration model/index parity and guarded Down. Mutants must fail
+   for always-first agency/item and removed ownership checks; restore exact source before final
+   acceptance. Combined appropriate API/signature/portal-boundary regressions preserve revocation,
+   lease expiry, GET-only recovery and immutable evidence. Documentation gates accompany each chunk.
+
+Source migrations, owned synthetic tests and implementation are local-only. Existing database
+apply/rollback, reset-baseline uptake, compatible all-host rollout, signature/mail operating
+approval, external reset retention guard, activation and release remain separate. Broader note
+restart/membership, resource admission, dependency deadlines, CPU cancellation and combined load
+remain open. [Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-1335-signature-fairness-design)
+owns actual design checks; proposed acceptance above is not a test result.
+
 #### October 9 — shared SQL/session admission design task 1.4.2
 **Main review — October 9, source `9132a59`:** task 1.4.2 is complete as a reviewed/integrated
 proposal. The retained investigator text below describes its original handoff state and source.

@@ -216,6 +216,15 @@
       "status": "proposed",
       "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0243",
+      "date": "2026-10-10",
+      "title": "Bounded durable signature-worker turns",
+      "path": "docs/decisions/current/2026-10-10-DEC-0243.md",
+      "status": "accepted",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

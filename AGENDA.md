@@ -115,7 +115,9 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.4** | Resource limits: bound shared connections, concurrency and operation times | Open; includes global/agency budgets, bounded queued work, dependency quotas and measured hosting choices. |
 | **1.4.1** | [Resource-limit inventory](#141--resource-limit-inventory) | Complete for main-reviewed source/documentation integration; current-source corrections in W8; no adopted limiter. |
 | **1.4.2** | [Shared SQL/session admission design](#142--shared-sqlsession-admission-design) | Complete for main-reviewed proposal integration; DEC-0242 remains proposed, backend/value adoption open. |
-| **1.3.3.5** | [Signature fairness design](#1335--signature-fairness-design) | Ready; independent source/safety design before implementation. |
+| **1.3.3.5** | [Signature fairness design](#1335--signature-fairness-design) | Complete for main source/design integration; DEC-0243 selects bounded local implementation. |
+| **1.3.3.6** | [Signature reset and hosted boundary](#1336--signature-reset-and-hosted-boundary) | Ready; fail-first reset/timing/gate acceptance before changing selection. |
+| **1.3.3.7** | [Durable signature selection](#1337--durable-signature-selection) | Blocked pending 1.3.3.6 acceptance; selected local source design. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
@@ -144,7 +146,9 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.3.3.4 — Note-maintenance fairness review** | Complete; 35 existing tests passed | Main integration thread / main thread | Existing note batch/discovery/cache/failure policy; completed polling slice. | Its W8 review, assignment/status and dated evidence; focused existing synthetic tests. No runtime policy change without a defined successor. |
 | **1.4.1 — Resource-limit inventory** | Complete for main-reviewed documentation integration | Investigation chat `01a12363-741d-79b0-8b4d-dc2f7e7c5a1b`, `C:/Users/Joshu/.codex/worktrees/c3a1/Sati`, base `40e091b` / main thread | Captured source digest verified; current dispatch/polling drift reconciled against main `72cec51`. | Only its W8 inventory/assignment/evidence extracted; inherited changes and dedicated checkout preserved. No runtime source edits. |
 | **1.4.2 — Shared SQL/session admission design** | Complete for main-reviewed proposal integration; adoption remains open | Same investigation chat/worktree, separately assigned by Josh / main thread | Current source corrections retained; DEC-0242 proposed; backend/enrollment/cost/value/fencing prerequisites unresolved. | Only its W8 proposal/assignment/evidence extracted; main review/decision registration. No implemented limiter or capacity claim. |
-| **1.3.3.5 — Signature fairness design** | Ready | Main integration thread / main thread | Integrated resource inventory/proposal; signature reset, projection/package/mail and revocation/recovery owners. | Its W8 source/design, proposed/adopted decision, assignment/global ordering and dated evidence. No runtime/schema/test edits in design. |
+| **1.3.3.5 — Signature fairness design** | Complete; DEC-0243 selected local direction | Main integration thread / main thread | Integrated resource inventory/proposal; signature reset, projection/package/mail and revocation/recovery owners. | Its W8 source/design, decision, assignment/global ordering and dated evidence; no runtime edits in design. |
+| **1.3.3.6 — Signature reset and hosted boundary** | Ready | Main integration thread / main thread | DEC-0243; existing reset coordination and signature processing/identity/uncertainty owners. | Hosted service seam/timing/reset/gates, fail-first synthetic tests, canonical behavior/evidence; no schema or selection policy change. |
+| **1.3.3.7 — Durable signature selection** | Blocked pending 1.3.3.6 acceptance | Main integration thread / main thread | DEC-0243; shared reset/timing acceptance; preserved authoritative projection/package/mail semantics. | API selector/host scan, shared scheduling metadata/source migration, projection-query reuse and scoped mail claim, synthetic tests and canonical docs. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -213,7 +217,7 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.3.3.5 — Signature fairness design**.
+**Next numbered task:** **1.3.3.6 — Signature reset and hosted boundary**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -384,6 +388,44 @@ preserved-safety and fail-first/private-synthetic plan, explicit conditional pro
 limits, documentation structure/negative/whitespace checks. Documentation/source review only;
 no runtime/schema/test code, database, real data, vendor/cloud call, benchmark, deployment or sealed
 release evidence change. Main owns later adoption and implementation; commit/push reviewed chunk.
+
+### 1.3.3.6 — Signature reset and hosted boundary
+
+**Eligibility:** DEC-0243 selected under continued-work authority; source design establishes
+reset participation as a prerequisite for durable signature scheduling.
+
+**Bounded slice:** preserve existing selection/three phases/quantum; extract an internal pass,
+inject hosted timer TimeProvider, join shared Demo reset before discovery/effects and recheck
+matching signature/API identity, gates and cancellation before later work.
+
+**Dependencies and owners:** signature feature/options, hosted service, zero-retry processor
+scopes and existing reset coordination. Preserve package/clinical/mail evidence, cancellation,
+revocation and uncertainty. A held reset lease is exclusion, not external-reset retention proof.
+
+**Boundaries and completion evidence:** fail-first reset-exclusion test against original scan,
+disabled/mismatch/timing/cancellation/fault tests, private SQL exclusion/lifetime/disposal and
+appropriate signature regressions; canonical docs/evidence/agenda and documentation checks.
+Owned synthetic fixtures/source changes only; no schema, existing database, real data, vendor,
+cloud/security, activation, migration, deployment or release. Commit/push verified bounded chunk.
+
+### 1.3.3.7 — Durable signature selection
+
+**Eligibility:** after 1.3.3.6 acceptance; DEC-0243 defines local policy/additive source schema.
+
+**Bounded slice:** two scheduling entities with per-phase seed and per-agency/item positions,
+short verified zero-retry selector, ten distinct item offers per each of three phases, shared
+projection candidate query, conditionally scoped mail claim and preserved processor semantics.
+Generate additive source migration/indexes and deterministic fail-first/private acceptance.
+
+**Dependencies and owners:** selected W8/DEC-0243 design, accepted reset/timing boundary, current
+projection/clinical scope, package/blob/key/orphan and mail lease/GUID/revocation/attempt owners.
+Resource DEC-0242 remains proposed; this implementation claims scheduling opportunities only.
+
+**Boundaries and completion evidence:** fail-first agency/damaged-head/restart behavior, scope/
+count/gate/cancellation effects, SQL ownership/commit uncertainty/order/restart, shared model/index
+parity and guarded source-migration Down; meaningful API/signature/portal regressions. Record all
+failures/limits and run documentation/negative/whitespace checks. Source schema and owned synthetic
+tests only; no existing apply/baseline/host rollout, real data, external call, activation or release.
 
 ## Preserved open-work inventory
 

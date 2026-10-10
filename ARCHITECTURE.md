@@ -53,6 +53,12 @@ Reset/poller/vendor admission and authoritative receipt/cursor effects retain th
 bounded feed offers and one oldest ERA replace full account/ERA draining. Source migration
 generation and synthetic verification are separate from existing database rollout/activation.
 
+The selected [signature-worker design](BACKGROUND_WORKERS_HANDOFF.md#october-10--signature-fairness-design--task-1335)
+is local work pending implementation: shared reset/timing/gate boundary first, then independent
+Persistence scheduling metadata and API phase/agency/item selection. Clinical projection,
+immutable package, outbox lease/GUID/revocation and restricted portal owners remain authoritative.
+This plan supplies no deployed activation, shared capacity or safe external baseline-reset claim.
+
 The [desktop test boundary](docs/architecture/desktop.md) explicitly suppresses production
 startup while loading canonical UI resources; omitting Application.Run does not suppress the
 startup callback queued by WPF construction. Fixture hosts remain explicitly supplied.
