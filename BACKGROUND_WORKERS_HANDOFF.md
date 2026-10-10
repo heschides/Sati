@@ -702,6 +702,31 @@ fencing/concrete backend proof remain operating blockers, not a new missing prod
 Josh. [Dated evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-154-durable-controller-protocol-proposal)
 records actual checks; no runtime/schema/database/external changes here.
 
+#### October 10 — terminal retirement reference tests — task 1.5.5
+
+**Status:** source-level reference acceptance complete; awaiting review. The unregistered
+[retirement candidate](Sati.Api/Infrastructure/RetirementLedgerCandidate.cs) and
+[deterministic tests](Sati.Api.Tests/RetirementLedgerCandidateTests.cs) use only an in-memory fake
+compare/commit store. They implement no SQL capacity grant, DI registration, worker/API enrollment,
+provider closure or durable backend. The 16 owner / 128 retained-request profile remains a
+synthetic test parameter.
+
+The acceptance covers 512 sequential completions without retained-row growth, rejection of delayed
+replays below the retired floor, live and uncertain holes, full-record refusal, wrong profile/
+epoch, stale owner identity, fingerprint conflict, competing writers, before/after-commit response
+loss, client restart over retained fake state, and sequence/version overflow. Slot reuse and
+uncertainty reconciliation remain intentionally absent. First test execution found that retirement
+could delete held/uncertain rows; the floor now advances only over contiguous `Terminal` rows. The
+regression tests failed before the fix and pass after it, preserving recovery debt behind a hole.
+
+**Checks/limits:** 23 focused API-test cases pass after the fix. A deliberate removal of the
+terminal-phase guard made both held/uncertain-hole cases fail; source was restored byte-for-byte.
+This proves the candidate guard is exercised, not provider/backend safety. No database, external
+service, real data, benchmark or operating capacity test was used. [Dated evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-155-terminal-retirement-reference-tests)
+records initial failures and final checks. Next: 1.6 multi-host/load verification remains blocked
+on a reviewed durable authority, consumer enrollment/fencing and a defined synthetic workload;
+the fake shared store cannot establish an operating limit.
+
 #### October 10 — shared accounting candidate — task 1.5.3
 
 **Source scope:** main base `18ba76a`, same main checkout; task 1.5.3's explicitly assigned

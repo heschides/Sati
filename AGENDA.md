@@ -132,8 +132,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.5.2** | [Shared admission adoption prerequisites](#152--shared-admission-adoption-prerequisites) | Complete for direction/assignment; operating adoption remains separate. |
 | **1.5.3** | [Shared accounting candidate and deterministic limits](#153--shared-accounting-candidate-and-deterministic-limits) | Complete for unregistered candidate/main acceptance; 182 focused cases passed, no live limiter/capacity adoption. |
 | **1.5.4** | [Durable controller recovery and retirement proposal](#154--durable-controller-recovery-and-retirement-proposal) | Complete for reviewed proposal; protocol tests/backend/fencing remain separate. |
-| **1.5.5** | [Terminal retirement reference tests](#155--terminal-retirement-reference-tests) | Ready after 1.5.4 proposal acceptance; no durable backend or activation. |
-| **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
+| **1.5.5** | [Terminal retirement reference tests](#155--terminal-retirement-reference-tests) | Awaiting review; 23 synthetic source tests pass; no durable backend or activation. |
+| **1.6** | Multi-host and load verification | Blocked on durable authority, complete consumer enrollment/fencing and a defined synthetic workload; operating capacity remains unmeasured. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
 
 Each actionable task has four fields: **Eligibility** (why it is ready), **Scope** (its exact
@@ -176,7 +176,7 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.5.2 — Shared admission adoption prerequisites** | Complete; direction and successor assignment | Main integration thread / main integration thread | Josh's October 10 direction; DEC-0244 and dated W8/evidence. | Direction/assignment accepted; backend/numbers/enrollment remain unadopted for operation. |
 | **1.5.3 — Shared accounting candidate and deterministic limits** | Complete; unregistered candidate/main acceptance | Main integration thread / main integration thread | Base `18ba76a`; 182 focused cases/guard mutations and dated W8/evidence. | Model-only guarantees; no DI/route/workflow/schema or operating capacity adoption. |
 | **1.5.4 — Durable controller recovery and retirement proposal** | Complete; main-reviewed proposal | Main integration thread / main integration thread | Base `73b3aaf`; W8/DEC-0245 and dated evidence/checks. | Proposal only; backend, fencing, transport values and actual-call enrollment remain unadopted/unverified. |
-| **1.5.5 — Terminal retirement reference tests** | Ready; assigned main reference tests | Main integration thread / main integration thread | 1.5.4 proposal closure; DEC-0245, 1.5.3 candidate and current W8. | Unregistered reference model/fake store and deterministic tests, W8/architecture/agenda/evidence. No DI/route/workflow/schema, backend/DB/cloud/real-data access. |
+| **1.5.5 — Terminal retirement reference tests** | Awaiting review; source acceptance complete | Main integration thread / main integration thread | Base `a1485e2`; 23 focused cases pass after a fail-first retirement fix; guard mutation failed as intended and source restoration verified. | Candidate/tests, W8/architecture/agenda/evidence. Unregistered fake store only; no DI/route/workflow/schema, backend/DB/cloud/real-data access. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -245,12 +245,14 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.5.5 — Terminal retirement reference tests**.
+**Next numbered task:** **1.6 — Multi-host and load verification (blocked pending backend and workload prerequisites)**.
 Josh selected overlapping instances and daily casework/recovery priority on October 10 and
 authorized proposed technical limits/tests. Direction 1.5.2 and unregistered candidate tests 1.5.3
-are complete. 1.5.4's reviewed proposal assigns 1.5.5 retirement reference tests.
-Real backend/enrollment/closure/pool facts remain integration
-and activation prerequisites; they do not prevent candidate source tests.
+are complete; 1.5.4's reviewed proposal and 1.5.5 terminal-retirement source acceptance are
+awaiting review/integration. The next multi-host/load slice needs a reviewed durable authority,
+complete consumer enrollment and closure/fencing evidence plus an explicit synthetic workload.
+Existing fake-store tests prove bounded model behavior only; real resource ceilings remain
+unmeasured. No new backend decision or operating limit is inferred from the candidate.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -781,11 +783,17 @@ wrong target/epoch, old generations, competing commits, lost response, client re
 the same fake state and numeric overflow. Positive terminal retirement only; no automatic slot
 reuse, epoch reset or uncertain-debt reconciliation. Preserve shared cost/profile ownership.
 
-**Acceptance/boundaries:** deterministic tests and meaningful guard mutation failures, exact source
-restoration, source identity and canonical evidence/architecture/agenda, structure/negative/
-whitespace checks. Unregistered reference model only; no DI/routes/workflows/schema, actual backend
-service/DB/real data/cloud calls, benchmark, release/deploy or sealed evidence change. Real storage,
-bounded transport/fencing and actual-call enrollment need separately defined acceptance successors.
+The bookkeeping reference does not issue SQL capacity grants or duplicate 1.5.3's cost/class
+rules. Its competing commits prove one retained request record; joint durable accounting and
+provider closure integration remain later proof. Terminal status is synthetic confirmation only.
+
+**Acceptance/result:** 23 focused synthetic API cases passed. The terminal guard mutation produced
+the expected two assertion failures and the candidate file was restored byte-for-byte. Source
+identity, canonical W8/architecture/agenda/evidence, structure/negative/whitespace checks are
+recorded in the ledger. Unregistered reference model only; no DI/routes/workflows/schema, actual
+backend service/DB/real data/cloud calls, benchmark, release/deploy or sealed evidence change. Real
+storage, bounded transport/fencing and actual-call enrollment need separately defined acceptance
+successors. [W8 result](BACKGROUND_WORKERS_HANDOFF.md#october-10--terminal-retirement-reference-tests--task-155).
 
 ## Preserved open-work inventory
 

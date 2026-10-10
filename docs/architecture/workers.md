@@ -80,6 +80,14 @@ exact replay and retained uncertainty debt have deterministic tests. There is no
 route/worker enrollment or actual distributed backend. Bounded terminal records deliberately stop
 new work until a safe retirement protocol exists. Numeric profiles remain proposed test parameters.
 
+Task 1.5.5 adds terminal-floor retirement to the same **unregistered** reference family: only
+contiguous positively terminal rows are removed, while held/uncertain holes remain replayable and
+block floor advancement. Its fake-store tests found and repaired a candidate bug that retired such
+holes. This is normal synthetic bookkeeping evidence; restart durability, cross-host storage,
+provider closure, fencing and measured capacity remain unproved. [W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--terminal-retirement-reference-tests--task-155)
+and [dated evidence](../readiness/work-evidence.md#2026-10-10--sati-wrk-001-155-terminal-retirement-reference-tests)
+own the results and next dependency.
+
 Remaining W8: sustained
 fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant
 sessions and dependency budgets, API admission and synthetic load/live owner evidence. Account

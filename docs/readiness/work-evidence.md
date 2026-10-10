@@ -1,5 +1,39 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.5.5 terminal-retirement reference tests
+
+**Identity/authority:** main `master`, source base `a1485e29f311fb210f1b10ceb74f39cf0ae64c9b`,
+checkout `C:/Users/Joshu/source/repos/heschides/Sati`. 1.5.4 proposal closed and Josh's explicit
+direction covers overlapping instances, daily casework/recovery priority and proposed-limit tests.
+The task-owned assignment-row transition was included; unrelated dirty `Sati.csproj` formatting and
+`assessment-working/` scratch inputs were preserved and excluded. The candidate and focused tests
+were untracked task inputs at start. No other checkout, process or agent was touched.
+
+**Result:** [W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-10--terminal-retirement-reference-tests--task-155)
+and [worker architecture](../architecture/workers.md) describe the unregistered fake-store model.
+Acceptance covers 512 sequential terminal completions, bounded row count, delayed retired replay,
+held/uncertain holes, full refusal, stale identities, fingerprint/profile/epoch checks, concurrent
+writers, ambiguous before/after commit, restart over shared fake state and numeric exhaustion. An
+initial focused run was red: three tests caught held/uncertain records being deleted while advancing
+the floor. The candidate now advances only across contiguous `Terminal` rows.
+
+**Checks:** final `dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj -c Release --no-restore --filter
+FullyQualifiedName~RetirementLedgerCandidateTests` passed **23/23**. Existing unrelated API nullable
+warning CS8602 appeared; no database/private SQL or broader application suite was run. Deliberately
+replacing the terminal-phase predicate with `true` caused both hole cases to fail (2 failed, 0
+passed); candidate bytes were restored and SHA-256 comparison passed. Documentation structure passed
+(46 root documents, 28 scoped owners, 12 snapshots, 11 active items, 454 legacy items, 218 imported
+decisions and 27 current decisions); all 22 documentation negative mutation proofs passed. Final
+working and staged whitespace checks are run after the evidence is recorded.
+
+**Limits/next:** 16 owner slots and 128 retained records are synthetic bookkeeping profile values,
+not operating budgets or measured capacity. A fake store does not establish durable restart,
+cross-host atomicity, provider closure, external fencing, pool/dependency ceilings or daily-casework
+latency. No SQL, real data, external service, benchmark, deployment, release or sealed readiness
+evidence was used. 1.5.5 is awaiting review; 1.6 multi-host/load verification depends on a reviewed
+durable authority, consumer enrollment/closure/fencing and a defined synthetic workload. No runtime
+policy or backend decision is adopted.
+
 ## 2026-10-10 — SATI-WRK-001 1.5.4 durable controller protocol proposal
 
 **Identity/authority:** main `master` base `73b3aafe9457b5c61f2a838046709941d44e5954`, checkout
