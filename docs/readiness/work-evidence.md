@@ -1,5 +1,33 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.3 worker connection-cost review
+
+**Identity/authority:** main `master` base `1802717a105dc8daa3cd4b9077e5000eec14de56`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`. Required coordination/task/input owners are present.
+Included uncommitted input: own active Agenda row; unrelated project formatting and assessment
+scratch excluded/preserved. Reviewed governance, architecture/decision owners, W8 inventory/
+admission contract, current scheduling/recovery source, operations and dated environment facts.
+Allowed edits are W8 task-owned accounting subsection, Agenda row/definition and this evidence.
+No other checkout/process touched, no application/schema/test code changed or database opened.
+
+**Result:** source-cited conditional normal connection arithmetic is dispatch 4, polling 3, note
+2 and hosted signature projection/package/mail 2, with phase-specific intervals and assumptions.
+Several locks can share one session; idle contexts are not active SQL connections; selector/
+processor and account/vendor intervals are successive. These are not measured peaks, failure-safe
+reservation costs or adopted C/P/K values. Existing retry/open/cleanup uncertainty, shared
+dependency spans and incomplete external/API/pool census are explicit. Source session admission
+scalar conversion/cancellation lacks the selectors' stricter result contract; proposed next local
+hardening tests establish no observed live failure. Mid-callback fencing remains unproved.
+
+**Actual checks:** source/symbol/call-site review only; no application tests, heavy build, benchmark,
+provider/real-data call, live deployment read or operational verification run for this task.
+Documentation structure passed (46 root documents, 28 scoped owners, 25 current decisions);
+all 22 negative mutation proofs passed; working/staged whitespace checks passed at closure.
+No backend, hosting,
+budget value, concurrency policy, activation, existing schema apply or sealed evidence changed.
+Next bounded step: strict scalar/cancellation contract in existing session coordinators, then
+synthetic lifetime instrumentation; runtime admission adoption retains DEC-0242 dependencies.
+
 ## 2026-10-10 — SATI-WRK-001 1.3.3.7 durable signature selection
 
 **Identity/authority:** main `master` base `e4f315bfcf15c101aeeb403c25f830b911bec905`, checkout

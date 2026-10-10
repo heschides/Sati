@@ -118,7 +118,8 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.3.3.5** | [Signature fairness design](#1335--signature-fairness-design) | Complete for main source/design integration; DEC-0243 selects bounded local implementation. |
 | **1.3.3.6** | [Signature reset and hosted boundary](#1336--signature-reset-and-hosted-boundary) | Complete for bounded source/main acceptance; 89 tests passed, unreleased. |
 | **1.3.3.7** | [Durable signature selection](#1337--durable-signature-selection) | Complete for bounded source verification/main integration; 111 signature cases passed, unreleased. |
-| **1.4.3** | [Worker SQL connection-cost review](#143--worker-sql-connection-cost-review) | Ready after 1.3.3.7; bounded source accounting review, no limiter adoption. |
+| **1.4.3** | [Worker SQL connection-cost review](#143--worker-sql-connection-cost-review) | Complete for bounded source accounting; conditional costs and unknowns retained, no limiter adoption. |
+| **1.4.4** | [Session admission result hardening](#144--session-admission-result-hardening) | Ready; main bounded scalar/cancellation contract, no resource-budget adoption. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
 | **1.6** | Multi-host and load verification | Open; prove preserved safety, aggregate limits and healthy-agency progress under a defined workload. Tests accompany implementation; this package also owns combined acceptance. |
 | **1.7** | Monitoring and operational evidence needed for activation | Open; coordinate with SATI-OPS-001 and the readiness registry. Source checks alone do not establish operating acceptance. |
@@ -150,7 +151,8 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | **1.3.3.5 — Signature fairness design** | Complete; DEC-0243 selected local direction | Main integration thread / main thread | Integrated resource inventory/proposal; signature reset, projection/package/mail and revocation/recovery owners. | Its W8 source/design, decision, assignment/global ordering and dated evidence; no runtime edits in design. |
 | **1.3.3.6 — Signature reset and hosted boundary** | Complete for source verification/main integration; 89 passed, unreleased | Main integration thread / main thread | DEC-0243; existing reset coordination and signature processing/identity/uncertainty owners. | Hosted service seam/timing/reset/gates, fail-first synthetic tests, canonical behavior/evidence; no schema or selection policy change. |
 | **1.3.3.7 — Durable signature selection** | Complete; bounded source/main acceptance, unreleased | Main integration thread / main thread | DEC-0243; 111 signature and complete 1,404-case API inventory coverage; exact interrupted/completed run evidence and limits retained. | API selector/host scan, shared scheduling metadata/source migration, projection-query reuse and scoped mail claim, synthetic tests and canonical docs. |
-| **1.4.3 — Worker SQL connection-cost review** | Ready; not started | Unassigned / main integration thread | Reviewed 1.4.1/1.4.2; accepted current selection/processing boundaries; preserve resource proposal status. | Task-owned W8 accounting subsection, this assignment/definition and dated working evidence only. |
+| **1.4.3 — Worker SQL connection-cost review** | Complete; bounded source/documentation review | Main integration thread / main integration thread | Reviewed current source at `1802717`; conditional normal counts are not reservation costs or capacity. | Task-owned W8 accounting subsection, assignment/definition and dated working evidence only. |
+| **1.4.4 — Session admission result hardening** | Ready; explicitly assigned to main for next bounded slice | Main integration thread / main integration thread | Completed 1.4.3; preserve existing lock order/modes, waits, gates and contention results. | API session coordinators and narrow shared result owner, actual-call-path synthetic tests, canonical topic/agenda/evidence. No schema/admission-budget change. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
 starting commit and included uncommitted inputs in its own dated evidence, and sets only its own
@@ -219,7 +221,7 @@ deployment or sealed evidence change. Extract only assigned sections; preserve t
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.4.3 — Worker SQL connection-cost review**.
+**Next numbered task:** **1.4.4 — Session admission result hardening**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -452,6 +454,27 @@ assumptions/unknowns, prioritized next bounded step, source identity and dated e
 structure/negative/whitespace checks. Documentation/source review only; no application/schema/test
 change, database, real data, benchmark, provider call, infrastructure, runtime admission, capacity
 promise, deployment or sealed release change. Commit/push the verified documentation chunk.
+
+### 1.4.4 — Session admission result hardening
+
+**Eligibility:** completed 1.4.3 identifies coercible/malformed scalar and cancellation-race gaps
+in existing session lock admission. Continued Agenda authority permits this bounded local guard;
+it does not adopt the proposed resource admission backend or capacity values.
+
+**Bounded slice:** require SQL Int32 0/1 for acquired and -1 for known contention in existing
+Demo worker reset/dispatch/account, Claim.MD request/poll and note sweep session coordinators.
+Cancellation observed after scalar completion wins before callback admission. Preserve each
+caller's existing contention outcome, lock names/modes/order, waits, pacing, release and gates.
+Use actual coordinator callback paths with synthetic ADO results and owned cleanup observations.
+
+**Dependencies and owners:** W8 accounting, existing session/reset, note and billing/polling owners;
+current selector strict contracts are precedent, not a new runtime budget. Main integrates.
+
+**Boundaries and completion evidence:** meaningful fail-first malformed/cancel-race cases, valid
+0/1/contention and failure cleanup coverage, focused existing private-instance SQL regressions,
+documentation structure/negative/whitespace checks and dated evidence. Synthetic data only; no
+existing database apply, schema, vendor, real-data, infrastructure, deployment or sealed evidence
+change. No mid-callback fencing or failure-safe reservation claim. Commit/push verified source.
 
 ## Preserved open-work inventory
 

@@ -607,6 +607,71 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — worker connection-cost review — task 1.4.3
+
+**Status:** main source accounting review complete; no admission backend/value adopted. Base
+`1802717a105dc8daa3cd4b9077e5000eec14de56`, exact-Demo hosted paths when enabled/admitted. The
+[earlier resource inventory](#october-9--resource-limit-inventory-task-141) owns other resource
+dimensions; [DEC-0242](docs/decisions/current/2026-10-09-DEC-0242.md) remains proposed. The
+[environment inventory](DATABASE_ENVIRONMENTS.md) owns dated deployment facts; those observations
+do not establish current process cardinality, pool configuration, outside consumers or capacity.
+
+**Accounting unit and assumptions:** count an explicitly opened coordination connection once,
+even when it owns several lock names. Count the operation's separate business/selector connection
+when an implicit command or transaction opens it. An idle DbContext is not another checked-out
+connection. Values below are source arithmetic for the enumerated owners, assuming ordinary
+sequential provider use and confirmed close/disposal between intervals. They are not observed
+peaks, a failure-safe reservation K, a physical-session limit or an aggregate deployment cap.
+Implicit-close/provider replacement and exceptional cleanup require synthetic instrumentation;
+unknown prior connections cannot be credited as closed just because a scope exited or lease expired.
+
+| Hosted operation / cited owners | Retained sessions and overlapping SQL intervals | Source arithmetic / boundary to preserve |
+|---|---|---|
+| [Dispatch](Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs), `ProcessUnderResetLeaseAsync`, `PrepareUnderAccountLeaseAsync`, `UploadAndRetainAsync`; [coordination](Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs), `RunWithLeaseAsync`; [write scope](Sati.Persistence/Data/ClaimReleaseWriteScope.cs), `BeginAsync` | Shared reset uses one factory context/open session. Selector adds one transient connection and disposes before fresh dispatch lookup. Dispatch and account admission each open a different context/session. Preflight SQL/decision transaction uses the dispatch business context alongside all three retained sessions. Compliance/history helpers receive that same context. Account admission and decision transaction finish before upload. Vendor request admission then uses a separate session, followed by response wrapping and a later evidence transaction on the business context. | Selection/read **2**; key/wrapping preflight **3**; preflight/missing-key decision **4**; coordinated upload **3** (reset + dispatch + vendor, no decision transaction); response wrapping **2**; evidence transaction **3**. Enumerated normal maximum **4**. Do not add account and vendor sessions as simultaneous: they belong to different intervals. Retain reset/dispatch through uncertainty/evidence/cleanup. Post-send work uses CancellationToken.None in places and is not bounded by the caller's exchange deadline. |
+| [Polling](Sati.Api/Infrastructure/ClaimMdSandboxPoller.cs), `PollOnceAsync`, `ReadFeedAsync`, `PollStatusAsync`, `PollEraAsync`; [coordination](Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs), `PollOnceAsync`, `RequestAsync`; [selector](Sati.Api/Infrastructure/ClearinghousePollSelector.cs) | Reset and global poller each retain one separate session through the pass. Selector/fresh feed read adds one transient context connection. Vendor admission retains a third session during pacing/HTTP; it disposes before status receipt context or ERA ingestion scope. Status processor receives one context; ERA's scoped [ingestion](Sati.Api/Infrastructure/ClaimResponseIngestion.cs) and AuditTrail share the scoped context registration in [Program](Sati.Api/Program.cs). Receipt transaction and wrapping use it. | Discovery/selection/read, vendor exchange and receipt processing each **3**, in successive intervals. Enumerated normal maximum **3**, not reset + poller + vendor + receipt = 4. Outer two sessions also remain through between-feed delays. Current feed/pass counts do not supply elapsed-time or shared resource admission. |
+| [Note coordination/worker](Sati.Api/Infrastructure/NoteAbandonmentWorker.cs), `RunOnceAsync`, `RunDueAsync`; [sweep](Sati.Api/Infrastructure/NoteAbandonmentSweep.cs), `RunAsync` | One explicitly opened coordination connection owns both shared reset and exclusive sweep locks. Agency discovery temporarily opens its separate context. The strategy context only constructs an execution strategy; each retry attempt creates a fresh sweep context/transaction. Discovery commands finish before each sweep, although the discovery context object remains in scope. | Discovery or sweep **2** (one coordination + one active EF connection), not three from counting lock names or idle strategy/discovery contexts. Enumerated normal maximum **2**, conditional on completed implicit closes and sequential retry disposal. One entire agency pass retains the coordination session; the pass and current-day cache remain unbounded in total cost. No SQL opens on disabled/completed-day fast path. |
+| [Signature host/selector](Sati.Api/Infrastructure/SignatureProcessingService.cs), `RunOnceAsync`, `ProcessOfferAsync`; [projection](Sati.Api/Infrastructure/SignatureComplianceProjectionService.cs), `ProjectCompletionAsync`; [package](Sati.Signatures/SignatureCompletionWorker.cs), `BuildAsync` | Each item callback retains one reset session. The short selector's separate context disposes before fresh scoped eligibility and processor context. Projection/package run on that one processor context. Package transaction spans original blob, synchronous PDF, write-once blob, invitation unwrap and receipt protection. | Selector/read/transaction **2**. Enumerated normal maximum **2**; selector and processor connections do not overlap. Package dependency/CPU work retains both reset and transaction connections. Three sequential phases and ten offers each are neither concurrent-host limits nor CPU/dependency deadlines. Reset disposes before the next offer/timer wait. |
+| [Signature mail](Sati.Signatures/SignatureMailWorker.cs), `ProcessCandidateAsync`, `ClaimAsync`, `PrepareSubmissionAsync`, `SubmitAsync`, `CompleteAsync`, under the hosted item callback | Reset session remains open. Durable row lease/operation GUID is business evidence, not another SQL session. Claim/preparation/final send/completion transactions use the same processor context, sequentially. Final revocation validation intentionally retains its transaction through POST. Existing-GUID GET recovery happens after claim/owned reads, outside that transaction, before completion. | Claim/final POST/completion **2**; ordinary unwrap/GET interval **1** retained reset connection if preceding implicit reads/transaction have closed. Enumerated normal maximum **2**. Preserve final send transaction, five-minute row lease, five-attempt cap and GET-only recovery; a resource wait after claim would waste lease time and may violate the proposed admission order. |
+
+**Prioritized unresolved dependencies:**
+
+1. **Before callback/credit trust:** existing session coordinators use Convert.ToInt32 for scalar
+   admission, unlike strict selector admission. Null/coercible/out-of-contract values and
+   cancellation racing a completed scalar have no common fail-closed contract. This is a source
+   validation/cancellation hardening seam, not an observed SQL incident or permission to alter lock
+   modes/order. Arbitrary mid-callback session loss/reconnect/fencing remains a separate unsolved
+   problem; validating one return cannot prove continuous lease ownership.
+2. **Before K registration:** instrument all factory opens, implicit close/transaction disposal,
+   replay/failed open and cleanup paths with one shared tracker across independent contexts. Charge
+   open attempts and retain unresolved debt; no success-path count establishes safe failure reuse.
+   Verify package/key/blob and mail barriers using real processors with synthetic providers. Current
+   pass/claim admission order must be reconciled with DEC-0242; do not shorten protective transactions.
+3. **Before database-wide C/P:** enumerate HTTP, reset/Function, startup/health, administrative,
+   migration, seed, desktop-local and outside consumers in the exact target. For example, Demo
+   [mutation middleware](Sati.Api/Infrastructure/DemoMutationLeaseMiddleware.cs) opens a raw
+   SqlConnection outside factory interception, whereas [actor validation](Sati.Api/Security/TenantAccess.cs)
+   disposes its context before entering the endpoint. API routes can have further nested owners;
+   this review is not their census. [Schema reads](Sati.Api/Infrastructure/SchemaSnapshotReader.cs)
+   explicitly open/close; identity validation and [watchdog](Sati.DemoRefresh/Shared/DemoWatchdog.ps1)
+   have their own connection owners. [Reset](Sati.DemoRefresh/Shared/DemoReset.ps1) retains its
+   connection while invoking seed/compliance children, so a single reset lock is not a single
+   whole-reset connection. Their maxima/enrollment and physical pool/session envelopes are open.
+4. **Before backend/value adoption:** establish enforceable host ownership, restart/rolling overlap,
+   closure/fencing and protected interactive/recovery shares; then choose C/I/B/R/E, A/Q/M and
+   dependency deadlines/quotas from approved objectives/evidence. Historical SKU labels do not
+   provide these values. No local semaphore or configured process token supplies a global proof.
+
+**Deterministic later acceptance:** first prove malformed/cancel-racing admission cannot enter
+callbacks or leak owned sessions, while valid 0/1 and known zero-wait contention retain behavior.
+Then barrier each enumerated interval and record open-attempt/close events across all contexts:
+dispatch preflight vs upload/evidence, poll request vs receipt, note discovery vs retry attempt,
+signature selector disposal vs package, and mail POST vs GET. Include failed/ambiguous cleanup,
+outer retry, gate changes and two independent callers. Assert both record/provider evidence and
+counter behavior. These are proposed cases, not measured peaks or an implemented admission limit.
+[Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-143-worker-connection-cost-review)
+owns source identity and actual documentation checks. Next bounded local step is coordinator
+scalar/cancellation hardening, followed by lifetime instrumentation; backend/capacity adoption waits.
+
 #### October 10 — durable signature selection — task 1.3.3.7
 
 **Status:** bounded source implementation, verification and main integration complete, unreleased. This section supersedes
