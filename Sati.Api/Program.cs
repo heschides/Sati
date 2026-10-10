@@ -140,6 +140,7 @@ builder.Services.AddSingleton<EnvelopeProtector>();
 builder.Services.AddScoped<ClaimResponseIngestion>();
 builder.Services.AddSingleton<ClearinghouseDispatchGate>();
 builder.Services.AddSingleton<ClearinghouseDispatchSchedule>();
+builder.Services.AddSingleton<ClearinghouseDispatchSelector>();
 builder.Services.AddSingleton<SyntheticClearinghouseConnector>();
 builder.Services.AddSingleton<IClaimMdSandboxKeySource, EnvironmentClaimMdSandboxKeySource>();
 builder.Services.AddSingleton<IClaimMdSandboxCoordination, SqlClaimMdSandboxCoordination>();

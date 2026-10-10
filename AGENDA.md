@@ -63,7 +63,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | Stable ID | Status | Work and acceptance owner |
 |---|---|---|
 | SATI-TEN-001 | planned | Structural tenant owners/composite constraints and shared/database-per-tenant/hybrid decision; [architecture](docs/architecture/identity.md), [structural review](SATI_STRUCTURAL_REVIEW_2026-09-28.md). Preserve current caseload/capability checks. |
-| SATI-WRK-001 | partial; missing-key recovery released; idle/wake source implemented locally; broader W8 open | [Numbered work breakdown](#1--sati-wrk-001--safe-background-processing-across-agencies); W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof. [Scheduling implementation](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-implementation) and [working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-implementation) own behavior and actual verification. |
+| SATI-WRK-001 | partial; missing-key recovery released; idle/wake and dispatch fairness source verified locally; broader W8 open | [Numbered work breakdown](#1--sati-wrk-001--safe-background-processing-across-agencies); other-worker fairness, API admission, global/tenant budgets and combined multi-host/load proof. [Dispatch implementation](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-implementation--task-132) and [working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-132-dispatch-fairness-implementation) own current behavior and acceptance. |
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
@@ -105,9 +105,10 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.1** | Failure isolation: keep a missing account key from blocking healthy work | Missing-key account recovery released in 1.3.39; [recovery owner](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation). Broader worker failure cases remain under 1.3–1.6. |
 | **1.2** | Idle/wake scheduling: control when dispatch runs and stops checking the database | Complete for bounded source implementation and acceptance; committed source `d05312a`, unreleased. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-implementation) records actual coverage and limits, separately from deployment and activation. |
 | **1.3** | Fair selection: give eligible agencies and accounts predictable turns | Open; contains tasks 1.3.1–1.3.3. |
-| **1.3.1** | [Dispatch fairness design](#131--dispatch-fairness-design) | Design deliverable complete; awaiting review/adoption of [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md). **Next eligible step:** concrete policy/additive source-schema review. |
-| **1.3.2** | Dispatch fairness implementation and tests | Pending adoption of 1.3.1's concrete policy; no implementation authorization follows from this outline. |
+| **1.3.1** | [Dispatch fairness design](#131--dispatch-fairness-design) | Complete; policy/additive source-schema proposal explicitly approved in [DEC-0240](docs/decisions/current/2026-10-09-DEC-0240.md). |
+| **1.3.2** | [Dispatch fairness implementation and tests](#132--dispatch-fairness-implementation-and-tests) | Complete for bounded source verification/main integration; unreleased. Full API 1,330 and shared persistence boundary 1 passed, zero failed/skipped; [evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-132-dispatch-fairness-implementation) owns failures/limits. |
 | **1.3.3** | Fairness in polling, note maintenance and signature work | Remaining broader W8 scope; preserve each worker's existing safety owner and define bounded tasks before implementation. |
+| **1.3.3.1** | [Polling fairness design](#1331--polling-fairness-design) | Ready; next main design slice, proposal/source review only. |
 | **1.4** | Resource limits: bound shared connections, concurrency and operation times | Open; includes global/agency budgets, bounded queued work, dependency quotas and measured hosting choices. |
 | **1.4.1** | [Resource-limit inventory](#141--resource-limit-inventory) | Ready for explicit parallel assignment; source review and documentation only, with policy/implementation deferred. |
 | **1.5** | API workload limits: protect interactive work from expensive requests | Open; coordinate shared admission work with SATI-SEC-001 rather than create a second owner. |
@@ -130,7 +131,9 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | Task | State | Assignment / integration owner | Dependencies and safe parallel work | Edit ownership |
 |---|---|---|---|---|
 | **1.2 — Idle/wake scheduling** | Complete for bounded source implementation, verification and integration; unreleased | Existing main thread / main thread | Source `d05312a`; broad 1,309-case acceptance precedes the final guard, with 21 focused/private SQL cases after it. Detailed limits belong to the existing evidence record. | Existing scheduling source, topic section and evidence ownership remain unchanged. |
-| **1.3.1 — Dispatch fairness design** | Awaiting review; source inventory, policy/schema proposal and deterministic acceptance plan complete | Main integration thread / main thread | Baseline `8e6509f`; [W8 design](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131) and [evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-131-dispatch-fairness-design). No runtime adoption. May accompany independent 1.4.1; 1.3.2 waits for review. | Fairness design section, proposed decisions, main next-task pointer and integration. |
+| **1.3.1 — Dispatch fairness design** | Complete; policy and additive source-schema adopted by explicit approval | Main integration thread / main thread | Retained design/evidence at `acf638b`; DEC-0240 records approval and scoped supersession. | Fairness design section, adoption decision and integration. |
+| **1.3.2 — Dispatch fairness implementation** | Complete for bounded source verification/main integration; unreleased | Main integration thread / main thread | DEC-0240; final API 1,330 and persistence boundary 1 passed. Source migration only; operating/combined load limits retained. Independent 1.4.1 remains source-only. | Selector/worker/scheduling owner, shared cursor model/source migration, relevant tests and canonical behavior/evidence. |
+| **1.3.3.1 — Polling fairness design** | Ready; next main queue slice, not started | Main integration thread / main thread | Completed dispatch slice and current polling safety/source owners; source-only proposal may accompany 1.4.1 without taking its matrix. | Its W8 polling proposal, proposed decision/registry, global agenda ordering and dated evidence; no runtime/schema/test edits. |
 | **1.4.1 — Resource-limit inventory** | Ready; explicitly assigned by Josh to the second thread; startup verification pending here | Second investigation thread/worktree created by Josh; actual identity to be recorded there / main thread | Captured current source and existing W8/operations rules; may accompany 1.3.1. Actual fair-selection policy is an input to later budget design, not a prerequisite for inventory. | Its own W8 resource-limit inventory subsection, this assignment row and a dated ledger entry in its dedicated worktree. No runtime source edits. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
@@ -177,7 +180,7 @@ capacity, latency, operating guarantee or sealed readiness-score change.
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.3.1 — Dispatch fairness policy/additive source-schema review**.
+**Next numbered task:** **1.3.3.1 — Polling fairness design**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -192,8 +195,8 @@ activation, aggregate capacity and sustained fairness remain open.
 
 The source inventory and concrete [fairness design](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131)
 are now complete as a reviewable deliverable. [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md)
-is proposed, with source/drift and documentation checks in [dated evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-131-dispatch-fairness-design).
-Review/adoption is the remaining 1.3.1 step; this pointer does not authorize 1.3.2 implementation.
+is retained, with source/drift and documentation checks in [dated evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-131-dispatch-fairness-design).
+Josh subsequently approved the policy and additive source-schema proposal in DEC-0240; 1.3.1 is complete.
 
 **Bounded slice:** **Scope —** inventory and design fair dispatch selection under sustained ready backlog and
 lease contention. Define eligible agency/account lanes, persisted versus process-local selection
@@ -219,6 +222,56 @@ before runtime implementation. Run documentation structure and negative checks a
 checks. No schema, database access, real data, hosting, vendor call, cloud/security setting, release
 or dispatch activation is part of this design slice. Follow [standing upkeep](AGENTS.md#standing-work-and-documentation-upkeep);
 sealed release scores remain unchanged.
+
+### 1.3.2 — Dispatch fairness implementation and tests
+
+**Eligibility:** Josh explicitly approved DEC-0239's reviewed policy/additive source-schema;
+DEC-0240 adopts it. Starting source is `acf638b8b840fdabcde443ee005b35a14221e6a6` with unrelated
+project formatting and assessment scratch excluded.
+
+**Bounded slice:** implement the adopted short SQL selector, persisted agency/account pivots,
+oldest-in-lane ordering, typed known LaneSkipped outcome, shared model/source migration/index
+and fail-first/private synthetic acceptance. Keep one existing hosted scheduling owner.
+
+**Dependencies and owners:** W8's adopted contract, DEC-0240, existing recovery/scheduling,
+reset/account/dispatch/claim-release lock order, current billing compliance and uncertainty.
+The secondary 1.4.1 is source-only; preserve its checkout and reconcile its findings later.
+
+**Boundaries and completion evidence:** retain unfixed failures, prove bounded selection and
+classification with actual runtime/fake time, and prove shared selector/disposal/restart/rollback/
+same-work safety with private SQL. Validate both EF models and generated migration, run appropriate
+regressions and documentation structure/negative/whitespace checks. Record actual failures/counts/
+skips/cleanup and coverage limits before completion. Source migration generation and newly owned
+synthetic schema tests are authorized; no existing/shared/working/cloud database, real data,
+vendor call, deployment, migration apply, baseline reset or activation is included.
+
+**Completion:** main source acceptance is complete under DEC-0240; final API 1,330 and persistence
+boundary 1 passed with zero failed/skipped. [W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-implementation--task-132)
+and the dated ledger own actual fail-first/mutation/SQL evidence, source schema and remaining
+operational limits. Broader 1.3/1.4/1.6 acceptance remains open.
+
+### 1.3.3.1 — Polling fairness design
+
+**Eligibility:** after bounded dispatch 1.3.2 acceptance, polling remains a distinct W8 fairness
+gap. Revalidate its current source/feature gates and topic owners; do not treat dispatch's turn
+bound as polling acceptance. The main thread owns this next design; ready does not start work.
+
+**Bounded slice:** source inventory and reviewable fair polling proposal covering agency/account/
+feed selection, retained cursor/receipt semantics, healthy-lane opportunity under backlog or a
+busy lane, shared-failure behavior, restart and bounded discovery/state. Define deterministic
+fail-first/private SQL acceptance and alternatives without adopting weights or runtime policy.
+
+**Dependencies and owners:** W8, `ClaimMdSandboxPoller`, vendor request admission/deadline,
+feed checkpoints/response ingestion, reset/account/receipt/compliance safety and DEC-0240's
+dispatch-only scope. Link reviewed 1.4.1 resource facts when available; it stays independently
+assigned. Inventory relevant polling facts here without taking over its resource-limit matrix.
+
+**Boundaries and completion evidence:** main-owned W8 polling proposal, unused proposed decision
+record/registry, agenda and dated evidence only. Revalidate source identity/drift, distinguish
+enforced versus proposed controls, specify bounded tests and operational dependencies, and run
+documentation structure/negative/whitespace checks. No application/schema/test implementation,
+database access, benchmarks, real data, external calls, hosting, activation or release. Submit
+the concrete proposal for adoption before implementation. The main thread owns integration.
 
 ## Preserved open-work inventory
 

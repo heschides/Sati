@@ -1,11 +1,12 @@
 namespace Sati.Api.Infrastructure;
 
-internal enum DispatchTurnKind { Disabled, Processed, Empty, Contended }
+internal enum DispatchTurnKind { Disabled, Processed, Empty, Contended, LaneSkipped }
 internal sealed record DispatchTurn(DispatchTurnKind Kind, DateTime? NextEligibleUtc = null)
 {
     public static DispatchTurn Disabled { get; } = new(DispatchTurnKind.Disabled);
     public static DispatchTurn Processed { get; } = new(DispatchTurnKind.Processed);
     public static DispatchTurn Contended { get; } = new(DispatchTurnKind.Contended);
+    public static DispatchTurn LaneSkipped { get; } = new(DispatchTurnKind.LaneSkipped);
 }
 
 /// <summary>Local scheduling hints only. Durable eligibility and cross-host admission stay in SQL.</summary>
@@ -73,7 +74,7 @@ internal sealed class ClearinghouseDispatchSchedule(TimeProvider clock, Clearing
                 var due = previous?.NextEligibleUtc is { } utc
                     ? utc - clock.GetUtcNow().UtcDateTime : Timeout.InfiniteTimeSpan;
                 var shouldRun = startup || state.Generation != consumed ||
-                    previous?.Kind is DispatchTurnKind.Processed or DispatchTurnKind.Contended ||
+                    previous?.Kind is DispatchTurnKind.Processed or DispatchTurnKind.Contended or DispatchTurnKind.LaneSkipped ||
                     emptyAt is not null && reconciliation <= TimeSpan.Zero ||
                     previous?.NextEligibleUtc is not null && due <= TimeSpan.Zero;
                 if (!shouldRun)

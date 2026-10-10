@@ -601,21 +601,93 @@ remain unchanged. The ledger retains the aborted run and final acceptance separa
 
 **Remaining dependencies and next slice:** broader W8 aggregate/tenant budgets, fair selection,
 request admission, full operation/dependency bounds, consistent configuration, query plans and
-owner alert/load evidence remain open. Next is a bounded fairness inventory/design defining
-eligible agency/account lanes, contention treatment, preserved release/lease order and testable
-turn bounds, now delivered in [task 1.3.1's proposed design](#october-9--dispatch-fairness-design--task-131).
-Its policy/source-schema review precedes implementation. Do not activate or replace the Demo inactivity
+owner alert/load evidence remain open. The next slice at this checkpoint was a bounded fairness
+inventory/design, subsequently adopted and implemented in
+[task 1.3.2](#october-9--dispatch-fairness-implementation--task-132). The agenda owns the current
+next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
+
+#### October 9 — dispatch fairness implementation — task 1.3.2
+
+**Status:** task 1.3.2 source implementation and main acceptance/integration complete; unreleased
+and default-off. [DEC-0240](docs/decisions/current/2026-10-09-DEC-0240.md) records Josh's explicit
+approval of the retained design below. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-132-dispatch-fairness-implementation)
+owns failures, actual results and remaining verification. Task 1.4.1 remains independently assigned.
+
+**Ownership and behavior:** `ClearinghouseDispatchSelector.SelectAsync` owns persisted agency-first,
+then account rotation with SQL-provider Guid comparison/order and oldest `RequestedAtUtc, Id`
+within the selected lane. Shared Persistence entities hold one seeded global pivot and at most
+one pivot per retained offered agency, with separate revision concurrency tokens. Both EF models
+use `ClearinghousePersistenceModel`; an offer changes no business account/readiness revision.
+Selection produces no tenant list, in-memory map, dispatch reservation or send evidence.
+
+`ProcessTurnAsync` first acquires existing shared reset admission. The selector refuses a retrying
+outer scope, owns a zero-retry transaction, and obtains one fixed SQL transaction-owned exclusive
+application lock with zero wait. Only explicit Testing/SatiApiTests SQLite may substitute a
+serializable stand-in. Other providers and missing singleton state fail closed; no automatic
+initialization or FIFO fallback occurs. SQL lock mode is reverified before an Empty return or
+offer commit; lost ownership rolls back and prevents upload. All selector resources dispose before scoped dispatch
+reload, existing dispatch/account leases, key/wrapping preflight, claim-release decisions and
+physical upload. Pivots advance before admission; a positively identified busy/stale lane spends
+that offer. `LaneSkipped` permits another active turn at normal three-second pacing, without
+renewing activity or counting account failure. Shared reset/selector contention and unknown faults
+retain sixty-second cooldown. Startup/activity/expiry/in-flight rules and all authoritative
+preparation checks remain. Sending and OutcomeUnknown remain excluded; uncertain/result failures
+never become automatic resend authority.
+
+**Query/storage limits:** scalar probes wrap at most once per hierarchy level: at most two agency
+candidates, two account candidates and one oldest dispatch projection, plus fixed cursor reads
+and at most two cursor writes. Empty uses the retained scalar due snapshot and commits no pivot
+change; shared contention does not advance position. Finite removal/hold/reopen retains pivots.
+Conditional stable-cohort offer bounds remain A / A × K with the adopted design's exclusions.
+Rows examined, query duration, connection counts, admission time, delivery and total resources
+are not bounded by this policy.
+
+**Additive source schema:** `20261010021210_AddClearinghouseDispatchRotation` adds two pivot tables,
+singleton seed, checks/restrict agency FK and filtered `IX_ClearinghouseDispatches_QueuedLane` on
+`AgencyId, AccountId, RequestedAtUtc, Id` for Queued state. All prior indexes are retained, including
+the unfiltered agency/account FK index. Source count is 130; observed deployments and sealed
+129-migration release evidence remain unchanged. Down refuses advanced global position or any
+retained agency row with 51045. Model writes refuse deletion, scope changes or missing revision
+increments; direct SQL remains a separate privileged boundary.
+
+**Operational dependencies:** pause dispatch on every host before separately authorized apply or
+rollback. Mixed global-FIFO workers do not honor the selector; all participating hosts must be
+compatible before enabling. Restore/reset baselines must include schema and reviewed pivot state;
+the retained readiness migration helper targets 129 and cannot apply this new 130th migration.
+A new reviewed apply/rollback preparation and baseline uptake are needed for later rollout.
+No cursor reset/restore is performed here. Broader budgets, other-worker fairness, API admission,
+configuration consistency and combined load/alert acceptance remain open. No existing/cloud/working
+database, real data, vendor call, deployment or activation is touched.
+
+**Actual acceptance:** original busy-head regressions failed both cases before implementation;
+always-first-agency/account and long-lane-cooldown mutants failed, with source restoration verified.
+SQL ownership-loss injection failed before the guard and passed in the final full API acceptance:
+**1,330 passed, zero failed/skipped**, including eight actual SQL fairness cases. Tests cover
+finite three-original A backlog/B progress, agency/account shares and restart, true held dispatch/
+account leases, shared selector serialization and release during blocked upload, rollback/ambiguous
+commit/no retry/no send, ownership loss, bounded projections/writes, finite lane removal, cursor
+concurrency, both-model metadata, additive schema and guarded rollback. Existing recovery, due/mode,
+reopen, billing, uncertainty, reset and fake-clock host acceptance also passes. Shared persistence
+boundary passed one case. The ledger retains initial fixture/build failures and final artifact
+exclusion used for that boundary build. No broader 1.6 load/operating guarantee follows.
+Next main slice is 1.3.3.1 polling fairness design; 1.4.1 stays independently assigned for review.
 
 #### October 9 — dispatch fairness design — task 1.3.1
 
-**Status:** source-grounded design deliverable awaiting review; policy, schema and runtime changes
+**Status at capture:** source-grounded design deliverable awaiting review; policy, schema and runtime changes
 are **proposed**, not adopted or implemented. [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md)
 records the recommendation and alternatives. Inventory baseline is `8e6509fc4c99fd5c32d8a63715ae7a98941be7f6`
 in the main checkout, `C:\Users\Joshu\source\repos\heschides\Sati`. No included uncommitted application
 inputs; unrelated project formatting and assessment scratch are excluded. Task 1.4.1 owns the
 separate resource-limit matrix in its dedicated worktree. This section covers dispatch selection
 only and does not adopt that thread's future findings or change sealed release evidence.
+
+**Later adoption:** Josh explicitly approved this policy and additive source-schema proposal;
+[DEC-0240](docs/decisions/current/2026-10-09-DEC-0240.md) supersedes only pending adoption and the
+specified local lane-contention cooldown. The design below is retained as the exact adopted
+contract; [task 1.3.2](#october-9--dispatch-fairness-implementation--task-132) now records source
+implementation/acceptance separately from any existing DB operation.
 
 **Current selection, scope and admission inventory:**
 

@@ -629,3 +629,10 @@ contains exact activity/cadence/publisher policy and verification limits. This h
 or activated. Do not add polling, a heartbeat or support-console actions to keep dispatch active.
 Broader resource/fairness/admission/alert/load requirements still gate activation; the environment
 inventory remains the sole owner of observed deployment facts.
+
+The adopted [dispatch fairness implementation](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-implementation--task-132)
+adds a source migration and retained scheduling pivots. Review all-host pause, compatible rollout
+and restore/reset baseline uptake before a separately authorized migration or activation.
+An offer records scheduling position, never transmission/nonreceipt. Do not reset pivots to retry
+work; guarded Down rejects advanced position. Local lane skips advance normal active pacing;
+shared barriers retain cooldown. Turn bounds establish no wall-time/capacity guarantee.

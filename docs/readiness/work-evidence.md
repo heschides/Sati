@@ -6,6 +6,93 @@ activation state or regulatory conclusions. Follow [the standing workflow](../..
 and [the assessment method](readiness-method.md). Link a reviewed release snapshot later when
 applicable; retain the earlier working record and its limits.
 
+## 2026-10-09 — SATI-WRK-001 1.3.2 dispatch fairness implementation
+
+**Status:** task 1.3.2 source implementation, verification and main integration complete;
+unreleased/default-off. Final ordinary commit/push identity is reported in the handoff.
+Josh explicitly approved task 1.3.1's hierarchical fairness policy and additive source-schema
+proposal; [DEC-0240](../decisions/current/2026-10-09-DEC-0240.md) adopts it. The
+[W8 implementation owner](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-implementation--task-132)
+records behavior, scopes, query/storage limits and operational prerequisites.
+
+**Source identity:** main checkout `C:\Users\Joshu\source\repos\heschides\Sati`, branch `master`,
+starting commit `acf638b8b840fdabcde443ee005b35a14221e6a6`. Included uncommitted inputs at start:
+none for this slice. Pre-existing `Sati.csproj` formatting/BOM changes and `assessment-working`
+scratch remain excluded. Current source is that commit plus the task-owned selector, worker,
+scheduling, shared cursor model/source migration, tests and canonical documentation changes.
+The second thread's 1.4.1 checkout/inputs, assignment row and processes are preserved.
+
+| Executed verification | Actual result / retained evidence |
+|---|---|
+| Two busy-oldest lane tests against unchanged worker | **2 failed, 0 passed/skipped**, second healthy-agency turn remained false for dispatch and account misses. `TestResults/dispatch-fairness-2026-10-09/busy-lane-before.trx`. |
+| Same tests after rotation/lane classification | **2 passed, 0 failed/skipped**, `busy-lane-after.trx`. |
+| Initial rotation/restart/offer-fault/empty acceptance | **6 passed, 0 failed/skipped**, `fairness-core.trx`. |
+| Expanded local acceptance, first run | **7 passed, 1 failed, 0 skipped**, `fairness-local-final.trx`: the new fake-clock assertion incorrectly expected no permitted turns during a five-minute advance. Corrected to 100 starts at 0..297s and none at exact expiry or later dormancy; runtime policy unchanged. |
+| Expanded local acceptance after fixture correction | **10 passed, 0 failed/skipped**, `fairness-local-final-fixed.trx`: finite three-original A backlog/B progress, equal agency opportunities/account rotation, real queue admission for independent claims/periods, restart pivots, before/after commit acknowledgement faults, fail-closed missing state, scalar query/writes bounds, finite eligibility removal, model/index consistency and lane pacing/expiry. |
+| First private SQL fairness acceptance | **6 passed, 1 failed, 0 skipped**, `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_22_16_22_net10.0.trx`. Failure was test-only random attempt-Guid ordering, corrected to assert the single attempt immediately after turn one. Owned instance `SatiSqlTests_6412ab383679485cad7020d6658d2846` stopped/deleted. Final acceptance remains pending. |
+| Source migration/model review | Generated with `dotnet ef migrations add AddClearinghouseDispatchRotation --project Sati.Persistence --startup-project Sati.Persistence --context SatiContext --configuration Release -- --synthetic-design`; no database accessed. Review caught EF convention removing the old unfiltered FK index when adding the filtered index; explicitly retained it in configuration/metadata. Additive Up and guarded Down reviewed. `has-pending-model-changes` with the same synthetic-design/no-build scope passed: no model drift. |
+
+**Later executed verification:** each deliberately broken always-first-agency, always-first-account
+and lane-cooldown mutant produced **1 failed, 0 passed/skipped**; the exact source bytes were
+restored and verified. Named TRX/log files and `verify-mutants.ps1` are retained in the task's
+TestResults folder. Restored-source dispatch regressions passed **98, zero failed/skipped** in
+`dispatch-regressions-restored.trx` before the final SQL ownership guard. A preliminary compile
+caught a missing account-admission method in the new test double; it was supplied before the
+accepted run, without runtime change.
+
+The real SQL lock-loss injection then failed as required: **1 failed, zero passed/skipped**, because
+the first selector implementation proceeded after its transaction lock was released. Retained
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_22_26_48_net10.0.trx`; owned
+instance `SatiSqlTests_c46328a1a0d34cf29071afde3dc7b03c` stopped/deleted. Added an exact SQL
+ownership recheck before Empty return or offer commit, so loss propagates/rolls back before upload.
+Final Release API/test build passed, zero errors and seven existing warnings.
+
+**Verification history:** initial pending checks were resolved by the final acceptance and closing
+checks below. Failures remain preserved rather than overwritten.
+The earlier 129th-migration acceptance fixture is explicitly pinned to its historical target and
+removes the new source schema only inside its newly owned synthetic database; sealed source
+scripts/release evidence remain unchanged.
+
+**Final API acceptance:** `scripts/Test-IsolatedLocalDb.ps1 -FullApi -NoBuild` passed **1,330,
+zero failed/skipped** in 25m19s on the final ownership-verified source. Retained
+`TestResults/ClaimMdPreparationFinalApi/Joshu_LONGCHENPA_2026-10-09_22_28_12_net10.0.trx`.
+All 19 named fairness cases and the lane pacing/expiry case passed, including eight actual SQL
+cases. New SQL acceptance covers real dispatch/account lease misses, zero-wait serialization,
+two-host distinct offers and released connection/upload boundaries, persisted restart/rotation,
+pre/after-commit fault/no-retry/no-send, lost ownership rollback, query/state bounds, additive
+schema and 51045 rollback refusal. Existing full-suite recovery/reopen/mode/due, scoped admission,
+current billing compliance, uncertainty/late receipt, reset and hosted scheduling cases also pass.
+Owned instance `SatiSqlTests_22ee5a2d6ca24cd0bce3effcf1cf2b34` stopped/deleted. The 18-input
+SHA-256 manifest `TestResults/dispatch-fairness-2026-10-09/acceptance-source-identity.json` matches
+after acceptance, as does the excluded project hash. No runtime/test source changed during the run.
+Shared assembly boundary subsequently passed **1, zero failed/skipped** in `persistence-boundary.trx`,
+including the platform-neutral 130-migration chain/new ID. Both EF model/index metadata cases pass.
+The first desktop build recursively included the retained prior `TestResults/.../staged-snapshot`
+source copy and failed on duplicate source/types before tests. The accepted Release build used
+verification-only `-p:DefaultItemExcludesInProjectFolder=TestResults/**`, preserving that artifact
+and the excluded project file. `persistence-boundary-build.log` retains the accepted command output,
+existing warnings and single passing test. An ordinary dirty-workspace desktop build needs this
+artifact exclusion or reviewed relocation; clean source does not include those ignored copies.
+
+**Closing checks:** documentation structure and all 22 disposable negative cases passed;
+source consistency passed at version 1.3.39 with source migration count 130; EF pending-model check
+reported no changes with synthetic-design. Tracked/staged whitespace and source drift are verified
+before the ordinary commit. Final documentation/negative outputs are retained in this task's
+TestResults folder. Historical snapshots, sealed reports/rubrics and observed deployments remain
+unchanged. No full desktop/application/load/benchmark/live vendor or intended-host acceptance was run.
+
+**Evidence limits:** synthetic connector and test claims only; SQL uses newly created private
+LocalDB instance/databases and no shared default or working data. SQLite proves logic, not SQL
+application locks. Scheduling offers establish neither send receipt nor throughput/capacity.
+No existing/cloud/working database migration, reset/baseline operation, real data, vendor call,
+deployment, activation or release performed. No other-worker fairness, dependency budgets,
+whole-operation deadline, intended-host load, alert delivery or regulatory conclusion follows.
+Working readiness evidence does not change sealed scores or the observed deployment inventory.
+
+**Next bounded step:** task 1.3.3.1 polling fairness proposal/source review, defined in
+[the agenda](../../AGENDA.md#next-eligible-work), before policy adoption or implementation. The independently
+assigned 1.4.1 resource inventory is an input to later budget design and needs main review.
+
 ## 2026-10-08 — Documentation consolidation and standing workflow
 
 **Stable work ID:** SATI-DOC-001. **Status:** implemented and locally verified; unreleased.

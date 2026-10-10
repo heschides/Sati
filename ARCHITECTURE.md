@@ -40,9 +40,12 @@ validated request publishers. It owns local activity/waits; SQL retains eligibil
 No route, DTO, schema, desktop scheduler or deployment boundary changes.
 
 Task 1.3.1's [dispatch fairness design](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131)
-proposes Persistence-owned rotation metadata and a short API-owned shared selector, separate
-from current send admission. [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md) awaits policy
-and additive source-schema review; no model, runtime owner or deployment changed in this design.
+was adopted in [DEC-0240](docs/decisions/current/2026-10-09-DEC-0240.md). Task 1.3.2's
+[source implementation](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-implementation--task-132)
+adds Persistence-owned rotation metadata/index and a constructor-injected API selector. Its
+short zero-retry SQL transaction disposes before existing send admission and external work.
+Offers change scheduling position only. Known lane skips preserve normal activity pacing;
+shared barriers retain cooldown. Acceptance is recorded separately from migration/deployment.
 
 The [desktop test boundary](docs/architecture/desktop.md) explicitly suppresses production
 startup while loading canonical UI resources; omitting Application.Run does not suppress the

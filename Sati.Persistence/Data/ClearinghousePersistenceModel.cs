@@ -12,6 +12,25 @@ public static class ClearinghousePersistenceModel
     {
         model.Entity<TGeneration>().HasAlternateKey("AgencyId", "Id");
 
+        model.Entity<ClearinghouseDispatchRotation>(entity =>
+        {
+            entity.ToTable("ClearinghouseDispatchRotation", table => table.HasCheckConstraint(
+                "CK_ClearinghouseDispatchRotation_Scope", "[Id] = 1 AND [Revision] > 0 AND ([LastAgencyId] IS NULL OR [LastAgencyId] > 0)"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasData(new ClearinghouseDispatchRotation());
+        });
+        model.Entity<ClearinghouseAgencyDispatchRotation>(entity =>
+        {
+            entity.ToTable("ClearinghouseAgencyDispatchRotation", table => table.HasCheckConstraint(
+                "CK_ClearinghouseAgencyDispatchRotation_Scope", "[AgencyId] > 0 AND [Revision] > 0"));
+            entity.HasKey(x => x.AgencyId);
+            entity.Property(x => x.AgencyId).ValueGeneratedNever();
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasOne<TAgency>().WithMany().HasForeignKey(x => x.AgencyId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         model.Entity<ClearinghouseAccount>(entity =>
         {
             entity.ToTable("ClearinghouseAccounts", table => table.HasCheckConstraint(
@@ -60,8 +79,12 @@ public static class ClearinghousePersistenceModel
             entity.Property(x => x.Revision).IsConcurrencyToken();
             entity.HasIndex(x => x.EdiGenerationId).IsUnique();
             entity.HasIndex(x => new { x.AgencyId, x.State, x.RequestedAtUtc });
+            // Preserve the unfiltered FK-supporting index when adding the filtered lane index.
+            entity.HasIndex(x => new { x.AgencyId, x.AccountId });
             entity.HasIndex(x => new { x.State, x.RequestedAtUtc, x.Id })
                 .IncludeProperties(x => new { x.AgencyId, x.AccountId });
+            entity.HasIndex(x => new { x.AgencyId, x.AccountId, x.RequestedAtUtc, x.Id })
+                .HasDatabaseName("IX_ClearinghouseDispatches_QueuedLane").HasFilter("[State] = 1");
             entity.HasOne<ClearinghouseAccount>().WithMany()
                 .HasForeignKey(x => new { x.AgencyId, x.AccountId })
                 .HasPrincipalKey(x => new { x.AgencyId, x.Id }).OnDelete(DeleteBehavior.Restrict);
@@ -146,6 +169,29 @@ public static class ClearinghousePersistenceModel
 
     public static void ProtectWrites(ChangeTracker tracker)
     {
+        foreach (var entry in tracker.Entries<ClearinghouseDispatchRotation>())
+        {
+            if (entry.State == EntityState.Deleted)
+                throw new InvalidOperationException("Dispatch rotation cannot be deleted to reset scheduling position.");
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var row = entry.Entity;
+            if (row.Id != ClearinghouseDispatchRotation.SingletonId || row.LastAgencyId is <= 0 ||
+                entry.State == EntityState.Added && row.Revision != 1 ||
+                entry.State == EntityState.Modified && (entry.Property(x => x.Id).IsModified ||
+                    row.Revision != checked(entry.OriginalValues.GetValue<long>(nameof(row.Revision)) + 1)))
+                throw new InvalidOperationException("Dispatch rotation requires its fixed scope and a new revision.");
+        }
+        foreach (var entry in tracker.Entries<ClearinghouseAgencyDispatchRotation>())
+        {
+            if (entry.State == EntityState.Deleted)
+                throw new InvalidOperationException("Agency dispatch rotation cannot be deleted to reset scheduling position.");
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var row = entry.Entity;
+            if (row.AgencyId <= 0 || entry.State == EntityState.Added && row.Revision != 1 ||
+                entry.State == EntityState.Modified && (entry.Property(x => x.AgencyId).IsModified ||
+                    row.Revision != checked(entry.OriginalValues.GetValue<long>(nameof(row.Revision)) + 1)))
+                throw new InvalidOperationException("Agency dispatch rotation requires immutable scope and a new revision.");
+        }
         foreach (var entry in tracker.Entries<ClearinghouseDispatchReadiness>())
         {
             if (entry.State == EntityState.Deleted)

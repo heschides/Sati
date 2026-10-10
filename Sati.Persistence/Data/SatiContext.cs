@@ -57,6 +57,8 @@ namespace Sati.Data
         public DbSet<ClearinghouseAccount> ClearinghouseAccounts => Set<ClearinghouseAccount>();
         public DbSet<ClearinghouseDispatch> ClearinghouseDispatches => Set<ClearinghouseDispatch>();
         public DbSet<ClearinghouseDispatchReadiness> ClearinghouseDispatchReadiness => Set<ClearinghouseDispatchReadiness>();
+        public DbSet<ClearinghouseDispatchRotation> ClearinghouseDispatchRotation => Set<ClearinghouseDispatchRotation>();
+        public DbSet<ClearinghouseAgencyDispatchRotation> ClearinghouseAgencyDispatchRotation => Set<ClearinghouseAgencyDispatchRotation>();
         public DbSet<ClearinghouseDispatchAttempt> ClearinghouseDispatchAttempts => Set<ClearinghouseDispatchAttempt>();
         public DbSet<ClearinghouseFeedCheckpoint> ClearinghouseFeedCheckpoints => Set<ClearinghouseFeedCheckpoint>();
         public DbSet<ClearinghouseResponseReceipt> ClearinghouseResponseReceipts => Set<ClearinghouseResponseReceipt>();

@@ -410,7 +410,8 @@ public sealed partial class ClearinghouseDispatchApiTests
             connector, gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
             keys, new TestDemoWorkerResetCoordination(),
             fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System,
-            fixture.Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>());
+            fixture.Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>(),
+            new ClearinghouseDispatchSelector(fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), gate, TimeProvider.System));
         using var caller = new CancellationTokenSource();
         var processing = worker.ProcessOneAsync(caller.Token);
         try
@@ -494,7 +495,7 @@ public sealed partial class ClearinghouseDispatchApiTests
         var connector = new ThrowingConnector();
         var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
         {
-            ExpectedEnvironment = "Demo", ExpectedDatabaseName = "SatiDemo",
+            ExpectedEnvironment = "Testing", ExpectedDatabaseName = "SatiApiTests",
             EnableClaimMdSandboxTransport = true
         }), fixture.Factory.Services.GetRequiredService<IHostEnvironment>());
         var worker = new ClearinghouseDispatchWorker(
@@ -502,7 +503,8 @@ public sealed partial class ClearinghouseDispatchApiTests
             connector, gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
             new MissingKeySource(), new TestDemoWorkerResetCoordination(),
             fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System,
-            fixture.Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>());
+            fixture.Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>(),
+            new ClearinghouseDispatchSelector(fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), gate, TimeProvider.System));
         Assert.True(await worker.ProcessOneAsync(CancellationToken.None));
         Assert.Equal(0, connector.Calls);
         await using var saved = fixture.Factory.OpenDatabase();
@@ -950,7 +952,8 @@ public sealed partial class ClearinghouseDispatchApiTests
             Factory.Services.GetRequiredService<IClaimMdSandboxKeySource>(),
             resetCoordination ?? new TestDemoWorkerResetCoordination(),
             Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System,
-            Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>());
+            Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>(),
+            Factory.Services.GetRequiredService<ClearinghouseDispatchSelector>());
 
         public async ValueTask DisposeAsync()
         {

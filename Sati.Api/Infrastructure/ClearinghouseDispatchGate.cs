@@ -9,6 +9,8 @@ namespace Sati.Api.Infrastructure;
 /// <summary>Transport is only possible for an exact Demo/Testing identity and an explicit server opt-in.</summary>
 internal sealed class ClearinghouseDispatchGate(IOptions<SatiApiOptions> options, IHostEnvironment environment)
 {
+    internal bool IsTestingIdentity => environment.IsEnvironment("Testing") &&
+        options.Value.ExpectedEnvironment == "Testing" && options.Value.ExpectedDatabaseName == "SatiApiTests";
     public bool IsSyntheticEnvironment =>
         options.Value.ExpectedEnvironment == "Demo" && options.Value.ExpectedDatabaseName == "SatiDemo" ||
         environment.IsEnvironment("Testing") && options.Value.ExpectedEnvironment == "Testing" &&

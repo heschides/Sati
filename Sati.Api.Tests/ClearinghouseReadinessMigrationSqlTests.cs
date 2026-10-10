@@ -221,11 +221,16 @@ public sealed class ClearinghouseReadinessMigrationSqlTests
                 });
                 await db.SaveChangesAsync();
                 var migration = new AddClearinghousePreflightReadiness { ActiveProvider = "Microsoft.EntityFrameworkCore.SqlServer" };
+                // This fixture proves the sealed 129th migration's predecessor, not the latest schema.
+                var later = new AddClearinghouseDispatchRotation { ActiveProvider = "Microsoft.EntityFrameworkCore.SqlServer" };
+                foreach (var command in db.GetService<IMigrationsSqlGenerator>().Generate(later.DownOperations, db.Model))
+                    await db.Database.ExecuteSqlRawAsync(command.CommandText);
                 foreach (var command in db.GetService<IMigrationsSqlGenerator>().Generate(migration.DownOperations, db.Model))
                     await db.Database.ExecuteSqlRawAsync(command.CommandText);
                 var migrations = typeof(AddClearinghousePreflightReadiness).Assembly.GetTypes()
                     .Select(type => type.GetCustomAttribute<MigrationAttribute>()?.Id)
-                    .OfType<string>().Order(StringComparer.Ordinal).ToArray();
+                    .OfType<string>().Where(id => StringComparer.Ordinal.Compare(id, TargetMigration) <= 0)
+                    .Order(StringComparer.Ordinal).ToArray();
                 Assert.Equal(129, migrations.Length);
                 Assert.Equal(TargetMigration, migrations[^1]);
                 await fixture.ExecuteAsync("CREATE TABLE dbo.__EFMigrationsHistory(MigrationId nvarchar(150) NOT NULL PRIMARY KEY, ProductVersion nvarchar(32) NOT NULL);");

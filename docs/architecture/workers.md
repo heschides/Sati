@@ -47,10 +47,12 @@ leases dispose. SQL eligibility/admission remains authoritative. [DEC-0237](../d
 adopts the retained policy; source verification does not establish deployment or activation.
 
 The later [task 1.3.1 fairness design](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131)
-recommends agency/account rotation with persisted scheduling pivots and a short shared selector.
-[DEC-0239](../decisions/current/2026-10-09-DEC-0239.md) remains proposed; current runtime selection,
-contention handling and schema remain unchanged pending review. Its conditional offer bounds
-are distinct from dependency deadlines, measured capacity and operating acceptance.
+was adopted by [DEC-0240](../decisions/current/2026-10-09-DEC-0240.md). Task 1.3.2's
+[implementation](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-implementation--task-132)
+adds persisted scheduling pivots and a short SQL selector released before send admission.
+The source migration is additive; known local lane skips use normal pacing while shared barriers
+retain cooldown. Conditional offer bounds remain distinct from dependency deadlines, measured
+capacity and operating acceptance; the ledger owns actual verification status.
 
 Remaining W8: sustained
 fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant

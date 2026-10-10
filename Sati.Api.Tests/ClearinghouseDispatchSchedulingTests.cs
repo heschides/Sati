@@ -152,7 +152,8 @@ public sealed partial class ClearinghouseDispatchApiTests
             new ThrowingConnector(), gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
             fixture.Factory.Services.GetRequiredService<IClaimMdSandboxKeySource>(), coordination,
             fixture.Factory.Services.GetRequiredService<Microsoft.Extensions.Logging.ILogger<ClearinghouseDispatchWorker>>(),
-            clock, schedule);
+            clock, schedule, new ClearinghouseDispatchSelector(
+                fixture.Factory.Services.GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Sati.Api.Data.ApiDbContext>>(), gate, clock));
         await worker.StartAsync(CancellationToken.None);
         try
         {
@@ -401,6 +402,28 @@ public sealed partial class ClearinghouseDispatchApiTests
             Assert.Equal(2, turns);
             clock.Advance(TimeSpan.FromMilliseconds(1));
             await UntilAsync(() => Volatile.Read(ref turns) == 3 && clock.ActiveTimerCount == 1);
+        }
+        finally { stop.Cancel(); await run; }
+    }
+
+    [Fact]
+    public async Task ScheduleLaneSkippedUsesOrdinaryPacingWithoutRenewingActivity()
+    {
+        var clock = new ManualTimeProvider(); var schedule = Schedule(clock);
+        schedule.SignalActivity(); var generation = schedule.Generation;
+        using var stop = new CancellationTokenSource(); var turns = 0;
+        var run = schedule.RunAsync(_ => { Interlocked.Increment(ref turns); return Task.FromResult(DispatchTurn.LaneSkipped); },
+            () => Assert.Fail("Unexpected fault"), stop.Token);
+        try
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(2999)); Assert.Equal(1, turns);
+            clock.Advance(TimeSpan.FromMilliseconds(1));
+            await UntilAsync(() => Volatile.Read(ref turns) == 2 && clock.ActiveTimerCount == 1);
+            Assert.Equal(generation, schedule.Generation);
+            clock.Advance(TimeSpan.FromMinutes(5));
+            await UntilAsync(() => clock.ActiveTimerCount == 0);
+            Assert.Equal(100, turns); // Starts at 0..297s; no turn at the exact 300s expiry.
+            clock.Advance(TimeSpan.FromDays(1)); Assert.Equal(100, turns);
         }
         finally { stop.Cancel(); await run; }
     }

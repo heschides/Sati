@@ -43,7 +43,7 @@ internal sealed class ClearinghouseDispatchWorker(
     ClearinghouseDispatchGate gate, EnvelopeProtector protector, IClaimMdSandboxKeySource keys,
     IDemoWorkerResetCoordination resetCoordination,
     ILogger<ClearinghouseDispatchWorker> logger, TimeProvider clock,
-    ClearinghouseDispatchSchedule schedule) : BackgroundService
+    ClearinghouseDispatchSchedule schedule, ClearinghouseDispatchSelector selector) : BackgroundService
 {
     private sealed record Preparation(bool Processed, ClearinghouseAccount? Account = null,
         ServerEdiGeneration? Generation = null)
@@ -64,53 +64,34 @@ internal sealed class ClearinghouseDispatchWorker(
         return await resetCoordination.RunAsync(ProcessUnderResetLeaseAsync, DispatchTurn.Contended, token);
     }
 
-    private IQueryable<ClearinghouseDispatch> EligibleQueued(ApiDbContext db, DateTime now) =>
-        db.ClearinghouseDispatches.Where(row => row.State == ClearinghouseDispatchState.Queued)
-            .Where(row => !db.ClearinghouseDispatchReadiness.Any(readiness =>
-                readiness.AgencyId == row.AgencyId && readiness.AccountId == row.AccountId &&
-                readiness.Disposition != ClearinghousePreflightDisposition.Ready &&
-                !(gate.IsRealSandboxEnabled && readiness.Disposition == ClearinghousePreflightDisposition.Deferred &&
-                    readiness.NextEligibleAtUtc <= now)));
-
     private async Task<DispatchTurn> ProcessUnderResetLeaseAsync(CancellationToken token)
     {
+        var selection = await selector.SelectAsync(token);
+        if (selection.Kind == DispatchSelectionKind.Disabled) return DispatchTurn.Disabled;
+        if (selection.Kind == DispatchSelectionKind.Contended) return DispatchTurn.Contended;
+        if (selection.Kind == DispatchSelectionKind.LaneSkipped) return DispatchTurn.LaneSkipped;
+        if (selection.Kind == DispatchSelectionKind.Empty) return new(DispatchTurnKind.Empty, selection.NextEligibleUtc);
         await using var db = await contexts.CreateDbContextAsync(token);
-        var now = clock.GetUtcNow().UtcDateTime;
-        var eligible = EligibleQueued(db, now);
-        var dispatch = await eligible
-            .OrderBy(row => row.RequestedAtUtc).ThenBy(row => row.Id)
-            .FirstOrDefaultAsync(token);
-        if (dispatch is null)
-        {
-            // One scalar snapshot command, including a newly eligible row racing the initial read.
-            // Do not materialize all accounts or interpret a missed lease as an empty queue.
-            var realSandbox = gate.IsRealSandboxEnabled;
-            var deferred = from readiness in db.ClearinghouseDispatchReadiness
-                where realSandbox && readiness.Disposition == ClearinghousePreflightDisposition.Deferred &&
-                    readiness.NextEligibleAtUtc > now && db.ClearinghouseDispatches.Any(row =>
-                        row.AgencyId == readiness.AgencyId && row.AccountId == readiness.AccountId &&
-                        row.State == ClearinghouseDispatchState.Queued)
-                select readiness.NextEligibleAtUtc;
-            var next = await eligible.Select(_ => (DateTime?)now).Concat(deferred)
-                .OrderBy(value => value).FirstOrDefaultAsync(token);
-            return new DispatchTurn(DispatchTurnKind.Empty, next);
-        }
+        var dispatch = await db.ClearinghouseDispatches.SingleOrDefaultAsync(row => row.Id == selection.DispatchId &&
+            row.AgencyId == selection.AgencyId && row.AccountId == selection.AccountId, token);
+        if (dispatch is null) return DispatchTurn.LaneSkipped;
 
-        var processed = await resetCoordination.RunDispatchAsync(dispatch.Id,
+        return await resetCoordination.RunDispatchAsync(dispatch.Id,
             innerToken => new DispatchSingleAttempt(db).ExecuteAsync(
-                () => UploadUnderDispatchLeaseAsync(db, dispatch, innerToken)), false, token);
-        return processed ? DispatchTurn.Processed : DispatchTurn.Contended;
+                () => UploadUnderDispatchLeaseAsync(db, dispatch, innerToken)), DispatchTurn.LaneSkipped, token);
     }
 
-    private async Task<bool> UploadUnderDispatchLeaseAsync(ApiDbContext db,
+    private async Task<DispatchTurn> UploadUnderDispatchLeaseAsync(ApiDbContext db,
         ClearinghouseDispatch dispatch, CancellationToken token)
     {
         var prepared = await resetCoordination.RunAccountPreflightAsync(dispatch.AgencyId, dispatch.AccountId,
             (lease, heldToken) => PrepareUnderAccountLeaseAsync(db, dispatch, lease, heldToken), Preparation.Idle, token);
-        if (prepared.Account is null || prepared.Generation is null) return prepared.Processed;
+        if (prepared.Account is null || prepared.Generation is null)
+            return prepared.Processed ? DispatchTurn.Processed : DispatchTurn.LaneSkipped;
         // Sending is committed. Release account admission before the physical upload;
         // the dispatch/reset leases and existing uncertainty policy remain in force.
-        return await UploadAndRetainAsync(db, dispatch, prepared.Account, prepared.Generation, token);
+        await UploadAndRetainAsync(db, dispatch, prepared.Account, prepared.Generation, token);
+        return DispatchTurn.Processed;
     }
 
     private async Task<Preparation> PrepareUnderAccountLeaseAsync(ApiDbContext db,

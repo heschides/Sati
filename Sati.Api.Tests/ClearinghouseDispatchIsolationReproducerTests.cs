@@ -148,16 +148,20 @@ public sealed partial class ClearinghouseDispatchApiTests
 
     private static ClearinghouseDispatchWorker CreateIsolationWorker(SyntheticPipelineFactory factory,
         IClaimMdSandboxKeySource keys, IClearinghouseConnector connector, TimeProvider? clock = null,
-        IDemoWorkerResetCoordination? coordination = null) => new(
-        factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(), connector,
-        new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
+        IDemoWorkerResetCoordination? coordination = null)
+    {
+        var gate = new ClearinghouseDispatchGate(Options.Create(new SatiApiOptions
         {
             ExpectedEnvironment = "Testing", ExpectedDatabaseName = "SatiApiTests",
             EnableClaimMdSandboxTransport = true
-        }), factory.Services.GetRequiredService<IHostEnvironment>()),
+        }), factory.Services.GetRequiredService<IHostEnvironment>());
+        var contexts = factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>();
+        return new(contexts, connector, gate,
         factory.Services.GetRequiredService<EnvelopeProtector>(), keys, coordination ?? new TestDemoWorkerResetCoordination(),
         factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), clock ?? TimeProvider.System,
-        factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>());
+        factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>(),
+        new ClearinghouseDispatchSelector(contexts, gate, clock ?? TimeProvider.System));
+    }
 
     private sealed class IsolationKeySource(string missingReference, string healthyReference) : IClaimMdSandboxKeySource
     {
