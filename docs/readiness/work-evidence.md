@@ -1,5 +1,44 @@
 # Working evidence ledger
 
+## 2026-10-10 — SATI-WRK-001 1.4.5 note-worker connection-lifetime evidence
+
+**Identity/authority:** main `master` base `c897b7bc053c6813d847583a5daa16d40907b838`, checkout
+`C:/Users/Joshu/source/repos/heschides/Sati`; explicit main test-only assignment after 1.4.4 under
+continued Agenda approval. Included input: own active assignment; unrelated project formatting/
+assessment scratch preserved/excluded. Required current coordination/task/governance and note
+source, retry/transaction/reset owners present and reviewed. No other checkout/process/agent used.
+
+**Result:** reusable test-only logical connection event probe plus real note worker/private SQL
+transaction cases. Normal per-operation peak two; discovery is closed before sweep despite its
+context staying in scope. Two unopened strategy objects are distinguished from four attempted
+connection objects. Second independent caller's contending admission produces combined peak
+three and enters no discovery. Precommit recoverable/cancelled paths verify rollback/audit,
+cleanup and healthy/later progress. Adverse extra held SQL connection makes the two-connection
+assertion fail and then closes; bookkeeping retains failed/unconfirmed debt without double-count.
+No runtime code/schema/policy changed. These are tested logical intervals, not capacity or K.
+
+**Actual checks:** first build failed on three fixture errors (init-only options, revision Int32,
+missing audit namespace), corrected before execution. First private run **5 passed, 1 failed,
+zero skipped**, 16 seconds,
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_25_48_net10.0.trx`.
+Normal test confused seen disposed objects (6) with distinct open-attempt objects (4); corrected
+probe labeling/assertions, retaining both counts. Other boundary/adverse tests passed. Corrected
+focused run **139 passed, zero failed/skipped**, 44 seconds,
+`TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_26_20_net10.0.trx`.
+Includes six new cases, 35 existing note-worker and 98 admission cases. All owned SQL instances
+cleaned by wrapper. Added bounded await of own barrier task in finally to prevent failed assertions
+from leaving work running during fixture teardown. Final six new cases passed, zero failed/skipped,
+16 seconds, `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-10_01_28_01_net10.0.trx`;
+owned `SatiSqlTests_c59a965dec59465c9970ff5c8f4b56a1` stopped/deleted. Documentation structure
+passed (46 root documents, 28 scoped owners, 25 current decisions), all 22 negative proofs passed,
+and working/staged whitespace checks passed at closure. No full API/desktop/load claim.
+
+**Limits/next step:** no benchmarks, real/application data, provider calls, existing database apply,
+hosting/security, activation, capacity/latency claim or sealed evidence changed. Simulated debt
+bookkeeping does not prove actual failed SqlClient closure/pool eviction; retry/reconnect/fencing
+and other consumers remain open. Next: equivalent real hosted signature lifetime evidence, then
+dispatch/poll owners and broader enrollment before DEC-0242 backend/value adoption.
+
 ## 2026-10-10 — SATI-WRK-001 1.4.4 session admission result hardening
 
 **Identity/authority:** main `master` base `f51dd5165214b5167b30019b35ba4a3d7ec699fd`, checkout

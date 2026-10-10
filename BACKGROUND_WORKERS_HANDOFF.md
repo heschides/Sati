@@ -607,6 +607,42 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 10 — note-worker connection-lifetime evidence — task 1.4.5
+
+**Status:** bounded test-only main acceptance complete; 139 focused cases and final six passed,
+runtime unchanged. The shared
+[connection probe](Sati.Api.Tests/WorkerConnectionProbe.cs) tracks logical ADO open attempts,
+successful opens and confirmed close/disposal across factory contexts. One connection with two
+session locks is counted once; opening/failed/cancelled outcomes remain charged until a confirmed
+close/disposal event. Closing/disposing intent alone earns no credit. Distinct disposed objects
+and distinct attempted opens are separate counts. These are synthetic event assertions, not
+physical SQL sessions, pool eviction, provider failure fencing or adopted reservation costs.
+
+[Real note-worker cases](Sati.Api.Tests/NoteWorkerConnectionLifetimeTests.cs) use the production
+coordination, discovery, sweep transaction and completion cache against owned synthetic SQL.
+The normal two-agency pass observes two simultaneously held logical connections at precommit
+audit: reset/sweep coordination and business transaction. Discovery's context object remains in
+scope with its connection closed. Six context connection objects are disposed; four attempt an
+open, while both execution-strategy objects stay unopened. Normal end has zero held connections;
+same-day completion and disablement add no opens. Note/revision/system-audit effects are checked.
+
+Precommit concurrency failure rolls back the first note and audit, releases its business
+connection, permits the healthy agency, and leaves the failed agency due for later completion.
+Cancellation at that boundary rolls back both pending effects, closes owned connections and
+leaves both agencies due. A second independent worker's failed sweep admission briefly raises
+the combined peak to three: contention itself uses a connection. It enters no discovery/sweep.
+An intentionally held extra SQL context raises the transaction interval to three and makes a
+two-connection assertion fail; cleanup restores two then zero. This adverse control demonstrates
+the probe catches extra held connections rather than assuming the source arithmetic is true.
+
+Actual SQL cleanup succeeded in these cases. Failed/cancelled open and unconfirmed cleanup debt
+are tested only as probe bookkeeping; real provider failure/reconnect/retry and physical pooling
+remain unproved. No failure-safe K, cross-host resource cap, capacity, latency, complete API census
+or deployed acceptance follows. Setup/evidence connections are separate and excluded; no real
+data/vendor/cloud call or application/schema/policy change. [Working evidence](docs/readiness/work-evidence.md#2026-10-10--sati-wrk-001-145-note-worker-connection-lifetime-evidence)
+owns actual results and fixture corrections. Next bounded slice is equivalent hosted signature
+projection/package/mail lifetime evidence, preserving protective dependency transactions.
+
 #### October 10 — session admission result hardening — task 1.4.4
 
 **Status:** bounded source/main acceptance complete; 162 focused cases passed, unreleased. The API's
