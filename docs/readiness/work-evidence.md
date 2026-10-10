@@ -1,5 +1,36 @@
 # Working evidence ledger
 
+## 2026-10-09 — SATI-WRK-001 1.3.3.4 note-maintenance fairness review
+
+**Identity/authority:** main checkout `C:/Users/Joshu/source/repos/heschides/Sati`, `master`
+at `7ec35182851ce4416dc5ec48f00a324b2fced04d`; no included uncommitted runtime inputs.
+Josh authorized continued bounded Agenda progression and verified commits/pushes. Preserved
+the preexisting project formatting and assessment scratch. This task changes only its canonical
+review, agenda and working evidence; application/schema/test files are unchanged.
+
+**Finding/choice:** existing one-100-note-batch-per-due-agency traversal already prevents a
+full or classified recoverably failing agency from draining/blocking later agencies in a stable,
+admitted, completing pass. Retain that owner rather than implement a redundant scheduler.
+[W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--note-maintenance-fairness-review--task-1334)
+records the conditional N − 1 invocation bound and its retry/time/crash/membership limitations.
+This is acceptance of an existing source control, not overall note fairness or W8 completion.
+
+**Actual acceptance:** `scripts/Test-IsolatedLocalDb.ps1 -BillingReleaseOnly
+-BillingReleaseFilter 'FullyQualifiedName~NoteAbandonmentWorkerTests' -NoBuild` ran the
+current Release binaries from task 1.3.3.3, **35 passed, 0 failed/skipped**, 45 seconds.
+TRX `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_23_51_26_net10.0.trx`.
+Owned synthetic instance `SatiSqlTests_2611e501ba034b18afc02212b9006e97` stopped/deleted.
+Includes two guarded SQL sweep/reset tests and the 251-agency/full-batch/recoverable-fault
+progress cases. No new test or fail-first claim; previous historical failures retain their own
+evidence. Documentation structure, all 22 negative proofs and whitespace passed for closure.
+
+**Limits/next:** restart loses scan/cache position; repeated interrupted passes, same-day
+provisioning invalidation, current-day cache bounds, total lock/operation time and aggregate
+capacity remain unresolved. No measured capacity, real data, vendor/cloud call, existing schema
+apply, activation, deployment or sealed readiness change. Next main integration reviews task
+1.4.1 and then 1.4.2 against current dispatch/polling source; signature fairness needs its own
+bounded definition. The second checkout remains untouched.
+
 ## 2026-10-09 — SATI-WRK-001 1.3.3.3 durable polling selection
 
 **Identity:** base `e443623116f6d89014709271c1c62654467abc79`, main `master`, checkout

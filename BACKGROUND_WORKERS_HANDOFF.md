@@ -607,6 +607,46 @@ inventory/design, subsequently adopted and implemented in
 next slice. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
+#### October 9 — note-maintenance fairness review — task 1.3.3.4
+
+**Status:** bounded source review and existing synthetic acceptance complete; no runtime change.
+[NoteAbandonmentWorker](Sati.Api/Infrastructure/NoteAbandonmentWorker.cs) already visits due
+stored agencies in ascending ID, within a captured finite maximum, using 100-ID keyset pages.
+For each uncached agency it calls [the sweep](Sati.Api/Infrastructure/NoteAbandonmentSweep.cs)
+once with the separate 100-note limit, then moves on. Filling that batch leaves the agency due
+for a later hourly pass; it does not drain that agency before visiting the next. DEC-0222's
+classified recoverable failure also leaves work due and continues; shared/unknown failures and
+cancellation stop the pass. The sweep owns oldest-note ordering, provider transaction retries,
+revision/ownership guards and atomic note/audit changes. No business-rule or scheduler owner moves.
+
+**Conditional opportunity:** for a stable finite membership of N due agencies, an admitted pass
+whose earlier operations terminate and whose gate remains enabled visits each once, after at
+most N − 1 other agency sweep calls. Each call initially materializes at most 100 candidates;
+provider retries can repeat a batch transaction. This is a per-pass invocation bound, not a
+command, retry, time, successful-change or global-host fairness bound. Other hosts serialize
+through the shared sweep session; whichever host acquires it restarts discovery at the first ID.
+Process-local successful-day skips are an optimization, not durable scheduling progress.
+
+**Evidence:** all **35 existing NoteAbandonmentWorkerTests passed, 0 failed/skipped**, including
+two real private-SQL sweep/reset coordination cases. The 251-agency case has pages 100/100/51;
+a recoverably failing first agency and a full second-agency batch still permit the last agency's
+note/audit commit, while subsequent passes retry only due agencies. The exact-100-note case
+commits healthy B in the same pass. Existing cancellation, disablement, shared-failure, date/cache,
+observed-growth and damaged-ID cases passed with current source. No new defect regression or
+unfixed-code failure is claimed; this task verifies an existing control. Exact identity/results
+belong to [working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-1334-note-maintenance-fairness-review).
+
+**Remaining gaps and dependencies:** crashes or repeated cancellation before B can repeat
+low-ID work because the scan/cache are process-local; no durable crash-resilient opportunity
+bound is established. Full pass/global lock duration, current-day cache cardinality and resource
+budgets remain open. Captured key range is not frozen membership; within-range/provisioning and
+post-check additions can miss completed-day invalidation. A cache/batch cap alone cannot repair
+that ownership problem. Preserve DEC-0224/0225 caveats and default-off/hourly/no-completed-day-SQL
+behavior. Budget/deadline and provisioning owners must precede any stronger claim or scheduler
+replacement. First integrate/revalidate the second thread's inventory and admission proposal;
+then define signature fairness separately. No application/schema/test edits, real data, existing
+database, external call, activation, release or sealed evidence change occurred here.
+
 #### October 9 — durable polling selection — task 1.3.3.3
 
 **Status:** bounded source implementation, verification and main integration complete under DEC-0241; unreleased.
