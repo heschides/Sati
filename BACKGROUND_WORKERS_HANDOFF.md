@@ -603,8 +603,203 @@ remain unchanged. The ledger retains the aborted run and final acceptance separa
 request admission, full operation/dependency bounds, consistent configuration, query plans and
 owner alert/load evidence remain open. Next is a bounded fairness inventory/design defining
 eligible agency/account lanes, contention treatment, preserved release/lease order and testable
-turn bounds. Review policy before implementing it. Do not activate or replace the Demo inactivity
+turn bounds, now delivered in [task 1.3.1's proposed design](#october-9--dispatch-fairness-design--task-131).
+Its policy/source-schema review precedes implementation. Do not activate or replace the Demo inactivity
 tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
+
+#### October 9 — dispatch fairness design — task 1.3.1
+
+**Status:** source-grounded design deliverable awaiting review; policy, schema and runtime changes
+are **proposed**, not adopted or implemented. [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md)
+records the recommendation and alternatives. Inventory baseline is `8e6509fc4c99fd5c32d8a63715ae7a98941be7f6`
+in the main checkout, `C:\Users\Joshu\source\repos\heschides\Sati`. No included uncommitted application
+inputs; unrelated project formatting and assessment scratch are excluded. Task 1.4.1 owns the
+separate resource-limit matrix in its dedicated worktree. This section covers dispatch selection
+only and does not adopt that thread's future findings or change sealed release evidence.
+
+**Current selection, scope and admission inventory:**
+
+| Current source owner / symbol | Enforced behavior and fairness consequence |
+|---|---|
+| [Worker](Sati.Api/Infrastructure/ClearinghouseDispatchWorker.cs), `EligibleQueued` / `ProcessUnderResetLeaseAsync` | One globally oldest `Queued` row by `RequestedAtUtc, Id`. Missing readiness means eligible; Ready is eligible, due Deferred is eligible only in real-sandbox mode, future Deferred/Held are excluded. No agency/account rotation or cursor. Selection does not filter out disabled/changed accounts: preparation must cancel or reject invalid intent under the existing rules. A long older A backlog can consume every offer before B. |
+| Worker, `PrepareUnderAccountLeaseAsync` | Composite agency/account and agency/generation reads; reload state, readiness revision, due time, current account binding/profile and current retained-subset compliance/history before Sending. A scheduling candidate grants no authority. Source/account changes and release holds may finish by cancellation before send. |
+| [Reset coordination](Sati.Api/Infrastructure/DemoWorkerResetCoordination.cs), `RunWithLeaseAsync` | In exact Demo/SatiDemo on SQL Server: shared reset session lease, then exclusive dispatch session lease, then exclusive `(AgencyId, AccountId)` preflight session lease. Each acquire is zero-wait; return -1 means known contention. Other negative results fail. Separate open connections back these leases. Outside exact Demo the implementation invokes an uncoordinated stand-in; generic Testing/SQLite tests do not prove SQL ownership. |
+| Worker, `Preparation.Idle` / `ProcessTurnAsync` | Reset/dispatch/account lease misses and stale state/readiness can all become `Contended`. The caller cannot currently distinguish a busy lane from a shared barrier. No bounded scan past the selected head is performed. |
+| [Scheduling owner](Sati.Api/Infrastructure/ClearinghouseDispatchSchedule.cs), `RunAsync` | One local runner, adopted activity/pacing/empty reconciliation and shared-failure cooldown. Every successful or contended turn still selects from the same global head. Pacing bounds local starts; it neither rotates lanes nor reserves aggregate capacity. Dormant/startup rules remain authoritative. |
+| [Release owner](Sati.Persistence/Data/ClaimReleaseWriteScope.cs), `BeginAsync` / `AcquireAsync` | Owns Serializable billing decision transaction, first agency claim-release decision lock, up to 10-second application-lock wait, 15-second command timeout, and zero-retry execution. Narrower billing locks follow it. Account/reset/dispatch sessions are not released by ending this write transaction. This wait is not a safe zero-wait lane miss. |
+| Worker, `UploadAndRetainAsync` | Account admission releases after Sending commits, before upload. Reset/dispatch sessions remain through upload, wrapping and evidence retention; result write re-enters claim-release admission with `CancellationToken.None`. Sending/OutcomeUnknown are never automatic candidates. A slow in-flight offer can delay the next offer on that host; selection fairness cannot bound total operation time. |
+| [Vendor coordination](Sati.Api/Infrastructure/ClaimMdSandboxCoordination.cs), `RequestAsync` | Deployment/database-shared request lease spans pacing and HTTP and can wait up to 120 seconds for admission. Upload and polling share it. It remains a shared dependency, not an account-failure signal or a quota that fairness can partition. Vendor capacity/actual limits are not verified in this inventory. |
+| [Shared model](Sati.Persistence/Data/ClearinghousePersistenceModel.cs), `Configure` / `ProtectWrites` | Composite account/generation tenant links; immutable intent scope, revision checks and immutable attempts. Account uniqueness allows one enabled account per agency/connector/test tuple, not unlimited enabled Claim.MD accounts. Neither account/readiness revision nor feed cursor is a dispatch fairness cursor. |
+
+**Existing indexes and proposed query shape:** the model and the foundation/readiness migrations
+declare dispatch indexes `(AgencyId, State, RequestedAtUtc)`, `(State, RequestedAtUtc, Id)` including
+agency/account, and `(AgencyId, AccountId)` from the composite link; unique generation identity
+and dispatch primary key remain. Readiness has composite primary key `(AgencyId, AccountId)` and
+`(Disposition, NextEligibleAtUtc)`. These declarations establish source layout, not deployed
+indexes, query plans or cost. No current index directly supplies ordered oldest work within a
+chosen agency/account/state lane including the Id tie-breaker.
+
+Recommend a later additive filtered Queued index `(AgencyId, AccountId, RequestedAtUtc, Id)`
+with `State = Queued`, subject to provider/model/migration and query-plan review. Retain the
+existing global/due indexes until evidence supports any separate change. Agency selection uses
+the trusted Agencies key and an `EXISTS` eligible-Queued predicate; account selection uses scoped
+ClearinghouseAccounts and the same predicate. Each level performs at most one `TOP (1)` next-key
+probe and one wrap probe. Within the chosen lane take one oldest `RequestedAtUtc, Id` dispatch.
+At most five candidate SELECTs, scalar cursor reads and at most two cursor-row writes per offer;
+no materialized tenant/account list, aggregate roster count, tenant dictionary or internal drain
+loop. Empty selection retains the existing one scalar relevant-due snapshot. Projections and
+query count are bounded; rows examined, blocking, SQL sessions and execution time are not.
+Implementation must validate actual SQL translation and command counts rather than count a
+client-side sort or hidden enumeration as a keyset probe. Account ordering/comparison uses SQL
+Server's `uniqueidentifier` order consistently; do not mix it with .NET Guid ordering.
+
+**Recommended policy: persisted hierarchical round robin, one offer per turn.** Rotate agencies
+first, then accounts within that agency. Preserve FIFO only inside the selected account lane.
+This gives each eligible agency one offer per agency rotation, even if A has more files/accounts.
+An offer means a selected opportunity, including a known lane miss; it is not a completed upload,
+claim approval, vendor reservation or resource entitlement. Equal offer shares need not mean
+equal elapsed time, file size, CPU, SQL or successful-send shares.
+
+Proposed schema is separate scheduling metadata in Persistence, configured once for both EF
+models: one fixed-job global row with nullable `LastAgencyId` and a concurrency `Revision`; one
+row per offered agency with primary/foreign key `AgencyId`, nullable `LastAccountId` and its own
+`Revision`. IDs are ordering pivots, not timestamps or authority. Nullable pivots represent an
+unvisited rotation; a pivot can outlive an eligible lane and wrapping still works. The per-agency
+row retains a restricted agency link; its last-account pivot does not assert an account binding.
+Require one fixed-key global row by primary key/check constraint, positive agency IDs and positive
+revisions; seed the global row once in the proposed migration. A first agency row is inserted
+with its final selected pivot in one write, rather than inserted empty and updated again.
+Never reuse or increment business account/readiness revisions for a scheduling offer. Store no
+EDI, note content, key reference/value, human identity or send claim in these rows. Persistent
+cardinality is one global row plus at most one row per retained agency that has been offered;
+this avoids a process-local tenant map but is not a numeric storage/tenant quota. Task 1.4 owns
+that capacity work. No automatic state/history deletion or new cleanup scheduler is proposed.
+
+1. Reuse current gate/cancellation/activity checks and shared reset exclusion. In a short,
+   separate selection context/transaction, acquire a new fixed-job exclusive SQL transaction
+   application lock with zero wait. All participating hosts sharing this database use it.
+   A known selector-lock miss is shared contention, not an account fault. Unsupported schema,
+   missing seeded global state, lost ownership, ambiguous commit or unknown SQL errors fail
+   safely under the shared-failure path; never fall back to global oldest selection.
+2. Choose the next eligible agency strictly after `LastAgencyId`, wrapping once if needed.
+   Read/create only that agency's cursor row under this lock. Choose its next eligible account
+   strictly after `LastAccountId`, wrapping once, then its oldest Queued candidate. Use the
+   exact existing readiness/mode predicate at every probe; preparation still rechecks it.
+   Disabled/changed account intent can receive an offer for existing cancellation handling.
+3. Advance both applicable pivots and revisions and commit the offer **before** attempting
+   dispatch/account admission. Advance on the selected opportunity, not on successful upload.
+   A committed agency whose eligible accounts vanished during discovery advances the agency
+   pivot only; a vanished selected dispatch still spends that account offer. These are scoped
+   stale-lane skips, not proof that the whole queue is empty. No second lane is scanned that turn.
+4. Dispose the selection transaction, application lock and context before acquiring the existing
+   dispatch/account sessions, key/wrapping calls or claim-release decision lock. The existing
+   outer reset lease remains. Proceed with current reload, binding, readiness, billing admission,
+   Sending commit, upload and evidence rules. The selection commit does not mutate Queued intent,
+   create an attempt or reserve physical work. Concurrent hosts may later choose the same record;
+   existing dispatch/account exclusion and the Sending recheck still decide whether it can send.
+5. Add a proposed distinct `LaneSkipped` scheduling result only for a positively identified
+   dispatch/account zero-wait miss or scoped stale selection before Sending. Continue with
+   ordinary adopted pacing while active; do not renew activity or immediately loop. Reset or
+   selector contention, claim-release timeout, key wrapping, vendor coordination and unknown
+   faults retain the existing shared cooldown. The specific missing-account-key exception keeps
+   its approved Deferred/Held/audit behavior; a busy lease consumes no account failure. Cancellation
+   propagates. Never classify a generic exception or post-Sending failure as a harmless lane skip.
+
+The proposed `LaneSkipped` distinction is a narrowly scoped amendment to DEC-0237's current
+blanket contention cooldown, pending adoption. Its timing constants, startup exception, default-off
+gate, activity publishers, no-idle-SQL rule and in-flight uncertainty policy remain unchanged.
+Do not make a lane rotation a new activity source. Global/shared failures still stop all local
+automatic work for the existing cooldown; fairness does not justify hammering a shared dependency.
+
+**Lock order and restart contract:** shared reset → temporary selector transaction/lock →
+release selector completely → dispatch session → account session → claim-release decision
+transaction → existing narrower billing locks. The selector never takes claim-release or external
+dependency admission; queue, reopen, reconciliation and other writers do not take the selector
+lock from inside their existing scopes. Selector cursor writes occur only through its named API
+owner in a zero-retry execution scope. SQLite may supply a deterministic test stand-in, but only
+real SQL proves shared lock/commit behavior. Retain current gate/cancellation rechecks at the send
+boundaries. Cursor advancement never renews activity. Expiry does not revoke an already admitted
+in-flight turn: it finishes/cancels under the accepted rules and cannot start a subsequent turn.
+Cancellation or a crash after offer commit may spend the opportunity without starting its work.
+
+Host restart resumes the persisted pivots; it does not reset every host to the first agency/account
+or create a new recurring poll. The existing one startup catch-up offer remains the sole exception
+without activity. Rollback before offer commit changes no pivot. A crash or uncertain acknowledgement
+after offer commit may spend one opportunity without sending; reread current pivots on the next
+ordinary turn without replaying the selection write. Cursors do not encode whether a send happened.
+Restore/intentional Demo reset can restore an older rotation with the database; verify cursor tables
+and baseline/reset ownership under exclusive reset before later deployment. No imported cursor
+from another database identity is valid. Mixed old/new workers would ignore this policy: dispatch
+must be paused across hosts for an approved additive migration/compatible rollout or rollback.
+No migration is created or applied here, and no Demo baseline is accessed or changed.
+
+**Conditional turn bounds and explicit exclusions:** for a stable finite set of `A` selection-
+eligible agencies, a continuously eligible agency gets an offer within the next `A` committed
+agency offers across participating hosts. For a continuously eligible account among `K` eligible
+accounts in that agency, its lane gets an offer within `K` visits to that agency, hence at most
+`A × K` committed agency offers. Each cursor moves past the selected key and wraps once, so a
+fixed eligible key cannot be passed twice before the target is visited. This is the reasoning to
+test, not measured runtime proof. If the target is oldest in its lane, those opportunities select
+it; a deeper target additionally depends on preceding lane work completing/removing. No bounded
+drain is promised for an indefinitely blocked head within one account.
+
+The bound assumes current schema/participating hosts, continuing permitted turns, successful
+selector commits, stable selection membership/order, and target eligibility. Successful sending
+also requires target dispatch/account leases, SQL, shared keys/vendor admission and current billing
+checks to remain available. Other lanes' known zero-wait misses spend their offers and therefore
+cannot monopolize the next agency. A target's own repeated lease misses do not guarantee its send.
+Global failures, hung in-flight work, shutdown/dormancy, infinite agency/account churn, incompatible
+hosts, restore and ambiguous selector commits are outside this bound. Finite membership changes
+are re-evaluated from authoritative state, but no frozen cohort or latency guarantee is invented.
+Under real-sandbox's current enabled-account uniqueness, ordinary active account counts are small;
+historical invalid Queued lanes still need safety cleanup, not an assumed provisioning quota.
+
+Example with stable A/B, accounts A1/A2 and B1, both A lanes backlogged: after initial null pivots
+the offers are A1, B1, A2, B1, A1, B1. A dispatch/account zero-wait miss at A1 still permits B1 on
+the next committed offer; it does not impose the shared cooldown on B. This is a design trace,
+not an executed test. Cross-host serialization defines the aggregate offer order, while adopted
+per-host pacing and provider request admission remain separate limits. No seconds, throughput,
+aggregate connection/concurrency budget, cost or interactive-latency claim follows from `A × K`.
+
+**Deterministic acceptance plan for 1.3.2 / 1.6 — proposed, not run:**
+
+| Case and existing seam | Required observation / fail-first proof |
+|---|---|
+| Older sustained A backlog / healthy B; `ClearinghouseDispatchApiTests.Fixture`, retained generation/queue endpoints | Queue at least three independent valid A originals before B using distinct claims/periods; keep A backlogged. B's oldest eligible lane receives an offer by the second committed offer for A=2. Record actual selected scopes. Original global-oldest code fails this bound; preserve failed TRX before implementation. Never manufacture several originals for the same claim to build backlog. |
+| Agency-first versus account-first; fixture `AddAccountAsync` / `GenerateAsync` | In synthetic mode use valid OfficeAlly and ClaimMd lanes for A and one lane for B, respecting enabled-account uniqueness. Trace A1/B1/A2/B1 with deterministic SQL Guid order. Flat lane rotation fails equal agency opportunities; an always-first-account mutant fails the K=2 bound. Do not bypass model constraints to invent many active same-kind accounts. |
+| Repeated dispatch/account contention; `IDemoWorkerResetCoordination`, SQL coordination fixtures | Hold A's exact lease with a separate session and barriers; A's offer advances pivots, adds no failure/audit/attempt, and returns LaneSkipped. B proceeds next at normal pacing. Current global head and blanket-cooldown behavior fail. Also contend only an A account while another account in A is ready. |
+| Shared reset/selector contention / unknown faults; `DemoWorkerResetCoordinationTests`, scheduling fake time | No offer commit or key/upload before reset admission. Selector miss uses shared cooldown; shared/unknown errors cannot become LaneSkipped or failure counts. Hint storms cannot bypass cooldown, and expiry parks with all selection resources disposed. |
+| Two independently constructed SQL hosts; `SyntheticPipelineFactory`, `SqlDemoWorkerResetCoordination` | Barrier around selector commit proves one serial pivot order, then release selector before paused upload. Another host can offer B while A uploads; same-dispatch/account exclusions and exact retained bytes/audits/attempts still hold. Do not infer SQL locking from a shared in-process object or SQLite. |
+| Offer commit rollback, loss and restart; commit interception seams in `ClaimReleaseAtomicityTests` | Before-commit failure changes neither cursor; after-commit crash/response loss preserves the offer but creates no send evidence. Recreated host continues after the persisted pivots; no write replay on ambiguous success. Lost/unsupported selector state fails safely. A reset-cursor-on-start mutant fails. |
+| Deferred/Held, due recovery and human reopen; `ClearinghousePreflightApiTests`, missing-key isolation regression | Exact mode/due eligibility retained; no key before due, no Held lane, no readiness reset on contention, only typed known-unsent failure increments. Reopen/due return lane to rotation without resetting others. UTC changes never override final due check. |
+| State/readiness changes between probes and admission; reload/binding/revision barriers | Scoped stale candidate spends at most that one offer; bounded queries, no whole-queue Empty or unbounded retry loop. Foreign scope and changed account/profile/compliance are refused/cancelled by current preparation. Changing another agency's pivot cannot change its business revisions, credentials, bytes or audits. |
+| Sending/OutcomeUnknown, late receipts and failed evidence commit; dispatch/compliance/`ClaimReleaseSqlTests` | Selection excludes uncertain work; retain single physical attempt, current claim history admission, current retained-subset/action/purpose checks and reconciliation/reset exclusions. Cursor advance is never evidence of nonreceipt. A selection-only success cannot authorize a resend. |
+| Hosted integration; `ClearinghouseDispatchSchedulingTests`, ManualTimeProvider and SQL barriers | LaneSkipped respects the adopted pacing and activity limit; no new turn at exact expiry, existing in-flight work retains its safety rules, no completion-driven renewal, one startup turn after restart, zero subsequent dormant selector/due SQL. Generic shared failure retains current cooldown. Mutants removing pacing, expiry or classification must fail. |
+| Query/state bounds and finite churn; command interceptor plus real SQL execution | Observe ≤5 candidate SELECTs, one existing Empty due snapshot only where applicable, ≤2 cursor writes and scalar materialization; no enumeration of all lanes or cursor writes on empty/shared contention. Add/remove/reopen lanes and wrap over removed pivots without cross-scope work. Churn cases establish safety, not the stable-cohort bound. Verify proposed index/model consistency on both EF models; inspect plans in later authorized synthetic capacity work. |
+
+Private SQL acceptance later uses `scripts/Test-IsolatedLocalDb.ps1` with a dedicated named
+fairness filter after a serial build; expand to complete API acceptance when the implementation
+and schema guards are ready. Coordinate machine/private-instance resources with the second
+thread. Record commands, every failure/count/skip and cleanup; do not silently substitute stand-in
+locking or skip SQL cases. No app build/test, database access, benchmark or live vendor call is
+needed for this documentation-only task. Existing tests are seams and prior evidence, not passing
+fairness tests. Broader 1.6 load proof includes polling/note/signatures and aggregate budgets.
+
+**Dependencies, alternatives and next bounded step:** recommend this policy over global FIFO
+(backlog/head contention dominance), flat account rotation (more accounts buy an agency more
+offers), process-local cursors (restart/cross-host phase bias and tenant-map lifecycle), and
+holding a global selector through upload (healthy lanes wait on one dependency). Weighted/deficit
+fairness needs adopted weights/cost measurements; queue infrastructure needs a separate wake/
+capacity owner. Neither is warranted by this bounded design. Preserve D1–D4 and the accepted
+missing-key recovery/inactivity tradeoff. The second thread's 1.4.1 facts inform later shared
+budgets without blocking this policy review or authorizing new runtime controls.
+
+Next is review/adoption of the hierarchical policy, the narrow LaneSkipped cooldown amendment,
+and the additive scheduling-metadata/index source proposal under §8, then task 1.3.2's fail-first
+implementation. Existing database migration, rollout/rollback/baseline operations, deployment,
+activation, actual quota verification and load/alert evidence remain separately authorized work.
+[Dated evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-131-dispatch-fairness-design)
+owns actual source-drift and documentation checks; no measured capacity or sealed score changes.
 
 #### October 9 — dispatch idle-wake scheduling proposal
 

@@ -2770,6 +2770,87 @@ The delivered starter prompt will authorize that bounded investigation when Josh
 
 **Later reviewed release snapshot, if any:** none; documentation working evidence only.
 
+## 2026-10-09 — SATI-WRK-001 1.3.1 dispatch fairness design
+
+**Stable work ID and bounded slice:** SATI-WRK-001 task 1.3.1; source inventory, concrete dispatch
+selection proposal, lock/cursor/query design, alternatives and later deterministic acceptance.
+Josh explicitly requested this numbered task in the main thread. Task 1.4.1 remains owned by the
+second investigation thread in its dedicated worktree; no inventory output from it is asserted here.
+
+**Status and source/revision:** design deliverable complete, **awaiting review/adoption**. Starting
+and reviewed source `8e6509fc4c99fd5c32d8a63715ae7a98941be7f6`, master in
+`C:\Users\Joshu\source\repos\heschides\Sati`. No included uncommitted application inputs. Preexisting
+`Sati.csproj` formatting and assessment scratch were preserved/excluded. Captured SHA-256 source
+manifest is `TestResults/dispatch-fairness-design-2026-10-09/source-identity.json`; final source
+drift check and documentation results are recorded below. Standing ordinary Git commit/push
+authority remains separate; the handoff identifies the resulting commit and remote equality.
+No application/schema/test implementation, database access, real data, cloud/vendor action,
+benchmark, deployment, activation or release belongs to this slice.
+
+**Changed behavior, ownership and canonical paths:** runtime behavior is unchanged.
+[W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131) owns the source-grounded
+matrix and complete proposed selection/metadata/lock/acceptance contract. [DEC-0239](../decisions/current/2026-10-09-DEC-0239.md)
+and its registry/index remain proposed. Architecture pages link the proposed boundary; agenda
+records awaiting review and retains one main pointer to the remaining 1.3.1 adoption step.
+No edits to the second thread's row/checkout/output or sealed release history/rubric.
+
+**Actual tests/checks, commands, results and evidence locations:** source review found global
+oldest selection and one blanket contention outcome, independently of existing due/hold recovery.
+Model configuration/migrations declare existing global/agency/readiness indexes and account
+uniqueness; they do not prove deployed layout or plans. Existing SQL reset/account/claim admission,
+key staging, uncertainty, compliance and fake-time fixtures were inspected as future seams.
+The six-offer A1/B1/A2/B1/A1/B1 example and A×K argument are design reasoning, not executed tests.
+
+| Check | Actual result |
+|---|---|
+| Source identity/drift against captured SHA-256 manifest and starting HEAD | Passed: all 25 reviewed source/test/model/migration files match their captured hashes; HEAD matches the starting commit before documentation commit. No runtime input drift. |
+| `scripts/Test-DocumentationStructure.ps1` | Passed: 46 root documents, 28 scoped owners, 12 preserved snapshots, 11 active items and 21 current decisions. Single SATI-WRK-001 pointer retained. |
+| `scripts/Test-DocumentationStructureChecks.ps1` | Passed: all 22 disposable-fixture negative cases rejected the intended bad state. Final proof artifact: `TestResults/dispatch-fairness-design-2026-10-09/documentation-negative-final.json`. |
+| `scripts/Test-DattPreflight.ps1`, including readiness/history | Passed; version 1.3.39 and unchanged 129-migration source identity. Source-only consistency check, no release invocation. |
+| `git diff --check` / staged whitespace | Passed for working changes and the scoped documentation index; unrelated project formatting remains unstaged. |
+
+**Failed/unrun checks, reason and verification limits:** no application or private SQL test,
+benchmark, source mutant or database query was run; this assignment is design only. Proposed
+fairness tests must fail against the original selection/cooldown or an explicit policy mutant
+before implementation is kept. Existing passed scheduling/recovery tests are prior evidence and
+test seams, not executed fairness acceptance. Initial source lookups guessed several filenames/
+Windows glob paths incorrectly; `rg --files`/filtered directory searches located the actual owners.
+One multi-hunk documentation patch failed its exact-line check and applied nothing; the scoped
+patch was corrected. No application control, assertion or documentation validator was relaxed.
+
+Persistent cursors avoid process-local per-tenant maps but introduce a shared short write and
+retained per-agency state, not a storage/connection quota. Conditional agency/account offer bounds
+assume a stable finite eligible roster and successful participating selectors; real send progress
+also needs target leases, available dependencies and current billing eligibility. Slow in-flight
+operations, shared outages, dormant hosts and infinite membership churn have no bound here.
+No aggregate throughput, cost, wall-time, interactive latency or actual vendor quota was measured.
+Source/default-off claims establish no deployed configuration, alert delivery or launch readiness.
+
+**Relevant readiness criterion IDs and evidence class:** design/source-review working evidence
+for MT06/MT09/MT10/MT11 and OP10; preserve ID07/ID10/OP06 billing, recovery and uncertainty controls.
+No criterion satisfaction or sealed release score/rubric changes asserted.
+
+**Durable decisions, alternatives and supersession links:** DEC-0239 recommends persisted
+hierarchical round robin and narrowly typed LaneSkipped over global FIFO, flat lane shares,
+process-local cursors and a global lock through external work. Weighted/dedicated infrastructure
+choices wait for service/cost/budget decisions. No current decision is superseded while proposed;
+adoption must explicitly scope the amendment to DEC-0237's blanket lane-contention cooldown.
+Its activity/pacing/shared-failure rules, DEC-0235 recovery and D1–D4 remain current.
+
+**Remaining risks/blockers, dependencies and deferred work:** review/adopt policy and additive
+metadata/index source proposal under W8 §8 before 1.3.2. The shared selector requires fail-first
+hosted and real SQL two-host/rollback/restart tests, not only a pure algorithm trace. Existing
+database migration/baseline/rollout and activation remain separate. Task 1.4.1 feeds later budget
+design; general API admission, total deadlines, intended-host plans/load and owner alerts remain
+broader W8 work. No resource limits or other-worker fairness policy is adopted here.
+
+**Next eligible stable ID and bounded slice:** SATI-WRK-001 1.3.1 review of DEC-0239's concrete
+hierarchical policy, typed local-skip amendment and additive source-schema proposal. After adoption,
+define/start 1.3.2's bounded implementation with the planned fail-first and private SQL gates.
+The agenda owns ordering; the second thread continues only its separate 1.4.1 assignment.
+
+**Later reviewed release snapshot, if any:** none; working design evidence only.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

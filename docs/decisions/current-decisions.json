@@ -180,6 +180,15 @@
       "status": "accepted",
       "evidence": ["AGENTS.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
       "supersedes": []
+    },
+    {
+      "id": "DEC-0239",
+      "date": "2026-10-09",
+      "title": "Hierarchical dispatch fairness proposal",
+      "path": "docs/decisions/current/2026-10-09-DEC-0239.md",
+      "status": "proposed",
+      "evidence": ["BACKGROUND_WORKERS_HANDOFF.md", "AGENDA.md", "docs/readiness/work-evidence.md"],
+      "supersedes": []
     }
   ]
 }

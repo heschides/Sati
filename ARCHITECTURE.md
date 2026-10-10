@@ -39,6 +39,11 @@ adds `ClearinghouseDispatchSchedule`, constructor-injected into the existing API
 validated request publishers. It owns local activity/waits; SQL retains eligibility and leases.
 No route, DTO, schema, desktop scheduler or deployment boundary changes.
 
+Task 1.3.1's [dispatch fairness design](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131)
+proposes Persistence-owned rotation metadata and a short API-owned shared selector, separate
+from current send admission. [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md) awaits policy
+and additive source-schema review; no model, runtime owner or deployment changed in this design.
+
 The [desktop test boundary](docs/architecture/desktop.md) explicitly suppresses production
 startup while loading canonical UI resources; omitting Application.Run does not suppress the
 startup callback queued by WPF construction. Fixture hosts remain explicitly supplied.

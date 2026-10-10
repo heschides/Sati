@@ -46,6 +46,12 @@ future due work. Validated/committed existing request hints renew local activity
 leases dispose. SQL eligibility/admission remains authoritative. [DEC-0237](../decisions/current/2026-10-09-DEC-0237.md)
 adopts the retained policy; source verification does not establish deployment or activation.
 
+The later [task 1.3.1 fairness design](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131)
+recommends agency/account rotation with persisted scheduling pivots and a short shared selector.
+[DEC-0239](../decisions/current/2026-10-09-DEC-0239.md) remains proposed; current runtime selection,
+contention handling and schema remain unchanged pending review. Its conditional offer bounds
+are distinct from dependency deadlines, measured capacity and operating acceptance.
+
 Remaining W8: sustained
 fairness, current-day completion capacity, total operation/pass deadlines, aggregate/tenant
 sessions and dependency budgets, API admission and synthetic load/live owner evidence. Account

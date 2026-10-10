@@ -105,7 +105,7 @@ the working ledger retains actual test results. This is a breakdown of existing 
 | **1.1** | Failure isolation: keep a missing account key from blocking healthy work | Missing-key account recovery released in 1.3.39; [recovery owner](BACKGROUND_WORKERS_HANDOFF.md#october-9--known-unsent-dispatch-isolation-implementation). Broader worker failure cases remain under 1.3–1.6. |
 | **1.2** | Idle/wake scheduling: control when dispatch runs and stops checking the database | Complete for bounded source implementation and acceptance; committed source `d05312a`, unreleased. [Working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-implementation) records actual coverage and limits, separately from deployment and activation. |
 | **1.3** | Fair selection: give eligible agencies and accounts predictable turns | Open; contains tasks 1.3.1–1.3.3. |
-| **1.3.1** | [Dispatch fairness design](#131--dispatch-fairness-design) | **Next eligible task**; source inventory, selection policy and acceptance plan for review. |
+| **1.3.1** | [Dispatch fairness design](#131--dispatch-fairness-design) | Design deliverable complete; awaiting review/adoption of [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md). **Next eligible step:** concrete policy/additive source-schema review. |
 | **1.3.2** | Dispatch fairness implementation and tests | Pending adoption of 1.3.1's concrete policy; no implementation authorization follows from this outline. |
 | **1.3.3** | Fairness in polling, note maintenance and signature work | Remaining broader W8 scope; preserve each worker's existing safety owner and define bounded tasks before implementation. |
 | **1.4** | Resource limits: bound shared connections, concurrency and operation times | Open; includes global/agency budgets, bounded queued work, dependency quotas and measured hosting choices. |
@@ -130,7 +130,7 @@ next-item pointer below. These task numbers all belong to the existing SATI-WRK-
 | Task | State | Assignment / integration owner | Dependencies and safe parallel work | Edit ownership |
 |---|---|---|---|---|
 | **1.2 — Idle/wake scheduling** | Complete for bounded source implementation, verification and integration; unreleased | Existing main thread / main thread | Source `d05312a`; broad 1,309-case acceptance precedes the final guard, with 21 focused/private SQL cases after it. Detailed limits belong to the existing evidence record. | Existing scheduling source, topic section and evidence ownership remain unchanged. |
-| **1.3.1 — Dispatch fairness design** | Ready; main next task, revalidate before starting | Main thread role; start not asserted / main thread | Current scheduling/recovery owners and D1–D4; may accompany 1.4.1's independent inventory. 1.3.2 waits for adoption. | Fairness design section, proposed decisions, main next-task pointer and integration. |
+| **1.3.1 — Dispatch fairness design** | Awaiting review; source inventory, policy/schema proposal and deterministic acceptance plan complete | Main integration thread / main thread | Baseline `8e6509f`; [W8 design](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131) and [evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-131-dispatch-fairness-design). No runtime adoption. May accompany independent 1.4.1; 1.3.2 waits for review. | Fairness design section, proposed decisions, main next-task pointer and integration. |
 | **1.4.1 — Resource-limit inventory** | Ready; explicitly assigned by Josh to the second thread; startup verification pending here | Second investigation thread/worktree created by Josh; actual identity to be recorded there / main thread | Captured current source and existing W8/operations rules; may accompany 1.3.1. Actual fair-selection policy is an input to later budget design, not a prerequisite for inventory. | Its own W8 resource-limit inventory subsection, this assignment row and a dated ledger entry in its dedicated worktree. No runtime source edits. |
 
 At startup, the assigned thread records its actual thread identifier if available, worktree path,
@@ -177,7 +177,7 @@ capacity, latency, operating guarantee or sealed readiness-score change.
 
 **Next eligible item:** SATI-WRK-001
 
-**Next numbered task:** **1.3.1 — Dispatch fairness design**.
+**Next numbered task:** **1.3.1 — Dispatch fairness policy/additive source-schema review**.
 The completed bounded scheduling source work is **1.2**; its actual verification and limits belong
 to its working evidence record. Deployment and activation remain separate.
 
@@ -190,12 +190,21 @@ approved idle/wake slice is implemented locally under [DEC-0237](docs/decisions/
 own source acceptance and its limits; the environment inventory owns deployment facts. Dispatch
 activation, aggregate capacity and sustained fairness remain open.
 
+The source inventory and concrete [fairness design](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131)
+are now complete as a reviewable deliverable. [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md)
+is proposed, with source/drift and documentation checks in [dated evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-131-dispatch-fairness-design).
+Review/adoption is the remaining 1.3.1 step; this pointer does not authorize 1.3.2 implementation.
+
 **Bounded slice:** **Scope —** inventory and design fair dispatch selection under sustained ready backlog and
 lease contention. Define eligible agency/account lanes, persisted versus process-local selection
 state, preserved reset/account/dispatch admission order, cold-start behavior and a conditional
 turn bound for healthy work. Inventory existing indexes/query shape and synthetic test seams;
 recommend a concrete policy with alternatives and dependencies for review. This is a reversible
 local source/design slice, not authorization to implement an unreviewed fairness policy.
+**Current review deliverable:** agency-first/account rotation with oldest-in-lane ordering;
+persisted scoped pivots and a short shared selector; a distinct known lane-skip outcome;
+additive metadata/index source design; conditional offer bounds and fail-first/private SQL plan.
+Review these concrete choices before implementing them; existing database operations remain separate.
 
 **Dependencies and owners:** **Dependencies —** current typed scheduling outcomes and activity/pacing boundary,
 D1–D4, [W8](BACKGROUND_WORKERS_HANDOFF.md), [operations](OPERATIONS.md), current billing compliance,

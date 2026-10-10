@@ -10,6 +10,12 @@ current-decision collection. New decisions never change the immutable import's c
 
 ## Governing boundaries
 
+Task 1.3.1's hierarchical dispatch fairness and additive scheduling-metadata/index design is
+**proposed** in [DEC-0239](docs/decisions/current/2026-10-09-DEC-0239.md), awaiting review.
+[W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-fairness-design--task-131) owns its source
+inventory, conditional offer bounds and acceptance plan. No runtime policy or schema is adopted;
+DEC-0237's current contention behavior remains authoritative until explicit scoped adoption.
+
 The two-thread planning convention and bounded parallel-assignment workflow are accepted in
 [DEC-0238](docs/decisions/current/2026-10-09-DEC-0238.md). [AGENTS.md](AGENTS.md#concurrent-thread-coordination)
 owns coordination rules; [AGENDA.md](AGENDA.md#parallel-work-assignments) owns assignments and
