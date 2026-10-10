@@ -618,13 +618,14 @@ Shared wrapping/SQL/lease faults require their dependency response, not repeated
 Pause dispatch on every host for additive migration or rollback; verify compatible workers honor
 readiness before enabling. Old workers ignore account holds. Preserve storage/audits and reconcile
 queued and uncertain work during operational rollback; Down refuses unresolved scheduling state.
-The existing idle loop, aggregate connection budget, configuration consistency, live notification
+The aggregate connection budget, configuration consistency, live notification
 owner/receipt and deployed query plans remain activation blockers, separately from source proof.
 No existing database migration or alert activation was performed by this source task.
 
-The later [dispatch idle/wake proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal)
-documents the inactivity/due tradeoff for review: an earliest retry time does not promise an
-unattended send, and delayed work catches up on qualifying use/start. This is proposed operating
-policy, not deployed behavior. No polling/heartbeat or support-console action should be added to
-keep dispatch active. Review/adopt the concrete policy before its separate local source slice;
-broader resource/alert/load requirements still gate activation.
+The later [dispatch idle/wake implementation](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-implementation)
+implements the adopted inactivity/due tradeoff in local source: an earliest retry time does not
+promise an unattended send, and delayed work catches up on qualifying use/start. The linked owner
+contains exact activity/cadence/publisher policy and verification limits. This has not been deployed
+or activated. Do not add polling, a heartbeat or support-console actions to keep dispatch active.
+Broader resource/fairness/admission/alert/load requirements still gate activation; the environment
+inventory remains the sole owner of observed deployment facts.

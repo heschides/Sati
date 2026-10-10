@@ -1296,6 +1296,7 @@ internal static partial class ApiEndpoints
             PasswordVerifier passwordVerifier,
             TokenIssuer tokenIssuer,
             LoginAttemptGuard attemptGuard,
+            ClearinghouseDispatchSchedule dispatchSchedule,
             AuditTrail auditTrail,
             HttpContext context,
             ILogger<Program> logger,
@@ -1354,6 +1355,7 @@ internal static partial class ApiEndpoints
                 .SingleAsync(cancellationToken);
             var issued = tokenIssuer.Issue(user, instanceId);
             logger.LogInformation("Sati authentication succeeded for user {UserId} in agency {AgencyId}.", user.Id, user.AgencyId);
+            if (user.AgencyId > 0 && user.Role != "PlatformOperator") dispatchSchedule.SignalActivity();
             return TypedResults.Ok(new LoginResponse(issued.Token, issued.ExpiresAtUtc, ContractMapper.ToProfile(user)));
         })
         .RequireRateLimiting("login")

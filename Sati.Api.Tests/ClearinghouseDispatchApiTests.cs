@@ -409,7 +409,8 @@ public sealed partial class ClearinghouseDispatchApiTests
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(),
             connector, gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
             keys, new TestDemoWorkerResetCoordination(),
-            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System);
+            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System,
+            fixture.Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>());
         using var caller = new CancellationTokenSource();
         var processing = worker.ProcessOneAsync(caller.Token);
         try
@@ -500,7 +501,8 @@ public sealed partial class ClearinghouseDispatchApiTests
             fixture.Factory.Services.GetRequiredService<IDbContextFactory<ApiDbContext>>(),
             connector, gate, fixture.Factory.Services.GetRequiredService<EnvelopeProtector>(),
             new MissingKeySource(), new TestDemoWorkerResetCoordination(),
-            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System);
+            fixture.Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System,
+            fixture.Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>());
         Assert.True(await worker.ProcessOneAsync(CancellationToken.None));
         Assert.Equal(0, connector.Calls);
         await using var saved = fixture.Factory.OpenDatabase();
@@ -947,7 +949,8 @@ public sealed partial class ClearinghouseDispatchApiTests
             Factory.Services.GetRequiredService<EnvelopeProtector>(),
             Factory.Services.GetRequiredService<IClaimMdSandboxKeySource>(),
             resetCoordination ?? new TestDemoWorkerResetCoordination(),
-            Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System);
+            Factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), TimeProvider.System,
+            Factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>());
 
         public async ValueTask DisposeAsync()
         {

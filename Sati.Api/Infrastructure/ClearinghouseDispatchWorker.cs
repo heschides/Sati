@@ -42,7 +42,8 @@ internal sealed class ClearinghouseDispatchWorker(
     IDbContextFactory<ApiDbContext> contexts, IClearinghouseConnector connector,
     ClearinghouseDispatchGate gate, EnvelopeProtector protector, IClaimMdSandboxKeySource keys,
     IDemoWorkerResetCoordination resetCoordination,
-    ILogger<ClearinghouseDispatchWorker> logger, TimeProvider clock) : BackgroundService
+    ILogger<ClearinghouseDispatchWorker> logger, TimeProvider clock,
+    ClearinghouseDispatchSchedule schedule) : BackgroundService
 {
     private sealed record Preparation(bool Processed, ClearinghouseAccount? Account = null,
         ServerEdiGeneration? Generation = null)
@@ -51,33 +52,54 @@ internal sealed class ClearinghouseDispatchWorker(
         public static Preparation Completed { get; } = new(true);
     }
 
-    internal async Task<bool> ProcessOneAsync(CancellationToken token)
+    internal async Task<bool> ProcessOneAsync(CancellationToken token) =>
+        (await ProcessTurnAsync(token)).Kind == DispatchTurnKind.Processed;
+
+    internal async Task<DispatchTurn> ProcessTurnAsync(CancellationToken token)
     {
         if (ExecutionStrategy.Current?.RetriesOnFailure == true)
             throw new InvalidOperationException("Claim release writes cannot run inside a retrying execution scope.");
-        if (!gate.IsEnabled) return false;
-        return await resetCoordination.RunAsync(ProcessUnderResetLeaseAsync, false, token);
+        token.ThrowIfCancellationRequested();
+        if (!gate.IsEnabled) return DispatchTurn.Disabled;
+        return await resetCoordination.RunAsync(ProcessUnderResetLeaseAsync, DispatchTurn.Contended, token);
     }
 
-    private async Task<bool> ProcessUnderResetLeaseAsync(CancellationToken token)
-    {
-        await using var db = await contexts.CreateDbContextAsync(token);
-        var now = clock.GetUtcNow().UtcDateTime;
-        var realSandbox = gate.IsRealSandboxEnabled;
-        var dispatch = await db.ClearinghouseDispatches
-            .Where(row => row.State == ClearinghouseDispatchState.Queued)
+    private IQueryable<ClearinghouseDispatch> EligibleQueued(ApiDbContext db, DateTime now) =>
+        db.ClearinghouseDispatches.Where(row => row.State == ClearinghouseDispatchState.Queued)
             .Where(row => !db.ClearinghouseDispatchReadiness.Any(readiness =>
                 readiness.AgencyId == row.AgencyId && readiness.AccountId == row.AccountId &&
                 readiness.Disposition != ClearinghousePreflightDisposition.Ready &&
-                !(realSandbox && readiness.Disposition == ClearinghousePreflightDisposition.Deferred &&
-                    readiness.NextEligibleAtUtc <= now)))
+                !(gate.IsRealSandboxEnabled && readiness.Disposition == ClearinghousePreflightDisposition.Deferred &&
+                    readiness.NextEligibleAtUtc <= now)));
+
+    private async Task<DispatchTurn> ProcessUnderResetLeaseAsync(CancellationToken token)
+    {
+        await using var db = await contexts.CreateDbContextAsync(token);
+        var now = clock.GetUtcNow().UtcDateTime;
+        var eligible = EligibleQueued(db, now);
+        var dispatch = await eligible
             .OrderBy(row => row.RequestedAtUtc).ThenBy(row => row.Id)
             .FirstOrDefaultAsync(token);
-        if (dispatch is null) return false;
+        if (dispatch is null)
+        {
+            // One scalar snapshot command, including a newly eligible row racing the initial read.
+            // Do not materialize all accounts or interpret a missed lease as an empty queue.
+            var realSandbox = gate.IsRealSandboxEnabled;
+            var deferred = from readiness in db.ClearinghouseDispatchReadiness
+                where realSandbox && readiness.Disposition == ClearinghousePreflightDisposition.Deferred &&
+                    readiness.NextEligibleAtUtc > now && db.ClearinghouseDispatches.Any(row =>
+                        row.AgencyId == readiness.AgencyId && row.AccountId == readiness.AccountId &&
+                        row.State == ClearinghouseDispatchState.Queued)
+                select readiness.NextEligibleAtUtc;
+            var next = await eligible.Select(_ => (DateTime?)now).Concat(deferred)
+                .OrderBy(value => value).FirstOrDefaultAsync(token);
+            return new DispatchTurn(DispatchTurnKind.Empty, next);
+        }
 
-        return await resetCoordination.RunDispatchAsync(dispatch.Id,
+        var processed = await resetCoordination.RunDispatchAsync(dispatch.Id,
             innerToken => new DispatchSingleAttempt(db).ExecuteAsync(
                 () => UploadUnderDispatchLeaseAsync(db, dispatch, innerToken)), false, token);
+        return processed ? DispatchTurn.Processed : DispatchTurn.Contended;
     }
 
     private async Task<bool> UploadUnderDispatchLeaseAsync(ApiDbContext db,
@@ -327,24 +349,9 @@ internal sealed class ClearinghouseDispatchWorker(
         return Preparation.Completed;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        if (!gate.IsEnabled) return;
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                if (await ProcessOneAsync(stoppingToken)) continue;
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
-            catch (Exception)
-            {
-                logger.LogError("Clearinghouse dispatch worker paused after a safe processing failure.");
-            }
-            try { await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken); }
-            catch (OperationCanceledException) { break; }
-        }
-    }
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
+        schedule.RunAsync(ProcessTurnAsync,
+            () => logger.LogError("Clearinghouse dispatch worker paused after a safe processing failure."), stoppingToken);
 
     private static string? SafeIdentifier(string? value, int maxLength) =>
         !string.IsNullOrWhiteSpace(value) && value.Length <= maxLength &&

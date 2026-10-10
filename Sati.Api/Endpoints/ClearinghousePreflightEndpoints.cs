@@ -18,7 +18,8 @@ internal static partial class ApiEndpoints
             async Task<IResult> (Guid accountId, ReopenClearinghousePreflightRequest request,
                 ClaimsPrincipal principal, ApiDbContext db, ClearinghouseDispatchGate gate,
                 IDemoWorkerResetCoordination coordination, IClaimMdSandboxKeySource keys,
-                EnvelopeProtector protector, ApiClock clock, HttpContext http, CancellationToken cancellationToken) =>
+                EnvelopeProtector protector, ApiClock clock, ClearinghouseDispatchSchedule schedule,
+                HttpContext http, CancellationToken cancellationToken) =>
             {
                 http.Response.Headers.CacheControl = "no-store";
                 var actor = Actor.From(principal);
@@ -35,7 +36,7 @@ internal static partial class ApiEndpoints
                     row.AgencyId == actor.AgencyId && row.AccountId == accountId, cancellationToken);
                 if (!CanReopenPreflight(staged, snapshot, request)) return PreflightRevisionConflict();
 
-                return await coordination.RunAccountPreflightAsync<IResult>(actor.AgencyId, accountId,
+                var result = await coordination.RunAccountPreflightAsync<IResult>(actor.AgencyId, accountId,
                     async (lease, token) =>
                     {
                         token.ThrowIfCancellationRequested();
@@ -76,6 +77,10 @@ internal static partial class ApiEndpoints
                         return Results.Ok(ToReadinessDto(account, readiness));
                     }, ReconciliationConflict("account_busy", "Account preparation is in progress. Refresh before retrying."),
                     cancellationToken);
+                // RunAccountPreflightAsync has released its session lease before publishing.
+                if (result is IValueHttpResult { Value: ClearinghouseAccountReadinessDto })
+                    schedule.SignalActivity();
+                return result;
             });
     }
 

@@ -2573,6 +2573,120 @@ load and owner/alert receipt remain activation dependencies.
 bounded local scheduling implementation and acceptance once explicitly adopted. This design
 does not silently start the rest of W8 or a new release.
 
+## 2026-10-09 — SATI-WRK-001 dispatch idle-wake implementation
+
+**Stable work ID and bounded slice:** SATI-WRK-001, approved local activity/wait/due scheduling
+around the existing dispatch worker. No fairness implementation, deployment or activation.
+
+**Status and source/revision:** local source implemented from `master` at
+`40e091bae9bd0f5de9bc89e39209cf3e17449ccc` (committed scheduling design). Josh's next-item
+continuation followed the concrete policy proposal; the turn announced adoption and bounded
+implementation. Unrelated `Sati.csproj` formatting and assessment scratch were preserved and
+excluded. Ordinary source/documentation commit and push are separately covered by standing user
+authority. No new DATT invocation, version, schema, existing/cloud database migration, cloud action or real-data
+access was performed. The handoff will identify the resulting commit and verified remote equality.
+
+**Changed behavior, ownership and canonical paths:**
+[W8](../../BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-implementation) owns
+runtime behavior and links the exact adopted policy. `ClearinghouseDispatchSchedule` is the sole
+constructor-injected API activity/wait owner; the existing hosted dispatch worker returns typed
+turn results and a scalar relevant due snapshot. Validated login/workspace and successful
+committed queue/reopen handlers publish local hints after owned write/lease scopes release.
+Dormancy produces no subsequent scheduling database callback; UTC due time does not wake it.
+Current billing/readiness, reset/account/dispatch leases and uncertain-send retention remain
+unchanged. No route, DTO, authorization scope, model or desktop scheduler changed.
+
+**Actual tests/checks, commands, results and evidence locations:**
+
+| Executed check | Actual result and retained evidence |
+|---|---|
+| Real unfixed hosted worker idle regression | **1 failed**, expected one database turn, actual two after the original three-second delay. `TestResults/worker-idle-wake-2026-10-09/idle-before.trx`. This uses real time because the unfixed delay ignored TimeProvider; a fake-only clock would miss the defect. |
+| New runtime owner/host/publisher/snapshot local acceptance | **17 passed, 0 failed/skipped**, 36 seconds, `scheduling-local-acceptance.trx` in that folder. Actual hosted SQLite catch-up/expiry, startup/default-off/cancel, monotonic pacing/activity, signal coalescing/discovery races, exact UTC due/reconciliation, clock jumps, shared cooldown, one runner, in-flight expiry, real API publisher authorization and reopen commit/disposal order. The runtime seam uses typed outcomes, not a second copy of scheduling logic. |
+| Reopen early-notification mutant | **1 failed**, `reopen-early-hint-negative.trx`: signal moved inside account coordination after commit; before-release assertion caused the expected HTTP failure. Source restored in `finally`. This proves the regression detects notification while admission is still held. |
+| Successful-turn pacing removed mutant | **1 failed**, `unpaced-turns-negative.trx`: zero interval started 22 immediate turns before the 2.999-second assertion. Source restored in `finally`; the fake process returns Empty after the bounded observation so the mutant cannot spin indefinitely. |
+| Restored scheduling API test build before fixture follow-up | Passed, zero errors; incremental build reports one existing unrelated nullable warning, 35.68 seconds. Prior clean test builds reported the six existing test warnings too. |
+| Interrupted full isolated SQL API attempt | Aborted after **1,087 passed, 74 failed**, 1,161 completed cases, 28m56s. `TestResults/ClaimMdPreparationFinalApi/Joshu_LONGCHENPA_2026-10-09_20_05_14_net10.0.trx`. The host wall clock jumped from about 20:10 to 20:31 during a short wait; failures were late Unauthorized responses, with 152 retained expired-token diagnostic occurrences. No scheduling case was in the failed-case list. Verified task-owned testhost ended to release the assembly; parent runner retained results and stopped/deleted private instance `SatiSqlTests_d85bd275142e46f8a4bebfcc46b29c3c`. Not full acceptance; remaining cases were unexecuted. |
+| Expired shared-fixture cache regression, unchanged fixture | **1 failed**, expected fresh-client OK, actual Unauthorized; `expired-fixture-cache-before.trx`. A signed synthetic expired token injected into this private factory's cache reproduces the defect without waiting or changing server time/lifetime. |
+| Final scheduling and fixture focused acceptance | **18 passed, 0 failed/skipped**, 25 seconds; `scheduling-and-fixture-final.trx`. Includes all earlier local scheduling/publisher cases and the cache regression proving new-client login while old-client headers stay expired/denied. Test project rebuilt successfully with six existing test warnings; business source unchanged from restored scheduling build. |
+| Broad full isolated SQL API acceptance after fixture repair | **1,309 passed, 0 failed/skipped**, 24m18s. `TestResults/ClaimMdPreparationFinalApi/Joshu_LONGCHENPA_2026-10-09_20_36_17_net10.0.trx`; private instance `SatiSqlTests_270736cbf53f4454bf02ad79264f0c10` stopped/deleted. Both new SQL hosted-expiry and scalar due/sending-exclusion cases passed. This run precedes only the final small activity-admission recheck described below. |
+| Scheduling-pause admission regression before final guard | **1 failed**, expected one turn, actual two; `turn-admission-before.trx`. Injected monotonic expiry during the UTC due calculation after the first activity snapshot. The old scheduling path admitted an extra turn after that expiry. |
+| Final admission guard focused private SQL acceptance | **21 passed, 0 failed/skipped**, 42 seconds; `TestResults/IsolatedSqlServer/Api/Joshu_LONGCHENPA_2026-10-09_21_03_05_net10.0.trx`. All scheduling/publisher/fixture and actual SQL hosted/snapshot cases ran after the final guard. Private instance `SatiSqlTests_26a9cc3afacf4cc8ad66d505c1492fc4` stopped/deleted. Final serial Release build passed, zero errors/one existing unrelated nullable warning, 16.21 seconds. |
+| Documentation/negative/history/whitespace gates | Passed: final working-tree structure, **22 negative proofs**, DATT source consistency/readiness history and both working/index whitespace checks. The staged scheduling-only snapshot also passed structure and preflight independently of the separate coordination edits. Earlier proofs remain in `documentation-negative.json`; sealed reports/rubrics and historical captures unchanged. |
+
+Build/local executions use `dotnet test Sati.Api.Tests/Sati.Api.Tests.csproj -c Release
+--no-restore --disable-build-servers -m:1`, focused `FullyQualifiedName` filters, named TRX loggers
+and `--results-directory TestResults/worker-idle-wake-2026-10-09`. Final restored build uses
+`dotnet build` with the same configuration/build flags. Complete SQL acceptance command is
+`scripts/Test-IsolatedLocalDb.ps1 -FullApi -NoBuild`; its private instance and all database names
+are test-owned synthetic resources, never the shared instance, working database or cloud.
+Final guard acceptance uses `-BillingReleaseOnly -NoBuild -BillingReleaseFilter` with
+`FullyQualifiedName~ClearinghouseDispatchApiTests.Schedule|FullyQualifiedName~ClaimReleaseSqlSchedule|FullyQualifiedName~HostedEmptyQueueStopsSchedulingWithoutActivity|FullyQualifiedName~SatiApiFactorySessionTests`.
+
+**Failed/unrun checks and limits:** initial test compilation used an inaccessible framework host
+stand-in; corrected to a private IHostEnvironment fixture, without production changes. The first
+clock expectation requested a second SQL turn at an old timer after backward UTC change;
+`scheduling-publishers.trx` recorded 15 passed/1 failed. Two later runs recorded 16 passed/1 failed
+(`scheduling-final-local.trx`, `scheduling-corrected-local.trx`) because the test left the same due
+snapshot eligible after its forward jump and advanced through a pacing timer without a barrier.
+The final test explicitly observes/rearms the timer, consumes the due item and checks reconciliation
+and expiry. These are retained test-expectation failures, not evidence of early physical sends.
+The first documentation gate rejected a renamed next-slice evidence label; restored the required
+`Boundaries and completion evidence` field without weakening the validator.
+One formatting edit attempt failed to locate the LF body and made no source change; formatting
+was then applied with line-based bounds. No assertion/policy/time limit was relaxed.
+
+The broad attempt crossed an observed roughly 20-minute wall-clock discontinuity. Its initial
+long-running cases and later new-client requests used expired 15-minute tokens. The shared
+`SatiApiFactory` cached only token/security-version, assuming the suite finished within that
+lifetime; it could return an expired token for a newly requested client. The test-only repair
+also checks the token's UTC ValidTo before cache reuse and uses the real login endpoint on
+expiry. Existing HttpClient headers remain unchanged, so old-client expiry/revocation proofs
+remain meaningful. Production authentication, lifetimes, clock, permissions and rate limits
+were not changed. The new regression proves this with a signed expired token and denied old
+client, not a relaxed assertion. It cannot prevent a real pause from expiring a session already
+held in the middle of a test. No cause of the host discontinuity is established here.
+An initial regression build attempted while the failed full runner still held its assembly
+was blocked by Windows file locking; no test ran. The exact task process chain was verified
+before ending only that testhost, leaving the parent runner to record the aborted result and
+perform guarded private-instance cleanup. Sequential rebuilding then supplied the fail-first proof.
+
+Final source review found a stale activity snapshot could survive a pause between the wait
+decision and admission. The fail-first regression establishes the extra turn. The owner now
+captures generation, activity remaining and one monotonic stamp again immediately before
+admission, skips expired activity, and uses that same stamp for turn-start pacing. This is a
+bounded completion of the adopted scheduling boundary, not a new cadence policy. The late
+change affects only scheduling admission; SQL eligibility, publishers, endpoints and auth are
+unchanged. Final focused runtime/publisher/private SQL acceptance follows this guard; the
+already-green broad suite is retained as prior broad coverage rather than claimed as a rerun
+against this final guard. No third full API or desktop/solution run is claimed.
+
+Counting the actual reset-owned database callback proves no dormant scheduling callback/context
+or lease acquisition. It does not measure individual EF commands, total provider sessions, query
+cost or intended-host resource usage. Runtime-owner signal barriers cover discovery in flight and
+after parking; no production test hook was added between individual lock instructions. Existing
+private SQL regressions supply cross-host exclusion, not cross-host wake delivery or a global
+fairness/latency bound. No complete solution/desktop/model rerun, query-plan/load measurement,
+live vendor/alert/installed-device acceptance or cloud action belongs to this API-only slice.
+
+**Readiness criterion IDs and evidence class:** local source and synthetic working evidence for
+MT06/MT09/MT10/MT11 and OP10; preserved ID07/ID10/OP06 billing/recovery/audit prerequisites.
+No complete criterion is declared satisfied; sealed release 1.3.39 scores and rubric are unchanged.
+
+**Durable decisions and supersession:** [DEC-0237](../decisions/current/2026-10-09-DEC-0237.md)
+adopts the retained DEC-0236 policy and supersedes only pending adoption/implementation status.
+Its inactivity tradeoff and rejected perpetual polling/heartbeats/parallel schedulers remain;
+D1–D4 and DEC-0235 are unchanged.
+
+**Remaining blockers/dependencies and next eligible slice:** broader fair selection, aggregate
+SQL/connection/dependency budgets, API admission, operation bounds, consistent host settings,
+intended-host load/query plans and owner alerts still gate activation. SATI-WRK-001 next bounded
+slice is source inventory and proposed fairness policy for ready agency/account lanes and
+contention, including conditional turn bounds and private SQL fail-first acceptance; review
+adoption before runtime implementation. [The agenda](../../AGENDA.md#next-eligible-work) owns
+the current pointer and authority. Release/migration/publication remain separate.
+
+**Later reviewed release snapshot:** none; working evidence only, unreleased source.
+
 ## Entry template for the next significant portion
 
 Copy this structure under a new dated heading; complete every field, using an explicit unknown

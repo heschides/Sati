@@ -156,7 +156,8 @@ public sealed partial class ClearinghouseDispatchApiTests
             EnableClaimMdSandboxTransport = true
         }), factory.Services.GetRequiredService<IHostEnvironment>()),
         factory.Services.GetRequiredService<EnvelopeProtector>(), keys, coordination ?? new TestDemoWorkerResetCoordination(),
-        factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), clock ?? TimeProvider.System);
+        factory.Services.GetRequiredService<ILogger<ClearinghouseDispatchWorker>>(), clock ?? TimeProvider.System,
+        factory.Services.GetRequiredService<ClearinghouseDispatchSchedule>());
 
     private sealed class IsolationKeySource(string missingReference, string healthyReference) : IClaimMdSandboxKeySource
     {

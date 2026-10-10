@@ -545,14 +545,73 @@ firewall rule. Keep dispatch disabled until its separate activation requirements
 
 [Working evidence](docs/readiness/work-evidence.md#2026-10-09--missing-key-dispatch-isolation-implementation)
 owns actual fail-first, fake-time, private SQL, UI and suite results and limits.
-Remaining W8 includes reviewed idle/wake scheduling (the existing three-second idle loop is
-unchanged), fairness under sustained backlog/contention, aggregate sessions/dependency budgets,
+The later [idle/wake implementation](#october-9--dispatch-idle-wake-implementation) supersedes
+only that pending cadence work. Remaining W8 includes fairness under sustained backlog/contention, aggregate sessions/dependency budgets,
 API admission, configuration consistency and owner-run operational/alert evidence.
+
+#### October 9 — dispatch idle-wake implementation
+
+**Status:** SATI-WRK-001 approved scheduling slice implemented locally; unreleased, default-off.
+[DEC-0237](docs/decisions/current/2026-10-09-DEC-0237.md) records adoption and scoped supersession.
+The retained [policy below](#october-9--dispatch-idle-wake-scheduling-proposal) owns the exact
+numeric cadence and allowlist. Its dated inventory describes the pre-change source, not current
+runtime. No deployment, schema change, activation, client heartbeat or version bump was performed.
+
+**Ownership and integration:** constructor-injected singleton `ClearinghouseDispatchSchedule`
+owns monotonic activity, turn spacing, cooldown and coalesced generation/wait registration. The
+existing hosted worker remains the only runner. Fixed scalar state carries no tenant/account
+payloads. Gate and cancellation checks precede turns. `ProcessTurnAsync` distinguishes Disabled,
+Processed, Empty and Contended; the old bool wrapper remains only for direct-call compatibility.
+The worker obtains one scalar empty-selection snapshot combining newly eligible Queued work
+with the earliest future Deferred time joined to same-agency Queued work. SQL still owns current
+readiness and every account/reset/dispatch lease. Stale snapshots authorize only another read.
+
+Login and billing workspace handlers publish after their existing validated successful work.
+Queue/replay success is inspected outside the entire owned queue workflow, so its transaction,
+write scope and recovery scopes dispose before notification. Admin reopen signals only after
+account coordination returns and releases its lease. Denials, rollback, failed/stale reopen,
+renewal, generic reads and health do not signal. No API route, network DTO or authorization scope
+changed. Notifications perform no SQL and never await dispatch completion.
+
+**Waiting behavior:** startup gets one ordinary catch-up without granting activity. After activity
+expires, the loop parks on an in-memory signal, without due/reconciliation SQL or active timers.
+Active waits use the relevant UTC due instant and monotonic reconciliation/expiry. A backward UTC
+jump can wake an old timer, but eligibility is recomputed in memory before any early database
+turn; reconciliation still permits a bounded fresh read while active. In-flight work retains its
+existing cancellation/receipt/uncertainty rules; expiry does not cancel an upload or renew activity.
+Shared/unclassified faults and contention enter the local cooldown, unaffected by hint floods.
+Immediately before admission, the owner takes a fresh generation/activity/monotonic timestamp
+under its lock and records that same timestamp as the turn start. A pause during the earlier
+wait decision cannot admit a new turn from an expired snapshot. Already admitted work may finish
+later under the retained in-flight rules; admission counts are not measured physical SQL timing.
+
+**Verification and limits:** [the working ledger](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-implementation)
+owns executed checks and retained failures. The real pre-change hosted idle loop failed the new
+regression by starting a second database turn. Fake-time tests exercise the runtime scheduling
+owner, actual hosted SQLite/private SQL turns and actual validated API publishers. Negative
+mutations check pacing and reopen notification order. Existing SQL multi-host/reset/account and
+billing compliance/uncertain-send regressions remain required. Counting turns around the actual
+reset-owned database callback proves no subsequent dormant callback; it is not instrumentation
+of every EF command, provider session, CPU cost or query plan. No measured aggregate resource,
+fair-wait, sustained-load, live vendor or intended-host acceptance follows from these tests.
+The broad verification exposed expired token reuse in the shared test fixture after a host
+wall-clock discontinuity. A fail-first fixture regression and cache-expiry check ensure a new
+test client signs in again; existing-client headers and every product authentication control
+remain unchanged. The ledger retains the aborted run and final acceptance separately.
+
+**Remaining dependencies and next slice:** broader W8 aggregate/tenant budgets, fair selection,
+request admission, full operation/dependency bounds, consistent configuration, query plans and
+owner alert/load evidence remain open. Next is a bounded fairness inventory/design defining
+eligible agency/account lanes, contention treatment, preserved release/lease order and testable
+turn bounds. Review policy before implementing it. Do not activate or replace the Demo inactivity
+tradeoff with unattended polling; future cloud Production requires its own reviewed wake policy.
 
 #### October 9 — dispatch idle-wake scheduling proposal
 
-**Status:** SATI-WRK-001 source inventory and concrete design complete; runtime policy **proposed**
-in [DEC-0236](docs/decisions/current/2026-10-09-DEC-0236.md), awaiting Josh's review. No application,
+**Retained design status at capture:** SATI-WRK-001 source inventory and concrete design complete;
+runtime policy was **proposed** in [DEC-0236](docs/decisions/current/2026-10-09-DEC-0236.md).
+Its pending adoption/implementation status is superseded by DEC-0237 and the implementation above.
+The following preserves the original proposed reasoning/acceptance. No application,
 schema, client, worker flag or hosting setting changes in this slice. D1–D4 and the approved
 account recovery rules remain in force. The next source implementation depends on adoption of
 this policy; activation additionally depends on the broader W8 gates. This section owns the

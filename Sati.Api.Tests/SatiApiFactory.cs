@@ -145,7 +145,8 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
     /// and a suite that logs in afresh for every test eventually trips that limit
     /// and fails whichever tests happen to run last. Caching keeps the limiter at
     /// its production settings instead of relaxing a real control to suit the
-    /// tests. Tokens outlive the suite comfortably at fifteen minutes.
+    /// tests. A new client signs in again if the cached token has expired; existing
+    /// clients retain their original headers for expiry and revocation proofs.
     /// </remarks>
     public async Task<HttpClient> CreateAuthenticatedClientAsync(string username)
     {
@@ -174,9 +175,9 @@ public sealed class SatiApiFactory : WebApplicationFactory<Program>
                 var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
                 var version = await db.Users.Where(x => x.Username == username && x.IsEnabled)
                     .Select(x => (long?)x.SecurityVersion).SingleOrDefaultAsync();
-                var claim = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(cached)
-                    .Claims.SingleOrDefault(x => x.Type == TokenIssuer.SecurityVersionClaim)?.Value;
-                if (long.TryParse(claim, out var tokenVersion) && version == tokenVersion)
+                var jwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(cached);
+                var claim = jwt.Claims.SingleOrDefault(x => x.Type == TokenIssuer.SecurityVersionClaim)?.Value;
+                if (jwt.ValidTo > DateTime.UtcNow && long.TryParse(claim, out var tokenVersion) && version == tokenVersion)
                     return cached;
                 _tokens.Remove(username);
             }

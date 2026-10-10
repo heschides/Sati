@@ -63,7 +63,7 @@ October 8 firewall-removal evidence; historical unchecked release items were not
 | Stable ID | Status | Work and acceptance owner |
 |---|---|---|
 | SATI-TEN-001 | planned | Structural tenant owners/composite constraints and shared/database-per-tenant/hybrid decision; [architecture](docs/architecture/identity.md), [structural review](SATI_STRUCTURAL_REVIEW_2026-09-28.md). Preserve current caseload/capability checks. |
-| SATI-WRK-001 | partial; missing-key recovery released; idle/wake design complete, policy review pending; broader W8 open | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [scheduling proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal), [working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-design). |
+| SATI-WRK-001 | partial; missing-key recovery released; idle/wake source implemented locally; broader W8 open | W8 workload isolation, agency/account fairness, API admission, global/tenant budgets and synthetic multi-host/load proof; [scheduling implementation](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-implementation), [working evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-implementation). |
 | SATI-OPS-001 | activation/evidence pending | Watchdog publication, named-owner notification/absence evidence and enabled-worker expectations; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-REC-001 | evidence pending | Complete-service recovery, approved RPO/RTO, protected SQL/blob/key inventories, restore/cutover/later-write/external-send reconciliation; [operations](OPERATIONS.md), [readiness](docs/readiness/README.md). |
 | SATI-IDEM-001 | investigation/evidence pending | End-to-end command identity: durable scoped request keys and fingerprints, replay/race conflicts, outbox/inbox intent, lease/fencing ownership, ambiguous external sends and provider reconciliation; [protocol baseline](docs/readiness/protocol-baseline.md), [readiness method](docs/readiness/readiness-method.md). Idempotency is assessed separately from source-only assertions or literal exactly-once claims. |
@@ -96,34 +96,33 @@ authorization requirements; no release outcome is established by this invocation
 
 **Next eligible item:** SATI-WRK-001
 
-**Eligibility:** the approved missing-key account recovery is included in completed release 1.3.39;
-[DEC-0235](docs/decisions/current/2026-10-09-DEC-0235.md) retains its authority and
-[the environment inventory](DATABASE_ENVIRONMENTS.md#1339-controlled-demo-rollout--october-9-2026)
-owns dated rollout facts. Dispatch activation remains separate. The October 9 idle/wake design
-is now complete at audited source `d223b1736df18202e397cea53a328984c50c3416`;
-[DEC-0236](docs/decisions/current/2026-10-09-DEC-0236.md) records the concrete **proposed** policy.
+**Eligibility:** missing-key account recovery is included in completed release 1.3.39. The later
+approved idle/wake slice is implemented locally under [DEC-0237](docs/decisions/current/2026-10-09-DEC-0237.md).
+[W8](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-implementation) and the
+[working ledger](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-implementation)
+own source acceptance and its limits; the environment inventory owns deployment facts. Dispatch
+activation, aggregate capacity and sustained fairness remain open.
 
-**Bounded slice:** review/adopt or amend [the idle/wake/activity/due proposal](BACKGROUND_WORKERS_HANDOFF.md#october-9--dispatch-idle-wake-scheduling-proposal),
-especially its inactivity tradeoff and signal allowlist. Once explicitly adopted, the next local
-source slice implements only this scheduling boundary in the existing API loop and validated/
-committed handlers, with fail-first hosted fake-time/race and private synthetic SQL acceptance.
-Until then, runtime cadence is blocked on that policy decision; do not infer adoption from design
-completion or a request to start unrelated work. No new wake ping, heartbeat, scheduler, shorter
-polling, schema, live load, cloud setting, release or dispatch activation belongs to this slice.
+**Bounded slice:** inventory and design fair dispatch selection under sustained ready backlog and
+lease contention. Define eligible agency/account lanes, persisted versus process-local selection
+state, preserved reset/account/dispatch admission order, cold-start behavior and a conditional
+turn bound for healthy work. Inventory existing indexes/query shape and synthetic test seams;
+recommend a concrete policy with alternatives and dependencies for review. This is a reversible
+local source/design slice, not authorization to implement an unreviewed fairness policy.
 
-**Dependencies and owners:** [W8](BACKGROUND_WORKERS_HANDOFF.md), D1–D4,
-[operations](OPERATIONS.md), supported compatible host/schema versions and approved publishers.
-Inventory found no general trusted presence service; authenticated allowlisted request activity
-is a bounded contract, not proof of human presence. Typed turn outcomes must distinguish empty
-work from contention/failure. Existing billing/readiness/lease/uncertainty gates remain unchanged.
-Broader fair selection, global/tenant budgets, API admission, sustained-load and owner alerts
-remain open and do not follow from adopting this proposal.
+**Dependencies and owners:** current typed scheduling outcomes and activity/pacing boundary,
+D1–D4, [W8](BACKGROUND_WORKERS_HANDOFF.md), [operations](OPERATIONS.md), current billing compliance,
+readiness and uncertainty gates. Fair selection must not infer account failure from contention,
+replay uncertain sends or create unbounded tenant maps. No measured latency/resource guarantee
+can be claimed from a turn-count proposal. Broader budgets, request admission, full operation
+bounds, configuration consistency and owner load/alert evidence retain their separate work.
 
-**Boundaries and completion evidence:** [dated design evidence](docs/readiness/work-evidence.md#2026-10-09--sati-wrk-001-dispatch-idle-wake-design)
-records actual source/structure checks and explicitly **unrun** scheduling acceptance. Future
-implementation must measure zero dormant scheduling SQL, finite active turns, due boundaries,
-lost-hint/cross-host/startup/suspend behavior and safe cancellation without touching working data.
-Follow [standing upkeep](AGENTS.md#standing-work-and-documentation-upkeep); no sealed score changes.
+**Boundaries and completion evidence:** a source-grounded lane/lock inventory, recommended bounded
+selection policy, dependencies and fail-first/private SQL acceptance plan; review its adoption
+before runtime implementation. Run documentation structure and negative checks and source drift
+checks. No schema, database access, real data, hosting, vendor call, cloud/security setting, release
+or dispatch activation is part of this design slice. Follow [standing upkeep](AGENTS.md#standing-work-and-documentation-upkeep);
+sealed release scores remain unchanged.
 
 ## Preserved open-work inventory
 

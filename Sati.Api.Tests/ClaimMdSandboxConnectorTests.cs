@@ -596,12 +596,17 @@ internal sealed class ManualTimeProvider : TimeProvider
     private readonly object _gate = new();
     private readonly List<ManualTimer> _timers = [];
     private long _elapsedTicks;
+    private TimeSpan _utcOffset;
     public int CreatedTimerCount { get; private set; }
     public int ActiveTimerCount { get { lock (_gate) return _timers.Count(timer => timer.DueTicks != long.MaxValue); } }
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;
     public override long GetTimestamp() { lock (_gate) return _elapsedTicks; }
-    public override DateTimeOffset GetUtcNow() =>
-        new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.Zero).AddTicks(GetTimestamp());
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (_gate) return new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.Zero)
+            .AddTicks(_elapsedTicks).Add(_utcOffset);
+    }
+    public void ShiftUtc(TimeSpan offset) { lock (_gate) _utcOffset += offset; }
 
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {

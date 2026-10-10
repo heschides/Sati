@@ -283,9 +283,10 @@ public sealed partial class ClearinghouseDispatchApiTests
 
     private static async Task<Fixture> CreatePreflightFixtureAsync(ControlledPreflightKeys keys,
         IKeyWrapper? wrapper = null, Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor? interceptor = null,
-        bool sqlServer = false)
+        bool sqlServer = false, IDemoWorkerResetCoordination? coordination = null)
     {
-        var fixture = await Fixture.CreateAsync(sqlServer: sqlServer, interceptor: interceptor, keyWrapper: wrapper, keySource: keys);
+        var fixture = await Fixture.CreateAsync(sqlServer: sqlServer, interceptor: interceptor,
+            keyWrapper: wrapper, keySource: keys, coordination: coordination);
         try
         {
             await using (var db = fixture.Factory.OpenDatabase())
